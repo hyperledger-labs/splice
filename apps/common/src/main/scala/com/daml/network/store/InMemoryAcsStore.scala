@@ -9,8 +9,8 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   InterfaceCompanion,
 }
-import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Template, Transaction}
-import com.daml.network.util.JavaContract
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.network.util.{JavaContract, Trees}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,7 +20,6 @@ import monocle.macros.syntax.lens.*
 import scala.collection.immutable.SortedMap
 import scala.collection.{immutable, mutable}
 import scala.concurrent.*
-import scala.jdk.CollectionConverters.*
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
@@ -97,7 +96,7 @@ class InMemoryAcsStore(
       }
 
     override def ingestTransaction(
-        tx: Transaction
+        tx: TransactionTree
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestTransaction(tx, contractFilter.contains)
@@ -317,7 +316,7 @@ object InMemoryAcsStore {
       )
     }
 
-    def ingestArchivedEvent(ev: ArchivedEvent): (State, Boolean) =
+    def ingestArchivedEvent(ev: ExercisedEvent): (State, Boolean) =
       createEventsById.get(ev.getContractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
@@ -396,7 +395,7 @@ object InMemoryAcsStore {
 
     /** Ingest a transaction while filtering out create events that do not satisfy the given predicate. */
     def ingestTransaction(
-        tx: Transaction,
+        tx: TransactionTree,
         p: CreatedEvent => Boolean,
     ): (State, (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -404,26 +403,28 @@ object InMemoryAcsStore {
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredArchivedEvents = 0
       val ingestedCreatedEvents = mutable.ListBuffer[CreatedEvent]()
-      val ingestedArchivedEvents = mutable.ListBuffer[ArchivedEvent]()
+      val ingestedArchivedEvents = mutable.ListBuffer[ExercisedEvent]()
 
-      val stNew = tx.getEvents.asScala.foldLeft(this)((st, ev) =>
-        ev match {
-          case ev: CreatedEvent if p(ev) =>
+      val stNew = Trees.foldTree(tx, this)(
+        (st, ev, _) =>
+          if (p(ev)) {
             ingestedCreatedEvents.append(ev)
             st.ingestCreatedEvent(ev)
-          case _: CreatedEvent =>
+          } else {
             numFilteredCreatedEvents += 1
             st
-          case ev: ArchivedEvent =>
+          },
+        (st, ev, _) =>
+          if (ev.isConsuming) {
             val (newSt, ingested) = st.ingestArchivedEvent(ev)
             if (ingested)
               ingestedArchivedEvents.append(ev)
             else
               numFilteredArchivedEvents += 1
             newSt
-          case _ =>
-            throw new IllegalArgumentException(s"Encountered unknown event: $ev")
-        }
+          } else {
+            st
+          },
       )
       val offsetsToRemove = stNew.computeOffsetsToRemove(tx.getOffset)
       val newOffset = Some(tx.getOffset)
@@ -469,7 +470,7 @@ object InMemoryAcsStore {
       txId: Option[String],
       ingestedCreatedEvents: mutable.ListBuffer[CreatedEvent],
       numFilteredCreatedEvents: Int,
-      ingestedArchivedEvents: mutable.ListBuffer[ArchivedEvent],
+      ingestedArchivedEvents: mutable.ListBuffer[ExercisedEvent],
       numFilteredArchivedEvents: Int,
       offset: Option[String],
       newAcsSize: Int,

@@ -149,7 +149,7 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     param("payload", _.getArguments),
   )
 
-  implicit def prettyArchivedEvent: Pretty[javaapi.data.ArchivedEvent] = prettyOfClass(
+  implicit def prettyExercisedEvent: Pretty[javaapi.data.ExercisedEvent] = prettyOfClass(
     param("contractId", ev => prettyContractIdString.treeOf(ev.getContractId)),
     param("templateId", _.getTemplateId),
   )

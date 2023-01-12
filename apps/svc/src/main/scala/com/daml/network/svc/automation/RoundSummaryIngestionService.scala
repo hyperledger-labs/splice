@@ -1,9 +1,8 @@
 package com.daml.network.svc.automation
 
-import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
+import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, TransactionTree}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.coin.TransferResult
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.store.AuditLogIngestionSink
 import com.daml.network.svc.store.SvcEventsStore
@@ -17,7 +16,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class RoundSummaryIngestionService(
     svcParty: PartyId,
-    connection: CoinLedgerConnection,
     store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -29,12 +27,11 @@ class RoundSummaryIngestionService(
   override def templateIds: Seq[Identifier] =
     Seq(cc.coin.Coin.TEMPLATE_ID, cc.coin.LockedCoin.TEMPLATE_ID)
 
-  override def processTransaction(tx: Transaction)(implicit
+  override def processTransaction(tx: TransactionTree)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
-      transfers <- traverseForest(tree)
+      transfers <- traverseForest(tx)
       _ <- store.addTransfers(transfers)
     } yield ()
   }

@@ -36,7 +36,7 @@ class ScanAutomationService(
   registerService(
     new AuditLogIngestionService(
       "Scan:ReadCoinTransactionsService",
-      new CoinTransactionsIngestionSink(svcParty, connection, store.history, loggerFactory),
+      new CoinTransactionsIngestionSink(svcParty, store.history, loggerFactory),
       connection,
       retryProvider,
       loggerFactory,

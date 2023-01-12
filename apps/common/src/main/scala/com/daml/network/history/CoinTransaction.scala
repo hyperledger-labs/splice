@@ -1,13 +1,7 @@
 package com.daml.network.history
 
 import cats.syntax.traverse._
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  ExercisedEvent,
-  Transaction,
-  TransactionTree,
-  TreeEvent,
-}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -88,7 +82,7 @@ case class TransactionMetadata(
 }
 
 object TransactionMetadata {
-  def apply(tx: Transaction): TransactionMetadata = {
+  def apply(tx: TransactionTree): TransactionMetadata = {
     val effectiveAt = Timestamp.of(tx.getEffectiveAt.getEpochSecond, tx.getEffectiveAt.getNano)
     TransactionMetadata(
       tx.getTransactionId,

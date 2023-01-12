@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.{Identifier, Transaction}
+import com.daml.ledger.javaapi.data.{Identifier, TransactionTree}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -19,7 +19,7 @@ trait AuditLogIngestionSink {
     * Long-running computations or blocking calls should be spawned off into an asynchronous computation
     * so that the service itself can synchronize its closing with the spawned-off computation if needed.
     */
-  def processTransaction(tx: Transaction)(implicit
+  def processTransaction(tx: TransactionTree)(implicit
       traceContext: TraceContext
   ): Future[Unit]
 }

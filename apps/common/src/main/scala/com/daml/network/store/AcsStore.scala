@@ -17,7 +17,7 @@ import com.daml.ledger.javaapi.data.{
   Identifier,
   InclusiveFilter,
   Template,
-  Transaction,
+  TransactionTree,
   TransactionFilter,
 }
 import com.daml.network.util.JavaContract
@@ -289,7 +289,7 @@ object AcsStore {
     def getLastIngestedOffset: Future[Option[String]]
 
     /** Ingest a transaction served by the transaction stream. */
-    def ingestTransaction(tx: Transaction)(implicit traceContext: TraceContext): Future[Unit]
+    def ingestTransaction(tx: TransactionTree)(implicit traceContext: TraceContext): Future[Unit]
   }
 
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */

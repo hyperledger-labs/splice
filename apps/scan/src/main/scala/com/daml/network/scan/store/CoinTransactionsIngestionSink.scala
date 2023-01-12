@@ -4,13 +4,11 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   ExercisedEvent,
   Identifier,
-  Transaction,
   TransactionTree,
   TreeEvent,
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.store.{AuditLogIngestionSink, CCHistoryStore}
 import com.daml.network.util.{ExerciseNode, JavaContract => Contract, Trees}
@@ -26,7 +24,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class CoinTransactionsIngestionSink(
     party: PartyId,
-    connection: CoinLedgerConnection,
     store: CCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -44,12 +41,11 @@ class CoinTransactionsIngestionSink(
     * - traverse the corresponding TransactionTree to find the creates and archives and then add them to TxStore with the context
     * derived from the full transaction tree
     */
-  override def processTransaction(tx: Transaction)(implicit
+  override def processTransaction(tx: TransactionTree)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      tree <- connection.tryGetTransactionTreeById(Seq(party), tx.getTransactionId)
-      events <- traverseForest(tree)
+      events <- traverseForest(tx)
       metadata = TransactionMetadata(tx)
       _ <-
         if (events.nonEmpty) {

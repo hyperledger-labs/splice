@@ -48,7 +48,6 @@ class SvcAutomationService(
       "svcRoundSummaryCollectionService",
       new RoundSummaryIngestionService(
         store.svcParty,
-        connection,
         store.events,
         loggerFactory,
       ),

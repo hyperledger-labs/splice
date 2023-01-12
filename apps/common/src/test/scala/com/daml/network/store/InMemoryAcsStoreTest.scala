@@ -3,7 +3,13 @@ package com.daml.network.store
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Event, Transaction}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  TransactionTree,
+  TreeEvent,
+  Unit => damlUnit,
+}
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
@@ -83,12 +89,19 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
 
   def toArchivedEvent[TCid <: ContractId[T], T](
       contract: JavaContract[TCid, T]
-  ): ArchivedEvent = {
-    new ArchivedEvent(
+  ): ExercisedEvent = {
+    new ExercisedEvent(
       eventId = "dummyEventId",
       contractId = contract.contractId.contractId,
       templateId = contract.identifier,
+      interfaceId = None.toJava,
       witnessParties = Seq.empty.asJava,
+      consuming = true,
+      choice = "DummyChoiceName",
+      choiceArgument = damlUnit.getInstance(),
+      exerciseResult = damlUnit.getInstance(),
+      actingParties = Seq.empty.asJava,
+      childEventIds = Seq.empty.asJava,
     )
   }
 
@@ -114,16 +127,20 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
 
   val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
-  private def mkTx(offset: String, events: Seq[Event]): Transaction = new Transaction(
-    transactionId = "",
-    commandId = "",
-    workflowId = "",
-    effectiveAt = effectiveAt,
-    offset = offset,
-    events = events.asJava,
-  )
+  private def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
+    val eventsById = events.zipWithIndex.map { case (e, i) => s"$i" -> e }.toMap
+    new TransactionTree(
+      transactionId = "",
+      commandId = "",
+      workflowId = "",
+      effectiveAt = effectiveAt,
+      offset = offset,
+      eventsById = eventsById.asJava,
+      rootEventIds = eventsById.keys.toList.asJava,
+    )
+  }
 
-  val tx1: Transaction = mkTx(
+  val tx1: TransactionTree = mkTx(
     tx1Offset,
     Seq(
       filteredAppRewards.map(toCreatedEvent),
@@ -135,17 +152,17 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   private def mkCreateTx[TCid <: ContractId[T], T](
       offset: String,
       createRequests: Seq[JavaContract[TCid, T]],
-  ) = mkTx(offset, createRequests.map[Event](toCreatedEvent))
+  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
 
-  val tx2: Transaction = mkTx(
+  val tx2: TransactionTree = mkTx(
     tx2Offset,
     Seq(mkValidatorReward(100))
       .map(toCreatedEvent)
       .appendedAll(filteredAppRewards.map(toArchivedEvent)),
   )
-  val tx3: Transaction = mkCreateTx(tx3Offset, validatorRewardsForTxs)
-  val tx4: Transaction = mkCreateTx(tx4Offset, Seq(mkValidatorReward(5)))
-  val tx5: Transaction = mkCreateTx(tx5Offset, Seq(mkValidatorReward(6)))
+  val tx3: TransactionTree = mkCreateTx(tx3Offset, validatorRewardsForTxs)
+  val tx4: TransactionTree = mkCreateTx(tx4Offset, Seq(mkValidatorReward(5)))
+  val tx5: TransactionTree = mkCreateTx(tx5Offset, Seq(mkValidatorReward(6)))
 
   val txFilter: AcsStore.ContractFilter = {
     import AcsStore.mkFilter

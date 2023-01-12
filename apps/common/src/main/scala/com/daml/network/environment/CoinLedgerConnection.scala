@@ -118,7 +118,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       subscriptionName: String,
       beginOffset: LedgerOffset,
       filter: Seq[PartyId],
-  )(f: Transaction => Future[Unit]): CoinLedgerSubscription
+  )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription
 
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
@@ -380,12 +380,12 @@ object CoinLedgerConnection {
           subscriptionName: String,
           beginOffset: LedgerOffset,
           parties: Seq[PartyId],
-      )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription = {
+      )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription = {
         makeSubscription(
           client.transactionTrees(
             new GetTransactionsRequest("", beginOffset, partyOnlyFilter(parties), false)
           ),
-          treesAsTransactions.via(mapOperator),
+          treesFromResponse.via(mapOperator),
           subscriptionName,
         )
       }
@@ -405,6 +405,13 @@ object CoinLedgerConnection {
           )
           .mapConcat(identity)
           .map(flattenTree)
+
+      private def treesFromResponse: Flow[GetTransactionTreesResponse, TransactionTree, NotUsed] =
+        Flow
+          .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
+            _.getTransactions.asScala.toSeq
+          )
+          .mapConcat(identity)
 
       private def flattenTree(tree: TransactionTree): Transaction = {
         val events: mutable.Buffer[Event] = mutable.ListBuffer()
@@ -442,9 +449,9 @@ object CoinLedgerConnection {
           subscriptionName: String,
           beginOffset: LedgerOffset,
           filter: Seq[PartyId],
-      )(f: Transaction => Future[Unit]): CoinLedgerSubscription =
+      )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription =
         subscription(subscriptionName, beginOffset, filter)({
-          Flow[Transaction].mapAsync(1)(f)
+          Flow[TransactionTree].mapAsync(1)(f)
         })
 
       private def makeSubscription[S, T](
