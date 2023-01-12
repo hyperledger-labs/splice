@@ -46,6 +46,7 @@ message UserStatusRequest {
 message UserStatusResponse {
   string party_id = 1;
   bool user_onboarded = 2;
+  bool has_featured_app_right = 3;
 }
 
 message ListRequest {
@@ -247,3 +248,4 @@ message RedistributeResponse {
 message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
 }
+

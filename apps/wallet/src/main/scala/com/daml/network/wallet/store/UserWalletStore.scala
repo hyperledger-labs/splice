@@ -109,9 +109,16 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
     def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
       state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
     )
+
     acs
       .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
       .map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq)
+  }
+
+  def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[
+    Option[JavaContract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
+  ] = {
+    acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true)
   }
 }
 
@@ -132,12 +139,16 @@ object UserWalletStore {
   case class Key(
       /** The party-id of the SVC issuing CC managed by this end-user wallet. */
       svcParty: PartyId,
+
       /** The party-id of the wallet's service party */
       walletServiceParty: PartyId,
+
       /** The party-id of the wallet's validator */
       validatorParty: PartyId,
+
       /** The participant user name of the end-user */
       endUserName: String,
+
       /** The party-id of the end-user, which is the primary party of its participant user */
       endUserParty: PartyId,
   ) extends PrettyPrinting {
@@ -231,6 +242,10 @@ object UserWalletStore {
         mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
+        ),
+        // Featured app right
+        mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+          co.payload.svc == svc && co.payload.provider == endUser
         ),
       ),
       Map(

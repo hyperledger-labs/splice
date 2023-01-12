@@ -61,12 +61,16 @@ class SplitwiseIntegrationTest
         Seq(bobUserParty, charlieUserParty),
       )
 
-      eventually() { bobSplitwise.listGroupInvites() should not be empty }
+      eventually() {
+        bobSplitwise.listGroupInvites() should not be empty
+      }
       inside(bobSplitwise.listGroupInvites()) { case Seq(invite) =>
         bobSplitwise.acceptInvite(invite.contractId)
       }
 
-      eventually() { aliceSplitwise.listAcceptedGroupInvites("group1") should not be empty }
+      eventually() {
+        aliceSplitwise.listAcceptedGroupInvites("group1") should not be empty
+      }
       inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
         aliceSplitwise.joinGroup(accepted.contractId)
       }

@@ -25,55 +25,76 @@ trait CommonCoinAppInstanceReferences {
   def svc(implicit env: CoinTestConsoleEnvironment): SvcAppBackendReference = env.svcOpt.getOrElse(
     sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
   )
+
   def svcClient(implicit env: CoinTestConsoleEnvironment): SvcAppClientReference =
     env.remoteSvcOpt.getOrElse(
       sys.error(
         "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
       )
     )
+
   def sv1(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
+
   def sv2(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv2")
+
   def sv3(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv3")
+
   def sv4(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
+
   def scan(implicit env: CoinTestConsoleEnvironment): ScanAppBackendReference =
     env.scans.local.headOption.getOrElse(
       sys.error(
         "Tried to access the Scan app but it isn't defined in the test's configuration file"
       )
     )
+
   def aliceWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
     "aliceWalletBackend"
   )
+
   def aliceWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
   )
+
   def aliceValidatorWallet(implicit
       env: CoinTestConsoleEnvironment
   ): WalletAppClientReference = wc(
     "aliceValidatorWallet"
   )
+
   def aliceValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "aliceValidator"
   )
+
   def bobWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
     "bobWalletBackend"
   )
+
   def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "bobWallet"
   )
+
   def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "charlieWallet"
   )
+
   def bobValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "bobValidator"
   )
+
   def directoryValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
     v(
       "directoryValidator"
     )
+
   def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
     v(
       "splitwiseValidator"
+    )
+
+  def splitwiseProviderWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
+    uwc(
+      "splitwiseProviderWallet"
     )
 
   def directory(implicit

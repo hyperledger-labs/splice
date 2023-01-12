@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.util.{JavaContract => Contract, Proto}
+import com.daml.network.util.{Proto, JavaContract as Contract}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.daml.network.wallet.v0.{
@@ -31,6 +31,7 @@ object GrpcWalletAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = WalletServiceStub
+
     override def createService(channel: ManagedChannel): WalletServiceStub =
       v0.WalletServiceGrpc.stub(channel)
   }
@@ -349,13 +350,16 @@ object GrpcWalletAppClient {
       main: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
       state: SubscriptionState,
   )
+
   sealed trait SubscriptionState extends Product with Serializable;
+
   final case class SubscriptionIdleState(
       contract: Contract[
         subsCodegen.SubscriptionIdleState.ContractId,
         subsCodegen.SubscriptionIdleState,
       ]
   ) extends SubscriptionState;
+
   final case class SubscriptionPayment(
       contract: Contract[
         subsCodegen.SubscriptionPayment.ContractId,
@@ -711,6 +715,7 @@ object GrpcWalletAppClient {
   case class UserStatusData(
       party: String,
       userOnboarded: Boolean,
+      hasFeaturedAppRight: Boolean,
   )
 
   case class UserStatus()
@@ -727,7 +732,7 @@ object GrpcWalletAppClient {
     override def handleResponse(
         response: v0.UserStatusResponse
     ): Either[String, UserStatusData] = Right(
-      UserStatusData(response.partyId, response.userOnboarded)
+      UserStatusData(response.partyId, response.userOnboarded, response.hasFeaturedAppRight)
     )
   }
 

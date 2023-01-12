@@ -2,8 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.digitalasset.canton.console.CommandFailure
+import com.daml.network.util.WalletTestUtil
 
-class SvcIntegrationTest extends CoinIntegrationTest {
+class SvcIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   "restart cleanly" in { implicit env =>
     // TODO(tech-debt): share tests for common properties of CoinApps, like restartabilty
@@ -20,7 +21,10 @@ class SvcIntegrationTest extends CoinIntegrationTest {
   }
 
   "manage featured app rights" in { implicit env =>
+    onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
+
     scan.listFeaturedAppRights() should be(empty)
+    splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
 
     val splitwiseProvider = providerSplitwiseBackend.getProviderPartyId()
     actAndCheck(
@@ -33,6 +37,7 @@ class SvcIntegrationTest extends CoinIntegrationTest {
         inside(scan.listFeaturedAppRights()) { case Seq(r) =>
           r.payload.provider shouldBe splitwiseProvider.toProtoPrimitive
         }
+        splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
       },
     )
 
