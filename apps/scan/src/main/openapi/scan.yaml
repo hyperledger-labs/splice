@@ -1,0 +1,139 @@
+openapi: 3.0.0
+info:
+  title: Scan API
+  version: 0.0.1
+tags:
+  - name: scan
+paths:
+  /svc-party-id:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getSvcPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSvcPartyIdResponse"
+  /transaction-details/{transaction_id}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getCoinTransactionDetails"
+      parameters:
+        - name: "transaction_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetCoinTransactionDetailsResponse"
+        "404":
+          description: not_found
+  /closed-rounds:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getClosedRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetClosedRoundsResponse"
+  /transfer-context:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTransferContextResponse"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTransferContextResponse"
+  /featured-apps:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listFeaturedAppRights"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
+components:
+  schemas:
+    GetSvcPartyIdResponse:
+      type: object
+      required: ["svc_party_id"]
+      properties:
+        svc_party_id:
+          type: string
+    GetCoinTransactionDetailsResponse:
+      type: object
+      required: ["tree"]
+      properties:
+        tree:
+          "$ref": "#/components/schemas/TransactionTree"
+    GetClosedRoundsResponse:
+      type: object
+      required: ["rounds"]
+      properties:
+        rounds:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+    GetTransferContextResponse:
+      type: object
+      properties:
+        coin_rules:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        latest_open_mining_round:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        open_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+      required: ["coin_rules", "latest_open_mining_round", "open_mining_rounds"]
+    ListFeaturedAppRightsResponse:
+      type: object
+      required: ["featured_apps"]
+      properties:
+        featured_apps:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+    TransactionTree:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+        command_id:
+          type: string
+        workflow_id:
+          type: string
+        effective_at:
+          type: string
+          format: date-time
+        offset:
+          type: string
+        events_by_id:
+          type: object
+          additionalProperties:
+            type: object
+        root_event_ids:
+          type: array
+          items:
+            type: string

@@ -8,7 +8,10 @@ import "com/daml/network/v0/contract.proto";
 
 service ScanService {
   rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
+
+  // TODO(#2115) leave getHistory as a grpc endpoint when switching the scan service to HTTP APIs, as it will get dropped
   rpc GetHistory (google.protobuf.Empty) returns (GetHistoryResponse);
+
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
   rpc GetTransferContext (google.protobuf.Empty) returns (GetTransferContextResponse);

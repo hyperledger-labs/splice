@@ -301,6 +301,19 @@ lazy val `apps-scan` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/scan/src/main/openapi/scan.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+          ScalaClient(
+            new File("apps/scan/src/main/openapi/scan.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
 
 lazy val `apps-common-frontend` = {
