@@ -603,3 +603,13 @@ It will expect the following environment variables:
 
 - `CN_APP_<APP>_LEDGER_API_AUTH_CLIENT_ID`: client ID of the given auth0 application on the [dev tenant](https://manage.auth0.com/dashboard/us/canton-network-dev).
 - `CN_APP_<APP>_LEDGER_API_AUTH_CLIENT_SECRET`: client secret of the given auth0 application on the [dev tenant](https://manage.auth0.com/dashboard/us/canton-network-dev).
+
+## Canton Metrics
+
+We expose prometheus metrics for our three participants and the domain on the following urls:
+
+- svc participant: http://$cluster.network.canton.global:10013/metrics
+- validator1 participant: http://$cluster.network.canton.global:10113/metrics
+- splitwise participant: http://$cluster.network.canton.global:10213/metrics
+- domain: http://$cluster.network.canton.global:10313/metrics
+

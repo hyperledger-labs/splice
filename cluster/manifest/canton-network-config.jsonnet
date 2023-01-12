@@ -32,6 +32,11 @@ local svcDeployments(config) = [
         name: 'cd-adm-api',
         port: 5009,
       },
+      {
+        name: 'cd-metrics',
+        port: 10013,
+        externalPort: 10313,
+      },
     ],
     ext={
       readinessProbe: {
@@ -64,6 +69,11 @@ local svcDeployments(config) = [
     {
       name: 'cp-lg-api',
       port: 5001,
+    },
+    {
+      name: 'cp-metrics',
+      port: 10013,
+      externalPort: 10013,
     },
   ], memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
     authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_USER_NAME'],
@@ -123,6 +133,11 @@ local validator1Deployments(config) = [
       name: 'val1-lg-api',
       port: 5001,
       externalPort: 5101,
+    },
+    {
+      name: 'val1-metrics',
+      port: 10013,
+      externalPort: 10113,
     },
   ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='val1-lg-api', extraEnvVars=[
     authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME'],
@@ -190,6 +205,11 @@ local splitwiseDeployments(config) = [
       name: 'sw-lg-api',
       port: 5001,
       externalPort: 5201,
+    },
+    {
+      name: 'sw-metrics',
+      port: 10013,
+      externalPort: 10213,
     },
   ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='sw-lg-api', extraEnvVars=[
     authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
