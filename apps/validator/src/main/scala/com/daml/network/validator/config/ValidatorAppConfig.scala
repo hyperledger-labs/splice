@@ -3,6 +3,7 @@ package com.daml.network.validator.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
+  CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
   LocalCoinConfig,
   RemoteCoinConfig,
@@ -36,7 +37,7 @@ case class ValidatorAppBackendConfig(
 }
 
 case class ValidatorAppClientConfig(
-    adminApi: ClientConfig
+    adminApi: CoinHttpClientConfig
 ) extends RemoteCoinConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

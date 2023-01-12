@@ -1,7 +1,12 @@
 package com.daml.network.admin.api.client
 
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.Materializer
+import cats.data.EitherT
+import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.version.GrpcVersionClient
 import com.daml.network.environment.BuildInfo
+import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
@@ -11,7 +16,7 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 /** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
   */
@@ -27,7 +32,6 @@ abstract class AppConnection(
     logger,
     s"$serviceName connection",
   )
-
   checkVersionCompatibility()
 
   private def checkVersionCompatibility() = {
@@ -61,6 +65,23 @@ abstract class AppConnection(
       err => Future.failed(new StatusRuntimeException(Status.INTERNAL.withDescription(err))),
       Future.successful(_),
     )
+
+  protected def runHttpCmd[Res, Result](
+      url: String,
+      command: HttpCommand[Res, Result],
+  )(implicit
+      templateDecoder: TemplateJsonDecoder,
+      httpClient: HttpRequest => Future[HttpResponse],
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): EitherT[Future, String, Result] = {
+    val client: command.Client = command.createClient(url)
+
+    for {
+      response <- command.submitRequest(client).leftMap(_.toString)
+      result <- EitherT.fromEither[Future](command.handleResponse(response))
+    } yield result
+  }
 
   // This adapted from GrpcCtlRunner but keeps the actual grpc exception
   // instead of turning everything into a String.

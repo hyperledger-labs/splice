@@ -208,7 +208,7 @@ lazy val `apps-validator` =
       `wallet-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
         List(
@@ -216,6 +216,7 @@ lazy val `apps-validator` =
             new File("apps/validator/src/main/openapi/validator.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
+            customExtraction = true,
           ),
           ScalaClient(
             new File("apps/validator/src/main/openapi/validator.yaml"),

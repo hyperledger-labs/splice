@@ -66,7 +66,7 @@ class SplitwiseApp(
     readAs <- connection.getUserReadAs(config.providerUser)
     scanConnection =
       new ScanConnection(
-        config.remoteScan.clientAdminApi,
+        config.remoteScan.adminApi,
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )

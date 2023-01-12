@@ -50,7 +50,7 @@ final class AuthInterceptor(
           headers,
           nextListener,
         )
-      };
+      }
       case Left(error) => {
         logger.info(s"Could not validate token: $error")
         val status = com.google.rpc.Status

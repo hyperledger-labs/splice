@@ -4,6 +4,7 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AuthTokenSourceConfig,
   AutomationConfig,
+  CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
   LocalCoinConfig,
   RemoteCoinConfig,
@@ -32,9 +33,9 @@ case class WalletAppBackendConfig(
 
 // Inlined to avoid a dependency
 case class WalletRemoteValidatorAppConfig(
-    adminApi: ClientConfig
+    adminApi: CoinHttpClientConfig
 ) extends RemoteCoinConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
 case class WalletAppClientConfig(

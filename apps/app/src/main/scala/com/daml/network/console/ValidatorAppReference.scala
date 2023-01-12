@@ -1,9 +1,14 @@
 package com.daml.network.console
 
+import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
+import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
-import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
+import com.daml.network.validator.admin.api.client.commands.{
+  GrpcValidatorAppClient,
+  HttpValidatorAppClient,
+}
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -15,7 +20,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 abstract class ValidatorAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends HttpCoinAppReference {
 
   override protected val instanceType = "Validator"
 
@@ -26,7 +31,9 @@ abstract class ValidatorAppReference(
   @Help.Description("Return the user info of the validator operator")
   def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.GetValidatorUserInfo(), callCredentials)
+      httpCommand(
+        HttpValidatorAppClient.GetValidatorUserInfo(List(Authorization(OAuth2BearerToken(token))))
+      )
     }
   }
 
@@ -40,7 +47,9 @@ abstract class ValidatorAppReference(
                       |Return the newly set up partyId.""".stripMargin)
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user), callCredentials)
+      httpCommand(
+        HttpValidatorAppClient.OnboardUser(user, List(Authorization(OAuth2BearerToken(token))))
+      )
     }
   }
 
@@ -66,6 +75,14 @@ final class ValidatorAppBackendReference(
       user = config.damlUser,
     )
   }
+
+  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+    // For local references, we assume that they are reachable on localhost.
+    // TODO (#2019) Reconsider if we want these for local refs at all and if so
+    // if we should specify a url here.
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 2000}",
+    config.clientAdminApi,
+  )
 
   protected val nodes = consoleEnvironment.environment.validators
 
@@ -105,6 +122,8 @@ final class ValidatorAppClientReference(
 ) extends ValidatorAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override def httpClientConfig = config.adminApi
 
   override def token: String = ""
 

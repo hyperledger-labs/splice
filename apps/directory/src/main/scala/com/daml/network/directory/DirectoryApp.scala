@@ -69,7 +69,7 @@ class DirectoryApp(
     for {
       scanConnection <- Future.successful(
         new ScanConnection(
-          config.remoteScan.clientAdminApi,
+          config.remoteScan.adminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )

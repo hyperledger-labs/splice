@@ -1,33 +1,27 @@
 package com.daml.network.validator
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.auth.{
-  AuthConfig,
-  AuthInterceptor,
-  HMACVerifier,
-  RSAVerifier,
-  SignatureVerifier,
-}
 import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
-import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
+import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.validator.v0.ValidatorAppServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -35,6 +29,18 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.{ServerInterceptors, Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import com.daml.network.auth.{
+  AuthConfig,
+  AuthExtractor,
+  AuthInterceptor,
+  HMACVerifier,
+  RSAVerifier,
+  SignatureVerifier,
+}
+import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc
+import com.digitalasset.canton.config.ProcessingTimeout
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -226,7 +232,7 @@ class ValidatorApp(
       scanConnection <-
         Future.successful(
           new ScanConnection(
-            config.remoteScan.clientAdminApi,
+            config.remoteScan.adminApi,
             coinAppParameters.processingTimeouts,
             loggerFactory,
           )
@@ -268,13 +274,41 @@ class ValidatorApp(
       )
       _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
-    } yield {
 
-      val verifier: SignatureVerifier = config.auth match {
+      verifier: SignatureVerifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
+      routes = cors() {
+        ValidatorResource.routes(
+          new HttpValidatorHandler(
+            ledgerClient,
+            store,
+            validatorUserName = config.damlUser,
+            walletServiceUser = walletServiceUser,
+            retryProvider = retryProvider,
+            flagCloseable = this,
+            loggerFactory,
+          ),
+          AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+        )
+      }
+      httpConfig = config.adminApi.clientConfig.copy(
+        // TODO(#2019) Remove once we disabled gRPC Servers completely.
+        // + 2000 since envoy frontends runs on + 1000
+        port = config.adminApi.port + 2000
+      )
+      _ = logger.info(s"Starting http server on ${httpConfig}")
+      binding <- Http()
+        .newServerAt(
+          httpConfig.address,
+          httpConfig.port.unwrap,
+        )
+        .bind(
+          routes
+        )
+    } yield {
       adminServerRegistry
         .addService(
           ServerInterceptors.intercept(
@@ -297,12 +331,15 @@ class ValidatorApp(
           )
         )
         .discard
+
       ValidatorApp.State(
         storage,
         store,
         automation,
         scanConnection,
+        binding,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
+        timeouts,
       )
     }
 
@@ -318,18 +355,21 @@ object ValidatorApp {
       store: ValidatorStore,
       automation: ValidatorAutomationService,
       scanConnection: ScanConnection,
+      binding: Http.ServerBinding,
       logger: TracedLogger,
-  ) extends AutoCloseable
+      timeouts: ProcessingTimeout,
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
+        AsyncCloseable("http binding", binding.unbind(), timeouts.shutdownNetwork.unwrap),
         automation,
         store,
         scanConnection,
         storage,
       )(logger)
-
   }
 }
