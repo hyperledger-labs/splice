@@ -36,7 +36,7 @@ private[validator] object ValidatorUtil {
     for {
       // TODO(#713): remove this workaround for missing `read-as-any-party` rights
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retryForAutomationGrpc(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case QueryResult(off, None) =>

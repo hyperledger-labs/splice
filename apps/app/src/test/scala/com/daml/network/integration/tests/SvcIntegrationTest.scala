@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
-import com.digitalasset.canton.console.CommandFailure
 import com.daml.network.util.WalletTestUtil
+import com.digitalasset.canton.console.CommandFailure
 
 class SvcIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 

@@ -1,8 +1,10 @@
 package com.daml.network.environment
 
+import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
+import com.daml.network.admin.api.client.AppConnection
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -27,7 +29,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
 
   import CoinRetries.{AutomationRetryConfig, RetryConfig}
 
-  val retryForAutomationConfig =
+  val retryForAutomationGrpcConfig =
     AutomationRetryConfig(
       RetryConfig(maxRetries = 35, initialDelay = 200.millis, maxDelay = 5.seconds),
       outerLoopDelay = 5.seconds,
@@ -36,11 +38,39 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     RetryConfig(maxRetries = 10, initialDelay = 100.millis, maxDelay = 1.seconds)
 
   /** A retry intended for automation calls, retries forever. */
-  def retryForAutomation[T](
+  def retryForAutomationGrpc[T](
       operationName: String,
       task: => Future[T],
       callingService: FlagCloseable,
       additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[T] =
+    retryForAutomation(
+      operationName,
+      task,
+      callingService,
+      CoinRetries.RetryableGrpcError(_, additionalCodes),
+    )
+
+  /** A retry intended for automation calls, retries forever. */
+  def retryForAutomationHttp[T](
+      operationName: String,
+      task: => Future[T],
+      callingService: FlagCloseable,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[T] =
+    retryForAutomation(operationName, task, callingService, CoinRetries.RetryableHttpError(_))
+
+  /** A retry intended for automation calls, retries forever. */
+  private def retryForAutomation[T](
+      operationName: String,
+      task: => Future[T],
+      callingService: FlagCloseable,
+      retryable: String => ExceptionRetryable,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -51,13 +81,13 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
         loggerFactory.getTracedLogger(callingService.getClass),
         callingService,
         Int.MaxValue, // This is special cased as infinite retries so don’t need to worry about overflows.
-        retryForAutomationConfig.outerLoopDelay,
+        retryForAutomationGrpcConfig.outerLoopDelay,
         operationName,
         longDescription = s"Outer retry loop for $operationName",
-      ).apply(task, CoinRetries.RetryableError(operationName, additionalCodes))
+      ).apply(task, retryable(operationName))
     }
     outerLoop(
-      retry(operationName, task, callingService, retryForAutomationConfig.config, additionalCodes)
+      retry(operationName, task, callingService, retryForAutomationGrpcConfig.config, retryable)
     )
   }
 
@@ -71,14 +101,20 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retry(operationName, task, callingService, retryForClientCallsConfig, additionalCodes)
+    retry(
+      operationName,
+      task,
+      callingService,
+      retryForClientCallsConfig,
+      CoinRetries.RetryableGrpcError(_, additionalCodes),
+    )
 
   private def retry[T](
       operationName: String,
       task: => Future[T],
       callingService: FlagCloseable,
       retryConfig: RetryConfig,
-      additionalCodes: Seq[Status.Code],
+      retryable: String => ExceptionRetryable,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -92,7 +128,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       retryConfig.initialDelay,
       retryConfig.maxDelay,
       operationName,
-    ).apply(task, CoinRetries.RetryableError(operationName, additionalCodes))
+    ).apply(task, retryable(operationName))
   }
 }
 
@@ -113,10 +149,40 @@ object CoinRetries {
     new CoinRetries(loggerFactory)
   }
 
+  case class RetryableHttpError(
+      operationName: String
+  ) extends ExceptionRetryable {
+
+    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = outcome match {
+      case Failure(
+            ex: StreamTcpException
+          ) =>
+        val msg =
+          s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): $ex"
+        logger.info(msg)
+        TransientErrorKind
+      case Failure(
+            ex: AppConnection.UnexpectedHttpResponse
+          ) =>
+        // TODO (tech-debt) Revisit whether we can provide more useful info here.
+        val msg =
+          s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): $ex"
+        logger.info(msg)
+        TransientErrorKind
+      case Failure(ex) =>
+        logger.warn(s"$operationName failed with an unknown exception, not retrying", ex)
+        FatalErrorKind
+      case util.Success(_) =>
+        NoErrorKind
+    }
+  }
+
   /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,
     *                        since we know that an external process is changing the system state.
     */
-  case class RetryableError(
+  case class RetryableGrpcError(
       operationName: String,
       additionalCodes: Seq[Status.Code],
   ) extends ExceptionRetryable {

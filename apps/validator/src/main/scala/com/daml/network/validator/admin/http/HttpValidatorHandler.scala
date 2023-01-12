@@ -1,16 +1,15 @@
 package com.daml.network.validator.admin.http
 
+import com.daml.ledger.javaapi.data.User
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.http.v0.{definitions, validator => v0}
+import com.daml.network.util.CoinUtil
+import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
-
-import com.daml.ledger.javaapi.data.User
-import com.daml.network.util.CoinUtil
-import com.daml.network.validator.util.ValidatorUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 

@@ -57,7 +57,7 @@ final class ValidatorConnection(
     prev match {
       case Some(userInfo) => Future.successful(userInfo)
       case None =>
-        val res = (for {
+        for {
           userInfo <- runHttpCmd(
             config.url,
             HttpValidatorAppClient.GetValidatorUserInfo(
@@ -68,12 +68,7 @@ final class ValidatorConnection(
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           validatorRef.set(Some(userInfo))
           userInfo
-        })
-
-        res.foldF(
-          error => Future.failed(new Exception(error)),
-          userInfo => Future.successful(userInfo),
-        )
+        }
     }
   }
 }

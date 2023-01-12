@@ -2,7 +2,6 @@ package com.daml.network.admin.api.client
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.version.GrpcVersionClient
 import com.daml.network.environment.BuildInfo
@@ -14,6 +13,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsy
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import com.digitalasset.canton.util.EitherTUtil
 import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -74,12 +74,14 @@ abstract class AppConnection(
       httpClient: HttpRequest => Future[HttpResponse],
       ec: ExecutionContext,
       mat: Materializer,
-  ): EitherT[Future, String, Result] = {
+  ): Future[Result] = {
     val client: command.Client = command.createClient(url)
-
     for {
-      response <- command.submitRequest(client).leftMap(_.toString)
-      result <- EitherT.fromEither[Future](command.handleResponse(response))
+      response <- EitherTUtil.toFuture(command.submitRequest(client).leftMap[Throwable] {
+        case Left(throwable) => throwable
+        case Right(response) => new AppConnection.UnexpectedHttpResponse(response)
+      })
+      result <- toFuture(command.handleResponse(response))
     } yield result
   }
 
@@ -108,4 +110,8 @@ abstract class AppConnection(
 
   protected def getAppVersion()(implicit traceContext: TraceContext): Future[String] =
     runCmd(GrpcVersionClient.GetVersion())
+}
+
+object AppConnection {
+  final class UnexpectedHttpResponse(response: HttpResponse) extends Throwable
 }

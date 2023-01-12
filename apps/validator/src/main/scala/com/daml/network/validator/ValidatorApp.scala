@@ -3,9 +3,18 @@ package com.daml.network.validator
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import cats.implicits.*
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.auth.{
+  AuthConfig,
+  AuthExtractor,
+  AuthInterceptor,
+  HMACVerifier,
+  RSAVerifier,
+  SignatureVerifier,
+}
 import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -14,11 +23,14 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
+import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -29,18 +41,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.{ServerInterceptors, Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import com.daml.network.auth.{
-  AuthConfig,
-  AuthExtractor,
-  AuthInterceptor,
-  HMACVerifier,
-  RSAVerifier,
-  SignatureVerifier,
-}
-import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
-import com.daml.network.validator.v0.ValidatorAppServiceGrpc
-import com.digitalasset.canton.config.ProcessingTimeout
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -163,7 +163,7 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[Unit] = {
     logger.info("Waiting for CoinRules contract to be created")
-    retryProvider.retryForAutomation(
+    retryProvider.retryForAutomationGrpc(
       "Wait for CoinRules",
       for {
         coinRulesResult <- store.lookupCoinRulesWithOffset()
@@ -191,7 +191,7 @@ class ValidatorApp(
     val coinRulesReq =
       new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
     retryProvider
-      .retryForAutomation(
+      .retryForAutomationGrpc(
         "createCoinRulesRequest",
         for {
           coinRulesResult <- store.lookupCoinRulesWithOffset()
@@ -238,7 +238,7 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection("ValidatorAppBootstrap")
-      svcParty <- retryProvider.retryForAutomation(
+      svcParty <- retryProvider.retryForAutomationGrpc(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

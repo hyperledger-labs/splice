@@ -1,13 +1,13 @@
 package com.daml.network.wallet
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{Http, HttpExt}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -100,12 +100,12 @@ class WalletApp(
           new JwtCallCredential(validatorAuthToken.getOrElse("")),
         )
       }
-      validatorUserInfo <- retryProvider.retryForAutomation(
-        "getValidatorPartyId",
+      validatorUserInfo <- retryProvider.retryForAutomationHttp(
+        "getValidatorUserInfo",
         validatorConnection.getValidatorUserInfo(),
         this,
       )
-      svcParty <- retryProvider.retryForAutomation(
+      svcParty <- retryProvider.retryForAutomationGrpc(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,
