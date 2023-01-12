@@ -1152,13 +1152,13 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - slack_context
+          - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
-          - slack_context
+          - slack-context
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -1189,13 +1189,13 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - slack_context
+          - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
-          - slack_context
+          - slack-context
     - deploy_cluster:
         <<: *main-branch-only
         context:
