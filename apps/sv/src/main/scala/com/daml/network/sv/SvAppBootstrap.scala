@@ -9,10 +9,7 @@ import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.metrics.SvAppMetrics
-import com.digitalasset.canton.concurrent.{
-  ExecutionContextIdlenessExecutorService,
-  FutureSupervisor,
-}
+import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -87,10 +84,8 @@ object SvAppBootstrap {
       svConfig: LocalSvAppConfig,
       svAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       svMetrics: SvAppMetrics,
       testingConfigInternal: TestingConfigInternal,
-      futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
       retryProvider: CoinRetries,

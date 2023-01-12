@@ -2,18 +2,12 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.store.AcsStore
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.memory.InMemorySvStore
-import com.daml.network.util.JavaContract as Contract
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.{Status, StatusRuntimeException}
 
-import java.time.{Duration, Instant}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Utility class grouping the two kinds of stores managed by the SvApp. */
 trait SvStore extends AutoCloseable {
@@ -27,62 +21,9 @@ trait SvStore extends AutoCloseable {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
 
-  def lookupCoinRulesWithOffset(
-  ): Future[
-    QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
-  ] =
-    acs.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true)
-
-  def getCoinRules(
-  )(implicit
-      ec: ExecutionContext
-  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
-    lookupCoinRulesWithOffset().map(
-      _.value.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active CoinRules contract")
-        )
-      )
-    )
-
-  /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
-  def lookupOpenMiningRoundTriple()(implicit
-      ec: ExecutionContext
-  ): Future[Option[SvStore.OpenMiningRoundTriple]] =
-    for {
-      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
-      result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
-        case Seq(oldest, middle, newest) =>
-          Some(SvStore.OpenMiningRoundTriple(oldest = oldest, middle = middle, newest = newest))
-        case _ => None
-      }
-    } yield result
-
-  /** List issuing mining rounds past their targetClosesAt */
-  def listExpiredIssuingMiningRounds(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[Contract[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound]]] =
-    acs
-      .listContracts(cc.round.IssuingMiningRound.COMPANION)
-      .map(
-        _.iterator
-          .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
-          .take(limit)
-          .toSeq
-      )
 }
 
 object SvStore {
-
-  case class RoundTotals(
-      transferFees: BigDecimal = 0.0,
-      adminFees: BigDecimal = 0.0,
-      holdingFees: BigDecimal = 0.0,
-      transferInputs: BigDecimal = 0.0,
-      nonSelfTransferOutputs: BigDecimal = 0.0,
-      selfTransferOutputs: BigDecimal = 0.0,
-  )
-
   def apply(
       svParty: PartyId,
       storage: Storage,
@@ -105,42 +46,8 @@ object SvStore {
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == sv),
         mkFilter(cc.coin.CoinRulesRequest.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.coin.ValidatorRight.COMPANION)(co =>
-          co.payload.svc == sv && co.payload.validator == sv && co.payload.user == sv
-        ),
-        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.coin.AppReward.COMPANION)(co => co.payload.svc == sv),
-        mkFilter(cc.coin.ValidatorReward.COMPANION)(co => co.payload.svc == sv),
+        // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ),
     )
-  }
-
-  type OpenMiningRoundContract =
-    Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
-
-  case class OpenMiningRoundTriple(
-      oldest: OpenMiningRoundContract,
-      middle: OpenMiningRoundContract,
-      newest: OpenMiningRoundContract,
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(param("oldest", _.oldest), param("middle", _.middle), param("newest", _.newest))
-
-    /** The time after which these can be advanced at assuming the given tick duration. */
-    def readyToAdvanceAt(tickDuration: Duration): Instant = {
-      Ordering[Instant].max(
-        oldest.payload.targetClosesAt,
-        Ordering[Instant].max(
-          // TODO(M3-07): when changing CoinConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
-          middle.payload.opensAt.plus(tickDuration),
-          newest.payload.opensAt,
-        ),
-      )
-    }
-
-    def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
   }
 }

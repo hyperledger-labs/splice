@@ -4,7 +4,7 @@ package com.daml.network.sv.v0;
 import "google/protobuf/empty.proto";
 
 service SvService {
-  // Returns some debug info about the running app
+  // TODO(M3-46): replace this stub with the first actual console command
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
 }
 
