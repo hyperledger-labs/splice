@@ -86,4 +86,13 @@ class SvcIntegrationTest extends CoinIntegrationTest {
     )
 
   }
+
+  "list connected domains of svc and sv app" in { implicit env =>
+    eventually() {
+      svc.listConnectedDomains().keySet shouldBe Set("da")
+    }
+    eventually() {
+      sv1.listConnectedDomains().keySet shouldBe Set("da")
+    }
+  }
 }

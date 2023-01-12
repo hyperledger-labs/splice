@@ -2,6 +2,7 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -54,6 +55,7 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
@@ -63,6 +65,7 @@ class ScanApp(
         clock,
         svcParty,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

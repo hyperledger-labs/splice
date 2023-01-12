@@ -2,6 +2,7 @@ package com.daml.network.svc
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
@@ -54,6 +55,7 @@ class SvcApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
@@ -65,6 +67,7 @@ class SvcApp(
         config,
         store,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

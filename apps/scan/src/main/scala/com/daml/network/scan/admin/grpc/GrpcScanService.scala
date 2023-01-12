@@ -7,6 +7,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.*
+import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.Spanning
@@ -88,6 +89,15 @@ class GrpcScanService(
         apps <- store.acs.listContracts(FeaturedAppRight.COMPANION)
       } yield {
         v0.ListFeaturedAppRightsResponse(apps.map(a => a.toProtoV0))
+      }
+    }
+
+  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { _ => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
       }
     }
 }

@@ -17,8 +17,8 @@ import com.daml.ledger.javaapi.data.{
   Identifier,
   InclusiveFilter,
   Template,
-  TransactionTree,
   TransactionFilter,
+  TransactionTree,
 }
 import com.daml.network.util.JavaContract
 import com.daml.network.util.PrettyInstances.PrettyContractId

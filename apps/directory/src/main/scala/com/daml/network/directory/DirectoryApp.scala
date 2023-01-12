@@ -8,6 +8,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatcher}
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
@@ -62,6 +63,7 @@ class DirectoryApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
@@ -89,6 +91,7 @@ class DirectoryApp(
         store,
         ledgerClient,
         scanConnection,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

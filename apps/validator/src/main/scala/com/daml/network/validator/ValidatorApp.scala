@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.{
   AuthConfig,
   AuthInterceptor,
@@ -218,6 +219,7 @@ class ValidatorApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
@@ -247,6 +249,7 @@ class ValidatorApp(
         clock,
         store,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

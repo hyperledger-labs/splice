@@ -1,10 +1,12 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
   AcsIngestionService,
   AuditLogIngestionService,
   AutomationService,
+  DomainIngestionService,
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.config.SvcAppBackendConfig
@@ -21,6 +23,7 @@ class SvcAutomationService(
     config: SvcAppBackendConfig,
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -40,6 +43,14 @@ class SvcAutomationService(
       retryProvider,
       loggerFactory,
       timeouts,
+    )
+  )
+
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
     )
   )
 

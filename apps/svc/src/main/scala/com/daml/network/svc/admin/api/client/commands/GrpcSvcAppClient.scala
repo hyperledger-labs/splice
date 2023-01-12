@@ -10,8 +10,9 @@ import com.daml.network.svc.v0.{
   WithdrawFeaturedAppRightRequest,
 }
 import com.daml.network.util.Proto
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -95,5 +96,21 @@ object GrpcSvcAppClient {
     /** Handle the response the service has provided
       */
     override def handleResponse(response: Empty): Either[String, Unit] = Right(())
+  }
+
+  case class ListConnectedDomains(
+  ) extends BaseCommand[Empty, v0.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: SvcServiceStub,
+        request: Empty,
+    ): Future[v0.ListConnectedDomainsResponse] = service.listConnectedDomains(request)
+
+    override def handleResponse(
+        response: v0.ListConnectedDomainsResponse
+    ): Either[String, Map[DomainAlias, DomainId]] =
+      Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
 }

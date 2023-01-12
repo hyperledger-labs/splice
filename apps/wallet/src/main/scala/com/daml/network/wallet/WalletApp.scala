@@ -3,6 +3,7 @@ package com.daml.network.wallet
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -60,6 +61,7 @@ class WalletApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {
     for {
@@ -114,6 +116,7 @@ class WalletApp(
         clock,
         walletManager,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

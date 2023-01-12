@@ -2,6 +2,7 @@ syntax = "proto3";
 package com.daml.network.splitwise.v0;
 
 import "com/daml/network/v0/contract.proto";
+import "com/daml/network/v0/connected_domains.proto";
 import "google/protobuf/empty.proto";
 
 service SplitwiseService {
@@ -84,5 +85,5 @@ message GetProviderPartyIdResponse {
 }
 
 message ListConnectedDomainsResponse {
-  map<string, string> domains = 1;
+  com.daml.network.v0.ConnectedDomains domains = 1;
 }

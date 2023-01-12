@@ -9,9 +9,10 @@ import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.jdk.OptionConverters.*
 
@@ -94,6 +95,12 @@ abstract class ScanAppReference(
   def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.ListFeaturedAppRight())
+    }
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.ListConnectedDomains())
     }
 }
 

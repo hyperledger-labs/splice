@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store.memory
 
-import com.daml.network.store.{AcsStore, InMemoryAcsStore}
+import com.daml.network.store.{AcsStore, DomainStore, InMemoryAcsStore, InMemoryDomainStore}
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -22,9 +22,14 @@ class InMemoryWalletStore(
       logAllStateUpdates = false,
     )
 
+  override val domains: InMemoryDomainStore =
+    new InMemoryDomainStore(loggerFactory)
+
   val acs: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
+
+  override val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 
   override def onClosed(): Unit = {}
 }

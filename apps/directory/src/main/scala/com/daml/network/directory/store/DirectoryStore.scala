@@ -4,7 +4,7 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.store.AcsStore
+import com.daml.network.store.{AcsStore, DomainStore}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -29,8 +29,12 @@ trait DirectoryStore extends AutoCloseable {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val domainIngestionSink: DomainStore.IngestionSink
+
   /** The [[com.daml.network.store.AcsStore]] to use for listing contracts and retrieving them by contract-id. */
   val acs: AcsStore
+
+  val domains: DomainStore
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.

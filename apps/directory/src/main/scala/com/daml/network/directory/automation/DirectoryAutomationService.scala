@@ -1,7 +1,8 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.{AcsIngestionService, AutomationService, DomainIngestionService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -20,6 +21,7 @@ class DirectoryAutomationService(
     store: DirectoryStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -41,6 +43,14 @@ class DirectoryAutomationService(
       retryProvider,
       loggerFactory,
       timeouts,
+    )
+  )
+
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
     )
   )
 

@@ -77,4 +77,13 @@ class GrpcValidatorAppService(
         )
       } yield OnboardUserResponse(Proto.encode(userPartyId))
     }
+
+  override def listConnectedDomains(request: Empty): Future[ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { _ => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        ListConnectedDomainsResponse(Some(Proto.encode(domains)))
+      }
+    }
 }

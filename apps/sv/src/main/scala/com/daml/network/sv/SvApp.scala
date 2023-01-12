@@ -2,6 +2,7 @@ package com.daml.network.sv
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.sv.admin.grpc.GrpcSvAppService
@@ -48,6 +49,7 @@ class SvApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       svPartyId: PartyId,
   ): Future[SvApp.State] =
     for {
@@ -58,6 +60,7 @@ class SvApp(
         config,
         store,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

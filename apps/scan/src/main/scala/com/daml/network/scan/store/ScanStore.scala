@@ -2,7 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{AcsStore, CCHistoryStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CCHistoryStore, DomainStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -25,8 +25,12 @@ trait ScanStore extends FlagCloseable with StoreWithOpenMiningRounds {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val domainIngestionSink: DomainStore.IngestionSink
+
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
+
+  val domains: DomainStore
 
   def lookupCoinRules()(implicit
       ec: ExecutionContext

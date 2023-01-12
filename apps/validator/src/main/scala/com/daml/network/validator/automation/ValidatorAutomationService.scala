@@ -1,6 +1,7 @@
 package com.daml.network.validator.automation
 
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.{AcsIngestionService, AutomationService, DomainIngestionService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.validator.store.ValidatorStore
@@ -16,6 +17,7 @@ class ValidatorAutomationService(
     clock: Clock,
     store: ValidatorStore,
     ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -37,4 +39,11 @@ class ValidatorAutomationService(
     )
   )
 
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
+    )
+  )
 }

@@ -3,8 +3,10 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.GrpcSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.topology.DomainId
 
 abstract class SvAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -17,6 +19,11 @@ abstract class SvAppReference(
     }
   }
 
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcSvAppClient.ListConnectedDomains())
+    }
 }
 
 class SvAppClientReference(

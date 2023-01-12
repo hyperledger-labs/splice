@@ -4,8 +4,9 @@ import com.daml.network.util.Proto
 import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.v0
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -57,4 +58,19 @@ object GrpcValidatorAppClient {
     ): Either[String, PartyId] = Proto.decode(Proto.Party)(response.partyId)
   }
 
+  case class ListConnectedDomains(
+  ) extends BaseCommand[Empty, v0.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: ValidatorAppServiceStub,
+        request: Empty,
+    ): Future[v0.ListConnectedDomainsResponse] = service.listConnectedDomains(request)
+
+    override def handleResponse(
+        response: v0.ListConnectedDomainsResponse
+    ): Either[String, Map[DomainAlias, DomainId]] =
+      Proto.decode(Proto.ConnectedDomains)(response.getDomains)
+  }
 }

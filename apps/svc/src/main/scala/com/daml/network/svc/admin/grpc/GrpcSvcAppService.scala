@@ -106,4 +106,13 @@ class GrpcSvcAppService(
         }
       } yield Empty()
     }
+
+  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { _ => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
+      }
+    }
 }

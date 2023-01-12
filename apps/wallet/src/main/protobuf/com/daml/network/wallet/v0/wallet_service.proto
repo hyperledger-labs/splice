@@ -1,6 +1,7 @@
 syntax = "proto3";
 package com.daml.network.wallet.v0;
 
+import "com/daml/network/v0/connected_domains.proto";
 import "com/daml/network/v0/contract.proto";
 import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
@@ -33,6 +34,10 @@ service WalletService {
 
   rpc ListAppRewardCoupons (ListAppRewardCouponsRequest) returns (ListAppRewardCouponsResponse);
   rpc ListValidatorRewardCoupons (ListValidatorRewardCouponsRequest) returns (ListValidatorRewardCouponsResponse);
+
+  // TODO(M3-18) Consider if we want to keep this
+  // once we no longer need it for testing.
+  rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 }
 
 message UserStatusRequest {
@@ -236,4 +241,9 @@ message RedistributeRequest {
 message RedistributeResponse {
   // The coins resulting from the transfer.
   repeated string coin_contract_ids = 1;
+}
+
+
+message ListConnectedDomainsResponse {
+  com.daml.network.v0.ConnectedDomains domains = 1;
 }

@@ -15,3 +15,7 @@ components:
         payload:
           type: object
       required: ["template_id", "contract_id", "payload"]
+    ConnectedDomains:
+      type: object
+      additionalProperties:
+        type: string

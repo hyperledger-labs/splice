@@ -1,7 +1,8 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.{AcsIngestionService, AutomationService, DomainIngestionService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.UserWalletManager
@@ -18,6 +19,7 @@ class WalletAutomationService(
     clock: Clock,
     walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     implicit protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -36,6 +38,14 @@ class WalletAutomationService(
       retryProvider,
       loggerFactory,
       timeouts,
+    )
+  )
+
+  registerTrigger(
+    new DomainIngestionService(
+      walletManager.store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
     )
   )
 

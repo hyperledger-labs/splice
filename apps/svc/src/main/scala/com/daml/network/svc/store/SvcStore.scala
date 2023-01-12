@@ -2,8 +2,8 @@ package com.daml.network.svc.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.{AcsStore, DomainStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.data.CantonTimestamp
@@ -29,8 +29,12 @@ trait SvcStore extends AutoCloseable {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val domainIngestionSink: DomainStore.IngestionSink
+
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
+
+  val domains: DomainStore
 
   def lookupCoinRulesWithOffset(
   ): Future[

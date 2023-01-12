@@ -2,10 +2,15 @@ syntax = "proto3";
 package com.daml.network.validator.v0;
 
 import "google/protobuf/empty.proto";
+import "com/daml/network/v0/connected_domains.proto";
 
 service ValidatorAppService {
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
   rpc GetValidatorUserInfo (google.protobuf.Empty) returns (GetValidatorUserInfoResponse);
+
+  // TODO(M3-18) Consider if we want to keep this
+  // once we no longer need it for testing.
+  rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 }
 
 message GetValidatorUserInfoResponse {
@@ -19,4 +24,8 @@ message OnboardUserRequest {
 
 message OnboardUserResponse {
   string party_id = 1;
+}
+
+message ListConnectedDomainsResponse {
+  com.daml.network.v0.ConnectedDomains domains = 1;
 }

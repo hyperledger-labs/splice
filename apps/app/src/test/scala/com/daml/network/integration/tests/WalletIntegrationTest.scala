@@ -318,5 +318,11 @@ class WalletIntegrationTest
 
       channel.shutdown() // to avoid error about improperly shut down channel
     }
+
+    "list one connected domain" in { implicit env =>
+      eventually() {
+        providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("da")
+      }
+    }
   }
 }

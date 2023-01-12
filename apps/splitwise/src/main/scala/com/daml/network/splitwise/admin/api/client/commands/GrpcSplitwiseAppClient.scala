@@ -194,14 +194,6 @@ object GrpcSplitwiseAppClient {
     override def handleResponse(
         response: v0.ListConnectedDomainsResponse
     ): Either[String, Map[DomainAlias, DomainId]] =
-      for {
-        domains <- response.domains.toList.traverse { case (k, v) =>
-          for {
-            k <- DomainAlias.create(k)
-            v <- DomainId.fromString(v)
-          } yield (k, v)
-        }
-      } yield domains.toMap
-
+      Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
 }

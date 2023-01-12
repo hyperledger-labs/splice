@@ -1,6 +1,7 @@
 package com.daml.network.sv.automation
 
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.{AcsIngestionService, AutomationService, DomainIngestionService}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.SvStore
@@ -16,6 +17,7 @@ class SvAutomationService(
     config: LocalSvAppConfig,
     store: SvStore,
     ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -38,4 +40,11 @@ class SvAutomationService(
     )
   )
 
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
+    )
+  )
 }

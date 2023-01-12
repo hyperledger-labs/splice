@@ -1,7 +1,7 @@
 package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.store.AcsStore
+import com.daml.network.store.{AcsStore, DomainStore}
 import com.daml.network.sv.store.memory.InMemorySvStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -18,9 +18,12 @@ trait SvStore extends AutoCloseable {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val domainIngestionSink: DomainStore.IngestionSink
+
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
 
+  val domains: DomainStore
 }
 
 object SvStore {

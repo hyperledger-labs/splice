@@ -39,4 +39,13 @@ class GrpcSvAppService(
         coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
       )
     }
+
+  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSvAppService") { _ => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
+      }
+    }
 }

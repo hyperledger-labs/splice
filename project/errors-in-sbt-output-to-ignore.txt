@@ -74,4 +74,8 @@ c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
 .*o.o.codegen.TemplateManager - writing file .*/apps/common/frontend-openapi/apis/exception.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/validator/frontend-openapi/apis/exception.ts
 
+# Output by guardrail if the yaml file changes because we cache the previous generated code
+^.\[31mWarning:.\[0m$
+.*contained different content than was expected.*
+
 # Make sure to have a trailing newline

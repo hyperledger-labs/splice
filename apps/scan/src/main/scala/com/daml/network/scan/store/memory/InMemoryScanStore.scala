@@ -1,7 +1,14 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.store.{AcsStore, CCHistoryStore, InMemoryAcsStore, InMemoryCCHistoryStore}
+import com.daml.network.store.{
+  AcsStore,
+  CCHistoryStore,
+  DomainStore,
+  InMemoryAcsStore,
+  InMemoryCCHistoryStore,
+  InMemoryDomainStore,
+}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -24,6 +31,10 @@ class InMemoryScanStore(
 
   override val acs: AcsStore = inMemoryAcsStore
 
+  override val domains: InMemoryDomainStore =
+    new InMemoryDomainStore(loggerFactory)
+
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
+  override val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
   override protected def onClosed(): Unit = history.close()
 }

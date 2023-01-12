@@ -3,13 +3,19 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  SyncCloseable,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
@@ -71,6 +77,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[State]
 
@@ -128,7 +135,17 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     )
   } yield client
 
-  private def initializeNode(ledgerClient: CoinLedgerClient) = for {
+  private def createParticipantAdminConnection(): ParticipantAdminConnection =
+    new ParticipantAdminConnection(
+      remoteParticipant.adminApi,
+      timeouts,
+      loggerFactory,
+    )
+
+  private def initializeNode(
+      ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
+  ) = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
     connection = ledgerClient.connection(name.toString)
@@ -148,12 +165,15 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(connection)
     _ = logger.info(s"Packages available, running app-specific init")
-    state <- initialize(ledgerClient, serviceParty)
+    state <- initialize(ledgerClient, participantAdminConnection, serviceParty)
   } yield state
 
   logger.info(s"Starting initialization")
   private val ledgerClientF = createLedgerClient()
-  private val initializeF = ledgerClientF.flatMap(initializeNode)
+  private val participantAdminConnection = createParticipantAdminConnection()
+  private val initializeF = ledgerClientF.flatMap { client =>
+    initializeNode(client, participantAdminConnection)
+  }
 
   initializeF.onComplete { _ =>
     logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")
@@ -174,6 +194,10 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         s"$name Ledger API connection",
         ledgerClientF.map(_.close()),
         closingTimeout,
+      ),
+      SyncCloseable(
+        s"$name Participant Admin connection",
+        participantAdminConnection.close(),
       ),
     )
   }

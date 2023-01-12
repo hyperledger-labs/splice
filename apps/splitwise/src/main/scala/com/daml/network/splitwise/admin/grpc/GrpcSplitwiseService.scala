@@ -201,8 +201,7 @@ class GrpcSplitwiseService(
       for {
         domains <- store.domains.listConnectedDomains()
       } yield {
-        val mapProto = domains.map { case (k, v) => k.toProtoPrimitive -> v.toProtoPrimitive }
-        v0.ListConnectedDomainsResponse(mapProto)
+        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
       }
     }
 

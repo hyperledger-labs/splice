@@ -1,6 +1,7 @@
 syntax = "proto3";
 package com.daml.network.svc.v0;
 
+import "com/daml/network/v0/connected_domains.proto";
 import "google/protobuf/empty.proto";
 
 service SvcService {
@@ -12,6 +13,10 @@ service SvcService {
 
   // Withdraw a featured app right from an app provider, with a textual reasoning
   rpc WithdrawFeaturedAppRight (WithdrawFeaturedAppRightRequest) returns (google.protobuf.Empty);
+
+  // TODO(M3-18) Consider if we want to keep this
+  // once we no longer need it for testing.
+  rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -46,4 +51,8 @@ message WithdrawFeaturedAppRightRequest {
 
   // Textual reasoning for the withdrawal
   string reason = 2;
+}
+
+message ListConnectedDomainsResponse {
+  com.daml.network.v0.ConnectedDomains domains = 1;
 }

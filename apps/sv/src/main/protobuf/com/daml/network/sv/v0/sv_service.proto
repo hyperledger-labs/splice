@@ -1,11 +1,16 @@
 syntax = "proto3";
 package com.daml.network.sv.v0;
 
+import "com/daml/network/v0/connected_domains.proto";
 import "google/protobuf/empty.proto";
 
 service SvService {
   // TODO(M3-46): replace this stub with the first actual console command
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
+
+  // TODO(M3-18) Consider if we want to keep this
+  // once we no longer need it for testing.
+  rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 }
 
 // Contains information useful for debugging a running SV app.
@@ -21,3 +26,6 @@ message GetDebugInfoResponse {
   repeated string coin_rules_contract_ids = 3;
 }
 
+message ListConnectedDomainsResponse {
+  com.daml.network.v0.ConnectedDomains domains = 1;
+}

@@ -15,10 +15,11 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
   UserStatusData,
 }
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 class WalletAppClientReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -360,6 +361,12 @@ class WalletAppBackendReference(
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListConnectedDomains())
+    }
 
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)

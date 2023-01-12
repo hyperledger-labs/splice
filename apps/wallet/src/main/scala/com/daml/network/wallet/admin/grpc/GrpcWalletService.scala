@@ -518,6 +518,15 @@ class GrpcWalletService(
       }
     }
 
+  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { _ => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
+      }
+    }
+
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *

@@ -3,13 +3,15 @@
 
 package com.daml.network.util
 
+import cats.syntax.traverse.*
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId => JavaContractId}
 import com.daml.lf.data.Numeric
-import com.digitalasset.canton.LfTimestamp
+import com.daml.network.v0
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.{DomainAlias, LfTimestamp}
 
 /** Trait for values used in our protobuf requests.
   * Dec is the Scala representation while Enc is the protobuf representation, e.g., Proto[BigDecimal, String].
@@ -109,5 +111,29 @@ object Proto {
   object Timestamp extends ProtoCompanion[CantonTimestamp] {
     type Enc = Long
     def instance = timestampValue
+  }
+
+  implicit val connectedDomainsValue: Proto[Map[DomainAlias, DomainId], v0.ConnectedDomains] =
+    new Proto[Map[DomainAlias, DomainId], v0.ConnectedDomains] {
+      def encode(d: Map[DomainAlias, DomainId]) =
+        v0.ConnectedDomains(
+          d.view.map { case (k, v) =>
+            k.toProtoPrimitive -> v.toProtoPrimitive
+          }.toMap
+        )
+      def decode(e: v0.ConnectedDomains) =
+        e.connectedDomains.toList
+          .traverse { case (k, v) =>
+            for {
+              k <- DomainAlias.create(k)
+              v <- DomainId.fromString(v)
+            } yield (k, v)
+          }
+          .map(_.toMap)
+    }
+
+  object ConnectedDomains extends ProtoCompanion[Map[DomainAlias, DomainId]] {
+    type Enc = v0.ConnectedDomains
+    def instance = connectedDomainsValue
   }
 }

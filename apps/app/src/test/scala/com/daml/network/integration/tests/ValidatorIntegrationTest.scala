@@ -89,4 +89,13 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     val party2 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     party1 shouldBe party2
   }
+
+  "list one connected domain" in { implicit env =>
+    svc.startSync()
+    scan.startSync()
+    aliceValidator.startSync()
+    eventually() {
+      aliceValidator.listConnectedDomains().keySet shouldBe Set("da")
+    }
+  }
 }

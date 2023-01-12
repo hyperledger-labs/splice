@@ -5,9 +5,10 @@ import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 /** Console commands that can be executed either through client or backend reference.
   */
@@ -42,6 +43,12 @@ abstract class ValidatorAppReference(
       adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user), callCredentials)
     }
   }
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcValidatorAppClient.ListConnectedDomains(), callCredentials)
+    }
 }
 
 final class ValidatorAppBackendReference(

@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, DomainStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -32,8 +32,12 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val domainIngestionSink: DomainStore.IngestionSink
+
   /** The store to use for default queries. */
   val acs: AcsStore
+
+  val domains: DomainStore
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key

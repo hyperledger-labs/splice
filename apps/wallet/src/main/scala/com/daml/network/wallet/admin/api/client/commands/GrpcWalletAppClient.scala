@@ -18,10 +18,10 @@ import com.daml.network.wallet.v0.{
   GetBalanceRequest,
   GetBalanceResponse,
 }
-import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.{DomainAlias, ProtoDeserializationError}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -729,5 +729,21 @@ object GrpcWalletAppClient {
     ): Either[String, UserStatusData] = Right(
       UserStatusData(response.partyId, response.userOnboarded)
     )
+  }
+
+  case class ListConnectedDomains(
+  ) extends BaseCommand[Empty, v0.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListConnectedDomainsResponse] = service.listConnectedDomains(request)
+
+    override def handleResponse(
+        response: v0.ListConnectedDomainsResponse
+    ): Either[String, Map[DomainAlias, DomainId]] =
+      Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
 }

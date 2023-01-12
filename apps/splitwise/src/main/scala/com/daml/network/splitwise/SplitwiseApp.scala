@@ -57,6 +57,7 @@ class SplitwiseApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
     store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))
@@ -66,12 +67,6 @@ class SplitwiseApp(
     scanConnection =
       new ScanConnection(
         config.remoteScan.clientAdminApi,
-        coinAppParameters.processingTimeouts,
-        loggerFactory,
-      )
-    participantAdminConnection =
-      new ParticipantAdminConnection(
-        config.remoteParticipant.adminApi,
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
@@ -107,7 +102,6 @@ class SplitwiseApp(
       storage,
       store,
       scanConnection,
-      participantAdminConnection,
       loggerFactory.getTracedLogger(SplitwiseApp.State.getClass),
     )
   }
@@ -121,7 +115,6 @@ object SplitwiseApp {
       storage: Storage,
       store: SplitwiseStore,
       scanConnection: ScanConnection,
-      participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
   ) extends AutoCloseable
       with HasHealth {
@@ -133,7 +126,6 @@ object SplitwiseApp {
         storage,
         store,
         scanConnection,
-        participantAdminConnection,
       )(logger)
   }
 }

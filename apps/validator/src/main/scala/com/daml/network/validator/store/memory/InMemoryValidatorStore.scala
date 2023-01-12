@@ -1,6 +1,6 @@
 package com.daml.network.validator.store.memory
 
-import com.daml.network.store.{AcsStore, InMemoryAcsStore}
+import com.daml.network.store.{AcsStore, DomainStore, InMemoryAcsStore, InMemoryDomainStore}
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 
@@ -19,9 +19,14 @@ class InMemoryValidatorStore(
       logAllStateUpdates = false,
     )
 
+  override val domains: InMemoryDomainStore =
+    new InMemoryDomainStore(loggerFactory)
+
   val acs: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
+
+  override val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 
   override def close(): Unit = ()
 }

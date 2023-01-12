@@ -87,6 +87,11 @@ class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
         "CoinRules_Transfer"
       ) and include("bob_wallet_user"))
     }
+  }
 
+  "list one connected domain" in { implicit env =>
+    eventually() {
+      scan.listConnectedDomains().keySet shouldBe Set("da")
+    }
   }
 }
