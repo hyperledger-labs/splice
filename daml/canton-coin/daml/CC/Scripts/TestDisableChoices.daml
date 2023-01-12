@@ -57,12 +57,12 @@ testAppReward = do
 
   cid <- tap app alice 10.0
   payWithTransferFeeRatio app alice bob.primaryParty 5.0 0.0 ""
-  [(cid, _)] <- query @AppReward bob.primaryParty
+  [(cid, _)] <- query @AppReward alice.primaryParty
 
-  replicateA_ 3 $ runNextIssuance app
+  replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
-  testChoice @"enable_AppReward_ProviderExpire" app [bob.primaryParty] [app.svc] $ \coinRules ->
+  testChoice @"enable_AppReward_ProviderExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd cid (AppReward_ProviderExpire round coinRules)
   pure ()
 
@@ -77,7 +77,7 @@ testValidatorReward = do
   pay app alice alice.primaryParty 5.0 ""
   [(cid, _)] <- query @ValidatorReward alice.primaryParty
 
-  replicateA_ 3 $ runNextIssuance app
+  replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
   testChoice @"enable_ValidatorReward_UserExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->

@@ -1,6 +1,7 @@
 module CN.Scripts.TestSvcRules where
 
 import DA.Action (unless)
+import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
@@ -178,7 +179,7 @@ runNextIssuanceD app coinPrice = do
     -- TODO(M2-01): collect SvcRewards via SvRewards into per-SV coins
 
     -- close current issuing rounds if there are any
-    imcs <- query @IssuingMiningRound app.svc
+    imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
     forA_ imcs $ \(miningRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
         totalTransferFees = 0.0
@@ -280,4 +281,4 @@ unitTestVoting = do
         [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
   let winner = instantRunOffVoting 2 2 rankings
   trace (votes, candidates, winner) $
-    assert $ (instantRunOffVoting 2 2 rankings) == "B"
+    instantRunOffVoting 2 2 rankings === "B"

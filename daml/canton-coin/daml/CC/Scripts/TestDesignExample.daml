@@ -6,6 +6,7 @@ import DA.Time
 import Daml.Script
 
 import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 import CN.Util.Assert
 import CC.Coin
 import CC.Round
@@ -88,6 +89,15 @@ test = do
 
   lockTo1 app alice arbiter.primaryParty 1000.25 (days 90) "lock"
 
+  -- check rewards that are issued for the locking tx
+  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 2)
+  appReward === AppReward with
+    svc = app.svc
+    provider = alice.primaryParty
+    featured = False
+    quantity = 0.01
+    round = API.Round 2
+
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   -- advance 40k rounds
   runNextIssuance app
@@ -95,9 +105,16 @@ test = do
   (_, c1) <- getLatestOpenRound app
 
   pay app alice alice.primaryParty 5.0 "split"
+  -- check reward issued by this payment
+  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 40002)
+  appReward === AppReward with
+    svc = app.svc
+    provider = alice.primaryParty
+    featured = False
+    quantity = 0.14 -- 0.1 create fee + 0.05 transfer fee
+    round = API.Round 40002
 
   [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity == 5.0)
-
 
   -- advance 10k rounds
   runNextIssuance app
@@ -124,9 +141,10 @@ test = do
     quantityBalance = 3.58
     numFloatingCoins = 1
     totalTransferFees = 0.01
-    senderAdminFees = 0.12
+    senderAdminFees = 0.32
     senderHoldingFees = 0.3
     receiverTransferFees = 0.01
+    usageFees = 0.11
 
   allCoins <- query @Coin app.svc
   allLockedCoins <- query @LockedCoin app.svc
@@ -169,12 +187,25 @@ test = do
       let quantity = 1.0 - receiverTransferFee
       in expiringQuantity coinConfig.holdingFee quantity c2.round
 
-  [(_, appReward)] <- query @AppReward app.svc
+  -- check app reward issued by the escrow refresh
+  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 50002)
   appReward === AppReward with
     svc = app.svc
     provider = arbiter.primaryParty
     featured = True
-    quantity = receiverTransferFee
-    round = c2.round
+    quantity = 0.11
+    round = API.Round 50002
+
+  -- check that the 'arbiter' does not receive featured app rewards when he's the provider
+  runNextIssuance app
+  pay app arbiter alice.primaryParty 0.5 "reimbursement"
+
+  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 50003)
+  appReward === AppReward with
+    svc = app.svc
+    provider = arbiter.primaryParty
+    featured = False -- not featured despite presenting their app right as part of the 'pay' function
+    quantity = 0.005 -- only the transfer fee is consider a usage fee here, as we have two input coins
+    round = API.Round 50003
 
   return ()

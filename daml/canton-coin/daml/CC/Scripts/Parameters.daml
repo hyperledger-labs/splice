@@ -32,11 +32,6 @@ defaultCoinConfig = CoinConfig with
     -- actions on the locked coin.
     lockHolderFee = FixedFee 0.01
 
-    -- The minimal quantity of burn for which a receipt is issued.
-    --
-    -- Chosen to cover to be just above the cost of updating a single update.
-    minRewardQuantity = 0.011 -- in $
-
     -- Fee for transferring some quantity of coin to a new owner.
     --
     -- TODO(M3-90) Finetuning required

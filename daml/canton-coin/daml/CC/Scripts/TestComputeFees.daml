@@ -16,9 +16,8 @@ template Test
         context : API.PaymentTransferContext
         quantities : [Decimal]
       controller sender
-      do
-        fees <- API.exerciseComputeFees context sender quantities
-        return fees
+      do API.exerciseComputeFees context sender quantities
+
 
 test = script do
     app <- setupApp

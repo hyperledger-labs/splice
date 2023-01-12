@@ -12,7 +12,6 @@ import DA.List.Total
 import DA.Time
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 import CC.Coin
 import CC.Round
 
@@ -134,16 +133,18 @@ runCoinRulesAcceptBot app = do
 -- Issuance automation
 ----------------------
 
+
 -- Advance issuance such that the next transfers use a round with the given coin-price
 advanceToIssuanceWithPrice : CCApp -> Decimal -> Script ()
 advanceToIssuanceWithPrice app coinPrice = do
   runNextIssuanceInternal app coinPrice
+  -- the round with the new price only becomes effective after one tick
+  -- we simulate that by runing another issuance, but run the coin deposit bots before
+  -- to collect eventual rewards
+  runCoinDepositBots app
   runNextIssuanceInternal app coinPrice
 
-
 -- | Run the next issuance but don't enforce a specific coin price.
---
---
 runNextIssuance : CCApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
@@ -170,9 +171,9 @@ runNextIssuanceInternal app coinPrice = do
         miningRoundCid
 
 
-    -- close current issuing rounds if there are any
-    imcs <- query @IssuingMiningRound app.svc
-    forA_ imcs $ \(miningRoundCid, _) ->
+    -- close issuing rounds that are ready for close
+    imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
+    forA_ imcs $ \(miningRoundCid, miningRound) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
         totalTransferFees = 0.0
         totalAdminFees = 0.0
@@ -281,7 +282,7 @@ payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg =
   coins <- unlockedCoins sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
-        provider = recipient
+        provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         outputs =
@@ -295,9 +296,10 @@ payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg =
                 senderTransferFeeRatio = transferFeeRatio
           ]
   (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, recipient] readAs
     API.CoinRules_Transfer with
-      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) None
+      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -310,7 +312,7 @@ lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
   coins <- unlockedCoins sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
-        provider = lockHolder
+        provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         outputs =
@@ -324,17 +326,19 @@ lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
                 expiresAt = now `addRelTime` lockDuration
           ]
   (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, lockHolder] readAs
     API.CoinRules_Transfer with
       -- TODO(M3-06): add test for featured app provider
-      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) None
+      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
 runCoinDepositBots app = do
   validatorRights <- getAllValidatorRights app
   (openRound, _) <- getLatestOpenRound app
-  issuingRounds <- query @IssuingMiningRound app.svc
+  issuingRounds <- getOpenIssuingRounds app
+  let issuingRoundNumbers = map (._2.round) issuingRounds
   let context = API.TransferContext with
         openMiningRound = toInterfaceContractId openRound
         issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
@@ -343,12 +347,11 @@ runCoinDepositBots app = do
   forA_ validatorRights $ \(_, ValidatorRight{..}) -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
-    rounds <- getIssuingRounds app
     appRewards <- queryFilter @AppReward app.svc $ \r ->
-      r.round `elem` rounds && r.provider == user
+      r.round `elem` issuingRoundNumbers && r.provider == user
 
     validatorRewards <- queryFilter @ValidatorReward app.svc $ \r ->
-      r.round `elem` rounds && r.user `elem` hostedUsers
+      r.round `elem` issuingRoundNumbers && r.user `elem` hostedUsers
 
     -- get all coins of this user
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
@@ -372,11 +375,12 @@ runCoinDepositBots app = do
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
       submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with transfer, context
 
--- | Retrieve a list of all issuances that have happened.
-getIssuingRounds : CCApp -> Script [API.Round]
-getIssuingRounds app = do
+-- | Retrieve a list of all issuing mining rounds that are currently open.
+getOpenIssuingRounds : CCApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
+getOpenIssuingRounds app = do
+  now <- getTime
   miningRounds <- query @IssuingMiningRound app.svc
-  return [ miningRound.round | (_, miningRound) <- miningRounds ]
+  return [ (cid, r) | (cid, r) <- miningRounds, r.opensAt <= now ]
 
 -- | All users of a specific validator.
 getValidatorUsers : Party -> Script [Party]
@@ -408,16 +412,16 @@ getOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
-getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId FeaturedAppRight, FeaturedAppRight))
+getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId API.FeaturedAppRight))
 getFeaturedAppRight app provider = do
   rounds <- query @FeaturedAppRight provider
-  return $ DA.List.Total.head [ r | r <- rounds, r._2.svc == app.svc ]
+  return $ DA.List.Total.head [ toInterfaceContractId cid | (cid, round) <- rounds, round.svc == app.svc ]
 
 getAppTransferContext : CCApp -> CCUser -> Script API.AppTransferContext
 getAppTransferContext app provider = do
   openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
   coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
-  featuredAppRight <- fmap (toInterfaceContractId . fst) <$> getFeaturedAppRight app provider.primaryParty
+  featuredAppRight <- getFeaturedAppRight app provider.primaryParty
   pure API.AppTransferContext with
     coinRules
     openMiningRound

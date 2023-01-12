@@ -67,6 +67,4 @@ testCoinBurn = do
   advanceToIssuanceWithPrice app 1.6
   runCoinDepositBots app
 
-  -- -}
-
   return ()

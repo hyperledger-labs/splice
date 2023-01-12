@@ -119,10 +119,7 @@ object CoinUtil {
     // 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
     BigDecimal(60.0).bigDecimal,
 
-    // The minimal quantity of burn for which a receipt is issued.
-    // Chosen to cover to be just above the cost of updating a single update.
-    BigDecimal(0.011).bigDecimal, // in $
-
+    // The ratio of coin to issue to the SVC
     BigDecimal(0.35).bigDecimal,
 
     // These should be large enough to ensure efficient batching, but not too large

@@ -152,10 +152,12 @@ data TransferSummary = TransferSummary with
     numOutputs : Int
     quantityBalance : Decimal
     numFloatingCoins : Int -- ^ Number of floating coins including both sender & receiver coins.
+    -- TODO(#2242): remove the fee totals from this one that we don't need
     totalTransferFees : Decimal
     senderAdminFees : Decimal
     senderHoldingFees : Decimal
     receiverTransferFees : Decimal
+    usageFees : Decimal
   deriving (Eq, Show)
 
 data CreatedCoin

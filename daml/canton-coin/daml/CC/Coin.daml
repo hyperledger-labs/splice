@@ -4,7 +4,7 @@ module CC.Coin where
 
 import Prelude hiding (forA)
 
-import DA.Action (void, when, foldlA)
+import DA.Action (void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_, mapA_)
 import DA.Map (Map)
@@ -69,7 +69,7 @@ template LockedCoin
         t <- getTime
         require "Lock is expired" (lock.expiresAt < t)
         toInterfaceContractId <$> create coin
-        
+
       lockedCoin_Unlock coinRulesCid = do
         coinRules <- view <$> fetch coinRulesCid
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
@@ -235,7 +235,6 @@ data CoinConfig currency = CoinConfig with
     transferFee : SteppedRate -- ^ Fee for transferring some quantity of coin to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
     coinsIssuedPerRound : Decimal
-    minRewardQuantity : Decimal -- ^ The minimal quantity of burn for which a receipt is issued.
     svcIssuanceRatio : Decimal
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
@@ -431,9 +430,11 @@ template CoinRules
       controller svc
       do
         -- archive issuing mining round
+        now <- getTime
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
         require "SVC matches" (miningRound.svc == svc)
+        require "Mining round is past targetClosesAt" (miningRound.targetClosesAt <= now)
         require "Non-negative transfer fees" (totalTransferFees >= 0.0)
         require "Non-negative admin fees" (totalAdminFees >= 0.0)
         require "Non-negative holding fees" (totalHoldingFees >= 0.0)
@@ -491,8 +492,8 @@ computeFees1 : CoinConfig CC -> [Decimal] -> Update Decimal
 computeFees1 config receiverQuantities = do
     transferFees <- foldlA transferFees 0.0 receiverQuantities
     let numOutputCoins = Prelude.length receiverQuantities
-    coinUpdateFees <- computeCoinUpdateFees config 1 numOutputCoins
-    coinCreateFees <- computeCoinCreateFees config 1 numOutputCoins
+    let coinUpdateFees = computeCoinUpdateFees config 1 numOutputCoins
+    let coinCreateFees = computeCoinCreateFees config 1 numOutputCoins
     return (coinUpdateFees + coinCreateFees + transferFees)
   where
     transferFees s quantity = do
@@ -568,7 +569,7 @@ checkTransferConstraints transfer summary config
 estimateOpenRoundCreatedAt : CoinConfig CC -> OpenMiningRound -> API.Round -> Time
 estimateOpenRoundCreatedAt config currentMiningRound targetRound
   | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
-  | otherwise = 
+  | otherwise =
     let relRound = subRound targetRound currentMiningRound.round
         -- Note: To estimate the time when the target open mining round is being created but not yet open,
         -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
@@ -576,7 +577,7 @@ estimateOpenRoundCreatedAt config currentMiningRound targetRound
     in addRelTime currentMiningRound.opensAt relTime
 
 lockExpiresBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringQuantity -> CoinConfig CC -> Bool
-lockExpiresBeforeCoin currentTime currentOpenRound lock e config = 
+lockExpiresBeforeCoin currentTime currentOpenRound lock e config =
   -- Note: we exploit that there are exactly three open rounds active at any
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
@@ -735,7 +736,7 @@ summarizeAndValidateInputs csum svc sender inps = do
       (_, reward) <- downcastInterface @AppReward "AppReward" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
-      require "issuing round is open" (now >= miningRound.opensAt)
+      require "issuing round is open" (miningRound.opensAt <= now)
       require "Sender matches app provider" (sender == reward.provider)
       let issuancePerCoin
             | reward.featured = miningRound.issuancePerFeaturedAppReward
@@ -891,65 +892,67 @@ preprocessAndSummarizeOutputs config sender outs = do
 
 summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
 summarizeTransfer config inp out = do
-    coinCreateFees <- computeCoinCreateFees config inp.numCoinInputs numOutputs
-    coinUpdateFees <- computeCoinUpdateFees config inp.numCoinInputs numOutputs
     let senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
-    return API.TransferSummary with
-      inQuantity = inQuantity
-      nonSelfOutQuantity = out.totalNonSelfOutputs
-      selfOutQuantity = out.totalSelfOutputs
-      quantityBalance = inp.totalQuantity - out.requiredQuantity - senderActionFees - out.senderTransferFees
-      numFloatingCoins = out.numFloatingCoins
-      receiverTransferFees = out.receiverTransferFees
-      numInputs = inp.numCoinInputs + inp.numBurnInputs
-      numOutputs
-      senderHoldingFees = inp.totalHoldingFees
-      senderAdminFees = senderActionFees
-      totalTransferFees = totalTransferFees
+    let summary = API.TransferSummary with
+          inQuantity = inQuantity
+          nonSelfOutQuantity = out.totalNonSelfOutputs
+          selfOutQuantity = out.totalSelfOutputs
+          quantityBalance = inp.totalQuantity - out.requiredQuantity - senderActionFees - out.senderTransferFees
+          numFloatingCoins = out.numFloatingCoins
+          receiverTransferFees = out.receiverTransferFees
+          numInputs = inp.numCoinInputs + inp.numBurnInputs
+          numOutputs
+          senderHoldingFees = inp.totalHoldingFees
+          senderAdminFees
+          totalTransferFees = totalTransferFees
+          usageFees
+    -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
+    trace summary $ trace out $ trace inp $ pure summary
   where
     -- compute fees for the sender actions
     numOutputs = out.numSenderCoins + out.numReceiverCoins
     totalTransferFees = out.senderTransferFees + out.receiverTransferFees
     inQuantity = inp.totalQuantity
 
+    coinCreateFees = computeCoinCreateFees config inp.numCoinInputs numOutputs
+    coinUpdateFees = computeCoinUpdateFees config inp.numCoinInputs numOutputs
     coinLockFees = config.lockHolderFee.fee * intToDecimal out.numlockHolders
 
-computeCoinUpdateFees : CoinConfig CC -> Int -> Int -> Update (Decimal)
-computeCoinUpdateFees config numCoinInputs numCoinOutputs = do
-    let numCoinUpdates = min numCoinInputs numCoinOutputs
-    return (config.updateFee.fee * intToDecimal numCoinUpdates)
+    usageFees = coinCreateFees + coinLockFees + totalTransferFees
+    senderAdminFees = inp.totalHoldingFees + coinUpdateFees
 
-computeCoinCreateFees : CoinConfig CC -> Int -> Int -> Update (Decimal)
-computeCoinCreateFees config numCoinInputs numCoinOutputs = do
+computeCoinUpdateFees : CoinConfig CC -> Int -> Int -> Decimal
+computeCoinUpdateFees config numCoinInputs numCoinOutputs =
+    let numCoinUpdates = min numCoinInputs numCoinOutputs
+    in config.updateFee.fee * intToDecimal numCoinUpdates
+
+computeCoinCreateFees : CoinConfig CC -> Int -> Int -> Decimal
+computeCoinCreateFees config numCoinInputs numCoinOutputs =
     let numCoinCreates = max 0 (numCoinOutputs - numCoinInputs)
-    return (config.createFee.fee * intToDecimal numCoinCreates)
+    in config.createFee.fee * intToDecimal numCoinCreates
 
 
 issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -> Update ()
-issueRewards csum sender provider summary = do
-    let validatorReward = summary.senderAdminFees + summary.senderHoldingFees + summary.totalTransferFees
-    -- issue reward for the validator of the sender
-    when (csum.config.minRewardQuantity <= validatorReward) $
+issueRewards csum sender provider summary
+  | summary.usageFees <= 0.0 = pure ()
+  | otherwise = do
       void $ create ValidatorReward with
         svc = csum.openRound.svc
         user = sender
-        quantity = validatorReward
+        quantity = summary.usageFees
         round = csum.openRound.round
 
-    -- issue receiver receipts
-    let featured =
-          Some provider == csum.featuredAppProvider &&
-          -- we do not create featured app rewards in case the app provider uses its own app
-          sender /= provider
-    -- TODO(#2150): parametrize these reward caps
-    let cap : Decimal = if featured then 100.0 else 0.8
-    when (csum.config.minRewardQuantity <= cap * summary.receiverTransferFees) $
       void $ create AppReward with
         svc = csum.openRound.svc
         provider
         featured
-        quantity = summary.receiverTransferFees
+        quantity = summary.usageFees
         round = csum.openRound.round
+  where
+    -- note: we do not create featured app rewards in case the app provider uses their own app
+    featured = Some provider == csum.featuredAppProvider && sender /= provider
+
+
 
 -- | A coin about to be created after distributed excess quantity
 -- to floating outputs.
@@ -1034,7 +1037,7 @@ createTransferOutputs currentTime currentOpenRound config svc outs =
             svc
             owner = out.owner
             quantity = expiringQuantity config.holdingFee out.quantity currentOpenRound.round
-      
+
       case out.lock of
         None -> API.TransferResultCoin . toInterfaceContractId <$> create coin
         Some lock -> do
@@ -1050,7 +1053,6 @@ scaleFees s c = CoinConfig with
     updateFee = scaleFixedFee s c.updateFee
     holdingFee = scaleRatePerRound s c.holdingFee
     lockHolderFee = scaleFixedFee s c.lockHolderFee
-    minRewardQuantity = s * c.minRewardQuantity
     transferFee = scaleSteppedRate s c.transferFee
     coinsIssuedPerRound = c.coinsIssuedPerRound
     svcIssuanceRatio = c.svcIssuanceRatio

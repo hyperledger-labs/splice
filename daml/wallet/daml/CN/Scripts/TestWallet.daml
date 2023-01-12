@@ -62,6 +62,12 @@ collectAcceptedPayment app provider acceptedAppPayment = do
   _ <- submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
+checkCoinPositions : CCUser -> [Decimal] -> Script ()
+checkCoinPositions owner expectedQuantities = do
+    let ownerParty = owner.primaryParty
+    actualCoins <- queryFilter @Coin ownerParty (\c -> c.owner == ownerParty)
+    sort (map (._2.quantity.initialQuantity) actualCoins) === sort expectedQuantities
+
 testSingleReceiverCCPaymentRequest : Script ()
 testSingleReceiverCCPaymentRequest = script do
   app <- setupApp
@@ -201,13 +207,9 @@ testCCPaymentRequest = script do
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
 
-  aliceCoins <- query @Coin alice.primaryParty
-
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.52]
-  bobCoins <- query @Coin bob.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0]
-  charlieCoins <- query @Coin charlie.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0]
+  checkCoinPositions alice [1.0, 1.52]
+  checkCoinPositions bob [1.0]
+  checkCoinPositions charlie [1.0]
 
   -- Check that the locked-coin is visible to charlie
   [(charlieLockedCoinCid, _)] <- query @LockedCoin charlie.primaryParty
@@ -216,12 +218,9 @@ testCCPaymentRequest = script do
 
   collectAcceptedPayment app alice acceptedPaymentCid
 
-  aliceCoins <- query @Coin alice.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.52]
-  bobCoins <- query @Coin bob.primaryParty
-  sort (map (\(_, c) -> c.quantity.initialQuantity) bobCoins) === [1.0, 15.0]
-  charlieCoins <- query @Coin charlie.primaryParty
-  sort (map (\(_, c) -> c.quantity.initialQuantity) charlieCoins) === [1.0, 10.0]
+  checkCoinPositions alice [1.0, 1.52]
+  checkCoinPositions bob [1.0, 15.0]
+  checkCoinPositions charlie [1.0, 10.0]
   pure ()
 
 testUSDPaymentRequest : Script ()

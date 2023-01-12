@@ -36,7 +36,7 @@ template SvcBootstrap with
       -- get authorization for acting as the 'svc' consortium party in the body as explained below
       do
         require "Invitee was invited" (invitee `elem` invitees)
-        require "Invitee is not yet a member" (not $ invitee `elem` members)
+        require "Invitee is not yet a member" (invitee `notElem` members)
         let newInvitees = delete invitee invitees
             newMembers = invitee :: members
         if null newInvitees
@@ -55,7 +55,7 @@ template SvcBootstrap with
               svc
               config = defaultCoinConfig
               observers = newMembers
-            
+
             exercise coinRulesCid CoinRules_Bootstrap_Rounds with
               coinPrice = 1.0
             pure ()
