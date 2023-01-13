@@ -295,6 +295,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
     /** invoked by [FlagCloseable] during shutdown */
     override def run(): Unit = {
+      logger.debug("Sending shutdown signal to polling loop")(TraceContext.empty)
       val _ = shutdownSignal.tryComplete(Success(UnlessShutdown.AbortedDueToShutdown))
     }
   })(TraceContext.empty)
@@ -346,7 +347,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           previousResult.transformWith {
             case Failure(ex) =>
               logger.error(
-                s"Unexpected task list processing failure (restarting after ${context.config.pollingInterval})",
+                s"Unexpected processing failure (restarting after ${context.config.pollingInterval})",
                 ex,
               )
               loopWithDelay()
@@ -358,7 +359,9 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 // If productive work was done in the previous iteration, then we loop without a delay.
                 pollingLoop(performWorkIfAvailable())
               } else {
-                logger.trace(show"No tasks found. Sleeping for ${context.config.pollingInterval}")
+                logger.trace(
+                  show"No work performed. Sleeping for ${context.config.pollingInterval}"
+                )
                 loopWithDelay()
               }
           }
