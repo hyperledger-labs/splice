@@ -3,7 +3,7 @@ package com.daml.network.splitwise.store
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
-import com.daml.network.store.{CoinAppStore, AcsStore}
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}

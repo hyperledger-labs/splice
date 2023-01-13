@@ -2,15 +2,15 @@ package com.daml.network.wallet.admin.api.client.commands
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.transferoffer.TransferOffer
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.util.{Proto, JavaContract as Contract}
+import com.daml.network.util.{JavaContract => Contract, Proto}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.daml.network.wallet.v0.{

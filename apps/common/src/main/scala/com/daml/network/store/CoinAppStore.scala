@@ -1,6 +1,7 @@
 package com.daml.network.store
 
 import com.digitalasset.canton.logging.NamedLogging
+
 import scala.concurrent.ExecutionContext
 
 /** Store setup shared by all of our apps

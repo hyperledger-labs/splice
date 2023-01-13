@@ -3,12 +3,14 @@ package com.daml.network.validator.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
+import cats.syntax.traverse._
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.http.v0.validator as http
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.validator.admin.api.client.UserInfo
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -61,5 +63,29 @@ object HttpValidatorAppClient {
           PartyId.fromProtoPrimitive(response.partyId)
       }
     }
+  }
+
+  case class ListConnectedDomains(headers: List[HttpHeader])
+      extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
+
+    override def submitRequest(
+        client: Client
+    ) =
+      client.listConnectedDomains(headers)
+
+    override def handleResponse(
+        response: http.ListConnectedDomainsResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Map[DomainAlias, DomainId]] =
+      response match {
+        case http.ListConnectedDomainsResponse.OK(response) =>
+          response.connectedDomains.toList
+            .traverse { case (k, v) =>
+              for {
+                k <- DomainAlias.create(k)
+                v <- DomainId.fromString(v)
+              } yield (k, v)
+            }
+            .map(_.toMap)
+      }
   }
 }

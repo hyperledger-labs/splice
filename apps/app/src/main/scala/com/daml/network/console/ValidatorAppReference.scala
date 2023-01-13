@@ -1,14 +1,11 @@
 package com.daml.network.console
 
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
-import com.daml.network.auth.{AuthUtil, JwtCallCredential}
+import com.daml.network.auth.AuthUtil
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
-import com.daml.network.validator.admin.api.client.commands.{
-  GrpcValidatorAppClient,
-  HttpValidatorAppClient,
-}
+import com.daml.network.validator.admin.api.client.commands.HttpValidatorAppClient
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -25,7 +22,6 @@ abstract class ValidatorAppReference(
   override protected val instanceType = "Validator"
 
   protected def token: String
-  private def callCredentials = Some(new JwtCallCredential(token))
 
   @Help.Summary("Get validator user info")
   @Help.Description("Return the user info of the validator operator")
@@ -56,7 +52,9 @@ abstract class ValidatorAppReference(
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.ListConnectedDomains(), callCredentials)
+      httpCommand(
+        HttpValidatorAppClient.ListConnectedDomains(List(Authorization(OAuth2BearerToken(token))))
+      )
     }
 }
 

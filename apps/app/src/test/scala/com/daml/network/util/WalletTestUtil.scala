@@ -1,13 +1,13 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cn.directory as dirCodegen
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
 }
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,

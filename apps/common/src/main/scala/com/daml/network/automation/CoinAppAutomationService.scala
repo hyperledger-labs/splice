@@ -1,13 +1,13 @@
 package com.daml.network.automation
 
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import io.opentelemetry.api.trace.Tracer
-import scala.concurrent.ExecutionContext
-import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.store.CoinAppStore
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.store.CoinAppStore
 import com.digitalasset.canton.time.Clock
+import io.opentelemetry.api.trace.Tracer
+
+import scala.concurrent.ExecutionContext
 
 abstract class CoinAppAutomationService(
     automationConfig: AutomationConfig,
