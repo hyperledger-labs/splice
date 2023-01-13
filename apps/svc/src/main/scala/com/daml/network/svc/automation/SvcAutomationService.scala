@@ -2,12 +2,7 @@ package com.daml.network.svc.automation
 
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{
-  AcsIngestionService,
-  AuditLogIngestionService,
-  AutomationService,
-  DomainIngestionService,
-}
+import com.daml.network.automation.{AuditLogIngestionService, CoinAppAutomationService}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
@@ -31,28 +26,14 @@ class SvcAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(config.automation, clock, retryProvider) {
-
-  private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
-
-  registerService(
-    new AcsIngestionService(
-      store.getClass.getSimpleName,
-      store.acsIngestionSink,
-      connection,
-      retryProvider,
-      loggerFactory,
-      timeouts,
-    )
-  )
-
-  registerTrigger(
-    new DomainIngestionService(
-      store.domainIngestionSink,
+) extends CoinAppAutomationService(
+      config.automation,
+      clock,
+      store,
+      ledgerClient,
       participantAdminConnection,
-      triggerContext,
-    )
-  )
+      retryProvider,
+    ) {
 
   registerService(
     new AuditLogIngestionService(

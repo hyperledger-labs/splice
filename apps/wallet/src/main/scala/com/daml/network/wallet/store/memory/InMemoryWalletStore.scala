@@ -16,6 +16,4 @@ class InMemoryWalletStore(
     with WalletStore {
 
   override lazy val acsContractFilter = WalletStore.contractFilter(key)
-
-  override def onClosed(): Unit = {}
 }

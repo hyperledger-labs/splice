@@ -1,0 +1,44 @@
+package com.daml.network.automation
+
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import io.opentelemetry.api.trace.Tracer
+import scala.concurrent.ExecutionContext
+import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.store.CoinAppStore
+import com.daml.network.config.AutomationConfig
+import com.daml.network.environment.CoinRetries
+import com.digitalasset.canton.time.Clock
+
+abstract class CoinAppAutomationService(
+    automationConfig: AutomationConfig,
+    clock: Clock,
+    store: CoinAppStore,
+    ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
+    retryProvider: CoinRetries,
+)(implicit
+    ec: ExecutionContext,
+    tracer: Tracer,
+) extends AutomationService(automationConfig, clock, retryProvider) {
+
+  protected val connection = registerResource(ledgerClient.connection(getClass.getName))
+
+  registerService(
+    new AcsIngestionService(
+      this.getClass.getSimpleName,
+      store.acsIngestionSink,
+      connection,
+      retryProvider,
+      loggerFactory,
+      timeouts,
+    )
+  )
+
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
+    )
+  )
+}

@@ -1,7 +1,7 @@
 package com.daml.network.directory.store.memory
 
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.store.{InMemoryCoinAppStore}
+import com.daml.network.store.InMemoryCoinAppStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 

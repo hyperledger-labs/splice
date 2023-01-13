@@ -1,12 +1,7 @@
 package com.daml.network.scan.automation
 
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{
-  AcsIngestionService,
-  AuditLogIngestionService,
-  AutomationService,
-  DomainIngestionService,
-}
+import com.daml.network.automation.{AuditLogIngestionService, CoinAppAutomationService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanStore}
@@ -32,9 +27,14 @@ class ScanAutomationService(
 )(implicit
     ec: ExecutionContextExecutor,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clock, retryProvider) {
-
-  private val connection = registerResource(ledgerClient.connection("ScanAutomationService"))
+) extends CoinAppAutomationService(
+      automationConfig,
+      clock,
+      store,
+      ledgerClient,
+      participantAdminConnection,
+      retryProvider,
+    ) {
 
   registerService(
     new AuditLogIngestionService(
@@ -44,25 +44,6 @@ class ScanAutomationService(
       retryProvider,
       loggerFactory,
       timeouts,
-    )
-  )
-
-  registerService(
-    new AcsIngestionService(
-      store.getClass.getSimpleName,
-      store.acsIngestionSink,
-      connection,
-      retryProvider,
-      loggerFactory,
-      timeouts,
-    )
-  )
-
-  registerTrigger(
-    new DomainIngestionService(
-      store.domainIngestionSink,
-      participantAdminConnection,
-      triggerContext,
     )
   )
 }

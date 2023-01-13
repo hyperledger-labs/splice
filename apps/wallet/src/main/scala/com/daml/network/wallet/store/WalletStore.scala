@@ -6,14 +6,13 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, DomainStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
@@ -25,19 +24,9 @@ import scala.jdk.OptionConverters.*
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
   */
-trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMiningRounds {
+trait WalletStore extends CoinAppStore with StoreWithOpenMiningRounds {
 
   protected implicit val ec: ExecutionContext
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  def acsIngestionSink: AcsStore.IngestionSink
-
-  def domainIngestionSink: DomainStore.IngestionSink
-
-  /** The store to use for default queries. */
-  def acs: AcsStore
-
-  def domains: DomainStore
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
