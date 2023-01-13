@@ -488,6 +488,17 @@ cncluster preflight
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
 (in particular, if you made any changes to the Daml model).
 
+You can also launch an SBT shell that is configured to run the
+preflight checks. This is useful if you want to iterate more quickly
+on the preflight checks or filter them down to only a subset of the
+preflight check:
+
+```
+cd cluster/deployment/devnet
+cncluster sbt_for_preflight
+sbt:coin> testOnly *Preflight* -- -z validator1 # only run the tests against validator1
+```
+
 #### Configure Auth0 Environment
 
 The preflight check also requires access to auth0's management API (`canton-network-dev` tenant). To enable that, please go
