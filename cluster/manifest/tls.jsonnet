@@ -51,6 +51,6 @@ local certificate(issuerRef, tlsCertSecret, clusterName, clusterDnsName) = {
 };
 
 {
-    issuer:: issuer,
-    certificate:: certificate
+  issuer:: issuer,
+  certificate:: certificate,
 }

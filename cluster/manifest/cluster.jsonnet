@@ -31,7 +31,7 @@ local validPortName(name) =
     error 'port name too long: ' + name;
 
 local externalPort(port) =
-  if std.objectHas(port, "externalPort") then port.externalPort else port.port;
+  if std.objectHas(port, 'externalPort') then port.externalPort else port.port;
 
 local toGrpcWebPort(port) = {
   name: validPortName(port.name + '-gw'),
@@ -46,46 +46,46 @@ local toContainerPortDefn(p) = {
 };
 
 local authEnvVars(s) = {
-    [s.env + '_URL']: {
-      name: s.env + '_URL',
-      valueFrom: {
-        secretKeyRef: {
-          name: s.secret,
-          key: 'url',
-          optional: false
-        }
-      }
+  [s.env + '_URL']: {
+    name: s.env + '_URL',
+    valueFrom: {
+      secretKeyRef: {
+        name: s.secret,
+        key: 'url',
+        optional: false,
+      },
     },
-    [s.env + '_CLIENT_ID']: {
-      name: s.env + '_CLIENT_ID',
-      valueFrom: {
-        secretKeyRef: {
-          name: s.secret,
-          key: 'client-id',
-          optional: false
-        }
-      }
+  },
+  [s.env + '_CLIENT_ID']: {
+    name: s.env + '_CLIENT_ID',
+    valueFrom: {
+      secretKeyRef: {
+        name: s.secret,
+        key: 'client-id',
+        optional: false,
+      },
     },
-    [s.env + '_CLIENT_SECRET']: {
-      name: s.env + '_CLIENT_SECRET',
-      valueFrom: {
-        secretKeyRef: {
-          name: s.secret,
-          key: 'client-secret',
-          optional: false
-        }
-      }
+  },
+  [s.env + '_CLIENT_SECRET']: {
+    name: s.env + '_CLIENT_SECRET',
+    valueFrom: {
+      secretKeyRef: {
+        name: s.secret,
+        key: 'client-secret',
+        optional: false,
+      },
     },
-    [s.env + '_USER_NAME']: {
-      name: s.env + '_USER_NAME',
-      valueFrom: {
-        secretKeyRef: {
-          name: s.secret,
-          key: 'daml-user-name',
-          optional: false
-        }
-      }
+  },
+  [s.env + '_USER_NAME']: {
+    name: s.env + '_USER_NAME',
+    valueFrom: {
+      secretKeyRef: {
+        name: s.secret,
+        key: 'daml-user-name',
+        optional: false,
+      },
     },
+  },
 };
 
 // The amount of memory reserved for the operating system in containers
@@ -238,7 +238,9 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
               name: p.name,
               protocol: 'TCP',
               port: p.port,
-            } for p in allPorts],
+            }
+            for p in allPorts
+          ],
         },
       },
     ],
@@ -280,8 +282,9 @@ local externalService(config, ports) = {
           {
             name: p.name,
             protocol: 'TCP',
-            port: externalPort(p)
-          } for p in ports
+            port: externalPort(p),
+          }
+          for p in ports
         ],
         loadBalancerIP: config.ipAddr,
         loadBalancerSourceRanges: config.externalIPRanges,
@@ -299,8 +302,8 @@ local cluster(config, clusterDeployments) =
 
   local allPorts = flatten(std.map(function(i) i.ports, deployments));
   local nonInternalPorts = std.filter(function(port) !std.get(port, 'internalOnly', false),
-               allPorts);
-  local externalProxyPorts = std.map(function(p) {name: p.name, port: externalPort(p)}, nonInternalPorts);
+                                      allPorts);
+  local externalProxyPorts = std.map(function(p) { name: p.name, port: externalPort(p) }, nonInternalPorts);
 
   objects(deployments + [
     configMap(config, 'cluster-manifest', 'manifest.json', {
