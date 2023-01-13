@@ -74,7 +74,7 @@ class SvApp(
         )
       )
       _ = retryProvider
-        .retryForAutomation(
+        .retryForAutomationGrpc(
           "joinConsortium",
           svcConnection.joinConsortium(svPartyId),
           this,
