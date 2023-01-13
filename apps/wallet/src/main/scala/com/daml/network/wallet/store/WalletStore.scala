@@ -30,14 +30,14 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
   protected implicit val ec: ExecutionContext
 
   /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
+  def acsIngestionSink: AcsStore.IngestionSink
 
-  val domainIngestionSink: DomainStore.IngestionSink
+  def domainIngestionSink: DomainStore.IngestionSink
 
   /** The store to use for default queries. */
-  val acs: AcsStore
+  def acs: AcsStore
 
-  val domains: DomainStore
+  def domains: DomainStore
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key

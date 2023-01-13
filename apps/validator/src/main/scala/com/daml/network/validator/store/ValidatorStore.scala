@@ -3,29 +3,20 @@ package com.daml.network.validator.store
 import com.daml.network.codegen.java.cc.{coin => coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, DomainStore}
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{JavaContract => Contract}
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends AutoCloseable with NamedLogging {
+trait ValidatorStore extends CoinAppStore {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
-
-  val domainIngestionSink: DomainStore.IngestionSink
-
-  val acs: AcsStore
-
-  val domains: DomainStore
 
   def lookupWalletInstallByNameWithOffset(
       endUserName: String

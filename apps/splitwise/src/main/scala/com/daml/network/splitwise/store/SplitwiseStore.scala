@@ -3,7 +3,7 @@ package com.daml.network.splitwise.store
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
-import com.daml.network.store.{AcsStore, DomainStore}
+import com.daml.network.store.{CoinAppStore, AcsStore}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -12,17 +12,8 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SplitwiseStore extends AutoCloseable {
+trait SplitwiseStore extends CoinAppStore {
   import AcsStore.QueryResult
-
-  val acsIngestionSink: AcsStore.IngestionSink
-  val domainIngestionSink: DomainStore.IngestionSink
-
-  implicit protected def ec: ExecutionContext
-
-  val acs: AcsStore
-
-  val domains: DomainStore
 
   def providerParty: PartyId
 

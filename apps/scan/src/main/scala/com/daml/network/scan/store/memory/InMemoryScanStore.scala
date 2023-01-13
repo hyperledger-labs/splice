@@ -1,16 +1,8 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.store.{
-  AcsStore,
-  CCHistoryStore,
-  DomainStore,
-  InMemoryAcsStore,
-  InMemoryCCHistoryStore,
-  InMemoryDomainStore,
-}
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.daml.network.store.{CCHistoryStore, InMemoryCCHistoryStore, InMemoryCoinAppStore}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.*
@@ -18,23 +10,17 @@ import scala.concurrent.*
 class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext
-) extends ScanStore
-    with NamedLogging {
+) extends InMemoryCoinAppStore
+    with ScanStore {
+
+  override lazy val acsContractFilter = ScanStore.contractFilter(svcParty)
 
   override val history: CCHistoryStore = new InMemoryCCHistoryStore(loggerFactory)
 
-  private val inMemoryAcsStore =
-    new InMemoryAcsStore(loggerFactory, ScanStore.contractFilter(svcParty))
-
-  override val acs: AcsStore = inMemoryAcsStore
-
-  override val domains: InMemoryDomainStore =
-    new InMemoryDomainStore(loggerFactory)
-
-  override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
-  override val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
-  override protected def onClosed(): Unit = history.close()
+  override def close(): Unit = {
+    history.close()
+    super.close()
+  }
 }

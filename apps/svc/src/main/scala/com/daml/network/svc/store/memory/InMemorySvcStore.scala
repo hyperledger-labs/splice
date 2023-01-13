@@ -1,8 +1,8 @@
 package com.daml.network.svc.store.memory
 
-import com.daml.network.store.{AcsStore, DomainStore, InMemoryAcsStore, InMemoryDomainStore}
+import com.daml.network.store.InMemoryCoinAppStore
 import com.daml.network.svc.store.{SvcEventsStore, SvcStore}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent._
@@ -12,25 +12,10 @@ class InMemorySvcStore(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends SvcStore
-    with NamedLogging {
+) extends InMemoryCoinAppStore
+    with SvcStore {
+
+  override lazy val acsContractFilter = SvcStore.contractFilter(svcParty)
 
   override val events: SvcEventsStore = new InMemorySvcEventsStore(loggerFactory)
-
-  private val inMemoryAcsStore =
-    new InMemoryAcsStore(loggerFactory, SvcStore.contractFilter(svcParty))
-
-  override val acs: AcsStore = inMemoryAcsStore
-
-  override val domains: InMemoryDomainStore =
-    new InMemoryDomainStore(loggerFactory)
-
-  override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
-
-  override val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
-
-  override def close(): Unit = {
-    events.close()
-  }
-
 }

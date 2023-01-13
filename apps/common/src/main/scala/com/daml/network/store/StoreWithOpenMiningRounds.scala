@@ -3,15 +3,14 @@ package com.daml.network.store
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Mix-in for an ACS-based store that tracks the OpenMiningRound contracts. */
-trait StoreWithOpenMiningRounds { this: FlagCloseable =>
+trait StoreWithOpenMiningRounds {
 
-  protected def acs: AcsStore
+  def acs: AcsStore
 
   /** Returns the active open mining rounds who are open according to 'opensAt'. */
   def lookupSubmittableOpenMiningRounds(

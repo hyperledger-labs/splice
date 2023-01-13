@@ -3,7 +3,7 @@ package com.daml.network.svc.store
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, DomainStore}
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.data.CantonTimestamp
@@ -17,7 +17,7 @@ import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait SvcStore extends AutoCloseable {
+trait SvcStore extends CoinAppStore {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -25,16 +25,6 @@ trait SvcStore extends AutoCloseable {
   /** Audit log store */
   // TODO(tech-debt): build common infrastructure for such audit-log stores and inline its functions
   val events: SvcEventsStore
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
-
-  val domainIngestionSink: DomainStore.IngestionSink
-
-  /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  val acs: AcsStore
-
-  val domains: DomainStore
 
   def lookupCoinRulesWithOffset(
   ): Future[

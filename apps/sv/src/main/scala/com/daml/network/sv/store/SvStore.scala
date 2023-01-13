@@ -1,7 +1,7 @@
 package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.store.{AcsStore, DomainStore}
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.sv.store.memory.InMemorySvStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -10,20 +10,10 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.ExecutionContext
 
 /** Utility class grouping the two kinds of stores managed by the SvApp. */
-trait SvStore extends AutoCloseable {
+trait SvStore extends CoinAppStore {
 
   /** Get the party-id of the SV issuing CC accepted by this provider. */
   def svParty: PartyId
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
-
-  val domainIngestionSink: DomainStore.IngestionSink
-
-  /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  val acs: AcsStore
-
-  val domains: DomainStore
 }
 
 object SvStore {

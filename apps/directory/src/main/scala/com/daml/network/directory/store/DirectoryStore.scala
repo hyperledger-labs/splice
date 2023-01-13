@@ -4,7 +4,7 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.store.{AcsStore, DomainStore}
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -20,21 +20,9 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore extends AutoCloseable {
+trait DirectoryStore extends CoinAppStore {
 
   import AcsStore.QueryResult
-
-  implicit protected def ec: ExecutionContext
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
-
-  val domainIngestionSink: DomainStore.IngestionSink
-
-  /** The [[com.daml.network.store.AcsStore]] to use for listing contracts and retrieving them by contract-id. */
-  val acs: AcsStore
-
-  val domains: DomainStore
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
