@@ -4,6 +4,9 @@
     1. [Directory Layout](#directory-layout)
     1. [IntelliJ Setup](#intellij-setup)
     1. [Using `sbt`](#using-sbt)
+        1. [`sbt` settings](#sbt-settings)
+        1. [`sbt` Commands](#sbt-commands)
+        1. [`sbt` Tips\&Tricks](#sbt-tipstricks)
 1. [Contributing Changes](#contributing-changes)
     1. [Contributing as a New Joiner](#contributing-as-a-new-joiner)
     1. [Contribution Guide](#contribution-guide)
@@ -13,24 +16,43 @@
     1. [Protobuf and GRPC Guidelines](#protobuf-and-grpc-guidelines)
     1. [Editing Daml](#editing-daml)
     1. [Bumping Our Canton fork](#bumping-our-canton-fork)
+        1. [Message Definitions](#message-definitions)
     1. [Code Layout](#code-layout)
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
+        1. [SVC App](#svc-app)
+        1. [Validator App](#validator-app)
+        1. [All Other Applications](#all-other-applications)
     1. [Frontend Code](#frontend-code)
-    1. [Conversions between Java & Scala types](#java-conversions)
+        1. [Background](#background)
+        1. [New Packages](#new-packages)
+        1. [Common libs](#common-libs)
+    1. [Conversions between Java \& Scala types](#conversions-between-java--scala-types)
 1. [Testing](#testing)
     1. [Managing Canton for Tests](#managing-canton-for-tests)
     1. [Managing Frontends for Tests](#managing-frontends-for-tests)
-    1. [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
     1. [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
-    1. [Testing App Behaviour Outside of Tests Without Running Bundle ](#testing-app-behaviour-outside-of-tests-without-running-bundle)
+    1. [Testing App Behaviour Outside of Tests Without Running Bundle](#testing-app-behaviour-outside-of-tests-without-running-bundle)
+    1. [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
     1. [Running The Preflight Check](#running-the-preflight-check)
+        1. [Configure Auth0 Environment](#configure-auth0-environment)
+        1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
+        1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
 1. [Building and Running the Wallet and Splitwise Apps](#building-and-running-the-wallet-and-splitwise-apps)
     1. [Building the Wallet and Splitwise Frontend](#building-the-wallet-and-splitwise-frontend)
     1. [Running the Wallet and Splitwise Frontend](#running-the-wallet-and-splitwise-frontend)
+    1. [NPM Lock file issues](#npm-lock-file-issues)
 1. [Auth0 Configuration](#auth0-configuration)
-    1. [Tenant & Application Layout](#tenant-Application-layout)
+    1. [Tenant & Application Layout](#tenant-application-layout)
 1. [CircleCI Tokens](#circleci-tokens)
+    1. [Auth0 Tokens](#auth0-tokens)
+        1. [Step 1: rotate all secrets that can be used to gain new access tokens](#step-1-rotate-all-secrets-that-can-be-used-to-gain-new-access-tokens)
+        1. [Step 2: revoke all existing access tokens by revoking the token signing key](#step-2-revoke-all-existing-access-tokens-by-revoking-the-token-signing-key)
+        1. [Step 3: restart all services](#step-3-restart-all-services)
+    1. [CircleCI Token](#circleci-token)
+    1. [GCP Token](#gcp-token)
+    1. [Github Tokens](#github-tokens)
+    1. [VPN Secrets](#vpn-secrets)
 
 For information on the runtime configuration of a Canton Network
 cluster, please see the [cluster specific documentation](/cluster/README.md).
@@ -50,14 +72,38 @@ clusters.)
    login yourartifactoryusername
    password yourartifactoryapikey
    ```
-   You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile). 
+   You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
 4. After switching to the CC repo you should see a line like
-```
-direnv: error /home/moritz/daml-projects/canton-coin/.envrc is blocked. Run `direnv allow` to approve its content
-```
+   ```
+   direnv: error /home/moritz/daml-projects/canton-coin/.envrc is blocked. Run `direnv allow` to approve its content
+   ```
 5. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
+6. If you get an authorization exception, like the following:
+   ```
+   direnv: using nix
+   error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-20230106.tar.gz': HTTP error 401 ('Unauthorized')
+   ```
+   1. Check that your access token is valid by running the following sample command:
+      ```
+      curl -vvv -L -u<yourartifactoryusername>:<yourartifactoryapikey> "https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-20230106.tar.gz" -o canton-research-20230106.tar.gz
+      ```
+      If the download fails, check that your access token matches what is set in [Artifactory](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
+      Also, check you have visability via the UI [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-research/snapshot) (ie., the `canton-research` snapshot folder).
+      If you don't have visability via the UI then check with [helpdesk](help@digitalasset.com).
+   2. If the artifact successfully downloaded, check the access rights of the file `/etc/nix/netrc`.
+      If the access rights are more restrictive than `-rw-rw-r--`, update them:
+      ```
+      chmod 664 /etc/nix/netrc
+      ```
+      Note - `sudo` may be required to run the above command.
+   3. Switch the CC repo.
+   4. If the authorization exception isn't resolved, investigate further with additional logging
+      by running the following command at the root of the CC repo :
+      ```
+      nix-shell --debug --verbose --pure
+      ```
 
 **Important:** start your IDE and other development tools from a console that
 has this `direnv` loaded; and thus has the proper version of all the
@@ -65,7 +111,7 @@ project dependencies on its `PATH`.
 
 If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
-6. On MacOS, please install the following globally:
+1. On MacOS, please install the following globally:
    1. Envoy, by running: `brew update ; brew install envoy`
    2. Firefox, by following the process here: <https://www.firefox.com>
 
@@ -149,7 +195,7 @@ Test:
 
 Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
 - In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
-- In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-cn` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed. 
+- In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-cn` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed.
 
 ## Contributing Changes
 
@@ -165,7 +211,7 @@ as a baseline, and list below only the points where we differ.
 
 Please read the above guide in particular to learn about metrics, logging, tracing, Scala guidelines, Protobuf guidelines, TODO notes, formatting and git hooks.
 
-Committed code must adhere to our formatting guidelines. To automatically reformat all code, run `sbt formatFix`. 
+Committed code must adhere to our formatting guidelines. To automatically reformat all code, run `sbt formatFix`.
 
 ### Unused Import Warnings
 
@@ -262,10 +308,10 @@ Current Canton commit: `2fdce073b00879669a32a9218eac11b08e594c38`
           lists `canton-open-source-20221011.tar.gz` under the
           artifacts so `20221011` is the Canton version.
        2. Bump `sdk_version` to the associated sdk snapshot version
-       3. Change a character of the `sha256` digest (e.g. "ef..." -> "0f..."), and then `cd ..` and `cd -` out of the repo, 
+       3. Change a character of the `sha256` digest (e.g. "ef..." -> "0f..."), and then `cd ..` and `cd -` out of the repo,
           to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
     4. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
-    5. In `shell.nix`, manually invalidate and then update the `sha256` digest as you did for `nix/canton.nix`. 
+    5. In `shell.nix`, manually invalidate and then update the `sha256` digest as you did for `nix/canton.nix`.
 15. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
 16. Make a PR with your changes, so CI starts churning.
 17. Test whether things compile using `sbt Test/compile`.
@@ -360,7 +406,7 @@ Frontend code projects are managed via [`npm workspaces`](https://docs.npmjs.com
 - One local monorepo package can be installed as a dependency of another, enabling "easy" code-sharing.
 - With `npm install`, all dependencies of all workspace projects are installed in the root `node_modules` folders, giving us de-deduplication.
 - If all workspace projects share common scripts, you can easily run that script across all workspaces in one command.
-- All required `npm` commands are issued from `sbt compile`, so there should not be a need to run e.g. `npm install` directly. 
+- All required `npm` commands are issued from `sbt compile`, so there should not be a need to run e.g. `npm install` directly.
 
 #### New Packages
 
@@ -540,7 +586,7 @@ If you don't find an usage of a given method within the CN network repo, you can
 
 ### Building the Wallet and Splitwise Frontend
 
-Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends 
+Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends
 (specifically, all ts code for our daml models and protobuf definitions), and build anything required for the frontends (e.g. install dependencies in `node_modules`).
 
 ### Running the Wallet and Splitwise Frontend
@@ -599,7 +645,7 @@ To make sure your lock files match CI, run the following steps:
 
 ## Auth0 Configuration
 
-We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/the Canton Network team) run in our Google Cloud cluster(s). This section elucidates how this is currently set up, but keep in mind this is not necessarily how we'd advise users of self-hosted validators to set up an Auth0 integration. For that, they should look at the relevant runbook docs section. 
+We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/the Canton Network team) run in our Google Cloud cluster(s). This section elucidates how this is currently set up, but keep in mind this is not necessarily how we'd advise users of self-hosted validators to set up an Auth0 integration. For that, they should look at the relevant runbook docs section.
 
 ### Tenant & Application Layout
 
@@ -615,7 +661,7 @@ Currently we maintain two tenants with some application clients in them:
     - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
     - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
 
-If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default). 
+If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 
 ## CircleCI Tokens
 
@@ -709,9 +755,9 @@ of the https://github.com/DACH-NY/the-real-canton-coin repo.
 
 ### VPN Secrets
 
-Some CircleCI jobs require connecting to a remote Canton Network cluster, protected behind a firewall. To access those services, 
+Some CircleCI jobs require connecting to a remote Canton Network cluster, protected behind a firewall. To access those services,
 the CI job establishes a connection to a VPN whose IP is whitelisted by the cluster (see: `setup_vpn` job). The VPN credentials,
 a username/password pair, are stored in the `canton-network-vpn` CircleCI Context.
 
-To rotate the VPN password, send an email to `help@digitalasset.com`, and IT will swap out the password in the context. 
+To rotate the VPN password, send an email to `help@digitalasset.com`, and IT will swap out the password in the context.
 No further changes to the CI config file should be necessary.
