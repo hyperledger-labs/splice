@@ -39,12 +39,29 @@ all: docker-build
 clean:
 	-rm -vfr target
 
+##########
+# version
+##########
+
+version := target/version
+
+.PHONY: force-update-version
+# Make depends on file modification times rather than hashes
+# so we need to be careful to only overwrite the version if it changed.
+$(version): force-update-version
+	mkdir -p $(@D); \
+	NEWVERSION=$$(mktemp); \
+	version-gen > $$NEWVERSION; \
+	if ! diff $$NEWVERSION $@ &> /dev/null; then \
+		cp $$NEWVERSION $@; \
+	fi; \
+	rm $$NEWVERSION
 
 #########
 # docker
 #########
 
-docker-src := Dockerfile
+docker-src := Dockerfile $(version)
 
 #################
 ## docker images
