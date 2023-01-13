@@ -355,9 +355,26 @@ class WalletIntegrationTest
         splitwiseProviderWallet.cancelFeaturedAppRight(),
       )(
         "splitwise provider is no longer featured",
-        _ => scan.listFeaturedAppRights() shouldBe empty,
+        { _ =>
+          scan.listFeaturedAppRights() shouldBe empty
+          splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+        },
       )
 
+      actAndCheck(
+        "Splitwise provider grants itself a featured app right",
+        splitwiseProviderWallet.selfGrantFeaturedAppRight(),
+      )(
+        "splitwise provider is featured",
+        { featuredAppRight =>
+          {
+            inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+              r.contractId shouldBe featuredAppRight
+            }
+            splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+          }
+        },
+      )
     }
   }
 }

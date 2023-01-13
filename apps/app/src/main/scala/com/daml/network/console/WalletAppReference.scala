@@ -53,12 +53,22 @@ class WalletAppClientReference(
 
   @Help.Summary("Credits the requested quantity of Canton coin to the wallet's user")
   @Help.Description(
-    "This function will only be available in the testnet. It allows creating coins for testing purposes." +
+    "This function will only be available in the devnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
   def tap(quantity: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.Tap(quantity), callCredentials)
+    }
+  }
+
+  @Help.Summary("Self-grant a featured app right")
+  @Help.Description(
+    "This function will only be available in the devnet. It allows an app provider to grant a featured app right to themselves without the SVC having to approve."
+  )
+  def selfGrantFeaturedAppRight(): coinCodegen.FeaturedAppRight.ContractId = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.SelfGrantFeaturedAppRight(), callCredentials)
     }
   }
 

@@ -186,6 +186,23 @@ class GrpcWalletService(
       }
     }
 
+  override def selfGrantFeaturedAppRight(
+      request: Empty
+  ): Future[v0.SelfGrantFeaturedAppRightResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth { user =>
+        for {
+          userStore <- getUserStore(user)
+          coinRules <- store.getCoinRules()
+          result <- exerciseWalletAction((installCid, _) =>
+            Future.successful(
+              installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
+            )
+          )(user, _.exerciseResult)
+        } yield v0.SelfGrantFeaturedAppRightResponse(Proto.encodeContractId(result))
+      }
+    }
+
   override def listAppPaymentRequests(
       request: v0.ListAppPaymentRequestsRequest
   ): Future[v0.ListAppPaymentRequestsResponse] =

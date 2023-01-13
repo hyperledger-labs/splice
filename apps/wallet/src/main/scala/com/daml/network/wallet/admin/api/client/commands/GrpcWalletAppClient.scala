@@ -3,13 +3,14 @@ package com.daml.network.wallet.admin.api.client.commands
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.wallet.transferoffer.TransferOffer
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.util.{JavaContract => Contract, Proto}
+import com.daml.network.util.{Proto, JavaContract as Contract}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.daml.network.wallet.v0.{
@@ -17,6 +18,7 @@ import com.daml.network.wallet.v0.{
   CreateTransferOfferResponse,
   GetBalanceRequest,
   GetBalanceResponse,
+  SelfGrantFeaturedAppRightResponse,
 }
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.data.CantonTimestamp
@@ -137,6 +139,26 @@ object GrpcWalletAppClient {
         response: v0.TapResponse
     ): Either[String, coinCodegen.Coin.ContractId] =
       Proto.decodeJavaContractId(coinCodegen.Coin.COMPANION)(response.contractId)
+  }
+
+  case class SelfGrantFeaturedAppRight()
+      extends BaseCommand[
+        Empty,
+        v0.SelfGrantFeaturedAppRightResponse,
+        coinCodegen.FeaturedAppRight.ContractId,
+      ] {
+
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[SelfGrantFeaturedAppRightResponse] = service.selfGrantFeaturedAppRight(request)
+
+    override def handleResponse(
+        response: SelfGrantFeaturedAppRightResponse
+    ): Either[String, FeaturedAppRight.ContractId] =
+      Proto.decodeJavaContractId(coinCodegen.FeaturedAppRight.COMPANION)(response.contractId)
   }
 
   case class Balance(

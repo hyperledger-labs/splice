@@ -10,6 +10,7 @@ service WalletService {
   rpc UserStatus (UserStatusRequest) returns (UserStatusResponse);
   rpc List (ListRequest) returns (ListResponse);
   rpc Tap (TapRequest) returns (TapResponse);
+  rpc SelfGrantFeaturedAppRight(google.protobuf.Empty) returns (SelfGrantFeaturedAppRightResponse);
 
   rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
 
@@ -71,6 +72,10 @@ message TapRequest {
 }
 
 message TapResponse {
+  string contract_id = 1;
+}
+
+message SelfGrantFeaturedAppRightResponse {
   string contract_id = 1;
 }
 
