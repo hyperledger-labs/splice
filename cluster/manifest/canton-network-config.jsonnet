@@ -149,6 +149,10 @@ local validator1Deployments(config) = [
       name: 'val1-val-api',
       port: 5103,
     },
+    {
+      name: 'val1-val-http',
+      port: 7103,
+    },
   ], proxyToGrpcWeb='val1-val-api', extraEnvVars=[
     authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_URL'],
     authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID'],
