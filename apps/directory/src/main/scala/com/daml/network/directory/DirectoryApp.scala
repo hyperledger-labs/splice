@@ -165,7 +165,11 @@ object DirectoryApp {
 
     override def close(): Unit =
       Lifecycle.close(
-        AsyncCloseable("http binding", binding.unbind(), timeouts.shutdownNetwork.unwrap),
+        AsyncCloseable(
+          "http binding",
+          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          timeouts.shutdownNetwork.unwrap,
+        ),
         automation,
         storage,
         store,

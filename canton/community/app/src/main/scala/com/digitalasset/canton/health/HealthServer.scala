@@ -39,7 +39,11 @@ class HealthServer(
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*
     List[AsyncOrSyncCloseable](
-      AsyncCloseable("binding", binding.unbind(), timeouts.shutdownNetwork.unwrap),
+      AsyncCloseable(
+        "binding",
+        binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+        timeouts.shutdownNetwork.unwrap,
+      ),
       SyncCloseable("check", Lifecycle.close(check)(logger)),
     )
   }
