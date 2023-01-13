@@ -4,7 +4,7 @@ import DA.Exception
 
 import qualified CC.API.V1.Coin as API
 import CC.Round (OpenMiningRound)
-import CC.Coin (CoinRules, CoinRules_Tap(..), InvalidTransfer, InvalidTransferReason(..))
+import CC.Coin (CoinRules, CoinRules_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -202,3 +202,9 @@ template WalletAppInstall
         cid : ContractId AcceptedTransferOffer
       controller walletServiceParty
       do exercise cid $ AcceptedTransferOffer_Withdraw
+
+    nonconsuming choice WalletAppInstall_FeaturedAppRights_Cancel : ()
+      with
+        cid : ContractId FeaturedAppRight
+      controller walletServiceParty
+      do exercise cid $ FeaturedAppRight_Cancel

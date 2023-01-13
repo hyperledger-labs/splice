@@ -38,6 +38,8 @@ service WalletService {
   // TODO(M3-18) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
+
+  rpc CancelFeaturedAppRights (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message UserStatusRequest {

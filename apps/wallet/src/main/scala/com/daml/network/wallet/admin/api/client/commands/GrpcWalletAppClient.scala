@@ -751,4 +751,14 @@ object GrpcWalletAppClient {
     ): Either[String, Map[DomainAlias, DomainId]] =
       Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
+
+  case class CancelFeaturedAppRight() extends BaseCommand[Empty, Empty, Unit] {
+
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+
+    override def submitRequest(service: WalletServiceStub, request: Empty): Future[Empty] =
+      service.cancelFeaturedAppRights(request)
+
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
+  }
 }

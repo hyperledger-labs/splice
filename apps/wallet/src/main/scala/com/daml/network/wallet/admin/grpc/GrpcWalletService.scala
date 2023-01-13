@@ -533,6 +533,30 @@ class GrpcWalletService(
       }
     }
 
+  override def cancelFeaturedAppRights(request: Empty): Future[Empty] = {
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
+      withAuth { user =>
+        for {
+          userStore <- getUserStore(user)
+          featuredAppRight <- userStore.lookupFeaturedAppRight()
+          result <- featuredAppRight match {
+            case None =>
+              logger.info(s"No featured app right found for user ${user} - nothing to cancel")
+              Future.successful(Empty())
+            case Some(cid) =>
+              exerciseWalletAction((installCid, _) => {
+                Future.successful(
+                  installCid.exerciseWalletAppInstall_FeaturedAppRights_Cancel(
+                    cid.contractId
+                  )
+                )
+              })(user, _ => Empty())
+          }
+        } yield result
+      }
+    }
+  }
+
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *

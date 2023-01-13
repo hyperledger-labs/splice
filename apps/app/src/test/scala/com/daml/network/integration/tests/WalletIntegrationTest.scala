@@ -58,6 +58,7 @@ class WalletIntegrationTest
             } catch {
               case _: CommandFailure =>
             }
+
           submitRequest()
           // Without this second request, the walletBackend would shut down too quickly, and we would not see
           // the message about an empty batch in the logs.
@@ -228,7 +229,9 @@ class WalletIntegrationTest
             // this leads to a retry..
             val _ =
               try aliceWallet.acceptAppPaymentRequest(request)
-              catch { case _: CommandFailure => () }
+              catch {
+                case _: CommandFailure => ()
+              }
             // Execute a successful tap here so that we see the recovery of the coin-operation batch executor.
             // Without that one, the shutdown would initiate before recovery starts.
             aliceWallet.tap(666)
@@ -323,6 +326,38 @@ class WalletIntegrationTest
       eventually() {
         providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("da")
       }
+    }
+
+    "support featured app rewards" in { implicit env =>
+      val splitwiseProvider = onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
+      splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+
+      clue("Canceling a featured app right before getting it, nothing bad should happen")(
+        splitwiseProviderWallet.cancelFeaturedAppRight()
+      )
+
+      actAndCheck(
+        "grant a featured app right to splitwise provider", {
+          svcClient.grantFeaturedAppRight(splitwiseProvider)
+        },
+      )(
+        "splitwise provider is featured",
+        { _ =>
+          inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+            r.payload.provider shouldBe splitwiseProvider.toProtoPrimitive
+          }
+          splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+        },
+      )
+
+      actAndCheck(
+        "splitwise cancels its own featured app right",
+        splitwiseProviderWallet.cancelFeaturedAppRight(),
+      )(
+        "splitwise provider is no longer featured",
+        _ => scan.listFeaturedAppRights() shouldBe empty,
+      )
+
     }
   }
 }

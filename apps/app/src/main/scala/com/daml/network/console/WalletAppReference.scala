@@ -324,6 +324,12 @@ class WalletAppClientReference(
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.UserStatus(), callCredentials)
     }
+
+  @Help.Summary("Cancel user's featured app rights")
+  def cancelFeaturedAppRight(): Unit =
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.CancelFeaturedAppRight(), callCredentials)
+    }
 }
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
