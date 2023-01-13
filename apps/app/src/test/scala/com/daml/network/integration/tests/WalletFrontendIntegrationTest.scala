@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.util.WalletTestUtil
 
+import java.time.Duration
 import scala.util.Try
 
 class WalletFrontendIntegrationTest
@@ -25,6 +26,52 @@ class WalletFrontendIntegrationTest
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val quantity = row.childElement(className("coins-table-quantity"))
         quantity.text should be("15.0000000000CC")
+      }
+    }
+
+    "show balance and locked coins" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+      val tapQty = 50
+      val lockedQty = 10
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+
+        eventually() {
+          find(id("locked-qty")).value.text should matchText("0.0000000000")
+          find(id("unlocked-qty")).value.text should matchText("0.0000000000")
+        }
+
+        click on "tap-amount-field"
+        numberField("tap-amount-field").underlying.sendKeys(s"$tapQty")
+        click on "tap-button"
+        // This is required to ensure we can lock coins
+        eventually() {
+          findAll(className("coins-table-row")) should have size 1
+        }
+
+        lockCoins(
+          aliceWalletBackend,
+          aliceParty,
+          aliceValidatorParty,
+          aliceWallet.list().coins,
+          lockedQty,
+          scan.getAppTransferContext(),
+          Duration.ofDays(1),
+        )
+
+        eventually() {
+          val currentLockedQty = BigDecimal(find(id("locked-qty")).value.text)
+          val currentUnlockedQty = BigDecimal(find(id("unlocked-qty")).value.text)
+          val currentHoldingFees = BigDecimal(find(id("holding-fees")).value.text)
+          val expectedUnlockedQty = tapQty - lockedQty
+
+          assertInRange(currentUnlockedQty, (expectedUnlockedQty - 1, expectedUnlockedQty))
+          assertInRange(currentLockedQty, (lockedQty, lockedQty))
+          assertInRange(currentHoldingFees, (0, 1))
+        }
       }
     }
 

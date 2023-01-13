@@ -22,6 +22,13 @@ export interface WalletProps {
   url: string;
 }
 
+export interface GetBalanceResponse {
+  round: number;
+  effectiveUnlockedQty: string;
+  effectiveLockedQty: string;
+  totalHoldingFees: string;
+}
+
 export interface ListResponse {
   lockedCoins: v0.CoinPosition[];
   coins: v0.CoinPosition[];
@@ -56,7 +63,7 @@ export interface ListSubscriptionsResponse {
 export interface WalletClient {
   tap: (quantity: string) => Promise<void>;
   list: () => Promise<ListResponse>;
-
+  getBalance: () => Promise<GetBalanceResponse>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
@@ -113,6 +120,15 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       tap: async quantity => {
         await walletClient.tap(new v0.TapRequest().setQuantity(quantity), getCreds());
+      },
+      getBalance: async (): Promise<GetBalanceResponse> => {
+        const balance = await walletClient.getBalance(new v0.GetBalanceRequest(), getCreds());
+        return {
+          round: balance.getRound(),
+          effectiveUnlockedQty: balance.getEffectiveUnlockedQty(),
+          effectiveLockedQty: balance.getEffectiveLockedQty(),
+          totalHoldingFees: balance.getTotalHoldingFees(),
+        };
       },
       createTransferOffer: async (
         receiverPartyId,

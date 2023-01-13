@@ -82,6 +82,39 @@ class WalletTimeBasedIntegrationTest
       }
     }
 
+    "ensure balances are updated accordingly after a round" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+      aliceWallet.tap(50)
+      val startingBalance = aliceWallet.balance()
+      val lockedQty = 25
+
+      advanceRoundsByOneTick
+
+      lockCoins(
+        aliceWalletBackend,
+        aliceUserParty,
+        aliceValidatorParty,
+        aliceWallet.list().coins,
+        lockedQty,
+        scan.getAppTransferContext(),
+        Duration.ofDays(10),
+      )
+
+      clue("Check balance after advancing round and locking coins") {
+        eventually() {
+          val expectedUnlockedCoins = startingBalance.unlockedQty - lockedQty
+          checkBalance(
+            aliceWallet,
+            startingBalance.round + 1,
+            (expectedUnlockedCoins - 1, expectedUnlockedCoins),
+            (lockedQty - 1, lockedQty),
+            (0, 1),
+          )
+        }
+      }
+    }
+
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 

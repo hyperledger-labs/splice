@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 
 import {
   Button,
+  CardContent,
   FormGroup,
   Stack,
   Table,
@@ -12,18 +13,26 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Typography,
 } from '@mui/material';
 
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 
 import { QuantityDisplay } from '../components/QuantityDisplay';
-import { useWalletClient } from '../contexts/WalletServiceContext';
+import { GetBalanceResponse, useWalletClient } from '../contexts/WalletServiceContext';
 
 const Coins: React.FC = () => {
+  const initialBalance = {
+    effectiveLockedQty: '',
+    effectiveUnlockedQty: '',
+    round: 0,
+    totalHoldingFees: '',
+  };
   const [coins, setCoins] = useState<Contract<Coin>[]>([]);
   const [tapValue, setTapValue] = useState<Decimal>(new Decimal(0.0));
+  const [balance, setBalance] = useState<GetBalanceResponse>(initialBalance);
 
-  const { tap, list } = useWalletClient();
+  const { tap, list, getBalance } = useWalletClient();
 
   const fetchCoins = useCallback(async () => {
     const newCoins = (await list()).coins;
@@ -36,7 +45,13 @@ const Coins: React.FC = () => {
     setCoins(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [list, setCoins]);
 
+  const fetchBalance = useCallback(async () => {
+    const balance = await getBalance();
+    setBalance(balance);
+  }, [getBalance, setBalance]);
+
   useInterval(fetchCoins, 500);
+  useInterval(fetchBalance, 500);
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -48,6 +63,11 @@ const Coins: React.FC = () => {
     tap(strVal);
   };
 
+  const formatBalanceValue = (value: string) => {
+    return value === '' ? 'Loading...' : Number(value).toFixed(10);
+  };
+
+  // Check balance first, then tap, then check updated balance.
   return (
     <Stack spacing={2}>
       <FormGroup row>
@@ -67,6 +87,32 @@ const Coins: React.FC = () => {
           Tap
         </Button>
       </FormGroup>
+      <Stack direction={'row'} spacing={2}>
+        <CardContent>
+          <Typography variant={'h6'}>
+            <span id={'unlocked-qty'}>{formatBalanceValue(balance.effectiveUnlockedQty)}</span> CC
+          </Typography>
+          <Typography variant={'caption'} gutterBottom>
+            Unlocked Coins
+          </Typography>
+        </CardContent>
+        <CardContent>
+          <Typography variant={'h6'}>
+            <span id={'locked-qty'}>{formatBalanceValue(balance.effectiveLockedQty)}</span> CC
+          </Typography>
+          <Typography variant={'caption'} gutterBottom>
+            Locked Coins
+          </Typography>
+        </CardContent>
+        <CardContent>
+          <Typography variant={'h6'}>
+            <span id={'holding-fees'}>{formatBalanceValue(balance.totalHoldingFees)}</span> CC
+          </Typography>
+          <Typography variant={'caption'} gutterBottom>
+            Holding Fees
+          </Typography>
+        </CardContent>
+      </Stack>
       <Table>
         <TableHead>
           <TableRow>
