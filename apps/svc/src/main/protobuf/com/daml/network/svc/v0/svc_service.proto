@@ -17,6 +17,9 @@ service SvcService {
   // TODO(M3-18) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
+
+  // TODO(#2241) part of mock SVC bootstrap; remove
+  rpc JoinConsortium (JoinConsortiumRequest) returns (google.protobuf.Empty);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -55,4 +58,10 @@ message WithdrawFeaturedAppRightRequest {
 
 message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
+}
+
+// TODO(#2241) part of mock SVC bootstrap; remove
+message JoinConsortiumRequest {
+  // Party representing the SV that wants to join
+  string sv_party = 1;
 }

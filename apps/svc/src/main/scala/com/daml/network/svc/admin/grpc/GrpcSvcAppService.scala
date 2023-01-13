@@ -1,13 +1,14 @@
 package com.daml.network.svc.admin.grpc
 
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
+  JoinConsortiumRequest,
   SvcServiceGrpc,
   WithdrawFeaturedAppRightRequest,
 }
@@ -21,6 +22,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
@@ -114,5 +116,41 @@ class GrpcSvcAppService(
       } yield {
         v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
       }
+    }
+
+  // TODO(#2241) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
+  override def joinConsortium(request: JoinConsortiumRequest): Future[Empty] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+      logger.info(s"Adding party ${request.svParty} to SV consortium")
+      for {
+        _ <- store.lookupSvcRulesWithOffset().flatMap {
+          case QueryResult(off, None) =>
+            logger.info("SvcRules don't exist; creating with party as leader")
+            val round1 = new cc.api.v1.round.Round(1);
+            connection
+              .submitCommands(
+                actAs = Seq(store.svcParty),
+                readAs = Seq.empty,
+                commands = new cn.svcrules.SvcRules(
+                  store.svcParty.toProtoPrimitive,
+                  0,
+                  round1, // we don't yet use this so KISS
+                  java.util.Map.of(request.svParty, new cn.svcrules.MemberInfo(round1)),
+                  request.svParty,
+                ).create.commands.asScala.toSeq,
+                commandId =
+                  CoinLedgerConnection.CommandId("com.daml.network.svc.createSvcRules", Seq()),
+                deduplicationOffset = off,
+              )
+          case QueryResult(_, Some(svcRules)) =>
+            logger.info("SvcRules exist; adding party as member")
+            connection.submitWithResultNoDedup(
+              actAs = Seq(store.svcParty),
+              readAs = Seq.empty,
+              update =
+                svcRules.contractId.exerciseSvcRules_AddMember(request.svParty, "mock bootstrap"),
+            )
+        },
+      } yield Empty()
     }
 }

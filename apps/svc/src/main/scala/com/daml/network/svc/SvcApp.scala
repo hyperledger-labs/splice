@@ -3,8 +3,8 @@ package com.daml.network.svc
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
@@ -25,6 +25,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
 
+import scala.collection.immutable.Map
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -62,6 +63,8 @@ class SvcApp(
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
       connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
+      // TODO(#2241) should be handled by SV app
+      _ <- connection.uploadDarFile(SvcApp.svcGovernancePackage)
       automation = new SvcAutomationService(
         clock,
         config,
@@ -115,6 +118,10 @@ object SvcApp {
       )(logger)
 
   }
+  val svcGovernancePackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
+    lazy val resourcePath: String = "dar/svc-governance-0.1.0.dar"
+  }
   val coinPackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = Coin.COMPANION.TEMPLATE_ID.getPackageId
 
@@ -144,6 +151,7 @@ object SvcApp {
         .commands
         .asScala
         .toSeq
+
     for {
       _ <- createValidatorRight(
         svc = svc,

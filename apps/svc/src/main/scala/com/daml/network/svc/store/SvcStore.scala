@@ -1,7 +1,7 @@
 package com.daml.network.svc.store
 
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, DomainStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
@@ -55,6 +55,32 @@ trait SvcStore extends AutoCloseable {
       _.getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active CoinRules contract")
+        )
+      )
+    )
+
+  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
+  def lookupSvcRulesWithOffset(
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
+  ] =
+    acs.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true)
+
+  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
+  def lookupSvcRules()(implicit
+      ec: ExecutionContext
+  ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
+    lookupSvcRulesWithOffset().map(_.value)
+
+  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
+  def getSvcRules(
+  )(implicit
+      ec: ExecutionContext
+  ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
+    lookupSvcRules().map(
+      _.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No active SvcRules contract")
         )
       )
     )
@@ -157,6 +183,7 @@ object SvcStore {
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

@@ -10,6 +10,7 @@ import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.SvStore
 import com.daml.network.sv.v0.SvServiceGrpc
+import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -65,6 +66,21 @@ class SvApp(
         loggerFactory,
         timeouts,
       )
+      svcConnection <- Future.successful(
+        new SvcConnection(
+          config.remoteSvc.clientAdminApi,
+          coinAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+      )
+      _ = retryProvider
+        .retryForAutomation(
+          "joinConsortium",
+          svcConnection.joinConsortium(svPartyId),
+          this,
+        )
+        // avoids "was not shutdown properly" errors
+        .onComplete(_ => svcConnection.close())
       _ = logger.info(s"SV App is initialized")
     } yield {
       adminServerRegistry

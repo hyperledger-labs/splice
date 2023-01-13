@@ -64,6 +64,22 @@ case class CoinEnvironmentDefinition(
         )
       })
     })
+  def withAllocatedSvUsers(): CoinEnvironmentDefinition =
+    copy(preSetup = env => {
+      import env._
+      this.preSetup(env)
+      svs.local.foreach(sv => {
+        val svParty =
+          sv.remoteParticipantWithAdminToken.parties.enable(sv.config.damlUser)
+        sv.remoteParticipantWithAdminToken.ledger_api.users.create(
+          id = sv.config.damlUser,
+          actAs = Set(svParty.toLf),
+          primaryParty = Some(svParty.toLf),
+          readAs = Set.empty,
+          participantAdmin = true,
+        )
+      })
+    })
   def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
       import env._
@@ -147,6 +163,7 @@ object CoinEnvironmentDefinition {
     fromResource("simple-topology.conf", testName)
       .withConnectedDomains()
       .withAllocatedSvcUser()
+      .withAllocatedSvUsers()
       .withAllocatedValidatorUsers()
       .withInitializedNodes()
 

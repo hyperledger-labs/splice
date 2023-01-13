@@ -7,6 +7,7 @@ import com.daml.network.svc.v0.{
   GetDebugInfoResponse,
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
+  JoinConsortiumRequest,
   WithdrawFeaturedAppRightRequest,
 }
 import com.daml.network.util.Proto
@@ -112,5 +113,27 @@ object GrpcSvcAppClient {
         response: v0.ListConnectedDomainsResponse
     ): Either[String, Map[DomainAlias, DomainId]] =
       Proto.decode(Proto.ConnectedDomains)(response.getDomains)
+  }
+
+  // TODO(#2241) part of mock SVC bootstrap; remove
+  case class JoinConsortium(svParty: PartyId)
+      extends BaseCommand[
+        JoinConsortiumRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def submitRequest(
+        service: SvcServiceStub,
+        request: JoinConsortiumRequest,
+    ): Future[Empty] = service.joinConsortium(request)
+
+    override def createRequest(): Either[String, JoinConsortiumRequest] = Right(
+      JoinConsortiumRequest(Proto.encode(svParty))
+    )
+
+    /** Handle the response the service has provided
+      */
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 }

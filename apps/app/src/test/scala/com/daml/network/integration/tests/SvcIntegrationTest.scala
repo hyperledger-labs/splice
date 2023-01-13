@@ -12,14 +12,6 @@ class SvcIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     svc.startSync()
   }
 
-  // TODO(M3-46): this test will probably become redundant soon
-  "we have four sv apps and they are online" in { implicit env =>
-    sv1.getDebugInfo()
-    sv2.getDebugInfo()
-    sv3.getDebugInfo()
-    sv4.getDebugInfo()
-  }
-
   "manage featured app rights" in { implicit env =>
     onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
 

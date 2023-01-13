@@ -285,6 +285,9 @@ lazy val `apps-svc` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
     )
+    .dependsOn(
+      `svc-governance-daml`
+    )
 
 lazy val `apps-sv` =
   project
@@ -293,6 +296,9 @@ lazy val `apps-sv` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+    )
+    .dependsOn(
+      `apps-svc`
     )
 
 lazy val `apps-scan` =
