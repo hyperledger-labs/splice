@@ -155,7 +155,7 @@ runNextIssuance app = do
 runNextIssuanceInternal : CCApp -> Decimal -> Script ()
 runNextIssuanceInternal app coinPrice = do
     now <- getTime
-    setTime (addRelTime now defaultCoinConfig.issuanceConfig.tickDuration)
+    setTime (addRelTime now defaultCoinConfig.tickDuration)
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do

@@ -42,19 +42,11 @@ defaultCoinConfig = CoinConfig with
 
     -- Using steady state parameters from whitepaper
     -- TODO(M3-06): implement issuance curve
-    issuanceConfig = IssuanceConfig with
-        -- 2.5B
-        coinToIssuePerYear = 2.5e9
+    issuanceCurve = defaultIssuanceCurve
 
-        -- Default duration of 2.5 minutes
-        tickDuration = seconds 150
-
-        validatorRewardPercentage = 0.2
-        appRewardPercentage = 0.75
-
-        validatorRewardCap = 0.2
-        featuredAppRewardCap = 100.0
-        unfeaturedAppRewardCap = 0.6
+    -- Duration of one tick, which is half the target duration of one round
+    -- default: 2.5 minutes
+    tickDuration = seconds 150
 
     -- These should be large enough to ensure efficient batching, but not too large
     -- to avoid creating very large transactions.
@@ -72,3 +64,58 @@ defaultCoinConfig = CoinConfig with
 
     -- All choices are enabled by default
     enabledChoices = API.enableAllChoices
+
+
+-- Issuance curve from the whitepaper
+-------------------------------------
+
+-- See the whitepaper here: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
+-- note: we use the notation _<fromYear>_<toYear> whereby we abbreviate year 0.5 as 0p5 and year 1.5 as 1p5
+
+issuanceConfig_0_0p5 : IssuanceConfig
+issuanceConfig_0_0p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 40e9
+  validatorRewardPercentage = 0.05
+  appRewardPercentage = 0.15
+
+issuanceConfig_0p5_1p5 : IssuanceConfig
+issuanceConfig_0p5_1p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 20e9
+  validatorRewardPercentage = 0.12
+  appRewardPercentage = 0.40
+
+issuanceConfig_1p5_5 : IssuanceConfig
+issuanceConfig_1p5_5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 10e9
+  validatorRewardPercentage = 0.18
+  appRewardPercentage = 0.62
+
+issuanceConfig_5_10 : IssuanceConfig
+issuanceConfig_5_10 = issuanceConfig_10plus with
+  coinToIssuePerYear = 5e9
+  validatorRewardPercentage = 0.21
+  appRewardPercentage = 0.69
+
+issuanceConfig_10plus : IssuanceConfig
+issuanceConfig_10plus = IssuanceConfig with
+  coinToIssuePerYear = 2.5e9
+  validatorRewardPercentage = 0.2
+  appRewardPercentage = 0.75
+  validatorRewardCap = 0.2
+  featuredAppRewardCap = 100.0
+  unfeaturedAppRewardCap = 0.6
+
+
+defaultIssuanceCurve : IssuanceCurve
+defaultIssuanceCurve =
+    IssuanceCurve with
+      currentConfig = issuanceConfig_0_0p5
+      futureConfigs =
+        [ (hours hoursPerHalfYear, issuanceConfig_0p5_1p5)
+        , (hours (3 * hoursPerHalfYear) , issuanceConfig_1p5_5)
+        , (hours (5 * hoursPerYear), issuanceConfig_5_10)
+        , (hours (10 * hoursPerYear), issuanceConfig_10plus)
+        ]
+  where
+    hoursPerHalfYear = 12 * 365
+    hoursPerYear = 24 * 365

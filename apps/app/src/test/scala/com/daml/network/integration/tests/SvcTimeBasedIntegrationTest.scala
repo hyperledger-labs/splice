@@ -203,7 +203,7 @@ class SvcTimeBasedIntegrationTest
 
     inside(issuingRounds) { case Seq(issuingRound) =>
       issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
-      issuingRound.data.issuancePerFeaturedAppRewardCoupon shouldBe decimal(15.1918949772)
+      issuingRound.data.issuancePerFeaturedAppRewardCoupon shouldBe decimal(100.0000000000)
       issuingRound.data.issuancePerUnfeaturedAppRewardCoupon shouldBe decimal(0.6000000000)
     }
   }

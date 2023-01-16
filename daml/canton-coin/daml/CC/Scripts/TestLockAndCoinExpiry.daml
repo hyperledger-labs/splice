@@ -25,7 +25,8 @@ test = script do
   let expectErrorMsg = "Target round has to be after current Round"
   let coinPrice = 2.5
       config = scaleFees (1.0 / coinPrice) defaultCoinConfig
-      tickDuration = config.issuanceConfig.tickDuration
+      tickDuration = config.tickDuration
+
       t00_00 = currentTime
       t02_30 = addRelRoundN 1 currentTime tickDuration
       t05_00 = addRelRoundN 2 currentTime tickDuration
@@ -34,8 +35,12 @@ test = script do
       t12_30 = addRelRoundN 5 currentTime tickDuration
       t15_00 = addRelRoundN 6 currentTime tickDuration
       t17_30 = addRelRoundN 7 currentTime tickDuration
+
+      issuingFor0 = days 0
+      issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
+
       observers = []
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00
+      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
 
   -- estimate the creation time of round relative to round 0

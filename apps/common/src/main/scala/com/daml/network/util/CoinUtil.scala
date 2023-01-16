@@ -6,7 +6,7 @@ import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
+import com.daml.network.codegen.java.cc.issuance.{IssuanceConfig, IssuanceCurve}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
@@ -75,37 +75,43 @@ object CoinUtil {
     )
 
   lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6
-    new cc.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+    new cc.fees.RatePerRound(damlDecimal(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
   // TODO(tech-debt) surely there's a better way to define Daml Numeric values in Scala
-  def damlNumeric(x: Double): java.math.BigDecimal =
+  def damlDecimal(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
   // Using the issuance config for the 10+ years segment of the curve
-  // TODO(M3-06): use issuance curve
-  def defaultIssuanceConfig(
-      initialTickDuration: NonNegativeFiniteDuration
+  private def issuanceConfig(
+      coinsToIssuePerYear: Double,
+      validatorPercentage: Double,
+      appPercentage: Double,
   ): cc.issuance.IssuanceConfig = new IssuanceConfig(
-    // coins to issue per year
-    BigDecimal(2.5e9).bigDecimal,
-
-    // tick duration
-    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
-
-    // validatorRewardPercentage
-    BigDecimal(0.2).bigDecimal,
-
-    // appRewardPercentage
-    BigDecimal(0.75).bigDecimal,
+    damlDecimal(coinsToIssuePerYear),
+    damlDecimal(validatorPercentage),
+    damlDecimal(appPercentage),
 
     // validatorRewardCap
-    BigDecimal(0.2).bigDecimal,
+    damlDecimal(0.2),
 
     // featuredAppRewardCap
-    BigDecimal(100).bigDecimal,
+    damlDecimal(100),
 
     // unfeaturedAppRewardCap
-    BigDecimal(0.6).bigDecimal,
+    damlDecimal(0.6),
+  )
+
+  private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
+
+  // Curve taken as-is from whitepaper: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
+  private val defaultIssuanceCurve: cc.issuance.IssuanceCurve = new IssuanceCurve(
+    issuanceConfig(40e9, 0.5, 0.15),
+    Seq(
+      new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4)),
+      new Tuple2(hours(3 * 365 * 12), issuanceConfig(10e9, 0.18, 0.62)),
+      new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69)),
+      new Tuple2(hours(10 * 365 * 24), issuanceConfig(2.5e9, 0.20, 0.75)),
+    ).asJava,
   )
 
   def defaultCoinConfig(
@@ -141,7 +147,12 @@ object CoinUtil {
     // Chosen to match the update fee to cover the cost of informing lock-holders about
     // actions on the locked coin.
     new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
-    defaultIssuanceConfig(initialTickDuration),
+
+    // tick duration
+    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+
+    // issuance curve from whitepaper
+    defaultIssuanceCurve,
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.

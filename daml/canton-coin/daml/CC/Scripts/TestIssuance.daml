@@ -6,47 +6,37 @@ import DA.Time
 import Daml.Script
 
 import CC.Issuance
+import CC.Scripts.Parameters
 
+-- Shared parameters
+--------------------
 
--- Issuance configs for issuance curve from the whitepaper
-----------------------------------------------------------
+tickDuration : RelTime
+tickDuration = defaultCoinConfig.tickDuration
 
--- See the whitepaper here: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
--- note: we use the notation _<fromYear>_<toYear> whereby we abbreviate year 0.5 as 0p5 and year 1.5 as 1p5
+-- Issuance curve retrieval
+---------------------------
 
-issuanceConfig_0_0p5 : IssuanceConfig
-issuanceConfig_0_0p5 = issuanceConfig_10plus with
-  coinToIssuePerYear = 40e9
-  validatorRewardPercentage = 0.05
-  appRewardPercentage = 0.15
+testIssuanceCurve : Script ()
+testIssuanceCurve = script do
+    test t0 t0p5 issuanceConfig_0_0p5
+    test t0p5 t1p5 issuanceConfig_0p5_1p5
+    test t1p5 t5 issuanceConfig_1p5_5
+    test t5 t10 issuanceConfig_5_10
+    test t10 t100 issuanceConfig_10plus
+  where
+    oneMicro = convertMicrosecondsToRelTime 1
+    t0 = hours 0
+    t0p5 = hours (365 * 12)
+    t1p5 = hours (365 * 36)
+    t5 = days (5 * 365)
+    t10 = days (10 * 365)
+    t100 = days (100 * 365)
 
-issuanceConfig_0p5_1p5 : IssuanceConfig
-issuanceConfig_0p5_1p5 = issuanceConfig_10plus with
-  coinToIssuePerYear = 20e9
-  validatorRewardPercentage = 0.12
-  appRewardPercentage = 0.40
-
-issuanceConfig_1p5_5 : IssuanceConfig
-issuanceConfig_1p5_5 = issuanceConfig_10plus with
-  coinToIssuePerYear = 10e9
-  validatorRewardPercentage = 0.18
-  appRewardPercentage = 0.62
-
-issuanceConfig_5_10 : IssuanceConfig
-issuanceConfig_5_10 = issuanceConfig_10plus with
-  coinToIssuePerYear = 5e9
-  validatorRewardPercentage = 0.21
-  appRewardPercentage = 0.69
-
-issuanceConfig_10plus : IssuanceConfig
-issuanceConfig_10plus = IssuanceConfig with
-  coinToIssuePerYear = 2.5e9
-  tickDuration = seconds 150
-  validatorRewardPercentage = 0.2
-  appRewardPercentage = 0.75
-  validatorRewardCap = 0.2
-  featuredAppRewardCap = 100.0
-  unfeaturedAppRewardCap = 0.6
+    test from to config = do
+      getIssuanceConfigAsOf from defaultIssuanceCurve === config
+      getIssuanceConfigAsOf (from + days 1) defaultIssuanceCurve === config
+      getIssuanceConfigAsOf (to - oneMicro) defaultIssuanceCurve === config
 
 
 -- Example 1: medium activity
@@ -110,11 +100,11 @@ testE1 : Script ()
 testE1 = script do
   validateOpenMiningRoundSummary summaryExample1
 
-  expectedParameters_E1_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample1
-  expectedParameters_E1_0p5_1p5 === computeIssuingRoundParameters issuanceConfig_0p5_1p5 summaryExample1
-  expectedParameters_E1_1p5_5 === computeIssuingRoundParameters issuanceConfig_1p5_5 summaryExample1
-  expectedParameters_E1_5_10 === computeIssuingRoundParameters issuanceConfig_5_10 summaryExample1
-  expectedParameters_E1_10plus === computeIssuingRoundParameters issuanceConfig_10plus summaryExample1
+  expectedParameters_E1_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExample1
+  expectedParameters_E1_0p5_1p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0p5_1p5 summaryExample1
+  expectedParameters_E1_1p5_5 === computeIssuingRoundParameters tickDuration issuanceConfig_1p5_5 summaryExample1
+  expectedParameters_E1_5_10 === computeIssuingRoundParameters tickDuration issuanceConfig_5_10 summaryExample1
+  expectedParameters_E1_10plus === computeIssuingRoundParameters tickDuration issuanceConfig_10plus summaryExample1
 
 
 -- Example 2: very high activity
@@ -176,11 +166,11 @@ testE2 : Script ()
 testE2 = script do
   validateOpenMiningRoundSummary summaryExample2
 
-  expectedParameters_E2_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample2
-  expectedParameters_E2_0p5_1p5 === computeIssuingRoundParameters issuanceConfig_0p5_1p5 summaryExample2
-  expectedParameters_E2_1p5_5 === computeIssuingRoundParameters issuanceConfig_1p5_5 summaryExample2
-  expectedParameters_E2_5_10 === computeIssuingRoundParameters issuanceConfig_5_10 summaryExample2
-  expectedParameters_E2_10plus === computeIssuingRoundParameters issuanceConfig_10plus summaryExample2
+  expectedParameters_E2_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExample2
+  expectedParameters_E2_0p5_1p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0p5_1p5 summaryExample2
+  expectedParameters_E2_1p5_5 === computeIssuingRoundParameters tickDuration issuanceConfig_1p5_5 summaryExample2
+  expectedParameters_E2_5_10 === computeIssuingRoundParameters tickDuration issuanceConfig_5_10 summaryExample2
+  expectedParameters_E2_10plus === computeIssuingRoundParameters tickDuration issuanceConfig_10plus summaryExample2
 
 
 -- Example 3: all zeros
@@ -205,7 +195,7 @@ testE3 : Script ()
 testE3 = script do
   validateOpenMiningRoundSummary summaryExample3
 
-  expectedParameters_E3_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample3
+  expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExample3
 
 
 -- Example 4: low activity
@@ -230,4 +220,4 @@ testE4 : Script ()
 testE4 = script do
   validateOpenMiningRoundSummary summaryExample4
 
-  expectedParameters_E4_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample4
+  expectedParameters_E4_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExample4

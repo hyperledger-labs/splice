@@ -235,7 +235,8 @@ data CoinConfig currency = CoinConfig with
     holdingFee : RatePerRound -- ^ Fee for keeping a coin around
     transferFee : SteppedRate -- ^ Fee for transferring some quantity of coin to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
-    issuanceConfig : IssuanceConfig
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    issuanceCurve : IssuanceCurve -- ^ Issuance curve to use.
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
@@ -257,6 +258,8 @@ template CoinRules
     observers: [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     -- TODO(M3-07): use a schedule with effective dating to make fees predictable to users
   where
+    ensure validCoinConfig config
+
     signatory svc
     observer observers -- TODO(M3-82): remove workaround for explicit disclosure
 
@@ -323,7 +326,7 @@ template CoinRules
       controller svc
       do
         now <- getTime
-        let tickDuration = config.issuanceConfig.tickDuration
+        let tickDuration = config.tickDuration
         let opensAt0 = now
         let opensAt1 = now
         let opensAt2 = addRelTime now tickDuration
@@ -332,9 +335,18 @@ template CoinRules
         let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
         let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
 
-        create OpenMiningRound with svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0
-        create OpenMiningRound with svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1
-        create OpenMiningRound with svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2
+        -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
+        -- Its SVC rewards are compensation for the extra effort of bootstrapping.
+        let issuingFor0 = days 0
+        let issuingFor1 = issuingFor0 + tickDuration
+        let issuingFor2 = issuingFor1 + tickDuration
+
+        create OpenMiningRound with
+          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0
+        create OpenMiningRound with
+          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1
+        create OpenMiningRound with
+          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
@@ -351,7 +363,7 @@ template CoinRules
 
         now <- getTime
 
-        let tickDuration = config.issuanceConfig.tickDuration
+        let tickDuration = config.tickDuration
         require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
         require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
@@ -364,6 +376,9 @@ template CoinRules
         -- round is open for two ticks.
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
         let round = API.Round (latestRound.round.number + 1)
+        -- We advance the time for which the SVC has been issuing independent of how real world advances.
+        -- Note that given the checks above the real time can only be slower.
+        let issuingFor = latestRound.issuingFor + tickDuration
 
         -- archive and create the rounds
         archive roundToArchiveCid
@@ -371,7 +386,8 @@ template CoinRules
           svc
           observers
           round = roundToArchive.round
-        newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
+          issuanceConfig = getIssuanceConfigAsOf roundToArchive.issuingFor config.issuanceCurve
+        newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt; issuingFor
         return (newSummarizingRound, newOpenRound)
 
     nonconsuming choice CoinRules_MiningRound_StartIssuing
@@ -388,9 +404,7 @@ template CoinRules
         require "SVC matches" (miningRound.svc == svc)
         validateOpenMiningRoundSummary summary
 
-        let params = computeIssuingRoundParameters
-              config.issuanceConfig
-              summary
+        let params = computeIssuingRoundParameters config.tickDuration miningRound.issuanceConfig summary
 
         -- record reward for the SVC
         create SvcReward with
@@ -399,7 +413,7 @@ template CoinRules
           quantity = params.coinsToIssueToSvc
 
         now <- getTime
-        let tickDuration = config.issuanceConfig.tickDuration
+        let tickDuration = config.tickDuration
         let opensAt = addRelTime now tickDuration
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
@@ -573,7 +587,7 @@ estimateOpenRoundCreatedAt config currentMiningRound targetRound
     let relRound = subRound targetRound currentMiningRound.round
         -- Note: To estimate the time when the target open mining round is being created but not yet open,
         -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
-        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.issuanceConfig.tickDuration)
+        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.tickDuration)
     in addRelTime currentMiningRound.opensAt relTime
 
 lockExpiresBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringQuantity -> CoinConfig CC -> Bool
@@ -1054,7 +1068,8 @@ scaleFees s c = CoinConfig with
     holdingFee = scaleRatePerRound s c.holdingFee
     lockHolderFee = scaleFixedFee s c.lockHolderFee
     transferFee = scaleSteppedRate s c.transferFee
-    issuanceConfig = c.issuanceConfig
+    issuanceCurve = c.issuanceCurve
+    tickDuration = c.tickDuration
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
@@ -1069,3 +1084,9 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" ((quantityExpiresAt coin.quantity).number <= round.round.number - 2)
+
+-- Check constraints on config params on which the implementation of the choices relies
+validCoinConfig : CoinConfig currency -> Bool
+validCoinConfig CoinConfig{..} =
+     tickDuration > days 0
+  && validIssuanceCurve issuanceCurve

@@ -1,8 +1,11 @@
 module CC.Round where
 
+import DA.Time
+
 import CN.Util.Assert
 import qualified CC.API.V1.Round as API
 import CC.API.V1.Round (Round(..))
+import CC.Issuance
 
 -- | The equivalent of RelTime for rounds, i.e., a delta between
 -- two rounds
@@ -30,7 +33,8 @@ template OpenMiningRound
     coinPrice : Decimal
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     opensAt : Time -- ^ Time after which transfers can use this mining round
-    targetClosesAt: Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
+    targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
+    issuingFor : RelTime -- ^ Time for which the SVC has been issuing rewards. Determines the configuration for the issuance round.
   where
     signatory svc
     observer observers
@@ -55,6 +59,7 @@ template SummarizingMiningRound
     svc : Party
     round : Round
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
+    issuanceConfig : IssuanceConfig
   where
     signatory svc
     ensure isDefinedRound round

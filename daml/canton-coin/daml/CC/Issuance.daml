@@ -1,13 +1,22 @@
 -- | CC rewards issuance configuration and computation.
 module CC.Issuance where
 
+import DA.List
 import DA.Time
 
 import CN.Util.Assert (require)
 
+
+-- issuance curve
+-----------------
+
+data IssuanceCurve = IssuanceCurve with
+    currentConfig : IssuanceConfig
+    futureConfigs : [(RelTime, IssuanceConfig)]
+  deriving (Eq, Show)
+
 data IssuanceConfig = IssuanceConfig with
     coinToIssuePerYear : Decimal
-    tickDuration : RelTime
     validatorRewardPercentage : Decimal
     appRewardPercentage : Decimal
     validatorRewardCap : Decimal
@@ -15,12 +24,50 @@ data IssuanceConfig = IssuanceConfig with
     unfeaturedAppRewardCap : Decimal
   deriving (Eq, Show)
 
+
+validIssuanceCurve : IssuanceCurve -> Bool
+validIssuanceCurve IssuanceCurve{..} =
+       dedupSort ts == ts
+    && validIssuanceConfig currentConfig
+    && all (validIssuanceConfig . snd) futureConfigs
+  where
+    ts = map fst futureConfigs
+
+validIssuanceConfig : IssuanceConfig -> Bool
+validIssuanceConfig IssuanceConfig{..} =
+       coinToIssuePerYear > 0.0
+    && validatorRewardPercentage >= 0.0
+    && appRewardPercentage >= 0.0
+    && validatorRewardCap >= 0.0
+    && featuredAppRewardCap >= 0.0
+    && unfeaturedAppRewardCap >= 0.0
+
+-- | Get the config for a round issuance as of a specific time since start of issuance.
+-- We use this to step through the issuance curve using a logical clock.
+-- See the `CoinRules_Advance_MiningRounds` choice for details.
+getIssuanceConfigAsOf : RelTime -> IssuanceCurve -> IssuanceConfig
+getIssuanceConfigAsOf t curve =
+  case curve.futureConfigs of
+    [] -> curve.currentConfig
+    ((effectiveAsOf, config) :: futureConfigs)
+      | t < effectiveAsOf ->
+          -- all future configs are effective later than our time of interest
+          curve.currentConfig
+      | otherwise ->
+          getIssuanceConfigAsOf t IssuanceCurve with currentConfig = config; futureConfigs
+
+
+-- computation of issuance per round
+------------------------------------
+
+-- | A summary of total reward coupons issued against a specific open mining round.
 data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalValidatorRewardCoupons : Decimal
     totalFeaturedAppRewardCoupons : Decimal
     totalUnfeaturedAppRewardCoupons : Decimal
   deriving (Eq, Show)
 
+-- | Parameters to use in a round that issues coin as rewards for collected coupons.
 data IssuingRoundParameters = IssuingRoundParameters with
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
@@ -36,8 +83,8 @@ validateOpenMiningRoundSummary summary = do
     require "totalFeaturedAppRewardCoupons >= 0.0" (summary.totalFeaturedAppRewardCoupons >= 0.0)
     require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
 
-computeIssuingRoundParameters : IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
-computeIssuingRoundParameters config summary =
+computeIssuingRoundParameters : RelTime -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
+computeIssuingRoundParameters tickDuration config summary =
     IssuingRoundParameters with
       coinsToIssueToSvc =
         coinsToIssueInRound - validatorIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
@@ -52,7 +99,7 @@ computeIssuingRoundParameters config summary =
   where
     roundsPerYear =
       intToDecimal (convertRelTimeToMicroseconds (days 365)) /
-      intToDecimal (convertRelTimeToMicroseconds config.tickDuration)
+      intToDecimal (convertRelTimeToMicroseconds tickDuration)
     coinsToIssueInRound = config.coinToIssuePerYear / roundsPerYear
 
     validatorIssuance = computeIssuanceTranche
