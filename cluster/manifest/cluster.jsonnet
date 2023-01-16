@@ -94,8 +94,9 @@ local authEnvVars(s) = {
 // adjusted.
 local JVM_SYSTEM_MEMORY_MIB = 512;
 
+// `image` defaults to `name`
+local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
 
-local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[]) =
   local proxyPort =
     if proxyToGrpcWeb == null then null
     else findPort(ports, proxyToGrpcWeb);
@@ -140,7 +141,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
               containers: [
                 {
                   name: name,
-                  image: imageName(config, name),
+                  image: imageName(config, if image == null then name else image),
                   imagePullPolicy: 'Always',
                   ports: [toContainerPortDefn(p) for p in ports],
                   env: [

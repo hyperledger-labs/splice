@@ -8,6 +8,10 @@ local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
   { env: 'CN_APP_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-validator-ledger-api-auth' },
   { env: 'CN_APP_WALLET_LEDGER_API_AUTH', secret: 'cn-app-wallet-ledger-api-auth' },
   { env: 'CN_APP_SVC_LEDGER_API_AUTH', secret: 'cn-app-svc-ledger-api-auth' },
+  { env: 'CN_APP_SV1_LEDGER_API_AUTH', secret: 'cn-app-sv1-ledger-api-auth' },
+  { env: 'CN_APP_SV2_LEDGER_API_AUTH', secret: 'cn-app-sv2-ledger-api-auth' },
+  { env: 'CN_APP_SV3_LEDGER_API_AUTH', secret: 'cn-app-sv3-ledger-api-auth' },
+  { env: 'CN_APP_SV4_LEDGER_API_AUTH', secret: 'cn-app-sv4-ledger-api-auth' },
   { env: 'CN_APP_SCAN_LEDGER_API_AUTH', secret: 'cn-app-scan-ledger-api-auth' },
   { env: 'CN_APP_DIRECTORY_LEDGER_API_AUTH', secret: 'cn-app-directory-ledger-api-auth' },
   { env: 'CN_APP_SPLITWISE_LEDGER_API_AUTH', secret: 'cn-app-splitwise-ledger-api-auth' },
@@ -78,6 +82,10 @@ local svcDeployments(config) = [
     },
   ], memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
+    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME,
+    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME,
+    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_USER_NAME,
+    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME,
   ]),
@@ -108,6 +116,58 @@ local svcDeployments(config) = [
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_CLIENT_ID,
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_CLIENT_SECRET,
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
+  ]),
+
+  c.deployment(config, 'sv-app-1', [
+    {
+      name: 'sv1-adm-api',
+      port: 5014,
+    },
+  ], image='sv-app', extraEnvVars=[
+    { name: 'CN_APP_SV_ADMIN_API_PORT', value: '5014' },
+    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_URL { name: 'CN_APP_SV_LEDGER_API_AUTH_URL' },
+    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_ID { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID' },
+    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_SECRET { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET' },
+    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME { name: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
+  ]),
+
+  c.deployment(config, 'sv-app-2', [
+    {
+      name: 'sv2-adm-api',
+      port: 5015,
+    },
+  ], image='sv-app', extraEnvVars=[
+    { name: 'CN_APP_SV_ADMIN_API_PORT', value: '5015' },
+    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_URL { name: 'CN_APP_SV_LEDGER_API_AUTH_URL' },
+    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_CLIENT_ID { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID' },
+    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_CLIENT_SECRET { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET' },
+    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME { name: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
+  ]),
+
+  c.deployment(config, 'sv-app-3', [
+    {
+      name: 'sv3-adm-api',
+      port: 5016,
+    },
+  ], image='sv-app', extraEnvVars=[
+    { name: 'CN_APP_SV_ADMIN_API_PORT', value: '5016' },
+    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_URL { name: 'CN_APP_SV_LEDGER_API_AUTH_URL' },
+    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_CLIENT_ID { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID' },
+    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_CLIENT_SECRET { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET' },
+    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_USER_NAME { name: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
+  ]),
+
+  c.deployment(config, 'sv-app-4', [
+    {
+      name: 'sv4-adm-api',
+      port: 5017,
+    },
+  ], image='sv-app', extraEnvVars=[
+    { name: 'CN_APP_SV_ADMIN_API_PORT', value: '5017' },
+    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_URL { name: 'CN_APP_SV_LEDGER_API_AUTH_URL' },
+    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_CLIENT_ID { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID' },
+    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_CLIENT_SECRET { name: 'CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET' },
+    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_USER_NAME { name: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
   ]),
 
   c.deployment(config, 'scan-app', [

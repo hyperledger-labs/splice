@@ -13,20 +13,19 @@ if (`svc_participant`.domains.list_connected().isEmpty) {
     `svc_participant`.health.ping(`svc_participant`)
 }
 
-val svcUserName = System.getenv("CN_APP_SVC_LEDGER_API_AUTH_USER_NAME")
-if (svcUserName == null) {
-  sys.error("Environment variable CN_APP_SVC_LEDGER_API_AUTH_USER_NAME does not exist")
+def getCnAppLedgerApiAuthUserNameFromEnv(app: String) = {
+  val envVar = s"CN_APP_${app}_LEDGER_API_AUTH_USER_NAME"
+  sys.env.get(envVar)
+    .getOrElse(sys.error(s"Environment variable ${envVar} does not exist"))
 }
 
-val scanUserName = System.getenv("CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME")
-if (scanUserName == null) {
-  sys.error("Environment variable CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME does not exist")
-}
+val svcUserName = getCnAppLedgerApiAuthUserNameFromEnv("SVC")
 
-val directoryUserName = System.getenv("CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME")
-if (directoryUserName == null) {
-  sys.error("Environment variable CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME does not exist")
-}
+val scanUserName = getCnAppLedgerApiAuthUserNameFromEnv("SCAN")
+
+val directoryUserName = getCnAppLedgerApiAuthUserNameFromEnv("DIRECTORY")
+
+val svUserNames = Seq("SV1", "SV2", "SV3", "SV4").map(getCnAppLedgerApiAuthUserNameFromEnv)
 
 // User name may contain characters not allowed in party names
 val svcPartyName = "svc"
@@ -40,6 +39,21 @@ val svcParty = `svc_participant`.parties.enable(svcPartyName)
   primaryParty = Some(svcParty.toLf),
   participantAdmin = true,
 )
+
+// User name may contain characters not allowed in party names
+val svPartyNames = Seq("sv1", "sv2", "sv3", "sv4")
+
+svPartyNames.zip(svUserNames).foreach({ case (svPartyName, svUserName) => {
+  println(s"Creating sv user $svUserName...")
+  val svParty = `svc_participant`.parties.enable(svPartyName)
+  `svc_participant`.ledger_api.users.create(
+    id = svUserName,
+    actAs = Set(svParty.toLf),
+    readAs = Set(svcParty.toLf),
+    primaryParty = Some(svParty.toLf),
+    participantAdmin = true,
+  )
+}})
 
 println(s"Creating scan user $scanUserName...")
 // Shares party with SVC but user can only read

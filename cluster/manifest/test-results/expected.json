@@ -336,6 +336,46 @@
                               }
                            },
                            {
+                              "name": "CN_APP_SV1_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV2_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV3_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV4_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -667,6 +707,506 @@
             ],
             "selector": {
                "app": "svc-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-app-1",
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-app-1"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-app-1",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5014"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-app-1",
+                        "ports": [
+                           {
+                              "containerPort": 5014,
+                              "name": "sv1-adm-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "sv-app-1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv1-adm-api",
+                  "port": 5014,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-app-1"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-app-2",
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-app-2"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-app-2",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5015"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-app-2",
+                        "ports": [
+                           {
+                              "containerPort": 5015,
+                              "name": "sv2-adm-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "sv-app-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv2-adm-api",
+                  "port": 5015,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-app-2"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-app-3",
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-app-3"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-app-3",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5016"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-app-3",
+                        "ports": [
+                           {
+                              "containerPort": 5016,
+                              "name": "sv3-adm-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "sv-app-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv3-adm-api",
+                  "port": 5016,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-app-3"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-app-4",
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-app-4"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-app-4",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5017"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-app-4",
+                        "ports": [
+                           {
+                              "containerPort": 5017,
+                              "name": "sv4-adm-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "sv-app-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv4-adm-api",
+                  "port": 5017,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-app-4"
             }
          }
       },
@@ -2006,7 +2546,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"cp-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 7103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 6103,\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103,\n      \"proxyToGrpc\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"externalPort\": 6104,\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104,\n      \"proxyToGrpc\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwise-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"cp-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-adm-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-adm-api\",\n      \"port\": 5015,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-adm-api\",\n      \"port\": 5016,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-adm-api\",\n      \"port\": 5017,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 7103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 6103,\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103,\n      \"proxyToGrpc\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"externalPort\": 6104,\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104,\n      \"proxyToGrpc\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwise-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",
@@ -2097,6 +2637,22 @@
                            {
                               "containerPort": 5005,
                               "name": "svc-app-adm-api"
+                           },
+                           {
+                              "containerPort": 5014,
+                              "name": "sv1-adm-api"
+                           },
+                           {
+                              "containerPort": 5015,
+                              "name": "sv2-adm-api"
+                           },
+                           {
+                              "containerPort": 5016,
+                              "name": "sv3-adm-api"
+                           },
+                           {
+                              "containerPort": 5017,
+                              "name": "sv4-adm-api"
                            },
                            {
                               "containerPort": 5012,
@@ -2275,6 +2831,26 @@
                   "protocol": "TCP"
                },
                {
+                  "name": "sv1-adm-api",
+                  "port": 5014,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv2-adm-api",
+                  "port": 5015,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv3-adm-api",
+                  "port": 5016,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv4-adm-api",
+                  "port": 5017,
+                  "protocol": "TCP"
+               },
+               {
                   "name": "scan-api",
                   "port": 5012,
                   "protocol": "TCP"
@@ -2440,6 +3016,26 @@
                {
                   "name": "svc-app-adm-api",
                   "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv1-adm-api",
+                  "port": 5014,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv2-adm-api",
+                  "port": 5015,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv3-adm-api",
+                  "port": 5016,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv4-adm-api",
+                  "port": 5017,
                   "protocol": "TCP"
                },
                {

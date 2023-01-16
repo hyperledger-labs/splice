@@ -6,6 +6,7 @@ apps := \
 	images/canton \
 	images/cn-app \
 	images/svc-app \
+	images/sv-app \
 	images/scan-app \
 	images/directory-app \
 	images/canton-domain \
