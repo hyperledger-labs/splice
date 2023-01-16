@@ -16,8 +16,7 @@ trait CoinLedgerClient extends FlagCloseableAsync {
   def applicationId: String
   def client: LedgerClient
   def connection(
-      workflowId: String,
-      maxRetries: Int = 10,
+      workflowId: String
   ): CoinLedgerConnection with NamedLogging
   def timeouts: ProcessingTimeout
 
@@ -86,12 +85,10 @@ object CoinLedgerClient {
         override val client: LedgerClient = client_
 
         override def connection(
-            workflowId: String,
-            maxRetries: Int,
+            workflowId: String
         ): CoinLedgerConnection with NamedLogging =
           CoinLedgerConnection(
             this,
-            maxRetries,
             workflowId,
             loggerFactoryForCoinLedgerConnectionOverride,
             tracerProvider,

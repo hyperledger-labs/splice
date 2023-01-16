@@ -191,7 +191,6 @@ object CoinLedgerConnection {
 
   def apply(
       coinLedgerClient: CoinLedgerClient,
-      maxRetries: Int,
       workflowId: String,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
