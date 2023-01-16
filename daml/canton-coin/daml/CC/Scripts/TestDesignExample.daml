@@ -65,14 +65,6 @@ test = do
   -- bootstrap app
   app <- setupApp
 
-  -- Change issuance per round so we can get Alice 1k without running through lots of rounds
-  -- which slows down the test significantly.
-  Some (rulesCid, rules) <- queryCoinRulesByKey app.svc
-  submit app.svc $
-    archiveCmd rulesCid *>
-    createCmd rules with
-      config.coinsIssuedPerRound = 5000.0
-
   runNextIssuance app
   runCoinDepositBots app
 

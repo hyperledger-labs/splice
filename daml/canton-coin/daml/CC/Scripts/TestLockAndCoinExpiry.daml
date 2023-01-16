@@ -25,14 +25,15 @@ test = script do
   let expectErrorMsg = "Target round has to be after current Round"
   let coinPrice = 2.5
       config = scaleFees (1.0 / coinPrice) defaultCoinConfig
+      tickDuration = config.issuanceConfig.tickDuration
       t00_00 = currentTime
-      t02_30 = addRelRoundN 1 currentTime config.tickDuration
-      t05_00 = addRelRoundN 2 currentTime config.tickDuration
-      t07_30 = addRelRoundN 3 currentTime config.tickDuration
-      t10_00 = addRelRoundN 4 currentTime config.tickDuration
-      t12_30 = addRelRoundN 5 currentTime config.tickDuration
-      t15_00 = addRelRoundN 6 currentTime config.tickDuration
-      t17_30 = addRelRoundN 7 currentTime config.tickDuration
+      t02_30 = addRelRoundN 1 currentTime tickDuration
+      t05_00 = addRelRoundN 2 currentTime tickDuration
+      t07_30 = addRelRoundN 3 currentTime tickDuration
+      t10_00 = addRelRoundN 4 currentTime tickDuration
+      t12_30 = addRelRoundN 5 currentTime tickDuration
+      t15_00 = addRelRoundN 6 currentTime tickDuration
+      t17_30 = addRelRoundN 7 currentTime tickDuration
       observers = []
       openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
@@ -61,7 +62,7 @@ test = script do
 
   -- This coin is estimated to expire at round 5.
   -- we exploit that there are exactly three open rounds active at any point in time.
-  -- we wait for 2 more rounds to ensure that a coin can be expired as soon as 
+  -- we wait for 2 more rounds to ensure that a coin can be expired as soon as
   -- it can definitely not be used as an input to transfer anymore.
   -- This coin can still be used until round 7 (5 + 2) which is created at T00:15:00 and opens at T00:17:30
   let quantityExpiresAtRound5 = ExpiringQuantity with initialQuantity = config.holdingFee.rate * 3.5; createdAt = API.Round 1; ratePerRound = config.holdingFee
@@ -84,7 +85,7 @@ assertError f = do
       let _ = f ()
       pure False
     catch (e : AnyException) -> pure True
-  unless isThrown (abort "expected exception but didn't get one") 
+  unless isThrown (abort "expected exception but didn't get one")
 
 testExpireLockedCoin : Script ()
 testExpireLockedCoin = do
@@ -100,7 +101,7 @@ testExpireLockedCoin = do
   roundCid <- advanceRound app (API.Round 3)
 
   -- Lock is not yet expired
-  -- svc fails to expire the coin 
+  -- svc fails to expire the coin
   testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
 
@@ -109,7 +110,7 @@ testExpireLockedCoin = do
 
   -- Coin is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the coin expires
-  -- svc fails to expire the coin 
+  -- svc fails to expire the coin
   testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
 

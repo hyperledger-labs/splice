@@ -33,7 +33,6 @@ class SummarizingMiningRoundTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       rewards <- queryRewards(summarizingRound.payload.round.number)
-      totalBurn = rewards.totalBurn
       coinRules <- store.getCoinRules()
       // TODO(M3-06): consider querying the round audit store (once we have it) and
       // passing along the opensAt time of the previous IssuingMiningRound
@@ -41,12 +40,12 @@ class SummarizingMiningRoundTrigger(
       cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_StartIssuing(
           summarizingRound.contractId,
-          totalBurn.bigDecimal,
+          rewards.summary,
         )
       cid <-
         connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
     } yield TaskSuccess(
-      s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
+      s"completed summarizing mining round with ${rewards.summary}, and created issuing mining round with cid ${cid.exerciseResult}"
     )
   }
 
@@ -61,15 +60,17 @@ class SummarizingMiningRoundTrigger(
         JavaContract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
       ],
   ) {
-
-    /** Calculate the total burn for the given round based on the rewards issued in that round.
-      */
-    def totalBurn: BigDecimal =
+    lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
+      validatorRewardCoupons.map[BigDecimal](c => BigDecimal(c.payload.quantity)).sum.bigDecimal,
       appRewardCoupons
-        .map[BigDecimal](r => BigDecimal(r.payload.quantity))
-        .sum + validatorRewardCoupons
-        .map[BigDecimal](r => BigDecimal(r.payload.quantity))
+        .collect[BigDecimal] { case c if c.payload.featured => BigDecimal(c.payload.quantity) }
         .sum
+        .bigDecimal,
+      appRewardCoupons
+        .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.quantity) }
+        .sum
+        .bigDecimal,
+    )
   }
 
   /** Query the open reward contracts for a given round. This should only be used

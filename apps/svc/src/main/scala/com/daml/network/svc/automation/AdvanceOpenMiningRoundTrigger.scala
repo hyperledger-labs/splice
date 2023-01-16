@@ -33,7 +33,7 @@ class AdvanceOpenMiningRoundTrigger(
     (for {
       rules <- OptionT(store.lookupCoinRules())
       rounds <- OptionT(store.lookupOpenMiningRoundTriple())
-      tickDuration = CoinUtil.relTimeToDuration(rules.payload.config.tickDuration)
+      tickDuration = CoinUtil.relTimeToDuration(rules.payload.config.issuanceConfig.tickDuration)
       if (rounds.readyToAdvanceAt(tickDuration).isBefore(now.toInstant))
       // NOTE: we store the coin-rules reference in the task, as otherwise its tickDuration and the one that is
       // actually used in the choice might go out of sync

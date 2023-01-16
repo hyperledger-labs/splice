@@ -6,6 +6,7 @@ import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
@@ -80,6 +81,33 @@ object CoinUtil {
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
+  // Using the issuance config for the 10+ years segment of the curve
+  // TODO(M3-06): use issuance curve
+  def defaultIssuanceConfig(
+      initialTickDuration: NonNegativeFiniteDuration
+  ): cc.issuance.IssuanceConfig = new IssuanceConfig(
+    // coins to issue per year
+    BigDecimal(2.5e9).bigDecimal,
+
+    // tick duration
+    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+
+    // validatorRewardPercentage
+    BigDecimal(0.2).bigDecimal,
+
+    // appRewardPercentage
+    BigDecimal(0.75).bigDecimal,
+
+    // validatorRewardCap
+    BigDecimal(0.2).bigDecimal,
+
+    // featuredAppRewardCap
+    BigDecimal(100).bigDecimal,
+
+    // unfeaturedAppRewardCap
+    BigDecimal(0.6).bigDecimal,
+  )
+
   def defaultCoinConfig(
       initialTickDuration: NonNegativeFiniteDuration
   ): cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
@@ -113,14 +141,7 @@ object CoinUtil {
     // Chosen to match the update fee to cover the cost of informing lock-holders about
     // actions on the locked coin.
     new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
-
-    // Coins issued per mining round.
-    // Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
-    // 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
-    BigDecimal(60.0).bigDecimal,
-
-    // The ratio of coin to issue to the SVC
-    BigDecimal(0.35).bigDecimal,
+    defaultIssuanceConfig(initialTickDuration),
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.
@@ -135,7 +156,6 @@ object CoinUtil {
     // TODO(M3-01): charge per character
     32,
     // 2.5 min default duration
-    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
     new cc.api.v1.coin.EnabledChoices(
       true, true, true, true, true, true, true, true, true, true,
     ),

@@ -1,0 +1,233 @@
+module CC.Scripts.TestIssuance where
+
+import DA.Assert
+import DA.Time
+
+import Daml.Script
+
+import CC.Issuance
+
+
+-- Issuance configs for issuance curve from the whitepaper
+----------------------------------------------------------
+
+-- See the whitepaper here: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
+-- note: we use the notation _<fromYear>_<toYear> whereby we abbreviate year 0.5 as 0p5 and year 1.5 as 1p5
+
+issuanceConfig_0_0p5 : IssuanceConfig
+issuanceConfig_0_0p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 40e9
+  validatorRewardPercentage = 0.05
+  appRewardPercentage = 0.15
+
+issuanceConfig_0p5_1p5 : IssuanceConfig
+issuanceConfig_0p5_1p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 20e9
+  validatorRewardPercentage = 0.12
+  appRewardPercentage = 0.40
+
+issuanceConfig_1p5_5 : IssuanceConfig
+issuanceConfig_1p5_5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 10e9
+  validatorRewardPercentage = 0.18
+  appRewardPercentage = 0.62
+
+issuanceConfig_5_10 : IssuanceConfig
+issuanceConfig_5_10 = issuanceConfig_10plus with
+  coinToIssuePerYear = 5e9
+  validatorRewardPercentage = 0.21
+  appRewardPercentage = 0.69
+
+issuanceConfig_10plus : IssuanceConfig
+issuanceConfig_10plus = IssuanceConfig with
+  coinToIssuePerYear = 2.5e9
+  tickDuration = seconds 150
+  validatorRewardPercentage = 0.2
+  appRewardPercentage = 0.75
+  validatorRewardCap = 0.2
+  featuredAppRewardCap = 100.0
+  unfeaturedAppRewardCap = 0.6
+
+
+-- Example 1: medium activity
+-----------------------------
+
+-- Note: expected params computed using computation from whitepaper implemented in
+-- https://docs.google.com/spreadsheets/d/1RrDYGjWH7Ol4e9LC_EYyE4iGl4iqs-e-eGbd-bugvys/edit#gid=1709116211
+
+summaryExample1 : OpenMiningRoundSummary
+summaryExample1 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 10000.0
+  totalFeaturedAppRewardCoupons = 200.0
+  totalUnfeaturedAppRewardCoupons = 9800.0
+
+expectedParameters_E1_0_0p5 : IssuingRoundParameters
+expectedParameters_E1_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  coinsToIssueToSvc = 152207.0015220700
+  unclaimedValidatorRewards = 7512.9375951294
+  unclaimedAppRewards = 2658.8127853881
+
+expectedParameters_E1_0p5_1p5 : IssuingRoundParameters
+expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  coinsToIssueToSvc = 45662.1004566210
+  unclaimedValidatorRewards = 9415.5251141553
+  unclaimedAppRewards = 12171.7503805175
+
+expectedParameters_E1_1p5_5 : IssuingRoundParameters
+expectedParameters_E1_1p5_5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 100.00
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  coinsToIssueToSvc = 9512.9375951294
+  unclaimedValidatorRewards = 6561.6438356164
+  unclaimedAppRewards = 3610.1065449011
+
+expectedParameters_E1_5_10 : IssuingRoundParameters
+expectedParameters_E1_5_10 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 52.6490867580
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  coinsToIssueToSvc = 2378.2343987824
+  unclaimedValidatorRewards = 2994.2922374429
+  unclaimedAppRewards = 0.0
+
+expectedParameters_E1_10plus : IssuingRoundParameters
+expectedParameters_E1_10plus = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.200000000
+  issuancePerFeaturedAppRewardCoupon = 15.1918949772
+  issuancePerUnfeaturedAppRewardCoupon = 0.600000000
+  coinsToIssueToSvc = 594.5585996956
+  unclaimedValidatorRewards = 378.2343987823
+  unclaimedAppRewards = 0.0
+
+testE1 : Script ()
+testE1 = script do
+  validateOpenMiningRoundSummary summaryExample1
+
+  expectedParameters_E1_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample1
+  expectedParameters_E1_0p5_1p5 === computeIssuingRoundParameters issuanceConfig_0p5_1p5 summaryExample1
+  expectedParameters_E1_1p5_5 === computeIssuingRoundParameters issuanceConfig_1p5_5 summaryExample1
+  expectedParameters_E1_5_10 === computeIssuingRoundParameters issuanceConfig_5_10 summaryExample1
+  expectedParameters_E1_10plus === computeIssuingRoundParameters issuanceConfig_10plus summaryExample1
+
+
+-- Example 2: very high activity
+--------------------------------
+
+summaryExample2 : OpenMiningRoundSummary
+summaryExample2 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons =  232317.71
+  totalFeaturedAppRewardCoupons = 112513.94
+  totalUnfeaturedAppRewardCoupons = 119803.77
+
+expectedParameters_E2_0_0p5 : IssuingRoundParameters
+expectedParameters_E2_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0409479656
+  issuancePerFeaturedAppRewardCoupon = 0.1228438968
+  issuancePerUnfeaturedAppRewardCoupon = 0.1228438968
+  coinsToIssueToSvc = 152207.0015220700
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+
+expectedParameters_E2_0p5_1p5 : IssuingRoundParameters
+expectedParameters_E2_0p5_1p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0491375587
+  issuancePerFeaturedAppRewardCoupon = 0.1637918624
+  issuancePerUnfeaturedAppRewardCoupon = 0.1637918624
+  coinsToIssueToSvc = 45662.1004566210
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+
+expectedParameters_E2_1p5_5 : IssuingRoundParameters
+expectedParameters_E2_1p5_5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0368531690
+  issuancePerFeaturedAppRewardCoupon = 0.1269386933
+  issuancePerUnfeaturedAppRewardCoupon = 0.1269386933
+  coinsToIssueToSvc = 9512.9375951294
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+
+expectedParameters_E2_5_10 : IssuingRoundParameters
+expectedParameters_E2_5_10 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0214976819
+  issuancePerFeaturedAppRewardCoupon = 0.0706352406
+  issuancePerUnfeaturedAppRewardCoupon = 0.0706352406
+  coinsToIssueToSvc = 2378.2343987824
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+
+expectedParameters_E2_10plus : IssuingRoundParameters
+expectedParameters_E2_10plus = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0102369914
+  issuancePerFeaturedAppRewardCoupon = 0.0383887177
+  issuancePerUnfeaturedAppRewardCoupon = 0.0383887177
+  coinsToIssueToSvc = 594.5585996956
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+
+
+testE2 : Script ()
+testE2 = script do
+  validateOpenMiningRoundSummary summaryExample2
+
+  expectedParameters_E2_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample2
+  expectedParameters_E2_0p5_1p5 === computeIssuingRoundParameters issuanceConfig_0p5_1p5 summaryExample2
+  expectedParameters_E2_1p5_5 === computeIssuingRoundParameters issuanceConfig_1p5_5 summaryExample2
+  expectedParameters_E2_5_10 === computeIssuingRoundParameters issuanceConfig_5_10 summaryExample2
+  expectedParameters_E2_10plus === computeIssuingRoundParameters issuanceConfig_10plus summaryExample2
+
+
+-- Example 3: all zeros
+-----------------------
+
+summaryExample3 : OpenMiningRoundSummary
+summaryExample3 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 0.0
+  totalFeaturedAppRewardCoupons = 0.0
+  totalUnfeaturedAppRewardCoupons = 0.0
+
+expectedParameters_E3_0_0p5 : IssuingRoundParameters
+expectedParameters_E3_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  coinsToIssueToSvc = 152207.0015220700
+  unclaimedValidatorRewards = 9512.9375951294
+  unclaimedAppRewards = 28538.8127853881
+
+testE3 : Script ()
+testE3 = script do
+  validateOpenMiningRoundSummary summaryExample3
+
+  expectedParameters_E3_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample3
+
+
+-- Example 4: low activity
+--------------------------
+
+summaryExample4 : OpenMiningRoundSummary
+summaryExample4 = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 200.0
+  totalFeaturedAppRewardCoupons = 100.0
+  totalUnfeaturedAppRewardCoupons = 100.0
+
+expectedParameters_E4_0_0p5 : IssuingRoundParameters
+expectedParameters_E4_0_0p5 = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  coinsToIssueToSvc = 152207.0015220700
+  unclaimedValidatorRewards = 9472.9375951294
+  unclaimedAppRewards = 18478.8127853881
+
+testE4 : Script ()
+testE4 = script do
+  validateOpenMiningRoundSummary summaryExample4
+
+  expectedParameters_E4_0_0p5 === computeIssuingRoundParameters issuanceConfig_0_0p5 summaryExample4

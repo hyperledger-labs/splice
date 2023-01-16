@@ -93,22 +93,45 @@ class SvcTimeBasedIntegrationTest
 
   }
 
-  "total burn calculation" in { implicit env =>
-    // 3 app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
+  "calculation of issuance per coin" in { implicit env =>
+    // 3 unfeatured app rewards & 3 featured app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
     val rewards = Seq(
+      // featured app rewards for a total of 200.0 in round 0
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        false,
+        true,
         BigDecimal(1.0).bigDecimal,
         new Round(0),
       ),
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
+        true,
+        BigDecimal(199.0).bigDecimal,
+        new Round(0),
+      ),
+      new AppRewardCoupon(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        true,
+        BigDecimal(3.0).bigDecimal,
+        new Round(1),
+      ),
+      // unfeatured app rewards for a total of 9800.0 in round 0
+      new AppRewardCoupon(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
         false,
-        BigDecimal(2.0).bigDecimal,
+        BigDecimal(2.5).bigDecimal,
+        new Round(0),
+      ),
+      new AppRewardCoupon(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        false,
+        BigDecimal(9797.5).bigDecimal,
         new Round(0),
       ),
       new AppRewardCoupon(
@@ -118,6 +141,7 @@ class SvcTimeBasedIntegrationTest
         BigDecimal(5.0).bigDecimal,
         new Round(1),
       ),
+      // validator rewards for a total of 10000.0 in round 0
       new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
@@ -127,7 +151,7 @@ class SvcTimeBasedIntegrationTest
       new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        BigDecimal(4.0).bigDecimal,
+        BigDecimal(9997.0).bigDecimal,
         new Round(0),
       ),
       new ValidatorRewardCoupon(
@@ -155,10 +179,20 @@ class SvcTimeBasedIntegrationTest
       entries =>
         forAtLeast(1, entries)(
           _.message should include(
-            s"successfully archived summarizing mining round with burn ${1 + 2 + 3 + 4}"
+            s"completed summarizing mining round with com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary(10000.0000000000, 200.0000000000, 9800.0000000000)"
           )
         ),
     )
+
+    def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
+    val issuingRounds = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      .filterJava(IssuingMiningRound.COMPANION)(svcParty)
+
+    inside(issuingRounds) { case Seq(issuingRound) =>
+      issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
+      issuingRound.data.issuancePerFeaturedAppRewardCoupon shouldBe decimal(15.1918949772)
+      issuingRound.data.issuancePerUnfeaturedAppRewardCoupon shouldBe decimal(0.6000000000)
+    }
   }
 
 }

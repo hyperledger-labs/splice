@@ -17,6 +17,7 @@ import DA.Traversable (forA)
 import DA.Time
 
 import CC.Fees
+import CC.Issuance
 import CC.Round
 import CC.Util
 
@@ -234,15 +235,13 @@ data CoinConfig currency = CoinConfig with
     holdingFee : RatePerRound -- ^ Fee for keeping a coin around
     transferFee : SteppedRate -- ^ Fee for transferring some quantity of coin to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
-    coinsIssuedPerRound : Decimal
-    svcIssuanceRatio : Decimal
+    issuanceConfig : IssuanceConfig
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
     maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
-    tickDuration: RelTime -- ^ Length of a tick
     enabledChoices : API.EnabledChoices
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show)
 
 
 requireChoiceIsEnabled : CanAssert m => Text -> (API.EnabledChoices -> Bool) -> API.CoinRulesView -> m ()
@@ -324,13 +323,14 @@ template CoinRules
       controller svc
       do
         now <- getTime
+        let tickDuration = config.issuanceConfig.tickDuration
         let opensAt0 = now
         let opensAt1 = now
-        let opensAt2 = addRelTime now config.tickDuration
+        let opensAt2 = addRelTime now tickDuration
 
-        let targetClosesAt0 = addRelTime now config.tickDuration
-        let targetClosesAt1 = addRelTime targetClosesAt0 config.tickDuration
-        let targetClosesAt2 = addRelTime targetClosesAt1 config.tickDuration
+        let targetClosesAt0 = addRelTime now tickDuration
+        let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
+        let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
 
         create OpenMiningRound with svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0
         create OpenMiningRound with svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1
@@ -351,17 +351,18 @@ template CoinRules
 
         now <- getTime
 
+        let tickDuration = config.issuanceConfig.tickDuration
         require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
         require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
         require "latestRound is open" (latestRound.opensAt <= now)
-        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt config.tickDuration <= now)
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt tickDuration <= now)
 
 
         -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
-        let opensAt = addRelTime (max now latestRound.opensAt) config.tickDuration
+        let opensAt = addRelTime (max now latestRound.opensAt) tickDuration
         -- round is open for two ticks.
-        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
+        let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
         let round = API.Round (latestRound.round.number + 1)
 
         -- archive and create the rounds
@@ -378,44 +379,42 @@ template CoinRules
       with
         miningRoundCid : ContractId SummarizingMiningRound
         -- The amount of coin burned in this round.
-        totalBurnQuantity : Decimal
+        summary : OpenMiningRoundSummary
       controller svc
       do
         -- archive summarizing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
         require "SVC matches" (miningRound.svc == svc)
-        require "Positive total burn quantity" (totalBurnQuantity >= 0.0)
+        validateOpenMiningRoundSummary summary
 
-        let svcCoinsPerIssuance = config.coinsIssuedPerRound * config.svcIssuanceRatio
-            userIssuanceRatio = 1.0 - config.svcIssuanceRatio
-            userCoinsPerIssuance = config.coinsIssuedPerRound * userIssuanceRatio
+        let params = computeIssuingRoundParameters
+              config.issuanceConfig
+              summary
 
         -- record reward for the SVC
         create SvcReward with
           svc
           round = miningRound.round
-          quantity = svcCoinsPerIssuance
+          quantity = params.coinsToIssueToSvc
 
         now <- getTime
-        let opensAt = addRelTime now config.tickDuration
-        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
+        let tickDuration = config.issuanceConfig.tickDuration
+        let opensAt = addRelTime now tickDuration
+        let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
         -- create issuing round
-        let issuancePerCoin =
-              if totalBurnQuantity <= 0.0
-                then 0.0
-                else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
         create IssuingMiningRound with
           svc
           observers
           round = miningRound.round
           opensAt = opensAt
           targetClosesAt = targetClosesAt
-          -- TODO(M3-06): properly compute the per-reward-issuances
-          issuancePerValidatorRewardCoupon = issuancePerCoin
-          issuancePerFeaturedAppRewardCoupon = issuancePerCoin
-          issuancePerUnfeaturedAppRewardCoupon = issuancePerCoin
+          issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
+
+        -- TODO(M3-06): create unclaimed rewards contract
 
     nonconsuming choice CoinRules_MiningRound_Close
       : ContractId ClosedMiningRound
@@ -574,7 +573,7 @@ estimateOpenRoundCreatedAt config currentMiningRound targetRound
     let relRound = subRound targetRound currentMiningRound.round
         -- Note: To estimate the time when the target open mining round is being created but not yet open,
         -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
-        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.tickDuration)
+        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.issuanceConfig.tickDuration)
     in addRelTime currentMiningRound.opensAt relTime
 
 lockExpiresBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringQuantity -> CoinConfig CC -> Bool
@@ -733,29 +732,29 @@ summarizeAndValidateInputs csum svc sender inps = do
         totalHoldingFees =
           s.totalHoldingFees + holdingFee
 
-    summarizeInput now round s (API.InputAppRewardCoupon rewardCid) = do
-      (_, reward) <- downcastInterface @AppRewardCoupon "AppRewardCoupon" rewardCid
-      require "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
+    summarizeInput now round s (API.InputAppRewardCoupon couponCid) = do
+      (_, coupon) <- downcastInterface @AppRewardCoupon "AppRewardCoupon" couponCid
+      require "SVC matches" (svc == coupon.svc)
+      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
       require "issuing round is open" (miningRound.opensAt <= now)
-      require "Sender matches app provider" (sender == reward.provider)
-      let issuancePerCoin
-            | reward.featured = miningRound.issuancePerFeaturedAppRewardCoupon
+      require "Sender matches app provider" (sender == coupon.provider)
+      let issuancePerCoupon
+            | coupon.featured = miningRound.issuancePerFeaturedAppRewardCoupon
             | otherwise = miningRound.issuancePerUnfeaturedAppRewardCoupon
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * issuancePerCoin
+        totalQuantity = s.totalQuantity + coupon.quantity * issuancePerCoupon
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeInput now round s (API.InputValidatorRewardCoupon rewardCid) = do
-      (_, reward) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" rewardCid
-      require "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
+    summarizeInput now round s (API.InputValidatorRewardCoupon couponCid) = do
+      (_, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
+      require "SVC matches" (svc == coupon.svc)
+      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerValidatorRewardCoupon
+        totalQuantity = s.totalQuantity + coupon.quantity * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
 
 fetchValidatorRight : TransferContextSummary -> ValidatorRewardCoupon -> Update (ContractId ValidatorRight, ValidatorRight)
@@ -791,15 +790,15 @@ consumeInputs coinRulesCid csum svc sender inps = do
     consumeInput (API.InputCoin coinCid) = do
       archive coinCid
 
-    consumeInput (API.InputAppRewardCoupon rewardCid) = do
-      archive rewardCid
+    consumeInput (API.InputAppRewardCoupon couponCid) = do
+      archive couponCid
 
-    consumeInput (API.InputValidatorRewardCoupon rewardCid) = do
-      (rewardCid, reward) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" rewardCid
-      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
-      (rightCid, validatorRight) <- fetchValidatorRight csum reward
+    consumeInput (API.InputValidatorRewardCoupon couponCid) = do
+      (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
+      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
+      (rightCid, validatorRight) <- fetchValidatorRight csum coupon
       require "Validator matches" (validatorRight.validator == sender)
-      exercise rewardCid ValidatorRewardCoupon_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
+      exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
 
 preprocessAndSummarizeOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessAndSummarizeOutputs config sender outs = do
@@ -1055,13 +1054,11 @@ scaleFees s c = CoinConfig with
     holdingFee = scaleRatePerRound s c.holdingFee
     lockHolderFee = scaleFixedFee s c.lockHolderFee
     transferFee = scaleSteppedRate s c.transferFee
-    coinsIssuedPerRound = c.coinsIssuedPerRound
-    svcIssuanceRatio = c.svcIssuanceRatio
+    issuanceConfig = c.issuanceConfig
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
     maxPayloadLength = c.maxPayloadLength
-    tickDuration = c.tickDuration
     enabledChoices = c.enabledChoices
 
 requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()

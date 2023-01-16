@@ -12,6 +12,7 @@ import DA.Time
 
 import CN.Util.Assert
 import CC.Coin
+import CC.Issuance
 import CC.Round
 import CC.Scripts.Util
 import CN.SvcRules
@@ -152,7 +153,7 @@ runCoinRulesAcceptBotD app = do
 runNextIssuanceD : CCApp -> Decimal -> Script ()
 runNextIssuanceD app coinPrice = do
     now <- getTime
-    setTime (addRelTime now defaultCoinConfig.tickDuration)
+    setTime (addRelTime now defaultCoinConfig.issuanceConfig.tickDuration)
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
@@ -205,12 +206,16 @@ runNextIssuanceD app coinPrice = do
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
-    let totalBurn = sum [ r.quantity | (_, r) <- appRewardCoupons] + sum [ r.quantity | (_, r) <- validatorRewardCoupons]
+
+    let summary = OpenMiningRoundSummary with
+          totalValidatorRewardCoupons = sum [ c.quantity | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, not (c.featured)]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
       miningRoundCid = summarizingRoundCid
-      totalBurnQuantity = totalBurn
+      summary
 
 
     pure ()
