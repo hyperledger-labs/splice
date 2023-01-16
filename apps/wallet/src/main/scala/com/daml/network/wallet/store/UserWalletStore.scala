@@ -13,14 +13,13 @@ import com.daml.network.codegen.java.cn.{
   directory => directoryCodegen,
   splitwise => splitwiseCodegen,
 }
-import com.daml.network.store.AcsStore
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{CoinUtil, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -30,15 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends FlagCloseable with NamedLogging {
-
-  /** The sink to use for ingesting data from the ledger into this store. */
-  def acsIngestionSink: AcsStore.IngestionSink
-
-  protected def acsStore: AcsStore
-
-  /** A direct way to access the generic methods for querying the underlying ACS store. */
-  def acs: AcsStore = acsStore
+trait UserWalletStore extends CoinAppStore {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -46,7 +37,7 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
   def getInstall()(implicit ec: ExecutionContext): Future[
     JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] =
-    acsStore
+    acs
       .findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
       .map(
         _.getOrElse(
@@ -55,7 +46,7 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
       )
 
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    acsStore.signalWhenIngested(offset)
+    acs.signalWhenIngested(offset)
 
   def listExpiredTransferOffers(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext

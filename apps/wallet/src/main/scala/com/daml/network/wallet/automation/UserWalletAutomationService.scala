@@ -1,7 +1,8 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.UserWalletStore
@@ -17,6 +18,7 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CoinLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     automationConfig: AutomationConfig,
     clock: Clock,
     retryProvider: CoinRetries,
@@ -26,20 +28,15 @@ class UserWalletAutomationService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clock, retryProvider) {
-
-  private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
-
-  registerService(
-    new AcsIngestionService(
-      s"UserWalletStore(${store.key.endUserName})",
-      store.acsIngestionSink,
-      connection,
+) extends CoinAppAutomationService(
+      automationConfig,
+      clock,
+      store,
+      ledgerClient,
+      participantAdminConnection,
       retryProvider,
-      loggerFactory,
-      timeouts,
-    )
-  )
+    ) {
+
   registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))

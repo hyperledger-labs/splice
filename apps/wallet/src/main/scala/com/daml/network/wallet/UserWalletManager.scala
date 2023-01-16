@@ -1,6 +1,7 @@
 package com.daml.network.wallet
 
 import akka.stream.Materializer
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
@@ -23,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: CoinLedgerClient,
+    private[wallet] val participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
     automationConfig: AutomationConfig,
     clock: Clock,

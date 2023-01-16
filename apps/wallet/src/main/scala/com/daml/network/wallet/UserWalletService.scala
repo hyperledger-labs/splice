@@ -58,6 +58,7 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
+    walletManager.participantAdminConnection,
     automationConfig,
     clock,
     retryProvider,
