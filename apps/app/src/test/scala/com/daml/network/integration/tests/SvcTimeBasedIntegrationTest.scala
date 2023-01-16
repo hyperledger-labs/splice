@@ -1,5 +1,7 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
+import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
@@ -15,7 +17,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class SvcTimeBasedIntegrationTest
@@ -60,14 +61,26 @@ class SvcTimeBasedIntegrationTest
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
+        val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
         // next tick - issuing round 0 can be closed
         // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
         advanceTime(java.time.Duration.ofSeconds(160))
-        // poll frequently, so we see the closed mining round before the automation archives it.
-        eventually(maxPollInterval = 100.milliseconds)(
-          svc.remoteParticipantWithAdminToken.ledger_api.acs
-            .filterJava(ClosedMiningRound.COMPANION)(svcParty) should have size 1
-        )
+        eventually() {
+          // Check for closing mining round in transactions instead of acs
+          // to guard against automation archiving it concurrently.
+          val transactions =
+            svc.remoteParticipantWithAdminToken.ledger_api.transactions
+              .treesJava(
+                Set(svcParty),
+                completeAfter = Int.MaxValue,
+                beginOffset = offsetBefore,
+                endOffset =
+                  Some(new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_END)),
+              )
+          val rounds =
+            transactions.flatMap(DecodeUtil.decodeAllCreatedTree(ClosedMiningRound.COMPANION)(_))
+          rounds should have size 1
+        }
         eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
           svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
