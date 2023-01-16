@@ -121,7 +121,7 @@ class GrpcSvcAppService(
   // TODO(#2241) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
   override def joinConsortium(request: JoinConsortiumRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      logger.info(s"Adding party ${request.svParty} to SV consortium")
+      logger.info(s"Party ${request.svParty} wants to join the SV consortium")
       for {
         _ <- store.lookupSvcRulesWithOffset().flatMap {
           case QueryResult(off, None) =>
@@ -143,13 +143,18 @@ class GrpcSvcAppService(
                 deduplicationOffset = off,
               )
           case QueryResult(_, Some(svcRules)) =>
-            logger.info("SvcRules exist; adding party as member")
-            connection.submitWithResultNoDedup(
-              actAs = Seq(store.svcParty),
-              readAs = Seq.empty,
-              update =
-                svcRules.contractId.exerciseSvcRules_AddMember(request.svParty, "mock bootstrap"),
-            )
+            if (svcRules.payload.members.keySet.contains(request.svParty)) {
+              logger.info("SvcRules exist and party is member; doing nothing")
+              Future.successful(())
+            } else {
+              logger.info("SvcRules exist; adding party as member")
+              connection.submitWithResultNoDedup(
+                actAs = Seq(store.svcParty),
+                readAs = Seq.empty,
+                update =
+                  svcRules.contractId.exerciseSvcRules_AddMember(request.svParty, "mock bootstrap"),
+              )
+            }
         },
       } yield Empty()
     }

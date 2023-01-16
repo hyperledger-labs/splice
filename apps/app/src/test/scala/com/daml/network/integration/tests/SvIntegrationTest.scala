@@ -7,6 +7,11 @@ import scala.jdk.CollectionConverters.*
 
 class SvIntegrationTest extends CoinIntegrationTest {
 
+  "restart cleanly" in { implicit env =>
+    sv1.stop()
+    sv1.startSync()
+  }
+
   "An SvcRules contract exists and has exactly all four sv parties as members" in { implicit env =>
     val svcRules = clue("There is exactly one SvcRules contract") {
       val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api.acs

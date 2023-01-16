@@ -66,17 +66,8 @@ class SvApp(
         loggerFactory,
         timeouts,
       )
-      svcConnection <- Future.successful(
-        new SvcConnection(
-          config.remoteSvc.clientAdminApi,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
-      )
-      _ <- retryProvider
-        .retryForAutomationGrpc("joinConsortium", svcConnection.joinConsortium(svPartyId), this)
-        // avoids "was not shutdown properly" errors
-        .andThen(_ => svcConnection.close())
+      // TODO(#2241) move check whether we are already part of the SVC to here
+      _ <- retryProvider.retryForAutomationGrpc("joinConsortium", joinConsortium(svPartyId), this)
       _ = logger.info(s"SV App is initialized")
     } yield {
       adminServerRegistry
@@ -99,6 +90,15 @@ class SvApp(
 
   // SV app uploads package so no dep.
   override lazy val requiredTemplates = Set.empty
+
+  def joinConsortium(svPartyId: PartyId) = {
+    val svcConnection = new SvcConnection(
+      config.remoteSvc.clientAdminApi,
+      coinAppParameters.processingTimeouts,
+      loggerFactory,
+    )
+    svcConnection.joinConsortium(svPartyId).andThen(_ => svcConnection.close())
+  }
 }
 
 object SvApp {

@@ -1,10 +1,10 @@
 package com.daml.network.util
 
-import com.digitalasset.canton.concurrent.Threading
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
 import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
