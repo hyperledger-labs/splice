@@ -73,14 +73,10 @@ class SvApp(
           loggerFactory,
         )
       )
-      _ = retryProvider
-        .retryForAutomationGrpc(
-          "joinConsortium",
-          svcConnection.joinConsortium(svPartyId),
-          this,
-        )
+      _ <- retryProvider
+        .retryForAutomationGrpc("joinConsortium", svcConnection.joinConsortium(svPartyId), this)
         // avoids "was not shutdown properly" errors
-        .onComplete(_ => svcConnection.close())
+        .andThen(_ => svcConnection.close())
       _ = logger.info(s"SV App is initialized")
     } yield {
       adminServerRegistry
