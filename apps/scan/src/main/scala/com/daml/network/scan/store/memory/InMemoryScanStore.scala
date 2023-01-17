@@ -1,7 +1,7 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.store.{CCHistoryStore, InMemoryCCHistoryStore, InMemoryCoinAppStore}
+import com.daml.network.store.InMemoryCoinAppStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
@@ -17,10 +17,7 @@ class InMemoryScanStore(
 
   override lazy val acsContractFilter = ScanStore.contractFilter(svcParty)
 
-  override val history: CCHistoryStore = new InMemoryCCHistoryStore(loggerFactory)
-
   override def close(): Unit = {
-    history.close()
     super.close()
   }
 }

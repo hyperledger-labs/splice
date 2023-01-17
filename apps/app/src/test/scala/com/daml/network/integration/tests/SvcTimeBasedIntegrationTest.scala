@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
@@ -15,6 +14,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*

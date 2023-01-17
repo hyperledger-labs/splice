@@ -3,9 +3,9 @@ package com.daml.network.console
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.{round => roundCodegen}
+import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
+import com.daml.network.history.CoinTransactionTreeView
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.JavaContract as Contract
@@ -27,15 +27,6 @@ abstract class ScanAppReference(
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetSvcPartyId())
-    }
-
-  @Help.Summary(
-    "Returns a list of all transactions that included the creation of archive of a Canton coin. "
-  )
-  @Help.Description("Transaction are ordered by transaction offset in ascending order.")
-  def getTxHistory(): Seq[CoinTransaction] =
-    consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetHistory())
     }
 
   @Help.Summary(

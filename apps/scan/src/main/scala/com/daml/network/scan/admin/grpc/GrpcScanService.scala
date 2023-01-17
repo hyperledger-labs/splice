@@ -55,13 +55,6 @@ class GrpcScanService(
       }
     }
 
-  override def getHistory(request: Empty): Future[GetHistoryResponse] =
-    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
-      for {
-        result <- store.history.getCCHistory
-      } yield v0.GetHistoryResponse(result.map(_.toProtoV0))
-    }
-
   override def getCoinTransactionDetails(
       request: GetCoinTransactionDetailsRequest
   ): Future[GetCoinTransactionDetailsResponse] = withSpanFromGrpcContext("GrpcScanService") {

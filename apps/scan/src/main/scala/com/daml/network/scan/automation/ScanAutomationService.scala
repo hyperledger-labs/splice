@@ -1,10 +1,10 @@
 package com.daml.network.scan.automation
 
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{AuditLogIngestionService, CoinAppAutomationService}
+import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanStore}
+import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -34,16 +34,4 @@ class ScanAutomationService(
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-    ) {
-
-  registerService(
-    new AuditLogIngestionService(
-      "Scan:ReadCoinTransactionsService",
-      new CoinTransactionsIngestionSink(svcParty, store.history, loggerFactory),
-      connection,
-      retryProvider,
-      loggerFactory,
-      timeouts,
-    )
-  )
-}
+    ) {}

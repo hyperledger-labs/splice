@@ -2,16 +2,12 @@ syntax = "proto3";
 package com.daml.network.scan.v0;
 
 import "google/protobuf/empty.proto";
-import "com/daml/network/v0/history.proto";
 import "com/daml/ledger/api/v1/transaction.proto";
 import "com/daml/network/v0/contract.proto";
 import "com/daml/network/v0/connected_domains.proto";
 
 service ScanService {
   rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
-
-  // TODO(#2115) leave getHistory as a grpc endpoint when switching the scan service to HTTP APIs, as it will get dropped
-  rpc GetHistory (google.protobuf.Empty) returns (GetHistoryResponse);
 
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
@@ -34,10 +30,6 @@ message GetTransferContextResponse {
   com.daml.network.v0.Contract coin_rules = 1;
   com.daml.network.v0.Contract latest_open_mining_round = 3;
   repeated com.daml.network.v0.Contract open_mining_rounds = 2;
-}
-
-message GetHistoryResponse {
-  repeated com.daml.network.v0.CCTransaction transactions = 1;
 }
 
 message GetCoinTransactionDetailsRequest {

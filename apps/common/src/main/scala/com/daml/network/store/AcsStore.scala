@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.Contract
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
+  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,

@@ -2,7 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{AcsStore, CCHistoryStore, CoinAppStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -15,10 +15,6 @@ trait ScanStore extends CoinAppStore with StoreWithOpenMiningRounds {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
-
-  /** Audit log store */
-  // TODO(tech-debt): build common infrastructure for such audit-log stores and inline its functions
-  val history: CCHistoryStore
 
   def lookupCoinRules()(implicit
       ec: ExecutionContext
