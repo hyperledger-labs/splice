@@ -1,5 +1,6 @@
 package com.daml.network.splitwise.automation
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -19,6 +20,7 @@ class AcceptedAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: SplitwiseStore,
     connection: CoinLedgerConnection,
+    globalDomain: DomainAlias,
     scanConnection: ScanConnection,
     // extra readAs rights, which are required to readAs the validatorParty and thus see the CoinRules
     // TODO(M3-82): once we have explicit disclosure: remove the need to fetch these extra readAs rights, which are there to enable using the CoinRules, which are only visible to the validatorParty
@@ -47,7 +49,7 @@ class AcceptedAppPaymentRequestsTrigger(
       payment.payload.deliveryOffer
     )
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.getDomainId(globalDomain)
       queryResult <- store.lookupInstall(sender)
       taskOutcome <- queryResult match {
         case None =>

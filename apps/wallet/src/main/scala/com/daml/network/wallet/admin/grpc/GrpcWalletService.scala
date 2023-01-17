@@ -657,7 +657,7 @@ class GrpcWalletService(
       userParty = userStore.key.endUserParty
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.getDomainId(walletManager.globalDomain)
       result <- dedup match {
         case None =>
           connection.submitWithResultNoDedup(

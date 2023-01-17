@@ -5,7 +5,11 @@ import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.splitwise.config.{
+  SplitwiseAppBackendConfig,
+  SplitwiseAppClientConfig,
+  SplitwiseDomainConfig,
+}
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
@@ -15,6 +19,7 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.config.{
   TreasuryConfig,
+  WalletDomainConfig,
   WalletAppBackendConfig,
   WalletAppClientConfig,
   WalletRemoteValidatorAppConfig,
@@ -460,6 +465,8 @@ object CoinConfig {
       deriveReader[WalletRemoteValidatorAppConfig]
     implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
       deriveReader[TreasuryConfig]
+    implicit val walletDomainConfigReader: ConfigReader[WalletDomainConfig] =
+      deriveReader[WalletDomainConfig]
     implicit val walletBackendConfigReader: ConfigReader[WalletAppBackendConfig] =
       deriveReader[WalletAppBackendConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
@@ -468,6 +475,8 @@ object CoinConfig {
       deriveReader[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
       deriveReader[RemoteDirectoryAppConfig]
+    implicit val splitwiseDomainConfigReader: ConfigReader[SplitwiseDomainConfig] =
+      deriveReader[SplitwiseDomainConfig]
     implicit val splitwiseConfigReader: ConfigReader[SplitwiseAppBackendConfig] =
       deriveReader[SplitwiseAppBackendConfig]
     implicit val remoteSplitwiseConfigReader: ConfigReader[SplitwiseAppClientConfig] =
@@ -542,6 +551,8 @@ object CoinConfig {
       deriveWriter[WalletRemoteValidatorAppConfig]
     implicit val treasuryConfigWriter: ConfigWriter[TreasuryConfig] =
       deriveWriter[TreasuryConfig]
+    implicit val walletDomainConfigWriter: ConfigWriter[WalletDomainConfig] =
+      deriveWriter[WalletDomainConfig]
     implicit val walletBackendConfigWriter: ConfigWriter[WalletAppBackendConfig] =
       deriveWriter[WalletAppBackendConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
@@ -550,6 +561,8 @@ object CoinConfig {
       deriveWriter[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
       deriveWriter[RemoteDirectoryAppConfig]
+    implicit val splitwiseDomainConfigWriter: ConfigWriter[SplitwiseDomainConfig] =
+      deriveWriter[SplitwiseDomainConfig]
     implicit val splitwiseConfigWriter: ConfigWriter[SplitwiseAppBackendConfig] =
       deriveWriter[SplitwiseAppBackendConfig]
     implicit val remoteSplitwiseConfigWriter: ConfigWriter[SplitwiseAppClientConfig] =

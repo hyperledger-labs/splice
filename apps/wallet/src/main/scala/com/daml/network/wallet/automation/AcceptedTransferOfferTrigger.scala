@@ -1,5 +1,6 @@
 package com.daml.network.wallet.automation
 
+import com.digitalasset.canton.DomainAlias
 import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
@@ -26,6 +27,7 @@ class AcceptedTransferOfferTrigger(
     store: UserWalletStore,
     treasury: TreasuryService,
     connection: CoinLedgerConnection,
+    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -86,7 +88,7 @@ class AcceptedTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.getDomainId(globalDomain)
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
         acceptedOffer.contractId
       )

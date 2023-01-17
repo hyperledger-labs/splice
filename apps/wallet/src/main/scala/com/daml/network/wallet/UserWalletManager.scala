@@ -1,5 +1,6 @@
 package com.daml.network.wallet
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.coin as coinCodegen
@@ -24,6 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: CoinLedgerClient,
+    val globalDomain: DomainAlias,
     private[wallet] val participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
     automationConfig: AutomationConfig,
@@ -72,6 +74,7 @@ class UserWalletManager(
       )
     val walletService = new UserWalletService(
       ledgerClient,
+      globalDomain,
       key,
       this,
       automationConfig,

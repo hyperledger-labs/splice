@@ -1,5 +1,6 @@
 package com.daml.network.wallet.automation
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{
   ExpiredContractTrigger,
   ScheduledTaskTrigger,
@@ -20,6 +21,7 @@ class ExpireAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     connection: CoinLedgerConnection,
+    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -42,7 +44,7 @@ class ExpireAppPaymentRequestsTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.getDomainId(globalDomain)
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AppPaymentRequest_Expire(
         task.work.contractId

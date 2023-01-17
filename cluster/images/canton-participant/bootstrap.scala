@@ -1,6 +1,6 @@
 println("Bootstrapping CN participant...")
 
-val domainLabel = "svc_domain"
+val domainLabel = "global"
 val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
 
 if (`svc_participant`.domains.list_connected().isEmpty) {

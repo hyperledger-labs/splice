@@ -3,7 +3,7 @@ val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.glob
 println("Starting participant node")
 splitwiseParticipant.start()
 println(s"Connecting self-hosted validator to the domain $domainUrl")
-splitwiseParticipant.domains.connect("canton-network", domainUrl)
+splitwiseParticipant.domains.connect("global", domainUrl)
 println(s"Creating validator user")
 val validatorParty = splitwiseParticipant.parties.enable("validator_user")
 splitwiseParticipant.ledger_api.users.create(

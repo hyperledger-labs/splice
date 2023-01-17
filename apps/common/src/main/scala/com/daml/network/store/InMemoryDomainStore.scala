@@ -9,6 +9,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
+import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
@@ -22,6 +23,7 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
     Map.empty,
     Promise(),
     Promise(),
+    Map.empty,
   )
 
   override def listConnectedDomains(): Future[Map[DomainAlias, DomainId]] =
@@ -53,6 +55,16 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
 
   override def signalWhenConnected(): Future[Unit] =
     stateVar.oneDomainConnected.future
+
+  override def signalWhenConnected(alias: DomainAlias): Future[Unit] =
+    updateState[Future[Unit]](state =>
+      state.connectedDomains.get(alias) match {
+        case Some(_) => (state, Future.unit)
+        case None =>
+          val (newState, promise) = state.addAliasToSignal(alias)
+          (newState, promise.future)
+      }
+    ).flatten
 
   private def nextDomainStateUpdate[T](
       previousState: InMemoryDomainStore.State
@@ -107,10 +119,11 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.setDomains(domains)
-      ).map { case (summary, stateChanged, oneDomainConnectedO) =>
+      ).map { case (summary, stateChanged, oneDomainConnectedO, aliasSignals) =>
         logger.debug(show"Ingested domain update $summary")
         stateChanged.success(())
         oneDomainConnectedO.foreach(_.trySuccess(()))
+        aliasSignals.foreach(_.success(()))
       }
   }
 
@@ -135,21 +148,38 @@ object InMemoryDomainStore {
       connectedDomains: Map[DomainAlias, DomainId],
       stateChanged: Promise[Unit],
       oneDomainConnected: Promise[Unit],
+      domainAliasIngestionsToSignal: Map[DomainAlias, Promise[Unit]],
   ) {
     def setDomains(
         newDomains: Map[DomainAlias, DomainId]
-    ): (State, (IngestionSummary, Promise[Unit], Option[Promise[Unit]])) = {
+    ): (
+        State,
+        (IngestionSummary, Promise[Unit], Option[Promise[Unit]], Iterable[Promise[Unit]]),
+    ) = {
       val summary = summarizeChanges(connectedDomains, newDomains)
       val oneDomainConnectedO =
         Option.when(summary.newNumConnectedDomains >= 1)(oneDomainConnected)
+      val (readyToSignal, leftoverSignals) =
+        domainAliasIngestionsToSignal.partition { case (alias, _) =>
+          newDomains.contains(alias)
+        }
       (
         State(
           newDomains,
           Promise(),
           oneDomainConnected,
+          leftoverSignals,
         ),
-        (summary, stateChanged, oneDomainConnectedO),
+        (summary, stateChanged, oneDomainConnectedO, readyToSignal.values),
       )
+    }
+    def addAliasToSignal(alias: DomainAlias): (State, Promise[Unit]) = {
+      domainAliasIngestionsToSignal.get(alias) match {
+        case None =>
+          val p = Promise[Unit]()
+          (this.focus(_.domainAliasIngestionsToSignal).modify(_ + (alias -> p)), p)
+        case Some(existingP) => (this, existingP)
+      }
     }
   }
 

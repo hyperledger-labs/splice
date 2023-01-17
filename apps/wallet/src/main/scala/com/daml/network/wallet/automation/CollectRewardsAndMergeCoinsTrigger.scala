@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,7 +17,6 @@ class CollectRewardsAndMergeCoinsTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     treasury: TreasuryService,
-    connection: CoinLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,

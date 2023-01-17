@@ -1,5 +1,6 @@
 package com.daml.network.wallet.automation
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
@@ -18,6 +19,7 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CoinLedgerClient,
+    globalDomain: DomainAlias,
     participantAdminConnection: ParticipantAdminConnection,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -37,14 +39,18 @@ class UserWalletAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
-  registerTrigger(new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection))
+  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection, globalDomain))
+  registerTrigger(
+    new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection, globalDomain)
+  )
   registerTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))
   registerTrigger(
-    new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
+    new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection, globalDomain)
   )
   registerTrigger(
-    new CollectRewardsAndMergeCoinsTrigger(triggerContext, store, treasury, connection)
+    new CollectRewardsAndMergeCoinsTrigger(triggerContext, store, treasury)
   )
-  registerTrigger(new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection))
+  registerTrigger(
+    new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
+  )
 }

@@ -1,5 +1,6 @@
 package com.daml.network.wallet.config
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AuthTokenSourceConfig,
@@ -12,6 +13,10 @@ import com.daml.network.config.{
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
+case class WalletDomainConfig(
+    global: DomainAlias
+)
+
 case class WalletAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -23,6 +28,7 @@ case class WalletAppBackendConfig(
     auth: AuthConfig,
     automation: AutomationConfig = AutomationConfig(),
     treasury: TreasuryConfig = TreasuryConfig(),
+    domains: WalletDomainConfig,
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"

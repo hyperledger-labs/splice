@@ -1,5 +1,6 @@
 package com.daml.network.wallet.treasury
 
+import com.digitalasset.canton.DomainAlias
 import akka.Done
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
@@ -52,6 +53,7 @@ import scala.util.{Failure, Success}
   */
 class TreasuryService(
     connection: CoinLedgerConnection,
+    globalDomain: DomainAlias,
     treasuryConfig: TreasuryConfig,
     clock: Clock,
     userStore: UserWalletStore,
@@ -327,7 +329,7 @@ class TreasuryService(
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing filtered batch $batch with inputs $inputs")
     for {
-      domainId <- userStore.domains.getUniqueDomainId()
+      domainId <- userStore.domains.getDomainId(globalDomain)
       (offset, outcomes) <- connection
         // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
         // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by

@@ -13,7 +13,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   "list one connected domain" in { implicit env =>
     eventually() {
-      scan.listConnectedDomains().keySet shouldBe Set("da")
+      scan.listConnectedDomains().keySet shouldBe Set("global")
     }
   }
 }

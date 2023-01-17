@@ -1,5 +1,6 @@
 package com.daml.network.wallet
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -20,6 +21,7 @@ import scala.concurrent.ExecutionContext
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
     ledgerClient: CoinLedgerClient,
+    globalDomain: DomainAlias,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
@@ -43,6 +45,7 @@ class UserWalletService(
 
   val treasury: TreasuryService = new TreasuryService(
     connection,
+    globalDomain,
     treasuryConfig,
     clock,
     store,
@@ -56,6 +59,7 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
+    globalDomain,
     walletManager.participantAdminConnection,
     automationConfig,
     clock,

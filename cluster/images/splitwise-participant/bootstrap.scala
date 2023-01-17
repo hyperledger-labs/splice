@@ -1,6 +1,6 @@
 println("Bootstrapping splitwise provider participant...")
 
-val domainLabel = "canton-network"
+val domainLabel = "global"
 val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
 
 println(s"Connecting to domain $domainUrl...")

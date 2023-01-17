@@ -324,7 +324,7 @@ class WalletIntegrationTest
 
     "list one connected domain" in { implicit env =>
       eventually() {
-        providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("da")
+        providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("global")
       }
     }
 

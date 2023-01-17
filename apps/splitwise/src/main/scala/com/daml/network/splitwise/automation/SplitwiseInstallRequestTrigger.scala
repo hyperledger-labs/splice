@@ -1,5 +1,6 @@
 package com.daml.network.splitwise.automation
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
@@ -18,6 +19,7 @@ class SplitwiseInstallRequestTrigger(
     override protected val context: TriggerContext,
     store: SplitwiseStore,
     connection: CoinLedgerConnection,
+    splitwiseDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -37,7 +39,7 @@ class SplitwiseInstallRequestTrigger(
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.getDomainId(splitwiseDomain)
       queryResult <- store.lookupInstallWithOffset(user)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>

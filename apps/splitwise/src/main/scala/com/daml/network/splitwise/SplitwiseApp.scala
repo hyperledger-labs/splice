@@ -72,6 +72,7 @@ class SplitwiseApp(
       )
     automation = new SplitwiseAutomationService(
       config.automation,
+      config.domains,
       clock,
       store,
       ledgerClient,
@@ -82,7 +83,8 @@ class SplitwiseApp(
       loggerFactory,
       timeouts,
     )
-    _ <- store.domains.signalWhenConnected()
+    _ <- store.domains.signalWhenConnected(config.domains.global)
+    _ <- store.domains.signalWhenConnected(config.domains.splitwise)
   } yield {
     adminServerRegistry
       .addService(

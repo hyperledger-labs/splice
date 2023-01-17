@@ -337,7 +337,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
     "list one connected domain" in { implicit env =>
       eventually() {
-        directory.listConnectedDomains().keySet shouldBe Set("da")
+        directory.listConnectedDomains().keySet shouldBe Set("global")
       }
     }
 

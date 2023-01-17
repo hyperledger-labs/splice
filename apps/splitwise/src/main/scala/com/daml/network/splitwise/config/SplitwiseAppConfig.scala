@@ -1,5 +1,6 @@
 package com.daml.network.splitwise.config
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.config.{
   AutomationConfig,
   CoinLedgerApiClientConfig,
@@ -10,6 +11,11 @@ import com.daml.network.config.{
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
+case class SplitwiseDomainConfig(
+    global: DomainAlias,
+    splitwise: DomainAlias,
+)
+
 case class SplitwiseAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -17,6 +23,7 @@ case class SplitwiseAppBackendConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
+    domains: SplitwiseDomainConfig,
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwise"

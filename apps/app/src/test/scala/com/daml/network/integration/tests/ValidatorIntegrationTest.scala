@@ -95,7 +95,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     scan.startSync()
     aliceValidator.startSync()
     eventually() {
-      aliceValidator.listConnectedDomains().keySet shouldBe Set("da")
+      aliceValidator.listConnectedDomains().keySet shouldBe Set("global")
     }
   }
 }

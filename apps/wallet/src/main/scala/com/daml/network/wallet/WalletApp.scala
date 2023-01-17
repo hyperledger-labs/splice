@@ -121,6 +121,7 @@ class WalletApp(
       walletManager =
         new UserWalletManager(
           ledgerClient,
+          config.domains.global,
           participantAdminConnection,
           walletStore,
           config.automation,

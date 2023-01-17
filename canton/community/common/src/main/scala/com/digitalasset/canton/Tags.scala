@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton
 
+import pureconfig.{ConfigReader, ConfigWriter}
+import pureconfig.error.CannotConvert
 import cats.syntax.either.*
 import com.digitalasset.canton.config.RequireTypes.{
   LengthLimitedStringWrapper,
@@ -29,6 +31,12 @@ object DomainAlias extends LengthLimitedStringWrapperCompanion[String255, Domain
   override protected def companion: String255.type = String255
   override def instanceName: String = "DomainAlias"
   override protected def factoryMethodWrapper(str: String255): DomainAlias = DomainAlias(str)
+
+  implicit val configReader: ConfigReader[DomainAlias] = ConfigReader.fromString(str =>
+    create(str).left.map(err => CannotConvert(str, "DomainAlias", err))
+  )
+  implicit val configWriter: ConfigWriter[DomainAlias] =
+    ConfigWriter.toString(_.toProtoPrimitive)
 }
 
 case class TimedValue[A](timestamp: Instant, value: A)

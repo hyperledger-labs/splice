@@ -4,6 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.config.AutomationConfig
+import com.daml.network.splitwise.config.SplitwiseDomainConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
@@ -18,6 +19,7 @@ import scala.concurrent.ExecutionContextExecutor
 /** Manages background automation that runs on an splitwise app. */
 class SplitwiseAutomationService(
     automationConfig: AutomationConfig,
+    domainConfig: SplitwiseDomainConfig,
     clock: Clock,
     store: SplitwiseStore,
     ledgerClient: CoinLedgerClient,
@@ -43,8 +45,19 @@ class SplitwiseAutomationService(
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
   registerTrigger(
-    new AcceptedAppPaymentRequestsTrigger(triggerContext, store, connection, scanConnection, readAs)
+    new AcceptedAppPaymentRequestsTrigger(
+      triggerContext,
+      store,
+      connection,
+      domainConfig.global,
+      scanConnection,
+      readAs,
+    )
   )
-  registerTrigger(new SplitwiseInstallRequestTrigger(triggerContext, store, connection))
-  registerTrigger(new GroupRequestTrigger(triggerContext, store, connection))
+  registerTrigger(
+    new SplitwiseInstallRequestTrigger(triggerContext, store, connection, domainConfig.splitwise)
+  )
+  registerTrigger(
+    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwise)
+  )
 }
