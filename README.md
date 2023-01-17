@@ -188,7 +188,7 @@ Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
   `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
-- `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
+- `test`: Note that it is [not currently advisable](https://github.com/DACH-NY/the-real-canton-coin/issues/2098) to use this command. Use the `testOnly` commands described above to run specific tests and use the CI to run all tests.
 - `damlTest`: run the Daml script tests included with the apps' Daml files
 
 #### `sbt` Tips&Tricks
