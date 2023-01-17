@@ -584,7 +584,6 @@ class GrpcWalletService(
     * of explicit disclosure for CoinRules).
     */
   private def exerciseWalletCoinAction[
-      LookupResult,
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
       ProtoResponse <: scalapb.GeneratedMessage,
   ](

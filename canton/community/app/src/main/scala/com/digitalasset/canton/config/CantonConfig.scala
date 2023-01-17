@@ -287,6 +287,8 @@ case class CantonFeatures(
 /** Root configuration parameters for a single Canton process. */
 trait CantonConfig {
 
+  def name: Option[String] = None
+
   type DomainConfigType <: DomainConfig with ConfigDefaults[DefaultPorts, DomainConfigType]
   type ParticipantConfigType <: LocalParticipantConfig with ConfigDefaults[
     DefaultPorts,

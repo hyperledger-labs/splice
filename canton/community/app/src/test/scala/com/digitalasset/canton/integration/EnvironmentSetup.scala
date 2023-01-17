@@ -3,9 +3,8 @@
 
 package com.digitalasset.canton.integration
 
-import com.digitalasset.canton.CloseableTest
+import com.digitalasset.canton.{CloseableTest, TestEssentials}
 import com.digitalasset.canton.environment.Environment
-import com.digitalasset.canton.logging.NamedLogging
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.util.control.NonFatal
@@ -16,7 +15,7 @@ import scala.util.control.NonFatal
   */
 sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends BeforeAndAfterAll {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with TestEssentials =>
 
   private lazy val envDef = environmentDefinition
 
@@ -83,7 +82,7 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
 
     try {
       val testEnvironment: TCE =
-        envDef.createTestConsole(environmentFixture, loggerFactory)
+        envDef.createTestConsole(environmentFixture, environmentFixture.loggerFactory)
 
       plugins.foreach(plugin =>
         if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
@@ -135,23 +134,29 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
 trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends EnvironmentSetup[E, TCE]
     with CloseableTest {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with TestEssentials =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var sharedEnvironment: Option[TCE] = None
+  private var sharedEnvironmentO: Option[TCE] = None
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    sharedEnvironment = Some(createEnvironment())
+    val env = createEnvironment()
+    sharedEnvironmentO = Some(env)
+    // Adjusting the logger to also include the config.name property
+    // (not possible for isolated environments because we use `lazy val` for accessing the logger from the logger factory,
+    // so after the first log line further changes to the logger factory have no effect on the logger)
+    varLoggerFactory =
+      env.actualConfig.name.fold(varLoggerFactory)(varLoggerFactory.append("config", _))
   }
 
   override def afterAll(): Unit =
     try {
-      sharedEnvironment.foreach(destroyEnvironment)
+      sharedEnvironmentO.foreach(destroyEnvironment)
     } finally super.afterAll()
 
   override def provideEnvironment: TCE =
-    sharedEnvironment.getOrElse(
+    sharedEnvironmentO.getOrElse(
       sys.error("beforeAll should have run before providing a shared environment")
     )
 }
@@ -159,7 +164,7 @@ trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
 /** Creates an environment for each test. */
 trait IsolatedEnvironments[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends EnvironmentSetup[E, TCE] {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with TestEssentials =>
 
   override def provideEnvironment: TCE = createEnvironment()
   override def testFinished(environment: TCE): Unit = destroyEnvironment(environment)

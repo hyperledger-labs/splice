@@ -92,7 +92,12 @@ trait TestEssentials
   // when mocking methods touching transactions it's very common to need to mock the traceContext as a an additional argument list
   def anyTraceContext = ArgumentMatchers.any[TraceContext]()
 
-  override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
+  // Using this construction to allow adjusting the loggerFactory dynamically
+  // and include the CantonConfig.name property of the respective environment in the scala-test orchestration's logger.
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  var varLoggerFactory: SuppressingLogger = SuppressingLogger(getClass)
+
+  override def loggerFactory: SuppressingLogger = varLoggerFactory
 
   // Make sure that JUL logging is redirected to SLF4J
   if (!SLF4JBridgeHandler.isInstalled) {

@@ -52,7 +52,7 @@ import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
 
 case class CoinConfig(
-    name: Option[String] = None,
+    override val name: Option[String] = None,
     validatorApps: Map[InstanceName, ValidatorAppBackendConfig] = Map.empty,
     validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
     svcApp: Option[SvcAppBackendConfig] = None,
