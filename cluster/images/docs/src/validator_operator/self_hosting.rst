@@ -17,7 +17,15 @@ To locally start a validator node that connects against the DevNet domain, you w
 Additionally, you'll also need to enable the GCP DA Canton DevNet VPN. If you can view
 this documentation, you already enabled the VPN successfully.
 
-.. To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
+To run a participant node, download Canton research: |canton_research_download_link|. If you do not have access, please reach out to Digital Asset.
+Canton research is an in-development version of Canton research that will eventually turn into a new Canton release.
+
+Please now extract Canton:
+
+.. parsed-literal::
+
+   tar xzvf canton-research-|canton_version|.tar.gz
+
 
 To obtain the Canton Coin network binary (required to run validator
 and wallet apps), please download a release bundle here:
@@ -49,13 +57,11 @@ The Canton participant is responsible for hosting your Daml apps; i.e. interpret
    bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
    This is also the convention we will use in this tutorial.
 
-First off, you will need to start the validator participant and connect it to the devnet domain: ::
+First off, you will need to start the validator participant and connect it to the devnet domain: We assume here that
+you extracted Canton research next to the Canton network tarball. If you placed it somewhere else, you might need to adjust the path. ::
 
-  bin/coin --config examples/validator/validator-participant.conf \
+  ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
       --bootstrap examples/validator/validator-participant.canton
-
-For convenience, this uses the coin binary at the moment. At a later point, the participant will need to be
-started as usual through Canton (``bin/canton``).
 
 Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps: ::
 
@@ -284,7 +290,7 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
   ::
 
-    bin/coin --config examples/validator/validator-participant-secure.conf \
+    ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
       --bootstrap examples/validator/validator-participant.canton \
       -DVALIDATOR_USER_NAME=${NETWORK_AUTH_VALIDATOR_USER_NAME}
 

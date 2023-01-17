@@ -1,10 +1,12 @@
 { stdenv }:
+let sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
+in
 stdenv.mkDerivation rec {
   name = "canton";
   version = "20230106";
   src = builtins.fetchTarball {
-    url = "https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-${version}.tar.gz";
-    sha256 = "1a7pxhgs00d867c45kf18wa9lcjzcl20q7amxsq54hiza0bfsl5m";
+    url = "https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-${sources.version}.tar.gz";
+    sha256 = sources.sha256;
   };
   installPhase = ''
     mkdir - p $out

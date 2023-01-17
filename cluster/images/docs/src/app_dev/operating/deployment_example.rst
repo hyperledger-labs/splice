@@ -14,9 +14,9 @@ Following the :ref:`recommended topology <topology_image>` for
 deploying Canton network applications, we run a separate validator
 node for our application.
 
-To start the validator node, first start the validator participant and connect it to the devnet domain: ::
+To start the validator node, first start the validator participant using the Canton research binary and connect it to the devnet domain: ::
 
-    bin/coin --config examples/splitwise/splitwise-participant.conf \
+    ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwise/splitwise-participant.conf \
       --bootstrap examples/splitwise/splitwise-participant.canton
 
 Before starting the splitwise backend, some setup is required:

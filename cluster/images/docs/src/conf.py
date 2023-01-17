@@ -14,7 +14,7 @@ import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import os
+import json
 
 
 # -- Project information -----------------------------------------------------
@@ -66,6 +66,10 @@ html_theme_options = {
     # 'analytics_id': 'UA-64532708-4'
 }
 
+with open("../../../../nix/canton-sources.json") as f:
+    obj = json.load(f)
+    canton_research_version = obj['version']
+
 # Sphinx does not allow something like ``|version|``
 # so instead we define a replacement that includes the formatting.
 rst_prolog = """
@@ -73,6 +77,8 @@ rst_prolog = """
    :format: html
 
 .. |version_literal| replace:: ``{version}``
+.. |canton_version| replace:: {canton_research_version}
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_coin-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
-""".format(version = os.getenv("VERSION"))
+.. |canton_research_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-{canton_research_version}.tar.gz">Download Canton research</a>`
+""".format(version = os.getenv("VERSION"), canton_research_version = canton_research_version)
