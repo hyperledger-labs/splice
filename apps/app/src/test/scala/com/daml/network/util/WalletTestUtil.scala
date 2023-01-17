@@ -1,13 +1,13 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
 }
-import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
@@ -20,7 +20,6 @@ import com.daml.network.console.{
 }
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
-import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
@@ -86,14 +85,8 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   )(implicit coinEnv: CoinTestConsoleEnvironment): Unit =
     clue(s"Locking $quantity coins for $userParty") {
       val coinOpt = coins.find(_.effectiveQuantity >= quantity)
-      val isStaticTime = coinEnv.actualConfig.parameters.clock match {
-        case ClockConfig.WallClock(_) => false
-        case _ => true
-      }
-      val now =
-        if (isStaticTime) userWallet.remoteParticipant.ledger_api.time.get()
-        else CantonTimestamp.now()
-      val expiredAt = now.add(expiredDuration)
+
+      val expiredAt = coinEnv.environment.clock.now.add(expiredDuration)
       val expirationOpt = Proto.decode(Proto.Timestamp)(expiredAt.underlying.micros)
 
       (coinOpt, expirationOpt) match {
