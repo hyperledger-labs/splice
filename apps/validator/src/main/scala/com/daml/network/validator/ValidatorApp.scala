@@ -127,7 +127,6 @@ class ValidatorApp(
       s"Attempting to create wallet install and validator right for validator party $validatorParty..."
     )
     for {
-      domainId <- store.domains.getUniqueDomainId()
       _ <- ValidatorUtil.installWalletForUser(
         validatorServiceParty = validatorParty,
         walletServiceParty = walletServiceParty,
@@ -266,8 +265,8 @@ class ValidatorApp(
         loggerFactory,
         timeouts,
       )
-      _ <- store.domains.signalWhenConnected()
-      domainId <- store.domains.getUniqueDomainId()
+      _ <- store.domains.signalWhenConnected(config.domains.global)
+      domainId <- store.domains.getDomainId(config.domains.global)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(connection, name, instance, validatorParty)
       })

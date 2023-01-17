@@ -14,6 +14,7 @@ import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
+  ValidatorDomainConfig,
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
 }
@@ -445,6 +446,8 @@ object CoinConfig {
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
+    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
+      deriveReader[ValidatorDomainConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig]
     implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -531,6 +534,8 @@ object CoinConfig {
       deriveWriter[AppInstance]
     implicit val remoteScanConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
+    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
+      deriveWriter[ValidatorDomainConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val remoteValidatorConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

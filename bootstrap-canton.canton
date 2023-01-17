@@ -5,6 +5,11 @@ import java.nio.charset.StandardCharsets
 
 println("Running canton bootstrap script...")
 
+println("Connecting all participants to global domain...")
+participants.all.domains.connect_local(global)
+println("Connecting splitwise, alice & bob participant to splitwise domain...")
+Seq(aliceParticipant, bobParticipant, splitwiseParticipant).foreach(_.domains.connect_local(splitwise))
+
 println(s"Allocating validator service users and SVC user...")
 Seq(
   (aliceParticipant, "alice_validator_user"),

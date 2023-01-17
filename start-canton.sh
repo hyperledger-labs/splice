@@ -21,6 +21,7 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwise"
 
 # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
@@ -29,6 +30,7 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwise_simtime"
 
 # TODO(#1836) Avoid having to inject our patched auth service.
 sbt canton-community-participant/compile
@@ -42,7 +44,7 @@ export CLASSPATH=$PWD/canton-classpath
 
 # Start Canton
 CANTON_TOKEN_FILENAME=canton.tokens canton \
-    daemon --auto-connect-local --log-level-canton=DEBUG \
+    daemon --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
     --bootstrap bootstrap-canton.canton &
 PID=$!
@@ -50,7 +52,7 @@ echo "$PID" > canton.pid
 
 # Start second Canton with simulated time, for time-based tests
 CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
-    daemon --auto-connect-local --log-level-canton=DEBUG \
+    daemon --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
     --log-file-name log/canton-simtime.log \
     --bootstrap bootstrap-canton.canton &

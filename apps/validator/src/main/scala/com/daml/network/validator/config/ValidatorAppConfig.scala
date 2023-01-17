@@ -1,5 +1,6 @@
 package com.daml.network.validator.config
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
@@ -18,6 +19,10 @@ case class AppInstance(
     dars: Seq[Path],
 )
 
+case class ValidatorDomainConfig(
+    global: DomainAlias
+)
+
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -28,6 +33,7 @@ case class ValidatorAppBackendConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
+    domains: ValidatorDomainConfig,
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
