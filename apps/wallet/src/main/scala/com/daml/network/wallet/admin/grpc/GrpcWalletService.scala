@@ -62,7 +62,7 @@ class GrpcWalletService(
   private val walletServiceParty: PartyId = store.key.walletServiceParty
   private val validatorParty: PartyId = store.key.validatorParty
 
-  private val connection = ledgerClient.connection("GrpcWalletService")
+  private val connection = ledgerClient.connection()
 
   override def userStatus(request: v0.UserStatusRequest): Future[v0.UserStatusResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
@@ -658,12 +658,14 @@ class GrpcWalletService(
       userParty = userStore.key.endUserParty
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
+      domainId <- store.domains.getUniqueDomainId()
       result <- dedup match {
         case None =>
           connection.submitWithResultNoDedup(
             Seq(walletServiceParty),
             Seq(validatorParty, userParty),
             update,
+            domainId,
           )
         case Some((commandId, dedupConfig)) =>
           connection
@@ -673,6 +675,7 @@ class GrpcWalletService(
               update,
               commandId,
               dedupConfig,
+              domainId,
             )
       }
 

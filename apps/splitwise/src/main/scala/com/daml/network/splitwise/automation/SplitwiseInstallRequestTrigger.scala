@@ -36,29 +36,34 @@ class SplitwiseInstallRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
-    store.lookupInstallWithOffset(user).flatMap {
-      case QueryResult(_, Some(_)) =>
-        logger.info(s"Rejecting duplicate install request from user party $user")
-        val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
-        connection
-          .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => TaskSuccess("rejected request for already existing installation."))
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      queryResult <- store.lookupInstallWithOffset(user)
+      taskOutcome <- queryResult match {
+        case QueryResult(_, Some(_)) =>
+          logger.info(s"Rejecting duplicate install request from user party $user")
+          val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
+          connection
+            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, domainId)
+            .map(_ => TaskSuccess("rejected request for already existing installation."))
 
-      case QueryResult(off, None) =>
-        val acceptCmd =
-          req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
-        connection
-          .submitCommands(
-            actAs = Seq(provider),
-            readAs = Seq(),
-            commands = acceptCmd,
-            commandId = CoinLedgerConnection.CommandId(
-              "com.daml.network.splitwise.createSplitwiseInstall",
-              Seq(provider, user),
-            ),
-            deduplicationOffset = off,
-          )
-          .map(_ => TaskSuccess("accepted install request."))
-    }
+        case QueryResult(off, None) =>
+          val acceptCmd =
+            req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
+          connection
+            .submitCommands(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              commands = acceptCmd,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.splitwise.createSplitwiseInstall",
+                Seq(provider, user),
+              ),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+            .map(_ => TaskSuccess("accepted install request."))
+      }
+    } yield taskOutcome
   }
 }

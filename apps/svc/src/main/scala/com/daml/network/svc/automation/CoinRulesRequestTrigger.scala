@@ -35,6 +35,7 @@ class CoinRulesRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
+      domainId <- store.domains.getUniqueDomainId()
       openMiningRounds <- store.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       issuingMiningRounds <- store.acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
       coinRules <- store.getCoinRules()
@@ -48,7 +49,7 @@ class CoinRulesRequestTrigger(
         .asScala
         .toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated
-      _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
+      _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds, domainId)
     } yield TaskSuccess(s"accepted coin rules request from $validatorParty")
   }
 

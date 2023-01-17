@@ -327,6 +327,7 @@ class TreasuryService(
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing filtered batch $batch with inputs $inputs")
     for {
+      domainId <- userStore.domains.getUniqueDomainId()
       (offset, outcomes) <- connection
         // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
         // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
@@ -335,6 +336,7 @@ class TreasuryService(
           Seq(walletManager.store.key.walletServiceParty),
           walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
+          domainId,
         )
       // return all outcomes to the callers
       _ = batch.completeBatchOperations(outcomes)(logger, tc)

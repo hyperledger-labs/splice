@@ -43,6 +43,7 @@ class ExpireIssuingMiningRoundTrigger(
     val totals = store.getTotalsForRound(round.payload.round.number)
     for {
       coinRules <- store.getCoinRules()
+      domainId <- store.domains.getUniqueDomainId()
       cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_Close(
           round.contractId,
@@ -54,7 +55,7 @@ class ExpireIssuingMiningRoundTrigger(
           totals.selfTransferOutputs.bigDecimal,
         )
       cid <- connection
-        .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+        .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
   }
 }

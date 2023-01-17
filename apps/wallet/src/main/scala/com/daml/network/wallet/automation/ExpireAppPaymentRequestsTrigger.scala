@@ -42,6 +42,7 @@ class ExpireAppPaymentRequestsTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
+      domainId <- store.domains.getUniqueDomainId()
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AppPaymentRequest_Expire(
         task.work.contractId
@@ -51,6 +52,7 @@ class ExpireAppPaymentRequestsTrigger(
           Seq(store.key.walletServiceParty),
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
+          domainId,
         )
     } yield TaskSuccess("expired app payment request")
   }

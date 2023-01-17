@@ -42,7 +42,7 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
@@ -65,6 +65,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commands: Seq[Command],
       commandId: CoinLedgerConnection.CommandId,
       deduplicationOffset: String,
+      domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[Transaction]
 
   // TODO(M3-60): review all uses of command submission w/o deduplication
@@ -72,18 +73,21 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       commands: Seq[Command],
+      domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[Transaction]
 
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
+      domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[T]
 
   def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
+      domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[(String, T)]
 
   def submitWithResult[T](
@@ -92,6 +96,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       update: Update[T],
       commandId: CoinLedgerConnection.CommandId,
       deduplicationConfig: DedupConfig,
+      domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[T]
 }
 
@@ -191,7 +196,6 @@ object CoinLedgerConnection {
 
   def apply(
       coinLedgerClient: CoinLedgerClient,
-      workflowId: String,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
   ): CoinLedgerConnection with NamedLogging =
@@ -206,13 +210,17 @@ object CoinLedgerConnection {
 
       implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
 
+      private def domainIdToWorkflowId(id: DomainId): String =
+        s"domain-id:${id.toProtoPrimitive}"
+
       def submitCommandsNoDedup(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           commands: Seq[Command],
+          domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
-          workflowId = workflowId,
+          workflowId = domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
@@ -228,9 +236,10 @@ object CoinLedgerConnection {
           commands: Seq[Command],
           commandId: CommandId,
           deduplicationOffset: String,
+          domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
-          workflowId = workflowId,
+          workflowId = domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           commandId = commandId.commandIdForSubmission,
           deduplicationConfig = DedupOffset(
@@ -246,15 +255,17 @@ object CoinLedgerConnection {
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: Update[T],
+          domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[T] =
-        submitWithResultAndOffsetNoDedup(actAs, readAs, update).map(_._2)
+        submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId).map(_._2)
 
       def submitWithResultAndOffsetNoDedup[T](
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: Update[T],
+          domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[(String, T)] =
-        doSubmitWithResultAndOffset(actAs, readAs, update, uniqueId, NoDedup)
+        doSubmitWithResultAndOffset(actAs, readAs, update, uniqueId, NoDedup, domainId)
 
       def submitWithResult[T](
           actAs: Seq[PartyId],
@@ -262,6 +273,7 @@ object CoinLedgerConnection {
           update: Update[T],
           commandId: CommandId,
           dedupConfig: DedupConfig,
+          domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[T] =
         doSubmitWithResultAndOffset(
           actAs,
@@ -269,6 +281,7 @@ object CoinLedgerConnection {
           update,
           commandId.commandIdForSubmission,
           dedupConfig,
+          domainId,
         )
           .map(_._2)
 
@@ -278,10 +291,11 @@ object CoinLedgerConnection {
           update: Update[T],
           commandIdForSubmission: String,
           dedup: DedupConfig,
+          domainId: DomainId,
       ): Future[(String, T)] = {
         for {
           tree <- client.submitAndWaitForTransactionTree(
-            workflowId = workflowId,
+            workflowId = domainIdToWorkflowId(domainId),
             applicationId = coinLedgerClient.applicationId,
             commandId = commandIdForSubmission,
             actAs = actAs.map(_.toProtoPrimitive),

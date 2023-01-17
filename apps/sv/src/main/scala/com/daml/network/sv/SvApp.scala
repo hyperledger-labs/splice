@@ -55,7 +55,7 @@ class SvApp(
   ): Future[SvApp.State] =
     for {
       store <- Future.successful(SvStore(svPartyId, storage, loggerFactory))
-      connection = ledgerClient.connection("SvAppBootstrap")
+      connection = ledgerClient.connection()
       automation = new SvAutomationService(
         clock,
         config,
@@ -66,6 +66,7 @@ class SvApp(
         loggerFactory,
         timeouts,
       )
+      _ <- store.domains.signalWhenConnected()
       // TODO(#2241) move check whether we are already part of the SVC to here
       _ <- retryProvider.retryForAutomationGrpc("joinConsortium", joinConsortium(svPartyId), this)
       _ = logger.info(s"SV App is initialized")

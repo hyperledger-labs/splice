@@ -6,7 +6,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,6 +23,7 @@ private[validator] object ValidatorUtil {
       svcParty: PartyId,
       connection: CoinLedgerConnection,
       store: ValidatorStore,
+      domainId: DomainId,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
       logger: TracedLogger,
@@ -56,6 +57,7 @@ private[validator] object ValidatorUtil {
                 commandId = CoinLedgerConnection
                   .CommandId("com.daml.network.validator.installWalletForUser", Seq(endUserParty)),
                 deduplicationOffset = off,
+                domainId = domainId,
               )
           case QueryResult(_, Some(_)) =>
             logger.info(s"WalletAppInstall for $endUserName already exists, skipping")

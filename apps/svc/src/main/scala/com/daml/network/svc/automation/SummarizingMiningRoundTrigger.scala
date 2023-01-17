@@ -32,6 +32,7 @@ class SummarizingMiningRoundTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
+      domainId <- store.domains.getUniqueDomainId()
       rewards <- queryRewards(summarizingRound.payload.round.number)
       coinRules <- store.getCoinRules()
       // TODO(M3-06): consider querying the round audit store (once we have it) and
@@ -43,7 +44,7 @@ class SummarizingMiningRoundTrigger(
           rewards.summary,
         )
       cid <-
-        connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+        connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
     } yield TaskSuccess(
       s"completed summarizing mining round with ${rewards.summary}, and created issuing mining round with cid ${cid.exerciseResult}"
     )

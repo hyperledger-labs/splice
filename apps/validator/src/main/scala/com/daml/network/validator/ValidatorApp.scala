@@ -37,7 +37,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.{ServerInterceptors, Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -121,11 +121,13 @@ class ValidatorApp(
       validatorUser: String,
       walletServiceParty: PartyId,
       walletServiceUser: String,
+      domainId: DomainId,
   ): Future[Unit] = {
     logger.info(
       s"Attempting to create wallet install and validator right for validator party $validatorParty..."
     )
     for {
+      domainId <- store.domains.getUniqueDomainId()
       _ <- ValidatorUtil.installWalletForUser(
         validatorServiceParty = validatorParty,
         walletServiceParty = walletServiceParty,
@@ -135,6 +137,7 @@ class ValidatorApp(
         svcParty = svcParty,
         connection = connection,
         store = store,
+        domainId = domainId,
         retryProvider = retryProvider,
         flagCloseable = this,
         logger = logger,
@@ -145,6 +148,7 @@ class ValidatorApp(
         svc = svcParty,
         connection = connection,
         lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
+        domainId = domainId,
         retryProvider = retryProvider,
         flagCloseable = this,
         logger = logger,
@@ -186,6 +190,7 @@ class ValidatorApp(
       store: ValidatorStore,
       svcParty: PartyId,
       validatorParty: PartyId,
+      domainId: DomainId,
   ): Future[Unit] = {
     logger.info("Attempting to create CoinRulesRequest")
     val coinRulesReq =
@@ -209,6 +214,7 @@ class ValidatorApp(
                       Seq(validatorParty),
                     ),
                   deduplicationOffset = Ordering.String.min(off1, off2),
+                  domainId = domainId,
                 )
             case (QueryResult(_, Some(_)), _) =>
               logger.info("CoinRulesRequest already exists, skipping")
@@ -237,7 +243,7 @@ class ValidatorApp(
             loggerFactory,
           )
         )
-      connection = ledgerClient.connection("ValidatorAppBootstrap")
+      connection = ledgerClient.connection()
       svcParty <- retryProvider.retryForAutomationGrpc(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
@@ -260,6 +266,8 @@ class ValidatorApp(
         loggerFactory,
         timeouts,
       )
+      _ <- store.domains.signalWhenConnected()
+      domainId <- store.domains.getUniqueDomainId()
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(connection, name, instance, validatorParty)
       })
@@ -271,8 +279,9 @@ class ValidatorApp(
         validatorUser = config.damlUser,
         walletServiceParty = walletServiceParty,
         walletServiceUser = walletServiceUser,
+        domainId = domainId,
       )
-      _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
+      _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
 
       verifier: SignatureVerifier = config.auth match {
@@ -287,6 +296,7 @@ class ValidatorApp(
             store,
             validatorUserName = config.damlUser,
             walletServiceUser = walletServiceUser,
+            domainId = domainId,
             retryProvider = retryProvider,
             flagCloseable = this,
             loggerFactory,
@@ -318,6 +328,7 @@ class ValidatorApp(
                 store,
                 config.damlUser,
                 config.walletServiceUser,
+                domainId = domainId,
                 retryProvider,
                 this,
                 loggerFactory,

@@ -141,6 +141,7 @@ class WalletApp(
         loggerFactory,
         timeouts,
       )
+      _ <- walletStore.domains.signalWhenConnected()
       _ <- walletStore.acs.signalWhenIngested(OpenMiningRound.COMPANION)
     } yield {
 

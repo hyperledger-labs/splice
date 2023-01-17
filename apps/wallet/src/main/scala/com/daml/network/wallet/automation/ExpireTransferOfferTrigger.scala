@@ -44,6 +44,7 @@ class ExpireTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
+      domainId <- store.domains.getUniqueDomainId()
       user = store.key.endUserParty.toProtoPrimitive
       _ <- user match {
         case task.work.payload.sender =>
@@ -55,6 +56,7 @@ class ExpireTransferOfferTrigger(
             Seq(store.key.walletServiceParty),
             Seq(store.key.validatorParty, store.key.endUserParty),
             cmd,
+            domainId,
           )
         case task.work.payload.receiver =>
           val cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Reject(
@@ -65,6 +67,7 @@ class ExpireTransferOfferTrigger(
             Seq(store.key.walletServiceParty),
             Seq(store.key.validatorParty, store.key.endUserParty),
             cmd,
+            domainId,
           )
         case _ =>
           Future.failed(

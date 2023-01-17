@@ -15,7 +15,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.math.RoundingMode
@@ -47,6 +47,7 @@ object CoinUtil {
       user: PartyId,
       logger: TracedLogger,
       connection: CoinLedgerConnection,
+      domainId: DomainId,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
       lookupValidatorRightByParty: (
@@ -67,6 +68,7 @@ object CoinUtil {
               commandId = CoinLedgerConnection
                 .CommandId("com.daml.network.validator.createValidatorRight", Seq(user)),
               deduplicationOffset = off,
+              domainId = domainId,
             )
             .map(_ => ())
         case QueryResult(_, Some(_)) =>

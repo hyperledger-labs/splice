@@ -54,13 +54,15 @@ class AdvanceOpenMiningRoundTrigger(
       .commands
       .asScala
       .toSeq
-    connection
-      .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-      .map(_ =>
-        TaskSuccess(
-          s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+    store.domains.getUniqueDomainId().flatMap { domainId =>
+      connection
+        .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds, domainId)
+        .map(_ =>
+          TaskSuccess(
+            s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+          )
         )
-      )
+    }
   }
 
   override protected def isStaleTask(

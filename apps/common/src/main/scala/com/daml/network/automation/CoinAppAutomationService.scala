@@ -21,7 +21,7 @@ abstract class CoinAppAutomationService(
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clock, retryProvider) {
 
-  protected val connection = registerResource(ledgerClient.connection(getClass.getName))
+  protected val connection = registerResource(ledgerClient.connection())
 
   registerService(
     new AcsIngestionService(

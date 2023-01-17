@@ -21,6 +21,7 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
   private var stateVar: InMemoryDomainStore.State = InMemoryDomainStore.State(
     Map.empty,
     Promise(),
+    Promise(),
   )
 
   override def listConnectedDomains(): Future[Map[DomainAlias, DomainId]] =
@@ -36,6 +37,22 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
           )
         )
       )(Future.successful(_))
+
+  override def getUniqueDomainId(): Future[DomainId] = Future {
+    val domains = stateVar.connectedDomains
+    domains.headOption match {
+      case None =>
+        throw new IllegalStateException("Tried to call getUniqueDomainId on empty domain store")
+      case Some((_, domainId)) if (domains.size == 1) => domainId
+      case _ =>
+        throw new IllegalStateException(
+          s"Tried to call getUniqueDomainId but domain store contains more than one domain: ${domains}"
+        )
+    }
+  }
+
+  override def signalWhenConnected(): Future[Unit] =
+    stateVar.oneDomainConnected.future
 
   private def nextDomainStateUpdate[T](
       previousState: InMemoryDomainStore.State
@@ -90,9 +107,10 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.setDomains(domains)
-      ).map { case (summary, stateChanged) =>
+      ).map { case (summary, stateChanged, oneDomainConnectedO) =>
         logger.debug(show"Ingested domain update $summary")
         stateChanged.success(())
+        oneDomainConnectedO.foreach(_.trySuccess(()))
       }
   }
 
@@ -116,17 +134,21 @@ object InMemoryDomainStore {
   private case class State(
       connectedDomains: Map[DomainAlias, DomainId],
       stateChanged: Promise[Unit],
+      oneDomainConnected: Promise[Unit],
   ) {
     def setDomains(
         newDomains: Map[DomainAlias, DomainId]
-    ): (State, (IngestionSummary, Promise[Unit])) = {
+    ): (State, (IngestionSummary, Promise[Unit], Option[Promise[Unit]])) = {
       val summary = summarizeChanges(connectedDomains, newDomains)
+      val oneDomainConnectedO =
+        Option.when(summary.newNumConnectedDomains >= 1)(oneDomainConnected)
       (
         State(
           newDomains,
           Promise(),
+          oneDomainConnected,
         ),
-        (summary, stateChanged),
+        (summary, stateChanged, oneDomainConnectedO),
       )
     }
   }

@@ -42,12 +42,15 @@ class ExpiredDirectoryEntryTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
       co.work.contractId.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
-    connection
-      .submitCommandsNoDedup(
-        actAs = Seq(store.providerParty),
-        readAs = Seq(),
-        commands = cmd.commands.asScala.toSeq,
-      )
-      .map(_ => TaskSuccess(s"archived expired entry"))
+    store.domains.getUniqueDomainId().flatMap { domainId =>
+      connection
+        .submitCommandsNoDedup(
+          actAs = Seq(store.providerParty),
+          readAs = Seq(),
+          commands = cmd.commands.asScala.toSeq,
+          domainId,
+        )
+        .map(_ => TaskSuccess(s"archived expired entry"))
+    }
   }
 }

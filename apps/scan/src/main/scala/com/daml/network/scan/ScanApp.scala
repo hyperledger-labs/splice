@@ -71,6 +71,7 @@ class ScanApp(
         timeouts,
         store,
       )
+      _ <- store.domains.signalWhenConnected()
       _ <- store.acs.signalWhenIngested(OpenMiningRound.COMPANION)
     } yield {
       adminServerRegistry

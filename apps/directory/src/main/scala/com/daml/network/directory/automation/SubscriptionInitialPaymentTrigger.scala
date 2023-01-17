@@ -11,6 +11,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -41,17 +42,22 @@ class SubscriptionInitialPaymentTrigger(
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
-    def rejectPayment(reason: String, transferContext: v1.coin.AppTransferContext) = {
+    def rejectPayment(
+        reason: String,
+        transferContext: v1.coin.AppTransferContext,
+        domainId: DomainId,
+    ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
       connection
-        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd)
+        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId)
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
     def collectPayment(
         entryName: String,
         offset: String,
         transferContext: v1.coin.AppTransferContext,
+        domainId: DomainId,
     ) = {
       val cmd =
         contextId
@@ -68,10 +74,12 @@ class SubscriptionInitialPaymentTrigger(
             commands = cmd.asScala.toSeq,
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = offset,
+            domainId = domainId,
           )
       } yield TaskSuccess("created directory entry.")
     }
     for {
+      domainId <- store.domains.getUniqueDomainId()
       context <- store.acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
@@ -90,10 +98,11 @@ class SubscriptionInitialPaymentTrigger(
           rejectPayment(
             s"entry already exists and owned by ${entry.payload.user}.",
             transferContext,
+            domainId,
           )
         case QueryResult(off, None) =>
           // collect the payment and create the entry
-          collectPayment(entryName, off, transferContext)
+          collectPayment(entryName, off, transferContext, domainId)
       }
     } yield result
   }

@@ -34,6 +34,7 @@ class ClosedMiningRoundTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       coinRules <- store.getCoinRules()
+      domainId <- store.domains.getUniqueDomainId()
       // TODO(M3-06): claim unclaimed rewards
       cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_Archive(
@@ -43,7 +44,7 @@ class ClosedMiningRoundTrigger(
         .asScala
         .toSeq
       _ <-
-        connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+        connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
     } yield TaskSuccess(s"successfully archived closed mining round $closedRound")
   }
 

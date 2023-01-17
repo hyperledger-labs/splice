@@ -34,7 +34,7 @@ class GrpcSplitwiseService(
 
   import GrpcSplitwiseService._
 
-  private val connection = ledgerClient.connection("GrpcSplitwiseService")
+  private val connection = ledgerClient.connection()
 
   override def listGroups(
       request: v0.ListGroupsRequest

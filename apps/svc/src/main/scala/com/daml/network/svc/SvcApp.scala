@@ -21,7 +21,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
 
@@ -61,7 +61,7 @@ class SvcApp(
   ): Future[SvcApp.State] =
     for {
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
-      connection = ledgerClient.connection("SvcAppBootstrap")
+      connection = ledgerClient.connection()
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       // TODO(#2241) should be handled by SV app
       _ <- connection.uploadDarFile(SvcApp.svcGovernancePackage)
@@ -75,7 +75,18 @@ class SvcApp(
         loggerFactory,
         timeouts,
       )
-      _ <- SvcApp.setupApp(svcPartyId, config, connection, logger, store, retryProvider, this)
+      _ <- store.domains.signalWhenConnected()
+      domainId <- store.domains.getUniqueDomainId()
+      _ <- SvcApp.setupApp(
+        svcPartyId,
+        config,
+        connection,
+        logger,
+        store,
+        domainId,
+        retryProvider,
+        this,
+      )
       _ = logger.info(s"SVC App is initialized")
     } yield {
       adminServerRegistry
@@ -134,6 +145,7 @@ object SvcApp {
       connection: CoinLedgerConnection,
       logger: TracedLogger,
       store: SvcStore,
+      domainId: DomainId,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
@@ -159,6 +171,7 @@ object SvcApp {
         user = svc,
         logger = logger,
         connection = connection,
+        domainId = domainId,
         retryProvider = retryProvider,
         flagCloseable = flagCloseable,
         lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
@@ -175,6 +188,7 @@ object SvcApp {
                 commandId =
                   CoinLedgerConnection.CommandId("com.daml.network.svc.createCoinRules", Seq()),
                 deduplicationOffset = off,
+                domainId = domainId,
               )
           case QueryResult(_, Some(_)) =>
             logger.info("CoinRules already exists, skipping")

@@ -30,7 +30,7 @@ class GrpcScanService(
     with Spanning
     with NamedLogging {
 
-  private val connection = ledgerClient.connection("GrpcScanService")
+  private val connection = ledgerClient.connection()
 
   @nowarn("cat=unused")
   override def getSvcPartyId(request: Empty): Future[v0.GetSvcPartyIdResponse] =

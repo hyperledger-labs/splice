@@ -8,6 +8,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
@@ -18,6 +19,7 @@ class HttpValidatorHandler(
     store: ValidatorStore,
     validatorUserName: String,
     walletServiceUser: String,
+    domainId: DomainId,
     retryProvider: CoinRetries,
     flagCloseable: FlagCloseable,
     protected val loggerFactory: NamedLoggerFactory,
@@ -28,7 +30,7 @@ class HttpValidatorHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val connection = ledgerClient.connection(workflowId)
+  private val connection = ledgerClient.connection()
 
   def onboardUser(
       respond: v0.ValidatorResource.OnboardUserResponse.type
@@ -56,6 +58,7 @@ class HttpValidatorHandler(
           svcParty = store.key.svcParty,
           connection = connection,
           store = store,
+          domainId = domainId,
           retryProvider = retryProvider,
           flagCloseable = flagCloseable,
           logger = logger,
@@ -67,6 +70,7 @@ class HttpValidatorHandler(
           svc = store.key.svcParty,
           connection = connection,
           lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
+          domainId = domainId,
           retryProvider = retryProvider,
           flagCloseable = flagCloseable,
           logger = logger,

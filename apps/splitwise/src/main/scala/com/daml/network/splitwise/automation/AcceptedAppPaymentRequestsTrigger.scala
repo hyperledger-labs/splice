@@ -46,48 +46,56 @@ class AcceptedAppPaymentRequestsTrigger(
     val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
       payment.payload.deliveryOffer
     )
-    store.lookupInstall(sender).flatMap {
-      case None =>
-        val msg = s"Install contract not found for sender party $sender"
-        logger.warn(msg)
-        for {
-          transferContext <- scanConnection.getAppTransferContext()
-          cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
-          res <- connection
-            .submitCommandsNoDedup(
-              actAs = Seq(provider),
-              readAs = Seq.empty,
-              commands = cmd.commands.asScala.toSeq,
-            )
-            .map(_ => s"rejected accepted app payment: $msg")
-        } yield TaskSuccess(res)
-      case Some(install) =>
-        for {
-          transferContext <- scanConnection.getAppTransferContext()
-          transferInProgress <- store.acs
-            .lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(transferInProgressId)
-            .map(
-              _.getOrElse(
-                throw new IllegalStateException(
-                  s"Invariant violation: transfer in progress $transferInProgressId not known"
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      queryResult <- store.lookupInstall(sender)
+      taskOutcome <- queryResult match {
+        case None =>
+          val msg = s"Install contract not found for sender party $sender"
+          logger.warn(msg)
+          for {
+            transferContext <- scanConnection.getAppTransferContext()
+            cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
+            res <- connection
+              .submitCommandsNoDedup(
+                actAs = Seq(provider),
+                readAs = Seq.empty,
+                commands = cmd.commands.asScala.toSeq,
+                domainId = domainId,
+              )
+              .map(_ => s"rejected accepted app payment: $msg")
+          } yield TaskSuccess(res)
+        case Some(install) =>
+          for {
+            transferContext <- scanConnection.getAppTransferContext()
+            transferInProgress <- store.acs
+              .lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(
+                transferInProgressId
+              )
+              .map(
+                _.getOrElse(
+                  throw new IllegalStateException(
+                    s"Invariant violation: transfer in progress $transferInProgressId not known"
+                  )
                 )
               )
+            group <- store.getGroup(
+              PartyId.tryFromProtoPrimitive(transferInProgress.payload.group.owner),
+              transferInProgress.payload.group.id,
             )
-          group <- store.getGroup(
-            PartyId.tryFromProtoPrimitive(transferInProgress.payload.group.owner),
-            transferInProgress.payload.group.id,
-          )
-          cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
-            group.contractId,
-            payment.contractId,
-            transferContext,
-          )
-          _ <- connection.submitCommandsNoDedup(
-            actAs = Seq(provider),
-            readAs = readAsWithValidatorUser.toSeq,
-            commands = cmd.commands.asScala.toSeq,
-          )
-        } yield TaskSuccess("accepted payment and completed transfer")
-    }
+            cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
+              group.contractId,
+              payment.contractId,
+              transferContext,
+            )
+            _ <- connection.submitCommandsNoDedup(
+              actAs = Seq(provider),
+              readAs = readAsWithValidatorUser.toSeq,
+              commands = cmd.commands.asScala.toSeq,
+              domainId = domainId,
+            )
+          } yield TaskSuccess("accepted payment and completed transfer")
+      }
+    } yield taskOutcome
   }
 }

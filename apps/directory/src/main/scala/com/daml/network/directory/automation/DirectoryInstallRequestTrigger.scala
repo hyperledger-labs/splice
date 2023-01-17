@@ -50,38 +50,42 @@ class DirectoryInstallRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
-    store.lookupInstallByUserWithOffset(user).flatMap {
-      case QueryResult(_, Some(_)) =>
-        logger.info(s"Rejecting duplicate install request from user party $user")
-        val cmd = req.contractId
-          .exerciseDirectoryInstallRequest_Reject()
-        connection
-          .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-          .map(_ => TaskSuccess("rejected request for already existing installation."))
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      queryResult <- store.lookupInstallByUserWithOffset(user)
+      taskOutcome <- queryResult match {
+        case QueryResult(_, Some(_)) =>
+          logger.info(s"Rejecting duplicate install request from user party $user")
+          val cmd = req.contractId
+            .exerciseDirectoryInstallRequest_Reject()
+          connection
+            .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq, domainId)
+            .map(_ => TaskSuccess("rejected request for already existing installation."))
 
-      case QueryResult(off, None) =>
-        val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
-          store.svcParty.toProtoPrimitive,
-          entryFee.bigDecimal,
-          collectionDuration,
-          renewalDuration,
-          entryLifetime,
-        )
-        val acceptCmd = req.contractId
-          .exerciseDirectoryInstallRequest_Accept(arg)
-        connection
-          .submitCommands(
-            actAs = Seq(provider),
-            readAs = Seq(),
-            commands = acceptCmd.commands.asScala.toSeq,
-            commandId = CoinLedgerConnection.CommandId(
-              "com.daml.network.directory.createDirectoryInstall",
-              Seq(provider, user),
-            ),
-            deduplicationOffset = off,
+        case QueryResult(off, None) =>
+          val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
+            store.svcParty.toProtoPrimitive,
+            entryFee.bigDecimal,
+            collectionDuration,
+            renewalDuration,
+            entryLifetime,
           )
-          .map(_ => TaskSuccess("accepted install request."))
-    }
+          val acceptCmd = req.contractId
+            .exerciseDirectoryInstallRequest_Accept(arg)
+          connection
+            .submitCommands(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              commands = acceptCmd.commands.asScala.toSeq,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.directory.createDirectoryInstall",
+                Seq(provider, user),
+              ),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+            .map(_ => TaskSuccess("accepted install request."))
+      }
+    } yield taskOutcome
   }
-
 }

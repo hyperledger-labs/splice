@@ -37,31 +37,36 @@ class GroupRequestTrigger(
     val provider = store.providerParty
     val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
     val groupId = req.payload.group.id
-    store.lookupGroupWithOffset(user, groupId).flatMap {
-      case QueryResult(_, Some(_)) =>
-        logger.info(
-          s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"
-        )
-        val cmd = req.contractId.exerciseGroupRequest_Reject()
-        connection
-          .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => TaskSuccess("rejected request for already existing group."))
-
-      case QueryResult(off, None) =>
-        val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
-        connection
-          .submitCommands(
-            actAs = Seq(provider),
-            readAs = Seq(),
-            commands = acceptCmd,
-            commandId = CoinLedgerConnection.CommandId(
-              "com.daml.network.splitwise.createGroupRequest",
-              Seq(provider, user),
-              groupId.unpack,
-            ),
-            deduplicationOffset = off,
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      queryResult <- store.lookupGroupWithOffset(user, groupId)
+      taskOutcome <- queryResult match {
+        case QueryResult(_, Some(_)) =>
+          logger.info(
+            s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"
           )
-          .map(_ => TaskSuccess("accepted group request."))
-    }
+          val cmd = req.contractId.exerciseGroupRequest_Reject()
+          connection
+            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, domainId)
+            .map(_ => TaskSuccess("rejected request for already existing group."))
+
+        case QueryResult(off, None) =>
+          val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
+          connection
+            .submitCommands(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              commands = acceptCmd,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.splitwise.createGroupRequest",
+                Seq(provider, user),
+                groupId.unpack,
+              ),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+            .map(_ => TaskSuccess("accepted group request."))
+      }
+    } yield taskOutcome
   }
 }

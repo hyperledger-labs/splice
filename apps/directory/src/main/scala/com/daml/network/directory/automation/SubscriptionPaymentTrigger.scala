@@ -11,6 +11,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -42,11 +43,15 @@ class SubscriptionPaymentTrigger(
       payment.payload.subscriptionData.context
     )
     val provider = store.providerParty
-    def rejectPayment(reason: String, transferContext: v1.coin.AppTransferContext) = {
+    def rejectPayment(
+        reason: String,
+        transferContext: v1.coin.AppTransferContext,
+        domainId: DomainId,
+    ) = {
       logger.warn(s"rejecting subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
       connection
-        .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq)
+        .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq, domainId)
         .map(_ => TaskSuccess(s"rejected subscription payment: $reason"))
     }
     def collectPayment(
@@ -56,6 +61,7 @@ class SubscriptionPaymentTrigger(
         ],
         offset: String,
         transferContext: v1.coin.AppTransferContext,
+        domainId: DomainId,
     ) = {
       val cmd =
         contextId
@@ -73,10 +79,12 @@ class SubscriptionPaymentTrigger(
             commands = cmd.asScala.toSeq,
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
             deduplicationOffset = offset,
+            domainId = domainId,
           )
       } yield TaskSuccess("renewed directory entry.")
     }
     for {
+      domainId <- store.domains.getUniqueDomainId()
       context <- store.acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
@@ -93,9 +101,9 @@ class SubscriptionPaymentTrigger(
       result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
         case QueryResult(off, Some(entry)) =>
           // collect the payment and renew the entry
-          collectPayment(entry, off, transferContext)
+          collectPayment(entry, off, transferContext, domainId)
         case QueryResult(_, None) =>
-          rejectPayment("entry doesn't exist.", transferContext)
+          rejectPayment("entry doesn't exist.", transferContext, domainId)
       }
     } yield result
   }

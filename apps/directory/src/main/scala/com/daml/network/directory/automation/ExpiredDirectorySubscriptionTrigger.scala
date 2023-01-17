@@ -34,13 +34,16 @@ class ExpiredDirectorySubscriptionTrigger(
     val cmd = task.work.state.contractId.exerciseSubscriptionIdleState_ExpireSubscription(
       store.providerParty.toProtoPrimitive
     )
-    connection
-      .submitCommandsNoDedup(
-        actAs = Seq(store.providerParty),
-        readAs = Seq(),
-        commands = cmd.commands.asScala.toSeq,
-      )
-      .map(_ => TaskSuccess(s"archived expired directory subscription"))
+    store.domains.getUniqueDomainId().flatMap { domainId =>
+      connection
+        .submitCommandsNoDedup(
+          actAs = Seq(store.providerParty),
+          readAs = Seq(),
+          commands = cmd.commands.asScala.toSeq,
+          domainId = domainId,
+        )
+        .map(_ => TaskSuccess(s"archived expired directory subscription"))
+    }
   }
 
   override protected def isStaleTask(

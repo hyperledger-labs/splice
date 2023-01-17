@@ -96,6 +96,7 @@ class DirectoryApp(
         loggerFactory,
         timeouts,
       )
+      _ <- store.domains.signalWhenConnected()
       // TODO(#2024) Validate that this is secure.
       settings = CorsSettings.defaultSettings
         .withAllowGenericHttpRequests(true)

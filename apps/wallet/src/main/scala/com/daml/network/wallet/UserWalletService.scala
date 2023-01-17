@@ -2,7 +2,7 @@ package com.daml.network.wallet
 
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
@@ -39,9 +39,7 @@ class UserWalletService(
 
   val store: UserWalletStore = UserWalletStore(key, storage, loggerFactory, timeouts)
 
-  private val connection = ledgerClient.connection(
-    s"TreasuryService_${CoinLedgerConnection.sanitizeUserIdToLedgerString(key.endUserName)}"
-  )
+  private val connection = ledgerClient.connection()
 
   val treasury: TreasuryService = new TreasuryService(
     connection,
