@@ -80,7 +80,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       userParty: PartyId,
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
-      quantity: Int,
+      quantity: BigDecimal,
       transferContext: v1.coin.AppTransferContext,
       expiredDuration: Duration,
   )(implicit coinEnv: CoinTestConsoleEnvironment): Unit =
@@ -113,7 +113,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
                   ).asJava,
                   Seq[v1.coin.TransferOutput](
                     new v1.coin.transferoutput.OutputSenderCoin(
-                      Some(BigDecimal(quantity).bigDecimal).toJava,
+                      Some(quantity.bigDecimal).toJava,
                       Some(
                         new v1.coin.TimeLock(
                           Seq(userParty.toProtoPrimitive).asJava,

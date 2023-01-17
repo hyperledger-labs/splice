@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.{CoinUtil, JavaContract as Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -97,6 +97,22 @@ trait SvcStore extends CoinAppStore {
       }
     } yield result
 
+  def lookupLatestActiveOpenMiningRound()(implicit
+      ec: ExecutionContext
+  ): Future[Option[SvcStore.OpenMiningRoundContract]] =
+    lookupOpenMiningRoundTriple().map(_.map(_.newest))
+
+  /** get the latest active open mining round contract, which should always be present after bootstrapping. */
+  def getLatestActiveOpenMiningRound()(implicit
+      ec: ExecutionContext
+  ): Future[SvcStore.OpenMiningRoundContract] = lookupLatestActiveOpenMiningRound().map(
+    _.getOrElse(
+      throw new StatusRuntimeException(
+        Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
+      )
+    )
+  )
+
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
@@ -109,6 +125,46 @@ trait SvcStore extends CoinAppStore {
           .take(limit)
           .toSeq
       )
+
+  /** List coins that are expired and can never be used as transfer input. */
+  def listExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]]] = for {
+    maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
+    result <- maybeLatestOpenMiningRound.fold(
+      Future.successful(Seq.empty[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]])
+    ) { latest =>
+      acs
+        .listContracts(
+          cc.coin.Coin.COMPANION,
+          (e: Contract[
+            cc.coin.Coin.ContractId,
+            cc.coin.Coin,
+          ]) => CoinUtil.coinExpiresAt(e.payload).number <= latest.payload.round.number - 2,
+        )
+        .map(_.iterator.take(limit).toSeq)
+    }
+  } yield result
+
+  /** List locked coins that are expired and can never be used as transfer input. */
+  def listLockedExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]] = for {
+    maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
+    result <- maybeLatestOpenMiningRound.fold(
+      Future.successful(Seq.empty[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]])
+    ) { latest =>
+      acs
+        .listContracts(
+          cc.coin.LockedCoin.COMPANION,
+          (e: Contract[
+            cc.coin.LockedCoin.ContractId,
+            cc.coin.LockedCoin,
+          ]) => CoinUtil.coinExpiresAt(e.payload.coin).number <= latest.payload.round.number - 2,
+        )
+        .map(_.iterator.take(limit).toSeq)
+    }
+  } yield result
 
   def getTotalsForRound(round: Long): SvcStore.RoundTotals = {
     val transfers = events.getTransferSummariesPerRound(round)
@@ -163,6 +219,8 @@ object SvcStore {
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coin.ValidatorRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
         ),

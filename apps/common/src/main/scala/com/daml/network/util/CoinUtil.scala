@@ -5,6 +5,7 @@ import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.issuance.{IssuanceConfig, IssuanceCurve}
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -17,6 +18,7 @@ import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.math.RoundingMode
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
@@ -186,6 +188,17 @@ object CoinUtil {
       currentRound: Long,
   ): java.math.BigDecimal = {
     coin.quantity.initialQuantity.subtract(holdingFee(coin, currentRound))
+  }
+
+  def coinExpiresAt(coin: Coin): Round = {
+    val rounds = coin.quantity.initialQuantity
+      .divide(
+        coin.quantity.ratePerRound.rate,
+        0,
+        RoundingMode.CEILING,
+      )
+      .longValueExact
+    new Round(coin.quantity.createdAt.number + rounds)
   }
 
   def relTimeToDuration(dt: RelTime): Duration =

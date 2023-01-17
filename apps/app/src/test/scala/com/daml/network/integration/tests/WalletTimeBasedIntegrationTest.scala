@@ -28,7 +28,6 @@ class WalletTimeBasedIntegrationTest
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       clue("Alice taps 50 coins") {
@@ -235,6 +234,111 @@ class WalletTimeBasedIntegrationTest
         aliceWallet.listTransferOffers() should have length 0
         aliceWallet.listAcceptedTransferOffers() should have length 0
       })
+    }
+
+    // TODO(#2182): switch back to one test case once collectRewardsAndMergeCoins automation ignores expired coins (right now, the app reward we get for locking the coin leads to the unlocked coin not expiring when we want)
+    "auto-expire coin" in { implicit env =>
+      onboardWalletUser(aliceWallet, aliceValidator)
+
+      clue("Alice taps 0.000005 coins") {
+        aliceWallet.list().coins should have length 0
+        aliceWallet.tap(0.000005)
+        eventually() {
+          aliceWallet.list().coins should have length 1
+          aliceWallet.list().lockedCoins should have length 0
+          // we have 0 holding fees because the coins were created in the same round we are currently in
+          aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
+          assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (0, 1))
+        }
+      }
+
+      val startRound = aliceWallet.list().coins.head.round
+
+      // advance 2 rounds.
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+
+      clue("Check wallet after advancing to next 2 round") {
+        eventually()(aliceWallet.list().coins.head.round shouldBe startRound + 2)
+        aliceWallet.list().coins should have length 1
+
+        // The coin is expired but not yet archived.
+        // They will be archived when no coins can be used as transfer input.
+        // ie, in 2 round
+        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000009, 0.00001))
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (-0.000005, -0.000004))
+      }
+
+      // advance 2 more rounds.
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+
+      clue("Check wallet after advancing to next 2 rounds") {
+        eventually()(aliceWallet.list().coins shouldBe empty)
+      }
+    }
+
+    "auto-expire locked coin" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+
+      clue("Alice taps 0.11001 coins") {
+        aliceWallet.list().coins should have length 0
+        aliceWallet.tap(0.11001)
+        eventually() {
+          aliceWallet.list().coins should have length 1
+          aliceWallet.list().lockedCoins should have length 0
+        }
+      }
+      val startRound = aliceWallet.list().coins.head.round
+
+      lockCoins(
+        aliceWalletBackend,
+        aliceUserParty,
+        aliceValidatorParty,
+        aliceWallet.list().coins,
+        0.000005,
+        scan.getAppTransferContext(),
+        Duration.ofMinutes(1),
+      )
+
+      clue("Check wallet after locking coins") {
+        aliceWallet.list().coins should have length 1
+        eventually()(aliceWallet.list().lockedCoins should have length 1)
+
+        aliceWallet.list().coins.head.round shouldBe startRound
+        // we have 0 holding fees because the coins were created in the same round we are currently in
+        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (0, 1))
+
+        aliceWallet.list().lockedCoins.head.round shouldBe startRound
+        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (0, 1))
+      }
+
+      // advance 2 rounds.
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+
+      clue("Check wallet after advancing to next 2 round") {
+        eventually()(aliceWallet.list().lockedCoins.head.round shouldBe startRound + 2)
+        aliceWallet.list().lockedCoins should have length 1
+
+        // The locked coin is expired but not yet archived.
+        // It will be archived when no coins can be used as transfer input.
+        // ie, in 2 rounds
+        aliceWallet.list().lockedCoins.head.round shouldBe startRound + 2
+        assertInRange(aliceWallet.list().lockedCoins.head.accruedHoldingFee, (0.000009, 0.00001))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (-0.000005, -0.000004))
+      }
+
+      // advance 2 more rounds.
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+
+      clue("Check wallet after advancing to next 2 rounds") {
+        eventually()(aliceWallet.list().lockedCoins shouldBe empty)
+      }
     }
   }
 }
