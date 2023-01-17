@@ -17,6 +17,23 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetValidatorUserInfoResponse"
+  /register:
+    post:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "register"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RegistrationRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RegistrationResponse"
   /users:
     post:
       tags: [validator]
@@ -58,6 +75,18 @@ components:
           type: string
 
     OnboardUserResponse:
+      type: object
+      required:
+        - party_id
+      properties:
+        party_id:
+          type: string
+
+    RegistrationRequest:
+      type: object
+      nullable: true
+
+    RegistrationResponse:
       type: object
       required:
         - party_id

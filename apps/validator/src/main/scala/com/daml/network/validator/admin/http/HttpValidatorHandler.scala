@@ -9,7 +9,8 @@ import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,43 +40,16 @@ class HttpValidatorHandler(
   )(damlUser: String): Future[v0.ValidatorResource.OnboardUserResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       val name = body.name
-
       span.setAttribute("name", name)
+      onboard(name).map(p => definitions.OnboardUserResponse(p))
+    }
 
-      for {
-        userPartyId <- connection.getOrAllocateParty(
-          name,
-          Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
-        )
-        // TODO(#713) Workaround for the lack of "act-as-any-party" rights
-        _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
-        _ <- ValidatorUtil.installWalletForUser(
-          endUserParty = userPartyId,
-          endUserName = name,
-          walletServiceUser = walletServiceUser,
-          walletServiceParty = store.key.walletServiceParty,
-          validatorServiceParty = store.key.validatorParty,
-          svcParty = store.key.svcParty,
-          connection = connection,
-          store = store,
-          domainId = domainId,
-          retryProvider = retryProvider,
-          flagCloseable = flagCloseable,
-          logger = logger,
-        )
-        // Create validator right contract so validator can collect validator rewards
-        _ <- CoinUtil.createValidatorRight(
-          user = userPartyId,
-          validator = store.key.validatorParty,
-          svc = store.key.svcParty,
-          connection = connection,
-          lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
-          domainId = domainId,
-          retryProvider = retryProvider,
-          flagCloseable = flagCloseable,
-          logger = logger,
-        )
-      } yield definitions.OnboardUserResponse(userPartyId.filterString)
+  def register(
+      respond: v0.ValidatorResource.RegisterResponse.type
+  )(body: Option[Json])(damlUser: String): Future[v0.ValidatorResource.RegisterResponse] =
+    withNewTrace(workflowId) { implicit traceContext => span =>
+      span.setAttribute("name", damlUser)
+      onboard(damlUser).map(p => definitions.RegistrationResponse(p))
     }
 
   def getValidatorUserInfo(
@@ -106,5 +80,41 @@ class HttpValidatorHandler(
         )
       )
     }
+  }
+  private def onboard(name: String)(implicit traceContext: TraceContext) = {
+    for {
+      userPartyId <- connection.getOrAllocateParty(
+        name,
+        Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
+      )
+      // TODO(#713) Workaround for the lack of "act-as-any-party" rights
+      _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
+      _ <- ValidatorUtil.installWalletForUser(
+        endUserParty = userPartyId,
+        endUserName = name,
+        walletServiceUser = walletServiceUser,
+        walletServiceParty = store.key.walletServiceParty,
+        validatorServiceParty = store.key.validatorParty,
+        svcParty = store.key.svcParty,
+        connection = connection,
+        store = store,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        flagCloseable = flagCloseable,
+        logger = logger,
+      )
+      // Create validator right contract so validator can collect validator rewards
+      _ <- CoinUtil.createValidatorRight(
+        user = userPartyId,
+        validator = store.key.validatorParty,
+        svc = store.key.svcParty,
+        connection = connection,
+        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        flagCloseable = flagCloseable,
+        logger = logger,
+      )
+    } yield userPartyId.filterString
   }
 }

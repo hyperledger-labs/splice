@@ -49,6 +49,19 @@ abstract class ValidatorAppReference(
     }
   }
 
+  @Help.Summary("Register a new user identified by token")
+  @Help.Description(
+    """Register individual canton-coin user for the given validator party, as identified by token.
+      |Return the newly set up partyId.""".stripMargin
+  )
+  def register(): PartyId = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAppClient.Register(List(Authorization(OAuth2BearerToken(token))))
+      )
+    }
+  }
+
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {

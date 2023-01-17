@@ -65,6 +65,26 @@ object HttpValidatorAppClient {
     }
   }
 
+  case class Register(headers: List[HttpHeader])
+      extends BaseCommand[http.RegisterResponse, PartyId] {
+
+    def submitRequest(
+        client: Client
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterResponse] =
+      client.register(headers = headers)
+
+    override def handleResponse(
+        response: http.RegisterResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, PartyId] = {
+      response match {
+        case http.RegisterResponse.OK(response) =>
+          PartyId.fromProtoPrimitive(response.partyId)
+      }
+    }
+  }
+
   case class ListConnectedDomains(headers: List[HttpHeader])
       extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
 
