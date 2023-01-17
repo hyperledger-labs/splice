@@ -34,6 +34,7 @@ class ExpiredLockedCoinTrigger(
         cc.coin.LockedCoin,
       ]]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
+    domainId <- store.domains.getUniqueDomainId()
     coinRules <- store.getCoinRules()
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     cmd = co.work.contractId
@@ -46,6 +47,7 @@ class ExpiredLockedCoinTrigger(
         actAs = Seq(store.svcParty),
         readAs = Seq(),
         commands = cmd.commands.asScala.toSeq,
+        domainId = domainId,
       )
   } yield TaskSuccess(s"archived expired locked coin")
 }
