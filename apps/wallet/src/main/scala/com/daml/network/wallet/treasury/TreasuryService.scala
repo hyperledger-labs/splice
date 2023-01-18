@@ -117,7 +117,7 @@ class TreasuryService(
       case Enqueued =>
         logger.debug(show"Received operation (queue size: ${queue.size()}): $operation")
         p.future
-      // TODO(M3-90): add tests for the failure cases.
+      // TODO(#2373): add a test for this back-pressure case.
       case Dropped =>
         Future.failed(
           new StatusRuntimeException(

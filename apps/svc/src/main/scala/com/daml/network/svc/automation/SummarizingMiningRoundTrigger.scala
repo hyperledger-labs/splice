@@ -35,9 +35,6 @@ class SummarizingMiningRoundTrigger(
       domainId <- store.domains.getUniqueDomainId()
       rewards <- queryRewards(summarizingRound.payload.round.number)
       coinRules <- store.getCoinRules()
-      // TODO(M3-06): consider querying the round audit store (once we have it) and
-      // passing along the opensAt time of the previous IssuingMiningRound
-      // see discussion: https://docs.google.com/document/d/1RAcc4uJKjRtPKDmVglVhqg-y58fCJ7xyljPbwimE-IA/edit?disco=AAAAjyuFFEw
       cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_StartIssuing(
           summarizingRound.contractId,
