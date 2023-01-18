@@ -56,7 +56,7 @@ class AcceptedAppPaymentRequestsTrigger(
           val msg = s"Install contract not found for sender party $sender"
           logger.warn(msg)
           for {
-            transferContext <- scanConnection.getAppTransferContext()
+            transferContext <- scanConnection.getAppTransferContext(store.providerParty)
             cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
             res <- connection
               .submitCommandsNoDedup(
@@ -69,7 +69,7 @@ class AcceptedAppPaymentRequestsTrigger(
           } yield TaskSuccess(res)
         case Some(install) =>
           for {
-            transferContext <- scanConnection.getAppTransferContext()
+            transferContext <- scanConnection.getAppTransferContext(store.providerParty)
             transferInProgress <- store.acs
               .lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(
                 transferInProgressId

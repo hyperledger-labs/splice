@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCode
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
 import com.daml.network.scan.v0.{GetClosedRoundsResponse, ListFeaturedAppRightsResponse}
-import com.daml.network.util.{JavaContract => Contract, Proto}
+import com.daml.network.util.{Proto, JavaContract as Contract}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -152,6 +152,30 @@ object GrpcScanAppClient {
         response: ListFeaturedAppRightsResponse
     ): Either[String, Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
       response.featuredApps
+        .traverse(co => Contract.fromProto(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
+  }
+
+  case class LookupFeaturedAppRight(providerPartyId: PartyId)
+      extends BaseCommand[
+        v0.LookupFeaturedAppRightRequest,
+        v0.LookupFeaturedAppRightResponse,
+        Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
+      ] {
+
+    override def submitRequest(
+        service: ScanServiceStub,
+        request: v0.LookupFeaturedAppRightRequest,
+    ): Future[v0.LookupFeaturedAppRightResponse] = service.lookupFeaturedAppRight(request)
+
+    override def createRequest(): Either[String, v0.LookupFeaturedAppRightRequest] = Right(
+      v0.LookupFeaturedAppRightRequest(Proto.encode(providerPartyId))
+    )
+
+    override def handleResponse(
+        response: v0.LookupFeaturedAppRightResponse
+    ): Either[String, Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+      response.featuredAppRight
         .traverse(co => Contract.fromProto(FeaturedAppRight.COMPANION)(co))
         .leftMap(_.toString)
   }

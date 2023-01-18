@@ -42,6 +42,7 @@ abstract class ScanAppReference(
   )
   def getAppTransferContext(): v1.coin.AppTransferContext = {
     def notFound(description: String) = new IllegalStateException(description)
+
     val transferContext = getTransferContext()
     val openMiningRound = transferContext.latestOpenMiningRound.getOrElse(
       throw notFound("No active OpenMiningRound contract")
@@ -86,6 +87,13 @@ abstract class ScanAppReference(
   def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.ListFeaturedAppRight())
+    }
+
+  def lookupFeaturedAppRight(
+      providerPartyId: PartyId
+  ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
   @Help.Summary("List the connected domains of the participant the app is running on")

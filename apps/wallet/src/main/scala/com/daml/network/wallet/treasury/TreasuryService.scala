@@ -416,8 +416,8 @@ object TreasuryService {
     * Mainly introduced to handle to cleanly separate the logic around managing CO_MergeTransferInputs.
     *
     * @param mergeOperationOpt tracks the CO_MergeTransferInputs operation if there is one as part of the batch.
-    *                           tracked separately because it doesn't make sense for there
-    *                           to be multiple merge operations in a single batch.
+    *                          tracked separately because it doesn't make sense for there
+    *                          to be multiple merge operations in a single batch.
     */
   private case class CoinOperationBatch(
       mergeOperationOpt: Option[EnqueuedCoinOperation],
@@ -445,6 +445,7 @@ object TreasuryService {
     }
 
     def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
+
     def addCOToBatch(operation: EnqueuedCoinOperation): CoinOperationBatch = {
       val isMergeOp = isCO_MergeTransferInputs(operation)
       mergeOperationOpt match {

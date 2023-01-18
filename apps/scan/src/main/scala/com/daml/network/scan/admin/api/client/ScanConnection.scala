@@ -1,8 +1,10 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
+import com.daml.network.util.JavaContract
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -51,10 +53,19 @@ final class ScanConnection(
     runCmd(GrpcScanAppClient.GetTransferContext())
   }
 
-  def getAppTransferContext()(implicit
+  def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       traceContext: TraceContext
-  ): Future[coinCodegen.AppTransferContext] =
-    getTransferContext().map { context =>
+  ): Future[Option[JavaContract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    runCmd(GrpcScanAppClient.LookupFeaturedAppRight(providerPartyId))
+  }
+
+  def getAppTransferContext(providerPartyId: PartyId)(implicit
+      traceContext: TraceContext
+  ): Future[coinCodegen.AppTransferContext] = {
+    for {
+      context <- getTransferContext()
+      featured <- lookupFeaturedAppRight(providerPartyId)
+    } yield {
       val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
       val openMiningRound = context.latestOpenMiningRound.getOrElse(
         throw notFound("No active OpenMiningRound contract")
@@ -62,10 +73,10 @@ final class ScanConnection(
       new coinCodegen.AppTransferContext(
         coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
         openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
-        // TODO(#2154) revisit how apps get access to app transfer contexts that include their featured app right
-        None.toJava,
+        featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
       )
     }
+  }
 
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)

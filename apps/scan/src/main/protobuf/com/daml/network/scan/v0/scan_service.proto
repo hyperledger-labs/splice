@@ -13,6 +13,7 @@ service ScanService {
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
   rpc GetTransferContext (google.protobuf.Empty) returns (GetTransferContextResponse);
   rpc ListFeaturedAppRights (google.protobuf.Empty) returns (ListFeaturedAppRightsResponse);
+  rpc LookupFeaturedAppRight (LookupFeaturedAppRightRequest) returns (LookupFeaturedAppRightResponse);
 
   // TODO(M3-18) Consider if we want to keep this
   // once we no longer need it for testing.
@@ -46,6 +47,14 @@ message GetClosedRoundsResponse {
 
 message ListFeaturedAppRightsResponse {
   repeated com.daml.network.v0.Contract featured_apps = 1;
+}
+
+message LookupFeaturedAppRightRequest {
+  string provider_party_id = 1;
+}
+
+message LookupFeaturedAppRightResponse {
+  optional com.daml.network.v0.Contract featured_app_right = 1;
 }
 
 message ListConnectedDomainsResponse {

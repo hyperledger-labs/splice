@@ -89,7 +89,7 @@ class SubscriptionInitialPaymentTrigger(
             )
           )
         )
-      transferContext <- scanConnection.getAppTransferContext()
+      transferContext <- scanConnection.getAppTransferContext(store.svcParty)
       // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
       entryName = context.payload.name
       // check whether the entry already exists

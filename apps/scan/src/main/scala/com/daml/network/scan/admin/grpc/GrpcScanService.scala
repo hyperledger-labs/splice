@@ -85,6 +85,19 @@ class GrpcScanService(
       }
     }
 
+  override def lookupFeaturedAppRight(
+      request: LookupFeaturedAppRightRequest
+  ): Future[LookupFeaturedAppRightResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
+      for {
+        right <- store.acs.findContract(FeaturedAppRight.COMPANION)(co =>
+          co.payload.provider == request.providerPartyId
+        )
+      } yield {
+        v0.LookupFeaturedAppRightResponse(right.map(r => r.toProtoV0))
+      }
+    }
+
   override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { _ => span =>
       for {
