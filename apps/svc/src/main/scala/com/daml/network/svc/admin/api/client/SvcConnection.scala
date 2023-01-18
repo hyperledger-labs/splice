@@ -11,8 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-/** Connection to the admin API of CC Svc. This is used by other apps
-  * to query for the SVC party id.
+/** Connection to the admin API of CC Svc.
   */
 final class SvcConnection(
     config: ClientConfig,
@@ -27,5 +26,11 @@ final class SvcConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(GrpcSvcAppClient.JoinConsortium(svParty))
+  }
+
+  def getDebugInfo()(implicit
+      traceContext: TraceContext
+  ): Future[GrpcSvcAppClient.DebugInfo] = {
+    runCmd(GrpcSvcAppClient.GetDebugInfo())
   }
 }

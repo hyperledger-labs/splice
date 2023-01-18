@@ -54,7 +54,14 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] =
     for {
-      store <- Future.successful(SvStore(svPartyId, storage, loggerFactory))
+      // TODO(#2241) move check whether we are already part of the SVC to here
+      svcPartyId <- retryProvider.retryForAutomationGrpc(
+        "join consortium and get SVC party ID",
+        joinConsortiumAndGetSvcPartyId(svPartyId),
+        this,
+      )
+      svStoreKey = SvStore.Key(svPartyId, svcPartyId)
+      store = SvStore(svStoreKey, storage, loggerFactory)
       connection = ledgerClient.connection()
       automation = new SvAutomationService(
         clock,
@@ -67,8 +74,6 @@ class SvApp(
         timeouts,
       )
       _ <- store.domains.signalWhenConnected()
-      // TODO(#2241) move check whether we are already part of the SVC to here
-      _ <- retryProvider.retryForAutomationGrpc("joinConsortium", joinConsortium(svPartyId), this)
       _ = logger.info(s"SV App is initialized")
     } yield {
       adminServerRegistry
@@ -92,13 +97,17 @@ class SvApp(
   // SV app uploads package so no dep.
   override lazy val requiredTemplates = Set.empty
 
-  def joinConsortium(svPartyId: PartyId) = {
+  private def joinConsortiumAndGetSvcPartyId(svPartyId: PartyId): Future[PartyId] = {
     val svcConnection = new SvcConnection(
       config.remoteSvc.clientAdminApi,
       coinAppParameters.processingTimeouts,
       loggerFactory,
     )
-    svcConnection.joinConsortium(svPartyId).andThen(_ => svcConnection.close())
+    svcConnection
+      .joinConsortium(svPartyId)
+      .flatMap(_ => svcConnection.getDebugInfo())
+      .map(_.svcParty)
+      .andThen(_ => svcConnection.close())
   }
 }
 

@@ -48,11 +48,12 @@ case class CoinEnvironmentDefinition(
       participants.local.foreach(_.domains.connect_local(da))
     })
 
-  def withAllocatedSvcUser(): CoinEnvironmentDefinition =
+  def withAllocatedSvcAndSvUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
       import env._
       this.preSetup(env)
       svcOpt.foreach(svc => {
+        // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
         val svcParty =
           svc.remoteParticipantWithAdminToken.parties.enable(svc.config.damlUser)
         svc.remoteParticipantWithAdminToken.ledger_api.users.create(
@@ -62,22 +63,17 @@ case class CoinEnvironmentDefinition(
           readAs = Set.empty,
           participantAdmin = true,
         )
-      })
-    })
-  def withAllocatedSvUsers(): CoinEnvironmentDefinition =
-    copy(preSetup = env => {
-      import env._
-      this.preSetup(env)
-      svs.local.foreach(sv => {
-        val svParty =
-          sv.remoteParticipantWithAdminToken.parties.enable(sv.config.damlUser)
-        sv.remoteParticipantWithAdminToken.ledger_api.users.create(
-          id = sv.config.damlUser,
-          actAs = Set(svParty.toLf),
-          primaryParty = Some(svParty.toLf),
-          readAs = Set.empty,
-          participantAdmin = true,
-        )
+        svs.local.foreach(sv => {
+          val svParty =
+            sv.remoteParticipantWithAdminToken.parties.enable(sv.config.damlUser)
+          sv.remoteParticipantWithAdminToken.ledger_api.users.create(
+            id = sv.config.damlUser,
+            actAs = Set(svParty.toLf),
+            primaryParty = Some(svParty.toLf),
+            readAs = Set(svcParty.toLf),
+            participantAdmin = true,
+          )
+        })
       })
     })
   def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
@@ -162,8 +158,7 @@ object CoinEnvironmentDefinition {
   def simpleTopology(testName: String): CoinEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
       .withConnectedDomains()
-      .withAllocatedSvcUser()
-      .withAllocatedSvUsers()
+      .withAllocatedSvcAndSvUsers()
       .withAllocatedValidatorUsers()
       .withInitializedNodes()
 

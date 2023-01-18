@@ -72,12 +72,14 @@ trait TimeTestUtil extends CoinTestCommon {
           aliceValidator.getValidatorPartyId()
         )
         .map(_.data.round.number)
+        .sorted
 
     val previousIssuingRounds = aliceWalletBackend.remoteParticipant.ledger_api.acs
       .filterJava(IssuingMiningRound.COMPANION)(
         aliceValidator.getValidatorPartyId()
       )
       .map(_.data.round.number)
+      .sorted
 
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(Duration.ofSeconds(160)))(

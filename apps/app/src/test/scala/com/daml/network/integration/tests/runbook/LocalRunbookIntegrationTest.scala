@@ -25,6 +25,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
   val svcParticipantPath: File = testResourcesPath / "canton-participant"
   val svcDomainPath: File = testResourcesPath / "canton-domain"
   val svcAppPath: File = testResourcesPath / "svc-app"
+  val svAppsPath: File = testResourcesPath / "sv-apps"
   val scanAppPath: File = testResourcesPath / "scan-app"
 
   var cantonProcess: Option[Process] = None
@@ -49,6 +50,18 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
       |  readAs = Set.empty,
       |  participantAdmin = true,
       |)
+      |Seq("sv1", "sv2", "sv3", "sv4").foreach(svUserName => {
+      |  println("Allocating " + svUserName + " party")
+      |  val svParty = svc_participant.parties.enable(svUserName)
+      |  println("Creating " + svUserName + " user")
+      |  svc_participant.ledger_api.users.create(
+      |    id = svUserName,
+      |    actAs = Set(svParty.toLf),
+      |    readAs = Set(svcParty.toLf),
+      |    primaryParty = Some(svParty.toLf),
+      |    participantAdmin = true,
+      |  )
+      |})
       |println("Connecting svc participant to domain")
       |svc_participant.domains.connect_local(svc_domain)
       |""".stripMargin)
@@ -92,6 +105,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
         svcAppPath / "coin.conf",
+        svAppsPath / "coin.conf",
         scanAppPath / "coin.conf",
         testResourcesPath / "localrunbook-overrides.conf",
       )

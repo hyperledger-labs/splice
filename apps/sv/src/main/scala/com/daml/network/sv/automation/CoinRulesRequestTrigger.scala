@@ -1,21 +1,22 @@
-package com.daml.network.svc.automation
+package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.svc.store.SvcStore
+import com.daml.network.sv.store.SvStore
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class CoinRulesRequestTrigger(
     override protected val context: TriggerContext,
-    store: SvcStore,
+    store: SvStore,
     connection: CoinLedgerConnection,
 )(implicit
     ec: ExecutionContext,
@@ -33,24 +34,63 @@ class CoinRulesRequestTrigger(
         cc.coin.CoinRulesRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    // TODO(M3-46) consider extracting this pattern into a reusable abstract class (`SvTrigger`?)
+    store
+      .svIsLeader()
+      .flatMap(if (_) {
+        completeTaskAsLeader(req)
+      } else {
+        completeTaskAsFollower(req)
+      })
+  }
+
+  def completeTaskAsLeader(
+      req: JavaContract[
+        cc.coin.CoinRulesRequest.ContractId,
+        cc.coin.CoinRulesRequest,
+      ]
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
       domainId <- store.domains.getUniqueDomainId()
       openMiningRounds <- store.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       issuingMiningRounds <- store.acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
       coinRules <- store.getCoinRules()
-      cmds = req.contractId
-        .exerciseCoinRulesRequest_Accept(
-          coinRules.contractId,
-          openMiningRounds.map(_.contractId).asJava,
-          issuingMiningRounds.map(_.contractId).asJava,
+      svcRules <- store.getSvcRules()
+      cmds = svcRules.contractId
+        .exerciseSvcRules_CoinRulesRequest_Accept(
+          req.contractId,
+          new cc.coin.CoinRulesRequest_Accept(
+            coinRules.contractId,
+            openMiningRounds.map(_.contractId).asJava,
+            issuingMiningRounds.map(_.contractId).asJava,
+          ),
         )
         .commands
         .asScala
         .toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated
-      _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds, domainId)
-    } yield TaskSuccess(s"accepted coin rules request from $validatorParty")
+      _ <- connection.submitCommandsNoDedup(
+        Seq(store.key.svParty),
+        Seq(store.key.svcParty),
+        cmds,
+        domainId,
+      )
+    } yield {
+      TaskSuccess(s"accepted coin rules request from $validatorParty")
+    }
   }
 
+  @nowarn("cat=unused")
+  def completeTaskAsFollower(
+      req: JavaContract[
+        cc.coin.CoinRulesRequest.ContractId,
+        cc.coin.CoinRulesRequest,
+      ]
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
+    Future.successful(
+      TaskSuccess(s"ignored coin rules request from $validatorParty, as we're not the leader")
+    )
+  }
 }

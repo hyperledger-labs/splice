@@ -7,8 +7,6 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
-//import com.auth0.jwt.JWT
-//import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -32,6 +30,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
   "start and restart cleanly" in { implicit env =>
     svc.startSync()
+    svs.foreach(_.startSync())
     scan.startSync()
     aliceValidator.startSync()
     aliceValidator.stop()
@@ -40,6 +39,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
   "initialize svc and validator apps" in { implicit env =>
     svc.startSync()
+    svs.foreach(_.startSync())
     scan.startSync()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
@@ -72,6 +72,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   "onboard users with party hint sanitizer" in { implicit env =>
     // Start nodes
     svc.start()
+    svs.foreach(_.start())
     scan.start()
     aliceValidator.startSync()
 
@@ -87,11 +88,15 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     partyIdFromGoodUserId.toString
       .split("::")
       .head should fullyMatch regex (s"other-_us:er-${randomId}")
+
+    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
+    svs.foreach(_.waitForInitialization())
   }
 
   "register user" in { implicit env =>
     // Start nodes
     svc.start()
+    svs.foreach(_.start())
     scan.start()
     aliceValidator.startSync()
 
@@ -100,11 +105,15 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     partyIdFromTokenUser.toString
       .split("::")
       .head should be(aliceValidator.config.damlUser)
+
+    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
+    svs.foreach(_.waitForInitialization())
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
     // Start nodes
     svc.start()
+    svs.foreach(_.start())
     scan.start()
     aliceValidator.startSync()
 
@@ -140,30 +149,42 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       .singleRequest(registerPost.withHeaders(tokenHeader(validToken)))
       .futureValue
     validResponse.status should be(StatusCodes.OK)
+
+    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
+    svs.foreach(_.waitForInitialization())
   }
 
   "onboard user multiple times" in { implicit env =>
     svc.start()
+    svs.foreach(_.start())
     scan.start()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     val party2 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     party1 shouldBe party2
+
+    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
+    svs.foreach(_.waitForInitialization())
   }
 
   "register user multiple times" in { implicit env =>
     svc.start()
+    svs.foreach(_.start())
     scan.start()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.register()
     val party2 = aliceValidator.register()
     party1 shouldBe party2
+
+    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
+    svs.foreach(_.waitForInitialization())
   }
 
   "list one connected domain" in { implicit env =>
     svc.startSync()
+    svs.foreach(_.startSync())
     scan.startSync()
     aliceValidator.startSync()
     eventually() {

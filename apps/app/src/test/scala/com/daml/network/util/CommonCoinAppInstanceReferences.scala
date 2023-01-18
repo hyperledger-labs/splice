@@ -33,6 +33,9 @@ trait CommonCoinAppInstanceReferences {
       )
     )
 
+  def svs(implicit env: CoinTestConsoleEnvironment): Seq[SvAppBackendReference] =
+    Seq(sv1, sv2, sv3, sv4)
+
   def sv1(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
   def sv2(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv2")

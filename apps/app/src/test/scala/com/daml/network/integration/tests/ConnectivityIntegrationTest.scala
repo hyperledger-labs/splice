@@ -27,23 +27,28 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
 
   "survive a disconnect" in { implicit env =>
     svc.startSync()
+    svs.foreach(_.startSync())
     scan.startSync()
 
     clue("svc app should report as active")(svc.health.active shouldBe true)
 
+    clue("sv apps should report as active")(svs.foreach(_.health.active shouldBe true))
+
     clue("alice's validator starts successfully")(aliceValidator.startSync())
 
-    clue("disable connection from SVC app to the ledger API server for 2 seconds") {
-      toxiproxy.disable("svc-ledger-api")
+    clue("disable all SV connections to the ledger API server for 2 seconds") {
+      svs.foreach(sv => toxiproxy.disable(s"${sv.name}-ledger-api"))
     }
 
-    clue("svc app should report as inactive") {
+    clue("sv apps should report as inactive") {
       eventually() {
-        svc.health.active shouldBe false
+        svs.foreach(_.health.active shouldBe false)
       }
     }
 
-    clue("start bob's validator and wait for its 'CoinRulesRequest' appearing on the SVC") {
+    clue(
+      "start bob's validator and wait for its 'CoinRulesRequest' appearing on the SVC participant"
+    ) {
       bobValidator.start()
       eventually() {
         // Using scan's remoteParticipant as that points to the non-toxied API
@@ -56,10 +61,10 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
       bobValidator.health.active shouldBe false
     }
 
-    clue("re-enable the connection and wait for svc app to report healthy again") {
-      toxiproxy.enable("svc-ledger-api")
+    clue("re-enable the connection and wait for sv apps to report healthy again") {
+      svs.foreach(sv => toxiproxy.enable(s"${sv.name}-ledger-api"))
       eventually() {
-        svc.health.active shouldBe true
+        svs.foreach(_.health.active shouldBe true)
       }
     }
 

@@ -14,15 +14,15 @@ import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
-  ValidatorDomainConfig,
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
+  ValidatorDomainConfig,
 }
 import com.daml.network.wallet.config.{
   TreasuryConfig,
-  WalletDomainConfig,
   WalletAppBackendConfig,
   WalletAppClientConfig,
+  WalletDomainConfig,
   WalletRemoteValidatorAppConfig,
 }
 import com.daml.nonempty.NonEmpty

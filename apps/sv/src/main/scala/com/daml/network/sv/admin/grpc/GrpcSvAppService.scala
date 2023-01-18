@@ -31,11 +31,11 @@ class GrpcSvAppService(
     withSpanFromGrpcContext("GrpcSvAppService") { _ => _ =>
       for {
         coinRulesCids <- connection
-          .activeContracts(store.svParty, cc.coin.CoinRules.COMPANION)
+          .activeContracts(store.key.svParty, cc.coin.CoinRules.COMPANION)
           .map(_.map(_.id))
       } yield v0.GetDebugInfoResponse(
         svUser = svUserName,
-        svPartyId = Proto.encode(store.svParty),
+        svPartyId = Proto.encode(store.key.svParty),
         coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
       )
     }

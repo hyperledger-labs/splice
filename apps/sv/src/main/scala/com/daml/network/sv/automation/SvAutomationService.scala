@@ -1,5 +1,6 @@
 package com.daml.network.sv.automation
 
+import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -23,6 +24,7 @@ class SvAutomationService(
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
+    mat: Materializer,
     tracer: Tracer,
 ) extends CoinAppAutomationService(
       config.automation,
@@ -31,4 +33,7 @@ class SvAutomationService(
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-    ) {}
+    ) {
+
+  registerTrigger(new CoinRulesRequestTrigger(triggerContext, store, connection))
+}
