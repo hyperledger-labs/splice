@@ -47,20 +47,3 @@ output_problems() {
     return "$RETURN_CODE_ON_PROBLEM"
   fi
 }
-
-# catch STDOUT STDERR cmd args..
-# https://stackoverflow.com/questions/11027679/capture-stdout-and-stderr-into-different-variables/41069638#41069638
-catch()
-{
-eval "$({
-__2="$(
-  { __1="$("${@:3}")"; } 2>&1;
-  ret=$?;
-  printf '%q=%q\n' "$1" "$__1" >&2;
-  exit $ret
-  )";
-ret="$?";
-printf '%s=%q\n' "$2" "$__2" >&2;
-printf '( exit %q )' "$ret" >&2;
-} 2>&1 )";
-}

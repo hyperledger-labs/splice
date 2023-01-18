@@ -57,6 +57,7 @@ in pkgs.mkShell {
     python3
     python3Packages.sphinx_rtd_theme
     python3Packages.datadog
+    ripgrep
     sbt
     scala
     selenium-server-standalone

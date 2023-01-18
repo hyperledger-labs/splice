@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 ###############################################################################
-# This script was copied from the Canton repo and slightly adapted for the CN repo.
+# This script was copied from the Canton repo and then heavily adapted to use
+# ripgrep instead of lnav for filtering the logs. To say that it's faster this
+# way is an understatement.
 ###############################################################################
 
 set -eo pipefail
@@ -21,68 +23,59 @@ fi
 SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
 # Load utility functions
-source "$SRCDIR"/common.sh
 source "$SRCDIR"/io-utils.sh
-
-# Install the canton log format
-CANTON_LNAV_JSON="$(nix-build -E '(import nix/default.nix {}).canton' --no-out-link)/canton.lnav.json"
-lnav -i "$CANTON_LNAV_JSON"
-# Check consistency of format
-lnav -C
 
 # Load ignore patterns for later use
 IGNORE_PATTERNS=$(remove_comment_and_blank_lines < "$FILE_WITH_IGNORE_PATTERNS")
 
-run_lnav() {
-  catch ENTRIES ERRORS lnav "$@"
-  if [[ -n "$ERRORS" ]]
-  then
-    err "Failed to run lnav with $*: $ERRORS"
-    exit 1
-  fi
-  if [[ -n "${ENTRIES// }" ]]
-  then
-    cat <<< "$ENTRIES"
-  fi
-}
+# Keywords are based on `canton.lnav.json`
+MIN_LOG_LEVEL_WARNING="] WARN  |] WARNING  |] CRITICAL  |] ERROR  |] SEVERE  |] FATAL"
 
 ### Output ignored log lines
 
 # Reads ignore patterns from stdin (one pattern per line).
 # Outputs log entries matching an ignore pattern.
 read_ignored_entries() {
-  while IFS= read -r; do
-    IGNORE_PATTERN="$REPLY"
-    run_lnav -n -c ":set-min-log-level warning" -c ":filter-in $IGNORE_PATTERN" "$LOGFILE"
-  done
+  set +o pipefail # rg returns 1 if there were not matches
+  rg -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
+    rg -e "$MIN_LOG_LEVEL_WARNING" |
+    # replaces [canton-env-execution-context-123] with [⋮]
+    sed "s/ \\[.*\\] / [⋮] /"
 }
 
 # Read ignored entries
-read_ignored_entries <<< "$IGNORE_PATTERNS" |
+read_ignored_entries |
   # Output ignored entries, succeeding in any case
   output_problems "ignored entries" "$LOGFILE" "0"
 
 ### Check for errors and warnings
 
-# Create ignore parameters, i.e., "-c :filter-out PATTERN" for later use
-IGNORE_PARAMS=$(sed -e 's/.*/:filter-out &/' -e 'i -c' <<< "$IGNORE_PATTERNS")
-
+# this differs from `read_ignored_entries` by one `-v`
 find_errors() {
-  lnav -n -c ":set-min-log-level warning" "$@" "$LOGFILE"
+  set +o pipefail # rg returns 1 if there were not matches
+  rg -v -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
+    rg -e "$MIN_LOG_LEVEL_WARNING" |
+    # replaces [canton-env-execution-context-123] with [⋮]
+    sed "s/ \\[.*\\] / [⋮] /"
 }
 
 # Find the errors
-with_input_as_params find_errors <<< "$IGNORE_PARAMS" |
+find_errors |
   # Output errors, failing if there are some
   output_problems "problems" "$LOGFILE"
 
 ### Output exceptions
 
 find_exceptions() {
-  lnav -n -c ":filter-in (?-i:Exception|Error)(?::\s.*)?$" "$@" "$LOGFILE"
+  set +o pipefail # rg returns 1 if there were not matches
+  rg -v -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
+    rg -e "(?-i:Exception|Error)(?::\s.*)?$" || true
+    # not replacing anything here on purpose as these log lines
+    # might have different structure; better to avoid removing
+    # anything we might need
 }
 
 # Find exceptions
-with_input_as_params find_exceptions <<< "$IGNORE_PARAMS" |
+find_exceptions |
   # Output total number of exceptions
   echo "Total: $(wc -l) lines with stack traces."; echo
