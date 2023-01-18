@@ -252,6 +252,7 @@ object BuildCommon {
           |  ignore:
           |    # Ignoring proto packages with these prefixes as they are external dependencies
           |    - com/daml/ledger/api/v1
+          |    - grpc
           |    - google
           |    - scalapb
           |    - com/digitalasset/canton

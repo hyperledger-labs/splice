@@ -1,5 +1,7 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.daml.network.environment.CoinLedgerConnection
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
@@ -256,6 +258,36 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
     acs
       .lookupContractById(templateCompanion)(task.contractId)
       .map(_.isEmpty)
+
+}
+
+/** TODO(M3-18) This is only duplicated because we don’t have multi-domain stores yet.
+  */
+abstract class OnCreateUpdateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+    connection: CoinLedgerConnection,
+    domainId: DomainId,
+    party: PartyId,
+    templateCompanion: ContractCompanion[TC, TCid, T],
+)(implicit
+    ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+) extends SourceBasedTrigger[JavaContract[TCid, T]] {
+
+  override protected val source: Source[JavaContract[TCid, T], NotUsed] =
+    connection
+      .updateCreates(
+        domainId,
+        party,
+        templateCompanion,
+      )
+      .map(JavaContract.fromCodegenContract(_))
+
+  // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
+  // we can implement this properly.
+  override final protected def isStaleTask(
+      task: JavaContract[TCid, T]
+  )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
 
 }
 

@@ -1,5 +1,9 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.protocol.LfContractId
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -11,6 +15,7 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as D
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
 
+import scala.language.implicitConversions
 import scala.concurrent.Future
 
 class WalletIntegrationTest
@@ -376,5 +381,41 @@ class WalletIntegrationTest
         },
       )
     }
+
+    // TODO(#2323) Actually check that the transfer happens here
+    "transfer AppPaymentRequest to global domain" in { implicit env =>
+      val splitwiseDomainId = aliceValidator.remoteParticipantWithAdminToken.domains.id_of(
+        DomainAlias.tryCreate("splitwise")
+      )
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
+      loggerFactory.assertLogsSeq(SuppressionRule.Level(org.slf4j.event.Level.INFO))(
+        {
+          val (referenceId, requestId, _) = createSelfPaymentRequest(
+            aliceValidator.remoteParticipantWithAdminToken,
+            aliceWallet.config.damlUser,
+            aliceParty,
+            domainId = Some(splitwiseDomainId),
+          )
+          // TODO(M3-18) If we only count on the target domain, this won’t be true anymore.
+          eventually() {
+            aliceWallet.listAppPaymentRequests() should have length 1
+          }
+          val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
+            .lookup_contract_domain(referenceId, requestId)
+          domains shouldBe Map[LfContractId, String](
+            javaToScalaContractId(referenceId) -> "splitwise",
+            javaToScalaContractId(requestId) -> "splitwise",
+          )
+        },
+        (logs: Seq[LogEntry]) => {
+          forExactly(1, logs) { log =>
+            log.message should include regex (s"Create of .* on ${splitwiseDomainId} requires transfer to global::")
+          }
+        },
+      )
+    }
   }
+
+  implicit def javaToScalaContractId[T](cid: ContractId[T]): LfContractId =
+    LfContractId.assertFromString(cid.contractId)
 }

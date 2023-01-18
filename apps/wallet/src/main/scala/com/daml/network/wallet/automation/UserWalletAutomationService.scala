@@ -3,7 +3,7 @@ package com.daml.network.wallet.automation
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
+import com.daml.network.automation.{CoinAppAutomationService, DomainOrchestrator}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.UserWalletStore
@@ -52,5 +52,23 @@ class UserWalletAutomationService(
   )
   registerTrigger(
     new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
+  )
+
+  registerTrigger(
+    new DomainOrchestrator(
+      triggerContext,
+      store.domains,
+      domainAdded => {
+        val trigger = new TransferAppPaymentRequestsTrigger(
+          triggerContext,
+          store,
+          connection,
+          globalDomain,
+          domainAdded.domainId,
+        )
+        trigger.run()
+        trigger
+      },
+    )
   )
 }

@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.digitalasset.canton.topology.DomainId
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.ledger.javaapi.data.{TransactionTree => JavaTransactionTree}
@@ -17,11 +18,12 @@ object LedgerApiUtils {
       readAs: Seq[PartyId],
       update: Update[T],
       commandId: Option[String] = None,
+      domainId: Option[DomainId] = None,
   ): T = {
     val tree = ledgerApi.ledger_api.commands.submitJava(
       actAs,
       update.commands.asScala.toSeq,
-      workflowId = "",
+      workflowId = domainId.fold("")(CoinLedgerConnection.domainIdToWorkflowId(_)),
       commandId.getOrElse(""),
       readAs = readAs,
       applicationId = userId,

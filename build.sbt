@@ -166,6 +166,7 @@ lazy val `apps-common` =
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-coin-daml`,
+      `canton-research-update-service`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(

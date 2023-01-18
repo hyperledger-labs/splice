@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -125,6 +126,12 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: Seq[PartyId],
   )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription
 
+  def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      domainId: DomainId,
+      filter: PartyId,
+      companion: ContractCompanion[TC, TCid, T],
+  ): Source[Contract[TCid, T], NotUsed]
+
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
   def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
@@ -210,9 +217,6 @@ object CoinLedgerConnection {
 
       implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
 
-      private def domainIdToWorkflowId(id: DomainId): String =
-        s"domain-id:${id.toProtoPrimitive}"
-
       def submitCommandsNoDedup(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
@@ -220,7 +224,7 @@ object CoinLedgerConnection {
           domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
-          workflowId = domainIdToWorkflowId(domainId),
+          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
@@ -239,7 +243,7 @@ object CoinLedgerConnection {
           domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
-          workflowId = domainIdToWorkflowId(domainId),
+          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           commandId = commandId.commandIdForSubmission,
           deduplicationConfig = DedupOffset(
@@ -295,7 +299,7 @@ object CoinLedgerConnection {
       ): Future[(String, T)] = {
         for {
           tree <- client.submitAndWaitForTransactionTree(
-            workflowId = domainIdToWorkflowId(domainId),
+            workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
             applicationId = coinLedgerClient.applicationId,
             commandId = commandIdForSubmission,
             actAs = actAs.map(_.toProtoPrimitive),
@@ -466,6 +470,23 @@ object CoinLedgerConnection {
         subscription(subscriptionName, beginOffset, filter)({
           Flow[TransactionTree].mapAsync(1)(f)
         })
+
+      def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+          domainId: DomainId,
+          party: PartyId,
+          companion: ContractCompanion[TC, TCid, T],
+      ): Source[Contract[TCid, T], NotUsed] = {
+        coinLedgerClient.client
+          .updates(
+            LedgerClient.GetUpdatesRequest(
+              begin = LedgerOffset.LedgerBegin.getInstance,
+              end = None,
+              party = party,
+              domainId = domainId,
+            )
+          )
+          .mapConcat(_.discardTransfers.flatMap(DecodeUtil.decodeAllCreatedTree(companion)(_)))
+      }
 
       private def makeSubscription[S, T](
           source: Source[S, NotUsed],
@@ -664,6 +685,9 @@ object CoinLedgerConnection {
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()
     }
+
+  def domainIdToWorkflowId(id: DomainId): String =
+    s"domain-id:${id.toProtoPrimitive}"
 
   def decodeExerciseResult[T](
       update: Update[T],

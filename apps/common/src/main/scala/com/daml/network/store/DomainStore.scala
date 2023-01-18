@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.digitalasset.canton.DomainAlias
@@ -38,15 +39,22 @@ abstract class DomainStore extends AutoCloseable {
 }
 
 object DomainStore {
-  sealed trait DomainConnectionEvent extends Product with Serializable {}
+  sealed trait DomainConnectionEvent extends Product with Serializable with PrettyPrinting {}
   final case class DomainAdded(
       domainAlias: DomainAlias,
       domainId: DomainId,
-  ) extends DomainConnectionEvent
+  ) extends DomainConnectionEvent {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("domainAlias", _.domainAlias), param("domainId", _.domainId))
+  }
   final case class DomainRemoved(
       domainAlias: DomainAlias,
       domainId: DomainId,
-  ) extends DomainConnectionEvent
+  ) extends DomainConnectionEvent {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("domainAlias", _.domainAlias), param("domainId", _.domainId))
+  }
+
   trait IngestionSink {
 
     /** Ingest the set of connected domains. This fully

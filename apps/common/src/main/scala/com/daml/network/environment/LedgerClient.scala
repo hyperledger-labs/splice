@@ -1,5 +1,10 @@
 package com.daml.network.environment
 
+import com.digitalasset.canton.research.participant.multidomain.{
+  transfer as xfr,
+  update_service as upsvc,
+}
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -86,6 +91,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
   val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
+  val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
+    withCredentials(upsvc.UpdateServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -141,6 +148,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     ClientAdapter
       .serverStreaming(request.toProto, transactionServiceStub.getTransactions)
       .map(GetTransactionsResponse.fromProto)
+  }
+
+  def updates(
+      request: LedgerClient.GetUpdatesRequest
+  ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
+    ClientAdapter
+      .serverStreaming(request.toProto, updateServiceStub.getTreeUpdates)
+      .map(LedgerClient.GetTreeUpdatesResponse.fromProto)
   }
 
   def transactionTrees(
@@ -314,5 +329,45 @@ object LedgerClient {
         )
       )
     }
+  }
+
+  final case class GetUpdatesRequest(
+      begin: LedgerOffset,
+      end: Option[LedgerOffset],
+      party: PartyId,
+      domainId: DomainId,
+  ) {
+    import com.daml.ledger.api.v1.ledger_offset as sclo
+
+    private[LedgerClient] def toProto: upsvc.GetUpdatesRequest =
+      upsvc.GetUpdatesRequest(
+        ledgerId = "",
+        begin = Some(sclo.LedgerOffset.fromJavaProto(begin.toProto)),
+        end = end.map(lc => sclo.LedgerOffset.fromJavaProto(lc.toProto)),
+        party = party.toLf,
+        domainId = domainId.unwrap.toProtoPrimitive,
+      )
+  }
+
+  final case class GetTreeUpdatesResponse(updates: Seq[Either[TransactionTree, xfr.Transfer]]) {
+    // TODO(M3-18) remove
+    private[environment] def discardTransfers: Seq[TransactionTree] =
+      updates collect { case Left(t) => t }
+  }
+
+  object GetTreeUpdatesResponse {
+    import upsvc.TreeUpdate.TreeUpdate as TU
+
+    private[LedgerClient] def fromProto(
+        proto: upsvc.GetTreeUpdatesResponse
+    ): GetTreeUpdatesResponse =
+      GetTreeUpdatesResponse(proto.updates map {
+        _.treeUpdate match {
+          case TU.TransactionTree(tree) =>
+            Left(TransactionTree fromProto tree.companion.toJavaProto(tree))
+          case TU.Transfer(x) => Right(x)
+          case TU.Empty => sys.error("uninitialized update service result")
+        }
+      })
   }
 }

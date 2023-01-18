@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.digitalasset.canton.topology.DomainId
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
@@ -198,6 +199,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       remoteParticipant: CoinRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
+      domainId: Option[DomainId] = None,
   )(implicit
       env: CoinTestConsoleEnvironment
   ): (
@@ -217,6 +219,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
           userParty.toProtoPrimitive,
           "description",
         ).create,
+        domainId = domainId,
       )
       testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
     }
@@ -245,6 +248,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = reqC.create,
+        domainId = domainId,
       )
       val cid = paymentCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
       (cid, reqC)
