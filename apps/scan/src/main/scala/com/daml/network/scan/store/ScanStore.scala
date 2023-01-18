@@ -16,9 +16,7 @@ trait ScanStore extends CoinAppStore with StoreWithOpenMiningRounds {
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  def lookupCoinRules()(implicit
-      ec: ExecutionContext
-  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 }
 

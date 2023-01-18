@@ -53,9 +53,8 @@ trait WalletStore extends CoinAppStore with StoreWithOpenMiningRounds {
       )
       .map(_.value)
 
-  def getCoinRules()(implicit
-      ec: ExecutionContext
-  ): Future[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]] =
+  def getCoinRules()
+      : Future[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]] =
     acs
       .findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true)
       .map(

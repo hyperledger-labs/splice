@@ -48,9 +48,7 @@ trait UserWalletStore extends CoinAppStore {
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acs.signalWhenIngested(offset)
 
-  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[JavaContract[
+  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int): Future[Seq[JavaContract[
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
   ]]] =
