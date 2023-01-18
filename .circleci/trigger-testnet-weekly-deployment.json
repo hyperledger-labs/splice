@@ -1,6 +1,6 @@
 {
-    "name" : "TestNet (Bi-)Weekly Deployment",
-    "description" : "Weekly deployment of testnet; currently bi-weekly until we switch away from in-memory storage for the canton participant TODO(#914)",
+    "name" : "TestNet Weekly Deployment",
+    "description" : "Weekly deployment of testnet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
@@ -9,7 +9,7 @@
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day" : [ 0 ],
-      "days-of-week" : [ "MON", "THU" ],
+      "days-of-week" : [ "MON" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     }
