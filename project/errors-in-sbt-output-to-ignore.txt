@@ -78,4 +78,10 @@ c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
 ^.\[31mWarning:.\[0m$
 .*contained different content than was expected.*
 
+# TODO(#2375) Remove this once we can ignore those
+# shutdown issues more granularly.
+WARN  c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
+ledger subscription for admin service \[com.digitalasset.canton.participant.admin.PingService@.*\] has completed with error
+io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
+
 # Make sure to have a trailing newline
