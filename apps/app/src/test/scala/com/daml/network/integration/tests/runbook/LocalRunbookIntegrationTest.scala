@@ -17,13 +17,14 @@ import scala.util.Try
 /** Runs through runbook but does so while spinning up a local SVC. */
 class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScriptRunner {
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
-  val clusterImagesPath: File = "cluster" / "images"
   val validatorPath: File = examplesPath / "validator"
-  val svcParticipantPath: File = clusterImagesPath / "canton-participant"
-  val svcDomainPath: File = clusterImagesPath / "canton-domain"
-  val svcAppPath: File = clusterImagesPath / "svc-app"
-  val scanAppPath: File = clusterImagesPath / "scan-app"
+
   val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+
+  val svcParticipantPath: File = testResourcesPath / "canton-participant"
+  val svcDomainPath: File = testResourcesPath / "canton-domain"
+  val svcAppPath: File = testResourcesPath / "svc-app"
+  val scanAppPath: File = testResourcesPath / "scan-app"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
