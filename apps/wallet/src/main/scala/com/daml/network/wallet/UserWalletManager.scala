@@ -124,7 +124,7 @@ class UserWalletManager(
             case Some(install) =>
               this.lookupUserWallet(install.payload.endUserName) match {
                 case None =>
-                  logger.warn(
+                  logger.info(
                     s"Might miss validator rewards as the UserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
                   )
                   Future.successful(Seq.empty)
