@@ -285,7 +285,11 @@ function cluster_check() {
 }
 
 function _cluster_reset() {
-    kubectl delete pods --all
+    kubectl delete StatefulSet --all
+    kubectl delete PersistentVolumeClaim --all
+    kubectl delete PersistentVolume --all
+    kubectl delete Deployment --all
+    kubectl delete Pods --all
 }
 
 function cluster_ciapply() {

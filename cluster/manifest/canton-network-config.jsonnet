@@ -1,5 +1,7 @@
 local networkDefaults = import './network-defaults.jsonnet';
 
+local postgres = import './postgres.jsonnet';
+
 local c = import './cluster.jsonnet';
 
 // A dictionary of all auth-related environment variables.
@@ -18,12 +20,8 @@ local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
   { env: 'CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-splitwise-validator-ledger-api-auth' },
 ], {});
 
-// memoryLimitMiB values for deployments are taken emperically from
-// DevNet with `kubectl top pod`. Note that these were taken on a very
-// lightly loaded cluster and will very likely need to be revised for
-// clusters with higher loads.
-
 local svcDeployments(config) = [
+  postgres.database('postgres', config),
   c.deployment(
     config,
     'canton-domain',
@@ -184,6 +182,7 @@ local svcDeployments(config) = [
 ];
 
 local validator1Deployments(config) = [
+  postgres.database('val1-postgres', config),
   c.deployment(config, 'validator1-participant', [
     {
       name: 'val1-adm-api',
@@ -260,6 +259,7 @@ local validator1Deployments(config) = [
 ];
 
 local splitwiseDeployments(config) = [
+  postgres.database('sw-postgres', config),
   c.deployment(config, 'splitwise-participant', [
     {
       name: 'sw-adm-api',

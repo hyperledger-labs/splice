@@ -1,3 +1,8 @@
+// memoryLimitMiB values for deployments are taken emperically from
+// DevNet with `kubectl top pod`. Note that these were taken on a very
+// lightly loaded cluster and will very likely need to be revised for
+// clusters with higher loads.
+
 {
   domainMemoryMib: 6144,
   participantMemoryMib: 12288,

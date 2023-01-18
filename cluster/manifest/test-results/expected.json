@@ -173,6 +173,125 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "postgres"
+            },
+            "name": "postgres-configuration"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "postgres"
+            },
+            "name": "postgres"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "postgres"
+               }
+            },
+            "serviceName": "postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "postgres"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "10Gi"
+                        }
+                     }
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "postgres"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "postgres"
+            }
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -1370,6 +1489,125 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "val1-postgres"
+            },
+            "name": "val1-postgres-configuration"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "val1-postgres"
+            },
+            "name": "val1-postgres"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "val1-postgres"
+               }
+            },
+            "serviceName": "val1-postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "val1-postgres"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "val1-postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "val1-postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "10Gi"
+                        }
+                     }
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "val1-postgres"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "val1-postgres"
+            }
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -2103,6 +2341,125 @@
             ],
             "selector": {
                "app": "validator1-splitwise-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "sw-postgres"
+            },
+            "name": "sw-postgres-configuration"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "sw-postgres"
+            },
+            "name": "sw-postgres"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sw-postgres"
+               }
+            },
+            "serviceName": "sw-postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sw-postgres"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "sw-postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "sw-postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "10Gi"
+                        }
+                     }
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "sw-postgres"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sw-postgres"
             }
          }
       },

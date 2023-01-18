@@ -247,7 +247,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
     ],
   };
 
-local configMap(config, name, fileName, data) = {
+local jsonFileConfigMap(config, name, fileName, data) = {
   ports: [],
   deploymentObjects: [
     {
@@ -294,6 +294,7 @@ local externalService(config, ports) = {
   ],
 };
 
+
 local cluster(config, clusterDeployments) =
   local deployments = flatten(clusterDeployments);
 
@@ -307,7 +308,7 @@ local cluster(config, clusterDeployments) =
   local externalProxyPorts = std.map(function(p) { name: p.name, port: externalPort(p) }, nonInternalPorts);
 
   objects(deployments + [
-    configMap(config, 'cluster-manifest', 'manifest.json', {
+    jsonFileConfigMap(config, 'cluster-manifest', 'manifest.json', {
       ports: allPorts,
     }),
     deployment(

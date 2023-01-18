@@ -1,16 +1,20 @@
-println("Bootstrapping validator1 participant...")
+def log(msg: String) = println(s"BOOTSTRAP: $msg")
+
+log("===============================")
+log("Bootstrapping validator1 participant...")
+log("===============================")
 
 val domainLabel = "global"
 val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
 
-println(s"Connecting to domain $domainUrl...")
+log(s"Connecting to domain $domainUrl...")
 if (`validator1_participant`.domains.list_connected().isEmpty) {
-    println("No registered domains, so connecting to the CN domain for the first time...")
+    log("No registered domains, so connecting to the CN domain for the first time...")
 
     `validator1_participant`.domains.connect(domainLabel, domainUrl)
     utils.retry_until_true(`validator1_participant`.domains.active(domainLabel))
 
-    println("Executing self ping for connection verification...")
+    log("Executing self ping for connection verification...")
     `validator1_participant`.health.ping(`validator1_participant`)
 }
 
@@ -24,17 +28,26 @@ if (walletServiceUserName == null) {
   sys.error("Environment variable CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME does not exist")
 }
 
-// User name may contain characters not allowed in party names
-val validatorServicePartyName = "validator1_validator_service_user"
+// Ensure there's a validator party
 
-println(s"Creating validator user $validatorServiceUserName...")
-val validatorParty = `validator1_participant`.parties.enable(validatorServicePartyName)
-`validator1_participant`.ledger_api.users.create(
-  id = validatorServiceUserName,
-  actAs = Set(validatorParty.toLf),
-  readAs = Set.empty,
-  primaryParty = Some(validatorParty.toLf),
-  participantAdmin = true,
-)
+def getUser(userName: String) =
+ `validator1_participant`.ledger_api.users.list(userName).users.headOption
 
-println("Bootstrapped validator1 participant!")
+getUser(validatorServiceUserName).getOrElse({
+  val validatorServicePartyName = "validator1_validator_service_user"
+  log(s"Enabling party $validatorServicePartyName...")
+  val validatorParty = `validator1_participant`.parties.enable(validatorServicePartyName)
+
+  log(s"Creating validator user $validatorServiceUserName...")
+  `validator1_participant`.ledger_api.users.create(
+    id = validatorServiceUserName,
+    actAs = Set(validatorParty.toLf),
+    readAs = Set.empty,
+    primaryParty = Some(validatorParty.toLf),
+    participantAdmin = true,
+  )
+})
+
+log("===============================")
+log("Bootstrapped validator1 participant!")
+log("===============================")

@@ -1,4 +1,6 @@
+println("===============================")
 println("Bootstrapping splitwise provider participant...")
+println("===============================")
 
 val domainLabel = "global"
 val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
@@ -19,17 +21,25 @@ if (validatorServiceUserName == null) {
   sys.error("Environment variable CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME does not exist")
 }
 
-// User name may contain characters not allowed in party names
+// Ensure there's an service Party
 val validatorServiceParty = "splitwise_validator_service_user"
+if (`splitwise_participant`.parties.list(validatorServiceParty).isEmpty) {
+   println(s"Enabling validator party $validatorServiceParty...")
+   `splitwise_participant`.parties.enable(validatorServiceParty)
+}
+val validatorParty = `splitwise_participant`.parties.list(validatorServiceParty).headOption.get.party
+println(s"Using validator party $validatorParty..")
 
-println(s"Creating validator user $validatorServiceUserName...")
-val validatorParty = `splitwise_participant`.parties.enable(validatorServiceParty)
-`splitwise_participant`.ledger_api.users.create(
-  id = validatorServiceUserName,
-  actAs = Set(validatorParty.toLf),
-  readAs = Set.empty,
-  primaryParty = Some(validatorParty.toLf),
-  participantAdmin = true,
-)
+if (`splitwise_participant`.ledger_api.users.list(validatorServiceUserName).users.isEmpty) {
+  `splitwise_participant`.ledger_api.users.create(
+    id = validatorServiceUserName,
+    actAs = Set(validatorParty.toLf),
+    readAs = Set.empty,
+    primaryParty = Some(validatorParty.toLf),
+    participantAdmin = true,
+  )
+}
 
+println("===============================")
 println("Bootstrapped splitwise provider participant!")
+println("===============================")
