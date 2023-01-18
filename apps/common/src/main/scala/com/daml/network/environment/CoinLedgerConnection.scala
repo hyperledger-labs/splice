@@ -1,6 +1,5 @@
 package com.daml.network.environment
 
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -43,6 +42,7 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil

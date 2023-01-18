@@ -7,7 +7,7 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
-import com.daml.network.util.Auth0User
+import com.daml.network.util.{Auth0User, CantonProcessTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -15,14 +15,14 @@ import monocle.macros.syntax.lens.*
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Using
-import scala.sys.process.Process
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
   */
 class PreflightIntegrationTest
     extends FrontendIntegrationTest("alice-v1", "bob-v1")
-    with HasConsoleScriptRunner {
+    with HasConsoleScriptRunner
+    with CantonProcessTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
@@ -259,38 +259,18 @@ class PreflightIntegrationTest
   "run through runbook against cluster deployment" taggedAs LiveDevNetTest in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
-    def startCanton() = {
-      val builder = Process(
-        command = Seq(
-          "canton",
-          "daemon",
-          "-c",
-          (validatorPath / "validator-participant.conf").toString,
-          "-C",
-          "canton.participants.validatorParticipant.ledger-api.port=6001",
-          "-C",
-          "canton.participants.validatorParticipant.admin-api.port=6002",
-          "--bootstrap",
-          (validatorPath / "validator-participant.canton").toString,
-          "--log-file-name",
-          "log/standalone-canton.log",
-          s"-DDOMAIN_URL=${System.getProperty("DOMAIN_URL")}",
-        ),
-        cwd = None,
-        // Clear the classpath to avoid weird conflicts
-        // that break logging.
-        extraEnv = ("CLASSPATH", ""),
-      )
-      val process = builder.run()
-      process
-    }
-    implicit val releasableProcess: Using.Releasable[Process] = new Using.Releasable[Process] {
-      override def release(process: Process): Unit = {
-        process.destroy()
-        process.exitValue()
-      }
-    }
-    Using.resource(startCanton()) { process =>
+    val cantonArgs = Seq(
+      "-c",
+      (validatorPath / "validator-participant.conf").toString,
+      "-C",
+      "canton.participants.validatorParticipant.ledger-api.port=6001",
+      "-C",
+      "canton.participants.validatorParticipant.admin-api.port=6002",
+      "--bootstrap",
+      (validatorPath / "validator-participant.canton").toString,
+      s"-DDOMAIN_URL=${System.getProperty("DOMAIN_URL")}",
+    )
+    Using.resource(startCanton(cantonArgs: _*)) { process =>
       runScript(validatorPath / "validator.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }

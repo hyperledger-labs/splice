@@ -9,14 +9,18 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.util.CantonProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import scala.sys.process.Process
-
 /** Runs through runbook but does so while spinning up a local SVC. */
-class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScriptRunner {
+class LocalRunbookIntegrationTest
+    extends CoinIntegrationTest
+    with HasConsoleScriptRunner
+    with CantonProcessTestUtil {
+  import CantonProcessTestUtil.CantonProcess
+
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
 
@@ -28,7 +32,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
   val svAppsPath: File = testResourcesPath / "sv-apps"
   val scanAppPath: File = testResourcesPath / "scan-app"
 
-  var cantonProcess: Option[Process] = None
+  var cantonProcess: Option[CantonProcess] = None
   override def provideEnvironment = {
     System.setProperty("DOMAIN_URL", "http://localhost:7008")
 
@@ -67,38 +71,29 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
       |""".stripMargin)
     bootstrapFile.append(validatorBootstrapContent)
 
-    val builder = Process(
-      command = Seq(
-        "canton",
-        "daemon",
-        "-c",
-        (validatorPath / "validator-participant.conf").toString,
-        "-c",
-        (svcParticipantPath / "canton.conf").toString,
-        "-c",
-        (svcDomainPath / "canton.conf").toString,
-        "-C",
-        "canton.participants.validatorParticipant.ledger-api.port=7001",
-        "-C",
-        "canton.participants.validatorParticipant.admin-api.port=7002",
-        "--bootstrap",
-        bootstrapFile.toString,
-        "--log-file-name",
-        "log/standalone-canton.log",
-        "-DDOMAIN_URL=http://localhost:7008",
-      ),
-      cwd = None,
-      extraEnv = ("CLASSPATH", ""),
+    val process = startCanton(
+      "-c",
+      (validatorPath / "validator-participant.conf").toString,
+      "-c",
+      (svcParticipantPath / "canton.conf").toString,
+      "-c",
+      (svcDomainPath / "canton.conf").toString,
+      "-C",
+      "canton.participants.validatorParticipant.ledger-api.port=7001",
+      "-C",
+      "canton.participants.validatorParticipant.admin-api.port=7002",
+      "--bootstrap",
+      bootstrapFile.toString,
+      "-DDOMAIN_URL=http://localhost:7008",
     )
-    cantonProcess = Some(builder.run())
+    cantonProcess = Some(process)
     super.provideEnvironment
   }
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
     super.testFinished(env)
     cantonProcess.foreach { p =>
-      p.destroy()
-      p.exitValue()
+      p.destroyAndWait()
     }
   }
 
