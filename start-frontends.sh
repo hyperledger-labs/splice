@@ -34,35 +34,32 @@ function tmux_cmd() {
 function start_frontend() {
   local app=$1
   local port=$2
-  local app_grpc=$3
-  local wallet_port=$4
-  local ledger_grpc=$5
-  local validator_grpc=$6
-  local scan_grpc=$7
-  local user=$8
-  local oa_domain=$9
-  local oa_clientid="${10}"
-  local algorithm="${11}"
-  local test_auth_secret="${12}"
+  local user=$3
+  local node_name=$4
+  local test_auth=$5
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
+  # Note: We are sending the content of the whole config.js file as a string to the webpack dev server.
+  # There are two issues with this:
+  # - The config contains quotes and line breaks
+  # - The command 'tmux send-keys' does not handle sending long strings well
+  # To avoid both issues, we are saving the content of the config to a temporary file
+  # and reading it back from the tmux session.
+  local config_file=$(mktemp)
+  trap "rm -f ${config_file}" 0 2 3 15
+
+  jsonnet \
+    --tla-str enableTestAuth="$test_auth" \
+    --tla-str validatorNode="$node_name" \
+    $REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet \
+    > "$config_file"
+
+  local log_file="${LOG_DIR}/npm-${app}-${user}.log"
+
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
-    "BROWSER=none PORT=$port \
-    REACT_APP_SERVICE_WALLET_GRPC_URL=http://localhost:${app_grpc} \
-    REACT_APP_SERVICE_WALLET_UI_URL=http://localhost:${wallet_port} \
-    REACT_APP_SERVICE_VALIDATOR_GRPC_URL=http://localhost:${validator_grpc} \
-    REACT_APP_SERVICE_SCAN_API_GRPC_URL=http://localhost:${scan_grpc} \
-    REACT_APP_SERVICE_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
-    REACT_APP_AUTH_AUTHORITY=${oa_domain} \
-    REACT_APP_AUTH_CLIENT_ID=${oa_clientid} \
-    REACT_APP_AUTH_ALGORITHM=${algorithm} \
-    REACT_APP_AUTH_TOKEN_AUDIENCE="https://canton.network.global" \
-    REACT_APP_AUTH_TOKEN_SCOPE="daml_ledger_api" \
-    REACT_APP_TESTAUTH_TOKEN_AUDIENCE="https://canton.network.global" \
-    REACT_APP_TESTAUTH_TOKEN_SCOPE="daml_ledger_api" \
-    REACT_APP_TESTAUTH_SECRET=${test_auth_secret} \
-    npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
+    "BROWSER=none PORT=$port REACT_APP_CANTON_NETWORK_CONFIG=\"\$(cat $config_file)\" \
+    npm start 2>&1 | tee -a $log_file"
 }
 
 function usage() {
@@ -73,13 +70,10 @@ function usage() {
   echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
 }
 
+# default values
 daemon=0
-# default: auth via auth0
-oauth_authority=https://canton-network-test.us.auth0.com
-oauth_clientid=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
-auth_algorithm=rs-256
-# default: enable testing auth with secret "test"
-test_auth_secret=test
+enable_test_auth="true"
+
 while getopts "hda" arg; do
   case ${arg} in
     h)
@@ -90,7 +84,7 @@ while getopts "hda" arg; do
       daemon=1
       ;;
     a)
-      test_auth_secret=
+      enable_test_auth="false"
       ;;
     ?)
       usage
@@ -120,13 +114,13 @@ do
     sleep 1
 done
 
-# start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <app-scan-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 0    0    6203 6012 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
-start_frontend wallet    3001 6304 0    0    6303 6012 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
-start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
-start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
-start_frontend directory 3004 6110 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
-start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+# start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth>
+start_frontend wallet    3000 alice   "alice" $enable_test_auth
+start_frontend wallet    3001 bob     "bob"   $enable_test_auth
+start_frontend splitwise 3002 alice   "alice" $enable_test_auth
+start_frontend splitwise 3003 bob     "bob"   $enable_test_auth
+start_frontend directory 3004 alice   "alice" $enable_test_auth
+start_frontend splitwise 3005 charlie "alice" $enable_test_auth
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}
