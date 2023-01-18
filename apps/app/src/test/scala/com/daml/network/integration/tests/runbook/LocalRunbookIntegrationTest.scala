@@ -83,8 +83,12 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
         "canton.participants.validatorParticipant.admin-api.port=7002",
         "--bootstrap",
         bootstrapFile.toString,
+        "--log-file-name",
+        "log/standalone-canton.log",
         "-DDOMAIN_URL=http://localhost:7008",
-      )
+      ),
+      cwd = None,
+      extraEnv = ("CLASSPATH", ""),
     )
     cantonProcess = Some(builder.run())
     super.provideEnvironment

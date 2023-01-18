@@ -19,3 +19,4 @@ validatorParticipant.ledger_api.users.create(
     primaryParty = Some(validatorParty.toLf),
     participantAdmin = true,
 )
+println("Validator participant bootstrap finished")
