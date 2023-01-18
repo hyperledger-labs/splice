@@ -61,9 +61,6 @@ testAppRewardCoupon = do
 
   replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
-
-  testChoice @"enable_AppRewardCoupon_ProviderExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (AppRewardCoupon_ProviderExpire round coinRules)
   pure ()
 
 testValidatorRewardCoupon : Script ()
@@ -80,14 +77,7 @@ testValidatorRewardCoupon = do
   replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
-  testChoice @"enable_ValidatorRewardCoupon_UserExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (ValidatorRewardCoupon_UserExpire round coinRules)
-
   [(right, _)] <- query @ValidatorRight alice.primaryParty
-
-  _ <- tap app alice 10.0
-  pay app alice alice.primaryParty 5.0 ""
-  [(cid, _)] <- query @ValidatorRewardCoupon alice.primaryParty
 
   testChoice @"enable_ValidatorRewardCoupon_ArchiveAsValidator" app [validator, app.svc] [alice.primaryParty] $ \coinRules ->
     exerciseCmd cid (ValidatorRewardCoupon_ArchiveAsValidator validator right coinRules)

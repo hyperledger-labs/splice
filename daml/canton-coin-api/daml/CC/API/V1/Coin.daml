@@ -87,9 +87,6 @@ data EnabledChoices = EnabledChoices
 
     enable_Coin_Expire : Bool
 
-    enable_AppRewardCoupon_ProviderExpire : Bool
-
-    enable_ValidatorRewardCoupon_UserExpire : Bool
     enable_ValidatorRewardCoupon_ArchiveAsValidator : Bool
 
     enable_CoinRules_Tap : Bool
@@ -105,9 +102,6 @@ enableAllChoices = EnabledChoices with
 
   enable_Coin_Expire = True
 
-  enable_AppRewardCoupon_ProviderExpire = True
-
-  enable_ValidatorRewardCoupon_UserExpire = True
   enable_ValidatorRewardCoupon_ArchiveAsValidator = True
 
   enable_CoinRules_Tap = True

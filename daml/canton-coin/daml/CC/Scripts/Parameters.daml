@@ -41,7 +41,6 @@ defaultCoinConfig = CoinConfig with
       steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
 
     -- Using steady state parameters from whitepaper
-    -- TODO(M3-06): implement issuance curve
     issuanceCurve = defaultIssuanceCurve
 
     -- Duration of one tick, which is half the target duration of one round

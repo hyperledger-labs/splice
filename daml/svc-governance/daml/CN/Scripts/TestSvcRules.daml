@@ -157,20 +157,23 @@ runNextIssuanceD app coinPrice = do
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
+
+      -- TODO(#2334): reactivate this code once we have SvcRules support for expiry
+
       -- app rewards
-      rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
-      forA_ rewards $ \(rcid, _) ->
-        leaderSubmits app $ \cid -> exerciseCmd cid $
-          SvcRules_AppRewardCoupon_SvcExpire with
-            cid = rcid
-            choiceArg = AppRewardCoupon_SvcExpire with miningRoundCid
-      -- validator rewards
-      rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
-      forA_ rewards $ \(rcid, _) ->
-        leaderSubmits app $ \cid -> exerciseCmd cid $
-          SvcRules_ValidatorRewardCoupon_SvcExpire with
-            cid = rcid
-            choiceArg = ValidatorRewardCoupon_SvcExpire with miningRoundCid
+      -- rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      -- forA_ rewards $ \(rcid, _) ->
+      --   leaderSubmits app $ \cid -> exerciseCmd cid $
+      --     SvcRules_AppRewardCoupon_SvcExpire with
+      --       cid = rcid
+      --       choiceArg = AppRewardCoupon_SvcExpire with miningRoundCid
+      -- -- validator rewards
+      -- rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      -- forA_ rewards $ \(rcid, _) ->
+      --   leaderSubmits app $ \cid -> exerciseCmd cid $
+      --     SvcRules_ValidatorRewardCoupon_SvcExpire with
+      --       cid = rcid
+      --       choiceArg = ValidatorRewardCoupon_SvcExpire with miningRoundCid
       -- the closed round
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
@@ -181,7 +184,7 @@ runNextIssuanceD app coinPrice = do
 
     -- close current issuing rounds if there are any
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
-    forA_ imcs $ \(miningRoundCid, _) ->
+    forA_ imcs $ \(issuingRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
         totalTransferFees = 0.0
         totalAdminFees = 0.0
@@ -192,7 +195,7 @@ runNextIssuanceD app coinPrice = do
         -- Putting actual values here would require duplicating the logic from
         -- the svc app here, and is not currently required for any of the existing
         -- tests.
-        miningRoundCid
+        issuingRoundCid
 
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
@@ -240,7 +243,7 @@ confirmAWC_MiningRound_Archive app = do
             coinRulesCid
             coinRulesAction = CRARC_MiningRound_Archive $
               CoinRules_MiningRound_Archive with
-                miningRoundCid = round._1
+                closedRoundCid = round._1
           confirmer = member
         pure ()
 

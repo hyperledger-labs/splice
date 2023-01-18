@@ -127,7 +127,6 @@ testProviderHosted = script do
   charlie <- setupUser app "charlie" validator
   provider <- setupUser app "provider" validator
 
-  -- TODO(M3-06): test that provider gets the expected rewards
   featureApp app provider
 
   testCase app Parties with

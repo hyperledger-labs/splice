@@ -97,6 +97,9 @@ template ClosedMiningRound
   with
     svc : Party
     round : Round
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
     totalTransferFees : Decimal
     totalAdminFees : Decimal
     totalHoldingFees : Decimal

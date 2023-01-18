@@ -64,6 +64,7 @@ template LockedCoin
         lock
         -- Need to qualify view here, see https://github.com/digital-asset/daml/issues/15459
         coin = DA.Internal.Desugar.view (toInterface @API.Coin coin)
+
       lockedCoin_OwnerExpireLock coinRulesCid = do
         coinRules <- view <$> fetch coinRulesCid
         requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
@@ -137,7 +138,8 @@ template FeaturedAppRight with
       do pure ()
 
 
--- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+-- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
+-- CC transfer coordinated by the app of a provider.
 template AppRewardCoupon
   with
     svc : Party
@@ -151,25 +153,17 @@ template AppRewardCoupon
 
     interface instance API.AppRewardCoupon for AppRewardCoupon where
       view = API.AppRewardCouponView with ..
-
-    choice AppRewardCoupon_SvcExpire : ()
+    choice AppRewardCoupon_SvcExpire : (Bool, Decimal)
       with
-        miningRoundCid : ContractId ClosedMiningRound
+        closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do miningRound <- fetch miningRoundCid
-         require "Mining round > expiry round" (round <= miningRound.round)
-    choice AppRewardCoupon_ProviderExpire : ()
-      with
-        miningRoundCid : ContractId ClosedMiningRound
-        coinRulesCid : ContractId API.CoinRules
-      controller provider
-      do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "AppRewardCoupon_ProviderExpire" (\c -> c.enable_AppRewardCoupon_ProviderExpire) coinRules
-         miningRound <- fetch miningRoundCid
-         require "Mining round > expiry round" (round <= miningRound.round)
+      do closedRound <- fetch closedRoundCid
+         require "SVC matches" (svc == closedRound.svc)
+         require "Mining round matches" (round == closedRound.round)
+         pure (featured, quantity)
 
-
--- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+-- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
+-- hosted by a validator operator.
 template ValidatorRewardCoupon
   with
     svc : Party
@@ -183,23 +177,15 @@ template ValidatorRewardCoupon
     interface instance API.ValidatorRewardCoupon for ValidatorRewardCoupon where
       view = API.ValidatorRewardCouponView with ..
 
-    choice ValidatorRewardCoupon_SvcExpire : ()
+    choice ValidatorRewardCoupon_SvcExpire : Decimal
       with
-        miningRoundCid : ContractId ClosedMiningRound
+        closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do miningRound <- fetch miningRoundCid
-         require "Mining round > expiry round" (round <= miningRound.round)
+      do closedRound <- fetch closedRoundCid
+         require "SVC matches" (svc == closedRound.svc)
+         require "Mining round matches" (round == closedRound.round)
+         pure quantity
 
-    choice ValidatorRewardCoupon_UserExpire : ()
-      with
-        miningRoundCid : ContractId ClosedMiningRound
-        coinRulesCid : ContractId API.CoinRules
-      controller user
-      -- TODO(M3-90): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
-      do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "ValidatorRewardCoupon_UserExpire" (\c -> c.enable_ValidatorRewardCoupon_UserExpire) coinRules
-         miningRound <- fetch miningRoundCid
-         require "Mining round > expiry round" (round <= miningRound.round)
 
     choice ValidatorRewardCoupon_ArchiveAsValidator : ()
       -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
@@ -221,6 +207,19 @@ template SvcReward with
     quantity : Decimal
   where
     signatory svc
+
+-- | Rewards that have not been claimed and are thus at the disposal of the foundation.
+template UnclaimedReward with
+    svc : Party
+    quantity : Decimal
+  where
+    ensure quantity > 0.0
+
+    signatory svc
+
+
+-- Configuration of CoinRules behavior
+--------------------------------------
 
 data CC = CC deriving (Show, Eq)
 data USD = USD deriving (Show, Eq)
@@ -412,12 +411,17 @@ template CoinRules
           round = miningRound.round
           quantity = params.coinsToIssueToSvc
 
+        -- record unclaimed reward contract
+        create UnclaimedReward with
+          svc
+          quantity = params.unclaimedValidatorRewards + params.unclaimedAppRewards
+
+        -- create issuing round
         now <- getTime
         let tickDuration = config.tickDuration
         let opensAt = addRelTime now tickDuration
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
-        -- create issuing round
         create IssuingMiningRound with
           svc
           observers
@@ -428,12 +432,11 @@ template CoinRules
           issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
 
-        -- TODO(M3-06): create unclaimed rewards contract
 
     nonconsuming choice CoinRules_MiningRound_Close
       : ContractId ClosedMiningRound
       with
-        miningRoundCid : ContractId IssuingMiningRound
+        issuingRoundCid : ContractId IssuingMiningRound
         totalTransferFees : Decimal
         totalAdminFees : Decimal
         totalHoldingFees : Decimal
@@ -444,10 +447,10 @@ template CoinRules
       do
         -- archive issuing mining round
         now <- getTime
-        miningRound <- fetch miningRoundCid
-        archive miningRoundCid
-        require "SVC matches" (miningRound.svc == svc)
-        require "Mining round is past targetClosesAt" (miningRound.targetClosesAt <= now)
+        issuingRound <- fetch issuingRoundCid
+        archive issuingRoundCid
+        require "SVC matches" (issuingRound.svc == svc)
+        require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
         require "Non-negative transfer fees" (totalTransferFees >= 0.0)
         require "Non-negative admin fees" (totalAdminFees >= 0.0)
         require "Non-negative holding fees" (totalHoldingFees >= 0.0)
@@ -460,28 +463,88 @@ template CoinRules
         create ClosedMiningRound with
           svc
           observers
+          issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
           totalTransferFees
           totalAdminFees
           totalHoldingFees
           totalTransferInputs
           totalNonSelfTransferOutputs
           totalSelfTransferOutputs
-          round = miningRound.round
+          round = issuingRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
       : ()
       with
-        miningRoundCid : ContractId ClosedMiningRound
+        closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
         -- archive closed mining round
-        miningRound <- fetch miningRoundCid
-        archive miningRoundCid
+        miningRound <- fetch closedRoundCid
+        archive closedRoundCid
         require "SVC matches" (miningRound.svc == svc)
+
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    nonconsuming choice CoinRules_ClaimExpiredRewards
+      : Optional (ContractId UnclaimedReward)
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+        validatorCouponCids : [ContractId ValidatorRewardCoupon]
+        appCouponCids : [ContractId AppRewardCoupon]
+      controller svc
+      do
+        -- retrieve round
+        closedRound <- fetch closedRoundCid
+        require "SVC matches" (closedRound.svc == svc)
+
+        -- expire validator rewards and compute their unclaimed rewards
+        expiredValidatorRewards <- forA validatorCouponCids $ \validatorCouponCid -> do
+          exercise validatorCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+
+        let validatorRewards = sum expiredValidatorRewards
+
+        -- expire app rewards and compute their unclaimed rewards
+        expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
+          exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+
+        let featuredAppRewards = sum [ quantity | (featured, quantity) <- expiredAppRewards, featured ]
+        let unfeaturedAppRewards = sum [ quantity | (featured, quantity) <- expiredAppRewards, not featured ]
+
+        -- create unclaimed reward for the total
+        let quantity =
+              validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
+              featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
+              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
+        if (quantity <= 0.0)
+          then pure None
+          else Some <$> create UnclaimedReward with svc; quantity
+
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice CoinRules_MergeUnclaimedRewards
+      : ContractId UnclaimedReward
+      with
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller svc
+      do
+        require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
+
+        -- fetch and archive all given rewards
+        archivedQuantities <- forA unclaimedRewardCids $ \unclaimedRewardCid -> do
+          unclaimedReward <- fetch unclaimedRewardCid
+          archive unclaimedRewardCid
+          require "SVC matches" (unclaimedReward.svc == svc)
+          pure unclaimedReward.quantity
+
+        -- create a new unclaimed reward over the total
+        create UnclaimedReward with
+          svc
+          quantity = sum archivedQuantities
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
-    nonconsuming choice CoinRules_Fetch : (ContractId CoinRules, CoinRules)
+    nonconsuming choice CoinRules_Fetch
+      : (ContractId CoinRules, CoinRules)
       with
         p : Party
       controller p

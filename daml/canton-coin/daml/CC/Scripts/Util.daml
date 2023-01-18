@@ -158,23 +158,23 @@ runNextIssuanceInternal app coinPrice = do
     setTime (addRelTime now defaultCoinConfig.tickDuration)
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
-    forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
+    forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
       -- app rewards
       rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid AppRewardCoupon_SvcExpire with miningRoundCid
+        submit app.svc $ exerciseCmd rcid AppRewardCoupon_SvcExpire with closedRoundCid
       -- validator rewards
       rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid ValidatorRewardCoupon_SvcExpire with miningRoundCid
+        submit app.svc $ exerciseCmd rcid ValidatorRewardCoupon_SvcExpire with closedRoundCid
       -- the closed round
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Archive with
-        miningRoundCid
+        closedRoundCid
 
 
     -- close issuing rounds that are ready for close
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
-    forA_ imcs $ \(miningRoundCid, miningRound) ->
+    forA_ imcs $ \(issuingRoundCid, issuingRound) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
         totalTransferFees = 0.0
         totalAdminFees = 0.0
@@ -185,7 +185,7 @@ runNextIssuanceInternal app coinPrice = do
         -- Putting actual values here would require duplicating the logic from
         -- the svc app here, and is not currently required for any of the existing
         -- tests.
-        miningRoundCid
+        issuingRoundCid
 
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
@@ -334,7 +334,6 @@ lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, lockHolder] readAs
     API.CoinRules_Transfer with
-      -- TODO(M3-06): add test for featured app provider
       transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
 
 -- | Deposit all coins together with new issuances into a single coin.

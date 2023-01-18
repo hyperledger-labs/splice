@@ -176,14 +176,14 @@ testE2 = script do
 -- Example 3: all zeros
 -----------------------
 
-summaryExample3 : OpenMiningRoundSummary
-summaryExample3 = OpenMiningRoundSummary with
+summaryExamplNoActivity : OpenMiningRoundSummary
+summaryExamplNoActivity = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
 
-expectedParameters_E3_0_0p5 : IssuingRoundParameters
-expectedParameters_E3_0_0p5 = IssuingRoundParameters with
+expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
+expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
   issuancePerValidatorRewardCoupon = 0.2000000000
   issuancePerFeaturedAppRewardCoupon = 100.0000000000
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
@@ -191,11 +191,11 @@ expectedParameters_E3_0_0p5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 9512.9375951294
   unclaimedAppRewards = 28538.8127853881
 
-testE3 : Script ()
-testE3 = script do
-  validateOpenMiningRoundSummary summaryExample3
+testNoActivity : Script ()
+testNoActivity = script do
+  validateOpenMiningRoundSummary summaryExamplNoActivity
 
-  expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExample3
+  expectedParameters_NoActivity_0_0p5 === computeIssuingRoundParameters tickDuration issuanceConfig_0_0p5 summaryExamplNoActivity
 
 
 -- Example 4: low activity

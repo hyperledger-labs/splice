@@ -306,28 +306,15 @@ template SvcRules with
         require "SVC matches" (reward.svc == svc)
         require "SV matches" (reward.sv == sv)
         openRound <- fetch openRoundCid
-        -- TODO(M2-01): make collection delay configurable
+        -- TODO(M3-46): make collection delay configurable
         require "Reward is not too old" (openRound.round.number <= reward.round.number + 10)
         exercise coinRulesCid CoinRules_Mint with
           receiver = sv
           quantity = reward.quantity
           openRound = openRoundCid
 
-    -- TODO(M2-01): expire rewards that are too old
+    -- TODO(#2334): add SvcRules choices to expire rewards that are too old
 
-    nonconsuming choice SvcRules_AppRewardCoupon_SvcExpire : ()
-      with
-        cid : ContractId AppRewardCoupon
-        choiceArg : AppRewardCoupon_SvcExpire
-      controller leader
-      do exercise cid choiceArg
-
-    nonconsuming choice SvcRules_ValidatorRewardCoupon_SvcExpire : ()
-      with
-        cid : ContractId ValidatorRewardCoupon
-        choiceArg : ValidatorRewardCoupon_SvcExpire
-      controller leader
-      do exercise cid choiceArg
 
 
 -- Utility functions
@@ -391,7 +378,7 @@ determineWinner requiredNumVotes remainingVotingRounds st
   where
     candidates = sortOn snd
       [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList st.rankings ]
-    (winner, numWinnerVotes) = head $ reverse candidates
+    (winner, numWinnerVotes) = last candidates
 
 
 distributeVotes : forall a. Ord a => a -> VotingState a -> VotingState a
