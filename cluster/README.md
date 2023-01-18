@@ -281,6 +281,11 @@ Available operations include:
   running CN cluster in GCE. (Accepts an optional argument that allows
   a specific set of images to be deployed by tag. Defaults to the current
   working directory's tag. Manifest is always deployed from working copy.)
+  Note that this also checks for the existence of the correct docker images
+  in the registry, which is safer but might take a few minutes.
+  To skip this check, set env var `CNCLUSTER_SKIP_DOCKER_CHECK` to 1
+  (you can add `export CNCLUSTER_SKIP_DOCKER_CHECK=1` to `.envrc.private` to make
+  this configuration persistent).
 * `cncluster check` - Run a series of simple validity checks against the
   external API exposed by a cluster.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,

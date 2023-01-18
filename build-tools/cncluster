@@ -108,10 +108,12 @@ function cluster_apply() {
     IMAGE_TAG=${SOURCE_IMAGE_TAG}
 
     if [ -z "${1-}" ]; then
-       if ! make -C ${REPO_ROOT}/cluster docker-check; then
-           _error "Images missing from artifact registry, cannot apply."
-           exit 1
-       fi
+       if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
+         if ! make -C ${REPO_ROOT}/cluster docker-check; then
+             _error "Images missing from artifact registry, cannot apply."
+             exit 1
+         fi
+      fi
     else
         IMAGE_TAG=$1
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
