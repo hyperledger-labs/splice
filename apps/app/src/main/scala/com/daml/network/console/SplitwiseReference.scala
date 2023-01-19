@@ -233,11 +233,11 @@ final class SplitwiseAppClientReference(
   // Member operations
 
   @Help.Summary(
-    "Enter a payment to the group on your behalf. Payment quantity is split equally between current group members."
+    "Enter a payment to the group on your behalf. Payment amount is split equally between current group members."
   )
   def enterPayment(
       key: GrpcSplitwiseAppClient.GroupKey,
-      quantity: BigDecimal,
+      amount: BigDecimal,
       description: String,
   ): splitwiseCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
@@ -246,7 +246,7 @@ final class SplitwiseAppClientReference(
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_EnterPayment(
         getGroup(key.toPrim),
-        quantity.bigDecimal,
+        amount.bigDecimal,
         description,
       ),
     ).exerciseResult
@@ -255,7 +255,7 @@ final class SplitwiseAppClientReference(
   @Help.Summary("Initiate a transfer. Must be confirmed in the wallet.")
   def initiateTransfer(
       key: GrpcSplitwiseAppClient.GroupKey,
-      receiverQuantities: Seq[walletCodegen.ReceiverCCQuantity],
+      receiverAmounts: Seq[walletCodegen.ReceiverCCAmount],
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
@@ -263,7 +263,7 @@ final class SplitwiseAppClientReference(
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_InitiateTransfer(
         getGroup(key.toPrim),
-        receiverQuantities.asJava,
+        receiverAmounts.asJava,
       ),
     ).exerciseResult
   }

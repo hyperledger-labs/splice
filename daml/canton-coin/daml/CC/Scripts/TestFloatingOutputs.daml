@@ -30,6 +30,6 @@ testFloatingOutputs = do
 
     bobCoins <- query @Coin bob.primaryParty
     charlieCoins <- query @Coin charlie.primaryParty
-    sort (map (\(_, c) -> c.quantity.initialQuantity) bobCoins) === [1.0, 49.4505]
-    sort (map (\(_, c) -> c.quantity.initialQuantity) charlieCoins) === [1.0, 49.4505]
+    sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, 49.4505]
+    sort (map (\(_, c) -> c.amount.initialAmount) charlieCoins) === [1.0, 49.4505]
     return ()

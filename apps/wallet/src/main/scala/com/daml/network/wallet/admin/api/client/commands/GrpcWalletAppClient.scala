@@ -42,14 +42,14 @@ object GrpcWalletAppClient {
       contract: Contract[coinCodegen.Coin.ContractId, coinCodegen.Coin],
       round: Long,
       accruedHoldingFee: BigDecimal,
-      effectiveQuantity: BigDecimal,
+      effectiveAmount: BigDecimal,
   )
 
   final case class LockedCoinPosition(
       contract: Contract[coinCodegen.LockedCoin.ContractId, coinCodegen.LockedCoin],
       round: Long,
       accruedHoldingFee: BigDecimal,
-      effectiveQuantity: BigDecimal,
+      effectiveAmount: BigDecimal,
   )
 
   final case class ListResponse(
@@ -84,13 +84,13 @@ object GrpcWalletAppClient {
             .leftMap(_.toString)
 
           accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(position.accruedHoldingFee)
-          effectiveQuantity <- Proto.decode(Proto.BigDecimal)(position.effectiveQuantity)
+          effectiveAmount <- Proto.decode(Proto.BigDecimal)(position.effectiveAmount)
         } yield {
           new CoinPosition(
             contract,
             position.round,
             accruedHoldingFee,
-            effectiveQuantity,
+            effectiveAmount,
           )
         }
 
@@ -102,13 +102,13 @@ object GrpcWalletAppClient {
             .leftMap(_.toString)
 
           accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(lockedPosition.accruedHoldingFee)
-          effectiveQuantity <- Proto.decode(Proto.BigDecimal)(lockedPosition.effectiveQuantity)
+          effectiveAmount <- Proto.decode(Proto.BigDecimal)(lockedPosition.effectiveAmount)
         } yield {
           new LockedCoinPosition(
             contract,
             lockedPosition.round,
             accruedHoldingFee,
-            effectiveQuantity,
+            effectiveAmount,
           )
         }
 
@@ -121,12 +121,12 @@ object GrpcWalletAppClient {
     }
   }
 
-  case class Tap(quantity: BigDecimal)
+  case class Tap(amount: BigDecimal)
       extends BaseCommand[v0.TapRequest, v0.TapResponse, coinCodegen.Coin.ContractId] {
 
     override def createRequest(): Either[String, v0.TapRequest] = {
       Right(
-        v0.TapRequest(quantity = Proto.encode(quantity))
+        v0.TapRequest(amount = Proto.encode(amount))
       )
     }
 
@@ -507,7 +507,7 @@ object GrpcWalletAppClient {
 
   case class CreateTransferOffer(
       receiver: PartyId,
-      quantity: BigDecimal,
+      amount: BigDecimal,
       description: String,
       expiresAt: CantonTimestamp,
       senderFeeTransferRatio: BigDecimal,
@@ -526,7 +526,7 @@ object GrpcWalletAppClient {
       Right(
         v0.CreateTransferOfferRequest(
           Proto.encode(receiver),
-          Proto.encode(quantity),
+          Proto.encode(amount),
           description,
           Proto.encode(expiresAt),
           Proto.encode(senderFeeTransferRatio),

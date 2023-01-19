@@ -270,7 +270,7 @@ object UserWalletStore {
               new walletCodegen.DeliveryOfferView(
                 offer.group.svc,
                 offer.sender,
-                s"Transfer from '${offer.sender}' to [${offer.receiverQuantities.asScala
+                s"Transfer from '${offer.sender}' to [${offer.receiverAmounts.asScala
                     .map(r => s"'${r.receiver}'")
                     .mkString(", ")}]",
               )

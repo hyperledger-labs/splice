@@ -70,18 +70,18 @@ test = script do
   -- we wait for 2 more rounds to ensure that a coin can be expired as soon as
   -- it can definitely not be used as an input to transfer anymore.
   -- This coin can still be used until round 7 (5 + 2) which is created at T00:15:00 and opens at T00:17:30
-  let quantityExpiresAtRound5 = ExpiringQuantity with initialQuantity = config.holdingFee.rate * 3.5; createdAt = API.Round 1; ratePerRound = config.holdingFee
-  quantityExpiresAt quantityExpiresAtRound5 === API.Round 5
-  estimateOpenRoundCreatedAt config openRound3 (addRelRound (quantityExpiresAt quantityExpiresAtRound5) (RelRound 2)) === t15_00
+  let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.holdingFee.rate * 3.5; createdAt = API.Round 1; ratePerRound = config.holdingFee
+  amountExpiresAt amountExpiresAtRound5 === API.Round 5
+  estimateOpenRoundCreatedAt config openRound3 (addRelRound (amountExpiresAt amountExpiresAtRound5) (RelRound 2)) === t15_00
 
   -- lock expires at T00:12:30 before coin expires at T00:15:00
-  assert $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt12_30 quantityExpiresAtRound5 config
+  assert $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config
 
   -- lock expires at T00:15:00 while coin expires at T00:15:00
-  assert $ not $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt15_00 quantityExpiresAtRound5 config
+  assert $ not $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config
 
   -- lock expires at T00:17:30 after coin expires at T00:15:00
-  assert $ not $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt17_30 quantityExpiresAtRound5 config
+  assert $ not $ lockExpiresBeforeCoin currentTime openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config
 
 assertError : (CanAbort m, ActionCatch m)  => (() -> a ) -> m ()
 assertError f = do
@@ -99,7 +99,7 @@ testExpireLockedCoin = do
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
   passTime (minutes 6)
-  -- Lock the coin with initialQuantity 0.000005 and created at round 2
+  -- Lock the coin with initialAmount 0.000005 and created at round 2
   -- As the holding fee is 0.000005 so the coin will be expired at round 3
   cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (minutes 1)
 
@@ -137,17 +137,17 @@ testExpireCoin = do
   app <- setupApp
   alice <- setupUser app "alice" app.svc
 
-  -- alice own a coin with initial quantity of 1.0
+  -- alice own a coin with initial amount of 1.0
   [(_, onlyCoin)] <- query @Coin alice.primaryParty
-  onlyCoin.quantity.initialQuantity === 1.0
+  onlyCoin.amount.initialAmount === 1.0
 
   cid <- tap app alice 0.0000050001
-  -- Lock the coin with initialQuantity 0.0000050001 and created at round 1
+  -- Lock the coin with initialAmount 0.0000050001 and created at round 1
   -- As the holding fee is 0.000005 so the coin will be expired at round 3
   Some(coin) <- queryContractId @Coin alice.primaryParty cid
 
-  coin.quantity.initialQuantity === 0.0000050001
-  coin.quantity.createdAt === API.Round 1
+  coin.amount.initialAmount === 0.0000050001
+  coin.amount.createdAt === API.Round 1
 
   -- current latest active round is 3
   latestActiveRoundCid <- advanceRound app (API.Round 3)
@@ -178,9 +178,9 @@ testExpireCoin = do
   forA_ allActiveOpenMiningRoundCids $ \(_, openRound) -> do
     assert $ openRound.round.number >= 3 && openRound.round.number <= 5
 
-  -- alice now only owns a coin with initial quantity of 1.0
+  -- alice now only owns a coin with initial amount of 1.0
   [(_, onlyCoin)] <- query @Coin alice.primaryParty
-  onlyCoin.quantity.initialQuantity === 1.0
+  onlyCoin.amount.initialAmount === 1.0
   pure ()
 
 advanceRound : CCApp -> API.Round -> Script (ContractId OpenMiningRound)

@@ -27,32 +27,32 @@ class WalletCoinPriceFrontendIntegrationTest
       createPaymentRequest(
         aliceUserParty,
         Seq(
-          receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.CC),
-          receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.USD),
+          receiverAmount(aliceUserParty, 22, paymentCodegen.Currency.CC),
+          receiverAmount(aliceUserParty, 20, paymentCodegen.Currency.USD),
         ),
       )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
 
-        // Verify that the total quantity of USD is properly displayed
+        // Verify that the total amount of USD is properly displayed
         eventually() {
           inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-            // Verify that the currency and quantity are properly displayed
-            row.childElement(className("app-request-total-quantity")).text should matchText(
+            // Verify that the currency and amount are properly displayed
+            row.childElement(className("app-request-total-amount")).text should matchText(
               "32.00000000CC"
             )
           }
         }
 
-        // Verify that the receiver table rows contain both receiver quantities
+        // Verify that the receiver table rows contain both receiver amounts
         eventually() {
-          val quantities =
-            findAll(className("receiver-quantity-row")).toList.map(row =>
-              row.childElement(className("app-request-payment-quantity")).text
+          val amounts =
+            findAll(className("receiver-amount-row")).toList.map(row =>
+              row.childElement(className("app-request-payment-amount")).text
             )
 
-          quantities should contain theSameElementsAs Seq(
+          amounts should contain theSameElementsAs Seq(
             "22.0000000000CC",
             "20.0000000000USD",
           )

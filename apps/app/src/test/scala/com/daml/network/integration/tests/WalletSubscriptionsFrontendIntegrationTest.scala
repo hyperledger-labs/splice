@@ -132,16 +132,16 @@ class WalletSubscriptionsFrontendIntegrationTest
     "display currency in subscriptions and subscription requests" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val usdQuantity = new paymentCodegen.PaymentQuantity(
+      val usdAmount = new paymentCodegen.PaymentAmount(
         BigDecimal(42.0).bigDecimal,
         paymentCodegen.Currency.USD,
       )
       val dueAt = Instant.now().plus(1, ChronoUnit.DAYS)
-      createSelfSubscription(aliceUserParty, nextPaymentDueAt = dueAt, quantity = usdQuantity)
+      createSelfSubscription(aliceUserParty, nextPaymentDueAt = dueAt, amount = usdAmount)
       createSelfSubscriptionRequest(
         aliceUserParty,
         nextPaymentDueAt = dueAt,
-        quantity = usdQuantity,
+        amount = usdAmount,
       )
       createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
       withFrontEnd("alice") { implicit webDriver =>
@@ -149,7 +149,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         clue("Check that the subscription request displays the currency") {
           eventually() {
             inside(findAll(className("sub-requests-table-row")).toList) { case Seq(row) =>
-              row.childElement(className("sub-request-quantity")).text should matchText(
+              row.childElement(className("sub-request-amount")).text should matchText(
                 "42.0000000000USD"
               )
             }
@@ -158,7 +158,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         clue("Check that the subscription displays the currency") {
           eventually() {
             inside(findAll(className("subs-table-row")).toList) { case Seq(row) =>
-              row.childElement(className("sub-quantity")).text should matchText("42.0000000000USD")
+              row.childElement(className("sub-amount")).text should matchText("42.0000000000USD")
             }
           }
         }

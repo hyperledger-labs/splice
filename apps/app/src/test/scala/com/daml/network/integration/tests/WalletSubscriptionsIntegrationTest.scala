@@ -173,7 +173,7 @@ class WalletSubscriptionsIntegrationTest
           contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
         )
         val payData = new subsCodegen.SubscriptionPayData(
-          new walletCodegen.PaymentQuantity(
+          new walletCodegen.PaymentAmount(
             BigDecimal(10).bigDecimal.setScale(10),
             walletCodegen.Currency.CC,
           ),

@@ -10,7 +10,7 @@ template TransferOffer
     sender : Party
     receiver : Party
     svc : Party
-    quantity : PaymentQuantity
+    amount : PaymentAmount
     description : Text
     expiresAt : Time
     senderTransferFeeRatio : Decimal
@@ -47,7 +47,7 @@ template AcceptedTransferOffer
     receiver : Party
     svc : Party
     description : Text
-    quantity : PaymentQuantity
+    amount : PaymentAmount
     expiresAt : Time
     senderTransferFeeRatio : Decimal
       -- ^ TODO(#875) Consider if we want to remove that configuration
@@ -63,7 +63,7 @@ template AcceptedTransferOffer
       do
         now <- getTime
         require "Offer has not expired" (now < expiresAt)
-        ccQuantity <- paymentQuantityToCC svc sender transferContext.context.openMiningRound quantity
+        ccAmount <- paymentAmountToCC svc sender transferContext.context.openMiningRound amount
         let
           transfer = API.Transfer with
             sender
@@ -73,10 +73,10 @@ template AcceptedTransferOffer
               [ API.OutputReceiverCoin with
                   receiver
                   coinType = API.FixedReceiverCoin
-                    ccQuantity
+                    ccAmount
                     senderTransferFeeRatio
               , API.OutputSenderCoin with
-                  exactQuantity = None
+                  exactAmount = None
                   lock = None
               ]
             payload = description

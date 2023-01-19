@@ -88,7 +88,7 @@ class PreflightIntegrationTest
     }
   }
 
-  private def createTransferOffer(receiverPartyId: String, quantity: String, description: String)(
+  private def createTransferOffer(receiverPartyId: String, amount: String, description: String)(
       implicit webDriver: WebDriverType
   ): Unit = {
     clue(s"Creating transfer offer for: $receiverPartyId") {
@@ -98,8 +98,8 @@ class PreflightIntegrationTest
 
       setDirectoryField(textField("create-offer-receiver"), receiverPartyId, receiverPartyId)
 
-      click on "create-offer-quantity"
-      numberField("create-offer-quantity").underlying.sendKeys(quantity)
+      click on "create-offer-amount"
+      numberField("create-offer-amount").underlying.sendKeys(amount)
 
       click on "create-offer-description"
       textField("create-offer-description").value = description

@@ -62,7 +62,7 @@ class AcceptedTransferOfferTrigger(
         case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
           failedOperation.invalidTransferReasonValue match {
             case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-              val missingStr = s"(missing ${fundsError.missingQuantity} CC)"
+              val missingStr = s"(missing ${fundsError.missingAmount} CC)"
               val msg = s"Insufficient funds for the transfer $missingStr, aborting transfer offer"
               logger.info(msg)
               abortAcceptedTransferOffer(acceptedOffer, s"out of funds $missingStr")

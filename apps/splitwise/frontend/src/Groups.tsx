@@ -39,7 +39,7 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { ReceiverCCQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
@@ -98,13 +98,13 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   useInterval(fetchBalances, 500);
 
   const initiateSettleDebts = async () => {
-    const quantities: ReceiverCCQuantity[] = Array.from(balances)
+    const amounts: ReceiverCCAmount[] = Array.from(balances)
       .filter(([_, v]) => new Decimal(v).isNegative())
       .map(([k, v]) => {
-        return { receiver: k, ccQuantity: Decimal.abs(new Decimal(v)).toString() };
+        return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
       });
 
-    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, quantities);
+    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, amounts);
   };
 
   return (
@@ -124,7 +124,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
                 <TableCell className="balances-table-receiver">
                   <DirectoryEntryComponent partyId={party} />
                 </TableCell>
-                <TableCell className="balances-table-quantity">{balance}</TableCell>
+                <TableCell className="balances-table-amount">{balance}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -203,22 +203,22 @@ interface EntryProps {
 
 const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
-  const [paymentQuantity, setPaymentQuantity] = useState<string>('');
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
   const onEnterPayment = async () => {
     await ledgerApiClient.enterPayment(
       party,
       provider,
       group.contractId,
-      paymentQuantity,
+      paymentAmount,
       paymentDescription
     );
   };
-  const [transferQuantity, setTransferQuantity] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const initiateTransfer = async () => {
     return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
-      { receiver: transferReceiverEntry!.user, ccQuantity: transferQuantity },
+      { receiver: transferReceiverEntry!.user, ccAmount: transferAmount },
     ]);
   };
   return (
@@ -230,10 +230,10 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
       <Stack>
         <Stack direction="row">
           <TextField
-            label="Quantity"
-            className="enter-payment-quantity-field"
-            value={paymentQuantity}
-            onChange={event => setPaymentQuantity(event.target.value)}
+            label="Amount"
+            className="enter-payment-amount-field"
+            value={paymentAmount}
+            onChange={event => setPaymentAmount(event.target.value)}
           ></TextField>
           <TextField
             label="Description"
@@ -247,10 +247,10 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
         </Stack>
         <Stack direction="row" justifyContent="stretch">
           <TextField
-            label="Quantity"
-            className="transfer-quantity-field"
-            value={transferQuantity}
-            onChange={event => setTransferQuantity(event.target.value)}
+            label="Amount"
+            className="transfer-amount-field"
+            value={transferAmount}
+            onChange={event => setTransferAmount(event.target.value)}
           ></TextField>
           <Autocomplete<DirectoryEntry, false, false, true>
             sx={{ width: '38%' }}
@@ -307,7 +307,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent partyId={value.payer} /> paid {value.quantity} {'CC for '}
+          <DirectoryEntryComponent partyId={value.payer} /> paid {value.amount} {'CC for '}
           {value.description}
         </ListItem>
       );
@@ -315,7 +315,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent partyId={value.sender} /> sent {value.quantity} {'CC to '}
+          <DirectoryEntryComponent partyId={value.sender} /> sent {value.amount} {'CC to '}
           <DirectoryEntryComponent partyId={value.receiver} />
         </ListItem>
       );

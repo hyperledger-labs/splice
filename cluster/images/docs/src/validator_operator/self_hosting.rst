@@ -101,7 +101,7 @@ You can list your balances with the following command: ::
       payload = Coin(
         svc = ...,
         owner = ...,
-        quantity = ExpiringQuantity(initialQuantity = 100.00, ...)
+        amount = ExpiringAmount(initialAmount = 100.00, ...)
       )
     )
   )
@@ -153,7 +153,7 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 90 co
       payload = Coin(
         svc = ...,
         owner = ...,
-        quantity = ExpiringQuantity(initialQuantity = 89.8000000000, ...)
+        amount = ExpiringAmount(initialAmount = 89.8000000000, ...)
       )
     )
   )
@@ -165,7 +165,7 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 90 co
       payload = Coin(
         svc = ...,
         owner = ...,
-        quantity = ExpiringQuantity(initialQuantity = 10.0000000000, ...)
+        amount = ExpiringAmount(initialAmount = 10.0000000000, ...)
       )
     )
   )

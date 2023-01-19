@@ -51,14 +51,14 @@ class WalletAppClientReference(
     }
   }
 
-  @Help.Summary("Credits the requested quantity of Canton coin to the wallet's user")
+  @Help.Summary("Credits the requested amount of Canton coin to the wallet's user")
   @Help.Description(
     "This function will only be available in the devnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(quantity: BigDecimal): coinCodegen.Coin.ContractId = {
+  def tap(amount: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.Tap(quantity), callCredentials)
+      adminCommand(GrpcWalletAppClient.Tap(amount), callCredentials)
     }
   }
 
@@ -213,7 +213,7 @@ class WalletAppClientReference(
   @Help.Description("Creates a transfer offer, to be accepted by the receiver")
   def createTransferOffer(
       receiver: PartyId,
-      quantity: BigDecimal,
+      amount: BigDecimal,
       description: String,
       expiresAt: CantonTimestamp,
       idempotencyKey: String,
@@ -224,7 +224,7 @@ class WalletAppClientReference(
         GrpcWalletAppClient
           .CreateTransferOffer(
             receiver,
-            quantity,
+            amount,
             description,
             expiresAt,
             senderFeeTransferRatio,

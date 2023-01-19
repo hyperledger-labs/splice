@@ -6,7 +6,7 @@ import {
   GroupInvite,
   SplitwiseInstall,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { ReceiverCCQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 class SplitwiseLedgerApiClient extends LedgerApiClient {
@@ -82,7 +82,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     group: ContractId<Group>,
-    quantity: string,
+    amount: string,
     description: string
   ) {
     const install = await this.getSplitwiseInstall(user, provider);
@@ -93,7 +93,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       install.contractId,
       {
         group: group,
-        quantity: quantity,
+        amount: amount,
         description: description,
       }
     );
@@ -103,7 +103,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     sender: string,
     provider: string,
     group: ContractId<Group>,
-    receiverQuantities: ReceiverCCQuantity[]
+    receiverAmounts: ReceiverCCAmount[]
   ) {
     const install = await this.getSplitwiseInstall(sender, provider);
     return await this.exercise(
@@ -113,7 +113,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       install.contractId,
       {
         group: group,
-        receiverQuantities: receiverQuantities,
+        receiverAmounts: receiverAmounts,
       }
     );
   }

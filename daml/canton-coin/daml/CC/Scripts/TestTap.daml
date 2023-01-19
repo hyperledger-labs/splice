@@ -15,16 +15,16 @@ testTap = do
     pat <- setupUser app "pat" validator
     cid <- tap app pat 100.0
     Some coin <- queryContractId @Coin pat.primaryParty cid
-    coin.quantity.initialQuantity === 100.0
+    coin.amount.initialAmount === 100.0
     Some (_, coinRules) <- queryCoinRulesByKey app.svc
-    coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate
+    coin.amount.ratePerRound.rate === coinRules.config.holdingFee.rate
 
     let newPrice = 3.7 : Decimal
     advanceToIssuanceWithPrice app newPrice
     runCoinDepositBots app
     cid <- tap app pat 100.0
     Some coin <- queryContractId @Coin pat.primaryParty cid
-    coin.quantity.initialQuantity === 100.0
+    coin.amount.initialAmount === 100.0
     Some (_, coinRules) <- queryCoinRulesByKey app.svc
-    coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate / newPrice
+    coin.amount.ratePerRound.rate === coinRules.config.holdingFee.rate / newPrice
     return ()

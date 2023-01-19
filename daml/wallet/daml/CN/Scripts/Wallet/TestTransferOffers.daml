@@ -38,10 +38,10 @@ testTransferOffers = script do
     svcParty = app.svc
     validatorParty = validator
 
-  let createOffer quantity description curTime = submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall 
+  let createOffer amount description curTime = submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall
         WalletAppInstall_CreateTransferOffer with
           receiver = bob.primaryParty
-          quantity = PaymentQuantity quantity CC
+          amount = PaymentAmount amount CC
           description = description
           expiresAt = curTime `addRelTime` minutes 5
           senderTransferFeeRatio = 1.0
@@ -54,7 +54,7 @@ testTransferOffers = script do
   offer <- createOffer 2.0 " transfer test" t
   accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
+  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 2.5)
   transferContext <- getPaymentTransferContext app alice
   outcomes <- completeTransfer accepted coin transferContext
 
@@ -66,7 +66,7 @@ testTransferOffers = script do
 
   offer <- createOffer 7.0 "To expire" t
   passTime (minutes 6)
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 7.5)
+  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 7.5)
   submitMultiMustFail [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
 
@@ -90,12 +90,12 @@ testTransferOffers = script do
   accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   transferContext <- getPaymentTransferContext app alice
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 1.0)
+  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
   outcomes <- completeTransfer accepted coin transferContext
   let [COO_Error errorMsg] = outcomes
   -- tap more coin and retry the transfer
   tap app alice 150.0
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 100.0)
+  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
   outcomes <- completeTransfer accepted coin transferContext
   let [COO_CompleteAcceptedTransfer result] = outcomes
 

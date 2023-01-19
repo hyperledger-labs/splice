@@ -135,7 +135,7 @@ template DirectoryInstall with
               context = toInterfaceContractId context
               ..
         let payData = SubscriptionPayData with
-              paymentQuantity = PaymentQuantity entryFee USD
+              paymentAmount = PaymentAmount entryFee USD
               paymentInterval = entryLifetime
               paymentDuration = renewalDuration
               collectionDuration

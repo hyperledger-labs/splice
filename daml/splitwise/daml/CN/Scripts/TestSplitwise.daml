@@ -82,7 +82,7 @@ queryBalances p k = do
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
-        let split = quantity / intToNumeric (length group.members + 1) -- TODO(#1451) Make sure nothing gets lost here.
+        let split = amount / intToNumeric (length group.members + 1) -- TODO(#1451) Make sure nothing gets lost here.
         in if payer == p.primaryParty
              then let g acc x
                         | x == payer = acc
@@ -90,20 +90,20 @@ queryBalances p k = do
                   in foldl g acc (group.owner :: group.members)
              else M.insertWith (+) payer (-split) acc
       Transfer {..}
-        | p.primaryParty == sender -> M.insertWith (+) receiver quantity acc
-        | p.primaryParty == receiver -> M.insertWith (+) sender (- quantity) acc
+        | p.primaryParty == sender -> M.insertWith (+) receiver amount acc
+        | p.primaryParty == receiver -> M.insertWith (+) sender (- amount) acc
         | otherwise -> acc
       Netting {..} -> case M.lookup p.primaryParty balanceChanges of
         None -> acc
         Some changes -> foldl (\acc (p', v) -> M.insertWith (+) p' v acc) acc (M.toList changes)
 
 enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
-enterPayment payer provider groupKey quantity description = do
+enterPayment payer provider groupKey amount description = do
   group <- getGroup payer groupKey
   void $ exerciseSplitwiseInstall payer provider SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverCCQuantity] -> Script (ContractId AppPaymentRequest)
-initiateTransfer sender provider groupKey receiverQuantities = do
+initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverCCAmount] -> Script (ContractId AppPaymentRequest)
+initiateTransfer sender provider groupKey receiverAmounts = do
   group <- getGroup sender groupKey
   exerciseSplitwiseInstall sender provider SplitwiseInstall_InitiateTransfer with ..
 
@@ -189,7 +189,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverCCQuantity bob.primaryParty 8.0]
+  request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice request coin
 
@@ -203,8 +203,8 @@ testCase app Parties{..} = do
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
   request <- initiateTransfer charlie (getProvider charlie) (getGroupKey group) [
-      ReceiverCCQuantity alice.primaryParty 39.0,
-      ReceiverCCQuantity bob.primaryParty 11.0
+      ReceiverCCAmount alice.primaryParty 39.0,
+      ReceiverCCAmount bob.primaryParty 11.0
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptPaymentRequest app charlie request coin

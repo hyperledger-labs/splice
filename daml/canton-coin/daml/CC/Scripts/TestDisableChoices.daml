@@ -117,7 +117,7 @@ testCoinRules = do
       API.CoinRules_ComputeFees with
         context = context
         sender = alice.primaryParty
-        receiverQuantities = []
+        receiverAmounts = []
 
 
   pure ()

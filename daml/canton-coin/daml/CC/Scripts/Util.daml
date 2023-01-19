@@ -201,9 +201,9 @@ runNextIssuanceInternal app coinPrice = do
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
-          totalValidatorRewardCoupons = sum [ c.quantity | (_, c) <- validatorRewardCoupons]
-          totalFeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, c.featured]
-          totalUnfeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
@@ -271,17 +271,17 @@ queryCoinRulesByKey svc = do
     rules -> abort $ "Expected 0 or 1 CoinRules contracts but got " <> show rules
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
--- the sender and transfer's the desired quantity off of them to the receiver.
--- The left-over quantity is kept.
+-- the sender and transfers the desired amount off of them to the receiver.
+-- The left-over amount is kept.
 pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
-pay app sender recipient coinQuantity msg = do
-  payWithTransferFeeRatio app sender recipient coinQuantity 1.0 msg
+pay app sender recipient coinAmount msg = do
+  payWithTransferFeeRatio app sender recipient coinAmount 1.0 msg
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
--- the sender and transfer's the desired quantity off of them to the receiver.
--- The left-over quantity is kept.
+-- the sender and transfers the desired amount off of them to the receiver.
+-- The left-over amount is kept.
 payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text -> Script ()
-payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg = do
+payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   coins <- unlockedCoins sender.primaryParty
@@ -292,12 +292,12 @@ payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg =
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         outputs =
           [ API.OutputSenderCoin with
-              exactQuantity = None
+              exactAmount = None
               lock = None
           , API.OutputReceiverCoin with
               receiver = recipient
               coinType = API.FixedReceiverCoin with
-                quantity = coinQuantity
+                amount = coinAmount
                 senderTransferFeeRatio = transferFeeRatio
           ]
   (openRound, _) <- getLatestOpenRound app
@@ -306,11 +306,11 @@ payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg =
     API.CoinRules_Transfer with
       transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
 
--- | Locks a coin of the given quantity to the given lock holder
+-- | Locks a coin of the given amount to the given lock holder
 -- for the given time starting at the current time
 -- It gathers all coints of the sender as input coins.
 lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
-lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
+lockTo1 app sender lockHolder coinAmount lockDuration msg = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
@@ -322,10 +322,10 @@ lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         outputs =
           [ API.OutputSenderCoin with
-              exactQuantity = None
+              exactAmount = None
               lock = None
           , API.OutputSenderCoin with
-              exactQuantity = Some coinQuantity
+              exactAmount = Some coinAmount
               lock = Some API.TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
@@ -373,7 +373,7 @@ runCoinDepositBots app = do
               map (API.InputCoin . toInterfaceContractId . fst) coins
           outputs =
             [ API.OutputSenderCoin with
-                exactQuantity = None
+                exactAmount = None
                 lock = None
             ]
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
@@ -449,11 +449,11 @@ getTransferContext app user = do
     featuredAppRight = None
 
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
-tap app user quantity = do
+tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
   submitExerciseCoinRulesByKey' app user CoinRules_Tap with
     receiver = user.primaryParty
-    quantity
+    amount
     openRound
 
 featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)

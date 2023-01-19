@@ -59,13 +59,13 @@ class SummarizingMiningRoundTrigger(
       ],
   ) {
     lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
-      validatorRewardCoupons.map[BigDecimal](c => BigDecimal(c.payload.quantity)).sum.bigDecimal,
+      validatorRewardCoupons.map[BigDecimal](c => BigDecimal(c.payload.amount)).sum.bigDecimal,
       appRewardCoupons
-        .collect[BigDecimal] { case c if c.payload.featured => BigDecimal(c.payload.quantity) }
+        .collect[BigDecimal] { case c if c.payload.featured => BigDecimal(c.payload.amount) }
         .sum
         .bigDecimal,
       appRewardCoupons
-        .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.quantity) }
+        .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.amount) }
         .sum
         .bigDecimal,
     )

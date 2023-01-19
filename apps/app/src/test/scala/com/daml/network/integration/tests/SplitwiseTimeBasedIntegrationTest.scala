@@ -99,7 +99,7 @@ class SplitwiseTimeBasedIntegrationTest
       bobSplitwise.initiateTransfer(
         key,
         Seq(
-          new walletCodegen.ReceiverCCQuantity(
+          new walletCodegen.ReceiverCCAmount(
             aliceUserParty.toProtoPrimitive,
             BigDecimal(1000.0).bigDecimal,
           )
@@ -190,7 +190,7 @@ class SplitwiseTimeBasedIntegrationTest
           bobSplitwise.initiateTransfer(
             key,
             Seq(
-              new walletCodegen.ReceiverCCQuantity(
+              new walletCodegen.ReceiverCCAmount(
                 aliceUserParty.toProtoPrimitive,
                 BigDecimal(1000.0).bigDecimal,
               )

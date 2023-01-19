@@ -24,48 +24,48 @@ interface DeliveryOffer
 
 data Currency = USD | CC deriving (Eq, Show, Ord)
 
-data PaymentQuantity = PaymentQuantity
+data PaymentAmount = PaymentAmount
   with
-    quantity : Decimal
+    amount : Decimal
     currency : Currency
   deriving (Eq, Show, Ord)
 
-data ReceiverQuantity = ReceiverQuantity
+data ReceiverAmount = ReceiverAmount
  with
    receiver : Party
-   quantity : PaymentQuantity
+   amount : PaymentAmount
  deriving (Show, Eq, Ord)
 
-data ReceiverCCQuantity = ReceiverCCQuantity
+data ReceiverCCAmount = ReceiverCCAmount
  with
    receiver : Party
-   ccQuantity : Decimal
+   ccAmount : Decimal
  deriving (Show, Eq, Ord)
 
-paymentQuantityToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentQuantity -> Update Decimal
-paymentQuantityToCC svc submitter openMiningRound pq =
+paymentAmountToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentAmount -> Update Decimal
+paymentAmountToCC svc submitter openMiningRound pq =
   case pq.currency of
     USD ->
       do
         round <- exercise @OpenMiningRound openMiningRound (OpenMiningRound_Fetch submitter)
         require "SVC matches" (round.svc == svc)
-        pure (pq.quantity / round.coinPrice)
+        pure (pq.amount / round.coinPrice)
     CC ->
-      pure pq.quantity
+      pure pq.amount
 
-receiverQuantityToCCReceiverQuantity : Party -> Party -> (ContractId OpenMiningRound) -> ReceiverQuantity -> Update ReceiverCCQuantity
-receiverQuantityToCCReceiverQuantity svc submitter openMiningRound rq =
+receiverAmountToCCReceiverAmount : Party -> Party -> (ContractId OpenMiningRound) -> ReceiverAmount -> Update ReceiverCCAmount
+receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
   do
-    cc <- paymentQuantityToCC svc submitter openMiningRound rq.quantity
-    pure ReceiverCCQuantity with
+    cc <- paymentAmountToCC svc submitter openMiningRound rq.amount
+    pure ReceiverCCAmount with
       receiver = rq.receiver
-      ccQuantity = cc
+      ccAmount = cc
 
 
 template AppPaymentRequest
   with
     sender : Party -- ^ The party that should pay.
-    receiverQuantities : [ReceiverQuantity] -- ^ Pairs of (party, quantity) requesting to be paid.
+    receiverAmounts : [ReceiverAmount] -- ^ Pairs of (party, amount) requesting to be paid.
     provider : Party -- ^ The app provider; receives usage rewards.
     svc : Party -- ^ The issuer of CC that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
@@ -73,10 +73,10 @@ template AppPaymentRequest
     deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
   where
     let
-      receivers = map (\r -> r.receiver) receiverQuantities
+      receivers = map (\r -> r.receiver) receiverAmounts
 
     signatory sender, receivers, provider
-    ensure (collectionDuration > aunit && all (\rq -> rq.quantity.quantity > 0.0) receiverQuantities)
+    ensure (collectionDuration > aunit && all (\rq -> rq.amount.amount > 0.0) receiverAmounts)
 
     choice AppPaymentRequest_Accept : (ContractId AcceptedAppPayment, ContractId Coin)
       with
@@ -87,15 +87,15 @@ template AppPaymentRequest
          -- check that the reference is active and implements DeliveryOffer
          void $ fetch deliveryOffer
 
-         -- Convert from USD to CC quantities
+         -- Convert from USD to CC amounts
 
-         ccReceiverQuantities <- forA receiverQuantities (\rq -> receiverQuantityToCCReceiverQuantity svc sender context.context.openMiningRound rq)
+         ccReceiverAmounts <- forA receiverAmounts (\rq -> receiverAmountToCCReceiverAmount svc sender context.context.openMiningRound rq)
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         ccQuantities <- forA ccReceiverQuantities (\ccq -> pure ccq.ccQuantity)
+         ccAmounts <- forA ccReceiverAmounts (\ccq -> pure ccq.ccAmount)
 
          -- TODO(#1492) Lock to specific round to avoid fees changing
-         fees <- exerciseComputeFees context sender ccQuantities
+         fees <- exerciseComputeFees context sender ccAmounts
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
@@ -104,12 +104,12 @@ template AppPaymentRequest
               inputs
               outputs =
                 [ OutputSenderCoin with
-                    exactQuantity = Some (fees + sum ccQuantities)
+                    exactAmount = Some (fees + sum ccAmounts)
                     lock = Some TimeLock with
-                      holders = dedupSort $ provider :: map (.receiver) receiverQuantities
+                      holders = dedupSort $ provider :: map (.receiver) receiverAmounts
                       expiresAt = now `addRelTime` collectionDuration
                 , OutputSenderCoin with
-                    exactQuantity = None
+                    exactAmount = None
                     lock = None
                 ]
               payload = "lock payment"
@@ -117,7 +117,7 @@ template AppPaymentRequest
          let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
          acceptedPayment <- create AcceptedAppPayment
            with
-             svc, provider, ccReceiverQuantities, sender, deliveryOffer, lockedCoin
+             svc, provider, ccReceiverAmounts, sender, deliveryOffer, lockedCoin
          return (acceptedPayment, senderChange)
 
     choice AppPaymentRequest_Withdraw : ()
@@ -146,13 +146,13 @@ unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, locked
 template AcceptedAppPayment
   with
     sender : Party
-    ccReceiverQuantities : [ReceiverCCQuantity]
+    ccReceiverAmounts : [ReceiverCCAmount]
     provider : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
     deliveryOffer : ContractId DeliveryOffer
   where
-    signatory sender, provider, map (\r -> r.receiver) ccReceiverQuantities
+    signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
 
     choice AcceptedAppPayment_Collect : (ContractId DeliveryOffer, [(Party, ContractId Coin)])
       with
@@ -166,24 +166,24 @@ template AcceptedAppPayment
               provider
               inputs = [InputCoin coin]
               outputs = fmap
-                (\receiverQuantity -> OutputReceiverCoin with
-                  receiver = receiverQuantity.receiver
+                (\receiverAmount -> OutputReceiverCoin with
+                  receiver = receiverAmount.receiver
                   coinType = FixedReceiverCoin with
-                    quantity = receiverQuantity.ccQuantity
+                    amount = receiverAmount.ccAmount
                     senderTransferFeeRatio = 1.0
-                ) ccReceiverQuantities
+                ) ccReceiverAmounts
               payload = "transfer locked payment"
         result <- exerciseAppTransfer context transfer
         let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
-        let receivers = map (\r -> r.receiver) ccReceiverQuantities
+        let receivers = map (\r -> r.receiver) ccReceiverAmounts
         pure (deliveryOffer, zip receivers coins)
 
     choice AcceptedAppPayment_Reject : ContractId Coin
       with
         context : AppTransferContext
-      controller map (\r -> r.receiver) ccReceiverQuantities
+      controller map (\r -> r.receiver) ccReceiverAmounts
       do archive deliveryOffer
          exercise lockedCoin (LockedCoin_Unlock context.coinRules)
 

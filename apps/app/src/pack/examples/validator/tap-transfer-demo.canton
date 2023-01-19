@@ -26,4 +26,4 @@ utils.retry_until_true(bobWallet.listTransferOffers().length == 1)
 bobWallet.acceptTransferOffer(transferOffer)
 
 utils.retry_until_true(bobWallet.list().coins.length == 1)
-bobWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) == 10))
+bobWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.amount.initialAmount) == 10))

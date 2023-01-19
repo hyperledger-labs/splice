@@ -36,7 +36,7 @@ testSubscription = script do
   provider <- setupUser app "la_famiglia" validator
 
   coin <- tap app alice 42.0
-  let payData = SubscriptionPayData (PaymentQuantity 12.0 CC) (days 28) (days 1) (minutes 5)
+  let payData = SubscriptionPayData (PaymentAmount 12.0 CC) (days 28) (days 1) (minutes 5)
 
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
@@ -96,7 +96,7 @@ testUSDSubscription = script do
         paymentInterval = days 28
         paymentDuration = days 1
         collectionDuration = minutes 5
-        paymentQuantity = PaymentQuantity 1.0 USD
+        paymentAmount = PaymentAmount 1.0 USD
 
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription with
@@ -117,14 +117,14 @@ testUSDSubscription = script do
 
   coins1 <- query @Coin pizzeria.primaryParty
 
-  map (\(_, c) -> c.quantity.initialQuantity) (coins1 `diffContracts` coins0) === [0.5]
+  map (\(_, c) -> c.amount.initialAmount) (coins1 `diffContracts` coins0) === [0.5]
 
   passTime (days 27)
   (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
   coins2 <- query @Coin pizzeria.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) (coins2 `diffContracts` coins1) === [0.5]
+  map (\(_, c) -> c.amount.initialAmount) (coins2 `diffContracts` coins1) === [0.5]
 
   advanceToIssuanceWithPrice app 0.5
 
@@ -133,7 +133,7 @@ testUSDSubscription = script do
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
 
   coins3 <- query @Coin pizzeria.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) (coins3 `diffContracts` coins2) === [2.0]
+  map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2) === [2.0]
 
   pure ()
 

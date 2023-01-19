@@ -33,7 +33,7 @@ defaultCoinConfig = CoinConfig with
     -- actions on the locked coin.
     lockHolderFee = FixedFee 0.01
 
-    -- Fee for transferring some quantity of coin to a new owner.
+    -- Fee for transferring some amount of coin to a new owner.
     --
     -- TODO(M3-90) Finetuning required
     transferFee = SteppedRate with

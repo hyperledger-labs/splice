@@ -24,8 +24,8 @@ class WalletFrontendIntegrationTest
           findAll(className("coins-table-row")) should have size 1
         }
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
-        val quantity = row.childElement(className("coins-table-quantity"))
-        quantity.text should be("15.0000000000CC")
+        val amount = row.childElement(className("coins-table-amount"))
+        amount.text should be("15.0000000000CC")
       }
     }
 

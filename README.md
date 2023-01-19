@@ -342,7 +342,8 @@ You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commit
 
 * Use `listXXX`, `acceptXXX`, `rejectXXX`, `withdrawXXX` for managing proposals, requests etc.
 * [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity)
-  between `quantity`, `amount` and `number`: **`quantity`**  is usually the right choice
+  between `amount`, `quantity` and `number`: To keep things simple across the repository, 
+  we consistently use only the term **`amount`**
 * Between `sender`/`receiver` and `payer`/`payee`: please use **`sender`/`receiver`**
 
 ### App Architecture - Initialization

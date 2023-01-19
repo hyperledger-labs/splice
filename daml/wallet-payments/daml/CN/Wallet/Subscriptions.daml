@@ -82,7 +82,7 @@ assertContextValid subscriptionData = do
 -- | Payment-related properties. Expected to be mutated rarely.
 data SubscriptionPayData = SubscriptionPayData
   with
-    paymentQuantity : PaymentQuantity -- ^ What quantity of coin is due on each interval.
+    paymentAmount : PaymentAmount -- ^ What amount of coin is due on each interval.
     paymentInterval : RelTime -- ^ At which intervals payments should be made.
     paymentDuration : RelTime -- ^ The time available to the sender to initiate a payment; they can initiate the payment this much before the end of the current interval.
     collectionDuration : RelTime -- ^ The time available to the receiver to collect a payment.
@@ -91,7 +91,7 @@ data SubscriptionPayData = SubscriptionPayData
 -- for ensure assertions
 payDataIsValid: SubscriptionPayData -> Bool
 payDataIsValid payData =
-  payData.paymentQuantity.quantity > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit && payData.collectionDuration > aunit
+  payData.paymentAmount.amount > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit && payData.collectionDuration > aunit
 
 
 -- | A request for establishing a subscription.
@@ -112,7 +112,7 @@ template SubscriptionRequest
         assertContextValid subscriptionData
 
         now <- getTime
-        (lockedCoin, senderChange, targetQuantity) <- lockAndMakeChange context subscriptionData payData inputs now
+        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now
 
         subscriptionPayment <- create SubscriptionInitialPayment with ..
 
@@ -134,7 +134,7 @@ template SubscriptionInitialPayment
   with
     subscriptionData : Subscription
     payData : SubscriptionPayData
-    targetQuantity : Decimal -- ^ Exact quantity in CC that the receiver will get.
+    targetAmount : Decimal -- ^ Exact amount in CC that the receiver will get.
     lockedCoin : ContractId LockedCoin
   where
     signatory signatory subscriptionData
@@ -153,7 +153,7 @@ template SubscriptionInitialPayment
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
-        coin <- unlockAndTransfer transferContext subscriptionData targetQuantity lockedCoin
+        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
 
         pure (subscription, state, coin)
 
@@ -202,7 +202,7 @@ template SubscriptionIdleState
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
-        (lockedCoin, senderChange, targetQuantity) <- lockAndMakeChange context subscriptionData payData inputs now
+        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now
 
         payment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
@@ -238,7 +238,7 @@ template SubscriptionPayment
     subscriptionData : Subscription -- ^ Copy of the base subscription properties; for convenience.
     payData : SubscriptionPayData -- ^ Payment-related properties.
     thisPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
-    targetQuantity : Decimal
+    targetAmount : Decimal
     lockedCoin : ContractId LockedCoin
   where
     signatory signatory subscriptionData
@@ -253,7 +253,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
-        coin <- unlockAndTransfer transferContext subscriptionData targetQuantity lockedCoin
+        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
         pure (state, coin)
 
     choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -286,14 +286,14 @@ template SubscriptionPayment
 lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin, Decimal)
 lockAndMakeChange context subscriptionData payData inputs now = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
-  let SubscriptionPayData { paymentQuantity; collectionDuration = lockDuration; .. } = payData
+  let SubscriptionPayData { paymentAmount; collectionDuration = lockDuration; .. } = payData
 
 
-  targetQuantity <- paymentQuantityToCC svc subscriptionData.sender context.context.openMiningRound paymentQuantity
+  targetAmount <- paymentAmountToCC svc subscriptionData.sender context.context.openMiningRound paymentAmount
 
   -- TODO(#1492) Lock to specific round to avoid fees changing
-  fees <- exerciseComputeFees context subscriptionData.sender [targetQuantity]
-  let lockQuantity = targetQuantity + fees
+  fees <- exerciseComputeFees context subscriptionData.sender [targetAmount]
+  let lockAmount = targetAmount + fees
 
   let transfer = Transfer with
        sender
@@ -302,12 +302,12 @@ lockAndMakeChange context subscriptionData payData inputs now = do
        inputs
        outputs =
          [ OutputSenderCoin with
-             exactQuantity = Some lockQuantity
+             exactAmount = Some lockAmount
              lock = Some TimeLock with
                holders = dedupSort [provider, receiver]
                expiresAt = now `addRelTime` lockDuration
          , OutputSenderCoin with
-             exactQuantity = None
+             exactAmount = None
              lock = None
          ]
        payload = "lock payment"
@@ -315,11 +315,11 @@ lockAndMakeChange context subscriptionData payData inputs now = do
   result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
 
-  pure(lockedCoin, senderChange, targetQuantity)
+  pure(lockedCoin, senderChange, targetAmount)
 
 
 unlockAndTransfer: AppTransferContext -> Subscription -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)
-unlockAndTransfer transferContext subscriptionData targetQuantity lockedCoin = do
+unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
@@ -332,7 +332,7 @@ unlockAndTransfer transferContext subscriptionData targetQuantity lockedCoin = d
           [ OutputReceiverCoin with
               receiver
               coinType = FixedReceiverCoin with
-                quantity = targetQuantity
+                amount = targetAmount
                 senderTransferFeeRatio = 1.0
           ]
         payload = "transfer locked payment"

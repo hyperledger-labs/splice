@@ -146,7 +146,7 @@ class GrpcSplitwiseService(
           update.update match {
             case externalPayment: splitwiseCodegen.balanceupdatetype.ExternalPayment => {
               val split: BigDecimal =
-                BigDecimal(externalPayment.quantity) / (update.group.members.size + 1)
+                BigDecimal(externalPayment.amount) / (update.group.members.size + 1)
               if (externalPayment.payer == javaUserParty) {
                 (update.group.owner +: update.group.members.asScala).foldLeft(acc) {
                   case (acc, member) =>
@@ -167,11 +167,11 @@ class GrpcSplitwiseService(
             case transfer: splitwiseCodegen.balanceupdatetype.Transfer =>
               if (transfer.sender == javaUserParty) {
                 acc.updatedWith(transfer.receiver)(prev =>
-                  Some(prev.getOrElse[BigDecimal](0.0) + transfer.quantity)
+                  Some(prev.getOrElse[BigDecimal](0.0) + transfer.amount)
                 )
               } else if (transfer.receiver == javaUserParty) {
                 acc.updatedWith(transfer.sender)(prev =>
-                  Some(prev.getOrElse[BigDecimal](0.0) - transfer.quantity)
+                  Some(prev.getOrElse[BigDecimal](0.0) - transfer.amount)
                 )
               } else acc
             case netting: splitwiseCodegen.balanceupdatetype.Netting =>

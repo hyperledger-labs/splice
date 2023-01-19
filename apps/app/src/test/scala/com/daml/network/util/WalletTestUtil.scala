@@ -36,24 +36,24 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   val exactly = (x: BigDecimal) => (x, x)
 
-  /** @param expectedQuantityRanges : lower and upper bounds for coins sorted by their initial quantity in ascending order. */
+  /** @param expectedAmountRanges : lower and upper bounds for coins sorted by their initial amount in ascending order. */
   def checkWallet(
       walletParty: PartyId,
       wallet: WalletAppClientReference,
-      expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
-  ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
+      expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],
+  ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
     eventually(10.seconds, 500.millis) {
       val coins =
-        wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
-      coins should have size (expectedQuantityRanges.size.toLong)
+        wallet.list().coins.sortBy(coin => coin.contract.payload.amount.initialAmount)
+      coins should have size (expectedAmountRanges.size.toLong)
       coins
-        .zip(expectedQuantityRanges)
-        .foreach { case (coin, quantityBounds) =>
+        .zip(expectedAmountRanges)
+        .foreach { case (coin, amountBounds) =>
           coin.contract.payload.owner shouldBe walletParty.toPrim
-          val coinQuantity =
-            coin.contract.payload.quantity
-          assertInRange(coinQuantity.initialQuantity, quantityBounds)
-          coinQuantity.ratePerRound shouldBe
+          val coinAmount =
+            coin.contract.payload.amount
+          assertInRange(coinAmount.initialAmount, amountBounds)
+          coinAmount.ratePerRound shouldBe
             CoinUtil.defaultHoldingFee
         }
     }
@@ -80,12 +80,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       userParty: PartyId,
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
-      quantity: BigDecimal,
+      amount: BigDecimal,
       transferContext: v1.coin.AppTransferContext,
       expiredDuration: Duration,
   )(implicit coinEnv: CoinTestConsoleEnvironment): Unit =
-    clue(s"Locking $quantity coins for $userParty") {
-      val coinOpt = coins.find(_.effectiveQuantity >= quantity)
+    clue(s"Locking $amount coins for $userParty") {
+      val coinOpt = coins.find(_.effectiveAmount >= amount)
 
       val expiredAt = coinEnv.environment.clock.now.add(expiredDuration)
       val expirationOpt = Proto.decode(Proto.Timestamp)(expiredAt.underlying.micros)
@@ -107,7 +107,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
                   ).asJava,
                   Seq[v1.coin.TransferOutput](
                     new v1.coin.transferoutput.OutputSenderCoin(
-                      Some(quantity.bigDecimal).toJava,
+                      Some(amount.bigDecimal).toJava,
                       Some(
                         new v1.coin.TimeLock(
                           Seq(userParty.toProtoPrimitive).asJava,
@@ -228,9 +228,9 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       val reqC = new paymentCodegen.AppPaymentRequest(
         userParty.toProtoPrimitive,
         Seq(
-          new paymentCodegen.ReceiverQuantity(
+          new paymentCodegen.ReceiverAmount(
             userParty.toProtoPrimitive,
-            new paymentCodegen.PaymentQuantity(
+            new paymentCodegen.PaymentAmount(
               BigDecimal(10).bigDecimal.setScale(10),
               paymentCodegen.Currency.CC,
             ),
@@ -339,29 +339,29 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     }
   }
 
-  def receiverQuantity(
+  def receiverAmount(
       receiverParty: PartyId,
-      quantity: Int,
+      amount: Int,
       currency: paymentCodegen.Currency,
   ) =
-    new paymentCodegen.ReceiverQuantity(
+    new paymentCodegen.ReceiverAmount(
       receiverParty.toProtoPrimitive,
-      new paymentCodegen.PaymentQuantity(
-        BigDecimal(quantity).bigDecimal,
+      new paymentCodegen.PaymentAmount(
+        BigDecimal(amount).bigDecimal,
         currency,
       ),
     )
 
   def createPaymentRequest(
       aliceUserParty: PartyId,
-      receiverQuantities: Seq[paymentCodegen.ReceiverQuantity],
+      receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
   )(implicit env: CoinTestConsoleEnvironment) = {
     val deliveryOfferId = createTestDeliveryOffer(aliceUserParty)
 
     clue("Create a payment request") {
       val paymentRequest = new paymentCodegen.AppPaymentRequest(
         aliceUserParty.toProtoPrimitive,
-        receiverQuantities.asJava,
+        receiverAmounts.asJava,
         aliceUserParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         Instant.now().plus(5, ChronoUnit.MINUTES), // expires in 5 min
@@ -381,17 +381,17 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   def createSelfPaymentRequest(
       aliceUserParty: PartyId,
-      quantity: Int,
+      amount: Int,
       currency: paymentCodegen.Currency,
   )(implicit env: CoinTestConsoleEnvironment) = {
-    val receiverQuantities = Seq(
-      receiverQuantity(aliceUserParty, quantity, currency)
+    val receiverAmounts = Seq(
+      receiverAmount(aliceUserParty, amount, currency)
     )
 
-    createPaymentRequest(aliceUserParty, receiverQuantities)
+    createPaymentRequest(aliceUserParty, receiverAmounts)
   }
 
-  private val defaultSubscriptionQuantity = new paymentCodegen.PaymentQuantity(
+  private val defaultSubscriptionAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
     paymentCodegen.Currency.CC,
   )
@@ -424,7 +424,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
       aliceUserParty: PartyId,
       nextPaymentDueAt: Instant,
-      quantity: paymentCodegen.PaymentQuantity,
+      amount: paymentCodegen.PaymentAmount,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
@@ -436,7 +436,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
     )
     val payData = new subsCodegen.SubscriptionPayData(
-      quantity,
+      amount,
       new RelTime(60 * 60 * 1000000L),
       new RelTime(10 * 60 * 1000000L),
       new RelTime(60 * 1000000L),
@@ -447,13 +447,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   protected def createSelfSubscriptionRequest(
       aliceUserParty: PartyId,
       nextPaymentDueAt: Instant,
-      quantity: paymentCodegen.PaymentQuantity,
+      amount: paymentCodegen.PaymentAmount,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
     val contextId = createSelfSubscriptionContext(aliceUserParty)
     val (subscription, payData) =
-      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, quantity)
+      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, amount)
     clue("Create subscription request") {
       val subscriptionRequest = new subsCodegen.SubscriptionRequest(
         subscription,
@@ -470,13 +470,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   protected def createSelfSubscription(
       aliceUserParty: PartyId,
       nextPaymentDueAt: Instant,
-      quantity: paymentCodegen.PaymentQuantity = defaultSubscriptionQuantity,
+      amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
     val contextId = createSelfSubscriptionContext(aliceUserParty)
     val (subscriptionData, payData) =
-      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, quantity)
+      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, amount)
     val subscriptionId = clue("Create a subscription") {
       val subscription = new subsCodegen.Subscription(
         aliceUserParty.toProtoPrimitive,

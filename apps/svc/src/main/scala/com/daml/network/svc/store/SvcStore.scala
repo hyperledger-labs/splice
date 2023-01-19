@@ -170,9 +170,9 @@ trait SvcStore extends CoinAppStore {
         t.transferFees + transfer.totalTransferFees,
         t.adminFees + transfer.senderAdminFees,
         t.holdingFees + transfer.senderHoldingFees,
-        t.transferInputs + transfer.inQuantity,
-        t.nonSelfTransferOutputs + transfer.nonSelfOutQuantity,
-        t.selfTransferOutputs + transfer.selfOutQuantity,
+        t.transferInputs + transfer.inAmount,
+        t.nonSelfTransferOutputs + transfer.nonSelfOutAmount,
+        t.selfTransferOutputs + transfer.selfOutAmount,
       )
     })
   }

@@ -14,9 +14,9 @@ template Test
     choice Test_ComputeFees : Decimal
       with
         context : API.PaymentTransferContext
-        quantities : [Decimal]
+        amounts : [Decimal]
       controller sender
-      do API.exerciseComputeFees context sender quantities
+      do API.exerciseComputeFees context sender amounts
 
 
 test = script do
@@ -25,7 +25,7 @@ test = script do
     context <- getPaymentTransferContext app alice
     test <- submitUser alice.userId $ createCmd Test with
       sender = alice.primaryParty
-    let quantities = [1.0, 2.0, 101.0]
+    let amounts = [1.0, 2.0, 101.0]
     fees <- submitUser alice.userId $ exerciseCmd test Test_ComputeFees with ..
     fees === (
         0.01 * 1.0 + -- update 1 coin

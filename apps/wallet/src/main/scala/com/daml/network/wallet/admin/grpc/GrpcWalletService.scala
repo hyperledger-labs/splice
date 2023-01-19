@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
   coinoperation,
   coinoperationoutcome,
 }
-import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentQuantity}
+import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -92,7 +92,7 @@ class GrpcWalletService(
       Some(coin.toProtoV0),
       round,
       Proto.encode(CoinUtil.holdingFee(coin.payload, round)),
-      Proto.encode(CoinUtil.currentQuantity(coin.payload, round)),
+      Proto.encode(CoinUtil.currentAmount(coin.payload, round)),
     )
 
   private def lockedCoinToCoinPosition(
@@ -103,7 +103,7 @@ class GrpcWalletService(
       Some(lockedCoin.toProtoV0),
       round,
       Proto.encode(CoinUtil.holdingFee(lockedCoin.payload.coin, round)),
-      Proto.encode(CoinUtil.currentQuantity(lockedCoin.payload.coin, round)),
+      Proto.encode(CoinUtil.currentAmount(lockedCoin.payload.coin, round)),
     )
 
   private def withAuth[A](f: String => A)(implicit tc: TraceContext): A = {
@@ -171,12 +171,12 @@ class GrpcWalletService(
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+        val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
         for {
           userStore <- getUserStore(user)
           result <- exerciseWalletCoinAction(
             new coinoperation.CO_Tap(
-              quantity
+              amount
             ),
             user,
             (outcome: coinoperationoutcome.COO_Tap) =>
@@ -226,10 +226,10 @@ class GrpcWalletService(
           val unlockedHoldingFees =
             coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
           val unlockedQty =
-            coins.view.map(c => BigDecimal(CoinUtil.currentQuantity(c.payload, currentRound))).sum
+            coins.view.map(c => BigDecimal(CoinUtil.currentAmount(c.payload, currentRound))).sum
           val lockedQty =
             lockedCoins.view
-              .map(c => BigDecimal(CoinUtil.currentQuantity(c.payload.coin, currentRound)))
+              .map(c => BigDecimal(CoinUtil.currentAmount(c.payload.coin, currentRound)))
               .sum
 
           v0.GetBalanceResponse(
@@ -423,14 +423,14 @@ class GrpcWalletService(
           val sender = getUserWallet(user).store.key.endUserParty
           exerciseWalletAction((installCid, _) => {
             val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-            val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+            val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
             val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
             val senderTransferFeeRatio =
               Proto.tryDecode(Proto.JavaBigDecimal)(request.senderTransferFeeRatio)
             Future.successful(
               installCid.exerciseWalletAppInstall_CreateTransferOffer(
                 receiver.toProtoPrimitive,
-                new PaymentQuantity(quantity, Currency.CC),
+                new PaymentAmount(amount, Currency.CC),
                 request.description,
                 expiresAt.toInstant,
                 senderTransferFeeRatio,

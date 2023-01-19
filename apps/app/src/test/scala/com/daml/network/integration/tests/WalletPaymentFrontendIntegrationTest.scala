@@ -42,11 +42,11 @@ class WalletPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
 
-          // Verify that the total quantity of CC is properly displayed
+          // Verify that the total amount of CC is properly displayed
           eventually() {
             inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-              // Verify that the currency and quantity are properly displayed
-              row.childElement(className("app-request-total-quantity")).text should matchText(
+              // Verify that the currency and amount are properly displayed
+              row.childElement(className("app-request-total-amount")).text should matchText(
                 "42.00000000CC"
               )
             }
@@ -61,8 +61,8 @@ class WalletPaymentFrontendIntegrationTest
                 .childElement(className("app-request-receiver"))
                 .text shouldBe aliceUserParty.toProtoPrimitive
 
-              // Verify that the currency and quantity are properly displayed
-              row.childElement(className("app-request-payment-quantity")).text should matchText(
+              // Verify that the currency and amount are properly displayed
+              row.childElement(className("app-request-payment-amount")).text should matchText(
                 "42.0000000000CC"
               )
             }
@@ -80,11 +80,11 @@ class WalletPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
 
-          // Verify that the total quantity of USD is properly displayed
+          // Verify that the total amount of USD is properly displayed
           eventually() {
             inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-              // Verify that the currency and quantity are properly displayed
-              row.childElement(className("app-request-total-quantity")).text should matchText(
+              // Verify that the currency and amount are properly displayed
+              row.childElement(className("app-request-total-amount")).text should matchText(
                 "42.00000000CC"
               )
             }
@@ -99,8 +99,8 @@ class WalletPaymentFrontendIntegrationTest
                 .childElement(className("app-request-receiver"))
                 .text shouldBe aliceUserParty.toProtoPrimitive
 
-              // Verify that the currency and quantity are properly displayed
-              row.childElement(className("app-request-payment-quantity")).text should matchText(
+              // Verify that the currency and amount are properly displayed
+              row.childElement(className("app-request-payment-amount")).text should matchText(
                 "42.0000000000USD"
               )
             }
@@ -116,32 +116,32 @@ class WalletPaymentFrontendIntegrationTest
       createPaymentRequest(
         aliceUserParty,
         Seq(
-          receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.CC),
-          receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.CC),
+          receiverAmount(aliceUserParty, 22, paymentCodegen.Currency.CC),
+          receiverAmount(aliceUserParty, 20, paymentCodegen.Currency.CC),
         ),
       )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
 
-        // Verify that the total quantity of USD is properly displayed
+        // Verify that the total amount of USD is properly displayed
         eventually() {
           inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-            // Verify that the currency and quantity are properly displayed
-            row.childElement(className("app-request-total-quantity")).text should matchText(
+            // Verify that the currency and amount are properly displayed
+            row.childElement(className("app-request-total-amount")).text should matchText(
               "42.00000000CC"
             )
           }
         }
 
-        // Verify that the receiver table rows contain both receiver quantities
+        // Verify that the receiver table rows contain both receiver amounts
         eventually() {
-          val quantities =
-            findAll(className("receiver-quantity-row")).toList.map(row =>
-              row.childElement(className("app-request-payment-quantity")).text
+          val amounts =
+            findAll(className("receiver-amount-row")).toList.map(row =>
+              row.childElement(className("app-request-payment-amount")).text
             )
 
-          quantities should contain theSameElementsAs Seq(
+          amounts should contain theSameElementsAs Seq(
             "22.0000000000CC",
             "20.0000000000CC",
           )
@@ -207,8 +207,8 @@ class WalletPaymentFrontendIntegrationTest
               bobEntryName,
               bobParty.toProtoPrimitive,
             )
-            click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("1.0")
+            click on "create-offer-amount"
+            numberField("create-offer-amount").underlying.sendKeys("1.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "by party ID"
             click on "create-offer-expiration-value"
@@ -222,7 +222,7 @@ class WalletPaymentFrontendIntegrationTest
             val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) =>
               row
             }
-            row.childElement(className("transfer-offers-table-quantity")).text should be(
+            row.childElement(className("transfer-offers-table-amount")).text should be(
               "1.0000000000CC"
             )
           },
@@ -236,8 +236,8 @@ class WalletPaymentFrontendIntegrationTest
             textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
             textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
             waitForDirectoryField(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
-            click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("2.0")
+            click on "create-offer-amount"
+            numberField("create-offer-amount").underlying.sendKeys("2.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "with auto-complete"
             click on "create-offer-expiration-value"
@@ -260,8 +260,8 @@ class WalletPaymentFrontendIntegrationTest
               bobParty.toProtoPrimitive,
               bobParty.toProtoPrimitive,
             )
-            click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("3.0")
+            click on "create-offer-amount"
+            numberField("create-offer-amount").underlying.sendKeys("3.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "with auto-complete"
             click on "create-offer-expiration-value"
@@ -311,8 +311,8 @@ class WalletPaymentFrontendIntegrationTest
               bobParty.toProtoPrimitive,
               bobParty.toProtoPrimitive,
             )
-            click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-amount"
+            numberField("create-offer-amount").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = description
             click on "create-offer-expiration-value"

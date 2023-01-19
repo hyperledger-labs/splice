@@ -61,13 +61,13 @@ export interface ListSubscriptionsResponse {
 }
 
 export interface WalletClient {
-  tap: (quantity: string) => Promise<void>;
+  tap: (amount: string) => Promise<void>;
   list: () => Promise<ListResponse>;
   getBalance: () => Promise<GetBalanceResponse>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
-    quantity: Decimal,
+    amount: Decimal,
     description: string,
     expiresAt: Date,
     senderTransferFeeRatio: Decimal,
@@ -118,8 +118,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.list(new v0.ListRequest(), getCreds());
         return { coins: res.getCoinsList(), lockedCoins: res.getLockedCoinsList() };
       },
-      tap: async quantity => {
-        await walletClient.tap(new v0.TapRequest().setQuantity(quantity), getCreds());
+      tap: async amount => {
+        await walletClient.tap(new v0.TapRequest().setAmount(amount), getCreds());
       },
       getBalance: async (): Promise<GetBalanceResponse> => {
         const balance = await walletClient.getBalance(new v0.GetBalanceRequest(), getCreds());
@@ -132,7 +132,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       createTransferOffer: async (
         receiverPartyId,
-        quantity,
+        amount,
         description,
         expiresAt,
         senderTransferFeeRatio,
@@ -141,7 +141,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         await walletClient.createTransferOffer(
           new v0.CreateTransferOfferRequest()
             .setReceiverPartyId(receiverPartyId)
-            .setQuantity(quantity.isInt() ? quantity.toFixed(1) : quantity.toString())
+            .setAmount(amount.isInt() ? amount.toFixed(1) : amount.toString())
             .setDescription(description)
             .setExpiresAt(expiresAt.getTime() * 1000)
             .setSenderTransferFeeRatio(

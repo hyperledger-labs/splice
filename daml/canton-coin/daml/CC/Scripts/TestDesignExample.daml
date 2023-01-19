@@ -42,17 +42,17 @@ template Escrow
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
                  [ API.OutputSenderCoin with
-                     exactQuantity = None
+                     exactAmount = None
                      lock = None
                  , API.OutputSenderCoin with
-                     exactQuantity = Some locked.quantity.initialQuantity
+                     exactAmount = Some locked.amount.initialAmount
                      lock = Some API.TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
                  , API.OutputReceiverCoin with
                      receiver = arbiter
                      coinType = API.FixedReceiverCoin with
-                       quantity = 1.0
+                       amount = 1.0
                        senderTransferFeeRatio = 0.0
                  ]
          -- TODO(M3-06): adjust design example to featured app right
@@ -87,7 +87,7 @@ test = do
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    quantity = 0.01
+    amount = 0.01
     round = API.Round 2
 
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
@@ -103,10 +103,10 @@ test = do
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    quantity = 0.14 -- 0.09 create fee + 0.05 transfer fee
+    amount = 0.14 -- 0.09 create fee + 0.05 transfer fee
     round = API.Round 40002
 
-  [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity == 5.0)
+  [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount == 5.0)
 
   -- advance 10k rounds
   runNextIssuance app
@@ -125,12 +125,12 @@ test = do
 
   -- TODO(#2148): adjust design example to changes due to rewards issuance
   result.summary === API.TransferSummary with
-    inQuantity = 1004.95
-    selfOutQuantity = 1003.83
-    nonSelfOutQuantity = 0.99
+    inAmount = 1004.95
+    selfOutAmount = 1003.83
+    nonSelfOutAmount = 0.99
     numInputs = 2
     numOutputs = 3
-    quantityBalance = 3.58
+    amountBalance = 3.58
     numFloatingCoins = 1
     totalTransferFees = 0.01
     senderAdminFees = 0.32
@@ -157,27 +157,27 @@ test = do
     coin = Coin with
       svc = app.svc
       owner = alice.primaryParty
-      quantity = expiringQuantity coinConfig.holdingFee 1000.25 c2.round
+      amount = expiringAmount coinConfig.holdingFee 1000.25 c2.round
   change === Coin with
     svc = app.svc
     owner = alice.primaryParty
-    quantity =
-      let quantity =
+    amount =
+      let amount =
             5.0
             - 1.0 -- payment
             - (chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c1.round) + chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
             - 0.01 * 2.0 -- update & locking fee for locked coin
             - 0.01 -- update fee for transfered coin
             - 0.09 -- create fee for change
-      in expiringQuantity coinConfig.holdingFee quantity c2.round
+      in expiringAmount coinConfig.holdingFee amount c2.round
 
   let receiverTransferFee = chargeSteppedRate coinConfig.transferFee 1.0
   payment === Coin with
     svc = app.svc
     owner = arbiter.primaryParty
-    quantity =
-      let quantity = 1.0 - receiverTransferFee
-      in expiringQuantity coinConfig.holdingFee quantity c2.round
+    amount =
+      let amount = 1.0 - receiverTransferFee
+      in expiringAmount coinConfig.holdingFee amount c2.round
 
   -- check app reward issued by the escrow refresh
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50002)
@@ -185,7 +185,7 @@ test = do
     svc = app.svc
     provider = arbiter.primaryParty
     featured = True
-    quantity = 0.11
+    amount = 0.11
     round = API.Round 50002
 
   -- check that the 'arbiter' does not receive featured app rewards when he's the provider
@@ -197,7 +197,7 @@ test = do
     svc = app.svc
     provider = arbiter.primaryParty
     featured = False -- not featured despite presenting their app right as part of the 'pay' function
-    quantity = 0.005 -- only the transfer fee is consider a usage fee here, as we have two input coins
+    amount = 0.005 -- only the transfer fee is considered a usage fee here, as we have two input coins
     round = API.Round 50003
 
   return ()

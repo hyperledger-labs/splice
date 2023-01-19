@@ -98,7 +98,7 @@ template SvReward with
     svc : Party
     sv : Party
     round : Round
-    quantity : Decimal
+    amount : Decimal
   where
     signatory svc
 
@@ -281,7 +281,7 @@ template SvcRules with
         let eligibleSVs =
               [ member | (member, info) <- Map.toList members, info.joinedAsOfRound <= reward.round]
             -- TODO(M3-90): review rounding of SV issuance
-            issuancePerSV = reward.quantity / intToDecimal (length eligibleSVs)
+            issuancePerSV = reward.amount / intToDecimal (length eligibleSVs)
         -- NOTE: we are not directly creating coin's for the SV's here, as otherwise
         -- we'd require their participants to confirm this tx, which is not fault-tolerant
         -- against some SVs being offline. Instead, we create separate reward contracts
@@ -291,7 +291,7 @@ template SvcRules with
             svc
             sv
             round = reward.round
-            quantity = issuancePerSV
+            amount = issuancePerSV
 
     nonconsuming choice SvcRules_CollectSvReward : ContractId Coin
       with
@@ -310,7 +310,7 @@ template SvcRules with
         require "Reward is not too old" (openRound.round.number <= reward.round.number + 10)
         exercise coinRulesCid CoinRules_Mint with
           receiver = sv
-          quantity = reward.quantity
+          amount = reward.amount
           openRound = openRoundCid
 
     -- TODO(#2334): add SvcRules choices to expire rewards that are too old

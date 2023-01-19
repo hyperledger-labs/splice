@@ -38,8 +38,8 @@ executeCoinOperationRec endUserP context inputs prevResults (operation::remainin
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
         result <- catchAll (API.exercisePaymentTransfer context transfer)
         handleResultMergeInputs result
-    CO_Tap tapQuantity -> do
-      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUserP tapQuantity (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
+    CO_Tap tapAmount -> do
+      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
       handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
     handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
@@ -93,7 +93,7 @@ data CoinOperation
   -- merge coin contracts
   | CO_MergeTransferInputs
   | CO_Tap with
-      tapQuantity: Decimal
+      tapAmount: Decimal
 
 
   deriving (Eq, Show)
@@ -162,7 +162,7 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_CreateTransferOffer : ContractId TransferOffer
       with
         receiver : Party
-        quantity : PaymentQuantity
+        amount : PaymentAmount
         description : Text
         expiresAt: Time
         senderTransferFeeRatio : Decimal

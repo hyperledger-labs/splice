@@ -19,7 +19,7 @@ import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { PaymentQuantityDisplay, PaymentQuantityTotalDisplay } from './QuantityDisplay';
+import { PaymentAmountDisplay, PaymentAmountTotalDisplay } from './AmountDisplay';
 
 interface AppPaymentRequestsProps {
   requests: Contract<AppPaymentRequest>[];
@@ -106,9 +106,9 @@ const AppPaymentRequestRows: React.FC<{
         <TableCell className="app-request-provider">
           <DirectoryEntry partyId={provider} />
         </TableCell>
-        <TableCell className="app-request-total-quantity">
-          <PaymentQuantityTotalDisplay
-            quantities={request.receiverQuantities.map(rq => rq.quantity)}
+        <TableCell className="app-request-total-amount">
+          <PaymentAmountTotalDisplay
+            amounts={request.receiverAmounts.map(rq => rq.amount)}
             coinPrice={coinPrice}
           />
         </TableCell>
@@ -128,17 +128,17 @@ const AppPaymentRequestRows: React.FC<{
               <TableHead>
                 <TableRow>
                   <TableCell>Receiver</TableCell>
-                  <TableCell align="right">Quantity</TableCell>
+                  <TableCell align="right">Amount</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {request.receiverQuantities.map(({ receiver, quantity }, index) => (
-                  <TableRow key={index} className="receiver-quantity-row">
+                {request.receiverAmounts.map(({ receiver, amount }, index) => (
+                  <TableRow key={index} className="receiver-amount-row">
                     <TableCell className="app-request-receiver">
                       <DirectoryEntry partyId={receiver} />
                     </TableCell>
-                    <TableCell className="app-request-payment-quantity" align="right">
-                      <PaymentQuantityDisplay quantity={quantity} />
+                    <TableCell className="app-request-payment-amount" align="right">
+                      <PaymentAmountDisplay amount={amount} />
                     </TableCell>
                   </TableRow>
                 ))}

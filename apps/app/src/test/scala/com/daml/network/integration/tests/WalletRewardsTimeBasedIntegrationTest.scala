@@ -59,8 +59,8 @@ class WalletRewardsTimeBasedIntegrationTest
         prevCoins
           .map(c =>
             (
-              BigDecimal(c.contract.payload.quantity.initialQuantity),
-              BigDecimal(c.contract.payload.quantity.initialQuantity) + 2,
+              BigDecimal(c.contract.payload.amount.initialAmount),
+              BigDecimal(c.contract.payload.amount.initialAmount) + 2,
             )
           )
           .sortBy(_._1),

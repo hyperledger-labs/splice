@@ -57,11 +57,11 @@ class WalletTimeBasedIntegrationTest
         aliceWallet.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
         aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (24.0, 25.0))
 
         aliceWallet.list().lockedCoins.head.round shouldBe startRound
         aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
       }
 
       // advance to next round.
@@ -70,14 +70,14 @@ class WalletTimeBasedIntegrationTest
       clue("Check wallet after advancing to next round") {
         eventually()(aliceWallet.list().coins.head.round shouldBe startRound + 1)
         assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (24.0, 25.0))
 
         aliceWallet.list().lockedCoins.head.round shouldBe startRound + 1
         assertInRange(
           aliceWallet.list().lockedCoins.head.accruedHoldingFee,
           (0.000004, 0.000005),
         )
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
       }
     }
 
@@ -248,7 +248,7 @@ class WalletTimeBasedIntegrationTest
           aliceWallet.list().lockedCoins should have length 0
           // we have 0 holding fees because the coins were created in the same round we are currently in
           aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-          assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (0, 1))
+          assertInRange(aliceWallet.list().coins.head.effectiveAmount, (0, 1))
         }
       }
 
@@ -266,7 +266,7 @@ class WalletTimeBasedIntegrationTest
         // They will be archived when no coins can be used as transfer input.
         // ie, in 2 round
         assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000009, 0.00001))
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (-0.000005, -0.000004))
+        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (-0.000005, -0.000004))
       }
 
       // advance 2 more rounds.
@@ -309,11 +309,11 @@ class WalletTimeBasedIntegrationTest
         aliceWallet.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
         aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (0, 1))
+        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (0, 1))
 
         aliceWallet.list().lockedCoins.head.round shouldBe startRound
         aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (0, 1))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (0, 1))
       }
 
       // advance 2 rounds.
@@ -329,7 +329,7 @@ class WalletTimeBasedIntegrationTest
         // ie, in 2 rounds
         aliceWallet.list().lockedCoins.head.round shouldBe startRound + 2
         assertInRange(aliceWallet.list().lockedCoins.head.accruedHoldingFee, (0.000009, 0.00001))
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (-0.000005, -0.000004))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (-0.000005, -0.000004))
       }
 
       // advance 2 more rounds.

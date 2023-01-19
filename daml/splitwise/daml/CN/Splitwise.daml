@@ -91,7 +91,7 @@ template SplitwiseInstall
     nonconsuming choice SplitwiseInstall_EnterPayment : ContractId BalanceUpdate
       with
         group : ContractId Group
-        quantity : Decimal
+        amount : Decimal
         description : Text
       controller user
       do exercise group Group_EnterPayment with
@@ -101,7 +101,7 @@ template SplitwiseInstall
     nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
       with
         group : ContractId Group
-        receiverQuantities : [ReceiverCCQuantity]
+        receiverAmounts : [ReceiverCCAmount]
       controller user
       do exercise group Group_InitiateTransfer with
            sender = user
@@ -185,31 +185,31 @@ template Group
     nonconsuming choice Group_EnterPayment : ContractId BalanceUpdate
       with
         payer : Party
-        quantity : Decimal
+        amount : Decimal
         description : Text
       controller payer
       do require "payer is a member" (payer `elem` groupMembers this)
          create BalanceUpdate with
            group = this
            update = ExternalPayment with
-             payer, quantity, description
+             payer, amount, description
 
     nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
       with
         sender : Party
-        receiverQuantities : [ReceiverCCQuantity]
+        receiverAmounts : [ReceiverCCAmount]
       controller sender
       do require "sender is a member" (sender `elem` groupMembers this)
-         require "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
+         require "receiver is a member" (fmap (\x -> x.receiver) receiverAmounts `subset` groupMembers this)
          deliveryOffer <- create TransferInProgress
            with
              group = this
              sender
-             receiverQuantities
+             receiverAmounts
          now <- getTime
          create AppPaymentRequest with
            sender, provider, svc
-           receiverQuantities = map (\rq -> ReceiverQuantity rq.receiver (PaymentQuantity rq.ccQuantity CC)) receiverQuantities
+           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
            expiresAt = now `addRelTime` acceptDuration
            collectionDuration = collectionDuration
            deliveryOffer = toInterfaceContractId deliveryOffer
@@ -226,11 +226,11 @@ template Group
          acceptedPayment.sender === sender
          archive refCid
 
-         let  receivers = map (\r -> r.receiver) ref.receiverQuantities
+         let  receivers = map (\r -> r.receiver) ref.receiverAmounts
               expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                provider
-               ccReceiverQuantities = ref.receiverQuantities
+               ccReceiverAmounts = ref.receiverAmounts
                svc
                lockedCoin = acceptedPayment.lockedCoin
                deliveryOffer = acceptedPayment.deliveryOffer
@@ -240,13 +240,13 @@ template Group
          require "Receivers are members" (receivers `subset` groupMembers this)
          -- Check that this belongs to the right group.
          getGroupKey ref.group === getGroupKey this
-         forA ref.receiverQuantities \ReceiverCCQuantity{receiver, ccQuantity} ->
+         forA ref.receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
            create BalanceUpdate with
              group = this
              update = Transfer with
                sender = ref.sender
                receiver
-               quantity = ccQuantity
+               amount = ccAmount
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
@@ -272,9 +272,9 @@ template TransferInProgress
   with
     group : Group
     sender : Party
-    receiverQuantities : [ReceiverCCQuantity]
+    receiverAmounts : [ReceiverCCAmount]
   where
-    let receivers = map (\rq -> rq.receiver) receiverQuantities
+    let receivers = map (\rq -> rq.receiver) receiverAmounts
     signatory signatory group
     interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with
@@ -295,13 +295,13 @@ data BalanceUpdateType
   = ExternalPayment with
       payer : Party
       description : Text
-      quantity : Decimal -- Quantity in CC
+      amount : Decimal -- Amount in CC
   -- | Transfer from sender to receiver to reduce their debt.
   -- Note that it is possible to transfer preemptively before a bill has been submitted.
   | Transfer with
       sender : Party
       receiver : Party
-      quantity : Decimal
+      amount : Decimal
   | -- Net the balances between the parties. This allows us to emulate [splitwise simplify debt feature](https://www.splitwise.com/l/sdv/FgPQSo3Bsev).
     -- E.g., if Alice owes Bob 10CC, and Charlie owes Alice 10CC, we can net that to Charlie owing Bob 10CC.
     -- Note that we do not enforce that the resulting balances are simpler but we do enforce

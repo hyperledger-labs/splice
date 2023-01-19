@@ -142,7 +142,7 @@ class SplitwiseFrontendIntegrationTest
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         click on className("add-user-link")
 
-        inside(find(className("enter-payment-quantity-field"))) { case Some(field) =>
+        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "1200.0"
         }
@@ -154,7 +154,7 @@ class SplitwiseFrontendIntegrationTest
       }
 
       withFrontEnd("charlieSplitwise") { implicit webDriver =>
-        inside(find(className("enter-payment-quantity-field"))) { case Some(field) =>
+        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "333.0"
         }
@@ -172,11 +172,11 @@ class SplitwiseFrontendIntegrationTest
               r1.childElement(className("balances-table-receiver")).text should matchText(
                 aliceCns
               )
-              r1.childElement(className("balances-table-quantity")).text shouldBe "-400.0000000000"
+              r1.childElement(className("balances-table-amount")).text shouldBe "-400.0000000000"
               r2.childElement(className("balances-table-receiver")).text should matchText(
                 charlieCns
               )
-              r2.childElement(className("balances-table-quantity")).text shouldBe "-111.0000000000"
+              r2.childElement(className("balances-table-amount")).text shouldBe "-111.0000000000"
           }
         }
         click on className("settle-my-debts-link")
@@ -194,11 +194,11 @@ class SplitwiseFrontendIntegrationTest
             row1.childElement(className("balances-table-receiver")).text should matchText(
               aliceCns
             )
-            row1.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
+            row1.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
             row2.childElement(className("balances-table-receiver")).text should matchText(
               charlieCns
             )
-            row2.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
+            row2.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
           }
           inside(findAll(className("balance-updates-list-item")).toSeq) {
             case Seq(row1, row2, row3, row4) =>
@@ -256,7 +256,7 @@ class SplitwiseFrontendIntegrationTest
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         click on className("add-user-link")
-        inside(find(className("enter-payment-quantity-field"))) { case Some(field) =>
+        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "1000.0"
         }
@@ -268,7 +268,7 @@ class SplitwiseFrontendIntegrationTest
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
-        inside(find(className("transfer-quantity-field"))) { case Some(field) =>
+        inside(find(className("transfer-amount-field"))) { case Some(field) =>
           field.underlying.click()
           reactTextInput(field).value = "500"
         }
@@ -293,7 +293,7 @@ class SplitwiseFrontendIntegrationTest
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
-            row.childElement(className("balances-table-quantity")).text.toDouble shouldBe 0.0
+            row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
           }
           inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
             case Seq(row1, row2) =>

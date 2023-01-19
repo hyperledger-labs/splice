@@ -211,9 +211,9 @@ runNextIssuanceD app coinPrice = do
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
-          totalValidatorRewardCoupons = sum [ c.quantity | (_, c) <- validatorRewardCoupons]
-          totalFeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, c.featured]
-          totalUnfeaturedAppRewardCoupons = sum [ c.quantity | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with

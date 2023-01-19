@@ -32,7 +32,7 @@ import {
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 import { Party } from '@daml/types';
 
-import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
+import { PaymentAmountDisplay } from '../components/AmountDisplay';
 import Timestamp from '../components/Timestamp';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
@@ -71,7 +71,7 @@ const TransferOffers: React.FC = () => {
   useInterval(fetchAcceptedTransferOffers, 500);
 
   const [receiver, setReceiver] = useState<string>('');
-  const [transferQuantity, setTransferQuantity] = useState<Decimal>(new Decimal(0.0));
+  const [transferAmount, setTransferAmount] = useState<Decimal>(new Decimal(0.0));
   const [transferDescription, setTransferDescription] = useState('');
   const [transferExpirationValue, setTransferExpirationValue] = useState(new Decimal(0.0));
   const [transferExpirationUnit, setTransferExpirationUnit] = useState<TimeUnits>(
@@ -97,7 +97,7 @@ const TransferOffers: React.FC = () => {
     const senderTransferFeeRatio = new Decimal(1.0);
     await createTransferOffer(
       receiver,
-      transferQuantity,
+      transferAmount,
       transferDescription,
       expires,
       senderTransferFeeRatio,
@@ -111,7 +111,7 @@ const TransferOffers: React.FC = () => {
 
   const [createOfferOpen, setCreateOfferOpen] = useState(false);
   const openCreateOffer = () => {
-    setTransferQuantity(new Decimal(0));
+    setTransferAmount(new Decimal(0));
     setTransferDescription('');
     setTransferExpirationValue(new Decimal(0));
     setTransferExpirationUnit(OTimeUnits.seconds);
@@ -140,12 +140,12 @@ const TransferOffers: React.FC = () => {
             onPartyChanged={onReceiverChanged}
           />
           <TextField
-            id="create-offer-quantity"
+            id="create-offer-amount"
             label="Amount"
-            value={transferQuantity}
+            value={transferAmount}
             type="number"
-            error={transferQuantity.lessThanOrEqualTo(0.0)}
-            onChange={event => setTransferQuantity(new Decimal(event.target.value))}
+            error={transferAmount.lessThanOrEqualTo(0.0)}
+            onChange={event => setTransferAmount(new Decimal(event.target.value))}
             fullWidth
           />
           <TextField
@@ -185,7 +185,7 @@ const TransferOffers: React.FC = () => {
             id="submit-create-offer-button"
             onClick={createTransferOfferAndClose}
             disabled={
-              transferQuantity.lessThanOrEqualTo(0.0) ||
+              transferAmount.lessThanOrEqualTo(0.0) ||
               transferExpirationValue.lessThanOrEqualTo(0.0)
             }
           >
@@ -215,8 +215,8 @@ const TransferOffers: React.FC = () => {
               <TableCell className="transfer-offers-table-receiver">
                 <DirectoryEntryComponent partyId={c.payload.receiver} />
               </TableCell>
-              <TableCell className="transfer-offers-table-quantity">
-                <PaymentQuantityDisplay quantity={c.payload.quantity} />
+              <TableCell className="transfer-offers-table-amount">
+                <PaymentAmountDisplay amount={c.payload.amount} />
               </TableCell>
               <TableCell className="transfer-offers-table-description">
                 {c.payload.description}
@@ -275,7 +275,7 @@ const TransferOffers: React.FC = () => {
                 <DirectoryEntryComponent partyId={c.payload.receiver} />
               </TableCell>
               <TableCell>
-                <PaymentQuantityDisplay quantity={c.payload.quantity} />
+                <PaymentAmountDisplay amount={c.payload.amount} />
               </TableCell>
               <TableCell>{c.payload.description}</TableCell>
               <TableCell>

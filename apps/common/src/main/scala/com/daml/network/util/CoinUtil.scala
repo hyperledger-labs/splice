@@ -136,7 +136,7 @@ object CoinUtil {
     // Incentivizes users to actively merge their coins.
     defaultHoldingFee,
 
-    // Fee for transferring some quantity of coin to a new owner.
+    // Fee for transferring some amount of coin to a new owner.
     // TODO(M3-01) Finetuning required
     new cc.fees.SteppedRate(
       BigDecimal(0.01).bigDecimal,
@@ -181,26 +181,26 @@ object CoinUtil {
       currentRound: Long,
   ): java.math.BigDecimal = {
     java.math.BigDecimal
-      .valueOf(currentRound - coin.quantity.createdAt.number)
-      .multiply(coin.quantity.ratePerRound.rate)
+      .valueOf(currentRound - coin.amount.createdAt.number)
+      .multiply(coin.amount.ratePerRound.rate)
   }
 
-  def currentQuantity(
+  def currentAmount(
       coin: Coin,
       currentRound: Long,
   ): java.math.BigDecimal = {
-    coin.quantity.initialQuantity.subtract(holdingFee(coin, currentRound))
+    coin.amount.initialAmount.subtract(holdingFee(coin, currentRound))
   }
 
   def coinExpiresAt(coin: Coin): Round = {
-    val rounds = coin.quantity.initialQuantity
+    val rounds = coin.amount.initialAmount
       .divide(
-        coin.quantity.ratePerRound.rate,
+        coin.amount.ratePerRound.rate,
         0,
         RoundingMode.CEILING,
       )
       .longValueExact
-    new Round(coin.quantity.createdAt.number + rounds)
+    new Round(coin.amount.createdAt.number + rounds)
   }
 
   def relTimeToDuration(dt: RelTime): Duration =

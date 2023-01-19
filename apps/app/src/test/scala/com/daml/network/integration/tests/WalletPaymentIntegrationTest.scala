@@ -81,7 +81,7 @@ class WalletPaymentIntegrationTest
           r.payload shouldBe new walletCodegen.AcceptedAppPayment(
             aliceUserParty.toProtoPrimitive,
             Seq(
-              new walletCodegen.ReceiverCCQuantity(
+              new walletCodegen.ReceiverCCAmount(
                 aliceUserParty.toProtoPrimitive,
                 BigDecimal(10).bigDecimal.setScale(10),
               )
