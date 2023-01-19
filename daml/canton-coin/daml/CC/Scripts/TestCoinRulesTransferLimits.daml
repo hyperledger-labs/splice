@@ -1,0 +1,130 @@
+module CC.Scripts.TestCoinRulesTransferLimits where
+
+import DA.Action
+import DA.Text as Text
+import DA.Time
+import DA.Exception
+import Daml.Script
+import CC.Scripts.Util
+import qualified CC.API.V1.Coin as API
+
+template CheckError
+  with
+    actors : [Party]
+  where
+    signatory actors
+    choice Test_Transfer : ()
+      with
+        context : API.PaymentTransferContext
+        transfer : API.Transfer
+        expectedError: Text
+      controller actors
+      do
+        isThrown <-
+          try do
+            API.exercisePaymentTransfer context transfer
+            pure False
+          catch (e : AnyException) -> if expectedError `Text.isInfixOf` message e then pure True else abort ("UnexpectedException" <> message e)
+        unless isThrown (abort "expected exception but didn't get one")
+
+testTransferExceedsMaxInputs: Script ()
+testTransferExceedsMaxInputs = do
+    app <- setupApp
+    validator <- setupValidator app "validator"
+    alice <- setupUser app "alice" validator
+    bob <- setupUser app "bob" validator
+    charlie <- setupUser app "charlie" validator
+    inputCoins <- forA [1..101] $ \i -> do 
+      coin <- tap app alice 1.0
+      pure $ API.InputCoin $ toInterfaceContractId coin
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of inputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = API.Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = inputCoins
+          outputs = 
+            [ API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin, 
+            API.OutputReceiverCoin charlie.primaryParty API.FloatingReceiverCoin ]
+          payload = "test"
+        context = context
+        expectedError = "More than the maximum number of inputs"
+    return ()
+
+testTransferExceedsMaxOutputs: Script ()
+testTransferExceedsMaxOutputs = do
+    app <- setupApp
+    validator <- setupValidator app "validator"
+    alice <- setupUser app "alice" validator
+    bob <- setupUser app "bob" validator
+    charlie <- setupUser app "charlie" validator
+    coin <- tap app alice 100.0
+    let outputCoins = map (\i -> API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin) [1..101]
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of outputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = API.Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [API.InputCoin $ toInterfaceContractId coin]
+          outputs = outputCoins
+          payload = "test"
+        context = context
+        expectedError = "More than the maximum number of outputs"
+    return ()
+
+testTransferExceedsMaxLockHolders: Script ()
+testTransferExceedsMaxLockHolders = do
+    app <- setupApp
+    validator <- setupValidator app "validator"
+    alice <- setupUser app "alice" validator
+    bob <- setupUser app "bob" validator
+    charlie <- setupUser app "charlie" validator
+    coin <- tap app alice 100.0
+    context <- getPaymentTransferContext app alice
+    now <- getTime
+    let lockHolders = map (const bob.primaryParty) [1..101]
+    -- More than the allowed number of lock holders
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+      transfer = API.Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [API.InputCoin $ toInterfaceContractId coin]
+        outputs = 
+          [ API.OutputSenderCoin with
+              exactAmount = None
+              lock = Some API.TimeLock with
+                holders = lockHolders
+                expiresAt = now `addRelTime` (minutes 1) ]
+        payload = "test"
+      context = context
+      expectedError = "Fewer than the allowed number of lock holders"
+    return ()
+
+testTransferExceedsMaxPayloadLength: Script ()
+testTransferExceedsMaxPayloadLength = do
+    app <- setupApp
+    validator <- setupValidator app "validator"
+    alice <- setupUser app "alice" validator
+    bob <- setupUser app "bob" validator
+    charlie <- setupUser app "charlie" validator
+    coin <- tap app alice 100.0
+    context <- getPaymentTransferContext app alice
+    let payloadOfLength33 = "testing123testing123testing123456"
+    -- Payload length is above limit
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = API.Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [API.InputCoin $ toInterfaceContractId coin]
+          outputs = [ API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin, 
+            API.OutputReceiverCoin charlie.primaryParty API.FloatingReceiverCoin ]
+          payload = payloadOfLength33
+        context = context
+        expectedError = "Payload length is above limit"
+    return ()

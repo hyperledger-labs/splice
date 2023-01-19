@@ -718,8 +718,8 @@ data TransferOutputsSummary = TransferOutputsSummary with
     senderTransferFees : Decimal
     preprocessedOutputs : [PreprocessedTransferOutput]
     receiverTransferFees : Decimal
-    totalSelfOutputs : Decimal -- sum of output coins (including floating) where receiver != sender
-    totalNonSelfOutputs : Decimal -- sum of output coins (including floating) where receiver == sender
+    totalSelfOutputs : Decimal -- sum of output coins (including floating) where receiver == sender
+    totalNonSelfOutputs : Decimal -- sum of output coins (including floating) where receiver != sender
   deriving (Eq, Show)
 
 data PreprocessedTransferOutputType
@@ -742,6 +742,7 @@ mergeReceiverFees fees summary =
   summary with
     receiverTransferFees = summary.receiverTransferFees + totFees
     totalTransferFees = summary.totalTransferFees + totFees
+    usageFees = summary.usageFees + totFees
   where
     totFees = sum (Map.values fees)
 

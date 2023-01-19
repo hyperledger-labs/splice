@@ -1,0 +1,57 @@
+module CC.Scripts.TestCoinRulesTransfer where
+
+import CC.Coin
+import CC.Fees
+import CC.Scripts.Parameters
+import CC.Scripts.Util
+import DA.Assert
+import DA.List
+import Daml.Script
+import qualified CC.API.V1.Coin as API
+
+testUsageFees: Script ()
+testUsageFees = do
+  app <- setupApp
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator 
+  coin1 <- tap app alice 33.0
+  coin2 <- tap app alice 33.0
+  coin3 <- tap app alice 34.0
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
+    transfer = API.Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[coin1, coin2, coin3]
+      outputs = [ API.OutputSenderCoin with
+                    exactAmount = Some 10.0
+                    lock = None
+                  , API.OutputSenderCoin with
+                    exactAmount = None
+                    lock = None
+                  , API.OutputReceiverCoin bob.primaryParty $ API.FixedReceiverCoin with
+                    amount = 10.0
+                    senderTransferFeeRatio = 0.6
+                  , API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin ]
+      payload = "test"
+    context = context.context
+  let config = scaleFees 1.0 defaultCoinConfig
+      expectedCreateFee : Decimal = 0.09
+      expectedUpdateFee : Decimal = 0.01 * 3.0
+      expectedSenderTransferFee = (chargeSteppedRate config.transferFee 10.0) * 0.6
+      expectedReceiverTransferFee = (chargeSteppedRate config.transferFee 10.0) * 0.4
+      excessAmount = 100.0 - (config.holdingFee.rate * 3.0) - 10.0 - 10.0 - expectedCreateFee - expectedUpdateFee - expectedSenderTransferFee
+      floatingSenderAmount = excessAmount / 2.0
+      expectedFloatingReceiverTransferFee = chargeSteppedRate config.transferFee floatingSenderAmount
+      floatingReceiverAmount = floatingSenderAmount - expectedFloatingReceiverTransferFee
+
+  aliceCoins <- query @Coin alice.primaryParty
+  bobCoins <- query @Coin bob.primaryParty
+  sort (map (\(_, c) -> c.amount.initialAmount) aliceCoins) === [1.0, 10.0, floatingSenderAmount]
+  sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, 10.0 - expectedReceiverTransferFee, floatingReceiverAmount ]
+
+  transferResult.summary.usageFees === expectedCreateFee + expectedSenderTransferFee + expectedReceiverTransferFee + expectedFloatingReceiverTransferFee 
+  return ()
