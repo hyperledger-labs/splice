@@ -114,8 +114,20 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalCoinInstances(svcOpt.toList, svs.local, scans.local, directories.local),
-    mergeRemoteCoinInstances(remoteSvcOpt.toList, svs.remote, scans.remote, directories.remote),
+    mergeLocalCoinInstances(
+      svcOpt.toList,
+      svs.local,
+      scans.local,
+      directories.local,
+      validators.local.filter(v => v.name == "directoryValidator"),
+    ),
+    mergeRemoteCoinInstances(
+      remoteSvcOpt.toList,
+      svs.remote,
+      scans.remote,
+      directories.remote,
+      validators.remote.filter(v => v.name == "directoryValidator"),
+    ),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */

@@ -30,19 +30,20 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       // that blocks on all apps being initialized.
       .withNoSetup()
 
+  def initSvc()(implicit env: CoinTestConsoleEnvironment) = {
+    env.appsHostedBySvc.local.foreach(_.start())
+    env.appsHostedBySvc.local.foreach(_.waitForInitialization())
+  }
+
   "start and restart cleanly" in { implicit env =>
-    svc.startSync()
-    svs.foreach(_.startSync())
-    scan.startSync()
+    initSvc()
     aliceValidator.startSync()
     aliceValidator.stop()
     aliceValidator.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
-    svc.startSync()
-    svs.foreach(_.startSync())
-    scan.startSync()
+    initSvc()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
@@ -72,10 +73,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
-    // Start nodes
-    svc.start()
-    svs.foreach(_.start())
-    scan.start()
+    initSvc()
     aliceValidator.startSync()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
@@ -90,16 +88,10 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     partyIdFromGoodUserId.toString
       .split("::")
       .head should fullyMatch regex (s"other-_us:er-${randomId}")
-
-    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
-    svs.foreach(_.waitForInitialization())
   }
 
   "register user" in { implicit env =>
-    // Start nodes
-    svc.start()
-    svs.foreach(_.startSync())
-    scan.start()
+    initSvc()
     aliceValidator.startSync()
 
     val partyIdFromTokenUser = aliceValidator.register()
@@ -110,10 +102,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
-    // Start nodes
-    svc.start()
-    svs.foreach(_.startSync())
-    scan.start()
+    initSvc()
     aliceValidator.startSync()
 
     implicit val sys = env.actorSystem
@@ -155,9 +144,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   }
 
   "onboard user multiple times" in { implicit env =>
-    svc.start()
-    svs.foreach(_.startSync())
-    scan.start()
+    initSvc()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
@@ -166,9 +153,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   }
 
   "register user multiple times" in { implicit env =>
-    svc.start()
-    svs.foreach(_.start())
-    scan.start()
+    initSvc()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.register()
@@ -177,9 +162,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   }
 
   "list one connected domain" in { implicit env =>
-    svc.startSync()
-    svs.foreach(_.startSync())
-    scan.startSync()
+    initSvc()
     aliceValidator.startSync()
     eventually() {
       aliceValidator.listConnectedDomains().keySet shouldBe Set("global", "splitwise")
