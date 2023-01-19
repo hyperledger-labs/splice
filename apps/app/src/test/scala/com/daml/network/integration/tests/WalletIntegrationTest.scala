@@ -396,10 +396,10 @@ class WalletIntegrationTest
             aliceParty,
             domainId = Some(splitwiseDomainId),
           )
-          // TODO(M3-18) If we only count on the target domain, this won’t be true anymore.
+          /* TODO(M3-18) we only count on the target domain, so this isn't true anymore. Reenable
           eventually() {
             aliceWallet.listAppPaymentRequests() should have length 1
-          }
+          }*/
           val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
             .lookup_contract_domain(referenceId, requestId)
           domains shouldBe Map[LfContractId, String](

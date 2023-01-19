@@ -11,6 +11,9 @@ import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
+import cats.instances.future.*
+import cats.instances.seq.*
+import cats.syntax.foldable.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvAppService(
@@ -30,9 +33,14 @@ class GrpcSvAppService(
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvAppService") { _ => _ =>
       for {
-        coinRulesCids <- connection
-          .activeContracts(store.key.svParty, cc.coin.CoinRules.COMPANION)
-          .map(_.map(_.id))
+        domains <- store.domains.listConnectedDomains().map(_.values.toSeq)
+        // TODO (M3-18) either choose the correct domain or fold over the
+        // store's ACSes instead (for which there should be 1/domain)
+        coinRulesCids <- domains.foldMapA { domain =>
+          connection
+            .activeContracts(domain, store.key.svParty, cc.coin.CoinRules.COMPANION)
+            .map(_.map(_.id))
+        }
       } yield v0.GetDebugInfoResponse(
         svUser = svUserName,
         svPartyId = Proto.encode(store.key.svParty),

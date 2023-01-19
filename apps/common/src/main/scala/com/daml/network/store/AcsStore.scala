@@ -410,8 +410,6 @@ object AcsStore {
       templateIds: Set[Identifier],
       interfaceIds: Set[Identifier],
   ) {
-    def parties: Set[PartyId] = Set(primaryParty)
-
     def toTransactionFilter: TransactionFilter = {
       val interfaceIdsJava =
         interfaceIds.view.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava

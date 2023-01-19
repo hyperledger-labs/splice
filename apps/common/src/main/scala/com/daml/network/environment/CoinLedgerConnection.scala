@@ -18,16 +18,10 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   Event,
   ExercisedEvent,
-  Filter,
-  FiltersByParty,
-  GetTransactionTreesResponse,
-  GetTransactionsRequest,
   Identifier,
   LedgerOffset,
-  NoFilter,
   Template,
   Transaction,
-  TransactionFilter,
   TransactionTree,
   User,
 }
@@ -103,19 +97,23 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
   def activeContractsWithOffset(
-      filter: IngestionFilter
+      domain: DomainId,
+      filter: IngestionFilter,
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
 
   def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      domain: DomainId,
       party: PartyId,
       companion: ContractCompanion[TC, TCid, T],
   ): Future[(Seq[Contract[TCid, T]], LedgerOffset)]
 
   def activeContracts(
-      filter: IngestionFilter
+      domain: DomainId,
+      filter: IngestionFilter,
   ): Future[Seq[CreatedEvent]]
 
   def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      domain: DomainId,
       party: PartyId,
       companion: ContractCompanion[TC, TCid, T],
   ): Future[Seq[Contract[TCid, T]]]
@@ -123,7 +121,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def subscribeAsync(
       subscriptionName: String,
       beginOffset: LedgerOffset,
-      filter: Seq[PartyId],
+      filter: PartyId,
+      domain: DomainId,
   )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription
 
   def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
@@ -317,22 +316,21 @@ object CoinLedgerConnection {
       }
 
       override def activeContractsWithOffset(
-          filter: IngestionFilter
+          domain: DomainId,
+          filter: IngestionFilter,
       ): Future[(Seq[CreatedEvent], LedgerOffset)] =
-        client.ledgerEnd().flatMap {
+        client.ledgerEnd(domain).flatMap {
           case lb: LedgerOffset.LedgerBegin => Future.successful((Seq.empty, lb))
           case simulatedAcsEnd =>
-            val filterParties = filter.parties.toSeq
-            val req = new GetTransactionsRequest(
-              "",
+            val req = LedgerClient.GetUpdatesRequest(
               LedgerOffset.LedgerBegin.getInstance,
-              simulatedAcsEnd,
-              partyOnlyFilter(filterParties),
-              false,
+              Some(simulatedAcsEnd),
+              filter.primaryParty,
+              domain,
             )
             val filterCreates = interpretCreateFilter(filter)
             val mapCe = client
-              .transactionTrees(req)
+              .updates(req)
               .via(treesAsTransactions)
               .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
                 val (creates, archives) = tx.getEvents.asScala.partitionMap {
@@ -359,25 +357,29 @@ object CoinLedgerConnection {
       override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
         T
       ], T <: Template](
+          domain: DomainId,
           party: PartyId,
           companion: ContractCompanion[TC, TCid, T],
       ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
         activeContractsWithOffset(
-          CoinLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID)
+          domain,
+          CoinLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID),
         ).map { case (events, off) =>
           (events.map(companion.fromCreatedEvent(_)), off)
         }
 
       override def activeContracts(
-          filter: IngestionFilter
+          domain: DomainId,
+          filter: IngestionFilter,
       ): Future[Seq[CreatedEvent]] =
-        activeContractsWithOffset(filter).map(_._1)
+        activeContractsWithOffset(domain, filter).map(_._1)
 
       override def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+          domain: DomainId,
           party: PartyId,
           companion: ContractCompanion[TC, TCid, T],
       ): Future[Seq[Contract[TCid, T]]] =
-        activeContractsWithOffset(party, companion).map(_._1)
+        activeContractsWithOffset(domain, party, companion).map(_._1)
 
       // TODO (M3-18)
       // This is a hacked up wrapper that transforms transaction trees into flat transactions.
@@ -396,39 +398,28 @@ object CoinLedgerConnection {
       private def subscription(
           subscriptionName: String,
           beginOffset: LedgerOffset,
-          parties: Seq[PartyId],
+          party: PartyId,
+          domain: DomainId,
       )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription = {
         makeSubscription(
-          client.transactionTrees(
-            new GetTransactionsRequest("", beginOffset, partyOnlyFilter(parties), false)
+          client.updates(
+            LedgerClient.GetUpdatesRequest(beginOffset, None, party, domain)
           ),
           treesFromResponse.via(mapOperator),
           subscriptionName,
         )
       }
 
-      private def partyOnlyFilter(parties: Seq[PartyId]): TransactionFilter =
-        new FiltersByParty(
-          parties
-            .map(p => p.toProtoPrimitive -> NoFilter.instance)
-            .toMap[String, Filter]
-            .asJava
-        )
+      private def treesAsTransactions
+          : Flow[LedgerClient.GetTreeUpdatesResponse, Transaction, NotUsed] =
+        treesFromResponse.map(flattenTree)
 
-      private def treesAsTransactions: Flow[GetTransactionTreesResponse, Transaction, NotUsed] =
-        Flow
-          .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
-            _.getTransactions.asScala.toSeq
+      private def treesFromResponse
+          : Flow[LedgerClient.GetTreeUpdatesResponse, TransactionTree, NotUsed] =
+        Flow[LedgerClient.GetTreeUpdatesResponse]
+          .mapConcat(
+            _.discardTransfers // TODO (M3-18) do not simply discard transfers
           )
-          .mapConcat(identity)
-          .map(flattenTree)
-
-      private def treesFromResponse: Flow[GetTransactionTreesResponse, TransactionTree, NotUsed] =
-        Flow
-          .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
-            _.getTransactions.asScala.toSeq
-          )
-          .mapConcat(identity)
 
       private def flattenTree(tree: TransactionTree): Transaction = {
         val events: mutable.Buffer[Event] = mutable.ListBuffer()
@@ -465,9 +456,10 @@ object CoinLedgerConnection {
       override def subscribeAsync(
           subscriptionName: String,
           beginOffset: LedgerOffset,
-          filter: Seq[PartyId],
+          filter: PartyId,
+          domain: DomainId,
       )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription =
-        subscription(subscriptionName, beginOffset, filter)({
+        subscription(subscriptionName, beginOffset, filter, domain)({
           Flow[TransactionTree].mapAsync(1)(f)
         })
 

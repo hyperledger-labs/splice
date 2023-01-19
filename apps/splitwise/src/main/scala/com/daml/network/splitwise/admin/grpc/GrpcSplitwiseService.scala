@@ -1,6 +1,7 @@
 package com.daml.network.splitwise.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
+import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
 import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -42,8 +43,13 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
+        domain <- assertGlobalDomain(store.domains).apply()
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
-        groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group.COMPANION)
+        groups <- connection.activeContracts(
+          domain,
+          providerParty,
+          splitwiseCodegen.Group.COMPANION,
+        )
       } yield {
         val filtered = groups.filter(c => c.hasStakeholder(userParty))
         v0.ListGroupsResponse(filtered.map(c => Contract.fromCodegenContract(c).toProtoV0))
@@ -55,8 +61,11 @@ class GrpcSplitwiseService(
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
       for {
+        domain <- assertGlobalDomain(store.domains).apply()
         groupInvites <- connection.activeContracts(
+          domain,
           providerParty,
           splitwiseCodegen.GroupInvite.COMPANION,
         )
@@ -74,7 +83,9 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
+        domain <- assertGlobalDomain(store.domains).apply()
         acceptedGroupInvites <- connection.activeContracts(
+          domain,
           providerParty,
           splitwiseCodegen.AcceptedGroupInvite.COMPANION,
         )
@@ -95,8 +106,11 @@ class GrpcSplitwiseService(
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
       for {
+        domain <- assertGlobalDomain(store.domains).apply()
         balanceUpdates <- connection.activeContracts(
+          domain,
           providerParty,
           splitwiseCodegen.BalanceUpdate.COMPANION,
         )
@@ -122,7 +136,9 @@ class GrpcSplitwiseService(
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       val javaUserParty = userParty.toProtoPrimitive
       for {
+        domain <- assertGlobalDomain(store.domains).apply()
         balanceUpdates <- connection.activeContracts(
+          domain,
           providerParty,
           splitwiseCodegen.BalanceUpdate.COMPANION,
         )

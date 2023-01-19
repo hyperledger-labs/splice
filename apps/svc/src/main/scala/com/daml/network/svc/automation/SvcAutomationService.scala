@@ -43,6 +43,7 @@ class SvcAutomationService(
         store.events,
         loggerFactory,
       ),
+      store.domains,
       connection,
       retryProvider,
       loggerFactory,

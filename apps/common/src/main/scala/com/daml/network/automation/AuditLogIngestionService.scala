@@ -2,7 +2,7 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
-import com.daml.network.store.AuditLogIngestionSink
+import com.daml.network.store.{AuditLogIngestionSink, DomainStore}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,6 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AuditLogIngestionService(
     name: String,
     ingestionSink: AuditLogIngestionSink,
+    domains: DomainStore,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
     loggerFactory0: NamedLoggerFactory,
@@ -22,6 +23,7 @@ class AuditLogIngestionService(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends LedgerIngestionService {
+  import CoinAppAutomationService.assertGlobalDomain
 
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("ingestLoopFor", name)
@@ -29,12 +31,13 @@ class AuditLogIngestionService(
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
   ): Future[CoinLedgerSubscription] =
-    Future.successful {
+    assertGlobalDomain(domains).apply() map { domain =>
       val offset = LedgerOffset.LedgerBegin.getInstance()
       connection.subscribeAsync(
         s"AuditLogIngestion($name)",
         offset,
-        Seq(ingestionSink.filterParty),
+        ingestionSink.filterParty,
+        domain,
       )(
         ingestionSink.processTransaction(_)
       )

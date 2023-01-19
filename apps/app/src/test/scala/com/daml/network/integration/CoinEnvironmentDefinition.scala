@@ -41,12 +41,6 @@ case class CoinEnvironmentDefinition(
   override val configTransforms = configTransformsWithContext(context)
   def withManualStart: CoinEnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
-  def withConnectedDomains(): CoinEnvironmentDefinition =
-    copy(preSetup = env => {
-      import env._
-      this.preSetup(env)
-      participants.local.foreach(_.domains.connect_local(da))
-    })
 
   def withAllocatedSvcAndSvUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
@@ -157,7 +151,6 @@ case class CoinEnvironmentDefinition(
 object CoinEnvironmentDefinition {
   def simpleTopology(testName: String): CoinEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
-      .withConnectedDomains()
       .withAllocatedSvcAndSvUsers()
       .withAllocatedValidatorUsers()
       .withInitializedNodes()

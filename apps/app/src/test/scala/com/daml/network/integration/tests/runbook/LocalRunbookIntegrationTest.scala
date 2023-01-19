@@ -67,7 +67,7 @@ class LocalRunbookIntegrationTest
       |  )
       |})
       |println("Connecting svc participant to domain")
-      |svc_participant.domains.connect_local(svc_domain)
+      |svc_participant.domains.connect("global", "http://localhost:7008")
       |""".stripMargin)
     bootstrapFile.append(validatorBootstrapContent)
 

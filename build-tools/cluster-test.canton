@@ -8,7 +8,7 @@ val clusterAddr = sys.env.get("CLUSTER_ADDR").get
 
 println("Connecting local participant to domain: " + clusterAddr)
 
-localParticipant1.domains.connect("svc_domain", s"http://$clusterAddr:5008")
+localParticipant1.domains.connect("global", s"http://$clusterAddr:5008")
 
 println("....waiting for active domain connection.")
 

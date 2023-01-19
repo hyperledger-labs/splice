@@ -37,9 +37,6 @@ import com.daml.ledger.javaapi.data.{
   CreateUserResponse,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
-  GetTransactionTreesResponse,
-  GetTransactionsRequest,
-  GetTransactionsResponse,
   GetUserRequest,
   GrantUserRightsRequest,
   LedgerOffset,
@@ -81,6 +78,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     ec: ExecutionContext,
     elc: ErrorLoggingContext,
 ) extends Closeable {
+  import LedgerClient.{GetUpdatesRequest, GetTreeUpdatesResponse, scalapbToJava}
+
   val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
     withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
   val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
@@ -95,7 +94,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
   val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
-  val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
+  private val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
     withCredentials(upsvc.UpdateServiceGrpc.stub(channel), token)
   private val transferSubmissionServiceStub
       : xfrsvc.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
@@ -118,10 +117,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
 
   override def close(): Unit = GrpcChannel.close(channel)
 
-  def ledgerEnd(): Future[LedgerOffset] = {
-    val req = TransactionServiceOuterClass.GetLedgerEndRequest.newBuilder().build()
-    wrapFuture(transactionServiceStub.getLedgerEnd(req, _)).map { resp =>
-      LedgerOffset.fromProto(resp.getOffset)
+  def ledgerEnd(domain: DomainId): Future[LedgerOffset] = {
+    val req = upsvc.GetLedgerEndRequest(domainId = domain.toProtoPrimitive)
+    updateServiceStub.getLedgerEnd(req).map { resp =>
+      LedgerOffset.fromProto(scalapbToJava(resp.getOffset)(_.companion))
     }
   }
 
@@ -149,28 +148,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     }
   }
 
-  def transactions(
-      request: GetTransactionsRequest
-  ): Source[GetTransactionsResponse, NotUsed] = {
-    ClientAdapter
-      .serverStreaming(request.toProto, transactionServiceStub.getTransactions)
-      .map(GetTransactionsResponse.fromProto)
-  }
-
-  def updates(
-      request: LedgerClient.GetUpdatesRequest
-  ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
+  def updates(request: GetUpdatesRequest): Source[GetTreeUpdatesResponse, NotUsed] = {
     ClientAdapter
       .serverStreaming(request.toProto, updateServiceStub.getTreeUpdates)
-      .map(LedgerClient.GetTreeUpdatesResponse.fromProto)
-  }
-
-  def transactionTrees(
-      request: GetTransactionsRequest
-  ): Source[GetTransactionTreesResponse, NotUsed] = {
-    ClientAdapter
-      .serverStreaming(request.toProto, transactionServiceStub.getTransactionTrees)
-      .map(GetTransactionTreesResponse.fromProto)
+      .map(GetTreeUpdatesResponse.fromProto)
   }
 
   private def submitAndWaitRequest(
@@ -390,7 +371,7 @@ object LedgerClient {
       GetTreeUpdatesResponse(proto.updates map {
         _.treeUpdate match {
           case TU.TransactionTree(tree) =>
-            Left(TransactionTree fromProto tree.companion.toJavaProto(tree))
+            Left(TransactionTree fromProto scalapbToJava(tree)(_.companion))
           case TU.Transfer(x) => Right(x)
           case TU.Empty => sys.error("uninitialized update service result")
         }
@@ -446,4 +427,8 @@ object LedgerClient {
       )
     }
   }
+
+  @inline
+  private def scalapbToJava[S, J](s: S)(companion: S => scalapb.JavaProtoSupport[_ >: S, J]): J =
+    companion(s).toJavaProto(s)
 }
