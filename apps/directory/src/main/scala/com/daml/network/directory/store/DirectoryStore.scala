@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -134,6 +135,7 @@ object DirectoryStore {
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext
   ): DirectoryStore =
@@ -143,6 +145,7 @@ object DirectoryStore {
           providerParty = providerParty,
           svcParty = svcParty,
           loggerFactory,
+          futureSupervisor,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }

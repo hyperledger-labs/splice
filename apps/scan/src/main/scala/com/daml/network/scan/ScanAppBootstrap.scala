@@ -37,6 +37,7 @@ class ScanAppBootstrap(
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -71,6 +72,7 @@ class ScanAppBootstrap(
           tracerProvider,
           adminServerRegistry,
           retryProvider,
+          futureSupervisor,
         )
       )
     )
@@ -114,6 +116,7 @@ object ScanAppBootstrap {
           loggerFactory,
           writeHealthDumpToFile,
           retryProvider,
+          futureSupervisor,
         )
       )
       .leftMap(_.toString)

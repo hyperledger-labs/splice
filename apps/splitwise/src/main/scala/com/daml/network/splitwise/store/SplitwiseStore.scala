@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -63,11 +64,17 @@ trait SplitwiseStore extends CoinAppStore {
 }
 
 object SplitwiseStore {
-  def apply(providerParty: PartyId, storage: Storage, loggerFactory: NamedLoggerFactory)(implicit
+  def apply(
+      providerParty: PartyId,
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
+  )(implicit
       ec: ExecutionContext
   ): SplitwiseStore =
     storage match {
-      case _: MemoryStorage => new InMemorySplitwiseStore(providerParty, loggerFactory)
+      case _: MemoryStorage =>
+        new InMemorySplitwiseStore(providerParty, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

@@ -30,6 +30,7 @@ import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
@@ -56,6 +57,7 @@ class ValidatorApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -254,7 +256,7 @@ class ValidatorApp(
         svcParty = svcParty,
         walletServiceParty = walletServiceParty,
       )
-      store = ValidatorStore(key, storage, loggerFactory)
+      store = ValidatorStore(key, storage, loggerFactory, futureSupervisor)
       automation = new ValidatorAutomationService(
         config.automation,
         clock,

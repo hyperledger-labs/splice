@@ -13,6 +13,7 @@ import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -39,6 +40,7 @@ class SplitwiseApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -60,7 +62,7 @@ class SplitwiseApp(
       participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
-    store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))
+    store <- Future.successful(SplitwiseStore(party, storage, loggerFactory, futureSupervisor))
     connection = ledgerClient.connection()
     // TODO(M3-82): once we have explicit disclosure: remove the need to fetch these extra readAs rights, which are there to enable using the CoinRules, which are only visible to the validatorParty
     readAs <- connection.getUserReadAs(config.providerUser)

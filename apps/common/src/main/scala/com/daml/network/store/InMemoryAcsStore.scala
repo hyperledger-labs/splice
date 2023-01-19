@@ -11,6 +11,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.util.{JavaContract, Trees}
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,6 +28,7 @@ import scala.concurrent.*
 class InMemoryAcsStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override val contractFilter: AcsStore.ContractFilter,
+    futureSupervisor: FutureSupervisor,
 
     // Boolean flag to enable very verbose state update logging
     logAllStateUpdates: Boolean = false,
@@ -118,7 +120,8 @@ class InMemoryAcsStore(
         (state, Future.unit)
       } else {
         val (newState, promise) = state.addOffsetToSignal(offset)
-        (newState, promise.future)
+        val future = futureSupervisor.supervised(s"signalWhenIngested($offset)")(promise.future)
+        (newState, future)
       }
     ).flatten
   }

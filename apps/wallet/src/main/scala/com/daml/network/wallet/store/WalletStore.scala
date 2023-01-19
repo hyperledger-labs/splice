@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -76,11 +77,13 @@ object WalletStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext
   ): WalletStore =
     storage match {
-      case _: MemoryStorage => new InMemoryWalletStore(key, loggerFactory, timeouts)
+      case _: MemoryStorage =>
+        new InMemoryWalletStore(key, loggerFactory, timeouts, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

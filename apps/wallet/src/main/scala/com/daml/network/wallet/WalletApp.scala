@@ -21,6 +21,7 @@ import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.v0.WalletServiceGrpc
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -51,6 +52,7 @@ class WalletApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -117,7 +119,13 @@ class WalletApp(
         svcParty = svcParty,
       )
       walletStore =
-        WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
+        WalletStore(
+          walletStoreKey,
+          storage,
+          loggerFactory,
+          coinAppParameters.processingTimeouts,
+          futureSupervisor,
+        )
       walletManager =
         new UserWalletManager(
           ledgerClient,
@@ -131,6 +139,7 @@ class WalletApp(
           retryProvider,
           loggerFactory,
           timeouts,
+          futureSupervisor,
         )
       automation = new WalletAutomationService(
         config.automation,

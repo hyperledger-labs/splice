@@ -22,6 +22,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.network.util.JavaContract
 import com.daml.network.util.PrettyInstances.PrettyContractId
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -246,11 +247,16 @@ object AcsStore {
       view => InterfaceImplementation(companion, view)
   }
 
-  def apply(storage: Storage, loggerFactory: NamedLoggerFactory, scope: ContractFilter)(implicit
+  def apply(
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+      scope: ContractFilter,
+      futureSupervisor: FutureSupervisor,
+  )(implicit
       ec: ExecutionContext
   ): AcsStore =
     storage match {
-      case _: MemoryStorage => new InMemoryAcsStore(loggerFactory, scope)
+      case _: MemoryStorage => new InMemoryAcsStore(loggerFactory, scope, futureSupervisor)
       case _: DbStorage =>
         throw new RuntimeException("Not implemented")
     }

@@ -5,6 +5,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.sv.store.memory.InMemorySvStore
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -63,9 +64,10 @@ object SvStore {
       key: Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): SvStore =
     storage match {
-      case _: MemoryStorage => new InMemorySvStore(key, loggerFactory)
+      case _: MemoryStorage => new InMemorySvStore(key, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

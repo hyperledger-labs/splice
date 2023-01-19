@@ -19,6 +19,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
@@ -46,6 +47,7 @@ class DirectoryApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -84,6 +86,7 @@ class DirectoryApp(
         svcParty = svcParty,
         storage,
         loggerFactory,
+        futureSupervisor,
       )
       automation = new DirectoryAutomationService(
         config.automation,

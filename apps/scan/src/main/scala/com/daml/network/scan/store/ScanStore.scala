@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -25,11 +26,13 @@ object ScanStore {
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext
   ): ScanStore =
     storage match {
-      case _: MemoryStorage => new InMemoryScanStore(svcParty = svcParty, loggerFactory)
+      case _: MemoryStorage =>
+        new InMemoryScanStore(svcParty = svcParty, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

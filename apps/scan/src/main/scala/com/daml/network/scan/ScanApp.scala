@@ -13,6 +13,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -39,6 +40,7 @@ class ScanApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -59,7 +61,7 @@ class ScanApp(
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
-      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory))
+      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory, futureSupervisor))
       automation = new ScanAutomationService(
         config.automation,
         clock,

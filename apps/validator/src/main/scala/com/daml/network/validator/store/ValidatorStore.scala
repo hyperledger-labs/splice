@@ -1,11 +1,12 @@
 package com.daml.network.validator.store
 
-import com.daml.network.codegen.java.cc.{coin => coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStore}
-import com.daml.network.util.{JavaContract => Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -52,10 +53,11 @@ object ValidatorStore {
       key: Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, loggerFactory)
+        new InMemoryValidatorStore(key, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

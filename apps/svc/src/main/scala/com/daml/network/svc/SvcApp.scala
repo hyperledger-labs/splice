@@ -15,6 +15,7 @@ import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
 import com.daml.network.util.{HasHealth, UploadablePackage}
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -40,6 +41,7 @@ class SvcApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     val retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -60,7 +62,7 @@ class SvcApp(
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
-      store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
+      store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory, futureSupervisor))
       connection = ledgerClient.connection()
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       // TODO(#2241) should be handled by SV app

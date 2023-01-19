@@ -9,7 +9,10 @@ import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.metrics.SvAppMetrics
-import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
+import com.digitalasset.canton.concurrent.{
+  ExecutionContextIdlenessExecutorService,
+  FutureSupervisor,
+}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -34,6 +37,7 @@ class SvAppBootstrap(
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -68,6 +72,7 @@ class SvAppBootstrap(
           tracerProvider,
           adminServerRegistry,
           retryProvider,
+          futureSupervisor,
         )
       )
     )
@@ -89,6 +94,7 @@ object SvAppBootstrap {
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
       retryProvider: CoinRetries,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -109,6 +115,7 @@ object SvAppBootstrap {
           loggerFactory,
           writeHealthDumpToFile,
           retryProvider,
+          futureSupervisor,
         )
       )
       .leftMap(_.toString)

@@ -12,6 +12,7 @@ import com.daml.network.sv.store.SvStore
 import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -34,6 +35,7 @@ class SvApp(
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
     val retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -61,7 +63,7 @@ class SvApp(
         this,
       )
       svStoreKey = SvStore.Key(svPartyId, svcPartyId)
-      store = SvStore(svStoreKey, storage, loggerFactory)
+      store = SvStore(svStoreKey, storage, loggerFactory, futureSupervisor)
       connection = ledgerClient.connection()
       automation = new SvAutomationService(
         clock,

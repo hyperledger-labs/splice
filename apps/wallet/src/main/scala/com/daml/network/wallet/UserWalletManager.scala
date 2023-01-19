@@ -10,6 +10,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.{HasHealth, JavaContract as Contract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -35,6 +36,7 @@ class UserWalletManager(
     retryProvider: CoinRetries,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends AutoCloseable
     with NamedLogging
@@ -84,6 +86,7 @@ class UserWalletManager(
       retryProvider,
       loggerFactory,
       timeouts,
+      futureSupervisor,
     )
 
     endUserWalletsMap

@@ -8,13 +8,13 @@ import com.daml.ledger.javaapi.data.{
   ExercisedEvent,
   TransactionTree,
   TreeEvent,
-  Unit => damlUnit,
+  Unit as damlUnit,
 }
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.wordspec.AsyncWordSpec
@@ -183,6 +183,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     val store = new InMemoryAcsStore(
       loggerFactory,
       txFilter,
+      FutureSupervisor.Noop,
     )
     for {
       // ingest test events

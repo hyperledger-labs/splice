@@ -9,6 +9,7 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -31,6 +32,7 @@ class UserWalletService(
     retryProvider: CoinRetries,
     loggerFactory0: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends FlagCloseable
     with NamedLogging
@@ -39,7 +41,8 @@ class UserWalletService(
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("user", key.endUserName)
 
-  val store: UserWalletStore = UserWalletStore(key, storage, loggerFactory, timeouts)
+  val store: UserWalletStore =
+    UserWalletStore(key, storage, loggerFactory, timeouts, futureSupervisor)
 
   private val connection = ledgerClient.connection()
 

@@ -37,6 +37,7 @@ class WalletAppBootstrap(
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -73,6 +74,7 @@ class WalletAppBootstrap(
           tracerProvider,
           adminServerRegistry,
           retryProvider,
+          futureSupervisor,
         )
       )
     )
@@ -115,6 +117,7 @@ object WalletAppBootstrap {
           loggerFactory,
           writeHealthDumpToFile,
           retryProvider,
+          futureSupervisor,
         )
       )
       .leftMap(_.toString)

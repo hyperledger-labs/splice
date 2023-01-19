@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.cn.{
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{CoinUtil, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -117,11 +118,13 @@ object UserWalletStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =
     storage match {
-      case _: MemoryStorage => new InMemoryUserWalletStore(key, loggerFactory, timeouts)
+      case _: MemoryStorage =>
+        new InMemoryUserWalletStore(key, loggerFactory, timeouts, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
