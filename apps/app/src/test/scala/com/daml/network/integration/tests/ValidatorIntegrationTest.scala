@@ -98,7 +98,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   "register user" in { implicit env =>
     // Start nodes
     svc.start()
-    svs.foreach(_.start())
+    svs.foreach(_.startSync())
     scan.start()
     aliceValidator.startSync()
 
@@ -107,15 +107,12 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     partyIdFromTokenUser.toString
       .split("::")
       .head should be(aliceValidator.config.damlUser)
-
-    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
-    svs.foreach(_.waitForInitialization())
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
     // Start nodes
     svc.start()
-    svs.foreach(_.start())
+    svs.foreach(_.startSync())
     scan.start()
     aliceValidator.startSync()
 
@@ -155,23 +152,17 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       .singleRequest(registerPost.withHeaders(tokenHeader(validToken)))
       .futureValue
     validResponse.status should be(StatusCodes.OK)
-
-    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
-    svs.foreach(_.waitForInitialization())
   }
 
   "onboard user multiple times" in { implicit env =>
     svc.start()
-    svs.foreach(_.start())
+    svs.foreach(_.startSync())
     scan.start()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     val party2 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     party1 shouldBe party2
-
-    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
-    svs.foreach(_.waitForInitialization())
   }
 
   "register user multiple times" in { implicit env =>
@@ -183,9 +174,6 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     val party1 = aliceValidator.register()
     val party2 = aliceValidator.register()
     party1 shouldBe party2
-
-    // avoids flaking on fast tests; the svc becomes operational before *all* svs have initialized
-    svs.foreach(_.waitForInitialization())
   }
 
   "list one connected domain" in { implicit env =>

@@ -121,10 +121,7 @@ class LocalRunbookIntegrationTest
         CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
       )
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      .withThisSetup(env => {
-        import env._
-        env.appsHostedBySvc.local.start()(env)
-      })
+      .withThisSetup(_.appsHostedBySvc.local.foreach(_.startSync()))
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {
     CoinConfigTransforms.updateAllValidatorConfigs_(
