@@ -1,8 +1,11 @@
 package com.daml.network.environment
 
+import com.google.protobuf.empty.Empty
 import com.digitalasset.canton.research.participant.multidomain.{
   transfer as xfr,
   update_service as upsvc,
+  transfer_submission_service as xfrsvc,
+  transfer_command as xfrcmd,
 }
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import akka.NotUsed
@@ -46,6 +49,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
@@ -93,6 +97,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
   val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
     withCredentials(upsvc.UpdateServiceGrpc.stub(channel), token)
+  private val transferSubmissionServiceStub
+      : xfrsvc.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
+    withCredentials(xfrsvc.TransferSubmissionServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -304,6 +311,25 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     }
     wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
   }
+
+  def submitTransfer(
+      applicationId: String,
+      commandId: String,
+      submitter: PartyId,
+      command: LedgerClient.TransferCommand,
+  ): Future[Unit] =
+    transferSubmissionServiceStub
+      .submit(
+        LedgerClient
+          .TransferSubmitRequest(
+            applicationId,
+            commandId,
+            submitter,
+            command,
+          )
+          .toProto
+      )
+      .map((_: Empty) => ())
 }
 
 object LedgerClient {
@@ -369,5 +395,55 @@ object LedgerClient {
           case TU.Empty => sys.error("uninitialized update service result")
         }
       })
+  }
+
+  sealed abstract class TransferCommand extends Product with Serializable
+
+  object TransferCommand {
+    final case class Out(
+        contractId: ContractId[_],
+        source: DomainId,
+        target: DomainId,
+    ) extends TransferCommand {
+      def toProto: xfrcmd.TransferOutCommand =
+        xfrcmd.TransferOutCommand(
+          contractId = contractId.contractId,
+          source = source.toProtoPrimitive,
+          target = target.toProtoPrimitive,
+        )
+    }
+    final case class In(
+        transferOutId: String,
+        source: DomainId,
+        target: DomainId,
+    ) extends TransferCommand {
+      def toProto: xfrcmd.TransferInCommand =
+        xfrcmd.TransferInCommand(
+          transferOutId = transferOutId,
+          source = source.toProtoPrimitive,
+          target = target.toProtoPrimitive,
+        )
+    }
+  }
+
+  final case class TransferSubmitRequest(
+      applicationId: String,
+      commandId: String,
+      submitter: PartyId,
+      command: TransferCommand,
+  ) {
+    def toProto: xfrsvc.SubmitRequest = {
+      val baseCommand = xfrcmd.TransferCommand(
+      )
+      val updatedCommand = command match {
+        case out: TransferCommand.Out =>
+          baseCommand.withTransferOutCommand(out.toProto)
+        case in: TransferCommand.In =>
+          baseCommand.withTransferInCommand(in.toProto)
+      }
+      xfrsvc.SubmitRequest(
+        Some(updatedCommand)
+      )
+    }
   }
 }

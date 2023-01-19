@@ -668,9 +668,9 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-research-update-service` = {
+  lazy val `canton-research-services` = {
     sbt
-      .Project("canton-research-update-service", file("canton/research/app"))
+      .Project("canton-research-services", file("canton/research/app"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
         disableTests,
