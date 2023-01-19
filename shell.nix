@@ -50,20 +50,21 @@ in pkgs.mkShell {
     nodejs
     openapi-generator-cli
     openjdk11
+    postgresql_11
+    pre-commit
     protobuf3_19
     protoc-gen-grpc-web
-    postgresql_11
     ps
     python3
-    python3Packages.sphinx_rtd_theme
     python3Packages.datadog
+    python3Packages.sphinx_rtd_theme
     ripgrep
     sbt
     scala
     selenium-server-standalone
     sphinx
-    toxiproxy
     tmux
+    toxiproxy
     unzip
     which
     x86Pkgs.sphinx-autobuild

@@ -104,6 +104,12 @@ clusters.)
       ```
       nix-shell --debug --verbose --pure
       ```
+4. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
+   ```
+   pre-commit install
+   # or:
+   pre-commit install -t pre-push
+   ```
 
 **Important:** start your IDE and other development tools from a console that
 has this `direnv` loaded; and thus has the proper version of all the

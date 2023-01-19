@@ -1,4 +1,4 @@
-local tls = import './tls.jsonnet';
+local tls = import "./tls.jsonnet";
 
 local flatten(obj) =
   if std.isArray(obj)
@@ -6,8 +6,8 @@ local flatten(obj) =
   else [obj];
 
 local objects(items) = {
-  apiVersion: 'apps/v1',
-  kind: 'List',
+  apiVersion: "apps/v1",
+  kind: "List",
   items: flatten(std.map(function(i) i.deploymentObjects, items)),
 };
 
@@ -15,26 +15,26 @@ local findPort(ports, portName) =
   local matches = std.filter(function(p) p.name == portName, ports);
 
   if std.length(matches) == 0 then
-    error 'Cannot find port: ' + portName
+    error "Cannot find port: " + portName
   else if std.length(matches) > 1 then
-    error 'Too many ports with name: ' + portName
+    error "Too many ports with name: " + portName
   else
     matches[0];
 
 local imageName(config, name) =
-  config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag;
+  config.gcpRegion + "-docker.pkg.dev/" + config.gcpRepoName + "/" + name + ":" + config.imageTag;
 
 local validPortName(name) =
   if std.length(name) <= 15 then
     name
   else
-    error 'port name too long: ' + name;
+    error "port name too long: " + name;
 
 local externalPort(port) =
-  if std.objectHas(port, 'externalPort') then port.externalPort else port.port;
+  if std.objectHas(port, "externalPort") then port.externalPort else port.port;
 
 local toGrpcWebPort(port) = {
-  name: validPortName(port.name + '-gw'),
+  name: validPortName(port.name + "-gw"),
   port: port.port + 1000,
   externalPort: externalPort(port) + 1000,
   proxyToGrpc: port.port,
@@ -46,42 +46,42 @@ local toContainerPortDefn(p) = {
 };
 
 local authEnvVars(s) = {
-  [s.env + '_URL']: {
-    name: s.env + '_URL',
+  [s.env + "_URL"]: {
+    name: s.env + "_URL",
     valueFrom: {
       secretKeyRef: {
         name: s.secret,
-        key: 'url',
+        key: "url",
         optional: false,
       },
     },
   },
-  [s.env + '_CLIENT_ID']: {
-    name: s.env + '_CLIENT_ID',
+  [s.env + "_CLIENT_ID"]: {
+    name: s.env + "_CLIENT_ID",
     valueFrom: {
       secretKeyRef: {
         name: s.secret,
-        key: 'client-id',
+        key: "client-id",
         optional: false,
       },
     },
   },
-  [s.env + '_CLIENT_SECRET']: {
-    name: s.env + '_CLIENT_SECRET',
+  [s.env + "_CLIENT_SECRET"]: {
+    name: s.env + "_CLIENT_SECRET",
     valueFrom: {
       secretKeyRef: {
         name: s.secret,
-        key: 'client-secret',
+        key: "client-secret",
         optional: false,
       },
     },
   },
-  [s.env + '_USER_NAME']: {
-    name: s.env + '_USER_NAME',
+  [s.env + "_USER_NAME"]: {
+    name: s.env + "_USER_NAME",
     valueFrom: {
       secretKeyRef: {
         name: s.secret,
-        key: 'daml-user-name',
+        key: "daml-user-name",
         optional: false,
       },
     },
@@ -111,8 +111,8 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
     ports: std.map(function(p) (p { service: name }), allPorts),
     deploymentObjects: [
       {
-        apiVersion: 'apps/v1',
-        kind: 'Deployment',
+        apiVersion: "apps/v1",
+        kind: "Deployment",
         metadata: {
           name: name,
           labels: {
@@ -123,7 +123,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
         spec: {
           replicas: 1,
           strategy: {
-            type: 'Recreate',
+            type: "Recreate",
           },
           selector: {
             matchLabels: {
@@ -142,31 +142,31 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
                 {
                   name: name,
                   image: imageName(config, if image == null then name else image),
-                  imagePullPolicy: 'Always',
+                  imagePullPolicy: "Always",
                   ports: [toContainerPortDefn(p) for p in ports],
                   env: [
                     {
-                      name: 'JAVA_TOOL_OPTIONS',
-                      value: '-Xms%sM -Xmx%sM' % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
+                      name: "JAVA_TOOL_OPTIONS",
+                      value: "-Xms%sM -Xmx%sM" % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
                     },
                   ] + extraEnvVars,
                   resources: {
                     requests: {
-                      memory: memoryLimitMiB + 'Mi',
+                      memory: memoryLimitMiB + "Mi",
                     },
                     limits: {
-                      memory: memoryLimitMiB + 'Mi',
+                      memory: memoryLimitMiB + "Mi",
                     },
                   },
                   volumeMounts: if mountConfig == null then [] else [
                     {
-                      mountPath: '/config',
-                      name: name + '-config-vol',
+                      mountPath: "/config",
+                      name: name + "-config-vol",
                     },
                   ] + if tlsCertSecret == null then [] else [
                     {
-                      mountPath: '/tmp',
-                      name: name + '-tls-cert-vol',
+                      mountPath: "/tmp",
+                      name: name + "-tls-cert-vol",
                     },
                   ],
                 } + ext,
@@ -174,29 +174,29 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
                 if proxyPort != null then
                   [
                     {
-                      name: 'envoy-proxy',
-                      image: imageName(config, 'envoy-proxy'),
-                      imagePullPolicy: 'Always',
+                      name: "envoy-proxy",
+                      image: imageName(config, "envoy-proxy"),
+                      imagePullPolicy: "Always",
                       resources: {
                         requests: {
-                          memory: '256Mi',
+                          memory: "256Mi",
                         },
                         limits: {
-                          memory: '256Mi',
+                          memory: "256Mi",
                         },
                       },
                       ports: [toContainerPortDefn(toGrpcWebPort(proxyPort))],
                       env: [
                         {
-                          name: 'GRPC_ADDRESS',
-                          value: '127.0.0.1',
+                          name: "GRPC_ADDRESS",
+                          value: "127.0.0.1",
                         },
                         {
-                          name: 'GRPC_PORT',
+                          name: "GRPC_PORT",
                           value: std.toString(proxyPort.port),
                         },
                         {
-                          name: 'GRPC_WEB_PORT',
+                          name: "GRPC_WEB_PORT",
                           value: std.toString(toGrpcWebPort(proxyPort).port),
                         },
                       ],
@@ -205,14 +205,14 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
               ),
               volumes: if mountConfig == null then [] else [
                 {
-                  name: name + '-config-vol',
+                  name: name + "-config-vol",
                   configMap: {
                     name: mountConfig,
                   },
                 },
               ] + if tlsCertSecret == null then [] else [
                 {
-                  name: name + '-tls-cert-vol',
+                  name: name + "-tls-cert-vol",
                   secret: {
                     secretName: tlsCertSecret,
                     optional: false,
@@ -224,8 +224,8 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
         },
       },
       {
-        apiVersion: 'v1',
-        kind: 'Service',
+        apiVersion: "v1",
+        kind: "Service",
         metadata: {
           name: name,
           clusterName: config.clusterName,
@@ -237,7 +237,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
           ports: [
             {
               name: p.name,
-              protocol: 'TCP',
+              protocol: "TCP",
               port: p.port,
             }
             for p in allPorts
@@ -251,14 +251,14 @@ local jsonFileConfigMap(config, name, fileName, data) = {
   ports: [],
   deploymentObjects: [
     {
-      apiVersion: 'v1',
-      kind: 'ConfigMap',
+      apiVersion: "v1",
+      kind: "ConfigMap",
       metadata: {
         name: name,
       },
       data: {
         version: config.imageTag,
-        [fileName]: std.manifestJsonEx(data, '  ', '\n', ': '),
+        [fileName]: std.manifestJsonEx(data, "  ", "\n", ": "),
       },
     },
   ],
@@ -268,21 +268,21 @@ local externalService(config, ports) = {
   ports: [],
   deploymentObjects: [
     {
-      apiVersion: 'v1',
-      kind: 'Service',
+      apiVersion: "v1",
+      kind: "Service",
       metadata: {
-        name: 'external',
+        name: "external",
         clusterName: config.clusterName,
       },
       spec: {
-        type: 'LoadBalancer',
+        type: "LoadBalancer",
         selector: {
-          app: 'external-proxy',
+          app: "external-proxy",
         },
         ports: [
           {
             name: p.name,
-            protocol: 'TCP',
+            protocol: "TCP",
             port: externalPort(p),
           }
           for p in ports
@@ -298,25 +298,25 @@ local externalService(config, ports) = {
 local cluster(config, clusterDeployments) =
   local deployments = flatten(clusterDeployments);
 
-  local tlsCertSecret = config.clusterName + '-tls';
-  local issuerName = 'letsencrypt-production';
-  local issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
+  local tlsCertSecret = config.clusterName + "-tls";
+  local issuerName = "letsencrypt-production";
+  local issuerServer = "https://acme-v02.api.letsencrypt.org/directory";
 
   local allPorts = flatten(std.map(function(i) i.ports, deployments));
-  local nonInternalPorts = std.filter(function(port) !std.get(port, 'internalOnly', false),
+  local nonInternalPorts = std.filter(function(port) !std.get(port, "internalOnly", false),
                                       allPorts);
   local externalProxyPorts = std.map(function(p) { name: p.name, port: externalPort(p) }, nonInternalPorts);
 
   objects(deployments + [
-    jsonFileConfigMap(config, 'cluster-manifest', 'manifest.json', {
+    jsonFileConfigMap(config, "cluster-manifest", "manifest.json", {
       ports: allPorts,
     }),
     deployment(
       config,
-      'external-proxy',
+      "external-proxy",
       externalProxyPorts,
       memoryLimitMiB=512,
-      mountConfig='cluster-manifest',
+      mountConfig="cluster-manifest",
       tlsCertSecret=tlsCertSecret
     ),
     externalService(config, externalProxyPorts),

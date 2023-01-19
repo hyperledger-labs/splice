@@ -12,7 +12,7 @@ test-vars=\
 
 .PHONY: format
 format:
-	jsonnetfmt -i *.jsonnet
+	jsonnetfmt --string-style d -i *.jsonnet
 
 .PHONY: test
 test:

@@ -1,17 +1,17 @@
 local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) = {
   deploymentObjects: [
     {
-      apiVersion: 'cert-manager.io/v1',
-      kind: 'Issuer',
+      apiVersion: "cert-manager.io/v1",
+      kind: "Issuer",
       metadata: {
         name: issuerRef,
       },
       spec: {
         acme: {
           server: issuerServer,
-          email: 'team-canton-network@digitalasset.com',
+          email: "team-canton-network@digitalasset.com",
           privateKeySecretRef: {
-            name: issuerRef + '-acme-account',
+            name: issuerRef + "-acme-account",
           },
           solvers: [{
             dns01: {
@@ -19,7 +19,7 @@ local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) =
                 project: cloudDnsProject,
                 serviceAccountSecretRef: {
                   name: cloudDnsServiceAccount,
-                  key: 'key.json',
+                  key: "key.json",
                 },
               },
             },
@@ -33,18 +33,18 @@ local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) =
 local certificate(issuerRef, tlsCertSecret, clusterName, clusterDnsName) = {
   deploymentObjects: [
     {
-      apiVersion: 'cert-manager.io/v1',
-      kind: 'Certificate',
+      apiVersion: "cert-manager.io/v1",
+      kind: "Certificate",
       metadata: {
-        name: clusterName + '-certificate',
-        namespace: 'default',
+        name: clusterName + "-certificate",
+        namespace: "default",
       },
       spec: {
         secretName: tlsCertSecret,
         issuerRef: {
           name: issuerRef,
         },
-        dnsNames: [clusterDnsName, '*.' + clusterDnsName, '*.validator1.' + clusterDnsName],
+        dnsNames: [clusterDnsName, "*." + clusterDnsName, "*.validator1." + clusterDnsName],
       },
     },
   ],

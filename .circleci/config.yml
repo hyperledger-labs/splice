@@ -738,6 +738,9 @@ jobs:
           cmd_retry_count: 5
       - execute_sbt_command:
           cmd: "lint"
+      - run_bash_command_in_nix:
+          cmd_name: pre-commit check all
+          cmd: pre-commit run --all-files
       - run_todo_script
       - cleanup_sbt_test_job
 

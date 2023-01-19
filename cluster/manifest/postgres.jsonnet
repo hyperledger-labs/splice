@@ -2,24 +2,24 @@ local database(name, config) = {
   ports: [],
   deploymentObjects: [
     {
-      apiVersion: 'v1',
-      kind: 'ConfigMap',
+      apiVersion: "v1",
+      kind: "ConfigMap",
       metadata: {
-        name: name + '-configuration',
+        name: name + "-configuration",
         labels: {
           app: name,
         },
       },
       data: {
-        PGDATA: '/var/lib/postgresql/data/pgdata',
-        POSTGRES_DB: 'cantonnet',
-        POSTGRES_USER: 'cnadmin',
-        POSTGRES_PASSWORD: 'cnadmin',
+        PGDATA: "/var/lib/postgresql/data/pgdata",
+        POSTGRES_DB: "cantonnet",
+        POSTGRES_USER: "cnadmin",
+        POSTGRES_PASSWORD: "cnadmin",
       },
     },
     {
-      apiVersion: 'apps/v1',
-      kind: 'StatefulSet',
+      apiVersion: "apps/v1",
+      kind: "StatefulSet",
       metadata: {
         name: name,
         labels: {
@@ -44,29 +44,29 @@ local database(name, config) = {
             containers: [
               {
                 name: name,
-                image: 'postgres:14',
+                image: "postgres:14",
                 envFrom: [
                   {
                     configMapRef: {
-                      name: name + '-configuration',
+                      name: name + "-configuration",
                     },
                   },
                 ],
                 ports: [
                   {
                     containerPort: 5432,
-                    name: 'postgresdb',
+                    name: "postgresdb",
                   },
                 ],
                 livenessProbe: {
                   exec: {
-                    command: ['psql', '-U', 'cnadmin', '-d', 'template1', '-c', 'SELECT 1'],
+                    command: ["psql", "-U", "cnadmin", "-d", "template1", "-c", "SELECT 1"],
                   },
                 },
                 volumeMounts: [
                   {
-                    name: 'pg-data',
-                    mountPath: '/var/lib/postgresql/data',
+                    name: "pg-data",
+                    mountPath: "/var/lib/postgresql/data",
                   },
                 ],
               },
@@ -76,13 +76,13 @@ local database(name, config) = {
         volumeClaimTemplates: [
           {
             metadata: {
-              name: 'pg-data',
+              name: "pg-data",
             },
             spec: {
-              accessModes: ['ReadWriteOnce'],
+              accessModes: ["ReadWriteOnce"],
               resources: {
                 requests: {
-                  storage: '10Gi',
+                  storage: "10Gi",
                 },
               },
             },
@@ -91,8 +91,8 @@ local database(name, config) = {
       },
     },
     {
-      apiVersion: 'v1',
-      kind: 'Service',
+      apiVersion: "v1",
+      kind: "Service",
       metadata: {
         name: name,
         clusterName: config.clusterName,
@@ -103,8 +103,8 @@ local database(name, config) = {
         },
         ports: [
           {
-            name: 'postgresdb',
-            protocol: 'TCP',
+            name: "postgresdb",
+            protocol: "TCP",
             port: 5432,
           },
         ],
