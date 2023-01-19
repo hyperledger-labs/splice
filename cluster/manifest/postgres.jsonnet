@@ -80,9 +80,10 @@ local database(name, config) = {
             },
             spec: {
               accessModes: ["ReadWriteOnce"],
+              storageClassName: "standard-rwo",
               resources: {
                 requests: {
-                  storage: "10Gi",
+                  storage: config.ledgerDatabaseGib + "Gi",
                 },
               },
             },

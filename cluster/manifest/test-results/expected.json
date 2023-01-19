@@ -263,9 +263,10 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "10Gi"
+                           "storage": "20Gi"
                         }
-                     }
+                     },
+                     "storageClassName": "standard-rwo"
                   }
                }
             ]
@@ -324,7 +325,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms5632M -Xmx5632M"
+                              "value": "-Xms1536M -Xmx1536M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -358,10 +359,10 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "6144Mi"
+                              "memory": "2048Mi"
                            },
                            "requests": {
-                              "memory": "6144Mi"
+                              "memory": "2048Mi"
                            }
                         },
                         "startupProbe": {
@@ -442,7 +443,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms11776M -Xmx11776M"
+                              "value": "-Xms7680M -Xmx7680M"
                            },
                            {
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
@@ -534,10 +535,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1579,9 +1580,10 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "10Gi"
+                           "storage": "20Gi"
                         }
-                     }
+                     },
+                     "storageClassName": "standard-rwo"
                   }
                }
             ]
@@ -1640,7 +1642,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms11776M -Xmx11776M"
+                              "value": "-Xms7680M -Xmx7680M"
                            },
                            {
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
@@ -1682,10 +1684,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -2435,9 +2437,10 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "10Gi"
+                           "storage": "20Gi"
                         }
-                     }
+                     },
+                     "storageClassName": "standard-rwo"
                   }
                }
             ]
@@ -2496,7 +2499,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms11776M -Xmx11776M"
+                              "value": "-Xms7680M -Xmx7680M"
                            },
                            {
                               "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
@@ -2528,10 +2531,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
-                              "memory": "12288Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [ ]
