@@ -1,5 +1,7 @@
 package com.daml.network.integration.tests
 
+import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.Post
 import akka.http.scaladsl.model.StatusCodes
@@ -118,7 +120,11 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     aliceValidator.startSync()
 
     implicit val sys = env.actorSystem
-
+    implicit val ec = env.executionContext
+    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+      () =>
+        Http().shutdownAllConnectionPools().map(_ => Done)
+    }
     val registerPost = Post(s"${aliceValidator.httpClientConfig.url}/register")
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 
