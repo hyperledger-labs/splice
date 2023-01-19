@@ -189,7 +189,7 @@ runNextIssuanceInternal app coinPrice = do
 
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
-    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
     (closingRoundCid, openRoundCid) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
       coinPrice
       roundToArchiveCid
@@ -215,7 +215,7 @@ runNextIssuanceInternal app coinPrice = do
 -- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
 skipNRounds : CCApp -> Int -> Script ()
 skipNRounds app n = do
-  [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getOpenRoundsSorted app
+  [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getActiveOpenRoundsSorted app
 
   let newRound1 = addRelRound r1.round (RelRound n)
   let newRound2 = addRelRound r2.round (RelRound n)
@@ -402,9 +402,8 @@ getLatestOpenRound app = do
     None -> abort "No open open mining rounds"
     Some r-> pure r
 
-getLatestActiveRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
-getLatestActiveRound app = do
-  now <- getTime
+getLatestActiveOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestActiveOpenRound app = do
   -- get active rounds
   rounds <- query @OpenMiningRound app.svc
   case maximumOn (\(_, r) -> r.round) rounds of
@@ -413,6 +412,13 @@ getLatestActiveRound app = do
 
 getOpenRoundsSorted : CCApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
 getOpenRoundsSorted app = do
+  now <- getTime
+  -- only get rounds that are actually open as-of now
+  rounds <- queryFilter @OpenMiningRound app.svc (\round -> now >= round.opensAt)
+  return $ sortOn (\(_, openRound) -> openRound.round) rounds
+
+getActiveOpenRoundsSorted : CCApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getActiveOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 

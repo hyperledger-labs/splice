@@ -8,6 +8,7 @@ import DA.Assert
 import DA.List
 import Daml.Script
 import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 
 testUsageFees: Script ()
 testUsageFees = do
@@ -53,5 +54,48 @@ testUsageFees = do
   sort (map (\(_, c) -> c.amount.initialAmount) aliceCoins) === [1.0, 10.0, floatingSenderAmount]
   sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, 10.0 - expectedReceiverTransferFee, floatingReceiverAmount ]
 
-  transferResult.summary.usageFees === expectedCreateFee + expectedSenderTransferFee + expectedReceiverTransferFee + expectedFloatingReceiverTransferFee 
+  transferResult.summary.usageFees === expectedCreateFee + expectedSenderTransferFee + expectedReceiverTransferFee + expectedFloatingReceiverTransferFee
+  return ()
+
+testCoinUsedInRoundBeforeItsCreation: Script ()
+testCoinUsedInRoundBeforeItsCreation = do
+  app <- setupApp
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  coinRound2Cid <- tap app alice 100.0
+  Some coinRound2 <- queryContractId @Coin alice.primaryParty coinRound2Cid
+
+  openRoundsSorted <- getOpenRoundsSorted app
+  let (round1Cid, round1) = head openRoundsSorted
+      round1IfcCid = (toInterfaceContractId @API.OpenMiningRound round1Cid)
+      contextWithRound1 = context with context = context.context with openMiningRound = round1IfcCid
+
+  -- The input coin is created in round 2
+  -- OpenMiningRound 1 will be used in the context
+  coinRound2.amount.createdAt.number === 2
+  round1.round.number === 1
+
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd contextWithRound1.coinRules API.CoinRules_Transfer with
+    transfer = API.Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
+      outputs = [ API.OutputSenderCoin with
+                    exactAmount = None
+                    lock = None
+                  , API.OutputReceiverCoin bob.primaryParty $ API.FixedReceiverCoin with
+                    amount = 10.0
+                    senderTransferFeeRatio = 0.6 ]
+      payload = "test"
+    context = contextWithRound1.context
+
+  -- Input amount is exactly 100.0.
+  -- There is no negative amount of holding fee
+  -- i.e., no extra holding fee added to the input amount value.
+  transferResult.summary.inAmount === 100.0
+  transferResult.summary.senderHoldingFees === 0.0
+
   return ()

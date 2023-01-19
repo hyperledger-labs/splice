@@ -186,7 +186,7 @@ testExpireCoin = do
 advanceRound : CCApp -> API.Round -> Script (ContractId OpenMiningRound)
 advanceRound app expectedRound  = do
   runNextIssuance app
-  (latestActiveRoundCid, _) <- getLatestActiveRound app
+  (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
   Some(currentRound) <- queryContractId @OpenMiningRound app.svc latestActiveRoundCid
   currentRound.round === expectedRound
   pure latestActiveRoundCid
