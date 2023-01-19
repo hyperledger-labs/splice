@@ -1,11 +1,9 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, ValidatorRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
@@ -18,8 +16,6 @@ import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
@@ -65,40 +61,13 @@ trait WalletStore extends CoinAppStore with StoreWithOpenMiningRounds {
         )
       )
 
-  /** Get the context required for executing a transfer.
-    */
-  def getPaymentTransferContext(retryProvider: CoinRetries, now: CantonTimestamp)(implicit
-      ec: ExecutionContext
-  ): Future[v1.coin.PaymentTransferContext] =
-    for {
-      coinRules <- getCoinRules()
-      openRound <- getLatestOpenMiningRound(now)
-      issuingMiningRounds <- acs.listContracts(roundCodegen.IssuingMiningRound.COMPANION)
-      validatorRights <- acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
-    } yield {
-      val openIssuingRounds = issuingMiningRounds
-        .filter(c => c.payload.opensAt.isBefore(now.toInstant))
-        .map(r =>
-          (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
-        )
-        .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
-        .asJava
-      val transferContext = new v1.coin.TransferContext(
-        openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-        openIssuingRounds,
-        validatorRights
-          .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
-          .toMap[String, v1.coin.ValidatorRight.ContractId]
-          .asJava,
-        // Note: featured app rights are ignored for transfers with sender == provider, which is the case for all
-        // transfers issued by the wallet. We therefore do not provide a FeaturedAppRight, even if the user has one.
-        None.toJava,
-      )
-      new v1.coin.PaymentTransferContext(
-        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        transferContext,
-      )
-    }
+  def getOpenIssuingRounds(
+      now: CantonTimestamp
+  ): Future[Seq[JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]]] = {
+    acs
+      .listContracts(roundCodegen.IssuingMiningRound.COMPANION)
+      .map(rounds => rounds.filter(c => c.payload.opensAt.isBefore(now.toInstant)))
+  }
 }
 
 object WalletStore {

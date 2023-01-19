@@ -10,6 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{PaymentTransferContext, TransferInput}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.{CoinConfig, USD}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -30,6 +31,7 @@ import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -285,20 +287,20 @@ class TreasuryService(
     } else {
       val now = clock.now
       val batchExecutionF = for {
-        transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
-        activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
+        contextAndInputsOpt <- getTransferContextAndInputs(now, filteredBatch.isMergeOnly)
         install <- userStore.getInstall()
-        (inputs, readAs, numRewardInputs) <- selectTransferInputs(activeIssuingRounds)
         res <-
-          // skip execution of the batch, if its only purpose is to merge the inputs, but the inputs are already merged.
-          // TODO(#2182): add edge cases + test them.
-          if (inputs.length <= 1 && numRewardInputs == 0 && filteredBatch.isMergeOnly) {
-            filteredBatch.mergeOperationOpt.foreach(
-              _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
-            )
-            Future.successful(Done)
-          } else {
-            executeFilteredBatch(install, transferContext, inputs, filteredBatch, readAs)
+          contextAndInputsOpt match {
+            // if we returned None previously, this is (1) a batch that only contains a "merge" operation, but
+            // (2) there is nothing to merge (e.g. only 1 coin + no rewards already, or rewards are too small)
+            // in this case, we just complete the merge-operation immediately without sending any data to the ledger.
+            case None =>
+              filteredBatch.mergeOperationOpt.foreach(
+                _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
+              )
+              Future.successful(Done)
+            case Some((inputs, readAs, transferContext)) =>
+              executeFilteredBatch(install, transferContext, inputs, filteredBatch, readAs)
           }
       } yield res
       batchExecutionF.recoverWith(ex => {
@@ -356,49 +358,147 @@ class TreasuryService(
     } yield Done
   }
 
-  /** Select transfer inputs to satisfy the coin operations.
+  private def shouldMergeOnlyTransferRun(
+      totalRewardsQuantity: BigDecimal,
+      numCoinInputs: Int,
+      config: CoinConfig[USD],
+  )(implicit tc: TraceContext): Boolean = {
+    if (numCoinInputs == 0) {
+      val run = totalRewardsQuantity > config.createFee.fee
+      // only log when there are actually some rewards to possibly collect.
+      if (!run && totalRewardsQuantity != 0)
+        logger.debug(
+          "Not executing a merge operation because there are no coin inputs " +
+            s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee ${config.createFee.fee}"
+        )
+      run
+    } else if (numCoinInputs == 1) {
+      val run = totalRewardsQuantity > config.updateFee.fee
+      // only log when there are actually some rewards to possibly collect.
+      if (!run && totalRewardsQuantity != 0)
+        logger.debug(
+          "Not executing a merge operation because there is only one coin-input and " +
+            s"the totalRewardsQuantity $totalRewardsQuantity is smaller than the update-fee ${config.updateFee.fee}"
+        )
+      run
+    } else true
+  }
+
+  /** Select transfer inputs and transfer context to satisfy the coin operations.
     * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
+    * It checks that if the coin-operation batch only consists of a merge operation, it makes
+    * sense to run this operation (e.g. it doesn't cost more to collect rewards in fees than they grant).
     * Also returns the set of readAs parties required for the selected inputs.
     */
-  private def selectTransferInputs(
-      activeIssuingRounds: Set[v1.round.Round]
-  )(implicit tc: TraceContext): Future[(Seq[v1.coin.TransferInput], Set[PartyId], Int)] = for {
-    coinInputs <- userStore.acs
-      .listContracts(coinCodegen.Coin.COMPANION)
-      .map(cs =>
-        cs.map(c =>
-          new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
-        )
-      )
-    validatorRewardCouponsRaw <- walletManager
-      .listValidatorRewardCouponsCollectableBy(userStore)
-    validatorRewardCoupons = validatorRewardCouponsRaw
-      .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-    validatorRewardCouponUsers = validatorRewardCoupons
-      .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
-      .toSet
-    validatorRewardCouponInputs = validatorRewardCoupons
-      .map(rw =>
-        new v1.coin.transferinput.InputValidatorRewardCoupon(
-          rw.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
-        )
-      )
-    appRewardCouponInputs <- userStore.acs
-      .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-      .map(rws =>
-        rws
-          .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-          .map(rw =>
-            new v1.coin.transferinput.InputAppRewardCoupon(
-              rw.contractId.toInterface(v1.coin.AppRewardCoupon.INTERFACE)
-            )
+  private def getTransferContextAndInputs(
+      now: CantonTimestamp,
+      isMergeOny: Boolean,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[
+    (
+        Seq[v1.coin.TransferInput],
+        Set[PartyId],
+        v1.coin.PaymentTransferContext,
+    )
+  ]] =
+    for {
+      coinRules <- walletManager.store.getCoinRules()
+      config = coinRules.payload.config
+      openRound <- walletManager.store.getLatestOpenMiningRound(now)
+      issuingMiningRounds <- walletManager.store.getOpenIssuingRounds(now)
+      issuingRoundsMap = issuingMiningRounds
+        .map(r => (r.payload.round, r.payload))
+        .toMap
+      validatorRights <- walletManager.store.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
+
+      coinInputs <- userStore.acs
+        .listContracts(coinCodegen.Coin.COMPANION)
+        .map(cs =>
+          cs.map(c =>
+            new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
           )
-      )
-  } yield (
-    coinInputs ++ validatorRewardCouponInputs ++ appRewardCouponInputs,
-    validatorRewardCouponUsers,
-    validatorRewardCouponInputs.length + appRewardCouponInputs.length,
-  )
+        )
+      validatorRewardCouponsRaw <- walletManager
+        .listValidatorRewardCouponsCollectableBy(
+          userStore
+        )
+      validatorRewardCouponUsers = validatorRewardCouponsRaw
+        .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
+        .toSet
+      validatorRewardsWithCoinQuantity = validatorRewardCouponsRaw.flatMap(rw => {
+        val issuingO = issuingRoundsMap.get(rw.payload.round)
+        issuingO
+          .map(i => {
+            val quantity = rw.payload.amount.multiply(i.issuancePerValidatorRewardCoupon)
+            (rw, quantity)
+          })
+      })
+      validatorRewardsCoinQuantity = validatorRewardsWithCoinQuantity.map(i => BigDecimal(i._2)).sum
+      appRewardCouponInputs <- userStore.acs
+        .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+      appRewardsWithCoinQuantity = appRewardCouponInputs
+        .flatMap(rw => {
+          val issuingO = issuingRoundsMap.get(rw.payload.round)
+          issuingO
+            .map(i => {
+              val quantity =
+                if (rw.payload.featured)
+                  rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
+                else rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
+              (rw, quantity)
+            })
+        })
+      appRewardsCoinQuantity = appRewardsWithCoinQuantity.map(i => BigDecimal(i._2)).sum
+    } yield {
+      if (
+        isMergeOny && !shouldMergeOnlyTransferRun(
+          appRewardsCoinQuantity + validatorRewardsCoinQuantity,
+          coinInputs.length,
+          config,
+        )
+      ) {
+        None
+      } else {
+        val transferContext = new v1.coin.TransferContext(
+          openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+          issuingMiningRounds
+            .map(r =>
+              (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
+            )
+            .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
+            .asJava,
+          validatorRights
+            .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
+            .toMap[String, v1.coin.ValidatorRight.ContractId]
+            .asJava,
+          // Note: featured app rights are ignored for transfers with sender == provider, which is the case for all
+          // transfers issued by the wallet. We therefore do not provide a FeaturedAppRight, even if the user has one.
+          None.toJava,
+        )
+        val inputs = coinInputs ++ validatorRewardsWithCoinQuantity.map(rw =>
+          new v1.coin.transferinput.InputValidatorRewardCoupon(
+            rw._1.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
+          )
+        ) ++ appRewardsWithCoinQuantity.map(rw =>
+          new v1.coin.transferinput.InputAppRewardCoupon(
+            rw._1.contractId.toInterface(v1.coin.AppRewardCoupon.INTERFACE)
+          )
+        )
+        Some(
+          (
+            inputs,
+            validatorRewardCouponUsers,
+            new v1.coin.PaymentTransferContext(
+              coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+              transferContext,
+            ),
+          )
+        )
+      }
+
+    }
 
   override def onClosed(): Unit = {
     logger.debug(
@@ -424,8 +524,8 @@ object TreasuryService {
       nonMergeOperations: Seq[EnqueuedCoinOperation],
   ) extends PrettyPrinting {
     override def pretty: Pretty[CoinOperationBatch.this.type] = prettyOfClass(
-      param("mergeOperationOpt", _.mergeOperationOpt),
-      param("nonMergeOperations", _.nonMergeOperations),
+      paramIfDefined("mergeOperationOpt", _.mergeOperationOpt),
+      paramIfNonEmpty("nonMergeOperations", _.nonMergeOperations),
     )
 
     /** Computes the coin operations that should be run on the ledger given the current batch state. */

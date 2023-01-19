@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{HasExecutionContext, time}
 import io.grpc.StatusRuntimeException
 import monocle.macros.syntax.lens.*
@@ -199,4 +200,65 @@ class TimeBasedTreasuryIntegrationTest
         exactly(CoinUtil.defaultHoldingFee.rate),
       )
   }
+
+  "don't collect rewards if their collection is more expensive than they reward in coins" in {
+    implicit env =>
+      val (_, bob) = onboardAliceAndBob()
+
+      // giving alice 2 coins...
+      aliceWallet.tap(1)
+      aliceWallet.tap(1)
+      eventually() {
+        aliceWallet.list().coins should have length 2
+      }
+      // ..so when she pays bob, she doesn't have to pay a transfer fee which
+      // will result in alice validator's reward being small enough that its not worth it to collect the reward
+      p2pTransfer(aliceWallet, bobWallet, bob, 0.00001)
+      eventually() {
+        aliceWallet.listAppRewardCoupons() should have length 1
+        aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
+      }
+
+      // advancing the rounds so the rewards would be collectable.
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          // reward is now collectable..
+          advanceRoundsByOneTick
+          Threading.sleep(3.seconds.toMillis)
+        },
+        entries => {
+          forAtLeast(1, entries)( // however, we see that we choose not to the validator reward..
+            _.message should include(
+              "is smaller than the create-fee"
+            )
+          )
+        },
+      )
+
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          aliceValidatorWallet.tap(1)
+          eventually() {
+            aliceValidatorWallet.list().coins should have length 1
+          }
+          advanceTime(Duration.ofMinutes(1))
+          Threading.sleep(3.seconds.toMillis)
+        },
+        entries => {
+          forAtLeast(
+            1,
+            entries,
+          )( // .. even when alice's validator has another coin and would only need to pay
+            // an update-fee for collecting the reward.
+            _.message should include(
+              "is smaller than the update-fee"
+            )
+          )
+        },
+      )
+  }
+
 }
