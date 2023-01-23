@@ -107,6 +107,7 @@ template SubscriptionRequest
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
+        walletProvider : Party -- TODO(#2415): use this to issue rewards to the sender's wallet provider
       controller subscriptionData.sender
       do
         assertContextValid subscriptionData
@@ -193,6 +194,7 @@ template SubscriptionIdleState
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
+        walletProvider : Party -- TODO(#2415): use this to issue rewards to the sender's wallet provider
       controller subscriptionData.sender
       do
         assertSubscriptionMatches subscription subscriptionData

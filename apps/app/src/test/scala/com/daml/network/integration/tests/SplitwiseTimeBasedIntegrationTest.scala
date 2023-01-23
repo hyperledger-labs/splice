@@ -11,6 +11,9 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
+import com.daml.network.console.WalletAppClientReference
+import com.daml.network.console.SplitwiseAppClientReference
 
 class SplitwiseTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -29,27 +32,14 @@ class SplitwiseTimeBasedIntegrationTest
       })
 
   "splitwise" should {
-    "support provider-hosted mode" in { implicit env =>
-      // Onboard users
+
+    def initSplitwiseTest()(implicit
+        env: CoinTests.CoinTestConsoleEnvironment
+    ) = {
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val splitwiseProviderParty = onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
-
-      actAndCheck(
-        "Self-grant a featured app right",
-        splitwiseProviderWallet.selfGrantFeaturedAppRight(),
-      )(
-        "Wait for right to be ingested",
-        // We are waiting for scan to ingest the featured app right, and not through the provider's wallet,
-        // to make sure that this right will be used when collecting payments.
-        _ =>
-          scan
-            .lookupFeaturedAppRight(splitwiseProviderParty)
-            .getOrElse(
-              fail("Scan did not ingest a featured app right contract for splitwise provider")
-            ),
-      )
 
       // Setup install contracts
       Seq(
@@ -91,25 +81,59 @@ class SplitwiseTimeBasedIntegrationTest
         "group1",
       )
 
+      actAndCheck(
+        "Self-grant a featured app right",
+        splitwiseProviderWallet.selfGrantFeaturedAppRight(),
+      )(
+        "Wait for right to be ingested",
+        // We are waiting for scan to ingest the featured app right, and not through the provider's wallet,
+        // to make sure that this right will be used when collecting payments.
+        _ =>
+          scan
+            .lookupFeaturedAppRight(splitwiseProviderParty)
+            .getOrElse(
+              fail("Scan did not ingest a featured app right contract for splitwise provider")
+            ),
+      )
+
+      (aliceUserParty, bobUserParty, charlieUserParty, splitwiseProviderParty, key)
+    }
+
+    def transfer(
+        senderSplitwise: SplitwiseAppClientReference,
+        senderWallet: WalletAppClientReference,
+        receiver: PartyId,
+        amount: BigDecimal,
+        key: GrpcSplitwiseAppClient.GroupKey,
+    ) = {
+      senderSplitwise.initiateTransfer(
+        key,
+        Seq(
+          new walletCodegen.ReceiverCCAmount(
+            receiver.toProtoPrimitive,
+            amount.bigDecimal,
+          )
+        ),
+      )
+      eventually()(senderWallet.listAppPaymentRequests() should not be empty)
+      inside(senderWallet.listAppPaymentRequests()) { case Seq(request) =>
+        senderWallet.acceptAppPaymentRequest(request.contractId)
+      }
+
+    }
+
+    "support provider-hosted mode" in { implicit env =>
+      val (aliceUserParty, bobUserParty, charlieUserParty, splitwiseProviderParty, key) =
+        initSplitwiseTest()
+
       aliceSplitwise.enterPayment(
         key,
         4200.0,
         "payment",
       )
-      bobSplitwise.initiateTransfer(
-        key,
-        Seq(
-          new walletCodegen.ReceiverCCAmount(
-            aliceUserParty.toProtoPrimitive,
-            BigDecimal(1000.0).bigDecimal,
-          )
-        ),
-      )
-      eventually()(bobWallet.listAppPaymentRequests() should not be empty)
-      inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
-        bobWallet.tap(4000)
-        bobWallet.acceptAppPaymentRequest(request.contractId)
-      }
+      bobWallet.tap(4000)
+      transfer(bobSplitwise, bobWallet, aliceUserParty, BigDecimal(1000.0), key)
+
       eventually() {
         bobSplitwise.listBalanceUpdates(key) should have size 2
       }
@@ -162,6 +186,7 @@ class SplitwiseTimeBasedIntegrationTest
       }
       val couponId = splitwiseProviderWallet.listAppRewardCoupons().head.contractId
 
+      // TODO(#2100): cleanup - completely separate the functionality test from the rewards, move all reward testing to WalletTimeBasedIntegrationTest
       actAndCheck(
         "Advance rounds until splitwise gets its rewards",
         Seq(1, 2, 3).foreach(_ => advanceRoundsByOneTick),
@@ -210,7 +235,6 @@ class SplitwiseTimeBasedIntegrationTest
         "Receive awards, but significantly smaller",
         _ => checkWallet(splitwiseProviderParty, splitwiseProviderWallet, Seq((191.0, 191.5))),
       )
-
     }
   }
 }

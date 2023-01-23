@@ -87,6 +87,7 @@ setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   createUser (User userId (Some user)) [CanActAs user, CanReadAs validator]
+  recordValidatorOf app user validator
   let u = CCUser userId user
   tap app u 1.0
   return u

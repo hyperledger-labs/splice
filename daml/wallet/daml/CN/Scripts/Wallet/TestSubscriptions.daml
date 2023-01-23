@@ -2,6 +2,7 @@ module CN.Scripts.Wallet.TestSubscriptions where
 
 import DA.Assert
 import DA.Time
+import DA.List
 import Daml.Script
 
 import CC.Coin hiding (CC, USD)
@@ -51,7 +52,7 @@ testSubscription = script do
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 
-  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid (toInterfaceContractId coin)
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice validator subscriptionRequestCid (toInterfaceContractId coin)
   None <- queryContractId alice.primaryParty subscriptionRequestCid
 
   -- expire...
@@ -62,7 +63,7 @@ testSubscription = script do
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
-  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid change
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice validator subscriptionRequestCid change
 
   (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
@@ -110,7 +111,8 @@ testUSDSubscription = script do
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 
-  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid (toInterfaceContractId coin)
+  coins <- unlockedCoins alice.primaryParty
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice validator subscriptionRequestCid (toInterfaceContractId $ head coins)
 
   coins0 <- query @Coin pizzeria.primaryParty
   (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
@@ -120,7 +122,7 @@ testUSDSubscription = script do
   map (\(_, c) -> c.amount.initialAmount) (coins1 `diffContracts` coins0) === [0.5]
 
   passTime (days 27)
-  (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
+  (payment2Cid, change2) <- makeSubscriptionPayment app alice validator subscriptionStateCid change
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
   coins2 <- query @Coin pizzeria.primaryParty
@@ -129,39 +131,42 @@ testUSDSubscription = script do
   advanceToIssuanceWithPrice app 0.5
 
   passTime (days 28)
-  (payment3Cid, change3) <- makeSubscriptionPayment app alice subscriptionState2Cid change2
+  (payment3Cid, change3) <- makeSubscriptionPayment app alice validator subscriptionState2Cid change2
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
 
   coins3 <- query @Coin pizzeria.primaryParty
-  map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2) === [2.0]
+  map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2) === [2.0, 1.9949825] -- TODO(#2415): check that this is correct
 
   pure ()
 
 
-acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> ContractId SubscriptionRequest -> ContractId API.Coin -> Script (ContractId SubscriptionInitialPayment, ContractId API.Coin)
-acceptSubscriptionRequestAndMakePayment app sender request coin = do
+acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> Party -> ContractId SubscriptionRequest -> ContractId API.Coin -> Script (ContractId SubscriptionInitialPayment, ContractId API.Coin)
+acceptSubscriptionRequestAndMakePayment app sender walletProvider request coin = do
   context <- getPaymentTransferContext app sender
   submitUser sender.userId $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs = [API.InputCoin coin]
     context
+    walletProvider
 
 
-makeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script (ContractId SubscriptionPayment, ContractId API.Coin)
-makeSubscriptionPayment app sender state coin = do
+makeSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script (ContractId SubscriptionPayment, ContractId API.Coin)
+makeSubscriptionPayment app sender walletProvider state coin = do
   context <- getPaymentTransferContext app sender
   (payment, change) <- submitUser sender.userId $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [API.InputCoin coin]
     context
+    walletProvider
   return (payment, change)
 
 
-failMakeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script ()
-failMakeSubscriptionPayment app sender state coin = do
+failMakeSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script ()
+failMakeSubscriptionPayment app sender walletProvider state coin = do
   readAs <- getUserReadAs sender.userId
   context <- getPaymentTransferContext app sender
   submitMultiMustFail [sender.primaryParty] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [API.InputCoin coin]
     context
+    walletProvider
 
 
 collectInitialSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)

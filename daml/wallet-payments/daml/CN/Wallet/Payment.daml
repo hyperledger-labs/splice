@@ -61,7 +61,6 @@ receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
       receiver = rq.receiver
       ccAmount = cc
 
-
 template AppPaymentRequest
   with
     sender : Party -- ^ The party that should pay.
@@ -82,7 +81,8 @@ template AppPaymentRequest
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
-      controller sender
+        walletProvider : Party
+      controller sender, walletProvider
       do now <- getTime
          -- check that the reference is active and implements DeliveryOffer
          void $ fetch deliveryOffer
@@ -96,11 +96,12 @@ template AppPaymentRequest
 
          -- TODO(#1492) Lock to specific round to avoid fees changing
          fees <- exerciseComputeFees context sender ccAmounts
+
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
-              -- this step is orchestrated by the sender's wallet, so the sender gets the rewards
-              provider = sender
+              -- this step is orchestrated by the sender's wallet, so the sender's wallet provider gets the rewards
+              provider = walletProvider
               inputs
               outputs =
                 [ OutputSenderCoin with

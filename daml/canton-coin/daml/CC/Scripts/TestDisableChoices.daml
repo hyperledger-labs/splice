@@ -68,7 +68,6 @@ testValidatorRewardCoupon = do
   app <- setupApp
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
-  recordValidatorOf app alice.primaryParty validator
 
   _ <- tap app alice 10.0
   pay app alice alice.primaryParty 5.0 ""

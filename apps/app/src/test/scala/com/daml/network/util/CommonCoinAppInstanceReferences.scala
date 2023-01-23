@@ -77,6 +77,12 @@ trait CommonCoinAppInstanceReferences {
     "bobWallet"
   )
 
+  def bobValidatorWallet(implicit
+      env: CoinTestConsoleEnvironment
+  ): WalletAppClientReference = wc(
+    "bobValidatorWallet"
+  )
+
   def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "charlieWallet"
   )

@@ -25,8 +25,8 @@ catchAll operation =
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
-executeCoinOperationRec : Party -> API.PaymentTransferContext -> [API.TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
-executeCoinOperationRec endUserP context inputs prevResults (operation::remainingOperations) = do
+executeCoinOperationRec : Party -> Party -> API.PaymentTransferContext -> [API.TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
+executeCoinOperationRec endUserP validatorP context inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> handle AppPaymentRequest_Accept COO_AcceptedAppPayment cid
     CO_CompleteAcceptedTransfer acceptedOffer -> do
@@ -42,15 +42,15 @@ executeCoinOperationRec endUserP context inputs prevResults (operation::remainin
       coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
       handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
-    handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
-      resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
+      resultE <- catchAll $ exercise cid (choiceConstructor inputs context validatorP)
       handleResult resultConstructor resultE
 
     handleResult : (r -> CoinOperationOutcome) -> Either InvalidTransferReason (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (result, change) -> executeCoinOperationRec endUserP context [API.InputCoin change] (resultConstructor result :: prevResults) remainingOperations
+      Right (result, change) -> executeCoinOperationRec endUserP validatorP context [API.InputCoin change] (resultConstructor result :: prevResults) remainingOperations
 
     handleResultMergeInputs : Either InvalidTransferReason (API.TransferResult) -> Update [CoinOperationOutcome]
     handleResultMergeInputs = \case
@@ -58,18 +58,18 @@ executeCoinOperationRec endUserP context inputs prevResults (operation::remainin
       Right transferResult -> do
         case transferResult.createdCoins of
           [API.TransferResultCoin coin] ->
-            executeCoinOperationRec endUserP context ([API.InputCoin coin]) (COO_MergeTransferInputs (Some coin) :: prevResults) remainingOperations
+            executeCoinOperationRec endUserP validatorP context ([API.InputCoin coin]) (COO_MergeTransferInputs (Some coin) :: prevResults) remainingOperations
           otherwise -> handleLeft $ ITR_Other ("expected CO_MergeTransferInputs's transfer to result in a single result coin but received " <> show otherwise)
     
     handleResultTap : Either InvalidTransferReason (ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right tappedCoin -> executeCoinOperationRec endUserP context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
+      Right tappedCoin -> executeCoinOperationRec endUserP validatorP context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
-    handleLeft errorMsg = executeCoinOperationRec endUserP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
+    handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
-executeCoinOperationRec _endUserP _context _inputs prevResults [] = do
+executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do
   return prevResults
 
 
@@ -112,12 +112,12 @@ data CoinOperationOutcome
   deriving (Eq, Show)
 
 
--- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)
+-- Note: includes the svc party, so that choices can look up CoinRules
 -- This should be replaced by explicit disclosure
 template WalletAppInstall
   with
     svcParty : Party -- TODO(M3-82): remove workaround for explicit disclosure
-    validatorParty : Party -- TODO(M3-82): remove workaround for explicit disclosure
+    validatorParty : Party -- The validator operator, who will receive app rewards for the first (locking) leg of payments by this user
     walletServiceParty : Party
     endUserName : Text -- The participant user name of the end-user
     endUserParty : Party -- The primary party of the end-user
@@ -132,7 +132,7 @@ template WalletAppInstall
         operations : [CoinOperation]
       controller walletServiceParty
       do
-        accepted <- executeCoinOperationRec endUserParty context inputs [] operations
+        accepted <- executeCoinOperationRec endUserParty validatorParty context inputs [] operations
         return $ reverse accepted
 
     nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()

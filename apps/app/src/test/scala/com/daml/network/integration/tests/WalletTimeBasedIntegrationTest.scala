@@ -340,5 +340,46 @@ class WalletTimeBasedIntegrationTest
         eventually()(aliceWallet.list().lockedCoins shouldBe empty)
       }
     }
+
+    "generate app rewards correctly" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      aliceWallet.tap(20.0)
+
+      clue("Check that no payment requests exist") {
+        aliceWallet.listAppPaymentRequests() shouldBe empty
+      }
+
+      actAndCheck(
+        "Alice creates a self-payment request",
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        ),
+      )(
+        "Wait for request to be ingested",
+        _ => aliceWallet.listAppPaymentRequests() should have length 1,
+      )
+
+      actAndCheck(
+        "Alice accepts the payment request",
+        aliceWallet
+          .listAppPaymentRequests()
+          .map(req => aliceWallet.acceptAppPaymentRequest(req.contractId)),
+      )("Request no longer exists", _ => aliceWallet.listAppPaymentRequests() should have length 0)
+
+      actAndCheck(
+        "Advance rounds until reward coupons are issued",
+        Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "Wait for reward coupons",
+        _ => {
+          aliceValidatorWallet
+            .listAppRewardCoupons() should have length 1 // Award for the first (locking) leg goes to the sender's validator
+          // TODO(#2100) In this test, we don't yet collect the app payment, so the provider (alice's wallet) doesn't currently get a reward
+        },
+      )
+    }
+
   }
 }
