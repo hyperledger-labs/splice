@@ -156,5 +156,45 @@ class DirectoryTimeBasedIntegrationTest
           .filterJava(codegen.DirectoryEntryContext.COMPANION)(aliceUserParty) shouldBe empty
       }
     }
+
+    "generate app rewards for the validator hosting a wallet" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+
+      clue("Request install and wait for provider to auto-accept") {
+        aliceDirectory.requestDirectoryInstall()
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+          .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+      }
+
+      val (_, subReqId) = clue("Alice requests a directory entry") {
+        aliceDirectory.requestDirectoryEntry(testEntryName)
+      }
+      clue("Alice obtains some coins and accepts the subscription") {
+        aliceWallet.tap(50.0)
+        aliceWallet.acceptSubscriptionRequest(subReqId)
+      }
+      clue("Getting Alice's new entry") {
+        def tryGetEntry() =
+          Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+        eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+      }
+
+      // TODO(#2100): check for rewards for the provider
+      clue("Wait for reward coupons to be issued") {
+        eventually()(
+          aliceValidatorWallet.listAppRewardCoupons() should have length 1
+        )
+      }
+
+      actAndCheck(
+        "Advance time until directory entry is up for renewal",
+        advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10))),
+      )(
+        "Wait for another coupon to be generated upon renewal",
+        // Note that the previous coupon is neither collected (since it is too small and not worth collecting)
+        // nor collected as unclaimed (since the svc does not yet do that), hence we should have 2 coupons for the validator
+        _ => aliceValidatorWallet.listAppRewardCoupons() should have length 2,
+      )
+    }
   }
 }

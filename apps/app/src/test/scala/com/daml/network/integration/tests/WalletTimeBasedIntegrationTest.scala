@@ -345,6 +345,10 @@ class WalletTimeBasedIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       aliceWallet.tap(20.0)
 
+      // TODO(#2100): Since unclaimed rewards or not (yet) archived automatically, and we are using a shared environment,
+      // we may have leftover reward coupons from the previous tests
+      val couponsBefore = aliceValidatorWallet.listAppRewardCoupons().length
+
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
@@ -375,7 +379,7 @@ class WalletTimeBasedIntegrationTest
         "Wait for reward coupons",
         _ => {
           aliceValidatorWallet
-            .listAppRewardCoupons() should have length 1 // Award for the first (locking) leg goes to the sender's validator
+            .listAppRewardCoupons() should have length ((couponsBefore + 1).toLong) // Award for the first (locking) leg goes to the sender's validator
           // TODO(#2100) In this test, we don't yet collect the app payment, so the provider (alice's wallet) doesn't currently get a reward
         },
       )

@@ -143,7 +143,7 @@ testUSDSubscription = script do
 acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> Party -> ContractId SubscriptionRequest -> ContractId API.Coin -> Script (ContractId SubscriptionInitialPayment, ContractId API.Coin)
 acceptSubscriptionRequestAndMakePayment app sender walletProvider request coin = do
   context <- getPaymentTransferContext app sender
-  submitUser sender.userId $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+  submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs = [API.InputCoin coin]
     context
     walletProvider
@@ -152,7 +152,7 @@ acceptSubscriptionRequestAndMakePayment app sender walletProvider request coin =
 makeSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script (ContractId SubscriptionPayment, ContractId API.Coin)
 makeSubscriptionPayment app sender walletProvider state coin = do
   context <- getPaymentTransferContext app sender
-  (payment, change) <- submitUser sender.userId $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  (payment, change) <- submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [API.InputCoin coin]
     context
     walletProvider
@@ -163,7 +163,7 @@ failMakeSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId Subscriptio
 failMakeSubscriptionPayment app sender walletProvider state coin = do
   readAs <- getUserReadAs sender.userId
   context <- getPaymentTransferContext app sender
-  submitMultiMustFail [sender.primaryParty] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  submitMultiMustFail [sender.primaryParty, walletProvider] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [API.InputCoin coin]
     context
     walletProvider

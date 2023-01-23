@@ -491,7 +491,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   context <- getPaymentTransferContext app alice
   coin <- tap  app alice 5.0
-  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -499,7 +499,7 @@ testInsufficientFundsBatchSubscriptions = script do
   outcomes === [COO_Error (ITR_InsufficientFunds (5.23))]
 
   coin <- tap app alice 15.0
-  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -512,14 +512,14 @@ testInsufficientFundsBatchSubscriptions = script do
   passTime (days 27)
 
   coin <- tap app alice 5.0
-  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
   outcomes === [COO_Error (ITR_InsufficientFunds (5.23))]
 
   coin <- tap app alice 15.0
-  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context

@@ -51,7 +51,7 @@ testWithSubscription = script do
 
   paymentContext <- getPaymentTransferContext app user
   appContext <- getAppTransferContext app provider
-  (initialPaymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitMulti [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
     context = paymentContext
     walletProvider = app.svc
@@ -75,7 +75,7 @@ testWithSubscription = script do
   -- how: cc wallet
   passTime (days 60)
   coin <- tap app user 1.5
-  (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  (paymentCid, _) <- submitMulti [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
     context = paymentContext
     walletProvider = app.svc
@@ -91,7 +91,7 @@ testWithSubscription = script do
 
   -- user can't pay earlier than `renewalDuration` from the next due date
   coin <- tap app user 1.5
-  submitMultiMustFail [user.primaryParty] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  submitMultiMustFail [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
     context = paymentContext
     walletProvider = app.svc
@@ -99,7 +99,7 @@ testWithSubscription = script do
   passTime (days 90)
 
   -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
-  (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  (paymentCid, _) <- submitMulti [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
     context = paymentContext
     walletProvider = app.svc

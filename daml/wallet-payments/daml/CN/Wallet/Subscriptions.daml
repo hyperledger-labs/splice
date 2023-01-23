@@ -107,13 +107,13 @@ template SubscriptionRequest
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
-        walletProvider : Party -- TODO(#2415): use this to issue rewards to the sender's wallet provider
-      controller subscriptionData.sender
+        walletProvider : Party
+      controller subscriptionData.sender, walletProvider
       do
         assertContextValid subscriptionData
 
         now <- getTime
-        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now
+        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         subscriptionPayment <- create SubscriptionInitialPayment with ..
 
@@ -194,8 +194,8 @@ template SubscriptionIdleState
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
-        walletProvider : Party -- TODO(#2415): use this to issue rewards to the sender's wallet provider
-      controller subscriptionData.sender
+        walletProvider : Party
+      controller subscriptionData.sender, walletProvider
       do
         assertSubscriptionMatches subscription subscriptionData
         assertContextValid subscriptionData
@@ -204,7 +204,7 @@ template SubscriptionIdleState
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
-        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now
+        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         payment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
@@ -285,8 +285,8 @@ template SubscriptionPayment
         pure (state, coin)
 
 
-lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin, Decimal)
-lockAndMakeChange context subscriptionData payData inputs now = do
+lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Party -> Update (ContractId LockedCoin, ContractId Coin, Decimal)
+lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentAmount; collectionDuration = lockDuration; .. } = payData
 
@@ -299,8 +299,8 @@ lockAndMakeChange context subscriptionData payData inputs now = do
 
   let transfer = Transfer with
        sender
-       -- this step is orchestrated by the sender's wallet, so the sender gets the rewards
-       provider = sender
+       -- this step is orchestrated by the sender's wallet, so the sender's wallet provider gets the rewards
+       provider = walletProvider
        inputs
        outputs =
          [ OutputSenderCoin with
