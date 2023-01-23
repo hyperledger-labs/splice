@@ -181,7 +181,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `apps-frontends/npmLint`: checks formatting of frontend code, but does not fix anything
 - `apps-frontends/npmFix`: fixes formatting of frontend code
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
-    `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
+    `scalafix` is a linting and rewrite tool. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
 - `formatFix`: apply `scalafmt`, `sbt scalafixAll`, `sbt apps-frontends/npmFix` and `sbt jsonnetfmtFix` to format source files
 - `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix`, `apps-frontends/npmLint` and `jsonnetfmt` rules
