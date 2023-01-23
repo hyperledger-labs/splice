@@ -1,7 +1,7 @@
 # -*- makefile -*-
 include ../common.mk
 
-src := Dockerfile coin.conf
+src := Dockerfile app.conf
 build_arg := --build-arg base_version=$(shell version-gen)
 
 .PHONY: build

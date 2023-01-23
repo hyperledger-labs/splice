@@ -14,15 +14,17 @@ ADD target/canton-classpath .
 ENV CLASSPATH=/canton-classpath
 
 # create and switch to a working directory
-RUN mkdir /canton
-WORKDIR /canton
+RUN mkdir /app
+WORKDIR /app
 
 # use this config until example configs are fixed
 COPY empty.conf .
-COPY entrypoint.sh .
+COPY target/entrypoint.sh .
 
 # move tarball to a static name
 ADD target/canton .
 
+RUN ln -s bin/canton cn-image-bin
+
 # point entrypoint to the coin executable
-ENTRYPOINT /canton/entrypoint.sh
+ENTRYPOINT /app/entrypoint.sh

@@ -16,6 +16,5 @@ $(html): $(src)
 	./gen-daml-docs.sh
 	VERSION=$(shell version-gen) sphinx-build -M html src target -D version=$(shell version-gen) -W
 
-.PHONY: clean
-clean:
-	rm -vfr target src/app_dev/api
+clean-local:
+	rm -vfr src/app_dev/api

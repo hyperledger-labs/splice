@@ -6,5 +6,5 @@ EXPOSE 5001
 EXPOSE 5002
 EXPOSE 10013
 
-COPY canton.conf .
+COPY app.conf .
 COPY bootstrap.scala .

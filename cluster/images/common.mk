@@ -36,8 +36,11 @@ all: docker-build
 #######
 
 .PHONY: clean
-clean:
+clean: clean-local
 	-rm -vfr target
+
+.PHONY: clean-local
+clean-local:
 
 ##########
 # version

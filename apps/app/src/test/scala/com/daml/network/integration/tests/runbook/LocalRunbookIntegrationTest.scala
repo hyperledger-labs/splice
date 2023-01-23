@@ -103,9 +103,9 @@ class LocalRunbookIntegrationTest
       .fromFiles(
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
-        svcAppPath / "coin.conf",
-        svAppsPath / "coin.conf",
-        scanAppPath / "coin.conf",
+        svcAppPath / "app.conf",
+        svAppsPath / "app.conf",
+        scanAppPath / "app.conf",
         testResourcesPath / "localrunbook-overrides.conf",
       )
       .clearConfigTransforms()

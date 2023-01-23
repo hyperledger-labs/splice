@@ -8,15 +8,17 @@ RUN apt-get update \
    && rm -rf /var/cache/apt/archives
 
 # create and switch to a working directory
-RUN mkdir /cn-app
-WORKDIR /cn-app
+RUN mkdir /app
+WORKDIR /app
 
 # use this config until example configs are fixed
 COPY empty.conf .
-COPY entrypoint.sh .
+COPY target/entrypoint.sh .
 
 # move tarball to a static name
 ADD target/coin-0.1.0-SNAPSHOT.tar.gz .
 
+RUN ln -s coin-0.1.0-SNAPSHOT/bin/coin cn-image-bin
+
 # point entrypoint to the coin executable
-ENTRYPOINT /cn-app/entrypoint.sh
+ENTRYPOINT /app/entrypoint.sh
