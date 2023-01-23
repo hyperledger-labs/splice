@@ -128,7 +128,7 @@ class RemoteDirectoryAppReference(
 
   private def getDirectoryInstall(): codegen.DirectoryInstall.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
     val allInstalls = ledgerApi.ledger_api.acs.filterJava(
       codegen.DirectoryInstall.COMPANION
     )(
@@ -148,10 +148,10 @@ class RemoteDirectoryAppReference(
   @Help.Summary("Request DirectoryInstall contract")
   def requestDirectoryInstall(): codegen.DirectoryInstallRequest.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
     val created = LedgerApiUtils.submitWithResult(
       ledgerApi,
-      userId = config.damlUser,
+      userId = config.ledgerApiUser,
       actAs = Seq(userParty),
       readAs = Seq.empty,
       update = new codegen.DirectoryInstallRequest(
@@ -166,11 +166,11 @@ class RemoteDirectoryAppReference(
   def requestDirectoryEntry(
       name: String
   ): (codegen.DirectoryEntryContext.ContractId, subsCodegen.SubscriptionRequest.ContractId) = {
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
     val damlTuple = LedgerApiUtils
       .submitWithResult(
         ledgerApi,
-        userId = config.damlUser,
+        userId = config.ledgerApiUser,
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = getDirectoryInstall()

@@ -186,7 +186,7 @@ class WalletTimeBasedIntegrationTest
         "Create a payment request, which expires after 1 minute",
         createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
-          aliceWallet.config.damlUser,
+          aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(
@@ -357,7 +357,7 @@ class WalletTimeBasedIntegrationTest
         "Alice creates a self-payment request",
         createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
-          aliceWallet.config.damlUser,
+          aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(

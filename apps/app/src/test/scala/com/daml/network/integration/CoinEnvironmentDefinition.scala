@@ -49,9 +49,9 @@ case class CoinEnvironmentDefinition(
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
         val svcParty =
-          svc.remoteParticipantWithAdminToken.parties.enable(svc.config.damlUser)
+          svc.remoteParticipantWithAdminToken.parties.enable(svc.config.ledgerApiUser)
         svc.remoteParticipantWithAdminToken.ledger_api.users.create(
-          id = svc.config.damlUser,
+          id = svc.config.ledgerApiUser,
           actAs = Set(svcParty.toLf),
           primaryParty = Some(svcParty.toLf),
           readAs = Set.empty,
@@ -59,9 +59,9 @@ case class CoinEnvironmentDefinition(
         )
         svs.local.foreach(sv => {
           val svParty =
-            sv.remoteParticipantWithAdminToken.parties.enable(sv.config.damlUser)
+            sv.remoteParticipantWithAdminToken.parties.enable(sv.config.ledgerApiUser)
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
-            id = sv.config.damlUser,
+            id = sv.config.ledgerApiUser,
             actAs = Set(svParty.toLf),
             primaryParty = Some(svParty.toLf),
             readAs = Set(svcParty.toLf),
@@ -76,9 +76,9 @@ case class CoinEnvironmentDefinition(
       this.preSetup(env)
       validators.local.foreach(validator => {
         val validatorParty =
-          validator.remoteParticipantWithAdminToken.parties.enable(validator.config.damlUser)
+          validator.remoteParticipantWithAdminToken.parties.enable(validator.config.ledgerApiUser)
         validator.remoteParticipantWithAdminToken.ledger_api.users.create(
-          id = validator.config.damlUser,
+          id = validator.config.ledgerApiUser,
           actAs = Set(validatorParty.toLf),
           primaryParty = Some(validatorParty.toLf),
           readAs = Set.empty,

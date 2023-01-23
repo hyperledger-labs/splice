@@ -75,14 +75,14 @@ final class SplitwiseAppClientReference(
       config.ledgerApi.getToken(),
     )(consoleEnvironment)
 
-  val userId: String = config.damlUser
+  val userId: String = config.ledgerApiUser
 
   lazy val context =
     GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
 
   private def getSplitwiseInstall(): splitwiseCodegen.SplitwiseInstall.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
     val installs = ledgerApi.ledger_api.acs.filterJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(
       userParty,
       (install: splitwiseCodegen.SplitwiseInstall.Contract) =>
@@ -100,7 +100,7 @@ final class SplitwiseAppClientReference(
   private def getGroup(
       groupKey: splitwiseCodegen.GroupKey
   ): splitwiseCodegen.Group.ContractId = {
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
     val groups = ledgerApi.ledger_api.acs.filterJava(splitwiseCodegen.Group.COMPANION)(
       userParty,
       (group: splitwiseCodegen.Group.Contract) =>

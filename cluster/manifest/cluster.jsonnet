@@ -81,7 +81,7 @@ local authEnvVars(s) = {
     valueFrom: {
       secretKeyRef: {
         name: s.secret,
-        key: "daml-user-name",
+        key: "ledger-api-user",
         optional: false,
       },
     },

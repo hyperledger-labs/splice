@@ -69,7 +69,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       .awaitJava(cc.coin.CoinRules.COMPANION)(aliceValidatorParty)
 
     // onboard end user
-    aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
@@ -98,7 +98,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
     partyIdFromTokenUser.toString
       .split("::")
-      .head should be(aliceValidator.config.damlUser)
+      .head should be(aliceValidator.config.ledgerApiUser)
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
@@ -117,7 +117,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     val invalidSignatureToken = JWT
       .create()
       .withAudience(aliceValidator.config.auth.audience)
-      .withSubject(aliceValidator.config.damlUser)
+      .withSubject(aliceValidator.config.ledgerApiUser)
       .sign(Algorithm.HMAC256("wrong-secret"))
 
     val responseForInvalidSignature = Http()
@@ -128,7 +128,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     val invalidAudienceToken = JWT
       .create()
       .withAudience("wrong-audience")
-      .withSubject(aliceValidator.config.damlUser)
+      .withSubject(aliceValidator.config.ledgerApiUser)
       .sign(AuthUtil.testSignatureAlgorithm)
 
     val responseForInvalidAudience = Http()
@@ -147,8 +147,8 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     initSvc()
     aliceValidator.startSync()
 
-    val party1 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-    val party2 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    val party1 = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
+    val party2 = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
     party1 shouldBe party2
   }
 

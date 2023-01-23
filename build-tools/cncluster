@@ -457,10 +457,12 @@ function _set_auth0_secret() {
       kubectl delete secret ${SECRET_NAME}
   fi
 
+  # TODO(#2438): Remove daml-user-name secret after 30th Jan
   kubectl create secret generic ${SECRET_NAME} \
     --from-literal=url="${WELL_KNOWN_URL}" \
     --from-literal=client-id="${CLIENT_ID}" \
     --from-literal=client-secret="${CLIENT_SECRET}" \
+    --from-literal=ledger-api-user="${USER_NAME}" \
     --from-literal=daml-user-name="${USER_NAME}"
 }
 

@@ -12,7 +12,7 @@ class WalletFrontendIntegrationTest
   "A wallet UI" should {
 
     "allow tapping coins and then list the created coins" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       onboardWalletUser(aliceWallet, aliceValidator)
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -30,7 +30,7 @@ class WalletFrontendIntegrationTest
     }
 
     "show balance and locked coins" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
       val tapQty = 50
@@ -77,7 +77,7 @@ class WalletFrontendIntegrationTest
 
     "allow a random user to onboard themselves, then tap and list coins" in { implicit env =>
       // Note: the test generates a unique user for each test
-      val newRandomUser = aliceWallet.config.damlUser
+      val newRandomUser = aliceWallet.config.ledgerApiUser
 
       withFrontEnd("alice") { implicit webDriver =>
         // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
@@ -109,7 +109,7 @@ class WalletFrontendIntegrationTest
     "allow a random user with uppercase characters to onboard themselves, then tap and list coins" in {
       implicit env =>
         // Note: the test generates a unique user for each test
-        val newRandomUser = "UPPERCASE" + aliceWallet.config.damlUser
+        val newRandomUser = "UPPERCASE" + aliceWallet.config.ledgerApiUser
 
         withFrontEnd("alice") { implicit webDriver =>
           // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
@@ -140,7 +140,7 @@ class WalletFrontendIntegrationTest
 
     "show logged in user details" in { implicit env =>
       // Create directory entry for alice
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val entryName = perTestCaseName("alice.cns")
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       requestDirectoryEntry(aliceParty, aliceDirectory, entryName)
@@ -174,7 +174,7 @@ class WalletFrontendIntegrationTest
     "user name is persisted" in { implicit env =>
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       withFrontEnd("alice") { implicit webDrivers =>
-        browseToAliceWallet(aliceWallet.config.damlUser)
+        browseToAliceWallet(aliceWallet.config.ledgerApiUser)
         find(id("logged-in-user")).value.text should matchText(aliceParty.toProtoPrimitive)
         actAndCheck(
           "Alice reloads the page", {

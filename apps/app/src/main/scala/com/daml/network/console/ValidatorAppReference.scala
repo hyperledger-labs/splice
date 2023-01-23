@@ -83,7 +83,7 @@ final class ValidatorAppBackendReference(
   override def token: String = {
     AuthUtil.testToken(
       audience = AuthUtil.testAudience,
-      user = config.damlUser,
+      user = config.ledgerApiUser,
     )
   }
 

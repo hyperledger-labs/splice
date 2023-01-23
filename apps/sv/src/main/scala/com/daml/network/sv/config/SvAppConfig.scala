@@ -12,7 +12,7 @@ import com.digitalasset.canton.config.*
 case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    damlUser: String,
+    ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteSvc: SvcAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),

@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.*
 case class LocalDirectoryAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    damlUser: String,
+    ledgerApiUser: String,
     override val remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
@@ -25,7 +25,7 @@ case class LocalDirectoryAppConfig(
 }
 
 case class RemoteDirectoryAppConfig(
-    damlUser: String,
+    ledgerApiUser: String,
     adminApi: CoinHttpClientConfig,
     ledgerApi: CoinLedgerApiClientConfig,
 ) extends RemoteCoinConfig {

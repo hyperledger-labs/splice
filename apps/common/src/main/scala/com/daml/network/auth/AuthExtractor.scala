@@ -31,14 +31,16 @@ final class AuthExtractor(
             val token = provided.identifier
             val res = (for {
               decodedToken <- verifier.verify(token)
-              damlUser <- JwtClaims
-                .getDamlUser(decodedToken)
+              ledgerApiUser <- JwtClaims
+                .getLedgerApiUser(decodedToken)
                 .toRight(s"No daml user found in token for operation '$operationId'")
-            } yield damlUser)
+            } yield ledgerApiUser)
             res match {
-              case Right(damlUser) => {
-                logger.debug(s"Decoded token with subject = $damlUser for operation '$operationId'")
-                Some(damlUser)
+              case Right(ledgerApiUser) => {
+                logger.debug(
+                  s"Decoded token with subject = $ledgerApiUser for operation '$operationId'"
+                )
+                Some(ledgerApiUser)
               }
               case Left(error) => {
                 logger.info(s"Could not validate token for operation '$operationId': $error")

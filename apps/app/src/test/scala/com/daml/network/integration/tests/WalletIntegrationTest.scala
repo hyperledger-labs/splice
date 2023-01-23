@@ -49,7 +49,7 @@ class WalletIntegrationTest
       val request =
         createSelfPaymentRequest(
           aliceValidator.remoteParticipantWithAdminToken,
-          aliceWallet.config.damlUser,
+          aliceWallet.config.ledgerApiUser,
           alice,
         )._2
       aliceWallet.rejectAppPaymentRequest(request)
@@ -88,7 +88,7 @@ class WalletIntegrationTest
           (1 to 3).map(i =>
             createSelfPaymentRequest(
               aliceValidator.remoteParticipantWithAdminToken,
-              aliceWallet.config.damlUser,
+              aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
@@ -128,7 +128,7 @@ class WalletIntegrationTest
           (0 to batchSize + 1).map(_ =>
             createSelfPaymentRequest(
               aliceValidator.remoteParticipantWithAdminToken,
-              aliceWallet.config.damlUser,
+              aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
@@ -181,7 +181,7 @@ class WalletIntegrationTest
           val request =
             createSelfPaymentRequest(
               aliceValidator.remoteParticipantWithAdminToken,
-              aliceWallet.config.damlUser,
+              aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           // Reject it so that we have a reference to an already archived app payment request
@@ -220,7 +220,7 @@ class WalletIntegrationTest
         val request =
           createSelfPaymentRequest(
             aliceValidator.remoteParticipantWithAdminToken,
-            aliceWallet.config.damlUser,
+            aliceWallet.config.ledgerApiUser,
             alice,
           )._2
         eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
@@ -272,7 +272,7 @@ class WalletIntegrationTest
       val token = JWT
         .create()
         .withAudience(aliceWalletBackend.config.auth.audience)
-        .withSubject(aliceWallet.config.damlUser)
+        .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(Algorithm.HMAC256("wrong-secret"))
 
       val channel =
@@ -304,7 +304,7 @@ class WalletIntegrationTest
       val token = JWT
         .create()
         .withAudience("wrong-audience")
-        .withSubject(aliceWallet.config.damlUser)
+        .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(AuthUtil.testSignatureAlgorithm)
 
       val channel =
@@ -392,7 +392,7 @@ class WalletIntegrationTest
         {
           val (referenceId, requestId, _) = createSelfPaymentRequest(
             aliceValidator.remoteParticipantWithAdminToken,
-            aliceWallet.config.damlUser,
+            aliceWallet.config.ledgerApiUser,
             aliceParty,
             domainId = Some(splitwiseDomainId),
           )

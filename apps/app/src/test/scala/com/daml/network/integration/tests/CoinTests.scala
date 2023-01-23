@@ -63,52 +63,52 @@ object CoinTests {
     // make `aliceWallet` etc. use updated usernames
     override def uwc(name: String)(implicit
         env: CoinTestConsoleEnvironment
-    ): WalletAppClientReference = extendDamlUserWithCaseId(super.wc(name))
+    ): WalletAppClientReference = extendLedgerApiUserWithCaseId(super.wc(name))
 
     // make `aliceDirectory` etc. use updated usernames
     override def rdp(name: String)(implicit
         env: CoinTestConsoleEnvironment
-    ): RemoteDirectoryAppReference = extendDamlUserWithCaseId(super.rdp(name))
+    ): RemoteDirectoryAppReference = extendLedgerApiUserWithCaseId(super.rdp(name))
 
     // make `aliceSplitwise` etc. use updated usernames
     override def rsw(name: String)(implicit
         env: CoinTestConsoleEnvironment
-    ): SplitwiseAppClientReference = extendDamlUserWithCaseId(super.rsw(name))
+    ): SplitwiseAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
 
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
 
-    private def extendDamlUserWithCaseId(
+    private def extendLedgerApiUserWithCaseId(
         ref: WalletAppClientReference
     ): WalletAppClientReference = {
-      val newDamlUser = perTestCaseName(ref.config.damlUser)
+      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       new WalletAppClientReference(
         ref.coinConsoleEnvironment,
         ref.name,
-        config = ref.config.copy(damlUser = newDamlUser),
+        config = ref.config.copy(ledgerApiUser = newLedgerApiUser),
       )
     }
-    private def extendDamlUserWithCaseId(
+    private def extendLedgerApiUserWithCaseId(
         ref: RemoteDirectoryAppReference
     ): RemoteDirectoryAppReference = {
-      val newDamlUser = perTestCaseName(ref.config.damlUser)
+      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
-        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newDamlUser))
+        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
       new RemoteDirectoryAppReference(
         ref.coinConsoleEnvironment,
         ref.name,
-        config = ref.config.copy(damlUser = newDamlUser, ledgerApi = newLedgerApiConfig),
+        config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
       )
     }
-    private def extendDamlUserWithCaseId(
+    private def extendLedgerApiUserWithCaseId(
         ref: SplitwiseAppClientReference
     ): SplitwiseAppClientReference = {
-      val newDamlUser = perTestCaseName(ref.config.damlUser)
+      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
-        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newDamlUser))
+        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
       new SplitwiseAppClientReference(
         ref.coinConsoleEnvironment,
         ref.name,
-        config = ref.config.copy(damlUser = newDamlUser, ledgerApi = newLedgerApiConfig),
+        config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
       )
     }
     private def updateUser(

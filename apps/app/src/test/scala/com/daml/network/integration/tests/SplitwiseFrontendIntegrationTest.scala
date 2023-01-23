@@ -82,11 +82,11 @@ class SplitwiseFrontendIntegrationTest
   "A splitwise UI" should {
 
     "settle debts with multiple parties" in { implicit env =>
-      val aliceDamlUser = aliceSplitwise.config.damlUser
+      val aliceDamlUser = aliceSplitwise.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobDamlUser = bobSplitwise.config.damlUser
+      val bobDamlUser = bobSplitwise.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
-      val charlieDamlUser = charlieSplitwise.config.damlUser
+      val charlieDamlUser = charlieSplitwise.config.ledgerApiUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
       val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
@@ -219,9 +219,9 @@ class SplitwiseFrontendIntegrationTest
     }
 
     "settle debts with a single party" in { implicit env =>
-      val aliceDamlUser = aliceSplitwise.config.damlUser
+      val aliceDamlUser = aliceSplitwise.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobDamlUser = bobSplitwise.config.damlUser
+      val bobDamlUser = bobSplitwise.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val groupName = "troika"
 
@@ -311,11 +311,11 @@ class SplitwiseFrontendIntegrationTest
     }
 
     "handle multiple groups correctly" in { implicit env =>
-      val aliceDamlUser = aliceSplitwise.config.damlUser
+      val aliceDamlUser = aliceSplitwise.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobDamlUser = bobSplitwise.config.damlUser
+      val bobDamlUser = bobSplitwise.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
-      val charlieDamlUser = charlieSplitwise.config.damlUser
+      val charlieDamlUser = charlieSplitwise.config.ledgerApiUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
       val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)

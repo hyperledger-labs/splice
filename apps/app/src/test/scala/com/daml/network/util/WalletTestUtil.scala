@@ -149,10 +149,10 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       walletAppClient: WalletAppClientReference,
       validator: ValidatorAppReference,
   ): PartyId = {
-    val damlUser = walletAppClient.config.damlUser
+    val ledgerApiUser = walletAppClient.config.ledgerApiUser
 
-    clue(s"Onboard $damlUser on ${validator.name}") {
-      val party = validator.onboardUser(damlUser)
+    clue(s"Onboard $ledgerApiUser on ${validator.name}") {
+      val party = validator.onboardUser(ledgerApiUser)
       // The wallet is not immediately usable by the onboarded user -
       // the wallet app backend has to ingest the wallet install contract first.
       eventually() {

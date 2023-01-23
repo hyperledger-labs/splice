@@ -5,8 +5,8 @@ import java.time.Duration
 import java.util.UUID
 
 // Onboard Test Parties
-val aliceUserName = aliceWallet.config.damlUser
-val bobUserName = bobWallet.config.damlUser
+val aliceUserName = aliceWallet.config.ledgerApiUser
+val bobUserName = bobWallet.config.ledgerApiUser
 
 println(s"Onboarding Alice user: " + aliceUserName)
 val aliceParty = validatorApp.onboardUser(aliceUserName)

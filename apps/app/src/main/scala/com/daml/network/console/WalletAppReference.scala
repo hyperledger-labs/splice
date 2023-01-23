@@ -34,7 +34,7 @@ class WalletAppClientReference(
   private def token: String = {
     AuthUtil.testToken(
       audience = AuthUtil.testAudience,
-      user = config.damlUser,
+      user = config.ledgerApiUser,
     )
   }
 

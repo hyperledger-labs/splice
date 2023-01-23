@@ -51,7 +51,7 @@ object CoinConfigTransforms {
     * in the source text of a '.conf' file. To reference these names in a '.canton' file,
     * you must read them from the objects themselves:
     *
-    * val validatorUserName = validatorApp.config.damlUser
+    * val validatorUserName = validatorApp.config.ledgerApiUser
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
@@ -59,12 +59,12 @@ object CoinConfigTransforms {
     val suffix = context.toLowerCase
 
     val transforms = Seq(
-      updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
-      updateAllSvAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateSvcAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateAllSvAppConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix")),
       updateAllValidatorConfigs_(c =>
         c.copy(
-          damlUser = s"${c.damlUser}-$suffix",
+          ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           walletServiceUser = s"${c.walletServiceUser}-$suffix",
           appInstances = c.appInstances.view
             .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
@@ -72,11 +72,15 @@ object CoinConfigTransforms {
         )
       ),
       updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix")),
-      updateAllWalletAppClientConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
-      updateDirectoryAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateDirectoryAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
-      updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
-      updateAllRemoteDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateAllRemoteSplitwiseAppConfigs_(c =>
+        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
+      ),
+      updateAllRemoteDirectoryAppConfigs_(c =>
+        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
+      ),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
@@ -107,7 +111,7 @@ object CoinConfigTransforms {
     * in the source text of a '.conf' file. To reference these names in a '.canton' file,
     * you must read them from the objects themselves:
     *
-    * val validatorUserName = validatorApp.config.damlUser
+    * val validatorUserName = validatorApp.config.ledgerApiUser
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
@@ -388,31 +392,31 @@ object CoinConfigTransforms {
   ): CoinConfigTransform = { config =>
     val transforms: Seq[CoinConfigTransform] = Seq(
       updateAllValidatorConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllWalletAppBackendConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.serviceUser, _))
       }),
       updateSvcAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllSvAppConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateScanAppConfig(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.svcUser, _))
       }),
       updateDirectoryAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllRemoteDirectoryAppConfigs_(c => {
-        c.focus(_.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllSplitwiseAppConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
       updateAllRemoteSplitwiseAppConfigs_(c => {
-        c.focus(_.ledgerApi).modify(enableAuth(c.damlUser, _))
+        c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))

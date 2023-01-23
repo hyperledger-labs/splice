@@ -55,7 +55,7 @@ class DirectoryApp(
     mat: Materializer,
     tracer: Tracer,
 ) extends CoinNode[DirectoryApp.State](
-      config.damlUser,
+      config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
       loggerFactory,

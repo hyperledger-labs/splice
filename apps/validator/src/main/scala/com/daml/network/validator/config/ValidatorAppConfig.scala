@@ -26,7 +26,7 @@ case class ValidatorDomainConfig(
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    damlUser: String,
+    ledgerApiUser: String,
     walletServiceUser: String,
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],

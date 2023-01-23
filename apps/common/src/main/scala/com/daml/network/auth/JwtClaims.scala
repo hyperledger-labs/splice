@@ -22,7 +22,7 @@ object JwtClaims {
     * @param token The decoded token claims
     * @return Either the Daml user ID as a String, or None if neither claim is set
     */
-  def getDamlUser(token: DecodedJWT): Option[String] = Option(
+  def getLedgerApiUser(token: DecodedJWT): Option[String] = Option(
     getCnClaims(token).flatMap(_.daml_user).getOrElse(token.getSubject)
   )
 }

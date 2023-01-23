@@ -12,7 +12,7 @@ import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFini
 case class SvcAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    damlUser: String,
+    ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     automation: AutomationConfig = AutomationConfig(),
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),

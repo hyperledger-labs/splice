@@ -13,7 +13,7 @@ class WalletSubscriptionsFrontendIntegrationTest
   "A wallet UI" should {
 
     "show subscription requests and allow users to accept them" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting the subscription request
@@ -41,7 +41,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     }
 
     "show subscriptions in different states" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
@@ -92,7 +92,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     }
 
     "support canceling subscriptions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
@@ -130,7 +130,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     }
 
     "display currency in subscriptions and subscription requests" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val usdAmount = new paymentCodegen.PaymentAmount(
         BigDecimal(42.0).bigDecimal,

@@ -15,9 +15,9 @@ Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { 
 println("Onboarding users...")
 val charlieValidator = aliceValidator
 
-val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
-val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.damlUser)
+val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
+val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)
+val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.ledgerApiUser)
 
 println("Waiting for directory initialization...")
 `directory-app`.waitForInitialization()

@@ -37,7 +37,7 @@ class HttpValidatorHandler(
       respond: v0.ValidatorResource.OnboardUserResponse.type
   )(
       body: definitions.OnboardUserRequest
-  )(damlUser: String): Future[v0.ValidatorResource.OnboardUserResponse] =
+  )(ledgerApiUser: String): Future[v0.ValidatorResource.OnboardUserResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       val name = body.name
       span.setAttribute("name", name)
@@ -46,16 +46,16 @@ class HttpValidatorHandler(
 
   def register(
       respond: v0.ValidatorResource.RegisterResponse.type
-  )(body: Option[Json])(damlUser: String): Future[v0.ValidatorResource.RegisterResponse] =
+  )(body: Option[Json])(ledgerApiUser: String): Future[v0.ValidatorResource.RegisterResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      span.setAttribute("name", damlUser)
-      onboard(damlUser).map(p => definitions.RegistrationResponse(p))
+      span.setAttribute("name", ledgerApiUser)
+      onboard(ledgerApiUser).map(p => definitions.RegistrationResponse(p))
     }
 
   def getValidatorUserInfo(
       respond: v0.ValidatorResource.GetValidatorUserInfoResponse.type
   )()(
-      damlUser: String
+      ledgerApiUser: String
   ): Future[v0.ValidatorResource.GetValidatorUserInfoResponse] =
     withNewTrace(workflowId) { _ => _ =>
       Future.successful(
@@ -68,7 +68,7 @@ class HttpValidatorHandler(
 
   def listConnectedDomains(
       respond: v0.ValidatorResource.ListConnectedDomainsResponse.type
-  )()(damlUser: String): Future[v0.ValidatorResource.ListConnectedDomainsResponse] = {
+  )()(ledgerApiUser: String): Future[v0.ValidatorResource.ListConnectedDomainsResponse] = {
     withNewTrace(workflowId) { _ => span =>
       for {
         domains <- store.domains.listConnectedDomains()

@@ -12,7 +12,7 @@ class WalletPaymentFrontendIntegrationTest
 
     "show app payment requests and allow users to reject them" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
 
@@ -35,7 +35,7 @@ class WalletPaymentFrontendIntegrationTest
     "show app payment requests in CC, and correctly handle unresolved party IDs" in {
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
-        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceDamlUser = aliceWallet.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
         createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
 
@@ -73,7 +73,7 @@ class WalletPaymentFrontendIntegrationTest
     "show app payment requests in USD (with USD==CC), and correctly handle unresolved party IDs" in {
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
-        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceDamlUser = aliceWallet.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
         createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.USD)
 
@@ -110,7 +110,7 @@ class WalletPaymentFrontendIntegrationTest
 
     "show app payment requests with multiple receivers (CC only)" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
       createPaymentRequest(
@@ -151,7 +151,7 @@ class WalletPaymentFrontendIntegrationTest
 
     "show app payment requests, and resolve party IDs in them" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceDirectoryName = perTestCaseName("alice.cns")
       val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
@@ -179,7 +179,7 @@ class WalletPaymentFrontendIntegrationTest
     }
 
     "support different ways of defining the receiver in transfer offers" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
       actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
@@ -284,7 +284,7 @@ class WalletPaymentFrontendIntegrationTest
     }
 
     "support withdrawing and rejecting transfer offers" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
       actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
@@ -292,7 +292,7 @@ class WalletPaymentFrontendIntegrationTest
         _ => (aliceWallet.list().coins.length shouldBe 1),
       )
       createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
-      val bobDamlUser = bobWallet.config.damlUser
+      val bobDamlUser = bobWallet.config.ledgerApiUser
       val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
       val bobEntryName = perTestCaseName("bob.cns")
       actAndCheck("Tap coin for bob", bobWallet.tap(50))(

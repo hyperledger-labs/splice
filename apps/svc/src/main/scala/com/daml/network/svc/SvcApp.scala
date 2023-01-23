@@ -48,7 +48,7 @@ class SvcApp(
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
 ) extends CoinNode[SvcApp.State](
-      config.damlUser,
+      config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
       loggerFactory,
@@ -94,7 +94,7 @@ class SvcApp(
       adminServerRegistry
         .addService(
           SvcServiceGrpc.bindService(
-            new GrpcSvcAppService(ledgerClient, config.damlUser, store, loggerFactory),
+            new GrpcSvcAppService(ledgerClient, config.ledgerApiUser, store, loggerFactory),
             ec,
           )
         )

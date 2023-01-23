@@ -280,12 +280,12 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     }
   }
 
-  protected def browseToWallet(port: Int, damlUser: String)(implicit webDriver: WebDriver) = {
+  protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     actAndCheck(
       s"Browse to wallet UI at port ${port}", {
         go to s"http://localhost:${port}"
         click on "user-id-field"
-        textField("user-id-field").value = damlUser
+        textField("user-id-field").value = ledgerApiUser
         click on "login-button"
       },
     )(
@@ -294,23 +294,23 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     )
   }
 
-  protected def browseToAliceWallet(damlUser: String)(implicit webDriver: WebDriver) = {
-    browseToWallet(3000, damlUser)
+  protected def browseToAliceWallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3000, ledgerApiUser)
   }
 
-  protected def browseToBobWallet(damlUser: String)(implicit webDriver: WebDriver) = {
-    browseToWallet(3001, damlUser)
+  protected def browseToBobWallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3001, ledgerApiUser)
   }
 
-  protected def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {
+  protected def browseToPaymentRequests(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
-    browseToAliceWallet(damlUser)
+    browseToAliceWallet(ledgerApiUser)
     click on "app-payment-requests-button"
   }
 
-  protected def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {
+  protected def browseToSubscriptions(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     // Go to subscriptions tab in alice's wallet
-    browseToAliceWallet(damlUser)
+    browseToAliceWallet(ledgerApiUser)
     click on "subscriptions-button"
   }
 

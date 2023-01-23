@@ -64,7 +64,7 @@ class ValidatorApp(
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
 ) extends CoinNode[ValidatorApp.State](
-      config.damlUser,
+      config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
       loggerFactory,
@@ -86,7 +86,7 @@ class ValidatorApp(
       party <- connection.getOrAllocateParty(config.walletServiceUser)
       // Note: need to immediately grant right to act as wallet service user in order to install wallet install contract
       // TODO(#713): remove this workaround for missing act-as-any-party rights
-      _ <- connection.grantUserRights(config.damlUser, Seq(party), Seq.empty)
+      _ <- connection.grantUserRights(config.ledgerApiUser, Seq(party), Seq.empty)
     } yield {
       logger.info(
         s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
@@ -277,7 +277,7 @@ class ValidatorApp(
         store,
         svcParty = svcParty,
         validatorParty = validatorParty,
-        validatorUser = config.damlUser,
+        validatorUser = config.ledgerApiUser,
         walletServiceParty = walletServiceParty,
         walletServiceUser = walletServiceUser,
         domainId = domainId,
@@ -295,7 +295,7 @@ class ValidatorApp(
           new HttpValidatorHandler(
             ledgerClient,
             store,
-            validatorUserName = config.damlUser,
+            validatorUserName = config.ledgerApiUser,
             walletServiceUser = walletServiceUser,
             domainId = domainId,
             retryProvider = retryProvider,
@@ -327,7 +327,7 @@ class ValidatorApp(
               new GrpcValidatorAppService(
                 ledgerClient,
                 store,
-                config.damlUser,
+                config.ledgerApiUser,
                 config.walletServiceUser,
                 domainId = domainId,
                 retryProvider,

@@ -38,7 +38,7 @@ case class SplitwiseAppClientConfig(
     // Ledger API for writes.
     ledgerApi: CoinLedgerApiClientConfig,
     remoteScan: ScanAppClientConfig,
-    damlUser: String,
+    ledgerApiUser: String,
 ) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

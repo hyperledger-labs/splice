@@ -449,7 +449,7 @@
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-svc-ledger-api-auth",
                                     "optional": false
                                  }
@@ -459,7 +459,7 @@
                               "name": "CN_APP_SV1_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv1-ledger-api-auth",
                                     "optional": false
                                  }
@@ -469,7 +469,7 @@
                               "name": "CN_APP_SV2_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv2-ledger-api-auth",
                                     "optional": false
                                  }
@@ -479,7 +479,7 @@
                               "name": "CN_APP_SV3_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv3-ledger-api-auth",
                                     "optional": false
                                  }
@@ -489,7 +489,7 @@
                               "name": "CN_APP_SV4_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv4-ledger-api-auth",
                                     "optional": false
                                  }
@@ -499,7 +499,7 @@
                               "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-scan-ledger-api-auth",
                                     "optional": false
                                  }
@@ -509,7 +509,7 @@
                               "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-directory-ledger-api-auth",
                                     "optional": false
                                  }
@@ -648,7 +648,7 @@
                               "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-directory-ledger-api-auth",
                                     "optional": false
                                  }
@@ -778,7 +778,7 @@
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-svc-ledger-api-auth",
                                     "optional": false
                                  }
@@ -903,7 +903,7 @@
                               "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv1-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1028,7 +1028,7 @@
                               "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv2-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1153,7 +1153,7 @@
                               "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv3-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1278,7 +1278,7 @@
                               "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-sv4-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1399,7 +1399,7 @@
                               "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-scan-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1648,7 +1648,7 @@
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1658,7 +1658,7 @@
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1835,7 +1835,7 @@
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1845,7 +1845,7 @@
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
@@ -1966,7 +1966,7 @@
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
@@ -2458,7 +2458,7 @@
                               "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-splitwise-validator-ledger-api-auth",
                                     "optional": false
                                  }
@@ -2635,7 +2635,7 @@
                               "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-splitwise-validator-ledger-api-auth",
                                     "optional": false
                                  }
@@ -2645,7 +2645,7 @@
                               "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-splitwise-ledger-api-auth",
                                     "optional": false
                                  }
@@ -2766,7 +2766,7 @@
                               "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
-                                    "key": "daml-user-name",
+                                    "key": "ledger-api-user",
                                     "name": "cn-app-splitwise-ledger-api-auth",
                                     "optional": false
                                  }

@@ -34,15 +34,17 @@ final class AuthInterceptor(
         s"Auth header did not start with bearer  prefix '$AuthInterceptor.BEARER_PREFIX'",
       )
       decodedToken <- verifier.verify(encodedToken)
-      damlUser <- JwtClaims.getDamlUser(decodedToken).toRight("No daml user found in token")
-    } yield damlUser
+      ledgerApiUser <- JwtClaims
+        .getLedgerApiUser(decodedToken)
+        .toRight("No daml user found in token")
+    } yield ledgerApiUser
 
     val ctx = Context.current
 
     tokenPayloadE match {
-      case Right(damlUser) => {
-        logger.debug(s"Decoded token with subject = $damlUser")
-        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, damlUser)
+      case Right(ledgerApiUser) => {
+        logger.debug(s"Decoded token with subject = $ledgerApiUser")
+        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, ledgerApiUser)
 
         Contexts.interceptCall(
           newCtx,
