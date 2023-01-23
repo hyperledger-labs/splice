@@ -39,7 +39,7 @@ local testAuth(enabled) =
 local validatorNodes = {
   alice: {
     ledgerApi: { grpcUrl: "http://localhost:6201" },
-    validator: { grpcUrl: "http://localhost:6203" },
+    validator: { grpcUrl: "http://localhost:7203" },
     wallet: { grpcUrl: "http://localhost:6204", uiUrl: "http://localhost:3000" },
     splitwise: { grpcUrl: "http://localhost:6113" },
     directory: { grpcUrl: "http://localhost:6110" },
@@ -47,7 +47,7 @@ local validatorNodes = {
   },
   bob: {
     ledgerApi: { grpcUrl: "http://localhost:6301" },
-    validator: { grpcUrl: "http://localhost:6303" },
+    validator: { grpcUrl: "http://localhost:7303" },
     wallet: { grpcUrl: "http://localhost:6304", uiUrl: "http://localhost:3001" },
     splitwise: { grpcUrl: "http://localhost:6113" },
     directory: { grpcUrl: "http://localhost:6110" },

@@ -19,8 +19,8 @@ window.canton_network_config = {
       grpcUrl: 'http://localhost:6004',
     },
     validator: {
-      // URL of the gRPC-Web envoy proxy, proxying to the validator app gRPC API
-      grpcUrl: 'http://localhost:6003',
+      // URL of the validator app HTTP API
+      grpcUrl: 'http://localhost:7003',
     },
     directory: {
       // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API

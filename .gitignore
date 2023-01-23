@@ -46,3 +46,4 @@ canton-simtime.tokens
 apps/common/frontend-openapi
 canton-classpath
 apps/validator/frontend-openapi
+/cluster/manifest/test-results/actual.json

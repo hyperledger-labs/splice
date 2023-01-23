@@ -1,8 +1,14 @@
-import * as v0 from 'common-protobuf/com/daml/network/validator/v0/validator_service_pb';
 import { useUserState } from 'common-frontend';
-import { ValidatorAppServicePromiseClient } from 'common-protobuf/com/daml/network/validator/v0/validator_service_grpc_web_pb';
-import { Metadata } from 'grpc-web';
 import React, { useContext, useMemo } from 'react';
+import {
+  Middleware,
+  createConfiguration,
+  OnboardUserRequest as HttpOnboardUserRequest,
+  ValidatorApi,
+  ServerConfiguration,
+  RequestContext,
+  ResponseContext,
+} from 'validator-openapi';
 
 const ValidatorContext = React.createContext<ValidatorClient | undefined>(undefined);
 
@@ -20,8 +26,22 @@ export interface ValidatorClient {
   onboardUser: (userId: string) => Promise<void>;
 }
 
-interface Credentials extends Metadata {
-  Authorization: string;
+class ApiMiddleware implements Middleware {
+  private token: string | undefined;
+
+  async pre(context: RequestContext): Promise<RequestContext> {
+    if (!this.token) {
+      throw new Error('Request issued before access token was set');
+    }
+    context.setHeaderParam('Authorization', `Bearer ${this.token}`);
+    return context;
+  }
+  post(context: ResponseContext): Promise<ResponseContext> {
+    return Promise.resolve(context);
+  }
+  constructor(accessToken: string | undefined) {
+    this.token = accessToken;
+  }
 }
 
 export const ValidatorClientProvider: React.FC<React.PropsWithChildren<ValidatorProps>> = ({
@@ -31,20 +51,18 @@ export const ValidatorClientProvider: React.FC<React.PropsWithChildren<Validator
   const { userAccessToken } = useUserState();
 
   const friendlyClient: ValidatorClient | undefined = useMemo(() => {
-    const getCreds = (): Credentials => {
-      if (!userAccessToken) {
-        throw new Error('Request issued before access token was set');
-      }
-      return {
-        Authorization: `Bearer ${userAccessToken}`,
-      };
-    };
+    const configuration = createConfiguration({
+      baseServer: new ServerConfiguration(url, {}),
+      promiseMiddleware: [new ApiMiddleware(userAccessToken)],
+    });
 
-    const validatorClient = new ValidatorAppServicePromiseClient(url, null, null);
+    const validatorClient = new ValidatorApi(configuration);
 
     return {
       onboardUser: async (userId: string): Promise<void> => {
-        validatorClient.onboardUser(new v0.OnboardUserRequest().setName(userId), getCreds());
+        const req = new HttpOnboardUserRequest();
+        req.name = userId;
+        validatorClient.register();
       },
     };
   }, [url, userAccessToken]);
