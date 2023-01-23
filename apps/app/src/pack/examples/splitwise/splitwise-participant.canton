@@ -1,4 +1,7 @@
-val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.global:5008")
+val domainUrl = System.getProperty("DOMAIN_URL")
+if (domainUrl == null) {
+   sys.error("System property DOMAIN_URL was not set, set it to http://${targetcluster}.network.canton.global:5008")
+}
 
 println("Starting participant node")
 splitwiseParticipant.start()

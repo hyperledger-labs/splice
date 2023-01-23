@@ -14,10 +14,12 @@ Following the :ref:`recommended topology <topology_image>` for
 deploying Canton network applications, we run a separate validator
 node for our application.
 
-To start the validator node, first start the validator participant using the Canton research binary and connect it to the devnet domain: ::
+To start the validator node, first start the validator participant using the Canton research binary and connect it to the domain:
+
+.. parsed-literal::
 
     ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwise/splitwise-participant.conf \
-      --bootstrap examples/splitwise/splitwise-participant.canton
+      --bootstrap examples/splitwise/splitwise-participant.canton -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
 
 Before starting the splitwise backend, some setup is required:
 
@@ -41,14 +43,18 @@ configuration.
     :end-before: END_SPLITWISE_CONFIG
 
 The release bundle already contains a configuration file with that
-section added so start your validator again with this configuration file: ::
+section added so start your validator again with this configuration file:
 
-  bin/coin --config examples/splitwise/splitwise-validator.conf
+.. parsed-literal::
+
+  bin/coin --config examples/splitwise/splitwise-validator.conf -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
 
 Now you can finally start the app backend. Splitwise is included as
-part of the standard release so it is started using the same binary. ::
+part of the standard release so it is started using the same binary.
 
-  bin/coin --config examples/splitwise/splitwise.conf
+.. parsed-literal::
+
+  bin/coin --config examples/splitwise/splitwise.conf -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
 
 With the backend running, you can connect to it as a given user. Here,
 we reuse the participant and the users ``alice`` and ``bob`` created
@@ -71,9 +77,11 @@ To interact with splitwise, the release includes an example configuration that
 provides two splitwise
 references ``aliceSplitwise`` and ``bobSplitwise`` which interact with
 splitwise using the ``alice`` and ``bob`` users that you onboarded
-earlier. ::
+earlier.
 
-  bin/coin --config examples/validator/splitwise-users.conf
+.. parsed-literal::
+
+  bin/coin --config examples/validator/splitwise-users.conf  -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
 
 To verify that you setup everything correctly, create an install
 request for ``alice`` followed by creating a group and listing your

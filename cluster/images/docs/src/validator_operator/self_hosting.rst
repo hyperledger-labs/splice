@@ -57,16 +57,20 @@ The Canton participant is responsible for hosting your Daml apps; i.e. interpret
    bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
    This is also the convention we will use in this tutorial.
 
-First off, you will need to start the validator participant and connect it to the devnet domain: We assume here that
-you extracted Canton research next to the Canton network tarball. If you placed it somewhere else, you might need to adjust the path. ::
+First off, you will need to start the validator participant and connect it to the domain: We assume here that
+you extracted Canton research next to the Canton network tarball. If you placed it somewhere else, you might need to adjust the path.
+
+.. parsed-literal::
 
   ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
-      --bootstrap examples/validator/validator-participant.canton
+      --bootstrap examples/validator/validator-participant.canton -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
 
-Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps: ::
+Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps:
+
+.. parsed-literal::
 
   bin/coin --config examples/validator/validator.conf \
-      --bootstrap examples/validator/validator.canton
+      --bootstrap examples/validator/validator.canton -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
 
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
@@ -288,18 +292,19 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
 8. Kill the running processes started at the beginning (both the participant and the validator), and restart them with `*-secure.conf` config files:
 
-  ::
+.. parsed-literal::
 
     ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
       --bootstrap examples/validator/validator-participant.canton \
       -DVALIDATOR_USER_NAME=${NETWORK_AUTH_VALIDATOR_USER_NAME}
+      -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
 
 and
 
-  ::
+.. parsed-literal::
 
     bin/coin --config examples/validator/validator-secure.conf \
-      --bootstrap examples/validator/validator.canton
+      --bootstrap examples/validator/validator.canton -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
 
 9. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block,
    manually replacing variables with values described below:
@@ -328,4 +333,3 @@ NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" ap
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
 If this user is logging in for the first time, a page will appear in the wallet UI prompting the user to onboard themselves. This creates the Daml user & its primary party on the ledger, associated with the external account.
-

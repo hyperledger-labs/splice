@@ -54,7 +54,7 @@ html_theme = 'sphinx_rtd_theme'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ['_static']
+html_static_path = ['_static']
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -66,6 +66,9 @@ html_theme_options = {
     # 'analytics_id': 'UA-64532708-4'
 }
 
+
+html_js_files = ['script.js']
+
 with open("../../../../nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_research_version = obj['version']
@@ -75,6 +78,8 @@ with open("../../../../nix/canton-sources.json") as f:
 rst_prolog = """
 .. role:: raw-html(raw)
    :format: html
+
+.. |cn_cluster| replace:: :raw-html:`<span class="cn-cluster">unknown_cluster</span>`
 
 .. |version_literal| replace:: ``{version}``
 .. |canton_version| replace:: {canton_research_version}
