@@ -123,14 +123,44 @@ function cluster_apply() {
 }
 
 function cluster_deploy() {
-    cluster_confirm "Build and apply configuration"
+    cluster_confirm "Build and apply configuration, forcibly pushing images."
 
-    if ! make -C ${REPO_ROOT}/cluster docker-push; then
+    if ! make -C ${REPO_ROOT}/cluster docker-push-force; then
         _error "Error building images, cannot apply."
         exit 1
     fi
 
     _cluster_apply ${SOURCE_IMAGE_TAG}
+}
+
+function cluster_push() {
+    module=$1
+
+    cluster_confirm "Rebuild and forcibly push module to update cluster: ${module}"
+
+    if ! cluster_exists; then
+        _error "Cluster does not exist, cannot push."
+        exit 1
+    fi
+
+    if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
+        _error "Unknown module: $1"
+        exit 1
+    fi
+
+    make -C ${REPO_ROOT}/cluster/images/${module} docker-push-force
+
+    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
+
+    if [ ! -f ${pushStateFile} ]; then
+        _error "Module not built: $1"
+        exit 1
+    fi
+
+    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
+
+    kubectl set image "deployment/${module}" "${module}=${imageTag}"
+    kubectl delete pods -l app=${module}
 }
 
 function cluster_create() {
@@ -517,6 +547,10 @@ case "${SUBCOMMAND_NAME}" in
         cluster_preflight $@
         ;;
 
+    push)
+        cluster_push $@
+        ;;
+
     sbt_for_preflight)
         run_sbt_for_preflight $@
         ;;
@@ -542,7 +576,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|reset|stats|wait|update_secrets}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|push|reset|stats|wait|update_secrets}" >&2
 	    exit 3
 	    ;;
 esac

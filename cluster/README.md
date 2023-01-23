@@ -291,9 +291,13 @@ Available operations include:
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
   if it does not already exist.
 * `cncluster delete` - Delete the currently running CN cluster from GCE.
-* `cncluster deploy` - Build a set of images, push them, and deploy to the cluster.
+* `cncluster deploy` - Build a set of images, push them, and deploy to
+  the cluster. This will force push, and overwrite any existing images. The
+  intent of this command is to allow developers to bring a cluster to a known
+  good state.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
 * `cncluster preflight` - Run the preflight check against the cluster.
+* `cncluster push` - Rebuild and push a single module into a cluster.
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
 * `cncluster stats` - Show memory and CPU usage across the cluster.
