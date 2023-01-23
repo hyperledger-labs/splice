@@ -1,5 +1,14 @@
 #! /usr/bin/env bash
 
+if [ ! -z "${CNCLUSTER_STATIC_DIRTY_VERSION}" ]; then
+    if [ ! -z "${CI}" ]; then
+        >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
+        exit 1
+    fi
+    echo "${USER}-dirty"
+    exit 0
+fi
+
 if [ -z "${CI}" ]; then
     revision_prefix="${USER}-"
 fi

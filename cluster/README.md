@@ -316,6 +316,15 @@ CI/CD deployment can be manually run from a development laptop during
 the day. **For this to work, the working directory for the git
 repository must be in a clean state without uncommitted changes.**
 
+By default, images are tagged with `$USER-$commit` and if your `git
+status` is not clean a `-dirty` suffix is appended. For fast
+iterations it can often be conventient to not tie the tag to the
+version number. That allows you to make changes to only one image,
+commit, and only rebuild & redeploy that one image. To achieve that
+you can set the environment variable `CNCLUSTER_STATIC_DIRTY_VERSION`
+which will instead tag images with `$USER-dirty` independently of your
+current commit.
+
 First, from the root of the working directory, rebuild the required
 docker images from scratch:
 
