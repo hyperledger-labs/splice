@@ -772,7 +772,7 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
-    parallelism: 6
+    parallelism: 8
     steps:
       - checkout
       - setup_sbt_test_job
