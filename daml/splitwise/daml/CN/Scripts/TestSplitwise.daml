@@ -193,7 +193,7 @@ testCase app Parties{..} = do
 
   request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
   coin <- tap app alice 63.0
-  receipt <- acceptPaymentRequest app alice (getValidator alice) request coin
+  receipt <- acceptPaymentRequest app alice (getValidator alice) None request coin
 
   completeTransfer app alice (getProvider alice) (getGroupKey group) receipt
 
@@ -209,7 +209,7 @@ testCase app Parties{..} = do
       ReceiverCCAmount bob.primaryParty 11.0
     ]
   coin <- tap app charlie 55.0
-  receipt <- acceptPaymentRequest app charlie (getValidator charlie) request coin
+  receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request coin
   completeTransfer app charlie (getProvider charlie) (getGroupKey group) receipt
 
   balance <- queryBalances alice (getGroupKey group)

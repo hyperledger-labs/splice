@@ -46,9 +46,9 @@ createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> Payment
 createSingleReceiverPaymentRequest app provider sender receiver amount = do
   createPaymentRequest app provider sender [(receiver, amount)]
 
-acceptPaymentRequest : CCApp -> CCUser -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
-acceptPaymentRequest app sender walletProvider transferRequest coin = do
-  context <- getPaymentTransferContext app sender
+acceptPaymentRequest : CCApp -> CCUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest coin = do
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   (accept, change) <- submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     context
@@ -87,7 +87,7 @@ testSingleReceiverCCPaymentRequest = script do
     provider.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 CC)
 
-  acceptedPaymentCid <- acceptPaymentRequest app alice validator transferRequest coin
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
@@ -158,7 +158,7 @@ testSingleReceiverUSDPaymentRequest = script do
     provider.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 USD)
 
-  acceptedPaymentCid <- acceptPaymentRequest app alice validator transferRequest coin
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
@@ -186,13 +186,16 @@ testCCPaymentRequest = script do
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
 
+  validatorUserId <- validateUserId "validator1"
+  featuredValidator <- featureApp app (CCUser validatorUserId validator)
+
   coin <- tap app alice 27.0
   t <- getTime
   (transferRequest, deliveryOffer) <-
     createPaymentRequest app provider.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 15.0 CC),
       (charlie.primaryParty, PaymentAmount 10.0 CC)]
-  acceptedPaymentCid <- acceptPaymentRequest app alice validator transferRequest coin
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator (Some featuredValidator) transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, lockedCoinPayload)] <- query @LockedCoin alice.primaryParty
   lockedCoinPayload.coin.amount.initialAmount === 25.35
@@ -222,6 +225,16 @@ testCCPaymentRequest = script do
   checkCoinPositions alice [1.0, 1.52]
   checkCoinPositions bob [1.0, 15.0]
   checkCoinPositions charlie [1.0, 10.0]
+
+  [(_, coupon)] <- query @AppRewardCoupon provider.primaryParty
+  coupon.amount === 0.34 -- TODO(#2100) check these values
+  coupon.featured === False
+
+  [(_, coupon)] <- query @AppRewardCoupon validator
+  coupon.amount === 0.12 -- TODO(#2100) check these values
+  coupon.provider === validator
+  coupon.featured === True
+
   pure ()
 
 testUSDPaymentRequest : Script ()
@@ -242,7 +255,7 @@ testUSDPaymentRequest = script do
     createPaymentRequest app provider.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 10.0 USD),
       (charlie.primaryParty, PaymentAmount 15.0 USD)]
-  acceptedPaymentCid <- acceptPaymentRequest app alice validator transferRequest coin
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
@@ -276,7 +289,7 @@ testMixedPaymentRequest = script do
     createPaymentRequest app provider.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 10.0 CC),
       (charlie.primaryParty, PaymentAmount 10.0 USD)]
-  acceptedPaymentCid <- acceptPaymentRequest app alice validator transferRequest coin
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with

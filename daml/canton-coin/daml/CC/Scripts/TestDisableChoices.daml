@@ -110,7 +110,7 @@ testCoinRules = do
           validatorRights = Map.empty
           featuredAppRight = None
 
-  context <- getTransferContext app alice
+  context <- getTransferContext app alice None
   testChoice @"enable_CoinRules_ComputeFees" app [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd coinRules
       API.CoinRules_ComputeFees with

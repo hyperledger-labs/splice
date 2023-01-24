@@ -440,12 +440,17 @@ getAppTransferContext app provider = do
 
 getPaymentTransferContext : CCApp -> CCUser -> Script API.PaymentTransferContext
 getPaymentTransferContext app user = do
-  context <- getTransferContext app user
+  getPaymentTransferContextFeaturedApp app user None
+
+getPaymentTransferContextFeaturedApp : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script API.PaymentTransferContext
+getPaymentTransferContextFeaturedApp app user featuredAppRight = do
+  context <- getTransferContext app user featuredAppRight
   coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
   pure API.PaymentTransferContext with ..
 
-getTransferContext : CCApp -> CCUser -> Script API.TransferContext
-getTransferContext app user = do
+
+getTransferContext : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script API.TransferContext
+getTransferContext app user featuredAppRight = do
   openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
   issuingRounds <- query @IssuingMiningRound app.svc
   validatorRights <- query @ValidatorRight user.primaryParty
@@ -453,7 +458,7 @@ getTransferContext app user = do
     issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
     validatorRights = Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights ]
     openMiningRound
-    featuredAppRight = None
+    featuredAppRight = fmap (\cid -> toInterfaceContractId cid) featuredAppRight
 
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do
