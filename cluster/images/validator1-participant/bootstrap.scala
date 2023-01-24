@@ -5,7 +5,7 @@ log("Bootstrapping validator1 participant...")
 log("===============================")
 
 val domainLabel = "global"
-val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
+val domainUrl = "http://canton-domain:5008"
 
 log(s"Connecting to domain $domainUrl...")
 if (`validator1_participant`.domains.list_connected().isEmpty) {

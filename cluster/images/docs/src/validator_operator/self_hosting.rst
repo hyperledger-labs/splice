@@ -62,15 +62,15 @@ you extracted Canton research next to the Canton network tarball. If you placed 
 
 .. parsed-literal::
 
-  ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
-      --bootstrap examples/validator/validator-participant.canton -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
+      --bootstrap examples/validator/validator-participant.canton
 
 Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps:
 
 .. parsed-literal::
 
-  bin/coin --config examples/validator/validator.conf \
-      --bootstrap examples/validator/validator.canton -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
+  NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf \
+      --bootstrap examples/validator/validator.canton
 
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
@@ -294,17 +294,16 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
 .. parsed-literal::
 
-    ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
       --bootstrap examples/validator/validator-participant.canton \
       -DVALIDATOR_USER_NAME=${NETWORK_AUTH_VALIDATOR_USER_NAME}
-      -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
 
 and
 
 .. parsed-literal::
 
-    bin/coin --config examples/validator/validator-secure.conf \
-      --bootstrap examples/validator/validator.canton -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
+    NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
+      --bootstrap examples/validator/validator.canton
 
 9. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block,
    manually replacing variables with values described below:

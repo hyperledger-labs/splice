@@ -3,7 +3,7 @@ println("Bootstrapping splitwise provider participant...")
 println("===============================")
 
 val domainLabel = "global"
-val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
+val domainUrl = "http://canton-domain:5008"
 
 println(s"Connecting to domain $domainUrl...")
 if (`splitwise_participant`.domains.list_connected().isEmpty) {

@@ -1,6 +1,6 @@
-val domainUrl = System.getProperty("DOMAIN_URL")
-if (domainUrl == null) {
-   sys.error("System property DOMAIN_URL was not set, set it to http://${targetcluster}.network.canton.global:5008")
+val domainUrl = sys.env.get("DOMAIN_URL") match {
+  case None => sys.error("Environment variable DOMAIN_URL was not set, set it to http://${targetcluster}.network.canton.global:5008")
+  case Some(url) => url
 }
 
 // Note: the validator user name is defined in validator.conf or validator-secure.conf

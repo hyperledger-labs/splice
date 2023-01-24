@@ -34,8 +34,9 @@ class LocalRunbookIntegrationTest
 
   var cantonProcess: Option[CantonProcess] = None
   override def provideEnvironment = {
-    System.setProperty("DOMAIN_URL", "http://localhost:7008")
-
+    // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
+    // Note that system properties can only be used in tests at this point.
+    System.setProperty("NETWORK_APPS_ADDRESS", "http://localhost:5012")
     // We merge the bootstrap we need for the SVC & the domain
     // with the bootstrap for the validator so we
     // don't need to start two Canton instances.
@@ -72,19 +73,21 @@ class LocalRunbookIntegrationTest
     bootstrapFile.append(validatorBootstrapContent)
 
     val process = startCanton(
-      "-c",
-      (validatorPath / "validator-participant.conf").toString,
-      "-c",
-      (svcParticipantPath / "canton.conf").toString,
-      "-c",
-      (svcDomainPath / "canton.conf").toString,
-      "-C",
-      "canton.participants.validatorParticipant.ledger-api.port=7001",
-      "-C",
-      "canton.participants.validatorParticipant.admin-api.port=7002",
-      "--bootstrap",
-      bootstrapFile.toString,
-      "-DDOMAIN_URL=http://localhost:7008",
+      Seq(
+        "-c",
+        (validatorPath / "validator-participant.conf").toString,
+        "-c",
+        (svcParticipantPath / "canton.conf").toString,
+        "-c",
+        (svcDomainPath / "canton.conf").toString,
+        "-C",
+        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "-C",
+        "canton.participants.validatorParticipant.admin-api.port=7002",
+        "--bootstrap",
+        bootstrapFile.toString,
+      ),
+      ("DOMAIN_URL", "http://localhost:7008"),
     )
     cantonProcess = Some(process)
     super.provideEnvironment

@@ -34,7 +34,8 @@ trait CantonProcessTestUtil {
     )
 
   protected def startCanton(
-      args: String*
+      args: Seq[String],
+      extraEnv: (String, String)*
   ): CantonProcess = {
     // We use the Java process management APIs here since they
     // support proper stream inheritance. Scala implements that by
@@ -52,6 +53,9 @@ trait CantonProcessTestUtil {
         "CLASSPATH",
         "",
       )
+    extraEnv.foreach { case (k, v) =>
+      builder.environment.put(k, v)
+    }
     builder.inheritIO()
     CantonProcess(
       builder.start()

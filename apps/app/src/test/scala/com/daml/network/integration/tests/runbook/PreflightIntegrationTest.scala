@@ -135,7 +135,7 @@ class PreflightIntegrationTest
   // differs from the latest one on your branch
 
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
     val aliceUser = auth0Users.get("alice-v1") match {
       case Some(user) => user
@@ -213,9 +213,9 @@ class PreflightIntegrationTest
   }
 
   "test a directory entry allocation against cluster deployment" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
-      s"https://directory.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
+      s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
     val aliceUser = auth0Users.get("alice-v1") match {
       case Some(user) => user
@@ -268,9 +268,8 @@ class PreflightIntegrationTest
       "canton.participants.validatorParticipant.admin-api.port=6002",
       "--bootstrap",
       (validatorPath / "validator-participant.canton").toString,
-      s"-DDOMAIN_URL=${System.getProperty("DOMAIN_URL")}",
     )
-    Using.resource(startCanton(cantonArgs: _*)) { process =>
+    Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }

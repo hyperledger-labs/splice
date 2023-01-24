@@ -18,8 +18,8 @@ To start the validator node, first start the validator participant using the Can
 
 .. parsed-literal::
 
-    ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwise/splitwise-participant.conf \
-      --bootstrap examples/splitwise/splitwise-participant.canton -DDOMAIN_URL=http://|cn_cluster|.network.canton.global:5008
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwise/splitwise-participant.conf \
+      --bootstrap examples/splitwise/splitwise-participant.canton
 
 Before starting the splitwise backend, some setup is required:
 
@@ -47,14 +47,14 @@ section added so start your validator again with this configuration file:
 
 .. parsed-literal::
 
-  bin/coin --config examples/splitwise/splitwise-validator.conf -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
+  NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwise/splitwise-validator.conf
 
 Now you can finally start the app backend. Splitwise is included as
 part of the standard release so it is started using the same binary.
 
 .. parsed-literal::
 
-  bin/coin --config examples/splitwise/splitwise.conf -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
+  NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwise/splitwise.conf
 
 With the backend running, you can connect to it as a given user. Here,
 we reuse the participant and the users ``alice`` and ``bob`` created
@@ -81,7 +81,7 @@ earlier.
 
 .. parsed-literal::
 
-  bin/coin --config examples/validator/splitwise-users.conf  -DNETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global
+  NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/splitwise-users.conf
 
 To verify that you setup everything correctly, create an install
 request for ``alice`` followed by creating a group and listing your
