@@ -265,6 +265,12 @@ object BuildCommon {
     },
   )
 
+  // Settings to avoid compiling test sources, applicable to canton projects
+  lazy val removeTestSources = Seq(
+    Test / managedSources := Seq.empty,
+    Test / unmanagedSources := Seq.empty,
+  )
+
   // Settings to disable tests for canton projects, so we don't run them when running our tests.
   lazy val disableTests = Seq(
     Compile / testOnly := {},
@@ -576,7 +582,7 @@ object BuildCommon {
       .apply("canton-community-domain", file("canton/community/domain"))
       .dependsOn(`canton-community-common` % "compile->compile;test->test")
       .settings(
-        disableTests,
+        removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           scala_logging,
@@ -614,7 +620,7 @@ object BuildCommon {
       .dependsOn(`canton-community-common` % "compile->compile;test->test", `canton-daml-fork`)
       .enablePlugins(DamlPlugin)
       .settings(
-        disableTests,
+        removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           scala_logging,
@@ -673,7 +679,7 @@ object BuildCommon {
       .Project("canton-research-services", file("canton/research/app"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
-        disableTests,
+        removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           daml_ledger_api_scalapb,
@@ -694,7 +700,7 @@ object BuildCommon {
       .apply("canton-blake2b", file("canton/community/lib/Blake2b"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
-        disableTests,
+        removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(
           bouncycastle_bcprov_jdk15on,
@@ -709,7 +715,7 @@ object BuildCommon {
       .apply("canton-functionmeta", file("canton/community/lib/functionmeta"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
-        disableTests,
+        removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(
           scala_reflect,
@@ -729,7 +735,7 @@ object BuildCommon {
       .apply("canton-slick-fork", file("canton/community/lib/slick"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
-        disableTests,
+        removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(
           scala_reflect,
@@ -788,7 +794,7 @@ object BuildCommon {
       .apply("canton-daml-fork", file("canton/community/lib/daml"))
       .disablePlugins(WartRemover) // to accommodate different daml repo coding style
       .settings(
-        disableTests,
+        removeTestSources,
         sharedSettings,
         libraryDependencies ++= Seq(),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
