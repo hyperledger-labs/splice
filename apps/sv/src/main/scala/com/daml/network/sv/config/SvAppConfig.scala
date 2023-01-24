@@ -16,6 +16,7 @@ case class LocalSvAppConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteSvc: SvcAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
+    foundConsortium: Boolean = false,
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "SV"
 

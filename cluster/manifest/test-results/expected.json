@@ -908,6 +908,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SV_FOUND_CONSORTIUM",
+                              "value": "true"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

@@ -1,7 +1,7 @@
 package com.daml.network.svc.admin.grpc
 
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
@@ -25,7 +25,6 @@ import cats.instances.future.*
 import cats.instances.seq.*
 import cats.syntax.foldable.*
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
@@ -136,27 +135,16 @@ class GrpcSvcAppService(
       logger.info(s"Party ${request.svParty} wants to join the SV consortium")
       for {
         domainId <- store.domains.getUniqueDomainId()
-        _ <- store.lookupSvcRulesWithOffset().flatMap {
-          case QueryResult(off, None) =>
-            logger.info("SvcRules don't exist; creating with party as leader")
-            val round1 = new cc.api.v1.round.Round(1);
-            connection
-              .submitCommands(
-                actAs = Seq(store.svcParty),
-                readAs = Seq.empty,
-                commands = new cn.svcrules.SvcRules(
-                  store.svcParty.toProtoPrimitive,
-                  0,
-                  round1, // we don't yet use this so KISS
-                  java.util.Map.of(request.svParty, new cn.svcrules.MemberInfo(round1)),
-                  request.svParty,
-                ).create.commands.asScala.toSeq,
-                commandId =
-                  CoinLedgerConnection.CommandId("com.daml.network.svc.createSvcRules", Seq()),
-                deduplicationOffset = off,
-                domainId = domainId,
+        _ <- store.lookupSvcRules().flatMap {
+          case None => {
+            logger.info("SvcRules doesn't exist yet, waiting for the founding SV app to create it")
+            throw new StatusRuntimeException(
+              Status.FAILED_PRECONDITION.withDescription(
+                s"Cannot join consortium for party ${request.svParty}, as its `SvcRules` don't exist yet."
               )
-          case QueryResult(_, Some(svcRules)) =>
+            )
+          }
+          case Some(svcRules) =>
             if (svcRules.payload.members.keySet.contains(request.svParty)) {
               logger.info("SvcRules exist and party is member; doing nothing")
               Future.successful(())

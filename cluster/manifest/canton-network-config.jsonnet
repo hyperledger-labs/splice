@@ -127,6 +127,7 @@ local svcDeployments(config) = [
     authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID" },
     authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET" },
     authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
+    { name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-2", [

@@ -104,10 +104,14 @@ svPartyNames.zip(svUserNames).foreach({ case (svPartyName, svUserName) => {
     log(s"Creating sv user $svUserName...")
 
     val svParty = `svc_participant`.parties.enable(svPartyName)
+    val foundConsortium = svPartyName == "sv1" // we configure sv1 to `found-consortium`
 
     `svc_participant`.ledger_api.users.create(
       id = svUserName,
-      actAs = Set(svParty.toLf),
+      actAs =
+        // the SV app will revoke the "act as svcParty" right at the end of its init
+        if (foundConsortium) Set(svParty.toLf, svcParty)
+        else Set(svParty.toLf),
       readAs = Set(svcParty),
       primaryParty = Some(svParty.toLf),
       participantAdmin = true,

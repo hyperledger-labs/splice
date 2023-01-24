@@ -1,13 +1,5 @@
 package com.daml.network.environment
 
-import com.google.protobuf.empty.Empty
-import com.digitalasset.canton.research.participant.multidomain.{
-  transfer as xfr,
-  update_service as upsvc,
-  transfer_submission_service as xfrsvc,
-  transfer_command as xfrcmd,
-}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -31,6 +23,7 @@ import com.daml.ledger.api.v1.{
   TransactionServiceOuterClass,
 }
 import com.daml.ledger.client.GrpcChannel
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserRequest,
@@ -42,13 +35,21 @@ import com.daml.ledger.javaapi.data.{
   LedgerOffset,
   ListUserRightsRequest,
   ListUserRightsResponse,
+  RevokeUserRightsRequest,
   Transaction,
   TransactionTree,
   User,
 }
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.research.participant.multidomain.{
+  transfer => xfr,
+  transfer_command => xfrcmd,
+  transfer_submission_service => xfrsvc,
+  update_service => upsvc,
+}
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
+import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, Duration}
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
@@ -291,6 +292,16 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
     }
     wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
+  }
+
+  def revokeUserRights(userId: String, rights: Seq[User.Right])(implicit
+      ec: ExecutionContext
+  ): Future[Unit] = {
+    val request = rights match {
+      case hd +: tl => new RevokeUserRightsRequest(userId, hd, tl: _*).toProto
+      case _ => throw new IllegalArgumentException("revokeUserRights requires at least one right")
+    }
+    wrapFuture(userManagementServiceStub.revokeUserRights(request, _)).map(_ => ())
   }
 
   def submitTransfer(

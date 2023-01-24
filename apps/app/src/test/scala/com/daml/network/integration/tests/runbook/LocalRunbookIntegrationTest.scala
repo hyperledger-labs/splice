@@ -59,9 +59,13 @@ class LocalRunbookIntegrationTest
       |  println("Allocating " + svUserName + " party")
       |  val svParty = svc_participant.parties.enable(svUserName)
       |  println("Creating " + svUserName + " user")
+      |  val foundConsortium = svUserName == "sv1" // we configure sv1 to `found-consortium`
       |  svc_participant.ledger_api.users.create(
       |    id = svUserName,
-      |    actAs = Set(svParty.toLf),
+      |    actAs =
+      |      // the SV app will revoke the "act as svcParty" right at the end of its init
+      |      if (foundConsortium) Set(svParty.toLf, svcParty.toLf)
+      |      else Set(svParty.toLf),
       |    readAs = Set(svcParty.toLf),
       |    primaryParty = Some(svParty.toLf),
       |    participantAdmin = true,
@@ -124,7 +128,10 @@ class LocalRunbookIntegrationTest
         CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
       )
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      .withThisSetup(_.appsHostedBySvc.local.foreach(_.startSync()))
+      .withThisSetup(env => {
+        env.appsHostedBySvc.local.foreach(_.start())
+        env.appsHostedBySvc.local.foreach(_.waitForInitialization())
+      })
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {
     CoinConfigTransforms.updateAllValidatorConfigs_(

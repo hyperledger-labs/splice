@@ -3,8 +3,10 @@ package com.daml.network.sv
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.grpc.GrpcSvAppService
 import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.LocalSvAppConfig
@@ -21,9 +23,11 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 class SvApp(
     override val name: InstanceName,
@@ -56,15 +60,9 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] =
     for {
-      // TODO(#2241) move check whether we are already part of the SVC to here
-      svcPartyId <- retryProvider.retryForAutomationGrpc(
-        "join consortium and get SVC party ID",
-        joinConsortiumAndGetSvcPartyId(svPartyId),
-        this,
-      )
+      svcPartyId <- retryProvider.retryForAutomationGrpc("get SVC party ID", getSvcPartyId, this)
       svStoreKey = SvStore.Key(svPartyId, svcPartyId)
       store = SvStore(svStoreKey, storage, loggerFactory, futureSupervisor)
-      connection = ledgerClient.connection()
       automation = new SvAutomationService(
         clock,
         config,
@@ -76,6 +74,20 @@ class SvApp(
         timeouts,
       )
       _ <- store.domains.signalWhenConnected()
+      _ <-
+        if (config.foundConsortium) {
+          retryProvider.retryForAutomationGrpc(
+            "found SV consortium",
+            foundConsortium(store, ledgerClient),
+            this,
+          )
+        } else {
+          retryProvider.retryForAutomationGrpc(
+            "join existing SV consortium",
+            joinConsortium(svPartyId),
+            this,
+          )
+        }
       _ = logger.info(s"SV App is initialized")
     } yield {
       adminServerRegistry
@@ -99,7 +111,64 @@ class SvApp(
   // SV app uploads package so no dep.
   override lazy val requiredTemplates = Set.empty
 
-  private def joinConsortiumAndGetSvcPartyId(svPartyId: PartyId): Future[PartyId] = {
+  private def getSvcPartyId: Future[PartyId] = {
+    // From SVC app for now
+    val svcConnection = new SvcConnection(
+      config.remoteSvc.clientAdminApi,
+      coinAppParameters.processingTimeouts,
+      loggerFactory,
+    )
+    svcConnection
+      .getDebugInfo()
+      .map(_.svcParty)
+      .andThen(_ => svcConnection.close())
+  }
+
+  private def foundConsortium(store: SvStore, ledgerClient: CoinLedgerClient): Future[Unit] = {
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      ledgerConnection = ledgerClient.connection()
+      svcParty = store.key.svcParty
+      svParty = store.key.svParty
+      _ <- store.lookupSvcRulesWithOffset().flatMap {
+        case QueryResult(off, None) =>
+          logger.info("SvcRules don't exist; creating with party as leader")
+          val round1 = new cc.api.v1.round.Round(1);
+          ledgerConnection
+            .submitCommands(
+              actAs = Seq(svcParty),
+              readAs = Seq.empty,
+              commands = new cn.svcrules.SvcRules(
+                svcParty.toProtoPrimitive,
+                0,
+                round1, // we don't yet use this so KISS
+                java.util.Map.of(svParty.toProtoPrimitive, new cn.svcrules.MemberInfo(round1)),
+                svParty.toProtoPrimitive,
+              ).create.commands.asScala.toSeq,
+              commandId =
+                CoinLedgerConnection.CommandId("com.daml.network.svc.createSvcRules", Seq()),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+        case QueryResult(_, Some(svcRules)) =>
+          if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
+            logger
+              .info(show"SvcRules exist and party is member; doing nothing. SvcRules: $svcRules")
+            Future.successful(())
+          } else {
+            sys.error(
+              "SvcRules exist but party tasked with founding it isn't member. " +
+                show"Is more than one SV app configured to `found-consortium`? SvcRules: $svcRules"
+            )
+          }
+      }
+      // make sure we can't act as the svc party anymore once the `SvcRules` are set up
+      _ <- ledgerConnection.grantUserRights(config.ledgerApiUser, Seq.empty, Seq(svcParty))
+      _ <- ledgerConnection.revokeUserRights(config.ledgerApiUser, Seq(svcParty), Seq.empty)
+    } yield ()
+  }
+
+  private def joinConsortium(svPartyId: PartyId): Future[Unit] = {
     val svcConnection = new SvcConnection(
       config.remoteSvc.clientAdminApi,
       coinAppParameters.processingTimeouts,
@@ -107,8 +176,6 @@ class SvApp(
     )
     svcConnection
       .joinConsortium(svPartyId)
-      .flatMap(_ => svcConnection.getDebugInfo())
-      .map(_.svcParty)
       .andThen(_ => svcConnection.close())
   }
 }

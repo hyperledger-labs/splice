@@ -25,6 +25,18 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
   }
 
+  "The founding SV app (sv1) is the first leader" in { implicit env =>
+    getSvcRules().data.leader should equal(sv1.getDebugInfo().svParty.toProtoPrimitive)
+  }
+
+  "After init, no single SV can act as the SVC party but all can read as it" in { implicit env =>
+    svs.foreach(sv => {
+      val rights = sv.remoteParticipant.ledger_api.users.rights.list(sv.config.ledgerApiUser)
+      rights.actAs should not contain (svcParty.toLf)
+      rights.readAs should contain(svcParty.toLf)
+    })
+  }
+
   def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one SvcRules contract") {
       val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api.acs

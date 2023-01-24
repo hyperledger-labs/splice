@@ -154,6 +154,12 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       readAsParties: Seq[PartyId],
   ): Future[Unit]
 
+  def revokeUserRights(
+      user: String,
+      actAsParties: Seq[PartyId],
+      readAsParties: Seq[PartyId],
+  ): Future[Unit]
+
   def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
 
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
@@ -621,6 +627,18 @@ object CoinLedgerConnection {
             new User.Right.CanReadAs(p.toLf)
           )
         client.grantUserRights(user, grants)
+      }
+
+      override def revokeUserRights(
+          user: String,
+          actAsParties: Seq[PartyId],
+          readAsParties: Seq[PartyId],
+      ): Future[Unit] = {
+        val revokes =
+          actAsParties.map(p => new User.Right.CanActAs(p.toLf)) ++ readAsParties.map(p =>
+            new User.Right.CanReadAs(p.toLf)
+          )
+        client.revokeUserRights(user, revokes)
       }
 
       override def listPackages()(implicit traceContext: TraceContext): Future[Set[String]] =

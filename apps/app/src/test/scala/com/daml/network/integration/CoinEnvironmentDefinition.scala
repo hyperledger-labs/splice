@@ -62,7 +62,10 @@ case class CoinEnvironmentDefinition(
             sv.remoteParticipantWithAdminToken.parties.enable(sv.config.ledgerApiUser)
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
-            actAs = Set(svParty.toLf),
+            actAs =
+              // the SV app will revoke the "act as svcParty" right at the end of its init
+              if (sv.config.foundConsortium) Set(svParty.toLf, svcParty.toLf)
+              else Set(svParty.toLf),
             primaryParty = Some(svParty.toLf),
             readAs = Set(svcParty.toLf),
             participantAdmin = true,
