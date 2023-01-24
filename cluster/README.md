@@ -332,12 +332,12 @@ current commit.
 First, from the root of the working directory, rebuild the required
 docker images from scratch:
 
-`make clean docker-build`
+`make clean docker-build -j`
 
 Secondly, from the same directory, push the docker images to the
 artifact registry with the appropriate tags.
 
-`CI=true make docker-push`
+`CI=true make docker-push -j`
 
 Setting `CI` to `true` requests a CI build. This enforces cleanliness
 of the working copy and generates image tags that do not contain a
@@ -515,7 +515,7 @@ For details on the individual steps, read the above sections.
        2. `./cluster/images/external-proxy/config` (egress of the cluster)
        3. config files baked into individual component images (ports that the applications actually use)
 3. If you touched `./cluster/manifest/canton-network-config.jsonnet`,
-   run `make -C cluster/manifest test-update`
+   run `make cluster/manifest/test-update`
 4. Make sure you are connected to a full tunnel VPN
    whenever you run a command interacting with the cloud.
 5. Build and upload all docker images
@@ -524,8 +524,8 @@ For details on the individual steps, read the above sections.
           `make` invocation to rerun `sbt bundle`. It does not do a full `sbt clean` though..
        2. If you still run into any issues, run `make clean && sbt clean` to trigger a full rebuild.
     2. Run `make`
-    3. Run `make -C cluster docker-push`
-    4. Do not edit any local files while running `make docker-push`.
+    3. Run `make docker-push -j`
+    4. Do not edit any local files while running `make docker-push -j`.
 6. Deploy your cluster definition to scratchnet
     1. Scratchnet is used for ad-hoc testing, and we only have one instance of scratchnet.
        Coordinate with team members if you are not sure that you are the only one using it.

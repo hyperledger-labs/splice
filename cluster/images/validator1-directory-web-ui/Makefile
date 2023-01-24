@@ -1,7 +1,4 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-src := Dockerfile config.js
-build_arg := --build-arg base_version=$(shell version-gen)
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/config.js
+$(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-gen)

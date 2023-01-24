@@ -1,7 +1,4 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-src := Dockerfile app.conf bootstrap.scala
-build_arg := --build-arg base_version=$(shell version-gen)
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/app.conf $(dir)/bootstrap.scala $(canton-image)
+$(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-gen)

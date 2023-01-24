@@ -1,6 +1,4 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-src := Dockerfile envoy.yaml docker-entrypoint.sh
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/envoy.yaml $(dir)/docker-entrypoint.sh
+$(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-gen)

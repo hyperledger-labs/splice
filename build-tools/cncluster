@@ -109,7 +109,7 @@ function cluster_apply() {
 
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-         if ! make -C ${REPO_ROOT}/cluster docker-check; then
+         if ! make docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
@@ -125,7 +125,7 @@ function cluster_apply() {
 function cluster_deploy() {
     cluster_confirm "Build and apply configuration, forcibly pushing images."
 
-    if ! make -C ${REPO_ROOT}/cluster docker-push-force; then
+    if ! make docker-push-force -j; then
         _error "Error building images, cannot apply."
         exit 1
     fi
@@ -148,7 +148,7 @@ function cluster_push() {
         exit 1
     fi
 
-    make -C ${REPO_ROOT}/cluster/images/${module} docker-push-force
+    make ${REPO_ROOT}/cluster/images/${module}/docker-push-force -j
 
     pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
 

@@ -723,7 +723,7 @@ commands:
          cmd_retry_count: 5
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
-           (cd $REPO_ROOT/cluster && make docker-build)
+           make docker-build -j
 
 jobs:
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -842,7 +842,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: Deployment Test
-         cmd: make -C cluster test
+         cmd: make cluster/manifest/test
 
   deploy_cluster:
     circleci_ip_ranges: true
@@ -945,10 +945,8 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build docs
          cmd: |
-           cd cluster/images/docs
            export PATH=$HOME/.daml/bin:$PATH
-           ./gen-daml-docs.sh
-           make html
+           make cluster/images/docs/html
 
   docker_images_push:
     machine:
@@ -977,7 +975,7 @@ jobs:
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            export PATH=$HOME/.daml/bin:$PATH
-           make -C cluster docker-push
+           make docker-push -j
          cmd_retry_count: 5
       - cleanup_sbt_test_job
 

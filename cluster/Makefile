@@ -1,63 +1,71 @@
-# With the exception of docs and the -proxy images, all of these
-# images depend on cn-apps or canton having been built first. This dependency
-# order is only expressed in the order of this list and must be
-# maintained for the build to operate properly.
-apps := \
-	images/canton \
-	images/cn-app \
-	images/svc-app \
-	images/sv-app \
-	images/scan-app \
-	images/directory-app \
-	images/canton-domain \
-	images/canton-participant \
-	images/docs \
-	images/external-proxy \
-	images/gcs-proxy \
-	images/envoy-proxy \
-	images/validator1-participant \
-	images/validator1-validator-app \
-	images/validator1-wallet-app \
-	images/validator1-wallet-web-ui \
-	images/validator1-directory-web-ui \
-	images/validator1-splitwise-web-ui \
-	images/splitwise-participant \
-	images/splitwise-validator-app \
-	images/splitwise-app
+images := \
+	canton \
+	canton-participant \
+	canton-domain \
+	splitwise-participant \
+	validator1-participant \
+	\
+	cn-app \
+	sv-app \
+	svc-app \
+	scan-app \
+	directory-app \
+	validator1-validator-app \
+	validator1-wallet-app \
+	splitwise-validator-app \
+	splitwise-app \
+	\
+	validator1-wallet-web-ui \
+	validator1-directory-web-ui \
+	validator1-splitwise-web-ui \
+	\
+	docs \
+	external-proxy \
+	gcs-proxy \
+	envoy-proxy
 
-define make_apps
-  for app in $(apps); do \
-    if ! make -C $${app} $(1); then \
-      exit 1; \
-    fi \
-  done
-endef
+$(foreach image,$(images),$(eval include cluster/images/$(image)/Makefile))
+include cluster/manifest/Makefile
 
 .PHONY: docker-build
-docker-build: test
-	$(call make_apps, docker-build)
+docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
 
 .PHONY: docker-push
-docker-push: docker-build
-	$(call make_apps, docker-push)
+docker-push: $(foreach image,$(images),cluster/images/$(image)/$(docker-push))
 
 .PHONY: docker-push-force
-docker-push-force: docker-build
-	$(call make_apps, docker-push-force)
-
-.PHONY: docker-clean-build-push
-docker-clean-build-push: test
-	$(call make_apps, clean)
-	$(call make_apps, docker-push)
+docker-push-force: $(foreach image,$(images),cluster/images/$(image)/$(docker-push-force))
 
 .PHONY: docker-check
-docker-check:
-	$(call make_apps, docker-check)
+docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 
-.PHONY: test
-test:
-	make -C manifest test
+.PHONY: force-update-version
 
-.PHONY: clean
-clean:
-	$(call make_apps, clean)
+# You cannot define implicit phony targets
+# so instead we define the phony targets in here.
+define DEFINE_PHONY_RULES =
+prefix := cluster/images/$(1)
+
+# Stop make from deleting version files to get working caching.
+.NOTINTERMEDIATE: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-local-image-tag)
+
+.PHONY: $$(prefix)/docker-push-force
+$$(prefix)/docker-push-force: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-build)
+	cd $$(@D) && docker-push $$$$(cat $$(abspath $$<)) --force
+
+.PHONY: $$(prefix)/docker-build
+$$(prefix)/docker-build: $$(prefix)/$(docker-build)
+
+.PHONY: $$(prefix)/docker-push
+$$(prefix)/docker-push: $$(prefix)/$(docker-push)
+
+.PHONY: $$(prefix)/docker-check
+$$(prefix)/docker-check: $$(prefix)/$(docker-image-tag)
+	docker-check $$$$(cat $$(abspath $$<))
+
+.PHONY: $$(prefix)/clean
+$$(prefix)/clean:
+	-rm -vfr $$(@D)/target
+endef
+
+$(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))

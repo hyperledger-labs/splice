@@ -1,16 +1,14 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-target-canton := target/canton
-target-classpath := target/canton-classpath
+target-canton := $(dir)/target/canton
+target-classpath := $(dir)/target/canton-classpath
 auth-service := ${REPO_ROOT}/canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class
 
-src := Dockerfile empty.conf target/entrypoint.sh $(target-canton) $(target-classpath)
-
-target/entrypoint.sh: ../common/entrypoint.sh
+$(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh
+	mkdir -p $(@D)
 	cp $< $@
 
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-canton) $(target-classpath)
 
 $(target-canton):
 	rm -rf $@

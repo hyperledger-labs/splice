@@ -1,4 +1,4 @@
-# -*- makefile -*-
+dir := $(call current_dir)
 
 test-vars=\
 	--tla-str gcpRegion=region \
@@ -10,17 +10,13 @@ test-vars=\
     --tla-str clusterName=cluster \
 	--tla-str clusterDnsName=cluster.network.global
 
-.PHONY: format
-format:
-	jsonnetfmt --string-style d -i *.jsonnet
+.PHONY: $(dir)/test
+$(dir)/test:
+	jsonnet $(test-vars) $(@D)/canton-network-config.jsonnet > $(@D)/test-results/actual.json
+	diff $(@D)/test-results/expected.json	$(@D)/test-results/actual.json
+	rm $(@D)/test-results/actual.json
 
-.PHONY: test
-test:
-	jsonnet $(test-vars) canton-network-config.jsonnet > test-results/actual.json
-	diff test-results/expected.json	test-results/actual.json
-	rm test-results/actual.json
-
-.PHONY: test-update
-test-update:
+.PHONY: $(dir)/test-update
+$(dir)/test-update:
 	jsonnet $(test-vars) \
-		canton-network-config.jsonnet > test-results/expected.json
+		$(dir)/canton-network-config.jsonnet > $(dir)/test-results/expected.json

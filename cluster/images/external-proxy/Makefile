@@ -1,6 +1,3 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-src := Dockerfile $(shell find conf -name '*.conf' -type f)
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(shell find $(dir) -name '*.conf' -type f)

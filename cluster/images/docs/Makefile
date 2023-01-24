@@ -1,20 +1,14 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
+html := $(dir)/target/html/index.html
 
-src := Dockerfile $(shell find src -type f)
 
-html := target/html/index.html
+$(dir)/$(docker-build): $(html)
+$(dir)/$(docker-build): build_arg := --build-arg version=$(shell version-gen)
 
-.PHONY: html
-html: $(html)
+.PHONY: $(dir)/html
+$(dir)/html: $(html)
 
-build_arg := --build-arg version=$(shell version-gen)
-
-$(docker-build): $(html)
-
-$(html): $(src)
-	./gen-daml-docs.sh
-	VERSION=$(shell version-gen) sphinx-build -M html src target -D version=$(shell version-gen) -W
-
-clean-local:
-	rm -vfr src/app_dev/api
+docs-dir := $(dir)
+$(html): $(shell find $(docs-dir)/src -type f)
+	$(docs-dir)/gen-daml-docs.sh
+	VERSION=$(shell version-gen) sphinx-build -M html $(docs-dir)/src $(docs-dir)/target -D version=$(shell version-gen) -W

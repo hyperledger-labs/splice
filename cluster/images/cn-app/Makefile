@@ -1,15 +1,12 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-target-bundle := target/coin-0.1.0-SNAPSHOT.tar.gz
+target-bundle := $(dir)/target/coin-0.1.0-SNAPSHOT.tar.gz
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 
-src := Dockerfile empty.conf target/entrypoint.sh $(target-bundle)
-
-target/entrypoint.sh: ../common/entrypoint.sh
+$(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh
+	mkdir -p $(@D)
 	cp $< $@
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-bundle)
 
 $(target-bundle): $(app-bundle)
 	mkdir -p $(@D)

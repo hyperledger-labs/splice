@@ -1,7 +1,4 @@
-# -*- makefile -*-
-include ../common.mk
+dir := $(call current_dir)
 
-src := Dockerfile app.conf
-build_arg := --build-arg base_version=$(shell version-gen)
-
-$(docker-build): $(src)
+$(dir)/$(docker-build): $(dir)/app.conf $(cn-image)
+$(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-gen)

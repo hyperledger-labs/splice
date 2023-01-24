@@ -10,7 +10,7 @@ gen_project_docs () {
     )
 }
 
-(cd ../../..; sbt canton-coin-daml/damlBuild wallet-payments-daml/damlBuild directory-daml/damlBuild)
+(cd $PROJ_ROOT; sbt canton-coin-daml/damlBuild wallet-payments-daml/damlBuild directory-daml/damlBuild)
 
 gen_project_docs daml/canton-coin cc
 gen_project_docs daml/wallet-payments wallet
