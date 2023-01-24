@@ -34,7 +34,7 @@ docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
 docker-push: $(foreach image,$(images),cluster/images/$(image)/$(docker-push))
 
 .PHONY: docker-push-force
-docker-push-force: $(foreach image,$(images),cluster/images/$(image)/$(docker-push-force))
+docker-push-force: $(foreach image,$(images),cluster/images/$(image)/docker-push-force)
 
 .PHONY: docker-check
 docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)

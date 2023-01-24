@@ -1,3 +1,10 @@
+const host = window.location.hostname;
+const hostParts = host.split(".");
+// Strip everything after the last 4 components so we get only the cluster name.
+if (hostParts.length < 4) {
+  console.error(`Unexpected hostname: ${hostParts}`);
+}
+const cluster = hostParts.slice(-4).join(".");
 window.canton_network_config = {
   auth: {
     algorithm: "rs-256",
@@ -8,8 +15,8 @@ window.canton_network_config = {
   },
   services: {
     directory: {
-      // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
-      grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
+      // URL of the directory backend.
+      grpcUrl: `https://${cluster}:6010`,
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API

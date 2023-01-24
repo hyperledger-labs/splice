@@ -22,10 +22,13 @@ window.canton_network_config = {
       // URL of the validator app HTTP API
       grpcUrl: 'http://localhost:6003',
     },
+    // BEGIN_WALLET_DIRECTORY_CONFIG
     directory: {
-      // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
-      grpcUrl: 'http://localhost:6110',
+      // URL of the directory backend.
+      // Edit this to the cluster you're trying to connect on.
+      grpcUrl: 'https://TARGET_CLUSTER.network.canton.global:6010',
     },
+    // END_WALLET_DIRECTORY_CONFIG
     scan: {
       // URL of the gRPC-Web envoy proxy, proxying to the scan app gRPC API
       grpcUrl: 'http://localhost:6012',

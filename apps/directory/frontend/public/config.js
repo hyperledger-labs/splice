@@ -16,10 +16,13 @@ window.canton_network_config = {
   //     token_scope: 'daml_ledger_api',
   //   },
   services: {
+    // BEGIN_DIRECTORY_CONFIG
     directory: {
       // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
-      grpcUrl: 'http://localhost:6110',
+      // Edit this to the cluster you're trying to connect on.
+      grpcUrl: 'https://TARGET_CLUSTER.network.canton.global:6010',
     },
+    // END_DIRECTORY_CONFIG
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
       grpcUrl: 'http://localhost:6201',

@@ -192,6 +192,13 @@ Next, start the envoy proxy. This proxies the wallet gRPC API on port
 
   envoy -c examples/validator/envoy.yaml
 
+Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs.
+For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:
+
+.. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
+    :start-after: BEGIN_WALLET_DIRECTORY_CONFIG
+    :end-before: END_WALLET_DIRECTORY_CONFIG
+
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
 things simple, we use the builtin HTTP Server in PHP. If you don't have PHP installed, please install it now, e.g. using the following on a Debian-based OS: ::
@@ -215,6 +222,14 @@ In order to use it in your self-hosted validator, you will need to serve one mor
 First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
 
   validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
+
+Before you can use the directory UI, you need to configure the URL of the directory backend similar to
+how you configured the wallet UI earlier. For that,
+open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:
+
+.. literalinclude:: ../../../../../apps/directory/frontend/public/config.js
+    :start-after: BEGIN_DIRECTORY_CONFIG
+    :end-before: END_DIRECTORY_CONFIG
 
 We are now ready to host the frontend - start another terminal and run: ::
 
