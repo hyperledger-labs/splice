@@ -181,10 +181,12 @@ class InMemoryAcsStore(
   private def listContracts[T](
       fromCreatedEvent: CreatedEvent => Option[T],
       filter: T => Boolean,
+      limit: Option[Long],
   ): Future[Seq[T]] = {
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       st.createEvents.values
         .collect(Function.unlift(ev => fromCreatedEvent(ev)))
+        .take(limit.fold(Int.MaxValue)(_.intValue()))
         .filter(filter)
         .toSeq
     }
@@ -193,17 +195,19 @@ class InMemoryAcsStore(
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
       filter: JavaContract[TCid, T] => Boolean,
+      limit: Option[Long],
   ): Future[Seq[JavaContract[TCid, T]]] = {
     requireInScope(templateCompanion)
-    listContracts(JavaContract.fromCreatedEvent(templateCompanion), filter)
+    listContracts(JavaContract.fromCreatedEvent(templateCompanion), filter, limit)
   }
 
-  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+  def listContractsI[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View],
       filter: JavaContract[Id, View] => Boolean,
+      limit: Option[Long],
   ): Future[Seq[JavaContract[Id, View]]] = {
     requireInScope(interfaceCompanion)
-    listContracts(JavaContract.fromCreatedEvent(interfaceCompanion), filter)
+    listContracts(JavaContract.fromCreatedEvent(interfaceCompanion), filter, limit)
   }
 
   private def lookupContractById[T](

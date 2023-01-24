@@ -119,7 +119,8 @@ object CoinUtil {
   )
 
   def defaultCoinConfig(
-      initialTickDuration: NonNegativeFiniteDuration
+      initialTickDuration: NonNegativeFiniteDuration,
+      initialMaxNumInputs: Int,
   ): cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
@@ -160,7 +161,7 @@ object CoinUtil {
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.
-    100,
+    initialMaxNumInputs.toLong,
     100,
 
     // Maximum number of lock holders.

@@ -16,6 +16,8 @@ case class SvcAppBackendConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     automation: AutomationConfig = AutomationConfig(),
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
+    // TODO(#2168): test edge cases.
+    initialMaxNumInputs: Int = 100,
     // TODO(M3-07): use price from SvcRules
     coinPrice: BigDecimal = 1.0,
 ) extends LocalCoinConfig {

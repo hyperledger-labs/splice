@@ -149,26 +149,16 @@ trait AcsStore extends AutoCloseable {
   // TODO(M3-83): add a limit parameter
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: JavaContract[TCid, T] => Boolean,
+      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
+      limit: Option[Long] = None,
   ): Future[Seq[JavaContract[TCid, T]]]
 
-  /** List all active contracts of the given template. */
-  def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
-  ): Future[Seq[JavaContract[TCid, T]]] =
-    listContracts(templateCompanion, _ => true)
-
-  /** List all active contracts of the given template. */
-  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+  /** List all active contracts of the given interface. */
+  def listContractsI[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View],
       filter: JavaContract[Id, View] => Boolean,
+      limit: Option[Long] = None,
   ): Future[Seq[JavaContract[Id, View]]]
-
-  /** List all active contracts of the given template. */
-  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
-      interfaceCompanion: InterfaceCompanion[I, Id, View]
-  ): Future[Seq[JavaContract[Id, View]]] =
-    listContracts(interfaceCompanion, (_: JavaContract[Id, View]) => true)
 
   /** A stream of contracts of the given template.
     *

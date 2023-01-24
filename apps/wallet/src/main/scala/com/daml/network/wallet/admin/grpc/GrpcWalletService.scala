@@ -409,7 +409,11 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(userStore)
+          validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
+            userStore,
+            None,
+            None,
+          )
         } yield v0.ListValidatorRewardCouponsResponse(validatorRewardCoupons.map(_.toProtoV0))
       }
     }

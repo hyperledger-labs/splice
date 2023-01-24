@@ -3,6 +3,10 @@ package com.daml.network.wallet.store
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.InputCoin
+import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -10,8 +14,8 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.cn.{
-  directory => directoryCodegen,
-  splitwise => splitwiseCodegen,
+  directory as directoryCodegen,
+  splitwise as splitwiseCodegen,
 }
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{CoinUtil, JavaContract}
@@ -103,6 +107,89 @@ trait UserWalletStore extends CoinAppStore {
     acs
       .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
       .map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq)
+  }
+
+  /** List all coins owned by a user in descending order according to their current amount in the given submitting round. */
+  def listSortedCoins(maxNumInputs: Int, submittingRound: Long): Future[Seq[InputCoin]] = {
+    acs
+      .listContracts(coinCodegen.Coin.COMPANION)
+      .map(coins =>
+        coins
+          .sortBy(c =>
+            CoinUtil
+              .currentAmount(c.payload, submittingRound)
+              // negating because largest values should come first.
+              .negate()
+          )
+          .take(maxNumInputs)
+          .map(c =>
+            new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
+          )
+      )
+  }
+
+  /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
+    * and optionally filtered by a set of issuing rounds.
+    */
+  def listSortedValidatorRewards(
+      maxNumInputs: Option[Int],
+      activeIssuingRoundsO: Option[Set[Long]],
+  ): Future[Seq[
+    JavaContract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+  ]] = {
+    def filterActiveRounds(round: Long) = activeIssuingRoundsO match {
+      case Some(rounds) => rounds.contains(round)
+      case None => true
+    }
+    // TODO(M3-83): use an index to access sorted rounds in the DB schema.
+    acs
+      .listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
+      .map(rewards => {
+        rewards
+          .filter(rw => filterActiveRounds(rw.payload.round.number))
+          .sortBy(_.payload.round.number)
+          .take(maxNumInputs.getOrElse(Int.MaxValue))
+      })
+  }
+
+  /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
+    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
+    */
+  def listSortedAppRewards(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+  ): Future[Seq[
+    (JavaContract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
+  ]] = {
+    // TODO(M3-83): use an index to access sorted rounds in the DB schema.
+    acs
+      .listContracts(
+        coinCodegen.AppRewardCoupon.COMPANION
+      )
+      .map(rewards =>
+        rewards
+          .flatMap(rw => {
+            val issuingO = issuingRoundsMap.get(rw.payload.round)
+            issuingO
+              .map(i => {
+                val quantity =
+                  if (rw.payload.featured)
+                    rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
+                  else
+                    rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
+                (rw, BigDecimal(quantity))
+              })
+          })
+          .sorted(
+            Ordering[(Long, BigDecimal)].on(
+              (x: (
+                  JavaContract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+                  BigDecimal,
+              )) => (x._1.payload.round.number, -x._2)
+            )
+          )
+          .take(maxNumInputs)
+      )
   }
 
   def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[

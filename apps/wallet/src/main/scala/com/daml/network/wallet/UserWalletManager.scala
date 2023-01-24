@@ -1,16 +1,16 @@
 package com.daml.network.wallet
 
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.util.{HasHealth, JavaContract as Contract}
+import com.daml.network.util.{HasHealth, JavaContract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -62,7 +62,7 @@ class UserWalletManager(
     * @return true, if a new end-user wallet was created
     */
   final def getOrCreateUserWallet(
-      install: Contract[WalletAppInstall.ContractId, WalletAppInstall]
+      install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall]
   ): Boolean = {
     val endUserName = install.payload.endUserName
     val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
@@ -99,18 +99,25 @@ class UserWalletManager(
 
   // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
   def listValidatorRewardCouponsCollectableBy(
-      validatorUserStore: UserWalletStore
+      validatorUserStore: UserWalletStore,
+      maxNumInputs: Option[Int],
+      activeIssuingRounds: Option[Set[Long]],
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]]
+    Seq[
+      JavaContract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+    ]
   ] =
     for {
       validatorRights <- validatorUserStore.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
       users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
       validatorRewardCouponsFs: Seq[
         Future[Seq[
-          Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+          JavaContract[
+            coinCodegen.ValidatorRewardCoupon.ContractId,
+            coinCodegen.ValidatorRewardCoupon,
+          ]
         ]]
       ] = users.toSeq
         .map(u =>
@@ -124,6 +131,7 @@ class UserWalletManager(
               )
               Future.successful(Seq.empty)
             case Some(install) =>
+              // TODO(M3-83): Avoid the application-level join and get the rewards in one go from the DB.
               this.lookupUserWallet(install.payload.endUserName) match {
                 case None =>
                   logger.info(
@@ -131,12 +139,12 @@ class UserWalletManager(
                   )
                   Future.successful(Seq.empty)
                 case Some(userWallet) =>
-                  userWallet.store.acs.listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
+                  userWallet.store.listSortedValidatorRewards(maxNumInputs, activeIssuingRounds)
               }
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
-    } yield validatorRewardCoupons.flatten
+    } yield validatorRewardCoupons.flatten.take(maxNumInputs.getOrElse(Int.MaxValue))
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_.isHealthy)
 

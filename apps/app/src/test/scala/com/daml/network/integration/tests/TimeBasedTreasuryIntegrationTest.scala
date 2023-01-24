@@ -39,7 +39,7 @@ class TimeBasedTreasuryIntegrationTest
         )(coinConfig)
       )
       .addConfigTransform((_, config) =>
-        // so we can test non-automatic coin merging too.
+        // for testing non-automation-based coin merging.
         setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(30))(config)
       )
   }
@@ -111,22 +111,6 @@ class TimeBasedTreasuryIntegrationTest
           }
         },
     )
-  }
-
-  "automatically merge transfer inputs on coin operations - even without automation" in {
-    implicit env =>
-      val (alice, bob) = onboardAliceAndBob()
-      // create two coins in alice's wallet
-      aliceWallet.tap(50)
-      aliceWallet.tap(50)
-      checkWallet(alice, aliceWallet, Seq(exactly(50), exactly(50)))
-
-      // run a coin operation
-      p2pTransfer(aliceWallet, bobWallet, bob, 40.0, 0.0)
-      // after the operation, the coins are merged.
-      checkWallet(alice, aliceWallet, Seq((59, 60)))
-    // not testing non-automation based rewards collection as being-able-to-collect-rewards requires advancing
-    // time such that the IR is open but that will trigger the automatic rewards collection
   }
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>

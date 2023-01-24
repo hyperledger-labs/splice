@@ -1,6 +1,5 @@
 package com.daml.network.wallet.treasury
 
-import com.digitalasset.canton.DomainAlias
 import akka.Done
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
@@ -8,9 +7,21 @@ import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.{PaymentTransferContext, TransferInput}
+import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.{
+  InputAppRewardCoupon,
+  InputCoin,
+  InputValidatorRewardCoupon,
+}
+import com.daml.network.codegen.java.cc.api.v1.coin.{
+  PaymentTransferContext,
+  TransferContext,
+  TransferInput,
+  ValidatorRight,
+}
+import com.daml.network.codegen.java.cc.api.v1.round as roundApi
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -30,6 +41,7 @@ import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -287,7 +299,11 @@ class TreasuryService(
     } else {
       val now = clock.now
       val batchExecutionF = for {
-        contextAndInputsOpt <- getTransferContextAndInputs(now, filteredBatch.isMergeOnly)
+        contextAndInputsOpt <- getTransferContextAndInputs(
+          now,
+          filteredBatch.isMergeOnly,
+          filteredBatch.numTapOperations,
+        )
         install <- userStore.getInstall()
         res <-
           contextAndInputsOpt match {
@@ -393,6 +409,7 @@ class TreasuryService(
   private def getTransferContextAndInputs(
       now: CantonTimestamp,
       isMergeOny: Boolean,
+      numTapOperations: Int,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
@@ -406,23 +423,132 @@ class TreasuryService(
     for {
       coinRules <- walletManager.store.getCoinRules()
       config = coinRules.payload.config
+      maxNumInputs = config.maxNumInputs.intValue()
       openRound <- walletManager.store.getLatestOpenMiningRound(now)
       issuingMiningRounds <- walletManager.store.getOpenIssuingRounds(now)
       issuingRoundsMap = issuingMiningRounds
         .map(r => (r.payload.round, r.payload))
         .toMap
-      validatorRights <- walletManager.store.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
-
-      coinInputs <- userStore.acs
-        .listContracts(coinCodegen.Coin.COMPANION)
-        .map(cs =>
-          cs.map(c =>
-            new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
+      validatorRights <- walletManager.store.acs
+        .listContracts(coinCodegen.ValidatorRight.COMPANION)
+      coinInputs <- userStore.listSortedCoins(
+        maxNumInputs,
+        openRound.payload.round.number,
+      )
+      (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
+        getValidatorRewardsAndQuantity(
+          maxNumInputs,
+          issuingRoundsMap,
+        )
+      (appRewardsTotalCoinQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
+        maxNumInputs,
+        issuingRoundsMap,
+      )
+      validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
+    } yield {
+      if (
+        isMergeOny && !shouldMergeOnlyTransferRun(
+          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,
+          coinInputs.length,
+          config,
+        )
+      ) {
+        None
+      } else {
+        val transferContext = new TransferContext(
+          openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+          issuingMiningRounds
+            .map(r =>
+              (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
+            )
+            .toMap[roundApi.Round, roundApi.IssuingMiningRound.ContractId]
+            .asJava,
+          validatorRights
+            .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
+            .toMap[String, ValidatorRight.ContractId]
+            .asJava,
+          // The first (locking coin) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
+          // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
+          validatorFeaturedAppRight
+            .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
+            .toJava,
+        )
+        Some(
+          (
+            constructTransferInputs(
+              maxNumInputs,
+              coinInputs,
+              validatorRewardInputs,
+              appRewardInputs,
+              numTapOperations,
+            ),
+            validatorRewardCouponUsers,
+            new PaymentTransferContext(
+              coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+              transferContext,
+            ),
           )
         )
+      }
+
+    }
+
+  /** Selects the transfer inputs. Uses a heuristics that aims to:
+    * - minimize fees,
+    * - reduce spurious out-of-funds errors,
+    * - and minimizes expirations rewards that could have been avoided.
+    */
+  private def constructTransferInputs(
+      maxNumInputs: Int,
+      coinInputs: Seq[InputCoin],
+      validatorRewardInputs: Seq[(roundApi.Round, BigDecimal, InputValidatorRewardCoupon)],
+      appRewardInputs: Seq[(roundApi.Round, BigDecimal, InputAppRewardCoupon)],
+      numTapOperations: Int,
+  ): Seq[TransferInput] = {
+    val sortedRewardInputs = (validatorRewardInputs ++ appRewardInputs)
+      .sorted(
+        // prioritize the soonest-to-expire, most-valuable rewards.
+        Ordering[(Long, BigDecimal)].on((rw: (roundApi.Round, BigDecimal, _)) =>
+          (rw._1.number, -rw._2)
+        )
+      )
+      .map(_._3)
+    // Since taps in the batch increase the number of transfer inputs, we need to subtract them from the maxNumInputs limit.
+    // (We could theoretically check/adjust the ordering of the batch such that if a non-tap operation is
+    // before a tap-operation, we don't need to adjust the maxNumInput limit since the inputs would be merged
+    // by the non-tap operation. However, the non-tap operation may fail in which case we would have again too
+    // many inputs and thus we decided to always simply subtract the number of tap operations in a batch.)
+    // In general, we refrain from merging more inputs in later steps in the batch to minimize code complexity.
+    // We prioritize including a small amount of large coins in transfers, so we avoid unnecessary out-of-funds errors
+    // for larger transfers.
+
+    val numCoinsToPrioritize =
+      Math
+        .max(2, Math.max(coinInputs.length + sortedRewardInputs.length, maxNumInputs) * 0.1)
+        .round
+        .intValue
+    val inputs =
+      (coinInputs.take(numCoinsToPrioritize) ++ sortedRewardInputs ++ coinInputs.drop(
+        numCoinsToPrioritize
+      ))
+        .take(maxNumInputs - numTapOperations)
+    inputs
+  }
+
+  private def getValidatorRewardsAndQuantity(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[roundApi.Round, IssuingMiningRound],
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    (BigDecimal, Set[PartyId], Seq[(roundApi.Round, BigDecimal, InputValidatorRewardCoupon)])
+  ] = {
+    for {
       validatorRewardCouponsRaw <- walletManager
         .listValidatorRewardCouponsCollectableBy(
-          userStore
+          userStore,
+          Some(maxNumInputs),
+          Some(issuingRoundsMap.keySet.map(_.number)),
         )
       validatorRewardCouponUsers = validatorRewardCouponsRaw
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
@@ -432,76 +558,43 @@ class TreasuryService(
         issuingO
           .map(i => {
             val quantity = rw.payload.amount.multiply(i.issuancePerValidatorRewardCoupon)
-            (rw, quantity)
+            (rw.payload.round, rw, BigDecimal(quantity))
           })
       })
-      validatorRewardsCoinQuantity = validatorRewardsWithCoinQuantity.map(i => BigDecimal(i._2)).sum
-      appRewardCouponInputs <- userStore.acs
-        .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-      appRewardsWithCoinQuantity = appRewardCouponInputs
-        .flatMap(rw => {
-          val issuingO = issuingRoundsMap.get(rw.payload.round)
-          issuingO
-            .map(i => {
-              val quantity =
-                if (rw.payload.featured)
-                  rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
-                else rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
-              (rw, quantity)
-            })
-        })
-      appRewardsCoinQuantity = appRewardsWithCoinQuantity.map(i => BigDecimal(i._2)).sum
-      validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
-    } yield {
-      if (
-        isMergeOny && !shouldMergeOnlyTransferRun(
-          appRewardsCoinQuantity + validatorRewardsCoinQuantity,
-          coinInputs.length,
-          config,
-        )
-      ) {
-        None
-      } else {
-        val transferContext = new v1.coin.TransferContext(
-          openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-          issuingMiningRounds
-            .map(r =>
-              (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
-            )
-            .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
-            .asJava,
-          validatorRights
-            .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
-            .toMap[String, v1.coin.ValidatorRight.ContractId]
-            .asJava,
-          // The first (locking coin) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
-          // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
-          validatorFeaturedAppRight
-            .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
-            .toJava,
-        )
-        val inputs = coinInputs ++ validatorRewardsWithCoinQuantity.map(rw =>
+      validatorRewardsCoinQuantity = validatorRewardsWithCoinQuantity.map(_._3).sum
+      validatorRewardInputs = validatorRewardsWithCoinQuantity.map(rw =>
+        (
+          rw._2.payload.round,
+          rw._3,
           new v1.coin.transferinput.InputValidatorRewardCoupon(
-            rw._1.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
-          )
-        ) ++ appRewardsWithCoinQuantity.map(rw =>
+            rw._2.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
+          ),
+        )
+      )
+    } yield (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs)
+  }
+
+  private def getAppRewardsAndQuantity(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[roundApi.Round, IssuingMiningRound],
+  ): Future[(BigDecimal, Seq[(roundApi.Round, BigDecimal, InputAppRewardCoupon)])] = {
+    for {
+      appRewardCouponInputs <- userStore.listSortedAppRewards(
+        maxNumInputs,
+        issuingRoundsMap,
+      )
+      appRewardsCoinQuantity = appRewardCouponInputs.map(_._2).sum
+      appRewardInputs = appRewardCouponInputs.map(rw =>
+        (
+          rw._1.payload.round,
+          rw._2,
           new v1.coin.transferinput.InputAppRewardCoupon(
             rw._1.contractId.toInterface(v1.coin.AppRewardCoupon.INTERFACE)
-          )
+          ),
         )
-        Some(
-          (
-            inputs,
-            validatorRewardCouponUsers,
-            new v1.coin.PaymentTransferContext(
-              coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-              transferContext,
-            ),
-          )
-        )
-      }
-
-    }
+      )
+    } yield (appRewardsCoinQuantity, appRewardInputs)
+  }
 
   override def onClosed(): Unit = {
     logger.debug(
@@ -531,6 +624,8 @@ object TreasuryService {
       paramIfNonEmpty("nonMergeOperations", _.nonMergeOperations),
     )
 
+    lazy val numTapOperations: Int = nonMergeOperations.count(_.isCO_Tap)
+
     /** Computes the coin operations that should be run on the ledger given the current batch state. */
     lazy val operationsToRun: Seq[EnqueuedCoinOperation] = {
       // if the batch is only a merge-operation - run that - else use the nonMergeOperations and don't include the
@@ -550,7 +645,7 @@ object TreasuryService {
     def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
 
     def addCOToBatch(operation: EnqueuedCoinOperation): CoinOperationBatch = {
-      val isMergeOp = isCO_MergeTransferInputs(operation)
+      val isMergeOp = operation.isCO_MergeTransferInputs
       mergeOperationOpt match {
         case None if isMergeOp => CoinOperationBatch(Some(operation), nonMergeOperations)
         case Some(_) if isMergeOp =>
@@ -597,12 +692,6 @@ object TreasuryService {
     }
   }
 
-  private def isCO_MergeTransferInputs(enqueued: EnqueuedCoinOperation): Boolean =
-    enqueued.operation match {
-      case _: coinoperation.CO_MergeTransferInputs => true
-      case _ => false
-    }
-
   private case class EnqueuedCoinOperation(
       operation: installCodegen.CoinOperation,
       outcomePromise: Promise[installCodegen.CoinOperationOutcome],
@@ -614,5 +703,17 @@ object TreasuryService {
         param("from", _.submittedFrom.showTraceId),
         param("op", _.operation.toValue),
       )
+
+    lazy val isCO_MergeTransferInputs: Boolean =
+      operation match {
+        case _: coinoperation.CO_MergeTransferInputs => true
+        case _ => false
+      }
+
+    lazy val isCO_Tap: Boolean =
+      operation match {
+        case _: coinoperation.CO_Tap => true
+        case _ => false
+      }
   }
 }

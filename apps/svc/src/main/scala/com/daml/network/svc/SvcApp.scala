@@ -156,7 +156,7 @@ object SvcApp {
     val createCoinRulesCmd =
       new cc.coin.CoinRules(
         svc.toProtoPrimitive,
-        defaultCoinConfig(config.initialTickDuration),
+        defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
         Seq.empty.asJava,
       ).createAnd
         .exerciseCoinRules_Bootstrap_Rounds(

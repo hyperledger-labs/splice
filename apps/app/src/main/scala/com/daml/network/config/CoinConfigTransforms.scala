@@ -87,20 +87,26 @@ object CoinConfigTransforms {
 
   def reducePollingInterval = setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(1))
 
-  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CoinConfigTransform = {
+  def updateAllAutomationConfigs(transform: AutomationConfigTransform): CoinConfigTransform = {
     config =>
-      def setPollingInterval(config: AutomationConfig): AutomationConfig =
-        config.focus(_.pollingInterval).replace(newInterval)
       val transforms = Seq(
-        updateSvcAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateAllSvAppConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateScanAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateAllValidatorConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateDirectoryAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
-        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateSvcAppConfig(c => c.focus(_.automation).modify(transform)),
+        updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform)),
+        updateScanAppConfig(c => c.focus(_.automation).modify(transform)),
+        updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
+        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(transform)),
+        updateDirectoryAppConfig(c => c.focus(_.automation).modify(transform)),
+        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(transform)),
       )
       transforms.foldLeft(config)((c, tf) => tf(c))
+  }
+
+  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CoinConfigTransform = {
+    config =>
+      def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig = {
+        config.focus(_.pollingInterval).replace(newInterval)
+      }
+      updateAllAutomationConfigs(setPollingIntervalInternal)(config)
   }
 
   /** Ensure that the set of Daml user names used in a given instance of a configuration
