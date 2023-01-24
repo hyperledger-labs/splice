@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTestWithSharedEnvironment,
+  CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
@@ -15,7 +15,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTimeBasedIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CoinIntegrationTest // TODO(#2100): investigate whether we can make this a shared environment again
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -343,11 +343,8 @@ class WalletTimeBasedIntegrationTest
 
     "generate app rewards correctly" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      aliceValidatorWallet.selfGrantFeaturedAppRight()
       aliceWallet.tap(20.0)
-
-      // TODO(#2100): Since unclaimed rewards or not (yet) archived automatically, and we are using a shared environment,
-      // we may have leftover reward coupons from the previous tests
-      val couponsBefore = aliceValidatorWallet.listAppRewardCoupons().length
 
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
@@ -379,10 +376,14 @@ class WalletTimeBasedIntegrationTest
         "Wait for reward coupons",
         _ => {
           aliceValidatorWallet
-            .listAppRewardCoupons() should have length ((couponsBefore + 1).toLong) // Award for the first (locking) leg goes to the sender's validator
+            .listAppRewardCoupons() should have length 1 // Award for the first (locking) leg goes to the sender's validator
           // TODO(#2100) In this test, we don't yet collect the app payment, so the provider (alice's wallet) doesn't currently get a reward
         },
       )
+
+      inside(aliceValidatorWallet.listAppRewardCoupons()) { case Seq(c) =>
+        c.payload.featured shouldBe true
+      }
     }
 
   }

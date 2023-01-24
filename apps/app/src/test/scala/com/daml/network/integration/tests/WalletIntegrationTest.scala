@@ -7,7 +7,7 @@ import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
@@ -19,7 +19,7 @@ import scala.language.implicitConversions
 import scala.concurrent.Future
 
 class WalletIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CoinIntegrationTest // TODO(#2100): investigate whether we can make this a shared environment again
     with HasExecutionContext
     with WalletTestUtil {
 

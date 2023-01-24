@@ -17,6 +17,7 @@ import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
@@ -68,6 +69,13 @@ trait WalletStore extends CoinAppStore with StoreWithOpenMiningRounds {
     acs
       .listContracts(roundCodegen.IssuingMiningRound.COMPANION)
       .map(rounds => rounds.filter(c => c.payload.opensAt.isBefore(now.toInstant)))
+  }
+
+  def lookupValidatorFeaturedAppRight()
+      : Future[Option[JavaContract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] = {
+    acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+      co.payload.provider == key.validatorParty.toProtoPrimitive
+    )
   }
 }
 
@@ -127,6 +135,9 @@ object WalletStore {
             co.payload.validator == validator
         ),
         mkFilter(CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(FeaturedAppRight.COMPANION)(co =>
+          co.payload.svc == svc && co.payload.provider == validator
+        ),
       ),
     )
   }

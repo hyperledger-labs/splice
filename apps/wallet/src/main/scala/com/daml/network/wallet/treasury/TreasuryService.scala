@@ -451,6 +451,7 @@ class TreasuryService(
             })
         })
       appRewardsCoinQuantity = appRewardsWithCoinQuantity.map(i => BigDecimal(i._2)).sum
+      validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
@@ -473,9 +474,11 @@ class TreasuryService(
             .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
             .toMap[String, v1.coin.ValidatorRight.ContractId]
             .asJava,
-          // Note: featured app rights are ignored for transfers with sender == provider, which is the case for all
-          // transfers issued by the wallet. We therefore do not provide a FeaturedAppRight, even if the user has one.
-          None.toJava,
+          // The first (locking coin) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
+          // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
+          validatorFeaturedAppRight
+            .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
+            .toJava,
         )
         val inputs = coinInputs ++ validatorRewardsWithCoinQuantity.map(rw =>
           new v1.coin.transferinput.InputValidatorRewardCoupon(
