@@ -7,14 +7,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.auth.{
-  AuthConfig,
-  AuthExtractor,
-  AuthInterceptor,
-  HMACVerifier,
-  RSAVerifier,
-  SignatureVerifier,
-}
+import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -23,24 +16,21 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
-import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.validator.v0.ValidatorAppServiceGrpc
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
-import io.grpc.{ServerInterceptors, Status, StatusRuntimeException}
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -55,13 +45,12 @@ class ValidatorApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
-    ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
+    ec: ExecutionContextExecutor,
     tracer: Tracer,
 ) extends CoinNode[ValidatorApp.State](
       config.ledgerApiUser,
@@ -285,7 +274,7 @@ class ValidatorApp(
       _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
 
-      verifier: SignatureVerifier = config.auth match {
+      verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
@@ -306,9 +295,7 @@ class ValidatorApp(
         )
       }
       httpConfig = config.adminApi.clientConfig.copy(
-        // TODO(#2019) Remove once we disabled gRPC Servers completely.
-        // + 2000 since envoy frontends runs on + 1000
-        port = config.adminApi.port + 2000
+        port = config.adminApi.port + 1000
       )
       _ = logger.info(s"Starting http server on ${httpConfig}")
       binding <- Http()
@@ -320,30 +307,6 @@ class ValidatorApp(
           routes
         )
     } yield {
-      adminServerRegistry
-        .addService(
-          ServerInterceptors.intercept(
-            ValidatorAppServiceGrpc.bindService(
-              new GrpcValidatorAppService(
-                ledgerClient,
-                store,
-                config.ledgerApiUser,
-                config.walletServiceUser,
-                domainId = domainId,
-                retryProvider,
-                this,
-                loggerFactory,
-              ),
-              ec,
-            ),
-            new AuthInterceptor(
-              verifier,
-              loggerFactory,
-            ),
-          )
-        )
-        .discard
-
       ValidatorApp.State(
         storage,
         store,

@@ -71,7 +71,6 @@ class ValidatorAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           retryProvider,
           futureSupervisor,
         )
@@ -90,7 +89,6 @@ object ValidatorAppBootstrap {
       validatorConfig: ValidatorAppBackendConfig,
       validatorAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       validatorMetrics: ValidatorAppMetrics,
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,

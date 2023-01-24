@@ -49,7 +49,6 @@ trait CoinEnvironment extends Environment {
       validatorConfig,
       config.tryValidatorAppParametersByString(name),
       createClock(appLoggerFactory),
-      testingTimeService,
       coinMetrics.forValidator(name),
       testingConfig,
       futureSupervisor,

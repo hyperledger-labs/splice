@@ -91,7 +91,7 @@ final class ValidatorAppBackendReference(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 2000}",
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 1000}",
     config.clientAdminApi,
   )
 

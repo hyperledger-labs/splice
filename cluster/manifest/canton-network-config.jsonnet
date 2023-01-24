@@ -208,7 +208,7 @@ local validator1Deployments(config) = [
   c.deployment(config, "validator1-validator-app", [
     {
       name: "val1-val-http",
-      port: 7103,
+      port: 6103,
     },
   ], extraEnvVars=[
     authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_URL,
