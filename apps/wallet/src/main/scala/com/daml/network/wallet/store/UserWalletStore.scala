@@ -109,21 +109,35 @@ trait UserWalletStore extends CoinAppStore {
       .map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq)
   }
 
-  /** List all coins owned by a user in descending order according to their current amount in the given submitting round. */
-  def listSortedCoins(maxNumInputs: Int, submittingRound: Long): Future[Seq[InputCoin]] = {
+  /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
+  def listSortedCoinsAndQuantity(
+      maxNumInputs: Int,
+      submittingRound: Long,
+  ): Future[Seq[(BigDecimal, InputCoin)]] = {
     acs
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(coins =>
         coins
-          .sortBy(c =>
-            CoinUtil
-              .currentAmount(c.payload, submittingRound)
-              // negating because largest values should come first.
-              .negate()
+          .map(c =>
+            (
+              CoinUtil
+                .currentAmount(c.payload, submittingRound),
+              c,
+            )
+          )
+          .filter { quantityAndCoin => quantityAndCoin._1.compareTo(BigDecimal.valueOf(0)) > 0 }
+          .sortBy(quantityAndCoin =>
+            // negating because largest values should come first.
+            quantityAndCoin._1.negate()
           )
           .take(maxNumInputs)
-          .map(c =>
-            new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
+          .map(quantityAndCoin =>
+            (
+              quantityAndCoin._1,
+              new v1.coin.transferinput.InputCoin(
+                quantityAndCoin._2.contractId.toInterface(v1.coin.Coin.INTERFACE)
+              ),
+            )
           )
       )
   }

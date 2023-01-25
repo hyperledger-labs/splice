@@ -374,11 +374,14 @@ class TreasuryService(
     } yield Done
   }
 
+  // TODO(#2100): adjust for changed fee structure.
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
-      numCoinInputs: Int,
+      coinInputsAndQuantity: Seq[(BigDecimal, InputCoin)],
       config: CoinConfig[USD],
   )(implicit tc: TraceContext): Boolean = {
+    val numCoinInputs = coinInputsAndQuantity.length
+    val totalCoinQuantity = coinInputsAndQuantity.map(_._1).sum
     if (numCoinInputs == 0) {
       val run = totalRewardsQuantity > config.createFee.fee
       // only log when there are actually some rewards to possibly collect.
@@ -397,7 +400,16 @@ class TreasuryService(
             s"the totalRewardsQuantity $totalRewardsQuantity is smaller than the update-fee ${config.updateFee.fee}"
         )
       run
-    } else true
+    } else {
+      val totalQuantity = totalRewardsQuantity + totalCoinQuantity
+      val run = totalQuantity > config.updateFee.fee
+      if (!run && totalQuantity != 0)
+        logger.debug(
+          "Not executing a merge operation because " +
+            s"the total rewards and coin quantity ${totalQuantity} is smaller than the update-fee ${config.updateFee.fee}"
+        )
+      run
+    }
   }
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.
@@ -431,7 +443,7 @@ class TreasuryService(
         .toMap
       validatorRights <- walletManager.store.acs
         .listContracts(coinCodegen.ValidatorRight.COMPANION)
-      coinInputs <- userStore.listSortedCoins(
+      coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
         openRound.payload.round.number,
       )
@@ -449,7 +461,7 @@ class TreasuryService(
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,
-          coinInputs.length,
+          coinInputsAndQuantity,
           config,
         )
       ) {
@@ -477,7 +489,7 @@ class TreasuryService(
           (
             constructTransferInputs(
               maxNumInputs,
-              coinInputs,
+              coinInputsAndQuantity.map(_._2),
               validatorRewardInputs,
               appRewardInputs,
               numTapOperations,

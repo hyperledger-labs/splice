@@ -245,4 +245,34 @@ class TimeBasedTreasuryIntegrationTest
       )
   }
 
+  "don't run merge if rewards and coins are too small" in { implicit env =>
+    val (_, _) = onboardAliceAndBob()
+    aliceWallet.tap(0.001)
+    aliceWallet.tap(0.001)
+
+    eventually() {
+      aliceWallet.list().coins should have length 2
+    }
+
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      {
+        // trigger automation.
+        advanceRoundsByOneTick
+        // TODO(#2414): remove magic number.
+        Threading.sleep(3.seconds.toMillis)
+      },
+      entries => {
+        forAtLeast(
+          1,
+          entries,
+        )(
+          // but do nothing since our coins are too small to be worth merging.
+          _.message should include regex (
+            "the total rewards and coin quantity .* is smaller than the update-fee"
+          )
+        )
+      },
+    )
+  }
+
 }

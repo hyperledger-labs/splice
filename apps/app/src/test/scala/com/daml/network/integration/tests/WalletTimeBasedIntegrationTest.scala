@@ -236,12 +236,10 @@ class WalletTimeBasedIntegrationTest
       })
     }
 
-    // TODO(#2182): switch back to one test case once collectRewardsAndMergeCoins automation ignores expired coins (right now, the app reward we get for locking the coin leads to the unlocked coin not expiring when we want)
     "auto-expire coin" in { implicit env =>
       onboardWalletUser(aliceWallet, aliceValidator)
 
       clue("Alice taps 0.000005 coins") {
-        aliceWallet.list().coins should have length 0
         aliceWallet.tap(0.000005)
         eventually() {
           aliceWallet.list().coins should have length 1
@@ -283,7 +281,6 @@ class WalletTimeBasedIntegrationTest
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       clue("Alice taps 0.11001 coins") {
-        aliceWallet.list().coins should have length 0
         aliceWallet.tap(0.11001)
         eventually() {
           aliceWallet.list().coins should have length 1
