@@ -24,6 +24,12 @@ images := \
 	gcs-proxy \
 	envoy-proxy
 
+canton-image-build := cluster/images/canton/$(docker-build)
+canton-image-push := cluster/images/canton/$(docker-push)
+
+cn-image-build := cluster/images/cn-app/$(docker-build)
+cn-image-push := cluster/images/cn-app/$(docker-push)
+
 $(foreach image,$(images),$(eval include cluster/images/$(image)/Makefile))
 include cluster/manifest/Makefile
 
