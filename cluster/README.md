@@ -276,16 +276,15 @@ is necessary to identify a given cluster.
 
 Available operations include:
 
-
-* `cncluster apply` - Apply the cluster configuration to the currently
-  running CN cluster in GCE. (Accepts an optional argument that allows
-  a specific set of images to be deployed by tag. Defaults to the current
-  working directory's tag. Manifest is always deployed from working copy.)
-  Note that this also checks for the existence of the correct docker images
-  in the registry, which is safer but might take a few minutes.
-  To skip this check, set env var `CNCLUSTER_SKIP_DOCKER_CHECK` to 1
-  (you can add `export CNCLUSTER_SKIP_DOCKER_CHECK=1` to `.envrc.private` to make
-  this configuration persistent).
+* `cncluster apply` - Apply the current working copy's manifest to a
+  cluster. The presence of all images referenced by that manifest is
+  confirmed prior to application of the manifst.
+      * The tag for the images to be deployed can be overriden with an
+        optional paramater. If this is specified, then the docker image
+        presence check is also bypassed.
+      * To docker image check can also be bypassed by setting the
+        `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
+        can also be added to `.envrc.private`.
 * `cncluster check` - Run a series of simple validity checks against the
   external API exposed by a cluster.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
@@ -296,8 +295,14 @@ Available operations include:
   intent of this command is to allow developers to bring a cluster to a known
   good state.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
+* `cncluster log` or `cncluster logs` - Stream the logs for the
+  specified module running in the cluster.
 * `cncluster preflight` - Run the preflight check against the cluster.
-* `cncluster push` - Rebuild and push a single module into a cluster.
+* `cncluster push` - Rebuild and push one or more modules into a
+  cluster. This command takes care to ensure that the specified modules
+  within the cluster are updated to match your local working copy. (It
+  also works for base images like `canton` and `cn-app` that do not have
+  corresponding cluster modules.)
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
 * `cncluster stats` - Show memory and CPU usage across the cluster.

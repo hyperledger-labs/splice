@@ -109,11 +109,13 @@ function cluster_apply() {
 
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-         if ! make docker-check -j; then
+         if ! make -C ${REPO_ROOT} docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
-      fi
+       else
+           _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+       fi
     else
         IMAGE_TAG=$1
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
@@ -125,7 +127,7 @@ function cluster_apply() {
 function cluster_deploy() {
     cluster_confirm "Build and apply configuration, forcibly pushing images."
 
-    if ! make docker-push-force -j; then
+    if ! make  -C ${REPO_ROOT} docker-push-force -j; then
         _error "Error building images, cannot apply."
         exit 1
     fi
@@ -133,10 +135,71 @@ function cluster_deploy() {
     _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
-function cluster_push() {
+function _cluster_push_module() {
     module=$1
 
-    cluster_confirm "Rebuild and forcibly push module to update cluster: ${module}"
+    _log "Pushing module: ${module}"
+
+    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
+
+    if [ ! -f ${pushStateFile} ]; then
+        _error "Module not built: $1"
+        exit 1
+    fi
+
+    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
+
+    if kubectl set image "deployment/${module}" "${module}=${imageTag}"; then
+        _log "Deleting module pods to force restart: ${module}"
+
+        # Delete the pod to force recreation. This forces a reload of
+        # the docker image, due to the imagePullPolicy setting of
+        # "Always".
+        kubectl delete pods -l app=${module}
+    else
+        _warning "No deployments found for module: ${module}"
+    fi
+}
+
+function cluster_push() {
+
+    cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
+
+    if ! cluster_exists; then
+        _error "Cluster does not exist, cannot push."
+        exit 1
+    fi
+
+    # Assemble target lists for parallel clean and then build.
+    clean_targets=""
+    dpf_targets=""
+    for module in "$@"
+    do
+        if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
+            _error "Unknown module: $module"
+        fi
+
+        clean_targets="${clean_targets} cluster/images/${module}/clean"
+        dpf_targets="${dpf_targets} cluster/images/${module}/docker-push-force"
+    done
+
+    if [ -z "${dpf_targets}" ]; then
+        _error "No modules specified."
+    fi
+
+    _warning "Clean targets: ${clean_targets}"
+    _warning "dpf targets: ${dpf_targets}"
+
+    make -C ${REPO_ROOT} ${clean_targets} -j
+    make -C ${REPO_ROOT} ${dpf_targets} -j
+
+    for module in "$@"; do
+        _cluster_push_module ${module}
+    done
+}
+
+function cluster_logs() {
+    module=$1
 
     if ! cluster_exists; then
         _error "Cluster does not exist, cannot push."
@@ -148,19 +211,7 @@ function cluster_push() {
         exit 1
     fi
 
-    make ${REPO_ROOT}/cluster/images/${module}/docker-push-force -j
-
-    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
-
-    if [ ! -f ${pushStateFile} ]; then
-        _error "Module not built: $1"
-        exit 1
-    fi
-
-    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
-
-    kubectl set image "deployment/${module}" "${module}=${imageTag}"
-    kubectl delete pods -l app=${module}
+    kubectl logs -l app=${module} -c ${module} -f
 }
 
 function cluster_create() {
@@ -541,6 +592,10 @@ case "${SUBCOMMAND_NAME}" in
 
     ipaddr)
         cluster_ipaddr $@
+        ;;
+
+    log | logs)
+        cluster_logs $@
         ;;
 
     preflight)
