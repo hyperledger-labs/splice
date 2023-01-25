@@ -7,7 +7,6 @@ import com.daml.network.config.{
   RemoteCoinConfig,
 }
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFiniteDurationT
 
 case class SvcAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
@@ -15,10 +14,8 @@ case class SvcAppBackendConfig(
     ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     automation: AutomationConfig = AutomationConfig(),
-    initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
-    // TODO(#2168): test edge cases.
-    initialMaxNumInputs: Int = 100,
     // TODO(M3-07): use price from SvcRules
+    // TODO(M3-46): remove entirely once mining rounds automations moves into SvApp
     coinPrice: BigDecimal = 1.0,
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "SVC"

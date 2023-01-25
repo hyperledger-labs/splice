@@ -5,7 +5,6 @@ import "com/daml/network/v0/connected_domains.proto";
 import "google/protobuf/empty.proto";
 
 service SvService {
-  // TODO(M3-46): replace this stub with the first actual console command
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
 
   // TODO(M3-18) Consider if we want to keep this
@@ -22,8 +21,20 @@ message GetDebugInfoResponse {
   // Party representing the SV
   string sv_party_id = 2;
 
-  // Contract IDs of all active CoinRules contracts created by this app
-  repeated string coin_rules_contract_ids = 3;
+  // Party representing the whole SVC
+  string svc_party_id = 3;
+
+  // Package containing the canton coin code
+  string coin_package_id = 4;
+
+  // Package containing the svc governance code
+  string svc_governance_package_id = 5;
+
+  // Contract ID of the CoinRules contract associated with the SVC
+  string coin_rules_contract_id = 6;
+
+  // Contract IDs of the SvcRules contract associated with the SVC
+  string svc_rules_contract_id = 7;
 }
 
 message ListConnectedDomainsResponse {

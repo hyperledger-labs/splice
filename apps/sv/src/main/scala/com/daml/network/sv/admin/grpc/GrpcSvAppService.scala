@@ -1,20 +1,16 @@
 package com.daml.network.sv.admin.grpc
 
-import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.sv.store.SvStore
 import com.daml.network.sv.v0
-import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
-import cats.instances.future.*
-import cats.instances.seq.*
-import cats.syntax.foldable.*
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.sv.SvApp
 
 class GrpcSvAppService(
     ledgerClient: CoinLedgerClient,
@@ -24,11 +20,9 @@ class GrpcSvAppService(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends SvServiceGrpc.SvService
+) extends v0.SvServiceGrpc.SvService
     with Spanning
     with NamedLogging {
-
-  private val connection = ledgerClient.connection()
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvAppService") { _ => _ =>
@@ -36,15 +30,15 @@ class GrpcSvAppService(
         domains <- store.domains.listConnectedDomains().map(_.values.toSeq)
         // TODO (M3-18) either choose the correct domain or fold over the
         // store's ACSes instead (for which there should be 1/domain)
-        coinRulesCids <- domains.foldMapA { domain =>
-          connection
-            .activeContracts(domain, store.key.svParty, cc.coin.CoinRules.COMPANION)
-            .map(_.map(_.id))
-        }
+        coinRules <- store.getCoinRules()
+        svcRules <- store.getSvcRules()
       } yield v0.GetDebugInfoResponse(
         svUser = svUserName,
         svPartyId = Proto.encode(store.key.svParty),
-        coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
+        svcPartyId = Proto.encode(store.key.svcParty),
+        svcGovernancePackageId = SvApp.svcGovernancePackage.packageId,
+        coinRulesContractId = Proto.encodeContractId(coinRules.contractId),
+        svcRulesContractId = Proto.encodeContractId(svcRules.contractId),
       )
     }
 

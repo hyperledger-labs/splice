@@ -27,17 +27,15 @@ trait SvcStore extends CoinAppStore {
   // TODO(tech-debt): build common infrastructure for such audit-log stores and inline its functions
   val events: SvcEventsStore
 
-  // TODO(#2241) consider removing this once coin rules are created by the SV app
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
     acs.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true)
 
-  // TODO(#2241) consider removing this once coin rules are created by the SV app
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 
-  // TODO(#2241) consider removing this once coin rules are created by the SV app
+  // needed for round automation
   def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
     lookupCoinRules().map(
       _.getOrElse(

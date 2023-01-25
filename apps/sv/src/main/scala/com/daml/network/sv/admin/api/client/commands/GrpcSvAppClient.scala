@@ -24,7 +24,11 @@ object GrpcSvAppClient {
   case class DebugInfo(
       svUser: String,
       svParty: PartyId,
-      coinRulesCids: Seq[String],
+      svcParty: PartyId,
+      coinPackageId: String,
+      svcGovernancePackageId: String,
+      coinRulesCid: String,
+      svcRulesCid: String,
   )
 
   case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
@@ -38,13 +42,18 @@ object GrpcSvAppClient {
     override def handleResponse(
         response: GetDebugInfoResponse
     ): Either[String, DebugInfo] =
-      Proto.decode(Proto.Party)(response.svPartyId).map { sv =>
-        DebugInfo(
-          svUser = response.svUser,
-          svParty = sv,
-          coinRulesCids = response.coinRulesContractIds,
-        )
-      }
+      for {
+        svParty <- Proto.decode(Proto.Party)(response.svPartyId)
+        svcParty <- Proto.decode(Proto.Party)(response.svcPartyId)
+      } yield DebugInfo(
+        svUser = response.svUser,
+        svParty = svParty,
+        svcParty = svcParty,
+        coinPackageId = response.coinPackageId,
+        svcGovernancePackageId = response.svcGovernancePackageId,
+        coinRulesCid = response.coinRulesContractId,
+        svcRulesCid = response.coinRulesContractId,
+      )
   }
 
   case class ListConnectedDomains(

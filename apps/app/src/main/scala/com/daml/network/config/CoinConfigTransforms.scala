@@ -155,7 +155,11 @@ object CoinConfigTransforms {
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
   def setCoinPrice(price: BigDecimal): CoinConfigTransform =
-    updateSvcAppConfig(_.focus(_.coinPrice).replace(price))
+    config =>
+      Seq(
+        updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
+        updateAllSvAppConfigs_(c => c.focus(_.coinPrice).replace(price)),
+      ).foldLeft(config)((c, tf) => tf(c))
 
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CoinConfigTransform =
     cantonConfig =>

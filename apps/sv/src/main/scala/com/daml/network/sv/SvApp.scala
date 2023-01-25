@@ -13,15 +13,16 @@ import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.SvStore
 import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.HasHealth
+import com.daml.network.util.CoinUtil.defaultCoinConfig
+import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -76,11 +77,7 @@ class SvApp(
       _ <- store.domains.signalWhenConnected()
       _ <-
         if (config.foundConsortium) {
-          retryProvider.retryForAutomationGrpc(
-            "found SV consortium",
-            foundConsortium(store, ledgerClient),
-            this,
-          )
+          foundConsortium(store, ledgerClient, retryProvider, this)
         } else {
           retryProvider.retryForAutomationGrpc(
             "join existing SV consortium",
@@ -124,16 +121,85 @@ class SvApp(
       .andThen(_ => svcConnection.close())
   }
 
-  private def foundConsortium(store: SvStore, ledgerClient: CoinLedgerClient): Future[Unit] = {
+  private def foundConsortium(
+      store: SvStore,
+      ledgerClient: CoinLedgerClient,
+      retryProvider: CoinRetries,
+      flagCloseable: FlagCloseable,
+  ): Future[Unit] = {
     for {
       domainId <- store.domains.getUniqueDomainId()
       ledgerConnection = ledgerClient.connection()
-      svcParty = store.key.svcParty
-      svParty = store.key.svParty
+      _ <- uploadDars(ledgerConnection)
+      _ <- retryProvider.retryForAutomationGrpc(
+        "create CoinRules and issuance state",
+        createCoinRules(store, ledgerConnection, domainId),
+        flagCloseable,
+      )
+      _ <- retryProvider.retryForAutomationGrpc(
+        "create SvcRules",
+        createSvcRules(store, ledgerConnection, domainId, 1),
+        flagCloseable,
+      )
+      // make sure we can't act as the svc party anymore now that the `SvcRules` are set up
+      _ <- waiveSvcRights(store.key.svcParty, ledgerConnection)
+    } yield ()
+  }
+
+  private def uploadDars(ledgerConnection: CoinLedgerConnection): Future[Unit] =
+    for {
+      _ <- ledgerConnection.uploadDarFile(SvApp.coinPackage)
+      _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
+    } yield ()
+
+  // Create CoinRules and open the first mining round
+  private def createCoinRules(
+      store: SvStore,
+      ledgerConnection: CoinLedgerConnection,
+      domainId: DomainId,
+  ): Future[Unit] =
+    for {
+      _ <- store.lookupCoinRulesWithOffset().flatMap {
+        case QueryResult(off, None) =>
+          ledgerConnection
+            .submitCommands(
+              actAs = Seq(store.key.svcParty),
+              readAs = Seq.empty,
+              commands = new cc.coin.CoinRules(
+                store.key.svcParty.toProtoPrimitive,
+                defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
+                Seq.empty.asJava,
+              ).createAnd
+                .exerciseCoinRules_Bootstrap_Rounds(
+                  config.coinPrice.bigDecimal
+                )
+                .commands
+                .asScala
+                .toSeq,
+              commandId =
+                CoinLedgerConnection.CommandId("com.daml.network.svc.createCoinRules", Seq()),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+        case QueryResult(_, Some(_)) =>
+          logger.info("CoinRules already exists, skipping")
+          Future.successful(())
+      }
+    } yield ()
+
+  private def createSvcRules(
+      store: SvStore,
+      ledgerConnection: CoinLedgerConnection,
+      domainId: DomainId,
+      roundNumber: Int,
+  ): Future[Unit] = {
+    val svcParty = store.key.svcParty
+    val svParty = store.key.svParty
+    for {
       _ <- store.lookupSvcRulesWithOffset().flatMap {
         case QueryResult(off, None) =>
           logger.info("SvcRules don't exist; creating with party as leader")
-          val round1 = new cc.api.v1.round.Round(1);
+          val round = new cc.api.v1.round.Round(roundNumber);
           ledgerConnection
             .submitCommands(
               actAs = Seq(svcParty),
@@ -141,8 +207,8 @@ class SvApp(
               commands = new cn.svcrules.SvcRules(
                 svcParty.toProtoPrimitive,
                 0,
-                round1, // we don't yet use this so KISS
-                java.util.Map.of(svParty.toProtoPrimitive, new cn.svcrules.MemberInfo(round1)),
+                round,
+                java.util.Map.of(svParty.toProtoPrimitive, new cn.svcrules.MemberInfo(round)),
                 svParty.toProtoPrimitive,
               ).create.commands.asScala.toSeq,
               commandId =
@@ -162,11 +228,17 @@ class SvApp(
             )
           }
       }
-      // make sure we can't act as the svc party anymore once the `SvcRules` are set up
+    } yield ()
+  }
+
+  private def waiveSvcRights(
+      svcParty: PartyId,
+      ledgerConnection: CoinLedgerConnection,
+  ): Future[Unit] =
+    for {
       _ <- ledgerConnection.grantUserRights(config.ledgerApiUser, Seq.empty, Seq(svcParty))
       _ <- ledgerConnection.revokeUserRights(config.ledgerApiUser, Seq(svcParty), Seq.empty)
     } yield ()
-  }
 
   private def joinConsortium(svPartyId: PartyId): Future[Unit] = {
     val svcConnection = new SvcConnection(
@@ -197,5 +269,15 @@ object SvApp {
         automation,
       )(logger)
 
+  }
+  val coinPackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId
+
+    // See `Compile / resourceGenerators` in build.sbt
+    lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
+  }
+  val svcGovernancePackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
+    lazy val resourcePath: String = "dar/svc-governance-0.1.0.dar"
   }
 }

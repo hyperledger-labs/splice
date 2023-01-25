@@ -31,8 +31,6 @@ object GrpcSvcAppClient {
   case class DebugInfo(
       svcUser: String,
       svcParty: PartyId,
-      coinPackageId: String,
-      coinRulesCids: Seq[String],
   )
 
   case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
@@ -50,8 +48,6 @@ object GrpcSvcAppClient {
         DebugInfo(
           svcUser = response.svcUser,
           svcParty = svc,
-          coinPackageId = response.coinPackageId,
-          coinRulesCids = response.coinRulesContractIds,
         )
       }
   }

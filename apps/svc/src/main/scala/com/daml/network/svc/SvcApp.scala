@@ -3,32 +3,27 @@ package com.daml.network.svc
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
-import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
-import com.daml.network.util.{HasHealth, UploadablePackage}
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.immutable.Map
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing an SVC app instance. */
 class SvcApp(
@@ -64,9 +59,10 @@ class SvcApp(
     for {
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory, futureSupervisor))
       connection = ledgerClient.connection()
-      _ <- connection.uploadDarFile(SvcApp.coinPackage)
-      // TODO(#2241) should be handled by SV app
-      _ <- connection.uploadDarFile(SvcApp.svcGovernancePackage)
+      // We can't move this to the SV app at the moment because of init order;
+      // without uploading this DAR here the `createValidatorRight` step below
+      // may fail, leaving the SVC app unitialized, which currently also means
+      // that none of the SV apps can boot.
       automation = new SvcAutomationService(
         clock,
         config,
@@ -79,16 +75,6 @@ class SvcApp(
       )
       _ <- store.domains.signalWhenConnected()
       domainId <- store.domains.getUniqueDomainId()
-      _ <- SvcApp.setupApp(
-        svcPartyId,
-        config,
-        connection,
-        logger,
-        store,
-        domainId,
-        retryProvider,
-        this,
-      )
       _ = logger.info(s"SVC App is initialized")
     } yield {
       adminServerRegistry
@@ -129,76 +115,5 @@ object SvcApp {
         store,
         automation,
       )(logger)
-
   }
-  val svcGovernancePackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
-    lazy val resourcePath: String = "dar/svc-governance-0.1.0.dar"
-  }
-  val coinPackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = Coin.COMPANION.TEMPLATE_ID.getPackageId
-
-    // See `Compile / resourceGenerators` in build.sbt
-    lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
-  }
-  private def setupApp(
-      svc: PartyId,
-      config: SvcAppBackendConfig,
-      connection: CoinLedgerConnection,
-      logger: TracedLogger,
-      store: SvcStore,
-      domainId: DomainId,
-      retryProvider: CoinRetries,
-      flagCloseable: FlagCloseable,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-
-    // Create CoinRules and open a first mining round
-    val createCoinRulesCmd =
-      new cc.coin.CoinRules(
-        svc.toProtoPrimitive,
-        defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
-        Seq.empty.asJava,
-      ).createAnd
-        .exerciseCoinRules_Bootstrap_Rounds(
-          config.coinPrice.bigDecimal
-        )
-        .commands
-        .asScala
-        .toSeq
-
-    for {
-      _ <- createValidatorRight(
-        svc = svc,
-        validator = svc,
-        user = svc,
-        logger = logger,
-        connection = connection,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        flagCloseable = flagCloseable,
-        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
-      )
-      _ <- retryProvider.retryForAutomationGrpc(
-        "create coinrules and issuance state",
-        store.lookupCoinRulesWithOffset().flatMap {
-          case QueryResult(off, None) =>
-            connection
-              .submitCommands(
-                actAs = Seq(svc),
-                readAs = Seq.empty,
-                commands = createCoinRulesCmd,
-                commandId =
-                  CoinLedgerConnection.CommandId("com.daml.network.svc.createCoinRules", Seq()),
-                deduplicationOffset = off,
-                domainId = domainId,
-              )
-          case QueryResult(_, Some(_)) =>
-            logger.info("CoinRules already exists, skipping")
-            Future.successful(())
-        },
-        flagCloseable,
-      )
-    } yield ()
-  }
-
 }

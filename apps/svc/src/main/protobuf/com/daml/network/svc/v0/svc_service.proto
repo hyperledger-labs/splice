@@ -30,12 +30,6 @@ message GetDebugInfoResponse {
 
   // Party representing the SVC
   string svc_party_id = 2;
-
-  // Package containing the canton coin code
-  string coin_package_id = 3;
-
-  // Contract IDs of all active CoinRules contracts created by this app
-  repeated string coin_rules_contract_ids = 4;
 }
 
 message GrantFeaturedAppRightRequest {

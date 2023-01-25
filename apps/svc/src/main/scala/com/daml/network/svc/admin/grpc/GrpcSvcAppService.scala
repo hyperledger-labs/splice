@@ -12,7 +12,7 @@ import com.daml.network.svc.v0.{
   SvcServiceGrpc,
   WithdrawFeaturedAppRightRequest,
 }
-import com.daml.network.svc.{SvcApp, v0}
+import com.daml.network.svc.v0
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -54,8 +54,6 @@ class GrpcSvcAppService(
       } yield v0.GetDebugInfoResponse(
         svcUser = svcUserName,
         svcPartyId = Proto.encode(store.svcParty),
-        coinPackageId = SvcApp.coinPackage.packageId,
-        coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
       )
     }
 

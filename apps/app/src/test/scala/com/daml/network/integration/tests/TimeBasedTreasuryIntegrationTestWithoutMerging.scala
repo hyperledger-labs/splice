@@ -28,7 +28,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       )
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
-        CoinConfigTransforms.updateSvcAppConfig(_.focus(_.initialMaxNumInputs).replace(4))(config)
+        CoinConfigTransforms
+          .updateAllSvAppConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
       )
   }
 
