@@ -10,3 +10,5 @@ $(dir)/target/directory-service-0.1.0.dar: $(REPO_ROOT)/daml/directory-service/.
 $(dir)/target/splitwise-0.1.0.dar: $(REPO_ROOT)/daml/splitwise/.daml/dist/splitwise-0.1.0.dar
 	mkdir -p $(@D)
 	cp $< $@
+
+$(dir)/$(docker-push): $(cn-image)

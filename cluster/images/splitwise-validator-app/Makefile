@@ -6,3 +6,5 @@ $(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-ge
 $(dir)/target/splitwise-0.1.0.dar: $(REPO_ROOT)/daml/splitwise/.daml/dist/splitwise-0.1.0.dar
 	mkdir -p $(@D)
 	cp $< $@
+
+$(dir)/$(docker-push): $(cn-image)
