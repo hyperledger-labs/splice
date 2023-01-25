@@ -47,7 +47,6 @@ function start_frontend() {
   # To avoid both issues, we are saving the content of the config to a temporary file
   # and reading it back from the tmux session.
   local config_file=$(mktemp)
-  trap "rm -f ${config_file}" 0 2 3 15
 
   jsonnet \
     --tla-str enableTestAuth="$test_auth" \
@@ -58,8 +57,11 @@ function start_frontend() {
   local log_file="${LOG_DIR}/npm-${app}-${user}.log"
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
+    "trap \"rm -f ${config_file}\" EXIT"
+
+  tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
     "BROWSER=none PORT=$port REACT_APP_CANTON_NETWORK_CONFIG=\"\$(cat $config_file)\" \
-    npm start 2>&1 | tee -a $log_file"
+    npm start 2>&1 | tee -a $log_file" C-m
 }
 
 function usage() {
