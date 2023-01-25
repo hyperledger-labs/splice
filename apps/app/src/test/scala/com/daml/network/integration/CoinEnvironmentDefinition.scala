@@ -194,11 +194,11 @@ object CoinEnvironmentDefinition {
 
   private def loadConfigFromResource(path: String): CoinConfig = {
     val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
-    CoinConfig.loadOrExit(rawConfig)
+    CoinConfig.loadOrThrow(rawConfig)
   }
 
   def fromFiles(testName: String, files: File*): CoinEnvironmentDefinition = {
-    val config = CoinConfig.parseAndLoadOrExit(files.map(_.toJava))
+    val config = CoinConfig.parseAndLoadOrThrow(files.map(_.toJava))
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
   def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =

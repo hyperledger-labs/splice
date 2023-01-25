@@ -14,7 +14,7 @@ object TransformConfig extends App {
       val outputConfig = CoinConfigTransforms.remoteCantonConfigWithAdminTokens(inputConfig)
       CantonCommunityConfig.writeToFile(outputConfig, outputFileName)
     case "useSelfSignedTokensForLedgerApiAuth" =>
-      val inputConfig = CoinConfig.parseAndLoadOrExit(Seq(inputFileName.toFile))
+      val inputConfig = CoinConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
       val outputConfig = CoinConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
       CoinConfig.writeToFile(outputConfig, outputFileName)
     case _ =>

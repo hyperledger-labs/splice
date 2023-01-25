@@ -1,7 +1,9 @@
 package com.daml.network.config
 
 import cats.data.Validated
+import cats.syntax.either._
 import cats.syntax.functor.*
+
 import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
@@ -56,6 +58,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
+import scala.util.control.NoStackTrace
 
 case class CoinConfig(
     override val name: Option[String] = None,
@@ -586,13 +589,16 @@ object CoinConfig {
   ): Either[CantonConfigError, CoinConfig] =
     CantonConfig.loadAndValidate[CoinConfig](config)
 
-  def parseAndLoadOrExit(files: Seq[File])(implicit
+  def parseAndLoadOrThrow(files: Seq[File])(implicit
       elc: ErrorLoggingContext = elc
   ): CoinConfig =
-    CantonConfig.parseAndLoadOrExit[CoinConfig](files)
+    CantonConfig.parseAndLoad[CoinConfig](files).valueOr(error => throw CoinConfigException(error))
 
-  def loadOrExit(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig =
-    CantonConfig.loadOrExit[CoinConfig](config)
+  def loadOrThrow(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig = {
+    CantonConfig
+      .loadAndValidate[CoinConfig](config)
+      .valueOr(error => throw CoinConfigException(error))
+  }
 
   def writeToFile(config: CoinConfig, path: Path): Unit = {
     val renderer = ConfigRenderOptions
@@ -606,3 +612,15 @@ object CoinConfig {
     Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
   }
 }
+
+object CoinConfigException {
+  def apply(error: CantonConfigError): CoinConfigException =
+    error.throwableO.fold(new CoinConfigException(error.cause))(t =>
+      new CoinConfigException(error.cause, t)
+    )
+}
+
+@SuppressWarnings(Array("org.wartremover.warts.Null"))
+final case class CoinConfigException(message: String, cause: Throwable = null)
+    extends RuntimeException(message, cause)
+    with NoStackTrace

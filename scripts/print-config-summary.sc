@@ -19,7 +19,7 @@ object ConfigSummaryPrinter extends App {
   private def printPortSummary(files: Seq[File]): Unit = {
     val ports = mutable.ListBuffer[(Int, String)]()
 
-    val config = CoinConfig.parseAndLoadOrExit(files)
+    val config = CoinConfig.parseAndLoadOrThrow(files)
 
     config.domains.foreach { case (name, i) =>
       ports.addOne(
