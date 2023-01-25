@@ -394,35 +394,19 @@ class SplitwiseFrontendIntegrationTest
           .head
       }
 
-      def accept_request(group: String, invitee: String)(implicit
-          webDriver: WebDriverType
-      ): Unit = {
-        eventually() {
-          findAll(className("add-user-link"))
-            .filter(elem =>
-              elem.attribute("data-group") == Some(group) &&
-                elem.attribute("data-invitee") == Some(invitee)
-            )
-            .toSeq
-            .map(click on _)
-          ()
-        }
-      }
-
       // Alice accepts all requests
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         eventually(timeUntilSuccess = 20.minute) {
           findAll(className("add-user-link")) should have length 4
         }
-        // The add-user elements change under our feet as we are clicking them, so we need to first extract the information from all, then find&click them one-by-one
-        findAll(className("add-user-link")).toSeq
-          .map(elem =>
-            (
-              elem.attribute("data-group").getOrElse(fail()),
-              elem.attribute("data-invitee").getOrElse(fail()),
-            )
-          )
-          .map(a => accept_request(a._1, a._2))
+        val allLinks = findAll(className("add-user-link")).toSeq
+        (allLinks zip (4L to 1 by -1)).foreach { case (elem, i) =>
+          // Wait for the previous join to finish. Otherwise we get contention on the group contract.
+          eventually() {
+            findAll(className("add-user-link")) should have length i
+          }
+          click on elem
+        }
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
