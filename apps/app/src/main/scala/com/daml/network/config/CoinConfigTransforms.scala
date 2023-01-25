@@ -336,20 +336,16 @@ object CoinConfigTransforms {
     )
   }
 
-  def bumpSvcParticipantPortsBy(bump: Int): CoinConfigTransform = {
-    val participant = updateAllParticipantConfigs { case (name, conf) =>
-      if (name == "svc_participant") {
-        conf
-          .focus(_.adminApi)
-          .modify(portTransform(bump, _))
-          .focus(_.ledgerApi)
-          .modify(portTransform(bump, _))
-      } else conf
-    }
-    val svc = updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    val svs = updateAllSvAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    val scan = updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    participant compose svc compose svs compose scan
+  def bumpSelfHostedParticipantPortsBy(bump: Int): CoinConfigTransform = {
+    val transforms = Seq(
+      updateAllWalletAppBackendConfigs_(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
+      updateAllValidatorConfigs_(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
+    )
+    transforms.foldLeft((c: CoinConfig) => c)((f, tf) => f compose tf)
   }
 
   private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =

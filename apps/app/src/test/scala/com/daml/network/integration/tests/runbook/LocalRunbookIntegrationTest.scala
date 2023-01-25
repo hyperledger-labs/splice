@@ -2,7 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import java.nio.file.Files
 import better.files.{File, *}
-import com.daml.network.config.{CoinConfigTransform, CoinConfigTransforms}
+import com.daml.network.config.CoinConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -24,19 +24,19 @@ class LocalRunbookIntegrationTest
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
 
-  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+  val svNodePath: File = "apps" / "app" / "src" / "test" / "resources" / "local-sv-node"
 
-  val svcParticipantPath: File = testResourcesPath / "canton-participant"
-  val svcDomainPath: File = testResourcesPath / "canton-domain"
-  val svcAppPath: File = testResourcesPath / "svc-app"
-  val svAppsPath: File = testResourcesPath / "sv-apps"
-  val scanAppPath: File = testResourcesPath / "scan-app"
+  val svcParticipantPath: File = svNodePath / "canton-participant"
+  val svcDomainPath: File = svNodePath / "canton-domain"
+  val svcAppPath: File = svNodePath / "svc-app"
+  val svAppsPath: File = svNodePath / "sv-apps"
+  val scanAppPath: File = svNodePath / "scan-app"
 
   var cantonProcess: Option[CantonProcess] = None
   override def provideEnvironment = {
     // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
     // Note that system properties can only be used in tests at this point.
-    System.setProperty("NETWORK_APPS_ADDRESS", "http://localhost:5012")
+    System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
     // We merge the bootstrap we need for the SVC & the domain
     // with the bootstrap for the validator so we
     // don't need to start two Canton instances.
@@ -72,10 +72,17 @@ class LocalRunbookIntegrationTest
       |  )
       |})
       |println("Connecting svc participant to domain")
-      |svc_participant.domains.connect("global", "http://localhost:7008")
+      |svc_participant.domains.connect("global", "http://localhost:9008")
       |""".stripMargin)
     bootstrapFile.append(validatorBootstrapContent)
 
+    // Note: the Canton process started here uses ports that do not collide with ports 5xxx used
+    // by the persistent Canton instance started by `./start-canton.sh`:
+    // - The local SVC node uses ports 9xxx (hardcoded in config files)
+    // - The self-hosted validator uses ports 7xxx (set via CLI arguments below)
+    // Note: the coin apps started implicitly through `environmentDefinition`, including all SVC-hosted coin apps,
+    // still use ports 5xxx. This is fine because we only start coin apps for the duration of tests, and we never
+    // run tests in parallel on the same machine.
     val process = startCanton(
       Seq(
         "-c",
@@ -91,7 +98,7 @@ class LocalRunbookIntegrationTest
         "--bootstrap",
         bootstrapFile.toString,
       ),
-      ("DOMAIN_URL", "http://localhost:7008"),
+      ("DOMAIN_URL", "http://localhost:9008"),
     )
     cantonProcess = Some(process)
     super.provideEnvironment
@@ -109,51 +116,25 @@ class LocalRunbookIntegrationTest
     CoinEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
+        // Config file for the self-hosted validator (original version from the runbook)
         validatorPath / "validator.conf",
+        // Config files for SVC-hosted apps (modified copies of deployed configs)
         svcAppPath / "app.conf",
         svAppsPath / "app.conf",
         scanAppPath / "app.conf",
-        testResourcesPath / "localrunbook-overrides.conf",
       )
       .clearConfigTransforms()
-      // Bump ports by 1000 to avoid collisions with the Canton instance started outside of our tests.
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(2000)(conf))
-      // Our SVC participant is instance 0 usually. However in our runbook
-      // our users are not exposed to that so we also use 0 for their participant. This
-      // rewrites the SVC ports by an extra 1000 to avoid collisions.
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy(2000)(conf))
-      .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
-      .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
-      .addConfigTransforms((_, conf) =>
-        CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
-      )
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      // In the runbook, the participant of the self-hosted validator uses ports 5xxx.
+      // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
+      // configs of apps started on the self-hosted validator node.
+      .addConfigTransforms((_, conf) =>
+        CoinConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
+      )
       .withThisSetup(env => {
         env.appsHostedBySvc.local.foreach(_.start())
         env.appsHostedBySvc.local.foreach(_.waitForInitialization())
       })
-
-  private def remoteScanAddressToLocalhost: CoinConfigTransform = {
-    CoinConfigTransforms.updateAllValidatorConfigs_(
-      _.focus(_.remoteScan.adminApi.address).replace("localhost")
-    ) compose CoinConfigTransforms.updateAllWalletAppBackendConfigs_(
-      _.focus(_.remoteScan.adminApi.address).replace("localhost")
-    )
-  }
-
-  private def remoteParticipantAddressToLocalhost: CoinConfigTransform = {
-    CoinConfigTransforms.updateSvcAppConfig(
-      _.focus(_.remoteParticipant.adminApi.address)
-        .replace("localhost")
-        .focus(_.remoteParticipant.ledgerApi.clientConfig.address)
-        .replace("localhost")
-    ) compose CoinConfigTransforms.updateScanAppConfig(
-      _.focus(_.remoteParticipant.adminApi.address)
-        .replace("localhost")
-        .focus(_.remoteParticipant.ledgerApi.clientConfig.address)
-        .replace("localhost")
-    )
-  }
 
   // TODO(#1983)
   "run through runbook against local SVC" in { implicit env =>
