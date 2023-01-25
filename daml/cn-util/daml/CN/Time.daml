@@ -1,0 +1,11 @@
+module CN.Time where
+
+import DA.Date
+import DA.Time
+
+-- | The smallest time point that can be represented by the `Time` type.
+minTime = time (date 1 Jan 1) 0 0 0
+
+-- | The largest time point that can be represented by the `Time` type.
+maxTime = let oneSecMinusOneMicro = convertMicrosecondsToRelTime ( convertRelTimeToMicroseconds (seconds 1) - 1 )
+          in addRelTime (time (date 9999 Dec 31) 23 59 59) oneSecMinusOneMicro
