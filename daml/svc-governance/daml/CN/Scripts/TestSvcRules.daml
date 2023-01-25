@@ -30,26 +30,25 @@ testSvcRules = do
   -- TODO(M2-02): make this a real consortium party
   svc <- allocateParty "svc"
 
-  -- execute the propose-accept bootstrapping dance
-  submit sv1 $ createCmd SvcBootstrap with
-    svc
-    members = [sv1]
-    invitees = [mallory, sv2, sv3]
+  -- have mallory, who starts off non-maliciously, bootstrap the consortium
+  submit svc $ createAndExerciseCmd
+    (SvcBootstrap with svc, founder = mallory, config = defaultCoinConfig, coinPrice = 1.0)
+    SvcBootstrap_Bootstrap
 
-  let acceptInvitation sv = do
-        [(bootstrapCid, _)] <- query @SvcBootstrap sv
-        -- TODO(M2-02): remove the actAs once consortium-party support landed in Daml
-        submitMulti [sv, svc] [] $ exerciseCmd bootstrapCid SvcBootstrap_AcceptInvitation with invitee = sv
-
-  forA_ [sv2, sv3, mallory] acceptInvitation
-
-  -- we now have a consortium with BFT for f = 1
   svcUserId <- validateUserId "svc-user"
   let app = CCApp with
         svc
         svcUser = CCUser with
           userId = svcUserId
           primaryParty = svc
+
+  -- add more sv nodes
+  -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
+  forA_ [sv1, sv2, sv3] $ \sv -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember sv "we want to"
+
+  -- we now have a consortium with BFT for f = 1
 
   -- run an issuance
   runNextIssuanceD app 1.0
@@ -58,7 +57,7 @@ testSvcRules = do
   v1 <- allocateParty "v1"
   requestCoinRules app v1
 
-  -- mallory is not acting, which the others detect; they thus request a re-election
+  -- mallory stops acting, which the others detect; they thus request a re-election
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = sv1

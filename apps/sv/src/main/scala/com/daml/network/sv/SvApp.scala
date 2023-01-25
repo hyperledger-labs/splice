@@ -132,16 +132,11 @@ class SvApp(
       ledgerConnection = ledgerClient.connection()
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomationGrpc(
-        "create CoinRules and issuance state",
-        createCoinRules(store, ledgerConnection, domainId),
+        "boostrapping SVC",
+        bootstrapSvc(store, ledgerConnection, domainId),
         flagCloseable,
       )
-      _ <- retryProvider.retryForAutomationGrpc(
-        "create SvcRules",
-        createSvcRules(store, ledgerConnection, domainId, 1),
-        flagCloseable,
-      )
-      // make sure we can't act as the svc party anymore now that the `SvcRules` are set up
+      // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
       _ <- waiveSvcRights(store.key.svcParty, ledgerConnection)
     } yield ()
   }
@@ -152,80 +147,68 @@ class SvApp(
       _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
     } yield ()
 
-  // Create CoinRules and open the first mining round
-  private def createCoinRules(
+  // Create SvcRules and CoinRules and open the first mining round
+  private def bootstrapSvc(
       store: SvStore,
       ledgerConnection: CoinLedgerConnection,
       domainId: DomainId,
-  ): Future[Unit] =
-    for {
-      _ <- store.lookupCoinRulesWithOffset().flatMap {
-        case QueryResult(off, None) =>
-          ledgerConnection
-            .submitCommands(
-              actAs = Seq(store.key.svcParty),
-              readAs = Seq.empty,
-              commands = new cc.coin.CoinRules(
-                store.key.svcParty.toProtoPrimitive,
-                defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
-                Seq.empty.asJava,
-              ).createAnd
-                .exerciseCoinRules_Bootstrap_Rounds(
-                  config.coinPrice.bigDecimal
-                )
-                .commands
-                .asScala
-                .toSeq,
-              commandId =
-                CoinLedgerConnection.CommandId("com.daml.network.svc.createCoinRules", Seq()),
-              deduplicationOffset = off,
-              domainId = domainId,
-            )
-        case QueryResult(_, Some(_)) =>
-          logger.info("CoinRules already exists, skipping")
-          Future.successful(())
-      }
-    } yield ()
-
-  private def createSvcRules(
-      store: SvStore,
-      ledgerConnection: CoinLedgerConnection,
-      domainId: DomainId,
-      roundNumber: Int,
   ): Future[Unit] = {
     val svcParty = store.key.svcParty
     val svParty = store.key.svParty
     for {
+      coinRules <- store.lookupCoinRules()
       _ <- store.lookupSvcRulesWithOffset().flatMap {
-        case QueryResult(off, None) =>
-          logger.info("SvcRules don't exist; creating with party as leader")
-          val round = new cc.api.v1.round.Round(roundNumber);
-          ledgerConnection
-            .submitCommands(
-              actAs = Seq(svcParty),
-              readAs = Seq.empty,
-              commands = new cn.svcrules.SvcRules(
-                svcParty.toProtoPrimitive,
-                0,
-                round,
-                java.util.Map.of(svParty.toProtoPrimitive, new cn.svcrules.MemberInfo(round)),
-                svParty.toProtoPrimitive,
-              ).create.commands.asScala.toSeq,
-              commandId =
-                CoinLedgerConnection.CommandId("com.daml.network.svc.createSvcRules", Seq()),
-              deduplicationOffset = off,
-              domainId = domainId,
-            )
+        case QueryResult(off, None) => {
+          coinRules match {
+            case Some(coinRules) =>
+              sys.error(
+                "A CoinRules contract was found but no SvcRules contract exists. " +
+                  show"This should never happen.\nCoinRules: $coinRules"
+              )
+            case None =>
+              ledgerConnection
+                .submitCommands(
+                  actAs = Seq(svcParty),
+                  readAs = Seq.empty,
+                  commands = new cn.svcbootstrap.SvcBootstrap(
+                    svcParty.toProtoPrimitive,
+                    svParty.toProtoPrimitive,
+                    defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
+                    config.coinPrice.bigDecimal,
+                  ).createAnd
+                    .exerciseSvcBootstrap_Bootstrap()
+                    .commands
+                    .asScala
+                    .toSeq,
+                  commandId = CoinLedgerConnection
+                    .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
+                  deduplicationOffset = off,
+                  domainId = domainId,
+                )
+          }
+        }
         case QueryResult(_, Some(svcRules)) =>
-          if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
-            logger
-              .info(show"SvcRules exist and party is member; doing nothing. SvcRules: $svcRules")
-            Future.successful(())
-          } else {
-            sys.error(
-              "SvcRules exist but party tasked with founding it isn't member. " +
-                show"Is more than one SV app configured to `found-consortium`? SvcRules: $svcRules"
-            )
+          coinRules match {
+            case Some(coinRules) => {
+              if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
+                logger.info(
+                  "CoinRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
+                    show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
+                )
+                Future.successful(())
+              } else {
+                sys.error(
+                  "CoinRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
+                    "Is more than one SV app configured to `found-consortium`?" +
+                    show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
+                )
+              }
+            }
+            case None =>
+              sys.error(
+                "An SvcRules contract was found but no CoinRules contract exists. " +
+                  show"This should never happen.\nSvcRules: $svcRules"
+              )
           }
       }
     } yield ()
