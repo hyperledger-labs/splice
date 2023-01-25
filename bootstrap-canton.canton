@@ -12,13 +12,13 @@ participants.all.domains.connect_local(global)
 println("Connecting splitwise, alice & bob participant to splitwise domain...")
 Seq(aliceParticipant, bobParticipant, splitwiseParticipant).foreach(_.domains.connect_local(splitwise))
 
-def createUser(participant: ParticipantReference, user: String, readAsParties: Set[PartyId]) = {
+def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[PartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
   val party = participant.parties.enable(user)
   participant.ledger_api.users.create(
     id = user,
-    actAs = Set(party.toLf),
+    actAs = Set(party.toLf) ++ additionalActAsParties.map(_.toLf),
     primaryParty = Some(party.toLf),
-    readAs = readAsParties.map(_.toLf),
+    readAs = Set(),
     participantAdmin = true,
   )
   party
@@ -31,17 +31,17 @@ Seq(
   (directoryParticipant, "directory_validator_user"),
   (splitwiseParticipant, "splitwise_validator_user"),
 ).foreach { case (participant, user) =>
-  createUser(participant, user, Set())
+  createUser(participant, user)
 }
 
-val svcParty = createUser(svcParticipant,"svc_shared_service_user", Set())
+val svcParty = createUser(svcParticipant,"svc_shared_service_user")
 Seq(
   "sv1",
   "sv2",
   "sv3",
   "sv4",
 ).foreach { user =>
-  createUser(svcParticipant,user, Set(svcParty))
+  createUser(svcParticipant,user, additionalActAsParties = Set(svcParty))
 }
 
 println(s"Collecting admin tokens...")
