@@ -1,4 +1,14 @@
-import { ErrorBoundary, DirectoryEntry, useUserState, Login } from 'common-frontend';
+import {
+  useScanClient,
+  ErrorBoundary,
+  DirectoryEntry,
+  useUserState,
+  Login,
+  useInterval,
+  Contract,
+} from 'common-frontend';
+import { Decimal } from 'decimal.js';
+import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 import {
   createBrowserRouter,
@@ -18,6 +28,8 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
+
+import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 
 import './App.css';
 import { useWalletClient } from './contexts/WalletServiceContext';
@@ -80,6 +92,24 @@ const Content = () => {
   // show an error page if we suspect an auth misconfiguration
   const [authError, setAuthError] = useState(false);
 
+  const [coinPrice, setCoinPrice] = useState<Decimal | undefined>();
+  const scanClient = useScanClient();
+
+  const fetchCoinPrice = useCallback(async () => {
+    const tctx = await scanClient.getTransferContext(new Empty(), undefined);
+    const omr = tctx.getLatestOpenMiningRound();
+    if (omr) {
+      const p = Contract.decode(omr, OpenMiningRound);
+      const newCoinPrice = new Decimal(p.payload.coinPrice);
+      // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
+      setCoinPrice(prevCoinPrice =>
+        prevCoinPrice?.equals(newCoinPrice) ? prevCoinPrice : newCoinPrice
+      );
+    }
+  }, [scanClient]);
+
+  useInterval(fetchCoinPrice, 2000);
+
   const routes = createBrowserRouter(
     createRoutesFromElements(
       <Route path="/" element={<Home />}>
@@ -87,8 +117,11 @@ const Content = () => {
         <Route path="coins" element={<Coins />} />
         <Route path="transfer-offers" element={<TransferOffers />} />
         <Route path="subscriptions" element={<Subscriptions />}></Route>
-        <Route path="app-payment-requests" element={<AppPaymentRequests />}></Route>
-        <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />
+        <Route
+          path="app-payment-requests"
+          element={<AppPaymentRequests coinPrice={coinPrice} />}
+        ></Route>
+        <Route path="confirm-payment/:cid/" element={<ConfirmPayment coinPrice={coinPrice} />} />
         <Route path="confirm-subscription/:cid/" element={<ConfirmSubscription />} />
       </Route>
     )

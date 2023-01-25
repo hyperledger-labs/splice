@@ -1,4 +1,5 @@
 import { sameContracts, useInterval, Contract } from 'common-frontend';
+import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -9,7 +10,11 @@ import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/
 import AppPaymentRequestsTable from '../components/AppPaymentRequestsTable';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-const AppPaymentRequests: React.FC = () => {
+interface AppPaymentRequestsProps {
+  coinPrice: Decimal | undefined;
+}
+
+const AppPaymentRequests: React.FC<AppPaymentRequestsProps> = ({ coinPrice }) => {
   const { listAppPaymentRequests } = useWalletClient();
   const { cid } = useParams();
 
@@ -26,7 +31,7 @@ const AppPaymentRequests: React.FC = () => {
 
   return (
     <Stack spacing={2}>
-      <AppPaymentRequestsTable requests={appPaymentRequests} />
+      <AppPaymentRequestsTable requests={appPaymentRequests} coinPrice={coinPrice} />
     </Stack>
   );
 };

@@ -1,7 +1,6 @@
-import { useScanClient, Contract, DirectoryEntry } from 'common-frontend';
+import { Contract, DirectoryEntry } from 'common-frontend';
 import { Decimal } from 'decimal.js';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -15,37 +14,20 @@ import {
   TableRow,
 } from '@mui/material';
 
-import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { PaymentAmountDisplay, PaymentAmountTotalDisplay } from './AmountDisplay';
 
-interface AppPaymentRequestsProps {
+interface AppPaymentRequestsTableProps {
   requests: Contract<AppPaymentRequest>[];
+  coinPrice: Decimal | undefined;
 }
 
-function useCoinPrice(): Decimal | undefined {
-  const [coinPrice, setCoinPrice] = useState<Decimal | undefined>();
-  const scanClient = useScanClient();
-  useEffect(() => {
-    const fetchCoinPrice = async () => {
-      const tctx = await scanClient.getTransferContext(new Empty(), undefined);
-      const omr = tctx.getLatestOpenMiningRound();
-      if (omr) {
-        const p = Contract.decode(omr, OpenMiningRound);
-        setCoinPrice(new Decimal(p.payload.coinPrice));
-      }
-    };
-    fetchCoinPrice();
-  }, [scanClient]);
-
-  return coinPrice;
-}
-
-const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }) => {
-  const coinPrice = useCoinPrice();
-
+const AppPaymentRequestsTable: React.FC<AppPaymentRequestsTableProps> = ({
+  requests,
+  coinPrice,
+}) => {
   return (
     <Table>
       <TableHead>
