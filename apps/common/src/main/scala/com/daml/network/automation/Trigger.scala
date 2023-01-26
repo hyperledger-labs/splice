@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
@@ -287,6 +287,34 @@ abstract class OnCreateUpdateTrigger[TC <: Contract[TCid, T], TCid <: ContractId
   // we can implement this properly.
   override final protected def isStaleTask(
       task: JavaContract[TCid, T]
+  )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
+
+}
+
+/** TODO(M3-18) Integrate into stores and support filtering.
+  */
+abstract class OnTransferOutTrigger(
+    connection: CoinLedgerConnection,
+    domainId: DomainId,
+    party: PartyId,
+)(implicit
+    ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out] {
+
+  override protected val source
+      : Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] =
+    connection
+      .updateTransferOuts(
+        domainId,
+        party,
+      )
+
+  // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
+  // we can implement this properly.
+  override final protected def isStaleTask(
+      task: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
   )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
 
 }

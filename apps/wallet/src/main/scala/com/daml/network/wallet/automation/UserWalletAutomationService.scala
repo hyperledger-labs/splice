@@ -1,12 +1,19 @@
 package com.daml.network.wallet.automation
 
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId}
+import com.daml.ledger.javaapi.data.codegen.ContractCompanion
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{CoinAppAutomationService, DomainOrchestrator}
+import com.daml.network.automation.{CoinAppAutomationService, DomainOrchestrator, Trigger}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.store.DomainStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -56,21 +63,43 @@ class UserWalletAutomationService(
     new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
   )
 
-  registerTrigger(
-    new DomainOrchestrator(
+  // TODO(#2472) Share Domain Orchestrator for multiple apps
+  def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(domainAdded: DomainStore.DomainAdded): Trigger =
+    new TransferOutTrigger(
       triggerContext,
-      store.domains,
-      domainAdded => {
-        val trigger = new TransferAppPaymentRequestsTrigger(
-          triggerContext,
-          store,
-          connection,
-          globalDomain,
-          domainAdded.domainId,
-        )
-        trigger.run()
-        trigger
-      },
+      store,
+      connection,
+      globalDomain,
+      domainAdded.domainId,
+      companion,
     )
-  )
+  def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
+    new TransferInTrigger(
+      triggerContext,
+      store,
+      connection,
+      globalDomain,
+      domainAdded.domainId,
+    )
+
+  Seq(
+    createTransferOutTrigger(paymentCodegen.AppPaymentRequest.COMPANION),
+    createTransferOutTrigger(testWalletCodegen.TestDeliveryOffer.COMPANION),
+    createTransferOutTrigger(splitwiseCodegen.TransferInProgress.COMPANION),
+    createTransferInTrigger,
+  ).foreach { createTrigger =>
+    registerTrigger(
+      new DomainOrchestrator(
+        triggerContext,
+        store.domains,
+        domainAdded => {
+          val trigger = createTrigger(domainAdded)
+          trigger.run()
+          trigger
+        },
+      )
+    )
+  }
 }

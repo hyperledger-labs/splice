@@ -1,5 +1,7 @@
 package com.daml.network.environment
 
+import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -367,13 +369,82 @@ object LedgerClient {
       )
   }
 
-  final case class GetTreeUpdatesResponse(updates: Seq[Either[TransactionTree, xfr.Transfer]]) {
+  final case class GetTreeUpdatesResponse(
+      updates: Seq[Either[TransactionTree, GetTreeUpdatesResponse.Transfer]]
+  ) {
     // TODO(M3-18) remove
     private[environment] def discardTransfers: Seq[TransactionTree] =
       updates collect { case Left(t) => t }
   }
 
   object GetTreeUpdatesResponse {
+    final case class Transfer(
+        event: TransferEvent
+    ) {}
+    object Transfer {
+      private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer = {
+        val event = proto.event match {
+          case xfr.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
+          case xfr.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
+          case xfr.Transfer.Event.Empty =>
+            throw new IllegalArgumentException("uninitialized transfer event")
+        }
+        Transfer(
+          event
+        )
+      }
+    }
+
+    sealed trait TransferEvent extends Product with Serializable with PrettyPrinting
+    object TransferEvent {
+      private case class TransferOutId(s: String) extends PrettyPrinting {
+        override def pretty: Pretty[this.type] = prettyOfString(_.s)
+      }
+      final case class Out(
+          transferOutId: String,
+          contractId: ContractId[_],
+          source: DomainId,
+          target: DomainId,
+      ) extends TransferEvent {
+        def pretty: Pretty[this.type] =
+          prettyOfClass(
+            param("transferOutId", o => TransferOutId(o.transferOutId)),
+            param("contractId", _.contractId),
+            param("source", _.source),
+            param("target", _.target),
+          )
+      }
+      object Out {
+        private[LedgerClient] def fromProto(proto: xfr.TransferredOutEvent): Out = {
+          Out(
+            transferOutId = proto.transferOutId,
+            contractId = new ContractId(proto.contractId),
+            source = DomainId.tryFromString(proto.source),
+            target = DomainId.tryFromString(proto.target),
+          )
+        }
+      }
+      final case class In(
+          source: DomainId,
+          target: DomainId,
+          transferOutId: String,
+      ) extends TransferEvent {
+        def pretty: Pretty[this.type] =
+          prettyOfClass(
+            param("source", _.source),
+            param("target", _.target),
+            param("transferOutId", i => TransferOutId(i.transferOutId)),
+          )
+      }
+      object In {
+        private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In =
+          In(
+            source = DomainId.tryFromString(proto.source),
+            target = DomainId.tryFromString(proto.target),
+            transferOutId = proto.transferOutId,
+          )
+      }
+    }
     import upsvc.TreeUpdate.TreeUpdate as TU
 
     private[LedgerClient] def fromProto(
@@ -383,7 +454,7 @@ object LedgerClient {
         _.treeUpdate match {
           case TU.TransactionTree(tree) =>
             Left(TransactionTree fromProto scalapbToJava(tree)(_.companion))
-          case TU.Transfer(x) => Right(x)
+          case TU.Transfer(x) => Right(GetTreeUpdatesResponse.Transfer.fromProto(x))
           case TU.Empty => sys.error("uninitialized update service result")
         }
       })
@@ -426,6 +497,9 @@ object LedgerClient {
   ) {
     def toProto: xfrsvc.SubmitRequest = {
       val baseCommand = xfrcmd.TransferCommand(
+        applicationId = applicationId,
+        commandId = commandId,
+        submitter = submitter.toProtoPrimitive,
       )
       val updatedCommand = command match {
         case out: TransferCommand.Out =>

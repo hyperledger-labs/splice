@@ -131,6 +131,11 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       companion: ContractCompanion[TC, TCid, T],
   ): Source[Contract[TCid, T], NotUsed]
 
+  def updateTransferOuts(
+      domainId: DomainId,
+      filter: PartyId,
+  ): Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed]
+
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
   def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
@@ -165,6 +170,11 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
 
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
+
+  def submitTransferNoDedup(
+      submitter: PartyId,
+      command: LedgerClient.TransferCommand,
+  ): Future[Unit]
 }
 
 /** Subscription for reading the ledger */
@@ -486,6 +496,28 @@ object CoinLedgerConnection {
           .mapConcat(_.discardTransfers.flatMap(DecodeUtil.decodeAllCreatedTree(companion)(_)))
       }
 
+      def updateTransferOuts(
+          domainId: DomainId,
+          party: PartyId,
+      ): Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] = {
+        import LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+        coinLedgerClient.client
+          .updates(
+            LedgerClient.GetUpdatesRequest(
+              // fixme
+              begin = LedgerOffset.LedgerBegin.getInstance,
+              end = None,
+              party = party,
+              domainId = domainId,
+            )
+          )
+          .mapConcat { response =>
+            response.updates.collect { case Right(Transfer(out: TransferEvent.Out)) =>
+              out
+            }
+          }
+      }
+
       private def makeSubscription[S, T](
           source: Source[S, NotUsed],
           mapOperator: Flow[S, T, _],
@@ -691,6 +723,14 @@ object CoinLedgerConnection {
           _ = Threading.sleep(500)
           _ = logger.info(s"DAR $path is uploaded")
         } yield ()
+      }
+
+      override def submitTransferNoDedup(
+          submitter: PartyId,
+          command: LedgerClient.TransferCommand,
+      ): Future[Unit] = {
+        val commandId = UUID.randomUUID().toString()
+        client.submitTransfer(coinLedgerClient.applicationId, commandId, submitter, command)
       }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()

@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.protocol.LfContractId
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.DomainAlias
@@ -382,37 +381,26 @@ class WalletIntegrationTest
       )
     }
 
-    // TODO(#2323) Actually check that the transfer happens here
-    "transfer AppPaymentRequest to global domain" in { implicit env =>
+    "transfer AppPaymentRequest and DeliveryOffer to global domain" in { implicit env =>
       val splitwiseDomainId = aliceValidator.remoteParticipantWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwise")
       )
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(org.slf4j.event.Level.INFO))(
-        {
-          val (referenceId, requestId, _) = createSelfPaymentRequest(
-            aliceValidator.remoteParticipantWithAdminToken,
-            aliceWallet.config.ledgerApiUser,
-            aliceParty,
-            domainId = Some(splitwiseDomainId),
-          )
-          /* TODO(M3-18) we only count on the target domain, so this isn't true anymore. Reenable
-          eventually() {
-            aliceWallet.listAppPaymentRequests() should have length 1
-          }*/
-          val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
-            .lookup_contract_domain(referenceId, requestId)
-          domains shouldBe Map[LfContractId, String](
-            javaToScalaContractId(referenceId) -> "splitwise",
-            javaToScalaContractId(requestId) -> "splitwise",
-          )
-        },
-        (logs: Seq[LogEntry]) => {
-          forExactly(1, logs) { log =>
-            log.message should include regex (s"Create of .* on ${splitwiseDomainId} requires transfer to global::")
-          }
-        },
-      )
+      val (referenceId, requestId, _) =
+        createSelfPaymentRequest(
+          aliceValidator.remoteParticipantWithAdminToken,
+          aliceWallet.config.ledgerApiUser,
+          aliceParty,
+          domainId = Some(splitwiseDomainId),
+        )
+      eventually() {
+        val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
+          .lookup_contract_domain(requestId, referenceId)
+        domains shouldBe Map[LfContractId, String](
+          javaToScalaContractId(requestId) -> "global",
+          javaToScalaContractId(referenceId) -> "global",
+        )
+      }
     }
   }
 
