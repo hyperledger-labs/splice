@@ -146,7 +146,7 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp](
 
 object StoredTopologyTransactions
     extends HasVersionedMessageCompanion[
-      StoredTopologyTransactions[TopologyChangeOp],
+      StoredTopologyTransactions[TopologyChangeOp]
     ] {
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(

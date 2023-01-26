@@ -172,7 +172,7 @@ class GrpcSequencerClientTransport(
     val response = CantonGrpcUtil
       .sendGrpcRequest(sequencerServiceClient, "sequencer")(
         stub =>
-          (if (requiresAuthentication) stub.sendAsync _ else stub.sendAsyncUnauthenticated _)(
+          (if (requiresAuthentication) stub.sendAsync _ else stub.sendAsyncUnauthenticated _) (
             request.toProtoV0
           ),
         requestDescription =

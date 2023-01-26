@@ -161,7 +161,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
             forAll(actualOutcomes) { (outcome: String) =>
               expectedOutcomes should contain(outcome)
             }
-            actualOutcomes should (contain allOf) (
+            actualOutcomes should (contain allOf)(
               "accepted install request",
               "rejected request for already existing installation",
             )

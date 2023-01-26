@@ -296,7 +296,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
           ),
           Help.Description(""),
           Help.Topic(Help.defaultTopLevelTopic),
-        ),
+        )
       ) :+
       (Help.Item(
         "exit",

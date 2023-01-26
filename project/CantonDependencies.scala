@@ -164,7 +164,7 @@ object CantonDependencies {
 
   lazy val tink = "com.google.crypto.tink" % "tink" % "1.3.0" excludeAll (
     ExclusionRule(organization = "com.google.guava", name = "guava-jdk5"),
-    ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms"),
+    ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
   lazy val dropwizard_metrics_core = "io.dropwizard.metrics" % "metrics-core" % "4.1.2"
