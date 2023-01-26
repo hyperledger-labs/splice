@@ -64,21 +64,21 @@ local svcDeployments(config) = [
     memoryLimitMiB=config.domainMemoryMib
   ),
 
-  c.deployment(config, "canton-participant", [
+  c.deployment(config, "svc-participant", [
     {
-      name: "cp-adm-api",
+      name: "svcp-adm-api",
       port: 5002,
     },
     {
-      name: "cp-lg-api",
+      name: "svcp-lg-api",
       port: 5001,
     },
     {
-      name: "cp-metrics",
+      name: "svcp-metrics",
       port: 10013,
       externalPort: 10013,
     },
-  ], memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
+  ], image="canton-participant", memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME,
