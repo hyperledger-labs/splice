@@ -130,7 +130,7 @@ object WalletStore {
         mkFilter(OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(ValidatorRight.COMPANION)(co =>
-          // All validator rights that entitle the endUser to collect rewards as a validator operator
+          // All validator rights that entitle this wallet's validator to collect rewards as a validator operator
           co.payload.svc == svc &&
             co.payload.validator == validator
         ),

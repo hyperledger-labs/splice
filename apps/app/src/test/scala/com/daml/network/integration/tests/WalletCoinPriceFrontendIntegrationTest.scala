@@ -19,7 +19,7 @@ class WalletCoinPriceFrontendIntegrationTest
       .addConfigTransforms((_, conf) => CoinConfigTransforms.setCoinPrice(2)(conf))
 
   "A wallet UI with a coin price of 2.0" should {
-    "correctly compute totals for multi-recepient requests with CC and USD" in { implicit env =>
+    "correctly compute totals for multi-recipient requests with CC and USD" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)

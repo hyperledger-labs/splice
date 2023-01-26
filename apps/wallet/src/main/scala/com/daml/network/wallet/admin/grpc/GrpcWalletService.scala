@@ -192,7 +192,6 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
         for {
-          userStore <- getUserStore(user)
           coinRules <- store.getCoinRules()
           result <- exerciseWalletAction((installCid, _) =>
             Future.successful(

@@ -98,6 +98,7 @@ class UserWalletManager(
   }
 
   // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
+  /** Lists the validator reward coupons collectable by the current user (i.e. where they are the validator). */
   def listValidatorRewardCouponsCollectableBy(
       validatorUserStore: UserWalletStore,
       maxNumInputs: Option[Int],
@@ -110,8 +111,8 @@ class UserWalletManager(
     ]
   ] =
     for {
-      validatorRights <- validatorUserStore.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
-      users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
+      validatorRights <- validatorUserStore.getValidatorRightsWhereUserIsValidator()
+      hostedUsers = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
       validatorRewardCouponsFs: Seq[
         Future[Seq[
           JavaContract[
@@ -119,7 +120,7 @@ class UserWalletManager(
             coinCodegen.ValidatorRewardCoupon,
           ]
         ]]
-      ] = users.toSeq
+      ] = hostedUsers.toSeq
         .map(u =>
           store.lookupInstallByParty(u).flatMap {
             case None =>
@@ -138,8 +139,9 @@ class UserWalletManager(
                     s"Might miss validator rewards as the UserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
                   )
                   Future.successful(Seq.empty)
-                case Some(userWallet) =>
-                  userWallet.store.listSortedValidatorRewards(maxNumInputs, activeIssuingRounds)
+                case Some(walletOfHostedUser) =>
+                  walletOfHostedUser.store
+                    .listSortedValidatorRewards(maxNumInputs, activeIssuingRounds)
               }
           }
         )

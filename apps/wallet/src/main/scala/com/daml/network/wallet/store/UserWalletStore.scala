@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.InputCoin
 import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc.coin.ValidatorRight
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -211,6 +212,11 @@ trait UserWalletStore extends CoinAppStore {
   ] = {
     acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true)
   }
+
+  /** Lists all the validator rights where the corresponding user is entered as the validator. */
+  def getValidatorRightsWhereUserIsValidator()
+      : Future[Seq[JavaContract[ValidatorRight.ContractId, ValidatorRight]]] =
+    acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
 }
 
 object UserWalletStore {
@@ -285,7 +291,7 @@ object UserWalletStore {
             co.payload.user == endUser
         ),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
-          // All validator rights that entitle the endUser to collect rewards as a validator operator
+          // All validator rights where the current user is the validator.
           co.payload.svc == svc &&
             co.payload.validator == endUser
         ),

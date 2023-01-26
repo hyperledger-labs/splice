@@ -442,7 +442,9 @@ class TreasuryService(
         .map(r => (r.payload.round, r.payload))
         .toMap
       validatorRights <- walletManager.store.acs
-        .listContracts(coinCodegen.ValidatorRight.COMPANION)
+        .listContracts(
+          coinCodegen.ValidatorRight.COMPANION
+        )
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
         openRound.payload.round.number,
@@ -467,15 +469,30 @@ class TreasuryService(
       ) {
         None
       } else {
+        val inputs = constructTransferInputs(
+          maxNumInputs,
+          coinInputsAndQuantity.map(_._2),
+          validatorRewardInputs,
+          appRewardInputs,
+          numTapOperations,
+        )
+        val rewardInputRounds =
+          appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
           openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
           issuingMiningRounds
+            // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
+            .filter(r => rewardInputRounds.contains(r.payload.round))
             .map(r =>
               (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
             )
             .toMap[roundApi.Round, roundApi.IssuingMiningRound.ContractId]
             .asJava,
           validatorRights
+            // only provide validator rights that are actually used in transfer context to avoid unnecessary fetching.
+            .filter(r =>
+              validatorRewardCouponUsers.contains(PartyId.tryFromProtoPrimitive(r.payload.user))
+            )
             .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
             .toMap[String, ValidatorRight.ContractId]
             .asJava,
@@ -487,13 +504,7 @@ class TreasuryService(
         )
         Some(
           (
-            constructTransferInputs(
-              maxNumInputs,
-              coinInputsAndQuantity.map(_._2),
-              validatorRewardInputs,
-              appRewardInputs,
-              numTapOperations,
-            ),
+            inputs,
             validatorRewardCouponUsers,
             new PaymentTransferContext(
               coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
