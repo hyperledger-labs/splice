@@ -386,21 +386,43 @@ class WalletIntegrationTest
         DomainAlias.tryCreate("splitwise")
       )
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val (referenceId, requestId, _) =
+      aliceWallet.tap(50)
+      val (_, (_, requestId)) = actAndCheck(
+        "Create payment request on private domain",
         createSelfPaymentRequest(
           aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceParty,
           domainId = Some(splitwiseDomainId),
-        )
-      eventually() {
-        val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
-          .lookup_contract_domain(requestId, referenceId)
-        domains shouldBe Map[LfContractId, String](
-          javaToScalaContractId(requestId) -> "global",
-          javaToScalaContractId(referenceId) -> "global",
-        )
+        ),
+      )(
+        "request and delivery offer get transferred to public domain",
+        { case (offer, request, _) =>
+          val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
+            .lookup_contract_domain(offer, request)
+          domains shouldBe Map[LfContractId, String](
+            javaToScalaContractId(request) -> "global",
+            javaToScalaContractId(offer) -> "global",
+          )
+          (offer, request)
+        },
+      )
+      val request = eventually() {
+        inside(aliceWallet.listAppPaymentRequests()) { case Seq(req) =>
+          req
+        }
       }
+      request.contractId shouldBe requestId
+      actAndCheck(
+        "Accept payment request",
+        aliceWallet.acceptAppPaymentRequest(request.contractId),
+      )(
+        "wait for the accepted payment to appear",
+        _ =>
+          inside(aliceWallet.listAcceptedAppPayments()) { case Seq(accepted) =>
+            accepted
+          },
+      )
     }
   }
 

@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import akka.NotUsed
@@ -370,19 +371,25 @@ object LedgerClient {
   }
 
   final case class GetTreeUpdatesResponse(
-      updates: Seq[Either[TransactionTree, GetTreeUpdatesResponse.Transfer]]
+      updates: Seq[GetTreeUpdatesResponse.TreeUpdate]
   ) {
     // TODO(M3-18) remove
     private[environment] def discardTransfers: Seq[TransactionTree] =
-      updates collect { case Left(t) => t }
+      updates collect { case GetTreeUpdatesResponse.TransactionTreeUpdate(t) => t }
   }
-
   object GetTreeUpdatesResponse {
+    sealed abstract class TreeUpdate extends Product with Serializable
+
+    final case class TransactionTreeUpdate(tree: TransactionTree) extends TreeUpdate
+
     final case class Transfer(
-        event: TransferEvent
-    ) {}
+        updateId: String,
+        offset: LedgerOffset.Absolute,
+        event: TransferEvent,
+    ) extends TreeUpdate
     object Transfer {
       private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer = {
+        val offset = new LedgerOffset.Absolute(proto.offset)
         val event = proto.event match {
           case xfr.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
           case xfr.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
@@ -390,7 +397,9 @@ object LedgerClient {
             throw new IllegalArgumentException("uninitialized transfer event")
         }
         Transfer(
-          event
+          proto.updateId,
+          offset,
+          event,
         )
       }
     }
@@ -428,21 +437,27 @@ object LedgerClient {
           source: DomainId,
           target: DomainId,
           transferOutId: String,
+          createdEvent: CreatedEvent,
       ) extends TransferEvent {
         def pretty: Pretty[this.type] =
           prettyOfClass(
             param("source", _.source),
             param("target", _.target),
             param("transferOutId", i => TransferOutId(i.transferOutId)),
+            param("createdEvent", _.createdEvent),
           )
       }
       object In {
-        private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In =
+        private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In = {
+          import com.daml.ledger.api.v1.{event => scalaEvent}
           In(
             source = DomainId.tryFromString(proto.source),
             target = DomainId.tryFromString(proto.target),
             transferOutId = proto.transferOutId,
+            createdEvent =
+              CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
           )
+        }
       }
     }
     import upsvc.TreeUpdate.TreeUpdate as TU
@@ -453,8 +468,8 @@ object LedgerClient {
       GetTreeUpdatesResponse(proto.updates map {
         _.treeUpdate match {
           case TU.TransactionTree(tree) =>
-            Left(TransactionTree fromProto scalapbToJava(tree)(_.companion))
-          case TU.Transfer(x) => Right(GetTreeUpdatesResponse.Transfer.fromProto(x))
+            TransactionTreeUpdate(TransactionTree fromProto scalapbToJava(tree)(_.companion))
+          case TU.Transfer(x) => GetTreeUpdatesResponse.Transfer.fromProto(x)
           case TU.Empty => sys.error("uninitialized update service result")
         }
       })

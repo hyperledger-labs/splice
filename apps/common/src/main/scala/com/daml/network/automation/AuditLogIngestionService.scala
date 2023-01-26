@@ -1,5 +1,9 @@
 package com.daml.network.automation
 
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  Transfer,
+  TransactionTreeUpdate,
+}
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
 import com.daml.network.store.{AuditLogIngestionSink, DomainStore}
@@ -38,8 +42,11 @@ class AuditLogIngestionService(
         offset,
         ingestionSink.filterParty,
         domain,
-      )(
-        ingestionSink.processTransaction(_)
+      )(update =>
+        update match {
+          case TransactionTreeUpdate(transaction) => ingestionSink.processTransaction(transaction)
+          case _: Transfer => Future.successful(())
+        }
       )
     }
 

@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.TreeUpdate
 import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -123,7 +124,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       beginOffset: LedgerOffset,
       filter: PartyId,
       domain: DomainId,
-  )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription
+  )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription
 
   def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       domainId: DomainId,
@@ -416,12 +417,12 @@ object CoinLedgerConnection {
           beginOffset: LedgerOffset,
           party: PartyId,
           domain: DomainId,
-      )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription = {
+      )(mapOperator: Flow[TreeUpdate, Any, _]): CoinLedgerSubscription = {
         makeSubscription(
           client.updates(
             LedgerClient.GetUpdatesRequest(beginOffset, None, party, domain)
           ),
-          treesFromResponse.via(mapOperator),
+          Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
           subscriptionName,
         )
       }
@@ -474,9 +475,9 @@ object CoinLedgerConnection {
           beginOffset: LedgerOffset,
           filter: PartyId,
           domain: DomainId,
-      )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription =
+      )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription =
         subscription(subscriptionName, beginOffset, filter, domain)({
-          Flow[TransactionTree].mapAsync(1)(f)
+          Flow[TreeUpdate].mapAsync(1)(f)
         })
 
       def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
@@ -512,7 +513,7 @@ object CoinLedgerConnection {
             )
           )
           .mapConcat { response =>
-            response.updates.collect { case Right(Transfer(out: TransferEvent.Out)) =>
+            response.updates.collect { case Transfer(_, _, out: TransferEvent.Out) =>
               out
             }
           }

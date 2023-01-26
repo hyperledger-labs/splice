@@ -1,5 +1,9 @@
 package com.daml.network.store
 
+import cats.instances.list.*
+import cats.syntax.foldable.*
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+import com.daml.ledger.javaapi.data.LedgerOffset
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -16,7 +20,7 @@ import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -105,6 +109,24 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  private val dummyDomain = DomainId.tryFromString("dummy::domain")
+
+  private def toTransferOutEvent(contractId: ContractId[_]): TransferEvent.Out = TransferEvent.Out(
+    transferOutId = "",
+    contractId = contractId,
+    source = dummyDomain,
+    target = dummyDomain,
+  )
+
+  private def toTransferInEvent[TCid <: ContractId[T], T](
+      contract: JavaContract[TCid, T]
+  ): TransferEvent.In = TransferEvent.In(
+    transferOutId = "",
+    source = dummyDomain,
+    target = dummyDomain,
+    createdEvent = toCreatedEvent(contract),
+  )
+
   // test values
   val (validatorRewardCouponsForAcs, validatorRewardCouponsForTxs) =
     Seq(0, 1, 2, 3).map(i => mkValidatorRewardCoupon(i)).splitAt(2)
@@ -140,6 +162,13 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       rootEventIds = eventsById.keys.toList.asJava,
     )
   }
+
+  private def mkTransfer(offset: String, event: TransferEvent): Transfer =
+    Transfer(
+      updateId = "",
+      offset = new LedgerOffset.Absolute(offset),
+      event = event,
+    )
 
   val tx1: TransactionTree = mkTx(
     tx1Offset,
@@ -314,6 +343,26 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         // never ingested.
         tx5OffsetIngestedF.isCompleted shouldBe false
       }
+    }
+
+    "handles transfers" in {
+      for {
+        store <- mkStore()
+        result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
+        _ = result shouldBe appRewardCoupons
+        transferOuts = result.zipWithIndex.map { case (contract, i) =>
+          mkTransfer(s"016$i", toTransferOutEvent(contract.contractId))
+        }
+        _ <- transferOuts.toList.traverse_(store.ingestionSink.ingestTransfer(_))
+        result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
+        _ = result shouldBe empty
+        transferIns = appRewardCoupons.zipWithIndex.map { case (contract, i) =>
+          mkTransfer(s"017$i", toTransferInEvent(contract))
+        }
+        _ <- transferIns.toList.traverse_(store.ingestionSink.ingestTransfer(_))
+        result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
+        _ = result shouldBe appRewardCoupons
+      } yield succeed
     }
 
   }

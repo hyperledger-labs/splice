@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.Contract
@@ -286,6 +287,15 @@ object AcsStore {
 
     /** Ingest a transaction served by the transaction stream. */
     def ingestTransaction(tx: TransactionTree)(implicit traceContext: TraceContext): Future[Unit]
+
+    /** Ingest a transfer in/out served by the update stream. */
+    def ingestTransfer(transfer: GetTreeUpdatesResponse.Transfer)(implicit
+        traceContext: TraceContext
+    ): Future[Unit]
+
+    def ingestUpdate(transfer: GetTreeUpdatesResponse.TreeUpdate)(implicit
+        traceContext: TraceContext
+    ): Future[Unit]
   }
 
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */

@@ -1,5 +1,11 @@
 package com.daml.network.store
 
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  Transfer,
+  TransferEvent,
+  TransactionTreeUpdate,
+  TreeUpdate,
+}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
@@ -108,6 +114,27 @@ class InMemoryAcsStore(
           offsetIngestionsToSignal.foreach(_.success(()))
           offsetChanged.success(())
         }
+      }
+
+    override def ingestTransfer(
+        event: Transfer
+    )(implicit traceContext: TraceContext): Future[Unit] =
+      updateState(
+        _.ingestTransfer(event, contractFilter.contains)
+      ).map {
+        case (summary, offsetChanged, offsetIngestionsToSignal) => {
+          logger.debug(show"Ingested transaction $summary")
+          offsetIngestionsToSignal.foreach(_.success(()))
+          offsetChanged.success(())
+        }
+      }
+
+    override def ingestUpdate(
+        update: TreeUpdate
+    )(implicit traceContext: TraceContext): Future[Unit] =
+      update match {
+        case TransactionTreeUpdate(tree) => ingestTransaction(tree)
+        case transfer: Transfer => ingestTransfer(transfer)
       }
   }
 
@@ -323,8 +350,8 @@ object InMemoryAcsStore {
       )
     }
 
-    def ingestArchivedEvent(ev: ExercisedEvent): (State, Boolean) =
-      createEventsById.get(ev.getContractId) match {
+    def ingestArchivedEvent(contractId: String): (State, Boolean) =
+      createEventsById.get(contractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
           (this, false)
@@ -335,7 +362,7 @@ object InMemoryAcsStore {
               offset = offset,
               nextEventNumber = nextEventNumber,
               createEvents = createEvents - eventNumber,
-              createEventsById = createEventsById - ev.getContractId,
+              createEventsById = createEventsById - contractId,
               offsetChanged = offsetChanged,
               offsetIngestionsToSignal = offsetIngestionsToSignal,
             ),
@@ -365,16 +392,35 @@ object InMemoryAcsStore {
       (
         stNew,
         IngestionSummary(
-          None,
-          ingestedCreatedEvents,
-          numFilteredCreatedEvents,
-          mutable.ListBuffer.empty,
-          0,
+          txId = None,
+          ingestedCreatedEvents = ingestedCreatedEvents,
+          numFilteredCreatedEvents = numFilteredCreatedEvents,
+          ingestedArchivedEvents = mutable.ListBuffer.empty,
+          numFilteredArchivedEvents = 0,
+          ingestedTransferInEvents = mutable.ListBuffer.empty,
+          numFilteredTransferInEvents = 0,
+          ingestedTransferOutEvents = mutable.ListBuffer.empty,
+          numFilteredTransferOutEvents = 0,
           None,
           stNew.createEvents.size,
         ),
       )
     }
+
+    def ingestTransferInEvent(in: TransferEvent.In, p: CreatedEvent => Boolean): (State, Boolean) =
+      // TODO (M3-83) Consider if we want to treat those differently
+      // than plain creates.
+      if (p(in.createdEvent)) {
+        (ingestCreatedEvent(in.createdEvent), true)
+      } else {
+        (this, false)
+      }
+
+    def ingestTransferOutEvent(out: TransferEvent.Out): (State, Boolean) =
+      // TODO (M3-83) Consider if we want to treat those differently
+      // than plain archives. In particular, we may want to
+      // mark a contract as pending when we submit the transfer out until we get the completion.
+      ingestArchivedEvent(out.contractId.contractId)
 
     def switchToIngestingTransactions(
         acsOffset: String
@@ -423,7 +469,7 @@ object InMemoryAcsStore {
           },
         (st, ev, _) =>
           if (ev.isConsuming) {
-            val (newSt, ingested) = st.ingestArchivedEvent(ev)
+            val (newSt, ingested) = st.ingestArchivedEvent(ev.getContractId)
             if (ingested)
               ingestedArchivedEvents.append(ev)
             else
@@ -446,14 +492,76 @@ object InMemoryAcsStore {
         ),
         (
           IngestionSummary(
-            Some(tx.getTransactionId),
-            ingestedCreatedEvents,
-            numFilteredCreatedEvents,
-            ingestedArchivedEvents,
-            numFilteredArchivedEvents,
-            newOffset,
-            stNew.createEvents.size,
+            txId = Some(tx.getTransactionId),
+            ingestedCreatedEvents = ingestedCreatedEvents,
+            numFilteredCreatedEvents = numFilteredCreatedEvents,
+            ingestedArchivedEvents = ingestedArchivedEvents,
+            numFilteredArchivedEvents = numFilteredArchivedEvents,
+            ingestedTransferInEvents = mutable.ListBuffer.empty,
+            numFilteredTransferInEvents = 0,
+            ingestedTransferOutEvents = mutable.ListBuffer.empty,
+            numFilteredTransferOutEvents = 0,
+            offset = newOffset,
+            newAcsSize = stNew.createEvents.size,
           ),
+          offsetChanged,
+          offsetsToRemove.values,
+        ),
+      )
+    }
+
+    def ingestTransfer(
+        transfer: Transfer,
+        p: CreatedEvent => Boolean,
+    ): (State, (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
+      val newOffset = Some(transfer.offset.getOffset)
+      val baseSummary = IngestionSummary(
+        txId = Some(transfer.updateId),
+        ingestedCreatedEvents = mutable.ListBuffer.empty,
+        numFilteredCreatedEvents = 0,
+        ingestedArchivedEvents = mutable.ListBuffer.empty,
+        numFilteredArchivedEvents = 0,
+        ingestedTransferInEvents = mutable.ListBuffer.empty,
+        numFilteredTransferInEvents = 0,
+        ingestedTransferOutEvents = mutable.ListBuffer.empty,
+        numFilteredTransferOutEvents = 0,
+        offset = newOffset,
+        newAcsSize = 0,
+      )
+      val (stNew, summary) = transfer.event match {
+        case out: TransferEvent.Out =>
+          val (stNew, ingested) = this.ingestTransferOutEvent(out)
+          (
+            stNew,
+            baseSummary.copy(
+              ingestedTransferOutEvents =
+                if (ingested) mutable.ListBuffer(out) else mutable.ListBuffer.empty,
+              numFilteredTransferOutEvents = if (ingested) 0 else 1,
+            ),
+          )
+        case in: TransferEvent.In =>
+          val (stNew, ingested) = this.ingestTransferInEvent(in, p)
+          (
+            stNew,
+            baseSummary.copy(
+              ingestedTransferInEvents =
+                if (ingested) mutable.ListBuffer(in) else mutable.ListBuffer.empty,
+              numFilteredTransferInEvents = if (ingested) 0 else 1,
+            ),
+          )
+      }
+      val offsetsToRemove = stNew.computeOffsetsToRemove(transfer.offset.getOffset)
+      (
+        State(
+          offset = newOffset,
+          nextEventNumber = stNew.nextEventNumber,
+          createEvents = stNew.createEvents,
+          createEventsById = stNew.createEventsById,
+          offsetChanged = Promise(),
+          offsetIngestionsToSignal = stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
+        ),
+        (
+          summary.copy(newAcsSize = stNew.createEvents.size),
           offsetChanged,
           offsetsToRemove.values,
         ),
@@ -479,6 +587,12 @@ object InMemoryAcsStore {
       numFilteredCreatedEvents: Int,
       ingestedArchivedEvents: mutable.ListBuffer[ExercisedEvent],
       numFilteredArchivedEvents: Int,
+      // For now transfers are either 0 or 1 per ingestion, we use a list for consistency with creates/archives
+      // and to support batching later.
+      ingestedTransferInEvents: mutable.ListBuffer[TransferEvent.In],
+      numFilteredTransferInEvents: Int,
+      ingestedTransferOutEvents: mutable.ListBuffer[TransferEvent.Out],
+      numFilteredTransferOutEvents: Int,
       offset: Option[String],
       newAcsSize: Int,
   ) extends PrettyPrinting {
@@ -490,7 +604,7 @@ object InMemoryAcsStore {
         "", // intentionally left empty, as that worked better in the log messages above
         paramIfDefined("offset", _.offset.map(_.unquoted)),
         paramIfDefined("txId", _.txId.map(_.readableHash)),
-        param("ingestedCreates", _.ingestedCreatedEvents.toSeq),
+        param("ingestedCreates", _.ingestedCreatedEvents.toSeq, _.ingestedCreatedEvents.nonEmpty),
         param(
           "numFilteredCreates",
           _.numFilteredCreatedEvents,
@@ -505,6 +619,26 @@ object InMemoryAcsStore {
           "numFilteredArchivals",
           _.numFilteredArchivedEvents,
           _.numFilteredArchivedEvents != 0,
+        ),
+        param(
+          "ingestedTransferIns",
+          _.ingestedTransferInEvents.toSeq,
+          _.ingestedTransferInEvents.nonEmpty,
+        ),
+        param(
+          "numFilteredTransferIns",
+          _.numFilteredTransferInEvents,
+          _.numFilteredTransferInEvents != 0,
+        ),
+        param(
+          "ingestedTransferOuts",
+          _.ingestedTransferOutEvents.toSeq,
+          _.ingestedTransferOutEvents.nonEmpty,
+        ),
+        param(
+          "numFilteredTransferOuts",
+          _.numFilteredTransferOutEvents,
+          _.numFilteredTransferOutEvents != 0,
         ),
         param("newAcsSize", _.newAcsSize),
       )

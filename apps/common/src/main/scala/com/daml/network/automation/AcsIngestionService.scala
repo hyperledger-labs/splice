@@ -45,8 +45,7 @@ class AcsIngestionService(
       igFilter.primaryParty,
       domain,
     )(
-      // Ingest every transaction as we get it.
-      ingestionSink.ingestTransaction(_)
+      ingestionSink.ingestUpdate(_)
     )
 
   /** Ingests the ACS and returns the offset of the ACS, as of which the transaction stream should be read. */
