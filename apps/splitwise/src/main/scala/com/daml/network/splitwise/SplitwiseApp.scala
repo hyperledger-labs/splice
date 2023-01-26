@@ -86,13 +86,14 @@ class SplitwiseApp(
       timeouts,
     )
     _ <- store.domains.signalWhenConnected(config.domains.global)
-    _ <- store.domains.signalWhenConnected(config.domains.splitwise)
+    splitwiseDomainId <- store.domains.signalWhenConnected(config.domains.splitwise)
   } yield {
     adminServerRegistry
       .addService(
         SplitwiseServiceGrpc.bindService(
           new GrpcSplitwiseService(
             ledgerClient,
+            splitwiseDomainId,
             scanConnection,
             party,
             store,

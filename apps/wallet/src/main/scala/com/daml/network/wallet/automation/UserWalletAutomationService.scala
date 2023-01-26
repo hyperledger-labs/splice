@@ -1,5 +1,6 @@
 package com.daml.network.wallet.automation
 
+import com.digitalasset.canton.topology.DomainId
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId}
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
@@ -20,7 +21,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class UserWalletAutomationService(
     store: UserWalletStore,
@@ -102,4 +103,7 @@ class UserWalletAutomationService(
       )
     )
   }
+
+  override def getIngestionDomain: () => Future[DomainId] = () =>
+    store.domains.signalWhenConnected(globalDomain)
 }

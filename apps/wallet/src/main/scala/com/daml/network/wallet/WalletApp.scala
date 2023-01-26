@@ -143,6 +143,7 @@ class WalletApp(
         )
       automation = new WalletAutomationService(
         config.automation,
+        config.domains.global,
         clock,
         walletManager,
         ledgerClient,

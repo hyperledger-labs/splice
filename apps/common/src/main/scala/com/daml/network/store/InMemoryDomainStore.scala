@@ -56,10 +56,10 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
   override def signalWhenConnected(): Future[Unit] =
     stateVar.oneDomainConnected.future
 
-  override def signalWhenConnected(alias: DomainAlias): Future[Unit] =
-    updateState[Future[Unit]](state =>
+  override def signalWhenConnected(alias: DomainAlias): Future[DomainId] =
+    updateState[Future[DomainId]](state =>
       state.connectedDomains.get(alias) match {
-        case Some(_) => (state, Future.unit)
+        case Some(domainId) => (state, Future.successful(domainId))
         case None =>
           val (newState, promise) = state.addAliasToSignal(alias)
           (newState, promise.future)
@@ -123,7 +123,9 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
         logger.debug(show"Ingested domain update $summary")
         stateChanged.success(())
         oneDomainConnectedO.foreach(_.trySuccess(()))
-        aliasSignals.foreach(_.success(()))
+        aliasSignals.foreach { case (domainId, promise) =>
+          promise.success(domainId)
+        }
       }
   }
 
@@ -148,13 +150,18 @@ object InMemoryDomainStore {
       connectedDomains: Map[DomainAlias, DomainId],
       stateChanged: Promise[Unit],
       oneDomainConnected: Promise[Unit],
-      domainAliasIngestionsToSignal: Map[DomainAlias, Promise[Unit]],
+      domainAliasIngestionsToSignal: Map[DomainAlias, Promise[DomainId]],
   ) {
     def setDomains(
         newDomains: Map[DomainAlias, DomainId]
     ): (
         State,
-        (IngestionSummary, Promise[Unit], Option[Promise[Unit]], Iterable[Promise[Unit]]),
+        (
+            IngestionSummary,
+            Promise[Unit],
+            Option[Promise[Unit]],
+            Iterable[(DomainId, Promise[DomainId])],
+        ),
     ) = {
       val summary = summarizeChanges(connectedDomains, newDomains)
       val oneDomainConnectedO =
@@ -163,6 +170,9 @@ object InMemoryDomainStore {
         domainAliasIngestionsToSignal.partition { case (alias, _) =>
           newDomains.contains(alias)
         }
+      val readyToSignalWithDomainId = readyToSignal.view.map { case (alias, promise) =>
+        (newDomains(alias), promise)
+      }
       (
         State(
           newDomains,
@@ -170,13 +180,13 @@ object InMemoryDomainStore {
           oneDomainConnected,
           leftoverSignals,
         ),
-        (summary, stateChanged, oneDomainConnectedO, readyToSignal.values),
+        (summary, stateChanged, oneDomainConnectedO, readyToSignalWithDomainId),
       )
     }
-    def addAliasToSignal(alias: DomainAlias): (State, Promise[Unit]) = {
+    def addAliasToSignal(alias: DomainAlias): (State, Promise[DomainId]) = {
       domainAliasIngestionsToSignal.get(alias) match {
         case None =>
-          val p = Promise[Unit]()
+          val p = Promise[DomainId]()
           (this.focus(_.domainAliasIngestionsToSignal).modify(_ + (alias -> p)), p)
         case Some(existingP) => (this, existingP)
       }

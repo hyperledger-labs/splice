@@ -1,7 +1,6 @@
 package com.daml.network.splitwise.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
-import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
 import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -10,7 +9,7 @@ import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.daml.network.util.{JavaContract as Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
@@ -22,6 +21,7 @@ import scala.jdk.CollectionConverters.*
 @nowarn("cat=unused")
 class GrpcSplitwiseService(
     ledgerClient: CoinLedgerClient,
+    splitwiseDomainId: DomainId,
     scanConnection: ScanConnection,
     providerParty: PartyId,
     store: SplitwiseStore,
@@ -43,10 +43,9 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        domain <- assertGlobalDomain(store.domains).apply()
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
         groups <- connection.activeContracts(
-          domain,
+          splitwiseDomainId,
           providerParty,
           splitwiseCodegen.Group.COMPANION,
         )
@@ -61,11 +60,9 @@ class GrpcSplitwiseService(
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
       for {
-        domain <- assertGlobalDomain(store.domains).apply()
         groupInvites <- connection.activeContracts(
-          domain,
+          splitwiseDomainId,
           providerParty,
           splitwiseCodegen.GroupInvite.COMPANION,
         )
@@ -83,9 +80,8 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        domain <- assertGlobalDomain(store.domains).apply()
         acceptedGroupInvites <- connection.activeContracts(
-          domain,
+          splitwiseDomainId,
           providerParty,
           splitwiseCodegen.AcceptedGroupInvite.COMPANION,
         )
@@ -108,9 +104,8 @@ class GrpcSplitwiseService(
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
       for {
-        domain <- assertGlobalDomain(store.domains).apply()
         balanceUpdates <- connection.activeContracts(
-          domain,
+          splitwiseDomainId,
           providerParty,
           splitwiseCodegen.BalanceUpdate.COMPANION,
         )
@@ -136,9 +131,8 @@ class GrpcSplitwiseService(
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       val javaUserParty = userParty.toProtoPrimitive
       for {
-        domain <- assertGlobalDomain(store.domains).apply()
         balanceUpdates <- connection.activeContracts(
-          domain,
+          splitwiseDomainId,
           providerParty,
           splitwiseCodegen.BalanceUpdate.COMPANION,
         )

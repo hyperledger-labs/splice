@@ -1,5 +1,6 @@
 package com.daml.network.config
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -447,6 +448,14 @@ object CoinConfigTransforms {
       c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
     })
   }
+
+  def useSeparateSplitwiseDomain(): CoinConfigTransform =
+    updateAllSplitwiseAppConfigs_(c =>
+      c.focus(_.domains.splitwise).replace(DomainAlias.tryCreate("splitwise"))
+    ) compose
+      updateAllRemoteSplitwiseAppConfigs_(c =>
+        c.focus(_.domains.splitwise).replace(DomainAlias.tryCreate("splitwise"))
+      )
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]

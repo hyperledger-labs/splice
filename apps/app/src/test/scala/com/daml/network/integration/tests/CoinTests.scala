@@ -1,5 +1,7 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.protocol.LfContractId
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.auth0.exception.Auth0Exception
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
@@ -14,6 +16,8 @@ import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.*
 import org.scalatest.BeforeAndAfterEach
+
+import scala.language.implicitConversions
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -194,5 +198,8 @@ object CoinTests {
         }
       }
     }
+
+    implicit def javaToScalaContractId[T](cid: ContractId[T]): LfContractId =
+      LfContractId.assertFromString(cid.contractId)
   }
 }

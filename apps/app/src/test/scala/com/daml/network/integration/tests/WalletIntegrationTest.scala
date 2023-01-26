@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.digitalasset.canton.protocol.LfContractId
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
@@ -14,7 +13,6 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as D
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
 
-import scala.language.implicitConversions
 import scala.concurrent.Future
 
 class WalletIntegrationTest
@@ -425,7 +423,4 @@ class WalletIntegrationTest
       )
     }
   }
-
-  implicit def javaToScalaContractId[T](cid: ContractId[T]): LfContractId =
-    LfContractId.assertFromString(cid.contractId)
 }

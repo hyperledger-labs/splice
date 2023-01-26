@@ -29,7 +29,7 @@ abstract class CoinAppAutomationService(
     new AcsIngestionService(
       this.getClass.getSimpleName,
       store.acsIngestionSink,
-      assertGlobalDomain(store.domains),
+      getIngestionDomain,
       connection,
       retryProvider,
       loggerFactory,
@@ -44,14 +44,16 @@ abstract class CoinAppAutomationService(
       triggerContext,
     )
   )
+
+  protected def getIngestionDomain: () => Future[DomainId] = assertGlobalDomain(store.domains)
 }
 
 object CoinAppAutomationService {
   // TODO (#2221) delete; make multiple AcsStores depend on add/remove domains instead
   private[network] def assertGlobalDomain(
       domains: DomainStore
-  )(implicit ec: ExecutionContext): () => Future[DomainId] = {
+  ): () => Future[DomainId] = {
     val forceGlobal = com.digitalasset.canton.DomainAlias.tryCreate("global")
-    () => domains.signalWhenConnected(forceGlobal) flatMap (_ => domains.getDomainId(forceGlobal))
+    () => domains.signalWhenConnected(forceGlobal)
   }
 }

@@ -49,6 +49,12 @@ abstract class SplitwiseAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.GetProviderPartyId())
     }
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.ListConnectedDomains())
+    }
 }
 
 final class SplitwiseAppClientReference(
@@ -129,8 +135,20 @@ final class SplitwiseAppClientReference(
       readAs: Seq[PartyId],
       update: Update[T],
       commandId: Option[String] = None,
-  ): T =
-    LedgerApiUtils.submitWithResult(ledgerApi, userId, actAs, readAs, update, commandId)
+  ): T = {
+    LedgerApiUtils.submitWithResult(
+      ledgerApi,
+      userId,
+      actAs,
+      readAs,
+      update,
+      commandId,
+      Some(getDomainId()),
+    )
+  }
+
+  private def getDomainId() =
+    listConnectedDomains()(config.domains.splitwise)
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
@@ -379,10 +397,4 @@ final class SplitwiseAppBackendReference(
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListConnectedDomains())
-    }
 }
