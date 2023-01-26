@@ -1,7 +1,9 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
+
+import io.grpc.CallCredentials
 
 import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.*
@@ -25,10 +27,9 @@ import com.digitalasset.canton.participant.config.{
 }
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnection
-import com.digitalasset.canton.topology.{DomainId, Identity, ParticipantId}
+import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
-import io.grpc.CallCredentials
 
 import scala.util.hashing.MurmurHash3
 
@@ -39,8 +40,6 @@ trait InstanceReference
     with FeatureFlagFilter
     with PrettyPrinting
     with CertificateAdministration {
-
-  type InstanceId <: Identity
 
   val name: String
   protected val instanceType: String
@@ -70,7 +69,7 @@ trait InstanceReference
 
   type Status <: NodeStatus.Status
 
-  def id: InstanceId
+  def id: NodeIdentity
 
   def health: HealthAdministration[Status]
 
@@ -132,7 +131,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
   override def keys: LocalKeyAdministrationGroup = _keys
 
   private val _keys =
-    new LocalKeyAdministrationGroup(this, consoleEnvironment, crypto)
+    new LocalKeyAdministrationGroup(this, this, consoleEnvironment, crypto)
 
   private[console] def migrateDbCommand(): ConsoleCommandResult[Unit] =
     migrateInstanceDb().toResult(_.message, _ => ())
@@ -190,7 +189,7 @@ trait RemoteInstanceReference extends InstanceReference {
   @Help.Summary("Manage public and secret keys")
   @Help.Group("Keys")
   override val keys: KeyAdministrationGroup =
-    new KeyAdministrationGroup(this, consoleEnvironment)
+    new KeyAdministrationGroup(this, this, consoleEnvironment)
 }
 
 trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
@@ -219,8 +218,6 @@ trait DomainReference
     with InstanceReferenceWithSequencerConnection {
   val consoleEnvironment: ConsoleEnvironment
   val name: String
-
-  override type InstanceId = DomainId
 
   override protected val instanceType: String = DomainReference.InstanceType
 
@@ -418,8 +415,6 @@ abstract class ParticipantReference(
     with LedgerApiAdministration
     with LedgerApiCommandRunner {
 
-  override type InstanceId = ParticipantId
-
   override protected val instanceType: String = ParticipantReference.InstanceType
 
   override protected val loggerFactory: NamedLoggerFactory =
@@ -463,6 +458,12 @@ abstract class ParticipantReference(
   override def parties: ParticipantPartiesAdministrationGroup
 
   def config: BaseParticipantConfig
+
+  @Help.Summary("Manage participant replication")
+  @Help.Group("Replication")
+  def replication: ParticipantReplicationAdministrationGroup = replicationGroup
+  lazy private val replicationGroup =
+    new ParticipantReplicationAdministrationGroup(this, consoleEnvironment)
 
 }
 
@@ -557,12 +558,6 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
     new LocalParticipantPartiesAdministrationGroup(this, this, consoleEnvironment, loggerFactory)
-
-  @Help.Summary("Manage participant replication")
-  @Help.Group("Replication")
-  def replication: ParticipantReplicationAdministrationGroup = replicationGroup
-  lazy private val replicationGroup =
-    new ParticipantReplicationAdministrationGroup(this, consoleEnvironment)
 
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)

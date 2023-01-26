@@ -25,3 +25,17 @@ To update the patched typescript libraries run:
 ```
 path/to/daml/repo/language-support/ts/extract-ts-libs.sh nix/vendored
 ```
+
+## Bumping the TS Codegen fork
+
+If you encounter errors like the following during a Canton upgrade,
+you likely need to rebase our TS codegen fork to be compatible with
+new Daml-LF changes.
+
+```
+[error] daml2ts: user error (ProtobufError "UnknownEnum \"ExprSumBuiltin\" 149")
+```
+
+To do so, rebase https://github.com/digital-asset/daml/tree/ts-proto
+to the SDK release you're upgrading to and repeat the two extraction
+commands above.

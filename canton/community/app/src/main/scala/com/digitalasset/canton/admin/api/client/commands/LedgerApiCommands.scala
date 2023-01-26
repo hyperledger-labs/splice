@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -61,7 +61,7 @@ import com.daml.ledger.api.v1.command_submission_service.{
   CommandSubmissionServiceGrpc,
   SubmitRequest,
 }
-import com.daml.ledger.api.v1.commands.{Command, Commands as CommandsV1}
+import com.daml.ledger.api.v1.commands.{Command, Commands as CommandsV1, DisclosedContract}
 import com.daml.ledger.api.v1.completion.Completion
 import com.daml.ledger.api.v1.ledger_configuration_service.LedgerConfigurationServiceGrpc.LedgerConfigurationServiceStub
 import com.daml.ledger.api.v1.ledger_configuration_service.{
@@ -82,7 +82,7 @@ import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.transaction_service.TransactionServiceGrpc.TransactionServiceStub
 import com.daml.ledger.api.v1.transaction_service.*
-import com.daml.ledger.client.binding.{Primitive as P}
+import com.daml.ledger.client.binding.Primitive as P
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
@@ -626,6 +626,7 @@ object LedgerApiCommands {
     def deduplicationPeriod: Option[DeduplicationPeriod]
     def submissionId: String
     def minLedgerTimeAbs: Option[Instant]
+    def disclosedContracts: Seq[DisclosedContract]
 
     protected def mkCommand: CommandsV1 = CommandsV1(
       workflowId = workflowId,
@@ -649,6 +650,7 @@ object LedgerApiCommands {
       minLedgerTimeAbs =
         minLedgerTimeAbs.map(t => ProtoConverter.InstantConverter.toProtoPrimitive(t)),
       submissionId = submissionId,
+      disclosedContracts = disclosedContracts,
     )
 
     override def pretty: Pretty[this.type] =
@@ -682,6 +684,7 @@ object LedgerApiCommands {
         override val deduplicationPeriod: Option[DeduplicationPeriod],
         override val submissionId: String,
         override val minLedgerTimeAbs: Option[Instant],
+        override val disclosedContracts: Seq[DisclosedContract],
     ) extends SubmitCommand
         with BaseCommand[SubmitRequest, Empty, Unit] {
       override def createRequest(): Either[String, SubmitRequest] = Right(
@@ -716,6 +719,7 @@ object LedgerApiCommands {
         override val deduplicationPeriod: Option[DeduplicationPeriod],
         override val submissionId: String,
         override val minLedgerTimeAbs: Option[Instant],
+        override val disclosedContracts: Seq[DisclosedContract],
     ) extends SubmitCommand
         with BaseCommand[
           SubmitAndWaitRequest,
@@ -751,6 +755,7 @@ object LedgerApiCommands {
         override val deduplicationPeriod: Option[DeduplicationPeriod],
         override val submissionId: String,
         override val minLedgerTimeAbs: Option[Instant],
+        override val disclosedContracts: Seq[DisclosedContract],
     ) extends SubmitCommand
         with BaseCommand[SubmitAndWaitRequest, SubmitAndWaitForTransactionResponse, Transaction] {
 

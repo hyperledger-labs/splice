@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -81,9 +81,9 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest {
 
   "ExtendedContractLookup" should {
 
-    val instance0 = contractInstance(agreementText = "instance0")
+    val instance0 = contractInstance()
     val instance0Template = instance0.unversioned.template
-    val instance1 = contractInstance(agreementText = "instance1")
+    val instance1 = contractInstance()
     val transactionId0 = transactionId(0)
     val transactionId1 = transactionId(1)
     val transactionId2 = transactionId(2)

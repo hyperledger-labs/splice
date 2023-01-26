@@ -1,13 +1,13 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
-import com.codahale.metrics.MetricRegistry
 import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.metrics.SequencerClientMetrics
 import com.digitalasset.canton.sequencing.client.SendTrackerUpdateError.TimeoutHandlerError
 import com.digitalasset.canton.sequencing.protocol.*
@@ -27,7 +27,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{Future, Promise}
 
 class SendTrackerTest extends AsyncWordSpec with BaseTest {
-  val metrics = new SequencerClientMetrics(MetricName("SendTrackerTest"), new MetricRegistry())
+  val metrics = new SequencerClientMetrics(
+    MetricName("SendTrackerTest"),
+    NoOpMetricsFactory,
+  )
   val msgId1 = MessageId.tryCreate("msgId1")
   val msgId2 = MessageId.tryCreate("msgId2")
 

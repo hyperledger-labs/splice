@@ -24,8 +24,8 @@ import monocle.macros.syntax.lens.*
 case class CoinEnvironmentDefinition(
     override val baseConfig: CoinConfig,
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
-    override val preSetup: CoinTestConsoleEnvironment => Unit = _ => (),
-    override val setup: CoinTestConsoleEnvironment => Unit = _ => (),
+    val preSetup: CoinTestConsoleEnvironment => Unit = _ => (),
+    val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
     val configTransformsWithContext: (String => Seq[CoinConfig => CoinConfig]) =
@@ -33,8 +33,7 @@ case class CoinEnvironmentDefinition(
 ) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
       baseConfig,
       testingConfig,
-      preSetup,
-      setup,
+      List(preSetup, setup),
       teardown,
       configTransformsWithContext(context),
     ) {

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -45,6 +45,9 @@ case class RootHash(private val hash: Hash) extends PrettyPrinting with HasCrypt
   override def getCryptographicEvidence: ByteString = hash.getCryptographicEvidence
 
   def toProtoPrimitive: ByteString = getCryptographicEvidence
+
+  def asLedgerTransactionId: Either[String, LedgerTransactionId] =
+    LedgerTransactionId.fromString(hash.toHexString)
 
   override def pretty: Pretty[RootHash] = prettyOfParam(_.unwrap)
 }

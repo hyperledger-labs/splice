@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -70,6 +70,7 @@ class DbStorageSingle private (
       traceContext: TraceContext
   ): Future[Unit] = {
     Future(blocking(try {
+      // FIXME(i11240): if db is backed by a connection pool, this can fail even if the db is healthy, because the pool is busy executing long-running queries
       val connection =
         // this will timeout and throw a SQLException if can't establish a connection
         db.source.createConnection()

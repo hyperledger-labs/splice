@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.6.0-snapshot.20221212.11134.0.1ac41995"
+  val version: String = "2.6.0-snapshot.20230116.11260.0.94327f5d"
   val daml_language_versions = Seq("1.14", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -94,6 +94,7 @@ object CantonDependencies {
   lazy val daml_error = "com.daml" %% "error" % daml_libraries_version
   lazy val daml_error_generator = "com.daml" %% "error-generator-lib" % daml_libraries_version
   lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
+  lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_participant_state = "com.daml" %% "participant-state" % daml_libraries_version
   lazy val daml_resources_akka = "com.daml" %% "resources-akka" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version

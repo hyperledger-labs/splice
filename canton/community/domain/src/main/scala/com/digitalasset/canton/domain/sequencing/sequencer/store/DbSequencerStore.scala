@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing.sequencer.store
@@ -11,14 +11,14 @@ import com.daml.nonempty.catsinstances.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{PositiveNumeric, String256M}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric, String256M}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.{
   CommitMode,
   SequencerMemberStatus,
   SequencerPruningStatus,
 }
-import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, HasCloseContext}
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.DbAction.ReadOnly
@@ -43,7 +43,6 @@ import slick.jdbc.*
 
 import java.sql.{Connection, JDBCType, SQLException, SQLNonTransientException}
 import java.util.UUID
-import scala.Ordering.Implicits.*
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,16 +57,19 @@ class DbSequencerStore(
     maxInClauseSize: PositiveNumeric[Int],
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
+    overrideCloseContext: Option[CloseContext] = None,
 )(protected implicit val executionContext: ExecutionContext)
     extends SequencerStore
     with NamedLogging
-    with FlagCloseable
-    with HasCloseContext {
+    with FlagCloseable {
 
   import DbStorage.Implicits.*
   import Member.DbStorageImplicits.*
   import storage.api.*
   import storage.converters.*
+
+  implicit val closeContext: CloseContext =
+    overrideCloseContext.getOrElse(CloseContext(this))
 
   private implicit val setRecipientsArrayOParameter
       : SetParameter[Option[NonEmpty[SortedSet[SequencerMemberId]]]] = (v, pp) => {
@@ -1053,6 +1055,18 @@ class DbSequencerStore(
         functionFullName,
       )
     } yield checkpointsRemoved
+
+  override def locatePruningTimestamp(skip: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): Future[Option[CantonTimestamp]] = storage
+    .querySingle(
+      sql"""select ts from sequencer_events order by ts #${storage.limit(
+          1,
+          skipItems = skip.value.toLong,
+        )}""".as[CantonTimestamp].headOption,
+      functionFullName,
+    )
+    .value
 
   override def status(
       now: CantonTimestamp

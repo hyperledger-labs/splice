@@ -1,14 +1,14 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
 
 import cats.syntax.parallel.*
-import com.codahale.metrics.MetricRegistry
 import com.daml.metrics
 import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.metrics.{MetricHandle, RefGauge}
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.RefGauge
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.MonadUtil
@@ -362,13 +362,13 @@ class TaskSchedulerTest extends AsyncWordSpec with BaseTest {
 
 object TaskSchedulerTest {
 
-  class MockTaskSchedulerMetrics extends TaskSchedulerMetrics with MetricHandle.Factory {
-    override val registry: MetricRegistry = new MetricRegistry()
-    override val prefix: MetricName = MetricName("test")
-    override val sequencerCounterQueue: metrics.api.MetricHandle.Counter = counter(
+  class MockTaskSchedulerMetrics extends TaskSchedulerMetrics {
+    val factory = NoOpMetricsFactory
+    val prefix: MetricName = MetricName("test")
+    override val sequencerCounterQueue: metrics.api.MetricHandle.Counter = factory.counter(
       prefix :+ "counter"
     )
-    override val taskQueue: RefGauge[Int] = refGauge(prefix :+ "queue", 0)
+    override val taskQueue: RefGauge[Int] = factory.refGauge(prefix :+ "queue", 0)
   }
 
   val Finalization: Int = 0

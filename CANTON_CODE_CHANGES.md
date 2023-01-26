@@ -7,6 +7,10 @@ make to the Canton file copies before then,
 to know which and/or what changes we'll need to upstream before the switch.
 
 # Changes
+
+NOTE: please refrain from creating extra files in the Canton code fork, as our fork update procedure
+cannot distinguish them from actual deletions of files by the Canton team.
+
 ## Methods or classes with changed visibility
 * `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`, 
     `MetricsFactory.registerReporter`, `BaseIntegrationTest` made public

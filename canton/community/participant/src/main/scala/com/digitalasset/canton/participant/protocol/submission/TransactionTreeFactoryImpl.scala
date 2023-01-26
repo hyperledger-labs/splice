@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -47,7 +47,7 @@ abstract class TransactionTreeFactoryImpl(
     submitterParticipant: ParticipantId,
     domainId: DomainId,
     protocolVersion: ProtocolVersion,
-    contractSerializer: LfContractInst => SerializableRawContractInstance,
+    contractSerializer: (LfContractInst, AgreementText) => SerializableRawContractInstance,
     packageInfoService: PackageInfoService,
     cryptoOps: HashOps with HmacOps,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -348,7 +348,8 @@ abstract class TransactionTreeFactoryImpl(
           Predef.identity,
         )
     )
-    val serializedCantonContractInst = contractSerializer(cantonContractInst)
+    val serializedCantonContractInst =
+      contractSerializer(cantonContractInst, AgreementText(createNode.agreementText))
 
     val discriminator = createNode.coid match {
       case LfContractId.V1(discriminator, suffix) if suffix.isEmpty =>
@@ -520,36 +521,24 @@ object TransactionTreeFactoryImpl {
       packageService: PackageInfoService,
       uniqueContractKeys: Boolean,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ex: ExecutionContext): TransactionTreeFactoryImpl = {
-    if (protocolVersion >= ProtocolVersion.v3) {
-      new TransactionTreeFactoryImplV3(
-        submitterParticipant,
-        domainId,
-        protocolVersion,
-        contractSerializer,
-        packageService,
-        cryptoOps,
-        uniqueContractKeys,
-        loggerFactory,
-      )
-    } else {
-      new TransactionTreeFactoryImplV2(
-        submitterParticipant,
-        domainId,
-        protocolVersion,
-        contractSerializer,
-        packageService,
-        cryptoOps,
-        loggerFactory,
-      )
-    }
-  }
+  )(implicit ex: ExecutionContext): TransactionTreeFactoryImpl =
+    new TransactionTreeFactoryImplV3(
+      submitterParticipant,
+      domainId,
+      protocolVersion,
+      contractSerializer,
+      packageService,
+      cryptoOps,
+      uniqueContractKeys,
+      loggerFactory,
+    )
 
   private[submission] def contractSerializer(
-      contractInst: LfContractInst
+      contractInst: LfContractInst,
+      agreementText: AgreementText,
   ): SerializableRawContractInstance =
     SerializableRawContractInstance
-      .create(contractInst)
+      .create(contractInst, agreementText)
       .leftMap { err: ValueCoder.EncodeError =>
         throw new IllegalArgumentException(
           s"Unable to serialize contract instance, although it is contained in a well-formed transaction.\n$err\n$contractInst"

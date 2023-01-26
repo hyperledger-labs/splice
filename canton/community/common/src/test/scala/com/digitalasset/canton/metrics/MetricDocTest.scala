@@ -1,9 +1,8 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
 
-import com.codahale.metrics
 import com.daml.metrics.api.MetricDoc
 import com.daml.metrics.api.MetricDoc.MetricQualification.Debug
 import com.daml.metrics.api.noop.NoOpTimer
@@ -13,7 +12,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class MetricDocTest extends AnyWordSpec with BaseTest {
 
-  lazy val tm = new metrics.Timer()
+  lazy val tm = NoOpTimer("test")
   class DocVar {
     @MetricDoc.Tag("varred summary", "varred desc", Debug)
     val varred = NoOpTimer("varred")

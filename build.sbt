@@ -232,6 +232,7 @@ lazy val `apps-validator` =
 
         val log = streams.value.log
         val cacheDir = streams.value.cacheDirectory
+        val commonSpec = baseDirectory.value / "../../common/src/main/openapi/common.yaml"
         val validatorSpec = baseDirectory.value / "src/main/openapi/validator.yaml"
         val cache = FileFunction.cached(cacheDir) { _ =>
           runCommand(
@@ -269,7 +270,7 @@ lazy val `apps-validator` =
           packageJson.overwrite(updated.spaces2)
           ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
         }
-        cache(Set(validatorSpec))
+        cache(Set(validatorSpec, commonSpec))
         // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
         Seq()
       }.taskValue,
@@ -329,6 +330,7 @@ lazy val `apps-common-frontend` = {
       `apps-directory`,
       `apps-wallet`,
       `apps-splitwise`,
+      `apps-validator`,
     )
     .settings(
       // daml typescript code generation settings:
@@ -353,6 +355,7 @@ lazy val `apps-common-frontend` = {
         (Compile / compile).value
         (`apps-common-frontend-protobuf` / Compile / compile).value
         (`apps-common-frontend-openapi` / Compile / compile).value
+        (`apps-validator` / Compile / compile).value
         val log = streams.value.log
         val cacheDir = streams.value.cacheDirectory
         val sourceFiles =

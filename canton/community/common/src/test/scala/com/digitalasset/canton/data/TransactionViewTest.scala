@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -19,7 +19,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
   val hashOps: HashOps = factory.cryptoOps
 
   val contractInst = ExampleTransactionFactory.contractInstance()
-  val serContractInst = ExampleTransactionFactory.asSerializableRaw(contractInst)
+  val serContractInst = ExampleTransactionFactory.asSerializableRaw(contractInst, "")
 
   val cantonContractIdVersion: CantonContractIdVersion =
     CantonContractIdVersion.fromProtocolVersion(testedProtocolVersion)

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -13,11 +13,12 @@ import org.slf4j
   */
 class LogReporter extends Reporter {
 
-  // Avoiding NamedLoggerFactory.root since that ends up with log messages that lnav interprets
-  // as java_log instead of canton_log.
-  // Specifically, setting name produces a log line of the form
+  // We do not use `NamedLoggerFactory.root` since that ends up with log messages
+  // that lnav interprets as java_log instead of canton_log.
+  // Specifically, setting the name below produces a log line of the form
   // INFO  c.d.c.LogReporter:reporter=scala-test - Starting test run...
-  // and the colon after the class name does not parse in java_log.
+  // and the colon after the class name does not fit lnav's predefined
+  // `java_log` format.
   private[this] val logger: slf4j.Logger =
     NamedLoggerFactory("reporter", "scala-test").getLogger(getClass)
 

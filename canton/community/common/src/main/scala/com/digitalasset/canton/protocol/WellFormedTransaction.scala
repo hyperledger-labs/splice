@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -422,7 +422,7 @@ object WellFormedTransaction {
       case (nodeId, create: LfNodeCreate) =>
         Checked.fromEitherNonabort(())(
           SerializableRawContractInstance
-            .create(create.versionedCoinst)
+            .create(create.versionedCoinst, AgreementText(create.agreementText))
             .leftMap(err =>
               show"unable to serialize contract instance in node $nodeId: ${err.errorMessage.unquoted}"
             )

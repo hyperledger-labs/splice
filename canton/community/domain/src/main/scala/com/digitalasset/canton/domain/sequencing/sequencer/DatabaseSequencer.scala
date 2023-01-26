@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing.sequencer
@@ -6,9 +6,10 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import akka.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.*
@@ -17,6 +18,7 @@ import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.scheduler.PruningScheduler
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
   SendAsyncError,
@@ -40,6 +42,7 @@ import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.functionmeta.functionFullName
 import io.opentelemetry.api.trace.Tracer
+import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -83,6 +86,7 @@ object DatabaseSequencer {
       timeouts,
       storage,
       None,
+      None,
       clock,
       domainId,
       topologyClientMember,
@@ -102,6 +106,7 @@ class DatabaseSequencer(
     onlineSequencerCheckConfig: OnlineSequencerCheckConfig,
     override protected val timeouts: ProcessingTimeout,
     storage: Storage,
+    exclusiveStorage: Option[Storage],
     health: Option[SequencerHealthConfig],
     clock: Clock,
     domainId: DomainId,
@@ -118,14 +123,6 @@ class DatabaseSequencer(
       SignatureVerifier(cryptoApi),
     )
     with FlagCloseable {
-  private val store: SequencerStore =
-    SequencerStore(
-      storage,
-      protocolVersion,
-      config.writer.maxSqlInListSize,
-      timeouts,
-      loggerFactory,
-    )
 
   private val writer = SequencerWriter(
     config.writer,
@@ -134,18 +131,39 @@ class DatabaseSequencer(
     keepAliveInterval,
     timeouts,
     storage,
-    store,
     clock,
     cryptoApi,
     eventSignaller,
     protocolVersion,
     loggerFactory,
   )
+
+  override val pruningScheduler: Option[PruningScheduler] =
+    pruningSchedulerBuilder.map(
+      _(
+        exclusiveStorage.getOrElse(
+          storage // no exclusive storage in non-ha setups
+        )
+      )
+    )
+
   withNewTraceContext { implicit traceContext =>
     timeouts.unbounded.await(s"Waiting for sequencer writer to fully start")(
       writer.startOrLogError()
     )
+
+    pruningScheduler.foreach(ps =>
+      // default wait should be enough since scheduler start only involves single database access
+      timeouts.default.await(
+        s"Waiting for pruning scheduler to start",
+        logFailing = Level.INFO.some, // in case we're shutting down at start-up
+      )(
+        ps.start()
+      )
+    )
   }
+
+  private val store = writer.generalStore
 
   // periodically run the call to mark lagging sequencers as offline
   private def periodicallyMarkLaggingSequencersOffline(
@@ -290,6 +308,13 @@ class DatabaseSequencer(
       result <- store.prune(requestedTimestamp, status, config.writer.payloadToEventMargin)
     } yield result
 
+  override def locatePruningTimestamp(index: PositiveInt)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, PruningSupportError, Option[CantonTimestamp]] =
+    EitherT.right[PruningSupportError](
+      store.locatePruningTimestamp(NonNegativeInt.tryCreate(index.value - 1))
+    )
+
   override def snapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): EitherT[Future, String, SequencerSnapshot] =
@@ -302,6 +327,8 @@ class DatabaseSequencer(
   override def onClosed(): Unit = {
     super.onClosed()
     Lifecycle.close(
+      () => pruningScheduler foreach (Lifecycle.close(_)(logger)),
+      () => exclusiveStorage foreach (Lifecycle.close(_)(logger)),
       writer,
       reader,
       eventSignaller,

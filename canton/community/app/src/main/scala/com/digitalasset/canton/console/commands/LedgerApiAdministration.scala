@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -6,12 +6,11 @@ package com.digitalasset.canton.console.commands
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.codahale.metrics.MetricRegistry
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.api.v1.admin.package_management_service.PackageDetails
 import com.daml.ledger.api.v1.admin.party_management_service.PartyDetails as ProtoPartyDetails
 import com.daml.ledger.api.v1.command_completion_service.Checkpoint
-import com.daml.ledger.api.v1.commands.Command
+import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v1.completion.Completion
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_configuration_service.LedgerConfiguration
@@ -19,7 +18,6 @@ import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, TransactionFilter}
 import com.daml.ledger.client.binding.{Contract, Primitive as P, TemplateCompanion}
-import com.daml.ledger.javaapi
 import com.daml.metrics.api.MetricHandle.{Histogram, Meter}
 import com.daml.metrics.api.{MetricName, MetricsContext}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
@@ -55,11 +53,12 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
   RemoteParticipantReference,
 }
+import com.daml.ledger.javaapi
+import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, JavaDecodeUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.metrics.MetricHandle
+import com.digitalasset.canton.metrics.MetricHandle.MetricsFactory
 import com.digitalasset.canton.networking.grpc.{GrpcError, RecordingStreamObserver}
-import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, JavaDecodeUtil}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.NoTracing
@@ -283,17 +282,16 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
           val metricName = MetricName(name, metricSuffix)
 
-          val observer: StreamObserver[TransactionTree] = new StreamObserver[TransactionTree]
-            with MetricHandle.Factory {
+          val observer: StreamObserver[TransactionTree] = new StreamObserver[TransactionTree] {
 
-            override def prefix: MetricName = MetricName(name)
+            def prefix: MetricName = MetricName(name)
 
-            override def registry: MetricRegistry =
-              consoleEnvironment.environment.metricsFactory.registry
+            val metricsFactory: MetricsFactory =
+              consoleEnvironment.environment.metricsFactory.metricsFactory
 
-            val metric: Meter = meter(metricName)
-            val nodeCount: Histogram = histogram(metricName :+ "tx-node-count")
-            val transactionSize: Histogram = histogram(metricName :+ "tx-size")
+            val metric: Meter = metricsFactory.meter(metricName)
+            val nodeCount: Histogram = metricsFactory.histogram(metricName :+ "tx-node-count")
+            val transactionSize: Histogram = metricsFactory.histogram(metricName :+ "tx-size")
 
             override def onNext(tree: TransactionTree): Unit = {
               val s = tree.rootEventIds.size.toLong
@@ -384,6 +382,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
           applicationId: String = LedgerApiCommands.defaultApplicationId,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
       ): TransactionTree = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -397,6 +396,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               deduplicationPeriod,
               submissionId,
               minLedgerTimeAbs,
+              disclosedContracts,
             )
           )
         }
@@ -429,6 +429,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
           applicationId: String = LedgerApiCommands.defaultApplicationId,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
       ): TransactionTree = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -442,6 +443,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               deduplicationPeriod,
               submissionId,
               minLedgerTimeAbs,
+              disclosedContracts,
             )
           )
         }
@@ -474,6 +476,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
           applicationId: String = LedgerApiCommands.defaultApplicationId,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
       ): Transaction = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -487,6 +490,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               deduplicationPeriod,
               submissionId,
               minLedgerTimeAbs,
+              disclosedContracts,
             )
           )
         }
@@ -508,6 +512,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
           applicationId: String = LedgerApiCommands.defaultApplicationId,
+          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
       ): Unit = check(FeatureFlag.Testing) {
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -521,6 +526,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               deduplicationPeriod,
               submissionId,
               minLedgerTimeAbs,
+              disclosedContracts,
             )
           )
         }

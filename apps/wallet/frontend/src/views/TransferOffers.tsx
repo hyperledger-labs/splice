@@ -41,7 +41,7 @@ const OTimeUnits = {
   minutes: 'Minutes',
   hours: 'Hours',
 } as const;
-type TimeUnits = typeof OTimeUnits[keyof typeof OTimeUnits];
+type TimeUnits = (typeof OTimeUnits)[keyof typeof OTimeUnits];
 
 const TransferOffers: React.FC = () => {
   const {

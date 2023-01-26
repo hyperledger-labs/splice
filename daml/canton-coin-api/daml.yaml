@@ -1,4 +1,4 @@
-sdk-version: 2.6.0-snapshot.20221212.11134.0.1ac41995
+sdk-version: 2.6.0-snapshot.20230116.11260.0.94327f5d
 name: canton-coin-api
 source: daml
 version: 0.1.0

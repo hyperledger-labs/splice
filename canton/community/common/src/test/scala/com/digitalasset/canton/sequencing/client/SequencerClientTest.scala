@@ -1,11 +1,10 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
 import cats.syntax.foldable.*
-import com.codahale.metrics.MetricRegistry
 import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
@@ -21,6 +20,7 @@ import com.digitalasset.canton.crypto.{Hash, HashPurpose, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerClientMetrics}
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.protocol.{DomainParametersLookup, TestDomainParameters}
@@ -77,7 +77,10 @@ import scala.util.{Failure, Success}
 class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorService {
 
   lazy val metrics =
-    new SequencerClientMetrics(MetricName("SequencerClientTest"), new MetricRegistry())
+    new SequencerClientMetrics(
+      MetricName("SequencerClientTest"),
+      NoOpMetricsFactory,
+    )
   lazy val deliver: Deliver[Nothing] =
     SequencerTestUtils.mockDeliver(
       42,

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -7,8 +7,8 @@ import com.codahale.metrics
 import com.codahale.metrics.{Metric, MetricFilter}
 import com.daml.metrics.api.opentelemetry.OpenTelemetryFactory
 import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.daml.metrics.grpc.{DamlGrpcServerMetrics, GrpcServerMetrics}
-import com.daml.metrics.{JvmMetricSet, OpenTelemetryMeterOwner}
+import com.daml.metrics.grpc.DamlGrpcServerMetrics
+import com.daml.metrics.{ExecutorServiceMetrics, JvmMetricSet, OpenTelemetryMeterOwner}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.domain.metrics.{
@@ -17,6 +17,7 @@ import com.digitalasset.canton.domain.metrics.{
   MediatorNodeMetrics,
   SequencerMetrics,
 }
+import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 import com.digitalasset.canton.metrics.MetricsConfig.MetricsFilterConfig
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -30,7 +31,6 @@ import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import scala.annotation.nowarn
-import scala.collection.concurrent
 import scala.collection.concurrent.TrieMap
 
 case class MetricsConfig(
@@ -98,7 +98,14 @@ object MetricsConfig {
   }
 }
 
-trait MetricsFactoryBase extends AutoCloseable {
+// Canton fork note: we are using a few hacky changes in the code below to allow inheriting from this class
+// and specializing it for the coin app.
+class MetricsFactory(
+    reporters: Seq[metrics.Reporter],
+    registry: metrics.MetricRegistry,
+    reportJVMMetrics: Boolean,
+    meter: Meter,
+) extends AutoCloseable {
 
   private val openTelemetryFactory = new OpenTelemetryFactory(meter) {
     override val globalMetricsContext: MetricsContext = MetricsContext(
@@ -106,21 +113,20 @@ trait MetricsFactoryBase extends AutoCloseable {
       "canton_version" -> BuildInfo.version,
     )
   }
-
-  def reporters: Seq[metrics.Reporter]
-
-  def registry: metrics.MetricRegistry
-
-  def reportJVMMetrics: Boolean
-
-  def meter: Meter
-
-  protected def allNodeMetrics: Seq[concurrent.Map[String, _]]
-
-  protected def nodeMetricsExcept(
-      toExclude: concurrent.Map[String, _]
-  ): Seq[concurrent.Map[String, _]] =
+  val metricsFactory = new CantonDropwizardMetricsFactory(registry)
+  private val envMetrics = new EnvMetrics(metricsFactory)
+  private val participants = TrieMap[String, ParticipantMetrics]()
+  private val domains = TrieMap[String, DomainMetrics]()
+  private val sequencers = TrieMap[String, SequencerMetrics]()
+  private val mediators = TrieMap[String, MediatorNodeMetrics]()
+  protected def allNodeMetrics: Seq[TrieMap[String, _]] =
+    Seq(participants, domains, sequencers, mediators)
+  private def nodeMetricsExcept(toExclude: TrieMap[String, _]): Seq[TrieMap[String, _]] =
     allNodeMetrics filterNot (_ eq toExclude)
+
+  val executionServiceMetrics: ExecutorServiceMetrics = new ExecutorServiceMetrics(
+    openTelemetryFactory
+  )
 
   object benchmark extends MetricsGroup(MetricName(MetricsFactory.prefix :+ "benchmark"), registry)
 
@@ -131,96 +137,25 @@ trait MetricsFactoryBase extends AutoCloseable {
     registry.registerAll(new JvmMetricSet) // register Daml repo JvmMetricSet
   }
 
-  protected def newRegistry(prefix: String): metrics.MetricRegistry = {
+  protected def newRegistry(prefix: String): CantonDropwizardMetricsFactory = {
     val nested = new metrics.MetricRegistry()
     registry.register(prefix, nested)
-    nested
+    new CantonDropwizardMetricsFactory(nested)
   }
 
-  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
-    */
-  protected def deduplicateName(
-      name: String,
-      nodeType: String,
-      nodesToExclude: TrieMap[String, _],
-  ): String =
-    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
-      s"$nodeType-$name"
-    else name
-
-  def grpcMetricsForComponent(component: String): GrpcServerMetrics =
-    new DamlGrpcServerMetrics(openTelemetryFactory, component)
-
-  override def close(): Unit = reporters.foreach(_.close())
-}
-
-//case class MetricsFactory(
-//    reporters: Seq[metrics.Reporter],
-//    registry: metrics.MetricRegistry,
-//    reportJVMMetrics: Boolean,
-//    meter: Meter,
-//) extends AutoCloseable {
-//
-//  private val envMetrics = new EnvMetrics(registry)
-//  private val participants = TrieMap[String, ParticipantMetrics]()
-//  private val domains = TrieMap[String, DomainMetrics]()
-//  private val sequencers = TrieMap[String, SequencerMetrics]()
-//  private val mediators = TrieMap[String, MediatorNodeMetrics]()
-//  private val allNodeMetrics: Seq[TrieMap[String, _]] =
-//    Seq(participants, domains, sequencers, mediators)
-//  private def nodeMetricsExcept(toExclude: TrieMap[String, _]): Seq[TrieMap[String, _]] =
-//    allNodeMetrics filterNot (_ eq toExclude)
-//
-//  object benchmark extends MetricsGroup(MetricName(MetricsFactory.prefix :+ "benchmark"), registry)
-//
-//  object health extends HealthMetrics(MetricName(MetricsFactory.prefix :+ "health"), registry)
-//
-//  // add default, system wide metrics to the metrics reporter
-//  if (reportJVMMetrics) {
-//    registry.registerAll(new JvmMetricSet) // register Daml repo JvmMetricSet
-//  }
-//
-//  protected def newRegistry(prefix: String): metrics.MetricRegistry = {
-//    val nested = new metrics.MetricRegistry()
-//    registry.register(prefix, nested)
-//    nested
-//  }
-//
-//  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
-//    */
-//  protected def deduplicateName(
-//      name: String,
-//      nodeType: String,
-//      nodesToExclude: TrieMap[String, _],
-//  ): String =
-//    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
-//      s"$nodeType-$name"
-//    else name
-//
-//  override def close(): Unit = reporters.foreach(_.close())
-//}
-
-case class MetricsFactory(
-    reporters: Seq[metrics.Reporter],
-    registry: metrics.MetricRegistry,
-    reportJVMMetrics: Boolean,
-    meter: Meter,
-) extends AutoCloseable
-    with MetricsFactoryBase {
-
-  private val envMetrics = new EnvMetrics(registry)
-  private val participants = TrieMap[String, ParticipantMetrics]()
-  private val domains = TrieMap[String, DomainMetrics]()
-  private val sequencers = TrieMap[String, SequencerMetrics]()
-  private val mediators = TrieMap[String, MediatorNodeMetrics]()
-  override protected val allNodeMetrics: Seq[TrieMap[String, _]] =
-    Seq(participants, domains, sequencers, mediators)
+  protected def grpcMetricsForComponent(name: String): DamlGrpcServerMetrics =
+    new DamlGrpcServerMetrics(openTelemetryFactory, name)
 
   def forParticipant(name: String): ParticipantMetrics = {
     participants.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "participant", participants)
-        new ParticipantMetrics(MetricsFactory.prefix, newRegistry(metricName), meter)
+        new ParticipantMetrics(
+          name,
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          openTelemetryFactory,
+        )
       },
     )
   }
@@ -234,7 +169,7 @@ case class MetricsFactory(
         new DomainMetrics(
           MetricsFactory.prefix,
           newRegistry(metricName),
-          grpcMetricsForComponent("domain"),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "domain"),
         )
       },
     )
@@ -247,7 +182,7 @@ case class MetricsFactory(
         new SequencerMetrics(
           MetricsFactory.prefix,
           newRegistry(metricName),
-          grpcMetricsForComponent("sequencer"),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "sequencer"),
         )
       },
     )
@@ -260,11 +195,22 @@ case class MetricsFactory(
         new MediatorNodeMetrics(
           MetricsFactory.prefix,
           newRegistry(metricName),
-          grpcMetricsForComponent("mediator"),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "mediator"),
         )
       },
     )
   }
+
+  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
+    */
+  protected def deduplicateName(
+      name: String,
+      nodeType: String,
+      nodesToExclude: TrieMap[String, _],
+  ): String =
+    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
+      s"$nodeType-$name"
+    else name
 
   /** returns the documented metrics by possibly creating fake participants / domains */
   def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item]) = {
@@ -289,6 +235,9 @@ case class MetricsFactory(
     // the fake instances are fine here as we do this anyway only when we build and export the docs
     (sorted(participantItems ++ clientMetrics), sorted(domainMetrics))
   }
+
+  override def close(): Unit = reporters.foreach(_.close())
+
 }
 
 object MetricsFactory extends LazyLogging {

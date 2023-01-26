@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.mediator
@@ -44,6 +44,9 @@ trait MediatorRuntime extends FlagCloseable {
 
   def timeService: ServerServiceDefinition
   def enterpriseAdministrationService: ServerServiceDefinition
+
+  def start()(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
+    mediator.start()
 
   override protected def onClosed(): Unit = mediator.close()
 }

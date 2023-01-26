@@ -1,10 +1,10 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.block
 
-import akka.stream.KillSwitch
 import akka.stream.scaladsl.Source
+import akka.stream.{KillSwitch, Materializer}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.TimeProvider
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
@@ -45,17 +45,25 @@ trait SequencerDriverFactory {
     * @param timeProvider Time provider to obtain time readings from.
     *                     If [[usesTimeProvider]] returns true, must be used instead of system time
     *                     so that we can modify time in tests
+    * @param firstBlockHeight Initial block from which the driver will start serving the block subscription.
     * @param loggerFactory A logger factory through which all logging should be done.
     *                      Useful in tests as we can capture log entries and check them.
     */
-  def create(config: ConfigType, timeProvider: TimeProvider, loggerFactory: NamedLoggerFactory)(
-      implicit executionContext: ExecutionContext
+  def create(
+      config: ConfigType,
+      timeProvider: TimeProvider,
+      firstBlockHeight: Option[Long],
+      domainTopologyManagerId: String,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      executionContext: ExecutionContext,
+      materializer: Materializer,
   ): SequencerDriver
 
-  /** Returns whether the [[SequencerDriver]] produced by [[create]] will use the [[com.digitalasset.canton.time.TimeProvider]]
+  /** Returns whether the driver produced by [[create]] will use the [[com.digitalasset.canton.time.TimeProvider]]
     * for generating timestamps on [[com.digitalasset.canton.domain.block.RawLedgerBlock.RawBlockEvent.Send]] events.
     *
-    * This information is used to prevent using the [[SequencerDriver]] in an environment
+    * This information is used to prevent using the driver in an environment
     * that needs to control time, e.g., for testing.
     */
   def usesTimeProvider: Boolean
@@ -110,7 +118,9 @@ trait SequencerDriver extends AutoCloseable {
   /** Register the given member.
     * Results in a [[com.digitalasset.canton.domain.block.RawLedgerBlock.RawBlockEvent.AddMember]].
     */
-  def registerMember(member: String)(implicit traceContext: TraceContext): Future[Unit]
+  def registerMember(member: String)(implicit
+      traceContext: TraceContext
+  ): Future[Unit]
 
   /** Distribute an acknowledgement request.
     * Results in a [[com.digitalasset.canton.domain.block.RawLedgerBlock.RawBlockEvent.Acknowledgment]].
@@ -124,7 +134,8 @@ trait SequencerDriver extends AutoCloseable {
 
   // Read operations
 
-  /** Delivers a stream of blocks starting with `firstBlockHeight` (if specified) or the first block serveable.
+  /** Delivers a stream of blocks starting with `firstBlockHeight` (if specified in the factory call)
+    * or the first block serveable.
     * Block heights must be consecutive.
     *
     * Fails if `firstBlockHeight` refers to a block whose sequencing the sequencer node has not yet observed
@@ -132,8 +143,12 @@ trait SequencerDriver extends AutoCloseable {
     *
     * Must succeed if an earlier call to `subscribe` delivered a block with height `firstBlockHeight`
     * unless the block has been pruned in between.
+    *
+    * This method will be called only once, so implementations do not have to try to create separate sources
+    * on every call to this method. It is acceptable to for the driver to have one internal source and just return
+    * it here.
     */
-  def subscribe(firstBlockHeight: Option[Long])(implicit
+  def subscribe()(implicit
       traceContext: TraceContext
   ): Source[RawLedgerBlock, KillSwitch]
 
@@ -141,6 +156,10 @@ trait SequencerDriver extends AutoCloseable {
 
   def health(implicit traceContext: TraceContext): Future[SequencerDriverHealthStatus]
 
+}
+
+object SequencerDriver {
+  val DefaultInitialBlockHeight = -1L
 }
 
 /** A block that a [[SequencerDriver]] delivers to the sequencer node.

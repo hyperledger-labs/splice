@@ -1,10 +1,11 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
 
 import cats.syntax.either.*
 import com.daml.lf.transaction.{TransactionCoder, TransactionOuterClass}
+import com.daml.lf.value.Value.ContractInstanceWithAgreement
 import com.daml.lf.value.ValueCoder
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -16,6 +17,8 @@ import com.digitalasset.canton.serialization.{
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
+import monocle.Lens
+import monocle.macros.GenLens
 import slick.jdbc.{GetResult, SetParameter}
 
 /** Represents a serializable contract instance and memoizes the serialization.
@@ -25,7 +28,11 @@ import slick.jdbc.{GetResult, SetParameter}
   *                         the given contract instance. If [[None]],
   *                         the serialization is produced by [[TransactionCoder.encodeContractInstance]].
   */
-case class SerializableRawContractInstance private (contractInstance: LfContractInst)(
+case class SerializableRawContractInstance private (
+    contractInstance: LfContractInst,
+    // Keeping this in the serializable instance for historical reasons
+    agreementText: AgreementText,
+)(
     override val deserializedFrom: Option[ByteString]
 ) extends MemoizedEvidenceWithFailure[ValueCoder.EncodeError] {
 
@@ -34,7 +41,10 @@ case class SerializableRawContractInstance private (contractInstance: LfContract
   @throws[SerializationCheckFailed[ValueCoder.EncodeError]]
   protected[this] override def toByteStringChecked: Either[ValueCoder.EncodeError, ByteString] =
     TransactionCoder
-      .encodeContractInstance(ValueCoder.CidEncoder, contractInstance)
+      .encodeContractInstance(
+        ValueCoder.CidEncoder,
+        contractInstance.map(ContractInstanceWithAgreement(_, agreementText.v)),
+      )
       .map(_.toByteString)
 
   lazy val contractHash: LfHash =
@@ -42,9 +52,24 @@ case class SerializableRawContractInstance private (contractInstance: LfContract
       contractInstance.unversioned.template,
       contractInstance.unversioned.arg,
     )
+
+  private def copy(
+      contractInstance: LfContractInst = this.contractInstance,
+      agreementText: AgreementText = this.agreementText,
+  ): SerializableRawContractInstance =
+    SerializableRawContractInstance(contractInstance, agreementText)(None)
 }
 
 object SerializableRawContractInstance {
+
+  @VisibleForTesting
+  lazy val contractInstanceUnsafe: Lens[SerializableRawContractInstance, LfContractInst] =
+    GenLens[SerializableRawContractInstance](_.contractInstance)
+
+  @VisibleForTesting
+  lazy val agreementTextUnsafe: Lens[SerializableRawContractInstance, AgreementText] =
+    GenLens[SerializableRawContractInstance](_.agreementText)
+
   implicit def contractGetResult(implicit
       getResultByteArray: GetResult[Array[Byte]]
   ): GetResult[SerializableRawContractInstance] = GetResult { r =>
@@ -59,10 +84,11 @@ object SerializableRawContractInstance {
     pp >> c.getCryptographicEvidence.toByteArray
 
   def create(
-      contractInstance: LfContractInst
+      contractInstance: LfContractInst,
+      agreementText: AgreementText,
   ): Either[ValueCoder.EncodeError, SerializableRawContractInstance] =
     try {
-      Right(new SerializableRawContractInstance(contractInstance)(None))
+      Right(new SerializableRawContractInstance(contractInstance, agreementText)(None))
     } catch {
       case SerializationCheckFailed(err: ValueCoder.EncodeError) => Left(err)
     }
@@ -78,14 +104,18 @@ object SerializableRawContractInstance {
       contractInstanceP <- ProtoConverter.protoParser(
         TransactionOuterClass.ContractInstance.parseFrom
       )(bytes)
-      contractInstance <- TransactionCoder
+      contractInstanceAndAgreementText <- TransactionCoder
         .decodeVersionedContractInstance(ValueCoder.CidDecoder, contractInstanceP)
         .leftMap(error => ValueConversionError("", error.toString))
-    } yield createWithSerialization(contractInstance)(bytes)
+      ContractInstanceWithAgreement(_, agreementText) = contractInstanceAndAgreementText.unversioned
+    } yield createWithSerialization(
+      contractInstanceAndAgreementText.map(_.contractInstance),
+      AgreementText(agreementText),
+    )(bytes)
 
   @VisibleForTesting
-  def createWithSerialization(contractInst: LfContractInst)(
+  def createWithSerialization(contractInst: LfContractInst, agreementText: AgreementText)(
       deserializedFrom: ByteString
   ): SerializableRawContractInstance =
-    new SerializableRawContractInstance(contractInst)(Some(deserializedFrom))
+    new SerializableRawContractInstance(contractInst, agreementText)(Some(deserializedFrom))
 }

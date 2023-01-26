@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing.sequencer.store
@@ -12,6 +12,7 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.SequencerCounter
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore.CheckpointDataAtCounter
@@ -27,7 +28,6 @@ import com.google.protobuf.ByteString
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
-import scala.Ordering.Implicits.*
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ExecutionContext, Future}
@@ -334,6 +334,13 @@ class InMemorySequencerStore(protected val loggerFactory: NamedLoggerFactory)(im
     }
 
     removedCheckpointsCounter.get()
+  }
+
+  override def locatePruningTimestamp(skip: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): Future[Option[CantonTimestamp]] = Future.successful {
+    import scala.jdk.OptionConverters.*
+    events.keySet().stream().skip(skip.value.toLong).findFirst().toScala
   }
 
   override protected[store] def adjustPruningTimestampForCounterCheckpoints(

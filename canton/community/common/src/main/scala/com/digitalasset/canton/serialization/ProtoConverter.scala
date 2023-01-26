@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.serialization
@@ -13,7 +13,8 @@ import com.digitalasset.canton.ProtoDeserializationError.{
   StringConversionError,
   TimestampConversionError,
 }
-import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError}
+import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.{LedgerTransactionId, LfPartyId, ProtoDeserializationError}
 import com.google.protobuf.timestamp.Timestamp
 import com.google.protobuf.{ByteString, CodedInputStream, InvalidProtocolBufferException}
 
@@ -92,9 +93,14 @@ object ProtoConverter {
       parsed <- contentNE.toNEF.traverse(fromProto)
     } yield parsed
 
-  def parseLfPartyId(party: String): Either[StringConversionError, LfPartyId] =
+  def parseLfPartyId(party: String): ParsingResult[LfPartyId] =
     LfPartyId.fromString(party).leftMap(StringConversionError)
 
+  def parseLedgerTransactionId(id: String): ParsingResult[LedgerTransactionId] =
+    LedgerTransactionId.fromString(id).leftMap(StringConversionError)
+
+  def parseLfContractId(id: String): ParsingResult[LfContractId] =
+    LfContractId.fromString(id).leftMap(StringConversionError)
   object InstantConverter extends ProtoConverter[Instant, Timestamp, ProtoDeserializationError] {
     override def toProtoPrimitive(value: Instant): Timestamp =
       Timestamp(value.getEpochSecond, value.getNano)

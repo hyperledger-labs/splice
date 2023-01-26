@@ -316,6 +316,7 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          daml_error,
           daml_telemetry,
           daml_lf_data,
           daml_lf_nonempty_cats,
@@ -484,6 +485,7 @@ object BuildCommon {
           daml_test_evidence_tag % Test,
           daml_test_evidence_scalatest % Test,
           daml_test_evidence_generator_scalatest % Test,
+          daml_metrics_test_lib % Test,
           better_files,
           cats,
           cats_law % Test,

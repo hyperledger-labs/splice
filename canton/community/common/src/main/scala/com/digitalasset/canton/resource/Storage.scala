@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
@@ -438,8 +438,8 @@ object DbStorage {
     }
 
     implicit val absCoidGetResult: GetResult[LfContractId] = GetResult(r =>
-      LfContractId
-        .fromProtoPrimitive(r.nextString())
+      ProtoConverter
+        .parseLfContractId(r.nextString())
         .fold(err => throw new DbDeserializationException(err.toString), Predef.identity)
     )
     implicit val absCoidSetParameter: SetParameter[LfContractId] =

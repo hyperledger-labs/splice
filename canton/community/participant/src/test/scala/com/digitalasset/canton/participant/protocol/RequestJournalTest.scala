@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -11,6 +11,7 @@ import cats.syntax.parallel.*
 import com.codahale.metrics.MetricRegistry
 import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 import com.digitalasset.canton.participant.metrics.SyncDomainMetrics
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestState.*
 import com.digitalasset.canton.participant.protocol.RequestJournal.{
@@ -45,7 +46,10 @@ class RequestJournalTest extends AsyncWordSpec with BaseTest {
   }
 
   private def mkSyncDomainMetrics = {
-    new SyncDomainMetrics(MetricName(getClass.getSimpleName), new MetricRegistry())
+    new SyncDomainMetrics(
+      MetricName(getClass.getSimpleName),
+      new CantonDropwizardMetricsFactory(new MetricRegistry),
+    )
   }
 
   def insertWithCursor(

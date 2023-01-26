@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
 import com.daml.metrics.grpc.GrpcServerMetrics
+import com.daml.network.CoinNodeMetrics
 import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.v0.VersionServiceGrpc
@@ -17,7 +18,6 @@ import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
 import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
 import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.time.Clock
@@ -83,7 +83,7 @@ abstract class CoinNodeBootstrapBase[
     config: NodeConfig,
     parameterConfig: ParameterConfig,
     val clock: Clock,
-    nodeMetrics: NodeMetrics,
+    nodeMetrics: CoinNodeMetrics,
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
@@ -170,12 +170,13 @@ abstract class CoinNodeBootstrapBase[
     val builder = CantonServerBuilder
       .forConfig(
         adminApiConfig,
-        nodeMetrics,
+        nodeMetrics.prefix,
+        nodeMetrics.dropwizardFactory,
         executionContext,
         loggerFactory,
         parameterConfig.loggingConfig.api,
         parameterConfig.tracing,
-        grpcMetrics,
+        nodeMetrics.grpcMetrics,
       )
 
     val registry = builder.mutableHandlerRegistry()

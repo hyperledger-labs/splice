@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission.routing
@@ -120,5 +120,5 @@ private[routing] final case class DomainRank(
 private[routing] object DomainRank {
   // The highest priority domain should be picked first, so negate the priority
   implicit val domainRanking: Ordering[DomainRank] =
-    Ordering.by(x => (x.transfers.size, -x.priority, x.domainId))
+    Ordering.by(x => (-x.priority, x.transfers.size, x.domainId))
 }

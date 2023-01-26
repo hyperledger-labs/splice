@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -223,7 +223,10 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       CantonOnly.newDamlEngine(uniqueContractKeys = false, enableLfDev = false),
       syncDomainStateFactory,
       new SimClock(loggerFactory = loggerFactory),
-      new ResourceManagementService.CommunityResourceManagementService(None),
+      new ResourceManagementService.CommunityResourceManagementService(
+        None,
+        ParticipantTestMetrics,
+      ),
       LocalNodeParameters,
       SyncDomain.DefaultFactory,
       indexedStringStore,

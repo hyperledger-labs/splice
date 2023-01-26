@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports.replay
@@ -203,7 +203,7 @@ class ReplayingSendsSequencerClientTransport(
       withResource(new PrintStream(os)) { ps =>
         withResource(
           ConsoleReporter
-            .forRegistry(metrics.registry)
+            .forRegistry(metrics.metricsFactory.registry)
             .filter(MetricFilter.startsWith(metrics.submissions.prefix.toString()))
             .outputTo(ps)
             .build()

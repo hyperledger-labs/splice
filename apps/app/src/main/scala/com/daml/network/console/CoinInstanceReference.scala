@@ -23,7 +23,7 @@ import com.digitalasset.canton.health.admin.data.SimpleStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 
 /** Copy of Canton ParticipantReference */
 trait CoinAppReference extends InstanceReference {
@@ -34,8 +34,6 @@ trait CoinAppReference extends InstanceReference {
 
   override implicit val consoleEnvironment: ConsoleEnvironment = coinConsoleEnvironment
   implicit val coinConsoleEnvironment: CoinConsoleEnvironment
-
-  override type InstanceId = ParticipantId
 
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("Wallet", name)
@@ -52,7 +50,7 @@ trait CoinAppReference extends InstanceReference {
     "Yields the globally unique id of this participant. " +
       "Throws an exception, if the id has not yet been allocated (e.g., the participant has not yet been started)."
   )
-  override def id: InstanceId = topology.idHelper(name, ParticipantId(_))
+  override def id: NodeIdentity = topology.idHelper(name, ParticipantId(_))
 
   private lazy val topology_ =
     new TopologyAdministrationGroup(

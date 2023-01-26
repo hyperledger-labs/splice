@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.admin.grpc
@@ -247,9 +247,13 @@ final case class PrivateKeyMetadata(
     wrapperKeyId: Option[String300],
 ) {
 
+  def id: Fingerprint = publicKey.id
+
   def publicKey: PublicKey = publicKeyWithName.publicKey
 
   def name: Option[KeyName] = publicKeyWithName.name
+
+  def purpose: KeyPurpose = publicKey.purpose
 
   def encrypted: Boolean = wrapperKeyId.isDefined
 

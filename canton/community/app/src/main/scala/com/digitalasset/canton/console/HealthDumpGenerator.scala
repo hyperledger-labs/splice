@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -77,7 +77,7 @@ trait HealthDumpGenerator[Status <: CantonStatus] {
     val cantonVersion = ReleaseVersion.current.fullVersion
     val env = EnvironmentInfo(sys.props("os.name"), javaVersion)
 
-    val metricsSnapshot = MetricsSnapshot(environment.metricsFactory.registry)
+    val metricsSnapshot = MetricsSnapshot(environment.metricsFactory.metricsFactory.registry)
     val config = environment.config.dumpString
 
     val traces = {

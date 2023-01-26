@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -115,7 +115,6 @@ class ParticipantNodeBootstrap(
     resourceManagementServiceFactory: ParticipantSettingsStore => ResourceManagementService,
     replicationServiceFactory: Storage => ServerServiceDefinition,
     allocateIndexerLockIds: DbConfig => Either[String, Option[IndexerLockIds]],
-    isReplicated: Boolean,
     futureSupervisor: FutureSupervisor,
     parentLogger: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
@@ -142,7 +141,9 @@ class ParticipantNodeBootstrap(
       config,
       cantonParameterConfig,
       clock,
-      metrics,
+      metrics.prefix,
+      metrics.dropwizardFactory,
+      metrics.dbStorage,
       storageFactory,
       cryptoPrivateStoreFactory,
       grpcVaultServiceFactory,
@@ -764,7 +765,8 @@ object ParticipantNodeBootstrap {
             (_ledgerApi, _ledgerApiDependentServices) => (),
             _ =>
               new ResourceManagementService.CommunityResourceManagementService(
-                participantConfig.parameters.warnIfOverloadedFor
+                participantConfig.parameters.warnIfOverloadedFor,
+                participantMetrics,
               ),
             _ =>
               StaticGrpcServices
@@ -773,7 +775,6 @@ object ParticipantNodeBootstrap {
                   loggerFactory,
                 ),
             _dbConfig => Option.empty[IndexerLockIds].asRight,
-            isReplicated = false,
             futureSupervisor,
             loggerFactory,
             writeHealthDumpToFile,

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -14,8 +14,6 @@ import com.digitalasset.canton.config.RequireTypes.{
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.store.db.DbDeserializationException
 import slick.jdbc.{GetResult, SetParameter}
-
-import java.time.Instant
 
 /** Participant local identifier used to refer to a Domain without the need to fetch identifying information from a domain.
   * This does not need to be globally unique. Only unique for the participant using it.
@@ -35,11 +33,10 @@ object DomainAlias extends LengthLimitedStringWrapperCompanion[String255, Domain
   implicit val configReader: ConfigReader[DomainAlias] = ConfigReader.fromString(str =>
     create(str).left.map(err => CannotConvert(str, "DomainAlias", err))
   )
+
   implicit val configWriter: ConfigWriter[DomainAlias] =
     ConfigWriter.toString(_.toProtoPrimitive)
 }
-
-case class TimedValue[A](timestamp: Instant, value: A)
 
 /** Command identifier for tracking ledger commands
   * @param id ledger string representing command

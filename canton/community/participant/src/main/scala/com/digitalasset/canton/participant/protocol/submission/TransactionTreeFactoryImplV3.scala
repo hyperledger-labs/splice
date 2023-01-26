@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -39,7 +39,7 @@ class TransactionTreeFactoryImplV3(
     submitterParticipant: ParticipantId,
     domainId: DomainId,
     protocolVersion: ProtocolVersion,
-    contractSerializer: LfContractInst => SerializableRawContractInstance,
+    contractSerializer: (LfContractInst, AgreementText) => SerializableRawContractInstance,
     packageInfoService: PackageInfoService,
     cryptoOps: HashOps with HmacOps,
     uniqueContractKeys: Boolean,

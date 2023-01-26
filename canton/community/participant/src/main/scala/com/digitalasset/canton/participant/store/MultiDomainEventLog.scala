@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -393,7 +393,7 @@ object MultiDomainEventLog {
               eventTraceContext,
             )
           }
-        case LedgerSyncEvent.CommandRejected(recordTime, completionInfo, reason) =>
+        case LedgerSyncEvent.CommandRejected(_recordTime, completionInfo, _reason) =>
           val changeId = completionInfo.changeId
           DeduplicationInfo(
             changeId,

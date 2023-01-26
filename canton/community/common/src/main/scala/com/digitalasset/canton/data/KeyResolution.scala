@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -36,8 +36,8 @@ object SerializableKeyResolution {
   ): ParsingResult[SerializableKeyResolution] =
     resolutionP match {
       case v0.ViewParticipantData.ResolvedKey.Resolution.ContractId(contractIdP) =>
-        LfContractId
-          .fromProtoPrimitive(contractIdP)
+        ProtoConverter
+          .parseLfContractId(contractIdP)
           .map(AssignedKey(_)(version))
       case v0.ViewParticipantData.ResolvedKey.Resolution
             .Free(v0.ViewParticipantData.FreeKey(maintainersP)) =>

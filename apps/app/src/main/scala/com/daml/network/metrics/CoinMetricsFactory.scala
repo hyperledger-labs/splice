@@ -9,7 +9,7 @@ import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
-import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryBase}
+import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory}
 import io.opentelemetry.api.metrics.Meter
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
@@ -20,8 +20,12 @@ case class CoinMetricsFactory(
     registry: metrics.MetricRegistry,
     reportJVMMetrics: Boolean,
     meter: Meter,
-) extends AutoCloseable
-    with MetricsFactoryBase {
+) extends MetricsFactory(
+      reporters,
+      registry,
+      reportJVMMetrics,
+      meter,
+    ) {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svcs = TrieMap[String, SvcAppMetrics]()
   private val svs = TrieMap[String, SvAppMetrics]()
@@ -30,7 +34,8 @@ case class CoinMetricsFactory(
   private val directories = TrieMap[String, DirectoryAppMetrics]()
   private val splitwises = TrieMap[String, SplitwiseAppMetrics]()
 
-  override protected def allNodeMetrics: Seq[TrieMap[String, _]] = Seq(validators)
+  override protected def allNodeMetrics: Seq[TrieMap[String, _]] =
+    Seq(validators, svcs, svs, scans, wallets, directories, splitwises)
 
   def forValidator(name: String): ValidatorAppMetrics = {
     validators.getOrElseUpdate(

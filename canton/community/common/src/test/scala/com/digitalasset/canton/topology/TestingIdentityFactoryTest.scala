@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -226,8 +226,8 @@ class TestingIdentityFactoryTest extends AnyWordSpec with BaseTest with HasExecu
         )
         syncCryptoApi.ipsSnapshot.activeParticipantsOf(party3.toLf).futureValue shouldBe Map()
         syncCryptoApi.ipsSnapshot.activeParticipantsOf(party2.toLf).futureValue shouldBe Map(
-          participant1 -> ol(ParticipantPermission.Observation)
-        ) // TODO(#6685): this should be confirmation
+          participant1 -> ol(ParticipantPermission.Confirmation)
+        )
       }
     }
 
