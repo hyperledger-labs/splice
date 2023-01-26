@@ -19,7 +19,7 @@ $(auth-service):
 	sbt canton-community-participant/compile
 
 .PHONY: clean
-clean: $(foreach image,$(images),cluster/images/$(image)/clean)
+clean: images/clean
 	rm -rf apps/app/target/release
 
 .PHONY: clean-all

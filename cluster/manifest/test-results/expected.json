@@ -7,7 +7,8 @@
          "metadata": {
             "labels": {
                "app": "docs",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "docs"
             },
             "name": "docs"
          },
@@ -25,7 +26,8 @@
                "metadata": {
                   "labels": {
                      "app": "docs",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "docs"
                   }
                },
                "spec": {
@@ -97,7 +99,8 @@
          "metadata": {
             "labels": {
                "app": "gcs-proxy",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "gcs-proxy"
             },
             "name": "gcs-proxy"
          },
@@ -115,7 +118,8 @@
                "metadata": {
                   "labels": {
                      "app": "gcs-proxy",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "gcs-proxy"
                   }
                },
                "spec": {
@@ -298,7 +302,8 @@
          "metadata": {
             "labels": {
                "app": "canton-domain",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "canton-domain"
             },
             "name": "canton-domain"
          },
@@ -316,7 +321,8 @@
                "metadata": {
                   "labels": {
                      "app": "canton-domain",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "canton-domain"
                   }
                },
                "spec": {
@@ -416,7 +422,8 @@
          "metadata": {
             "labels": {
                "app": "svc-participant",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "canton-participant"
             },
             "name": "svc-participant"
          },
@@ -434,7 +441,8 @@
                "metadata": {
                   "labels": {
                      "app": "svc-participant",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "canton-participant"
                   }
                },
                "spec": {
@@ -585,7 +593,8 @@
          "metadata": {
             "labels": {
                "app": "directory-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "directory-app"
             },
             "name": "directory-app"
          },
@@ -603,7 +612,8 @@
                "metadata": {
                   "labels": {
                      "app": "directory-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "directory-app"
                   }
                },
                "spec": {
@@ -715,7 +725,8 @@
          "metadata": {
             "labels": {
                "app": "svc-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "svc-app"
             },
             "name": "svc-app"
          },
@@ -733,7 +744,8 @@
                "metadata": {
                   "labels": {
                      "app": "svc-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "svc-app"
                   }
                },
                "spec": {
@@ -836,7 +848,8 @@
          "metadata": {
             "labels": {
                "app": "sv-app-1",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "sv-app"
             },
             "name": "sv-app-1"
          },
@@ -854,7 +867,8 @@
                "metadata": {
                   "labels": {
                      "app": "sv-app-1",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "sv-app"
                   }
                },
                "spec": {
@@ -965,7 +979,8 @@
          "metadata": {
             "labels": {
                "app": "sv-app-2",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "sv-app"
             },
             "name": "sv-app-2"
          },
@@ -983,7 +998,8 @@
                "metadata": {
                   "labels": {
                      "app": "sv-app-2",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "sv-app"
                   }
                },
                "spec": {
@@ -1090,7 +1106,8 @@
          "metadata": {
             "labels": {
                "app": "sv-app-3",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "sv-app"
             },
             "name": "sv-app-3"
          },
@@ -1108,7 +1125,8 @@
                "metadata": {
                   "labels": {
                      "app": "sv-app-3",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "sv-app"
                   }
                },
                "spec": {
@@ -1215,7 +1233,8 @@
          "metadata": {
             "labels": {
                "app": "sv-app-4",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "sv-app"
             },
             "name": "sv-app-4"
          },
@@ -1233,7 +1252,8 @@
                "metadata": {
                   "labels": {
                      "app": "sv-app-4",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "sv-app"
                   }
                },
                "spec": {
@@ -1340,7 +1360,8 @@
          "metadata": {
             "labels": {
                "app": "scan-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "scan-app"
             },
             "name": "scan-app"
          },
@@ -1358,7 +1379,8 @@
                "metadata": {
                   "labels": {
                      "app": "scan-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "scan-app"
                   }
                },
                "spec": {
@@ -1619,7 +1641,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-participant",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-participant"
             },
             "name": "validator1-participant"
          },
@@ -1637,7 +1660,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-participant",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-participant"
                   }
                },
                "spec": {
@@ -1776,7 +1800,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-validator-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-validator-app"
             },
             "name": "validator1-validator-app"
          },
@@ -1794,7 +1819,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-validator-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-validator-app"
                   }
                },
                "spec": {
@@ -1907,7 +1933,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-wallet-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-wallet-app"
             },
             "name": "validator1-wallet-app"
          },
@@ -1925,7 +1952,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-wallet-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-wallet-app"
                   }
                },
                "spec": {
@@ -2066,7 +2094,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-wallet-web-ui",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-wallet-web-ui"
             },
             "name": "validator1-wallet-web-ui"
          },
@@ -2084,7 +2113,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-wallet-web-ui",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-wallet-web-ui"
                   }
                },
                "spec": {
@@ -2147,7 +2177,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-directory-web-ui",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-directory-web-ui"
             },
             "name": "validator1-directory-web-ui"
          },
@@ -2165,7 +2196,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-directory-web-ui",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-directory-web-ui"
                   }
                },
                "spec": {
@@ -2228,7 +2260,8 @@
          "metadata": {
             "labels": {
                "app": "validator1-splitwise-web-ui",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "validator1-splitwise-web-ui"
             },
             "name": "validator1-splitwise-web-ui"
          },
@@ -2246,7 +2279,8 @@
                "metadata": {
                   "labels": {
                      "app": "validator1-splitwise-web-ui",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "validator1-splitwise-web-ui"
                   }
                },
                "spec": {
@@ -2429,7 +2463,8 @@
          "metadata": {
             "labels": {
                "app": "splitwise-participant",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "splitwise-participant"
             },
             "name": "splitwise-participant"
          },
@@ -2447,7 +2482,8 @@
                "metadata": {
                   "labels": {
                      "app": "splitwise-participant",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "splitwise-participant"
                   }
                },
                "spec": {
@@ -2576,7 +2612,8 @@
          "metadata": {
             "labels": {
                "app": "splitwise-validator-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "splitwise-validator-app"
             },
             "name": "splitwise-validator-app"
          },
@@ -2594,7 +2631,8 @@
                "metadata": {
                   "labels": {
                      "app": "splitwise-validator-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "splitwise-validator-app"
                   }
                },
                "spec": {
@@ -2707,7 +2745,8 @@
          "metadata": {
             "labels": {
                "app": "splitwise-app",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "splitwise-app"
             },
             "name": "splitwise-app"
          },
@@ -2725,7 +2764,8 @@
                "metadata": {
                   "labels": {
                      "app": "splitwise-app",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "splitwise-app"
                   }
                },
                "spec": {
@@ -2877,7 +2917,8 @@
          "metadata": {
             "labels": {
                "app": "external-proxy",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "moduleName": "external-proxy"
             },
             "name": "external-proxy"
          },
@@ -2895,7 +2936,8 @@
                "metadata": {
                   "labels": {
                      "app": "external-proxy",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "moduleName": "external-proxy"
                   }
                },
                "spec": {

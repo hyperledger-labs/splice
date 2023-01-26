@@ -45,8 +45,8 @@ docker-push-force: $(foreach image,$(images),cluster/images/$(image)/docker-push
 .PHONY: docker-check
 docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 
-.PHONY: clean-images
-clean-images: $(foreach image,$(images),cluster/images/$(image)/clean)
+.PHONY: images/clean
+images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)
 
 .PHONY: force-update-version
 

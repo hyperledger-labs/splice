@@ -125,9 +125,12 @@ function cluster_apply() {
 }
 
 function cluster_deploy() {
-    cluster_confirm "Build and apply configuration, forcibly pushing images."
+    cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
 
-    if ! make  -C ${REPO_ROOT} docker-push-force -j; then
+    make -C ${REPO_ROOT} clean -j
+    make -C ${REPO_ROOT} docker-build -j
+
+    if ! make -C ${REPO_ROOT} docker-push-force; then
         _error "Error building images, cannot apply."
         exit 1
     fi
@@ -135,7 +138,7 @@ function cluster_deploy() {
     _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
-function _cluster_push_module() {
+function _cluster_update_module() {
     module=$1
 
     _log "Pushing module: ${module}"
@@ -149,15 +152,22 @@ function _cluster_push_module() {
 
     imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
 
-    if kubectl set image "deployment/${module}" "${module}=${imageTag}"; then
+    dnames=$(kubectl get deployment -l moduleName=${module} -o jsonpath='{.items[*].metadata.name}')
+
+    if [ -z "$dnames" ]; then
+        _warning "No deployment found for module: ${module}"
+    else
+        for dname in $dnames; do
+            _log "Setting module for deployment: ${dname}"
+            kubectl set image "deployment/${dname}" "${dname}=${imageTag}"
+        done
+
         _log "Deleting module pods to force restart: ${module}"
 
-        # Delete the pod to force recreation. This forces a reload of
+        # Delete the pods to force recreation. This forces a reload of
         # the docker image, due to the imagePullPolicy setting of
         # "Always".
-        kubectl delete pods -l app=${module}
-    else
-        _warning "No deployments found for module: ${module}"
+        kubectl delete pods -l "moduleName=${module}"
     fi
 }
 
@@ -172,6 +182,7 @@ function cluster_push() {
 
     # Assemble target lists for parallel clean and then build.
     clean_targets=""
+    db_targets=""
     dpf_targets=""
     for module in "$@"
     do
@@ -180,21 +191,26 @@ function cluster_push() {
         fi
 
         clean_targets="${clean_targets} cluster/images/${module}/clean"
+        db_targets="${db_targets} cluster/images/${module}/docker-build"
         dpf_targets="${dpf_targets} cluster/images/${module}/docker-push-force"
     done
 
-    if [ -z "${dpf_targets}" ]; then
+    if [ -z "${db_targets}" ]; then
         _error "No modules specified."
     fi
 
-    _warning "Clean targets: ${clean_targets}"
-    _warning "dpf targets: ${dpf_targets}"
-
+    # Clean and build in parallel
     make -C ${REPO_ROOT} ${clean_targets} -j
-    make -C ${REPO_ROOT} ${dpf_targets} -j
+    make -C ${REPO_ROOT} ${db_targets} -j
 
+    # Run the push serially (since the push is ultimately serialized across
+    # the shared upoad link anyway, and adding contention won't help speed
+    # things up).
+    make -C ${REPO_ROOT} ${dpf_targets}
+
+    # Update all the modules in cluster
     for module in "$@"; do
-        _cluster_push_module ${module}
+        _cluster_update_module ${module}
     done
 }
 

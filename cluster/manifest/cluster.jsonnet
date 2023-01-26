@@ -117,6 +117,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
           name: name,
           labels: {
             app: name,
+            moduleName: if image == null then name else image,
             clusterName: config.clusterName,
           },
         },
@@ -134,6 +135,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
             metadata: {
               labels: {
                 app: name,
+                moduleName: if image == null then name else image,
                 clusterName: config.clusterName,
               },
             },
