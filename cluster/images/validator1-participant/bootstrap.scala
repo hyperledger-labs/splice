@@ -31,7 +31,7 @@ if (walletServiceUserName == null) {
 // Ensure there's a validator party
 
 def getUser(userName: String) =
- `validator1_participant`.ledger_api.users.list(userName).users.headOption
+ Try(`validator1_participant`.ledger_api.users.get(userName)).toOption
 
 getUser(validatorServiceUserName).getOrElse({
   val validatorServicePartyName = "validator1_validator_service_user"

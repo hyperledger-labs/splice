@@ -33,10 +33,10 @@ val directoryUserName = getCnAppLedgerApiAuthUserNameFromEnv("DIRECTORY")
 
 
 def getUser(userName: String) =
- `svc_participant`.ledger_api.users.list(userName).users.headOption
+ Try(`svc_participant`.ledger_api.users.get(userName)).toOption
 
 def userExists(userName: String) =
- !`svc_participant`.ledger_api.users.list(userName).users.isEmpty
+ getUser(userName).isDefined
 
 
 val svcUser = getUser(svcUserName).getOrElse({
