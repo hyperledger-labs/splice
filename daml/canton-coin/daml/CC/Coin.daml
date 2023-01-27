@@ -438,12 +438,6 @@ template CoinRules
       : ContractId ClosedMiningRound
       with
         issuingRoundCid : ContractId IssuingMiningRound
-        totalTransferFees : Decimal
-        totalAdminFees : Decimal
-        totalHoldingFees : Decimal
-        totalTransferInputs : Decimal -- after deducting holding fees
-        totalNonSelfTransferOutputs : Decimal -- sum of outputs where receiver != sender
-        totalSelfTransferOutputs : Decimal -- sum of outputs where receiver == sender
       controller svc
       do
         -- archive issuing mining round
@@ -452,13 +446,6 @@ template CoinRules
         archive issuingRoundCid
         require "SVC matches" (issuingRound.svc == svc)
         require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
-        require "Non-negative transfer fees" (totalTransferFees >= 0.0)
-        require "Non-negative admin fees" (totalAdminFees >= 0.0)
-        require "Non-negative holding fees" (totalHoldingFees >= 0.0)
-        require "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
-        require "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
-        -- TODO(M3-46): reestablish this requirement as appropriate after all rewards changes
-        -- require "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
 
         -- create closed round
         create ClosedMiningRound with
@@ -467,12 +454,6 @@ template CoinRules
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
-          totalTransferFees
-          totalAdminFees
-          totalHoldingFees
-          totalTransferInputs
-          totalNonSelfTransferOutputs
-          totalSelfTransferOutputs
           round = issuingRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
@@ -646,11 +627,11 @@ checkTransferConstraints transfer summary config
 
 -- | Compute the latest round that opens before `9999-12-31T23.59.59.99999Z`
 maxTargetRound : CoinConfig CC -> OpenMiningRound -> API.Round
-maxTargetRound config currentMiningRound = 
+maxTargetRound config currentMiningRound =
   let maxRelTime = subTime maxTime currentMiningRound.opensAt
       maxRelRound = RelRound $ (convertRelTimeToMicroseconds maxRelTime) / (convertRelTimeToMicroseconds config.tickDuration) + 1
   in addRelRound currentMiningRound.round maxRelRound
-        
+
 estimateOpenRoundCreatedAt : CoinConfig CC -> OpenMiningRound -> API.Round -> EstimatedTime
 estimateOpenRoundCreatedAt config currentMiningRound targetRound
   | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
@@ -673,8 +654,8 @@ doesLockExpireBeforeCoin currentTime currentOpenRound lock e config = do
   case coinExpiresAt of
     EstimatedAt t -> pure $ lock.expiresAt < t
     -- computed coin expiry time is too large to be represented by DA.Time (because the coin has a large value).
-    -- Therefore, the lock expires before the coin. 
-    AfterMaxTime -> pure True 
+    -- Therefore, the lock expires before the coin.
+    AfterMaxTime -> pure True
 
 -- | An estimation of a time point that can be too far in the future to be
 -- represented using the `Time` type.

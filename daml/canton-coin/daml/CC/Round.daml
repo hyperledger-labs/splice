@@ -100,12 +100,6 @@ template ClosedMiningRound
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
-    totalTransferFees : Decimal
-    totalAdminFees : Decimal
-    totalHoldingFees : Decimal
-    totalTransferInputs : Decimal -- after deducting holding fees
-    totalNonSelfTransferOutputs : Decimal -- sum of outputs where receiver != sender
-    totalSelfTransferOutputs : Decimal -- sum of outputs where receiver == sender
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
   where
     signatory svc

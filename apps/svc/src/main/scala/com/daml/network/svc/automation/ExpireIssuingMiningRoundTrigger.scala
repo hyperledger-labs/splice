@@ -40,20 +40,10 @@ class ExpireIssuingMiningRoundTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
-    val totals = store.getTotalsForRound(round.payload.round.number)
     for {
       coinRules <- store.getCoinRules()
       domainId <- store.domains.getUniqueDomainId()
-      cmd = coinRules.contractId
-        .exerciseCoinRules_MiningRound_Close(
-          round.contractId,
-          totals.transferFees.bigDecimal,
-          totals.adminFees.bigDecimal,
-          totals.holdingFees.bigDecimal,
-          totals.transferInputs.bigDecimal,
-          totals.nonSelfTransferOutputs.bigDecimal,
-          totals.selfTransferOutputs.bigDecimal,
-        )
+      cmd = coinRules.contractId.exerciseCoinRules_MiningRound_Close(round.contractId)
       cid <- connection
         .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")

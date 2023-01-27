@@ -2,7 +2,7 @@ package com.daml.network.svc.automation
 
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{AuditLogIngestionService, CoinAppAutomationService}
+import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
@@ -34,22 +34,6 @@ class SvcAutomationService(
       participantAdminConnection,
       retryProvider,
     ) {
-
-  registerService(
-    new AuditLogIngestionService(
-      "svcRoundSummaryCollectionService",
-      new RoundSummaryIngestionService(
-        store.svcParty,
-        store.events,
-        loggerFactory,
-      ),
-      store.domains,
-      connection,
-      retryProvider,
-      loggerFactory,
-      timeouts,
-    )
-  )
 
   registerTrigger(
     new AdvanceOpenMiningRoundTrigger(triggerContext, config, store, connection)

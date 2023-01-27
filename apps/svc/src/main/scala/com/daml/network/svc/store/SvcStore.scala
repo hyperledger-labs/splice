@@ -23,10 +23,6 @@ trait SvcStore extends CoinAppStore {
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  /** Audit log store */
-  // TODO(tech-debt): build common infrastructure for such audit-log stores and inline its functions
-  val events: SvcEventsStore
-
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
@@ -161,20 +157,6 @@ trait SvcStore extends CoinAppStore {
         .map(_.iterator.take(limit).toSeq)
     }
   } yield result
-
-  def getTotalsForRound(round: Long): SvcStore.RoundTotals = {
-    val transfers = events.getTransferSummariesPerRound(round)
-    transfers.foldLeft(SvcStore.RoundTotals())((t, transfer) => {
-      SvcStore.RoundTotals(
-        t.transferFees + transfer.totalTransferFees,
-        t.adminFees + transfer.senderAdminFees,
-        t.holdingFees + transfer.senderHoldingFees,
-        t.transferInputs + transfer.inAmount,
-        t.nonSelfTransferOutputs + transfer.nonSelfOutAmount,
-        t.selfTransferOutputs + transfer.selfOutAmount,
-      )
-    })
-  }
 
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
