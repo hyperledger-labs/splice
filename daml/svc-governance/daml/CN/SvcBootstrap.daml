@@ -11,8 +11,9 @@ import CN.SvcRules
 template SvcBootstrap with
     svc : Party
     founder : Party -- ^ the founding SV
-    config : CoinConfig USD
+    coinConfig : CoinConfig USD
     coinPrice : Decimal
+    config : SvcRulesConfig
   where
     signatory svc
     observer founder
@@ -26,9 +27,10 @@ template SvcBootstrap with
           nextMiningRound = Round 1
           members = Map.fromList [(founder, MemberInfo with joinedAsOfRound = Round 0)]
           leader = founder
+          config
         coinRulesCid <- create CoinRules with
           svc
-          config
+          config = coinConfig
           observers = []
 
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with

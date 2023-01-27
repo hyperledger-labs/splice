@@ -103,6 +103,11 @@ template SvReward with
     signatory svc
 
 
+-- TODO(M3-46): support changing the config
+data SvcRulesConfig = SvcRulesConfig with
+    numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
+  deriving (Eq, Show)
+
 -- SV Consortium rules
 ----------------------
 
@@ -113,9 +118,11 @@ template SvcRules with
     nextMiningRound : Round
     members : Map.Map Party MemberInfo
     leader : Party
-    -- TODO(M2-01): manage config explicitly, and support changing the config
+    config : SvcRulesConfig
   where
-    ensure leader `Map.member` members
+    ensure 
+      leader `Map.member` members &&
+        config.numUnclaimedRewardsThreshold > 0
 
     -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the members are indirect signatories by being backing
@@ -140,6 +147,7 @@ template SvcRules with
           nextMiningRound
           leader
           members = Map.insert newMember info members
+          config
 
     choice SvcRules_RemoveMember : ContractId SvcRules
       with
@@ -155,6 +163,7 @@ template SvcRules with
           leader
           -- NOTE: this immediate deletion also slashes that members share of the current round's issuance
           members = Map.delete member members
+          config
 
     -- Leader election
     ------------------
@@ -201,6 +210,7 @@ template SvcRules with
           nextMiningRound
           members
           leader = newLeader
+          config
         pure self
 
     nonconsuming choice SvcRules_ArchiveOutdatedElectionRequest : ()
@@ -313,8 +323,26 @@ template SvcRules with
           amount = reward.amount
           openRound = openRoundCid
 
-    -- TODO(#2334): add SvcRules choices to expire rewards that are too old
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    nonconsuming choice SvcRules_ClaimExpiredRewards
+      : Optional (ContractId UnclaimedReward)
+      with
+        coinRulesCid : ContractId CoinRules
+        choiceArg : CoinRules_ClaimExpiredRewards
+      controller leader
+      do
+        exercise coinRulesCid choiceArg
 
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice SvcRules_MergeUnclaimedRewards
+      : ContractId UnclaimedReward
+      with
+        coinRulesCid : ContractId CoinRules
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller leader
+      do
+        require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
+        exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
 
 
 -- Utility functions

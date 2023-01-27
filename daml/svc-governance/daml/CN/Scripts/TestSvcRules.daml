@@ -13,6 +13,7 @@ import DA.Time
 import CN.Util.Assert
 import CC.Coin
 import CC.Issuance
+import CC.API.V1.Round (Round(..))
 import CC.Round
 import CC.Scripts.Util
 import CN.SvcRules
@@ -23,31 +24,7 @@ import CC.Scripts.Parameters
 testSvcRules : Script ()
 testSvcRules = do
 
-  -- allocate users for the four founding members
-  [mallory, sv1, sv2, sv3] <- forA ["mallory", "sv1", "sv2", "sv3"] allocateParty
-
-  -- allocate consortium party
-  -- TODO(M2-02): make this a real consortium party
-  svc <- allocateParty "svc"
-
-  -- have mallory, who starts off non-maliciously, bootstrap the consortium
-  submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founder = mallory, config = defaultCoinConfig, coinPrice = 1.0)
-    SvcBootstrap_Bootstrap
-
-  svcUserId <- validateUserId "svc-user"
-  let app = CCApp with
-        svc
-        svcUser = CCUser with
-          userId = svcUserId
-          primaryParty = svc
-
-  -- add more sv nodes
-  -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
-  forA_ [sv1, sv2, sv3] $ \sv -> do
-    [(svcRulesCid, _)] <- query @SvcRules svc
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember sv "we want to"
-
+  (app, svc, (mallory, sv1, sv2, sv3)) <- initConsortium
   -- we now have a consortium with BFT for f = 1
 
   -- run an issuance
@@ -123,8 +100,75 @@ testSvcRules = do
   return ()
 
 
+testUnclaimedRewards : Script ()
+testUnclaimedRewards = do
+  (app, svc, _) <- initConsortium
+  -- we now have a consortium with BFT for f = 1
+
+  -- onboard a validator
+  validator1 <- setupValidator app "validator1"
+  provider1 <- setupUser app "provider1" validator1
+  user <- setupUser app "user" validator1
+
+  forA_ [1..6] do \i -> generateUnclaimedReward app provider1
+
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_MergeUnclaimedRewards with
+      coinRulesCid
+      unclaimedRewardCids = (fmap fst unclaimedRewards)
+
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  length unclaimedRewards === 1
+
+  pure ()
+
 -- Utils
 --------
+
+initConsortium : Script (CCApp, Party, (Party, Party, Party, Party))
+initConsortium = do
+  -- allocate users for the four founding members
+  [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
+
+  -- allocate consortium party
+  -- TODO(M2-02): make this a real consortium party
+  svc <- allocateParty "svc"
+
+  -- have mallory bootstrap the consortium
+  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5
+  submit svc $ createAndExerciseCmd
+    (SvcBootstrap with svc, founder = sv1, coinConfig = defaultCoinConfig, coinPrice = 1.0, config)
+    SvcBootstrap_Bootstrap
+
+  svcUserId <- validateUserId "svc-user"
+  let app = CCApp with
+        svc
+        svcUser = CCUser with
+          userId = svcUserId
+          primaryParty = svc
+
+  -- add more sv nodes
+  -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
+  forA_ [sv2, sv3, sv4] $ \sv -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember sv "we want to"
+
+  pure (app, svc, (sv1, sv2, sv3, sv4))
+
+generateUnclaimedReward : CCApp -> CCUser -> Script ()
+generateUnclaimedReward app provider1 = do
+  submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    svc = app.svc
+    provider = provider1.primaryParty
+    amount = 5.7
+    round = Round 0
+    featured = True
+
+  runNextIssuanceD app 1.0
+
+  pure ()
 
 leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
 leaderSubmits app mkCommands = do
@@ -155,29 +199,24 @@ runNextIssuanceD app coinPrice = do
     setTime (addRelTime now defaultCoinConfig.tickDuration)
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
+    [(coinRulesCid, _)] <- query @CoinRules app.svc
+    [(consortiumCid, consortium)] <- query @SvcRules app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
 
-      -- TODO(#2334): reactivate this code once we have SvcRules support for expiry
+      -- collect all unclaimed rewards into the unclaimed rewards fund
+      validatorRewards <- (queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round))
+      appRewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      leaderSubmits app $ \cid -> exerciseCmd cid $
+        SvcRules_ClaimExpiredRewards with
+          coinRulesCid = coinRulesCid
+          choiceArg = CoinRules_ClaimExpiredRewards with
+            closedRoundCid = miningRoundCid
+            validatorCouponCids = map fst validatorRewards
+            appCouponCids = map fst appRewards
 
-      -- app rewards
-      -- rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
-      -- forA_ rewards $ \(rcid, _) ->
-      --   leaderSubmits app $ \cid -> exerciseCmd cid $
-      --     SvcRules_AppRewardCoupon_SvcExpire with
-      --       cid = rcid
-      --       choiceArg = AppRewardCoupon_SvcExpire with miningRoundCid
-      -- -- validator rewards
-      -- rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
-      -- forA_ rewards $ \(rcid, _) ->
-      --   leaderSubmits app $ \cid -> exerciseCmd cid $
-      --     SvcRules_ValidatorRewardCoupon_SvcExpire with
-      --       cid = rcid
-      --       choiceArg = ValidatorRewardCoupon_SvcExpire with miningRoundCid
       -- the closed round
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
-      -- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Archive with
-      --   miningRoundCid
 
     -- TODO(M2-01): collect SvcRewards via SvRewards into per-SV coins
 

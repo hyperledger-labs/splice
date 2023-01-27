@@ -175,6 +175,9 @@ class SvApp(
                     svParty.toProtoPrimitive,
                     defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
                     config.coinPrice.bigDecimal,
+                    new cn.svcrules.SvcRulesConfig(
+                      10
+                    ), // TODO(M3-46) handle default config values better
                   ).createAnd
                     .exerciseSvcBootstrap_Bootstrap()
                     .commands
