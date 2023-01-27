@@ -12,6 +12,7 @@
     1. [Contribution Guide](#contribution-guide)
     1. [Unused Import Warnings](#unused-import-warnings)
     1. [TODO Comments](#todo-comments)
+    1. [Configuration](#configuration)
     1. [Daml Numerics](#daml-numerics)
     1. [Protobuf and GRPC Guidelines](#protobuf-and-grpc-guidelines)
     1. [Editing Daml](#editing-daml)
@@ -236,6 +237,13 @@ Note that in contrast to these guidelines, we
 - use normal .rst comments, e.g., `.. TODO(M1-14): some left-over doc work`
 
 Note that these guidelines are enforced in CI.
+
+### Configuration
+
+The applications are configured using [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md) files.
+
+Run `./scripts/print-config.sh FILE` in order to retrieve a canonical form of a given
+config file, with includes and substitutions resolved and comments stripped.
 
 ### Daml Numerics
 
