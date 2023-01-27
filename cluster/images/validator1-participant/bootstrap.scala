@@ -1,3 +1,5 @@
+import scala.util.Try
+
 def log(msg: String) = println(s"BOOTSTRAP: $msg")
 
 log("===============================")
