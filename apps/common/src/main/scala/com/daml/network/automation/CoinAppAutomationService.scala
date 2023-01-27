@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 abstract class CoinAppAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    store: CoinAppStore,
+    store: CoinAppStore[?, ?],
     ledgerClient: CoinLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,

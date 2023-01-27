@@ -41,10 +41,10 @@ class UserWalletService(
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("user", key.endUserName)
 
-  val store: UserWalletStore =
-    UserWalletStore(key, storage, loggerFactory, timeouts, futureSupervisor)
-
   private val connection = ledgerClient.connection()
+
+  val store: UserWalletStore =
+    UserWalletStore(key, storage, loggerFactory, timeouts, futureSupervisor, connection)
 
   val treasury: TreasuryService = new TreasuryService(
     connection,

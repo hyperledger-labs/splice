@@ -1,6 +1,6 @@
 package com.daml.network.svc.store.memory
 
-import com.daml.network.store.InMemoryCoinAppStore
+import com.daml.network.store.{InMemoryCoinAppStore, TxLogStore}
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -14,7 +14,7 @@ class InMemorySvcStore(
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore
+) extends InMemoryCoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]]
     with SvcStore {
 
   override lazy val acsContractFilter = SvcStore.contractFilter(svcParty)

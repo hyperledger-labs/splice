@@ -5,11 +5,11 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.Contract
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,
   InterfaceCompanion,
+  Contract as CodegenContract,
 }
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
@@ -23,9 +23,6 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.network.util.JavaContract
 import com.daml.network.util.PrettyInstances.PrettyContractId
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -237,20 +234,6 @@ object AcsStore {
     ): (Tmpl => View) => InterfaceImplementation[I, Id, View, TC, TCid, Tmpl] =
       view => InterfaceImplementation(companion, view)
   }
-
-  def apply(
-      storage: Storage,
-      loggerFactory: NamedLoggerFactory,
-      scope: ContractFilter,
-      futureSupervisor: FutureSupervisor,
-  )(implicit
-      ec: ExecutionContext
-  ): AcsStore =
-    storage match {
-      case _: MemoryStorage => new InMemoryAcsStore(loggerFactory, scope, futureSupervisor)
-      case _: DbStorage =>
-        throw new RuntimeException("Not implemented")
-    }
 
   /** A query result computed as-of a specific ledger API offset. */
   case class QueryResult[A](

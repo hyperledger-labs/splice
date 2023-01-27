@@ -3,7 +3,7 @@ package com.daml.network.validator.store
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.JavaContract as Contract
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -14,7 +14,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends CoinAppStore {
+trait ValidatorStore extends CoinAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key

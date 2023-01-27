@@ -1,5 +1,6 @@
 package com.daml.network.wallet.store
 
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
@@ -18,13 +19,15 @@ import com.daml.network.codegen.java.cn.{
   directory as directoryCodegen,
   splitwise as splitwiseCodegen,
 }
-import com.daml.network.store.{AcsStore, CoinAppStore}
-import com.daml.network.util.{CoinUtil, JavaContract}
+import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.history.{Tap, Transfer}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory, TxLogStore}
+import com.daml.network.util.{CoinUtil, ExerciseNode, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -35,7 +38,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends CoinAppStore {
+trait UserWalletStore
+    extends CoinAppStoreWithHistory[UserWalletStore.TxLogIndexRecord, UserWalletStore.TxLogEntry]
+    with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -217,6 +222,60 @@ trait UserWalletStore extends CoinAppStore {
   def getValidatorRightsWhereUserIsValidator()
       : Future[Seq[JavaContract[ValidatorRight.ContractId, ValidatorRight]]] =
     acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
+
+  // TODO(#2326): This is just a placeholder to showcase the tx log store API.
+  def listTransactions(
+      from: Int,
+      limit: Int,
+  )(implicit lc: TraceContext): Future[Seq[UserWalletStore.TxLogEntry]] =
+    txLogReader.getTxLogByOffset(from, limit)
+
+  override val txLogParser
+      : TxLogStore.Parser[UserWalletStore.TxLogIndexRecord, UserWalletStore.TxLogEntry] =
+    new TxLogStore.Parser[UserWalletStore.TxLogIndexRecord, UserWalletStore.TxLogEntry] {
+      override def parseCreate(tx: TransactionTree, event: CreatedEvent)(implicit
+          tc: TraceContext
+      ) = None
+
+      override def parseExercise(tx: TransactionTree, event: ExercisedEvent)(implicit
+          tc: TraceContext
+      ) = {
+        parseTransfer(tx, event).orElse(parseTap(tx, event))
+      }
+
+      private def parseTransfer(tx: TransactionTree, event: ExercisedEvent)(implicit
+          lc: ErrorLoggingContext
+      ): Option[UserWalletStore.TxLogEntry] =
+        ExerciseNode
+          .decodeExerciseEvent(Transfer)(event)
+          .map { tf =>
+            UserWalletStore.TxLogEntry.Transfer(
+              indexRecord = UserWalletStore.TxLogIndexRecord(
+                offset = tx.getOffset,
+                eventId = event.getEventId,
+                sender = tf.argument.value.transfer.sender,
+              ),
+              balance =
+                tf.result.value.summary.selfOutAmount.subtract(tf.result.value.summary.inAmount),
+            )
+          }
+
+      private def parseTap(tx: TransactionTree, event: ExercisedEvent)(implicit
+          lc: ErrorLoggingContext
+      ): Option[UserWalletStore.TxLogEntry] =
+        ExerciseNode
+          .decodeExerciseEvent(Tap)(event)
+          .map { tp =>
+            UserWalletStore.TxLogEntry.Tap(
+              indexRecord = UserWalletStore.TxLogIndexRecord(
+                offset = tx.getOffset,
+                eventId = event.getEventId,
+                sender = tp.argument.value.receiver,
+              ),
+              balance = tp.argument.value.amount,
+            )
+          }
+    }
 }
 
 object UserWalletStore {
@@ -226,12 +285,13 @@ object UserWalletStore {
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
+      connection: CoinLedgerConnection,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryUserWalletStore(key, loggerFactory, timeouts, futureSupervisor)
+        new InMemoryUserWalletStore(key, loggerFactory, timeouts, futureSupervisor, connection)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
@@ -398,5 +458,25 @@ object UserWalletStore {
         ),
       ),
     )
+  }
+
+  // TODO(#2326): This is just a placeholder to showcase the tx log store API.
+  final case class TxLogIndexRecord(
+      offset: String,
+      eventId: String,
+      sender: String,
+  ) extends TxLogStore.IndexRecord
+
+  // TODO(#2326): This is just a placeholder to showcase the tx log store API.
+  sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord]
+  object TxLogEntry {
+    final case class Transfer(
+        indexRecord: TxLogIndexRecord,
+        balance: BigDecimal,
+    ) extends TxLogEntry
+    final case class Tap(
+        indexRecord: TxLogIndexRecord,
+        balance: BigDecimal,
+    ) extends TxLogEntry
   }
 }

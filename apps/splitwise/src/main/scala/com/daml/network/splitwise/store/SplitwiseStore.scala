@@ -3,7 +3,7 @@ package com.daml.network.splitwise.store
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -13,7 +13,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SplitwiseStore extends CoinAppStore {
+trait SplitwiseStore extends CoinAppStoreWithoutHistory {
   import AcsStore.QueryResult
 
   def providerParty: PartyId

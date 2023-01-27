@@ -3,7 +3,7 @@ package com.daml.network.svc.store
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{CoinUtil, JavaContract as Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -18,7 +18,7 @@ import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait SvcStore extends CoinAppStore {
+trait SvcStore extends CoinAppStoreWithoutHistory {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId

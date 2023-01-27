@@ -2,7 +2,7 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.sv.store.memory.InMemorySvStore
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -14,7 +14,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SvStore extends CoinAppStore {
+trait SvStore extends CoinAppStoreWithoutHistory {
 
   def key: SvStore.Key
 

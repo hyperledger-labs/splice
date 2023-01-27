@@ -1,7 +1,7 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.store.InMemoryCoinAppStore
+import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -14,7 +14,7 @@ class InMemoryScanStore(
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore
+) extends InMemoryCoinAppStoreWithoutHistory
     with ScanStore {
 
   override lazy val acsContractFilter = ScanStore.contractFilter(svcParty)

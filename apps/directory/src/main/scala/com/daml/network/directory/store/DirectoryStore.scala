@@ -4,7 +4,7 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore extends CoinAppStore {
+trait DirectoryStore extends CoinAppStoreWithoutHistory {
 
   import AcsStore.QueryResult
 

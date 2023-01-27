@@ -2,7 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait ScanStore extends CoinAppStore with StoreWithOpenMiningRounds {
+trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRounds {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId

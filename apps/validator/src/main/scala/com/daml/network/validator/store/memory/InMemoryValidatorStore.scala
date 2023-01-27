@@ -1,6 +1,6 @@
 package com.daml.network.validator.store.memory
 
-import com.daml.network.store.InMemoryCoinAppStore
+import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,7 +12,7 @@ class InMemoryValidatorStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit override protected val ec: ExecutionContext)
-    extends InMemoryCoinAppStore
+    extends InMemoryCoinAppStoreWithoutHistory
     with ValidatorStore {
 
   override lazy val acsContractFilter = ValidatorStore.contractFilter(key)

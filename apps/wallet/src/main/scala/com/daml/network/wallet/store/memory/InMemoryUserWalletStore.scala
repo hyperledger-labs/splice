@@ -1,5 +1,6 @@
 package com.daml.network.wallet.store.memory
 
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.store.InMemoryCoinAppStore
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -14,9 +15,13 @@ class InMemoryUserWalletStore(
     override protected val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
+    override protected val connection: CoinLedgerConnection,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore
+) extends InMemoryCoinAppStore[
+      UserWalletStore.TxLogIndexRecord,
+      UserWalletStore.TxLogEntry,
+    ]
     with UserWalletStore {
 
   override def toString: String = show"InMemoryUserWalletStore(endUserParty=${key.endUserParty})"

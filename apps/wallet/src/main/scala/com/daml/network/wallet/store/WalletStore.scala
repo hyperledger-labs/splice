@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, ValidatorRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.store.{AcsStore, CoinAppStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
   */
-trait WalletStore extends CoinAppStore with StoreWithOpenMiningRounds {
+trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRounds {
 
   protected implicit val ec: ExecutionContext
 

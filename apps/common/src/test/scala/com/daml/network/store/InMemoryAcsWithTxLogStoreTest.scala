@@ -16,11 +16,13 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -29,7 +31,7 @@ import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
+class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryAcsStoreTest")
 
@@ -109,6 +111,41 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  def withEventId(
+      event: TreeEvent,
+      eventId: String,
+  ): TreeEvent = event match {
+    case created: CreatedEvent =>
+      new CreatedEvent(
+        eventId = eventId,
+        contractId = created.getContractId,
+        interfaceViews = created.getInterfaceViews,
+        failedInterfaceViews = created.getFailedInterfaceViews,
+        templateId = created.getTemplateId,
+        arguments = created.getArguments,
+        witnessParties = created.getWitnessParties,
+        signatories = created.getSignatories,
+        observers = created.getObservers,
+        agreementText = created.getAgreementText,
+        contractKey = created.getContractKey,
+      )
+    case exercised: ExercisedEvent =>
+      new ExercisedEvent(
+        eventId = eventId,
+        contractId = exercised.getContractId,
+        templateId = exercised.getTemplateId,
+        interfaceId = exercised.getInterfaceId,
+        witnessParties = exercised.getWitnessParties,
+        consuming = exercised.isConsuming,
+        choice = exercised.getChoice,
+        choiceArgument = exercised.getChoiceArgument,
+        exerciseResult = exercised.getExerciseResult,
+        actingParties = exercised.getActingParties,
+        childEventIds = exercised.getChildEventIds,
+      )
+    case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
+  }
+
   private val dummyDomain = DomainId.tryFromString("dummy::domain")
 
   private def toTransferOutEvent(contractId: ContractId[_]): TransferEvent.Out = TransferEvent.Out(
@@ -151,7 +188,9 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   private def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
-    val eventsById = events.zipWithIndex.map { case (e, i) => s"$i" -> e }.toMap
+    val eventsWithId = events.zipWithIndex.map { case (e, i) => withEventId(e, s"$offset:$i") }
+    val eventsById = eventsWithId.map(e => e.getEventId -> e).toMap
+    val rootEventIds = eventsWithId.map(_.getEventId)
     new TransactionTree(
       transactionId = "",
       commandId = "",
@@ -159,7 +198,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       effectiveAt = effectiveAt,
       offset = offset,
       eventsById = eventsById.asJava,
-      rootEventIds = eventsById.keys.toList.asJava,
+      rootEventIds = rootEventIds.asJava,
     )
   }
 
@@ -208,10 +247,37 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  def mkStore(): Future[InMemoryAcsStore] = {
-    val store = new InMemoryAcsStore(
+  case class TestTxLogIndexRecord(
+      offset: String,
+      eventId: String,
+  ) extends TxLogStore.IndexRecord
+
+  case class TestTxLogEntry(
+      indexRecord: TestTxLogIndexRecord,
+      payload: String,
+  ) extends TxLogStore.Entry[TestTxLogIndexRecord]
+
+  object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
+    override def parseCreate(tx: TransactionTree, event: CreatedEvent)(implicit
+        tc: TraceContext
+    ): Option[TestTxLogEntry] =
+      Some(
+        TestTxLogEntry(
+          indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
+          payload = event.getEventId,
+        )
+      )
+
+    override def parseExercise(tx: TransactionTree, event: ExercisedEvent)(implicit
+        tc: TraceContext
+    ): Option[TestTxLogEntry] = None
+  }
+
+  def mkStore(): Future[InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry]] = {
+    val store = new InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry](
       loggerFactory,
       txFilter,
+      TestTxLogStoreParser,
       FutureSupervisor.Noop,
     )
     for {
@@ -363,6 +429,34 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
         _ = result shouldBe appRewardCoupons
       } yield succeed
+    }
+
+    "return tx log entries in correct order" in {
+      for {
+        store <- mkStore()
+        reader = new TxLogStore.Reader[TestTxLogIndexRecord, TestTxLogEntry](
+          txLogStore = store,
+          transactionTreeSource = TransactionTreeSource.StaticForTesting(Seq(tx1, tx2, tx3, tx4)),
+        )
+        indices <- store.getTxLogIndicesByOffset(0, 1000)
+        entries <- reader.getTxLogByOffset(0, 1000)
+        indices2 <- store.getTxLogIndicesByOffset(2, 3)
+        entries2 <- reader.getTxLogByOffset(2, 3)
+      } yield {
+        // The test tx log creates one entry for each create event.
+        // The test transactions only contain root nodes, the tx log should preserve their order.
+        val expectedEventsInTxLog = Seq(tx1, tx2).flatMap(tx =>
+          tx.getRootEventIds.asScala.toList
+            .collect(i => tx.getEventsById.get(i) match { case c: CreatedEvent => c })
+        )
+        val expectedEventIds = expectedEventsInTxLog.map(_.getEventId)
+
+        indices.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds
+        entries.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds
+
+        indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 3)
+        entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 3)
+      }
     }
 
   }

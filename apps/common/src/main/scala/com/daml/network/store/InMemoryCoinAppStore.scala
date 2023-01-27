@@ -6,23 +6,35 @@ import scala.concurrent.ExecutionContext
 
 /** In memory store setup shared by all of our apps
   */
-abstract class InMemoryCoinAppStore(implicit protected val ec: ExecutionContext)
-    extends CoinAppStore {
+abstract class InMemoryCoinAppStore[
+    TXI <: TxLogStore.IndexRecord,
+    TXE <: TxLogStore.Entry[TXI],
+](implicit protected val ec: ExecutionContext)
+    extends CoinAppStore[TXI, TXE] {
   protected def acsContractFilter: AcsStore.ContractFilter
 
   protected def futureSupervisor: FutureSupervisor
 
-  override lazy val acs: InMemoryAcsStore =
-    new InMemoryAcsStore(
+  private lazy val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE] =
+    new InMemoryAcsWithTxLogStore(
       loggerFactory,
-      acsContractFilter,
-      futureSupervisor,
+      contractFilter = acsContractFilter,
+      txLogParser = txLogParser,
+      futureSupervisor = futureSupervisor,
       logAllStateUpdates = false,
     )
+
+  override def acs: AcsStore = acsWithTxLog
+  override def txLog: TxLogStore[TXI, TXE] = acsWithTxLog
+
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 
-  override lazy val acsIngestionSink: AcsStore.IngestionSink = acs.ingestionSink
+  override lazy val acsIngestionSink: AcsStore.IngestionSink = acsWithTxLog.ingestionSink
   override lazy val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 
   override def close(): Unit = ()
 }
+
+abstract class InMemoryCoinAppStoreWithoutHistory(implicit
+    override protected val ec: ExecutionContext
+) extends InMemoryCoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {}

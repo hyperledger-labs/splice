@@ -139,6 +139,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
+  def tryGetTransactionTreeByEventId(parties: Seq[PartyId], id: String): Future[TransactionTree]
+
   def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
 
   def getPrimaryParty(user: String): Future[PartyId]
@@ -571,6 +573,12 @@ object CoinLedgerConnection {
           id: String,
       ): Future[TransactionTree] =
         client.tryGetTransactionTreeById(parties.map(_.toProtoPrimitive), id)
+
+      override def tryGetTransactionTreeByEventId(
+          parties: Seq[PartyId],
+          id: String,
+      ): Future[TransactionTree] =
+        client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
       override def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
         for {
