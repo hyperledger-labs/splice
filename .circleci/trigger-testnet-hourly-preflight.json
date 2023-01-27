@@ -1,6 +1,6 @@
 {
-    "name" : "TestNet Hourly Preflight",
-    "description" : "Hourly Preflight of TestNet",
+    "name" : "TestNet 2-Hourly Preflight",
+    "description" : "2-Hourly Preflight of TestNet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
@@ -8,7 +8,7 @@
     },
     "timetable" : {
       "per-hour" : 1,
-      "hours-of-day" : [ ],
+      "hours-of-day" : [ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22 ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
