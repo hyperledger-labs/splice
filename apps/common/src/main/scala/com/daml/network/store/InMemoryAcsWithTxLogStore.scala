@@ -2,6 +2,7 @@ package com.daml.network.store
 
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransactionTreeUpdate,
+  TransferUpdate,
   Transfer,
   TransferEvent,
   TreeUpdate,
@@ -119,7 +120,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       }
 
     override def ingestTransfer(
-        event: Transfer
+        event: Transfer[TransferEvent]
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestTransfer(event, contractFilter.contains)
@@ -136,7 +137,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     )(implicit traceContext: TraceContext): Future[Unit] =
       update match {
         case TransactionTreeUpdate(tree) => ingestTransaction(tree)
-        case transfer: Transfer => ingestTransfer(transfer)
+        case TransferUpdate(transfer) => ingestTransfer(transfer)
       }
   }
 
@@ -559,7 +560,7 @@ object InMemoryAcsWithTxLogStore {
     }
 
     def ingestTransfer(
-        transfer: Transfer,
+        transfer: Transfer[TransferEvent],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       val newOffset = Some(transfer.offset.getOffset)

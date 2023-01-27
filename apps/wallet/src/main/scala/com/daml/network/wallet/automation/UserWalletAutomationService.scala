@@ -10,7 +10,13 @@ import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.{CoinAppAutomationService, DomainOrchestrator, Trigger}
+import com.daml.network.automation.{
+  CoinAppAutomationService,
+  DomainOrchestrator,
+  Trigger,
+  TransferInTrigger,
+  TransferOutTrigger,
+}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.UserWalletStore
@@ -70,19 +76,21 @@ class UserWalletAutomationService(
   )(domainAdded: DomainStore.DomainAdded): Trigger =
     new TransferOutTrigger(
       triggerContext,
-      store,
+      store.domains,
       connection,
       globalDomain,
       domainAdded.domainId,
+      store.key.endUserParty,
       companion,
     )
   def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
     new TransferInTrigger(
       triggerContext,
-      store,
+      store.domains,
       connection,
       globalDomain,
       domainAdded.domainId,
+      store.key.endUserParty,
     )
 
   Seq(

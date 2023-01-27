@@ -1,15 +1,15 @@
-package com.daml.network.wallet.automation
+package com.daml.network.automation
 
+import com.daml.network.store.DomainStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{OnCreateUpdateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import com.daml.network.util.JavaContract
-import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.daml.ledger.javaapi.data.Template
@@ -19,10 +19,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
     override protected val context: TriggerContext,
-    store: UserWalletStore,
+    domains: DomainStore,
     connection: CoinLedgerConnection,
     targetDomain: DomainAlias,
     domainId: DomainId,
+    partyId: PartyId,
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
@@ -31,7 +32,7 @@ class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Te
 ) extends OnCreateUpdateTrigger[TC, TCid, T](
       connection,
       domainId,
-      store.key.endUserParty,
+      partyId,
       templateCompanion,
     ) {
 
@@ -45,7 +46,7 @@ class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Te
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      targetDomainId <- store.domains.getDomainId(targetDomain)
+      targetDomainId <- domains.getDomainId(targetDomain)
       cid = PrettyContractId(templateCompanion.TEMPLATE_ID, contract.contractId)
       outcome <-
         if (targetDomainId == domainId) {
@@ -55,7 +56,7 @@ class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Te
         } else
           for {
             _ <- connection.submitTransferNoDedup(
-              submitter = store.key.endUserParty,
+              submitter = partyId,
               command = LedgerClient.TransferCommand.Out(
                 contractId = contract.contractId,
                 source = domainId,

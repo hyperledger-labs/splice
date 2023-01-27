@@ -53,15 +53,20 @@ object JavaDecodeUtil {
       companion.toContractId(new ContractId[T]((event.getContractId)))
     )
 
-  def decodeAllCreatedTree[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
-  )(transaction: TransactionTree): Seq[TC] =
+  def treeToCreated(transaction: TransactionTree): Seq[JavaCreatedEvent] =
     for {
       event <- transaction.getEventsById.values.asScala.toSeq
       created <- event match {
         case created: JavaCreatedEvent => Seq(created)
         case _ => Seq.empty
       }
+    } yield created
+
+  def decodeAllCreatedTree[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(transaction: TransactionTree): Seq[TC] =
+    for {
+      created <- treeToCreated(transaction)
       a <- decodeCreated(companion)(created).toList
     } yield a
 }

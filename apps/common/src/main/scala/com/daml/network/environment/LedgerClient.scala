@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyInstances}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -397,15 +397,26 @@ object LedgerClient {
     sealed abstract class TreeUpdate extends Product with Serializable
 
     final case class TransactionTreeUpdate(tree: TransactionTree) extends TreeUpdate
+    final case class TransferUpdate(transfer: Transfer[TransferEvent]) extends TreeUpdate
 
-    final case class Transfer(
+    final case class Transfer[+E](
         updateId: String,
         offset: LedgerOffset.Absolute,
-        event: TransferEvent,
-    ) extends TreeUpdate
+        submitter: PartyId,
+        event: E & TransferEvent,
+    ) extends PrettyPrinting {
+      override def pretty: Pretty[this.type] =
+        prettyOfClass(
+          param("updateId", (x: this.type) => x.updateId)(PrettyInstances.prettyString),
+          param("offset", (x: this.type) => x.offset.getOffset)(PrettyInstances.prettyString),
+          param("submitter", _.submitter),
+          param("event", _.event),
+        )
+    }
     object Transfer {
-      private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer = {
+      private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer[TransferEvent] = {
         val offset = new LedgerOffset.Absolute(proto.offset)
+        val submitter = PartyId.tryFromProtoPrimitive(proto.submitter)
         val event = proto.event match {
           case xfr.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
           case xfr.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
@@ -415,6 +426,7 @@ object LedgerClient {
         Transfer(
           proto.updateId,
           offset,
+          submitter,
           event,
         )
       }
@@ -485,7 +497,7 @@ object LedgerClient {
         _.treeUpdate match {
           case TU.TransactionTree(tree) =>
             TransactionTreeUpdate(TransactionTree fromProto scalapbToJava(tree)(_.companion))
-          case TU.Transfer(x) => GetTreeUpdatesResponse.Transfer.fromProto(x)
+          case TU.Transfer(x) => TransferUpdate(GetTreeUpdatesResponse.Transfer.fromProto(x))
           case TU.Empty => sys.error("uninitialized update service result")
         }
       })

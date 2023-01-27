@@ -135,7 +135,9 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def updateTransferOuts(
       domainId: DomainId,
       filter: PartyId,
-  ): Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed]
+  ): Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
+    LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+  ], NotUsed]
 
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
@@ -365,12 +367,13 @@ object CoinLedgerConnection {
         }
 
       private def interpretCreateFilter(filter: IngestionFilter): CreatedEvent => Boolean = {
-        val IngestionFilter(primaryParty @ _, templateIds, interfaceIds) = filter
+        val IngestionFilter(primaryParty, templateIds, interfaceIds) = filter
         ce =>
-          templateIds(ce.getTemplateId) ||
-            Seq(ce.getInterfaceViews, ce.getFailedInterfaceViews).exists(
-              _.keySet.asScala exists interfaceIds
-            )
+          ce.hasStakeholder(primaryParty) &&
+            (templateIds(ce.getTemplateId) ||
+              Seq(ce.getInterfaceViews, ce.getFailedInterfaceViews).exists(
+                _.keySet.asScala exists interfaceIds
+              ))
       }
 
       override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
@@ -496,14 +499,18 @@ object CoinLedgerConnection {
               domainId = domainId,
             )
           )
-          .mapConcat(_.discardTransfers.flatMap(DecodeUtil.decodeAllCreatedTree(companion)(_)))
+          .mapConcat(_.discardTransfers.flatMap(DecodeUtil.treeToCreated(_)))
+          .filter(_.hasStakeholder(party))
+          .mapConcat(DecodeUtil.decodeCreated(companion)(_).toList)
       }
 
       def updateTransferOuts(
           domainId: DomainId,
           party: PartyId,
-      ): Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] = {
-        import LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+      ): Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
+        LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      ], NotUsed] = {
+        import LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent, TransferUpdate}
         coinLedgerClient.client
           .updates(
             LedgerClient.GetUpdatesRequest(
@@ -515,8 +522,9 @@ object CoinLedgerConnection {
             )
           )
           .mapConcat { response =>
-            response.updates.collect { case Transfer(_, _, out: TransferEvent.Out) =>
-              out
+            response.updates.collect {
+              case TransferUpdate(Transfer(updateId, offset, submitter, out: TransferEvent.Out)) =>
+                Transfer(updateId, offset, submitter, out)
             }
           }
       }
@@ -810,4 +818,12 @@ object CoinLedgerConnection {
     IngestionFilter(partyId, templateIds = Set(templateId), interfaceIds = Set.empty)
 
   def uniqueId: String = UUID.randomUUID.toString
+
+  implicit class CreatedEventSyntax(private val event: CreatedEvent) extends AnyVal {
+    // We want to match ledger API ACS filtering here so we only include stakeholder contracts.
+    def hasStakeholder(party: PartyId): Boolean = {
+      val p = party.toProtoPrimitive
+      event.getSignatories.asScala.contains(p) || event.getObservers.asScala.contains(p)
+    }
+  }
 }

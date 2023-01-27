@@ -1,14 +1,14 @@
-package com.daml.network.wallet.automation
+package com.daml.network.automation
 
+import com.daml.network.store.DomainStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{OnTransferOutTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
-import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -16,10 +16,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferInTrigger(
     override protected val context: TriggerContext,
-    store: UserWalletStore,
+    domains: DomainStore,
     connection: CoinLedgerConnection,
     globalDomain: DomainAlias,
     domainId: DomainId,
+    partyId: PartyId,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -27,28 +28,35 @@ class TransferInTrigger(
 ) extends OnTransferOutTrigger(
       connection,
       domainId,
-      store.key.endUserParty,
+      partyId,
     ) {
 
   override protected lazy val loggerFactory: NamedLoggerFactory =
     super.loggerFactory.append("domainId", domainId.toProtoPrimitive)
 
   override protected def completeTask(
-      transferOut: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      transferOut: LedgerClient.GetTreeUpdatesResponse.Transfer[
+        LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      ]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      globalDomainId <- store.domains.getDomainId(globalDomain)
+      globalDomainId <- domains.getDomainId(globalDomain)
       outcome <-
-        for {
-          _ <- connection.submitTransferNoDedup(
-            submitter = store.key.endUserParty,
-            command = LedgerClient.TransferCommand.In(
-              transferOutId = transferOut.transferOutId,
-              source = transferOut.source,
-              target = transferOut.target,
-            ),
+        if (partyId == transferOut.submitter) {
+          for {
+            _ <- connection.submitTransferNoDedup(
+              submitter = partyId,
+              command = LedgerClient.TransferCommand.In(
+                transferOutId = transferOut.event.transferOutId,
+                source = transferOut.event.source,
+                target = transferOut.event.target,
+              ),
+            )
+          } yield show"Initiated transfer in of ${transferOut.event.contractId.contractId} from ${transferOut.event.source} to ${transferOut.event.target}"
+        } else {
+          Future.successful(
+            show"Ignoring tranfer out of ${transferOut.event.contractId.contractId}, not initiated by our party"
           )
-        } yield show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
-
+        }
     } yield TaskSuccess(outcome)
 }

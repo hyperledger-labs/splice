@@ -301,10 +301,13 @@ abstract class OnTransferOutTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out] {
+) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.Transfer[
+      LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+    ]] {
 
-  override protected val source
-      : Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] =
+  override protected val source: Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
+    LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+  ], NotUsed] =
     connection
       .updateTransferOuts(
         domainId,
@@ -314,7 +317,9 @@ abstract class OnTransferOutTrigger(
   // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
   // we can implement this properly.
   override final protected def isStaleTask(
-      task: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      task: LedgerClient.GetTreeUpdatesResponse.Transfer[
+        LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      ]
   )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
 
 }

@@ -272,7 +272,9 @@ object AcsStore {
     def ingestTransaction(tx: TransactionTree)(implicit traceContext: TraceContext): Future[Unit]
 
     /** Ingest a transfer in/out served by the update stream. */
-    def ingestTransfer(transfer: GetTreeUpdatesResponse.Transfer)(implicit
+    def ingestTransfer(
+        transfer: GetTreeUpdatesResponse.Transfer[GetTreeUpdatesResponse.TransferEvent]
+    )(implicit
         traceContext: TraceContext
     ): Future[Unit]
 

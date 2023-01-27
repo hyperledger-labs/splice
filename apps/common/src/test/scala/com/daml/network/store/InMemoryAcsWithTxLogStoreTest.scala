@@ -202,9 +202,10 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  private def mkTransfer(offset: String, event: TransferEvent): Transfer =
+  private def mkTransfer(offset: String, event: TransferEvent): Transfer[TransferEvent] =
     Transfer(
       updateId = "",
+      submitter = userParty(1),
       offset = new LedgerOffset.Absolute(offset),
       event = event,
     )
