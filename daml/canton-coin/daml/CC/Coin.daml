@@ -16,6 +16,7 @@ import qualified DA.Text
 import DA.Traversable (forA)
 import DA.Time
 
+import CC.Expiry
 import CC.Fees
 import CC.Issuance
 import CC.Round
@@ -24,7 +25,6 @@ import CC.Util
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
 
-import CN.Time
 import CN.Util.Assert
 
 -- | A Canton Coin, which can be locked and whose amount expires over time.
@@ -625,46 +625,6 @@ checkTransferConstraints transfer summary config
     | summary.amountBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ ITR_Other $ "There needs to be at least one floating output coin to receive excess input amount" <> show summary.amountBalance
     | otherwise = Right ()
 
--- | Compute the latest round that opens before `9999-12-31T23.59.59.99999Z`
-maxTargetRound : CoinConfig CC -> OpenMiningRound -> API.Round
-maxTargetRound config currentMiningRound =
-  let maxRelTime = subTime maxTime currentMiningRound.opensAt
-      maxRelRound = RelRound $ (convertRelTimeToMicroseconds maxRelTime) / (convertRelTimeToMicroseconds config.tickDuration) + 1
-  in addRelRound currentMiningRound.round maxRelRound
-
-estimateOpenRoundCreatedAt : CoinConfig CC -> OpenMiningRound -> API.Round -> EstimatedTime
-estimateOpenRoundCreatedAt config currentMiningRound targetRound
-  | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
-  | targetRound > maxTargetRound config currentMiningRound = AfterMaxTime
-  | otherwise =
-    let relRound = subRound targetRound currentMiningRound.round
-        -- Note: To estimate the time when the target open mining round is being created but not yet open,
-        -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
-        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.tickDuration)
-        t = addRelTime currentMiningRound.opensAt relTime
-    in EstimatedAt t
-
-doesLockExpireBeforeCoin : ActionCatch m => Time -> OpenMiningRound -> API.TimeLock -> ExpiringAmount -> CoinConfig CC -> m Bool
-doesLockExpireBeforeCoin currentTime currentOpenRound lock e config = do
-  -- Note: we exploit that there are exactly three open rounds active at any
-  -- point in time; and we ensure that a coin can be expired as soon as it can
-  -- definitely not be used as an input to transfer anymore.
-  let expiringRound = addRelRound (amountExpiresAt e) (RelRound 2)
-      coinExpiresAt = estimateOpenRoundCreatedAt config currentOpenRound expiringRound
-  case coinExpiresAt of
-    EstimatedAt t -> pure $ lock.expiresAt < t
-    -- computed coin expiry time is too large to be represented by DA.Time (because the coin has a large value).
-    -- Therefore, the lock expires before the coin.
-    AfterMaxTime -> pure True
-
--- | An estimation of a time point that can be too far in the future to be
--- represented using the `Time` type.
-data EstimatedTime
-  = EstimatedAt with
-      t : Time
-  | AfterMaxTime -- ^ Some time larger than 9999-12-31T23:59:59.999999Z
-  deriving (Eq, Ord, Show)
-
 -- | Execute a transfer.
 --
 executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update API.TransferResult
@@ -1124,8 +1084,8 @@ createTransferOutputs currentTime currentOpenRound config svc outs =
         Some lock -> do
           -- We require the lock to expire before the coin to allow CN app authors to
           -- assume that a locked coin is never archived by the SVC while the lock is held.
-          isLockExpiresBeforeCoin <- doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount config
-          require "lock expires before coin" (isLockExpiresBeforeCoin)
+          require "lock expires before coin" 
+            (doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount config.tickDuration)
           API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
 
 -- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
@@ -1151,7 +1111,7 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- Note: we exploit that there are exactly three open rounds active at any
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
-  require "Coin is expired" ((amountExpiresAt coin.amount).number <= round.round.number - 2)
+  require "Coin is expired" (isCoinExpired round coin.amount)
 
 -- Check constraints on config params on which the implementation of the choices relies
 validCoinConfig : CoinConfig currency -> Bool

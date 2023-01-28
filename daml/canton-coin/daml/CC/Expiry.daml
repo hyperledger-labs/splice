@@ -1,0 +1,187 @@
+-- | Functions for computing coin and lock expiry times and conditions.
+module CC.Expiry
+  ( BoundedSet(..)
+  , doesLockExpireBeforeCoin
+  , isCoinExpired
+  -- for testing
+  , amountExpiresAt
+  , estimateOpenRoundCreatedAt
+  , maxInt
+  , maxDecimal
+  , minTime
+  , maxTime
+  ) 
+  where
+
+import CC.Fees
+import CC.Round
+
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
+
+import DA.BigNumeric
+import DA.Date
+import DA.Time
+
+
+-- Representing sets of values with uppper bounds
+--------------------------------------------------
+
+-- | A symbolic representation of a set of values of type `a` useful for computing upper-bounds.
+data BoundedSet a
+  = Singleton a     -- ^ `Singleton x` represents the singleton set `{x}`
+  | AfterMaxBound
+    -- ^ `AfterMaxBound` represents the set of all values larger than the maximal value that can be represented by type `a`
+  deriving (Eq, Show)
+
+-- Note: be careful when using this instance: `fmap (- 100) AfterMaxBound` will return
+-- `AfterMaxBound`, but should actually return an error.
+instance Functor BoundedSet where
+  fmap f (Singleton x) = Singleton (f x)
+  fmap _ AfterMaxBound = AfterMaxBound
+
+
+-- BoundeSet Int
+----------------
+
+maxInt : Int
+maxInt = maxBound
+
+-- | Add a positive integer to a bounded set.
+addBoundedInt : Int -> BoundedSet Int -> BoundedSet Int
+addBoundedInt x 
+  | x < 0 = error $ "addBoundedInt: negative first operand " <> show x
+  | otherwise = addBounded
+  where
+    addBounded AfterMaxBound = AfterMaxBound
+    addBounded (Singleton y)
+      | y <= maxInt - x = Singleton (x + y)
+      | otherwise = AfterMaxBound
+
+-- | Multiply two positive integers and represent its result as bounded set.
+boundedTimes : Int -> Int -> BoundedSet Int
+boundedTimes x y
+  | x < 0 = error $ "boundedTimes: negative first operand " <> show x
+  | y < 0 = error $ "boundedTimes: negative second operand " <> show y
+  | x > maxInt / y = AfterMaxBound
+  | otherwise = Singleton (x * y)
+
+
+-- BoundedSet Decimal
+---------------------
+
+maxDecimal : Decimal
+maxDecimal = 9999999999999999999999999999.9999999999
+
+-- | Divide two positive decimal numbers such that a division by a number between 0.0 and 1.0 does
+-- not result in an overflow, but is instead captured as a bounded set. 
+-- Rounding mode RoundingCeiling is used for the division.
+boundedDivCeilingDecimal : Decimal -> Decimal -> BoundedSet Decimal
+boundedDivCeilingDecimal x y
+  | x <= 0.0 = error $ "boundedDivCeilingDecimal: negative first operand " <> show x
+  | y <= 0.0 = error $ "boundedDivCeilingDecimal: negative second operand " <> show y
+  | y < 1.0 && x > maxDecimal * y = AfterMaxBound
+  | otherwise = let d = div 10 RoundingCeiling (fromNumeric x) (fromNumeric y)
+                in Singleton (fromBigNumeric d)
+
+maxIntAsDecimal : Decimal
+maxIntAsDecimal = intToDecimal maxBound
+
+-- | Compute the ceiling of a decimal as a bounded int.
+boundedCeiling : BoundedSet Decimal -> BoundedSet Int
+boundedCeiling (Singleton x)
+  | x > maxIntAsDecimal = AfterMaxBound
+  | otherwise = Singleton (ceiling x)
+boundedCeiling AfterMaxBound = AfterMaxBound
+
+
+-- BoundedSet RelRound
+-----------------------
+
+maxRelRound : RelRound
+maxRelRound = RelRound maxInt
+
+-- | Add a BoundedSet of RelRound to a positive Round. 
+addBoundedRelRound : API.Round -> BoundedSet RelRound -> BoundedSet API.Round
+addBoundedRelRound (API.Round x) y = API.Round <$> addBoundedInt x ((.diff) <$> y)
+
+-- | Add a positive RelRound to BoundedSet of Round. 
+addToBoundedRound : BoundedSet API.Round -> RelRound -> BoundedSet API.Round
+addToBoundedRound x (RelRound y) = API.Round <$> addBoundedInt y ((.number) <$> x)
+
+
+-- BoundedSet Time
+------------------
+
+-- | The smallest time point that can be represented by the `Time` type.
+minTime = time (date 1 Jan 1) 0 0 0
+
+-- | The largest time point that can be represented by the `Time` type.
+maxTime = let oneSecMinusOneMicro = convertMicrosecondsToRelTime ( convertRelTimeToMicroseconds (seconds 1) - 1 )
+          in addRelTime (time (date 9999 Dec 31) 23 59 59) oneSecMinusOneMicro
+
+-- | Add a RelTime to a Time such that the addition will not result in 
+-- an overflow , but is instead captured as a bounded set. 
+addBoundedRelTime : Time -> BoundedSet RelTime -> BoundedSet Time
+addBoundedRelTime d (Singleton rt)
+  | rt > subTime maxTime d = AfterMaxBound
+  | otherwise = Singleton (addRelTime d rt)
+addBoundedRelTime d AfterMaxBound = AfterMaxBound
+
+-- | Check if a time is less than a bounded set.
+-- If the bounded set is a `AfterMaxBound`, it will already return true.
+boundedLessTime : Time -> BoundedSet Time -> Bool
+boundedLessTime t1 (Singleton t2) = t1 < t2
+boundedLessTime _ AfterMaxBound = True
+
+
+-- Amount expiry
+----------------
+
+-- | Compute number of rounds that the amount is expired with the specified rate
+spentWithRatePerRound : RatePerRound -> Decimal -> BoundedSet RelRound
+spentWithRatePerRound rate amount =
+    RelRound <$> boundedCeiling roundsUntilExpired
+  where
+    roundsUntilExpired = amount `boundedDivCeilingDecimal` rate.rate
+
+-- | Compute the round where the coin expires. i.e. the coin is fully expired.
+amountExpiresAt : ExpiringAmount -> BoundedSet API.Round
+amountExpiresAt e =
+  e.createdAt `addBoundedRelRound` spentWithRatePerRound e.ratePerRound e.initialAmount
+
+-- | `estimateOpenRoundCreatedAt tickDuration currentMiningRound targetRound` estimates
+-- creation `Time` of a specified `targetRound`.
+estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet API.Round -> BoundedSet Time
+estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRound)
+  | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
+  | otherwise = do
+    let relRound = subRound targetRound currentMiningRound.round
+    -- Note: To estimate the time when the target open mining round is being created but not yet open,
+    -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
+        relMicros = (relRound.diff - 1) `boundedTimes` (convertRelTimeToMicroseconds tickDuration)
+        relTime = convertMicrosecondsToRelTime <$> relMicros
+    addBoundedRelTime currentMiningRound.opensAt relTime
+estimateOpenRoundCreatedAt config currentMiningRound AfterMaxBound = AfterMaxBound
+
+-- | `doesLockExpireBeforeCoin` computes whether a `TimeLock` expires before a `Coin`
+doesLockExpireBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringAmount -> RelTime -> Bool
+doesLockExpireBeforeCoin currentTime currentOpenRound lock e tickDuration =
+  let r = amountExpiresAt e
+      -- Note: we exploit that there are exactly three open rounds active at any
+      -- point in time;(Singleton  and we ensure that a coin can be expired as soon as it can
+      -- definitely not be used as an input to transfer anymore.
+      expiringRound = addToBoundedRound r (RelRound 2)
+      coinExpiresAt = estimateOpenRoundCreatedAt tickDuration currentOpenRound expiringRound
+  in lock.expiresAt `boundedLessTime` coinExpiresAt
+
+-- | `isCoinExpired openRound coinAmount` computes whether the expiring `coinAmount`
+-- is definitely expired in case the `openRound` is open.
+isCoinExpired : OpenMiningRound -> ExpiringAmount -> Bool
+isCoinExpired round coinAmount =
+  let expiresAtRound = amountExpiresAt coinAmount
+  in case expiresAtRound of
+    -- Expiring round cannot be represented by API.Round due to coin amount is too large.
+    -- This coin will never expire unless it is broken into smaller amount.
+    Singleton x -> x.number <= round.round.number - 2
+    AfterMaxBound -> False

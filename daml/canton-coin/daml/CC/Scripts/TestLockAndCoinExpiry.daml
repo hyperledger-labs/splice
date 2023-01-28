@@ -6,6 +6,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.Fees
+import CC.Expiry
 import CC.Round
 import CC.Scripts.Parameters
 import CC.Scripts.Util
@@ -13,10 +14,7 @@ import CC.Scripts.Util
 import DA.Action
 import DA.Exception
 import DA.Foldable (forA_)
-import DA.Date
 import DA.Time
-
-import CN.Time
 
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
@@ -45,28 +43,6 @@ test = script do
       openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
       
-
-  let almostMax = time (date 9999 Dec 31) 23 57 30
-  -- estimated to be at 9999-12-31T23:57:30.000000Z
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 1678408704) === (EstimatedAt (almostMax))
-  -- estimated to be at 10000-01-01T00:00:00.000000Z, which is larger than max value of DA.Time. ie, 9999-12-31T23:59:59.999999Z
-  -- this will be regarded as never expired. (AfterMaxTime)
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 1678408705) === AfterMaxTime
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 61489146914) === AfterMaxTime
-
-  -- estimate the creation time of round relative to round 0
-  assertError(\_ -> estimateOpenRoundCreatedAt config openRound0 (API.Round (-1)))
-  assertError(\_ -> estimateOpenRoundCreatedAt config openRound0 (API.Round (0)))
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 1) === (EstimatedAt t00_00) -- T00:00:00
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 2) === (EstimatedAt t02_30) -- T00:02:30
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 3) === (EstimatedAt t05_00) -- T00:05:00
-
-  -- estimate the creation time of round relative to round 3
-  assertError(\_ -> estimateOpenRoundCreatedAt config openRound0 (API.Round (3)))
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 4) === (EstimatedAt t07_30) -- T00:07:30
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 5) === (EstimatedAt t10_00) -- T00:10:00
-  estimateOpenRoundCreatedAt config openRound0 (API.Round 6) === (EstimatedAt t12_30) -- T00:12:30
-
   alice <- setupUser app "alice" app.svc
   -- Lock expires at T00:12:30
   let lockExpiresAt12_30 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
@@ -81,32 +57,27 @@ test = script do
   -- it can definitely not be used as an input to transfer anymore.
   -- This coin can still be used until round 7 (5 + 2) which is created at T00:15:00 and opens at T00:17:30
   let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.holdingFee.rate * 3.5; createdAt = API.Round 1; ratePerRound = config.holdingFee
-  amountExpiresAt amountExpiresAtRound5 === API.Round 5
-  estimateOpenRoundCreatedAt config openRound3 (addRelRound (amountExpiresAt amountExpiresAtRound5) (RelRound 2)) === (EstimatedAt t15_00)
+  let bounded = amountExpiresAt amountExpiresAtRound5
+  bounded === Singleton (API.Round 5)
+  let (Singleton r) = bounded
+  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Singleton t15_00
+
+  -- lock expires at T00:12:30 before coin expires at T00:15:00
+  let lockExpireBeforeCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
+  assert lockExpireBeforeCoin
 
   -- lock expires at T00:15:00 while coin expires at T00:15:00
-  lockExpiresAsCoin <- doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config
+  let lockExpiresAsCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
   assert $ not lockExpiresAsCoin
 
   -- lock expires at T00:17:30 after coin expires at T00:15:00
-  lockExpiresAfterCoin <- doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config
+  let lockExpiresAfterCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
   assert $ not lockExpiresAfterCoin
 
   let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = config.holdingFee
   -- lock expires at T00:12:30 before coin with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
-  lockExpiresBeforeLargeCoin <- doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 largeAmount config
+  let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
   assert lockExpiresBeforeLargeCoin
-
-  -- lock expires at T00:12:30 before coin expires at T00:15:00
-  doesLockExpireBeforeCoin <- doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config
-  assert doesLockExpireBeforeCoin
-
-testAddRelTimeMaxTime : Script ()
-testAddRelTimeMaxTime = script do
-  let stillMaxTime = addRelTime maxTime (convertMicrosecondsToRelTime 0)
-  -- error due to adding one micro second since the epoch is too large to be represented by DA.Time.
-  assertError(\_ -> addRelTime maxTime (convertMicrosecondsToRelTime 1))
-  pure ()
 
 -- From #2336, This test case is to make sure we handle DA.Time overflow 
 -- in estimateOpenRoundCreatedAt when the coin amount is too large
@@ -118,7 +89,8 @@ testLargeCoinExpiry = script do
   let coinPrice = 2.5
       config = scaleFees (1.0 / coinPrice) defaultCoinConfig
       e = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = config.holdingFee
-      expiringRound = addRelRound (amountExpiresAt e) (RelRound 2)
+      Singleton r = amountExpiresAt e
+      expiringRound = Singleton $ addRelRound r (RelRound 2)
       currentMiningRound = OpenMiningRound with 
         svc = app.svc
         round = API.Round 1
@@ -128,7 +100,7 @@ testLargeCoinExpiry = script do
         targetClosesAt = addRelTime now (minutes 5)
         issuingFor = minutes 5
  
-  estimateOpenRoundCreatedAt config currentMiningRound expiringRound === AfterMaxTime
+  estimateOpenRoundCreatedAt config.tickDuration currentMiningRound expiringRound === AfterMaxBound
   pure ()
 
 -- This will not abort when there is no error throw
@@ -232,17 +204,6 @@ testExpireCoin = do
   [(_, onlyCoin)] <- query @Coin alice.primaryParty
   onlyCoin.amount.initialAmount === 1.0
   pure ()
-
--- | Test that the `Ord` instance for `EstimatedTime` puts `AfterMaxTime` last
-testEstimatedTime: Script()
-testEstimatedTime = do
-  let epochTime = time (date 1970 Jan 1) 0 0 0 
-  assert $ EstimatedAt minTime < EstimatedAt epochTime
-  assert $ EstimatedAt epochTime < EstimatedAt maxTime
-  assert $ EstimatedAt epochTime < EstimatedAt maxTime
-  assert $ EstimatedAt minTime < AfterMaxTime
-  assert $ EstimatedAt epochTime < AfterMaxTime
-  assert $ EstimatedAt maxTime < AfterMaxTime
 
 advanceRound : CCApp -> API.Round -> Script (ContractId OpenMiningRound)
 advanceRound app expectedRound  = do

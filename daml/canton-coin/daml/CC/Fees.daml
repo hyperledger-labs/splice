@@ -5,6 +5,7 @@ import CC.API.V1.Round (Round(..))
 import CC.Round
 import DA.Time
 
+
 -- Time utilities
 -----------------
 
@@ -29,10 +30,6 @@ newtype RatePerRound = RatePerRound with rate : Decimal
 
 chargeRatePerRound : RatePerRound -> RelRound -> Decimal
 chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
-
--- | TODO(tech-debt): better name
-spentWithRatePerRound : RatePerRound -> Decimal -> RelRound
-spentWithRatePerRound rate amount =  RelRound (ceiling $ amount / rate.rate)
 
 -- | Scale a round rate such that
 --
@@ -102,10 +99,6 @@ data ExpiringAmount = ExpiringAmount with
     createdAt : Round
     ratePerRound : RatePerRound
   deriving (Eq, Ord, Show)
-
--- TODO(M3-90) This does not handle time overflows.
-amountExpiresAt : ExpiringAmount -> Round
-amountExpiresAt e = e.createdAt `addRelRound` spentWithRatePerRound e.ratePerRound e.initialAmount
 
 validExpiringAmount : ExpiringAmount -> Bool
 validExpiringAmount e = e.initialAmount > 0.0
