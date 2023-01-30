@@ -107,19 +107,16 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
                   ).asJava,
                   Seq[v1.coin.TransferOutput](
                     new v1.coin.transferoutput.OutputSenderCoin(
-                      Some(amount.bigDecimal).toJava,
+                      amount.bigDecimal,
                       Some(
                         new v1.coin.TimeLock(
                           Seq(userParty.toProtoPrimitive).asJava,
                           expiration.toInstant,
                         )
                       ).toJava,
-                    ),
-                    new v1.coin.transferoutput.OutputSenderCoin(
-                      None.toJava,
-                      None.toJava,
-                    ),
+                    )
                   ).asJava,
+                  true,
                   "lock coins",
                 ),
                 new v1.coin.TransferContext(

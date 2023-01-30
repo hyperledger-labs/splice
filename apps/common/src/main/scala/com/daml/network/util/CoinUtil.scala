@@ -124,11 +124,7 @@ object CoinUtil {
   ): cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
-    new cc.fees.FixedFee(BigDecimal(0.09).bigDecimal),
-
-    // Fee to update an existing coin.
-    // Cost covering and 10x lower than creation to strongly incentivize merging coins.
-    new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
+    new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal),
 
     // Fee for keeping a coin around.
     // This is roughly equivalent to 1$/360 days but expressed as rounds
@@ -151,7 +147,7 @@ object CoinUtil {
     // Fee per lock holder.
     // Chosen to match the update fee to cover the cost of informing lock-holders about
     // actions on the locked coin.
-    new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
+    new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal),
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),

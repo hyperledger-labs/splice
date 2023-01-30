@@ -10,51 +10,63 @@ import Daml.Script
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
 
+
 testUsageFees: Script ()
 testUsageFees = do
   app <- setupApp
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator 
+  bob <- setupUser app "bob" validator
   coin1 <- tap app alice 33.0
   coin2 <- tap app alice 33.0
   coin3 <- tap app alice 34.0
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
+  let outputAmount1 = 89.87
+      outputAmount2 = 10.0
   transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
     transfer = API.Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
       inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[coin1, coin2, coin3]
       outputs = [ API.OutputSenderCoin with
-                    exactAmount = Some 10.0
+                    amount = outputAmount1
                     lock = None
-                  , API.OutputSenderCoin with
-                    exactAmount = None
-                    lock = None
-                  , API.OutputReceiverCoin bob.primaryParty $ API.FixedReceiverCoin with
-                    amount = 10.0
+                , API.OutputReceiverCoin with
+                    receiver = bob.primaryParty
+                    amount = outputAmount2
                     senderTransferFeeRatio = 0.6
-                  , API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin ]
+                ]
+      returnSenderChange = True
       payload = "test"
     context = context.context
+
   let config = scaleFees 1.0 defaultCoinConfig
-      expectedCreateFee : Decimal = 0.09
-      expectedUpdateFee : Decimal = 0.01 * 3.0
-      expectedSenderTransferFee = (chargeSteppedRate config.transferFee 10.0) * 0.6
-      expectedReceiverTransferFee = (chargeSteppedRate config.transferFee 10.0) * 0.4
-      excessAmount = 100.0 - (config.holdingFee.rate * 3.0) - 10.0 - 10.0 - expectedCreateFee - expectedUpdateFee - expectedSenderTransferFee
-      floatingSenderAmount = excessAmount / 2.0
-      expectedFloatingReceiverTransferFee = chargeSteppedRate config.transferFee floatingSenderAmount
-      floatingReceiverAmount = floatingSenderAmount - expectedFloatingReceiverTransferFee
+      expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
+      expectedSenderTransferFee = expectedTransferFee * 0.6
+      expectedReceiverTransferFee = expectedTransferFee * 0.4
+      holdingFees = config.holdingFee.rate * 3.0
+      outputFees = [config.createFee.fee, expectedTransferFee]
+      senderChangeFee =
+        100.0 - holdingFees - outputAmount1 - outputAmount2
+        - config.createFee.fee - expectedSenderTransferFee
+  assertMsg "Partial sender change fee"
+    (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
+  transferResult.summary === API.TransferSummary with
+    inputRewardAmount = 0.0
+    inputCoinAmount = 100.0
+    holdingFees
+    outputFees
+    senderChangeFee
+    senderChangeAmount = 0.0
 
   aliceCoins <- query @Coin alice.primaryParty
   bobCoins <- query @Coin bob.primaryParty
-  sort (map (\(_, c) -> c.amount.initialAmount) aliceCoins) === [1.0, 10.0, floatingSenderAmount]
-  sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, 10.0 - expectedReceiverTransferFee, floatingReceiverAmount ]
+  sort (map (\(_, c) -> c.amount.initialAmount) aliceCoins) === [1.0, outputAmount1]
+  sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, outputAmount2 - expectedReceiverTransferFee]
+  transferResult.summary.outputFees === [0.03, expectedTransferFee]
 
-  transferResult.summary.usageFees === expectedCreateFee + expectedSenderTransferFee + expectedReceiverTransferFee + expectedFloatingReceiverTransferFee
   return ()
 
 testCoinUsedInRoundBeforeItsCreation: Script ()
@@ -83,10 +95,9 @@ testCoinUsedInRoundBeforeItsCreation = do
       sender = alice.primaryParty
       provider = alice.primaryParty
       inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
-      outputs = [ API.OutputSenderCoin with
-                    exactAmount = None
-                    lock = None
-                  , API.OutputReceiverCoin bob.primaryParty $ API.FixedReceiverCoin with
+      returnSenderChange = True
+      outputs = [ API.OutputReceiverCoin with
+                    receiver = bob.primaryParty
                     amount = 10.0
                     senderTransferFeeRatio = 0.6 ]
       payload = "test"
@@ -95,7 +106,7 @@ testCoinUsedInRoundBeforeItsCreation = do
   -- Input amount is exactly 100.0.
   -- There is no negative amount of holding fee
   -- i.e., no extra holding fee added to the input amount value.
-  transferResult.summary.inAmount === 100.0
-  transferResult.summary.senderHoldingFees === 0.0
+  transferResult.summary.inputCoinAmount === 100.0
+  transferResult.summary.holdingFees === 0.0
 
   return ()

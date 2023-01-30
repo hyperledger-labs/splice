@@ -28,8 +28,7 @@ test = script do
     let amounts = [1.0, 2.0, 101.0]
     fees <- submitUser alice.userId $ exerciseCmd test Test_ComputeFees with ..
     fees === (
-        0.01 * 1.0 + -- update 1 coin
-        0.09 * 2.0 + -- create 2 coins
+        0.03 * 3.0 + -- create three coins
         0.01 * (1.0 + 2.0 + 100.0) + 0.001 * 1.0 -- stepped transfer fees
         )
     pure()

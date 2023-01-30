@@ -11,7 +11,7 @@ import CN.Wallet.Payment
 import CC.Scripts.Util
 
 testTransferOffers = script do
-  
+
   app <- setupApp
   runNextIssuance app
   runCoinDepositBots app
@@ -97,7 +97,7 @@ testTransferOffers = script do
   tap app alice 150.0
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
   outcomes <- completeTransfer accepted coin transferContext
+  trace outcomes $ pure ()
   let [COO_CompleteAcceptedTransfer result] = outcomes
 
   pure ()
-

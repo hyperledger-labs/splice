@@ -11,8 +11,6 @@ import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
-import CN.Util.Assert
-
 
 template TestSubscriptionContext
   with
@@ -139,7 +137,7 @@ testUSDSubscription = script do
 
   coins3 <- query @Coin pizzeria.primaryParty
   let amounts = map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2)
-  require "coin amounts are as expected" (amounts == [2.0, 1.9949825] || amounts == [1.9949825, 2.0]) -- TODO(#2100): double-check these values
+  sort amounts === [1.9849825, 2.0] -- TODO(#2100): double-check these values
 
   -- TODO(#2100): more thoroughly test rewards
   [(_, coupon1), (_, coupon2), (_, coupon3)] <- query @AppRewardCoupon provider.primaryParty

@@ -34,13 +34,13 @@ template TransferOffer
         controller receiver
       do
         pure ()
-          
+
     choice TransferOffer_Withdraw : ()
       with
         controller sender
       do
         pure ()
-          
+
 template AcceptedTransferOffer
   with
     sender : Party
@@ -72,22 +72,20 @@ template AcceptedTransferOffer
             outputs =
               [ API.OutputReceiverCoin with
                   receiver
-                  coinType = API.FixedReceiverCoin
-                    ccAmount
-                    senderTransferFeeRatio
-              , API.OutputSenderCoin with
-                  exactAmount = None
-                  lock = None
+                  amount = ccAmount
+                  senderTransferFeeRatio
               ]
+            returnSenderChange = True
             payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
         archive self
-        let [_, API.TransferResultCoin senderChange] = result.createdCoins
+        -- TODO(M3-01): allow not returning change
+        let Some senderChange = result.senderChangeCoin
         pure (result, senderChange)
 
     choice AcceptedTransferOffer_Withdraw : ()
       controller receiver
-      do 
+      do
         pure()
 
     choice AcceptedTransferOffer_Abort : ()

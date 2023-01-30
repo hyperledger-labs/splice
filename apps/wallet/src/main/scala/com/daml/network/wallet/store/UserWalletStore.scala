@@ -255,8 +255,7 @@ trait UserWalletStore
                 eventId = event.getEventId,
                 sender = tf.argument.value.transfer.sender,
               ),
-              balance =
-                tf.result.value.summary.selfOutAmount.subtract(tf.result.value.summary.inAmount),
+              balance = tf.result.value.summary.senderChangeAmount,
             )
           }
 

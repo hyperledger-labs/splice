@@ -56,11 +56,10 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     handleResultMergeInputs = \case
       Left errorMsg -> handleLeft errorMsg
       Right transferResult -> do
-        case transferResult.createdCoins of
-          [API.TransferResultCoin coin] ->
-            executeCoinOperationRec endUserP validatorP context ([API.InputCoin coin]) (COO_MergeTransferInputs (Some coin) :: prevResults) remainingOperations
-          otherwise -> handleLeft $ ITR_Other ("expected CO_MergeTransferInputs's transfer to result in a single result coin but received " <> show otherwise)
-    
+        let senderChange = transferResult.senderChangeCoin
+        let inputCoins = optional [] (\coin -> [API.InputCoin coin]) senderChange
+        executeCoinOperationRec endUserP validatorP context inputCoins (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
+
     handleResultTap : Either InvalidTransferReason (ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
@@ -79,7 +78,8 @@ mkMergeCoinAndRewardsTransfer endUserP inputs = do
         sender = endUserP
         provider = endUserP
         inputs = inputs
-        outputs = [API.OutputSenderCoin None None]
+        outputs = []
+        returnSenderChange = True
         payload = "mergeCoinsAndRewards"
   transfer
 
@@ -89,7 +89,7 @@ data CoinOperation
   | CO_CompleteAcceptedTransfer (ContractId AcceptedTransferOffer)
   | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
   | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
-  -- This CO is periodically sent by the wallet to automatically collect outstanding rewards and 
+  -- This CO is periodically sent by the wallet to automatically collect outstanding rewards and
   -- merge coin contracts
   | CO_MergeTransferInputs
   | CO_Tap with

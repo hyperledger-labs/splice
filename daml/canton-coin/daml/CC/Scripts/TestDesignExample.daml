@@ -13,6 +13,9 @@ import CC.Round
 import CC.Fees
 import CC.Scripts.Util
 
+arbiterPaymentAmount : Decimal
+arbiterPaymentAmount = 1.0
+
 template Escrow
   with
     svc : Party
@@ -39,23 +42,19 @@ template Escrow
                sender = p
                provider = arbiter
                payload = "refresh"
+               returnSenderChange = True
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
                  [ API.OutputSenderCoin with
-                     exactAmount = None
-                     lock = None
-                 , API.OutputSenderCoin with
-                     exactAmount = Some locked.amount.initialAmount
+                     amount = locked.amount.initialAmount
                      lock = Some API.TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
                  , API.OutputReceiverCoin with
                      receiver = arbiter
-                     coinType = API.FixedReceiverCoin with
-                       amount = 1.0
-                       senderTransferFeeRatio = 0.0
+                     amount = arbiterPaymentAmount
+                     senderTransferFeeRatio = 0.0
                  ]
-         -- TODO(M3-06): adjust design example to featured app right
          API.exerciseAppTransfer transferContext transfer
 
 -- | This matches the example in the design doc
@@ -72,6 +71,11 @@ test = do
   arbiter <- setupUser app "arbiter" app.svc
   featureApp app arbiter
 
+  -- retrieve the config
+  Some (_, CoinRules{config = coinConfig}) <- queryCoinRulesByKey app.svc
+
+  -- start the example
+
   tap app alice 1500.0
 
   escrow <- submitUser arbiter.userId $ createCmd (Escrow app.svc arbiter.primaryParty alice.primaryParty)
@@ -79,7 +83,8 @@ test = do
   t0 <- getTime
   (_, c0) <- getLatestOpenRound app
 
-  lockTo1 app alice arbiter.primaryParty 1000.25 (days 90) "lock"
+  let lockedCoinAmount = 1000.25
+  lockTo1 app alice arbiter.primaryParty lockedCoinAmount (days 90) "lock"
 
   -- check rewards that are issued for the locking tx
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 2)
@@ -87,7 +92,7 @@ test = do
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    amount = 0.01
+    amount = coinConfig.createFee.fee + coinConfig.lockHolderFee.fee
     round = API.Round 2
 
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
@@ -96,17 +101,19 @@ test = do
   skipNRounds app 39_999
   (_, c1) <- getLatestOpenRound app
 
-  pay app alice alice.primaryParty 5.0 "split"
+  let refreshCoinAmount = 5.0
+  pay app alice alice.primaryParty refreshCoinAmount "split"
   -- check reward issued by this payment
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 40002)
   appRewardCoupon === AppRewardCoupon with
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    amount = 0.14 -- 0.09 create fee + 0.05 transfer fee
+    -- TODO(M3-01): adjust this once we properly handle self-transfers
+    amount = coinConfig.createFee.fee + chargeSteppedRate coinConfig.transferFee refreshCoinAmount
     round = API.Round 40002
 
-  [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount == 5.0)
+  [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount == refreshCoinAmount)
 
   -- advance 10k rounds
   runNextIssuance app
@@ -123,20 +130,29 @@ test = do
     paymentCoin
     transferContext
 
-  -- TODO(#2148): adjust design example to changes due to rewards issuance
+  let lockedCoinFee = coinConfig.createFee.fee + coinConfig.lockHolderFee.fee
+      transferredCoinFee =
+        coinConfig.createFee.fee
+        + chargeSteppedRate coinConfig.transferFee arbiterPaymentAmount
+      holdingFees =
+        (chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c1.round)
+        + chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
+      outputFees = [lockedCoinFee, transferredCoinFee]
+      senderChangeAmount =
+        refreshCoinAmount
+        - arbiterPaymentAmount
+        - holdingFees
+        - lockedCoinFee
+        - coinConfig.createFee.fee -- fee for returning change
+        -- no subtraction of transferredCoinFee as that fee is paid by the receiver
+
   result.summary === API.TransferSummary with
-    inAmount = 1004.95
-    selfOutAmount = 1003.83
-    nonSelfOutAmount = 0.99
-    numInputs = 2
-    numOutputs = 3
-    amountBalance = 3.58
-    numFloatingCoins = 1
-    totalTransferFees = 0.01
-    senderAdminFees = 0.32
-    senderHoldingFees = 0.3
-    receiverTransferFees = 0.01
-    usageFees = 0.11
+    inputRewardAmount = 0.0
+    inputCoinAmount = refreshCoinAmount + lockedCoinAmount
+    holdingFees
+    outputFees
+    senderChangeAmount
+    senderChangeFee = coinConfig.createFee.fee
 
   allCoins <- query @Coin app.svc
   allLockedCoins <- query @LockedCoin app.svc
@@ -144,8 +160,6 @@ test = do
       newLockedCoins = map snd $ filter (\(cid, _) -> cid `notElem` prevLockedCoinCids) allLockedCoins
   length newCoins === 2
   length newLockedCoins === 1
-
-  Some (_, CoinRules{config = coinConfig}) <- queryCoinRulesByKey app.svc
 
   let Some newLocked = head newLockedCoins
       Some change = find (\c -> c.owner == alice.primaryParty) newCoins
@@ -161,22 +175,14 @@ test = do
   change === Coin with
     svc = app.svc
     owner = alice.primaryParty
-    amount =
-      let amount =
-            5.0
-            - 1.0 -- payment
-            - (chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c1.round) + chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
-            - 0.01 * 2.0 -- update & locking fee for locked coin
-            - 0.01 -- update fee for transfered coin
-            - 0.09 -- create fee for change
-      in expiringAmount coinConfig.holdingFee amount c2.round
+    amount = expiringAmount coinConfig.holdingFee senderChangeAmount c2.round
 
   let receiverTransferFee = chargeSteppedRate coinConfig.transferFee 1.0
   payment === Coin with
     svc = app.svc
     owner = arbiter.primaryParty
     amount =
-      let amount = 1.0 - receiverTransferFee
+      let amount = arbiterPaymentAmount - transferredCoinFee
       in expiringAmount coinConfig.holdingFee amount c2.round
 
   -- check app reward issued by the escrow refresh
@@ -185,19 +191,22 @@ test = do
     svc = app.svc
     provider = arbiter.primaryParty
     featured = True
-    amount = 0.11
+    amount =
+      -- rewards are issued for all output fees, but not the senderChangeFee
+      sum outputFees
     round = API.Round 50002
 
   -- check that the 'arbiter' does not receive featured app rewards when he's the provider
   runNextIssuance app
-  pay app arbiter alice.primaryParty 0.5 "reimbursement"
+  let reimbursementAmount = 0.5
+  pay app arbiter alice.primaryParty reimbursementAmount "reimbursement"
 
   [(_, appReward)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50003)
   appReward === AppRewardCoupon with
     svc = app.svc
     provider = arbiter.primaryParty
     featured = False -- not featured despite presenting their app right as part of the 'pay' function
-    amount = 0.005 -- only the transfer fee is considered a usage fee here, as we have two input coins
+    amount = coinConfig.createFee.fee + chargeSteppedRate coinConfig.transferFee reimbursementAmount
     round = API.Round 50003
 
   return ()

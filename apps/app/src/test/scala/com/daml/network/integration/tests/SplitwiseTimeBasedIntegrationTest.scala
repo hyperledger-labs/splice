@@ -193,12 +193,10 @@ class SplitwiseTimeBasedIntegrationTest
       )(
         "Rewards issued to splitwise",
         _ => {
-          // Redeeming the coupon generates a new reward coupon, so we are not checking that the list of reward coupons is empty here,
-          // but instead just that the original one has been archived
           splitwiseProviderWallet
             .listAppRewardCoupons()
             .map(_.contractId) should not contain couponId
-          checkWallet(splitwiseProviderParty, splitwiseProviderWallet, Seq((189.0, 190.0)))
+          checkWallet(splitwiseProviderParty, splitwiseProviderWallet, Seq((192.0, 193.0)))
         },
       )
 
@@ -228,12 +226,12 @@ class SplitwiseTimeBasedIntegrationTest
         },
       )(
         "Await another coupon",
-        _ => splitwiseProviderWallet.listAppRewardCoupons() should have length 2,
+        _ => splitwiseProviderWallet.listAppRewardCoupons() should have length 1,
       )
 
       actAndCheck("Advance three more rounds", Seq(1, 2, 3).foreach(_ => advanceRoundsByOneTick))(
         "Receive awards, but significantly smaller",
-        _ => checkWallet(splitwiseProviderParty, splitwiseProviderWallet, Seq((191.0, 191.5))),
+        _ => checkWallet(splitwiseProviderParty, splitwiseProviderWallet, Seq((194.0, 194.5))),
       )
     }
   }

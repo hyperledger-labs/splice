@@ -282,15 +282,12 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = d
         provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
+        returnSenderChange = True
         outputs =
-          [ API.OutputSenderCoin with
-              exactAmount = None
-              lock = None
-          , API.OutputReceiverCoin with
+          [  API.OutputReceiverCoin with
               receiver = recipient
-              coinType = API.FixedReceiverCoin with
-                amount = coinAmount
-                senderTransferFeeRatio = transferFeeRatio
+              amount = coinAmount
+              senderTransferFeeRatio = transferFeeRatio
           ]
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
@@ -312,12 +309,10 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
         provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
+        returnSenderChange = True
         outputs =
           [ API.OutputSenderCoin with
-              exactAmount = None
-              lock = None
-          , API.OutputSenderCoin with
-              exactAmount = Some coinAmount
+              amount = coinAmount
               lock = Some API.TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
@@ -363,11 +358,8 @@ runCoinDepositBots app = do
               map (API.InputAppRewardCoupon . toInterfaceContractId . fst) appRewardCoupons ++
               map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++
               map (API.InputCoin . toInterfaceContractId . fst) coins
-          outputs =
-            [ API.OutputSenderCoin with
-                exactAmount = None
-                lock = None
-            ]
+          outputs = []
+          returnSenderChange = True
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
       submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with transfer, context
 

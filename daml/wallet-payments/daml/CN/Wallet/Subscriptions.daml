@@ -304,18 +304,17 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
        inputs
        outputs =
          [ OutputSenderCoin with
-             exactAmount = Some lockAmount
+             amount = lockAmount
              lock = Some TimeLock with
                holders = dedupSort [provider, receiver]
                expiresAt = now `addRelTime` lockDuration
-         , OutputSenderCoin with
-             exactAmount = None
-             lock = None
          ]
+       returnSenderChange = True
        payload = "lock payment"
 
   result <- exercisePaymentTransfer context transfer
-  let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+  let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+  let Some senderChange = result.senderChangeCoin
 
   pure(lockedCoin, senderChange, targetAmount)
 
@@ -333,10 +332,10 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
         outputs =
           [ OutputReceiverCoin with
               receiver
-              coinType = FixedReceiverCoin with
-                amount = targetAmount
-                senderTransferFeeRatio = 1.0
+              amount = targetAmount
+              senderTransferFeeRatio = 1.0
           ]
+        returnSenderChange = False
         payload = "transfer locked payment"
   result <- exerciseAppTransfer transferContext transfer
   let [TransferResultCoin coinCid] = result.createdCoins

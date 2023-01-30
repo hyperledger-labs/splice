@@ -374,7 +374,6 @@ class TreasuryService(
     } yield Done
   }
 
-  // TODO(#2100): adjust for changed fee structure.
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
       coinInputsAndQuantity: Seq[(BigDecimal, InputCoin)],
@@ -382,31 +381,22 @@ class TreasuryService(
   )(implicit tc: TraceContext): Boolean = {
     val numCoinInputs = coinInputsAndQuantity.length
     val totalCoinQuantity = coinInputsAndQuantity.map(_._1).sum
-    if (numCoinInputs == 0) {
+    if (numCoinInputs <= 1) {
       val run = totalRewardsQuantity > config.createFee.fee
       // only log when there are actually some rewards to possibly collect.
       if (!run && totalRewardsQuantity != 0)
         logger.debug(
-          "Not executing a merge operation because there are no coin inputs " +
+          "Not executing a merge operation because there no coins to merge " +
             s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee ${config.createFee.fee}"
-        )
-      run
-    } else if (numCoinInputs == 1) {
-      val run = totalRewardsQuantity > config.updateFee.fee
-      // only log when there are actually some rewards to possibly collect.
-      if (!run && totalRewardsQuantity != 0)
-        logger.debug(
-          "Not executing a merge operation because there is only one coin-input and " +
-            s"the totalRewardsQuantity $totalRewardsQuantity is smaller than the update-fee ${config.updateFee.fee}"
         )
       run
     } else {
       val totalQuantity = totalRewardsQuantity + totalCoinQuantity
-      val run = totalQuantity > config.updateFee.fee
+      val run = totalQuantity > config.createFee.fee
       if (!run && totalQuantity != 0)
         logger.debug(
           "Not executing a merge operation because " +
-            s"the total rewards and coin quantity ${totalQuantity} is smaller than the update-fee ${config.updateFee.fee}"
+            s"the total rewards and coin quantity ${totalQuantity} is smaller than the create-fee ${config.createFee.fee}"
         )
       run
     }

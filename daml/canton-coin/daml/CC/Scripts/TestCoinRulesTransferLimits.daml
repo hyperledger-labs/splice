@@ -34,7 +34,7 @@ testTransferExceedsMaxInputs = do
     alice <- setupUser app "alice" validator
     bob <- setupUser app "bob" validator
     charlie <- setupUser app "charlie" validator
-    inputCoins <- forA [1..101] $ \i -> do 
+    inputCoins <- forA [1..101] $ \i -> do
       coin <- tap app alice 1.0
       pure $ API.InputCoin $ toInterfaceContractId coin
     context <- getPaymentTransferContext app alice
@@ -45,9 +45,8 @@ testTransferExceedsMaxInputs = do
           sender = alice.primaryParty
           provider = alice.primaryParty
           inputs = inputCoins
-          outputs = 
-            [ API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin, 
-            API.OutputReceiverCoin charlie.primaryParty API.FloatingReceiverCoin ]
+          outputs = []
+          returnSenderChange = True
           payload = "test"
         context = context
         expectedError = "More than the maximum number of inputs"
@@ -61,7 +60,7 @@ testTransferExceedsMaxOutputs = do
     bob <- setupUser app "bob" validator
     charlie <- setupUser app "charlie" validator
     coin <- tap app alice 100.0
-    let outputCoins = map (\i -> API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin) [1..101]
+    let outputCoins = map (const $ API.OutputSenderCoin with amount = 1.0; lock = None) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
     submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
@@ -71,6 +70,7 @@ testTransferExceedsMaxOutputs = do
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId coin]
           outputs = outputCoins
+          returnSenderChange = True
           payload = "test"
         context = context
         expectedError = "More than the maximum number of outputs"
@@ -94,12 +94,13 @@ testTransferExceedsMaxLockHolders = do
         sender = alice.primaryParty
         provider = alice.primaryParty
         inputs = [API.InputCoin $ toInterfaceContractId coin]
-        outputs = 
+        outputs =
           [ API.OutputSenderCoin with
-              exactAmount = None
+              amount = 1.0
               lock = Some API.TimeLock with
                 holders = lockHolders
                 expiresAt = now `addRelTime` (minutes 1) ]
+        returnSenderChange = True
         payload = "test"
       context = context
       expectedError = "Fewer than the allowed number of lock holders"
@@ -122,8 +123,8 @@ testTransferExceedsMaxPayloadLength = do
           sender = alice.primaryParty
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId coin]
-          outputs = [ API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin, 
-            API.OutputReceiverCoin charlie.primaryParty API.FloatingReceiverCoin ]
+          outputs = [ API.OutputSenderCoin with amount = 1.0; lock = None ]
+          returnSenderChange = True
           payload = payloadOfLength33
         context = context
         expectedError = "Payload length is above limit"

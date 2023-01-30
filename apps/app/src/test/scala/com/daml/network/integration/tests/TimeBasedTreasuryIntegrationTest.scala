@@ -236,9 +236,9 @@ class TimeBasedTreasuryIntegrationTest
             1,
             entries,
           )( // .. even when alice's validator has another coin and would only need to pay
-            // an update-fee for collecting the reward.
+            // an create-fee for collecting the reward.
             _.message should include(
-              "is smaller than the update-fee"
+              "is smaller than the create-fee"
             )
           )
         },
@@ -268,7 +268,7 @@ class TimeBasedTreasuryIntegrationTest
         )(
           // but do nothing since our coins are too small to be worth merging.
           _.message should include regex (
-            "the total rewards and coin quantity .* is smaller than the update-fee"
+            "the total rewards and coin quantity .* is smaller than the create-fee"
           )
         )
       },
