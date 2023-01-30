@@ -282,7 +282,6 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = d
         provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
-        returnSenderChange = True
         outputs =
           [  API.TransferOutput with
               receiver = recipient
@@ -310,7 +309,6 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
         provider = sender.primaryParty
         payload = msg
         inputs = map (API.InputCoin . toInterfaceContractId) coins
-        returnSenderChange = True
         outputs =
           [ API.TransferOutput with
               receiver = sender.primaryParty
@@ -362,7 +360,6 @@ runCoinDepositBots app = do
               map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++
               map (API.InputCoin . toInterfaceContractId . fst) coins
           outputs = []
-          returnSenderChange = True
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
       submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with transfer, context
 

@@ -55,7 +55,6 @@ testUsageFees = do
                       holders = [alice.primaryParty, provider.primaryParty]
 
                 ]
-      returnSenderChange = True
       payload = "test"
     context = context.context
 
@@ -120,7 +119,6 @@ testCoinUsedInRoundBeforeItsCreation = do
       sender = alice.primaryParty
       provider = alice.primaryParty
       inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
-      returnSenderChange = True
       outputs = [ API.TransferOutput with
                     receiver = bob.primaryParty
                     amount = 10.0

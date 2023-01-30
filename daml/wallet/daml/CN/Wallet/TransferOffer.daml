@@ -70,7 +70,6 @@ template AcceptedTransferOffer
                   lock = None
                   receiverFeeRatio = 0.0
               ]
-            returnSenderChange = True
             payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
         archive self

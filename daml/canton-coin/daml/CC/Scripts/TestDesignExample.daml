@@ -42,7 +42,6 @@ template Escrow
                sender = p
                provider = arbiter
                payload = "refresh"
-               returnSenderChange = True
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
                  [ API.TransferOutput with

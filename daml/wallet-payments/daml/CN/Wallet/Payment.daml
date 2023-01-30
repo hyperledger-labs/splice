@@ -110,7 +110,6 @@ template AppPaymentRequest
                       expiresAt = now `addRelTime` collectionDuration
                     receiverFeeRatio = 0.0
                 ]
-              returnSenderChange = True
               payload = "lock payment"
          result <- exercisePaymentTransfer context transfer
          let [TransferResultLockedCoin lockedCoin] = result.createdCoins
@@ -175,9 +174,9 @@ template AcceptedAppPayment
               provider
               inputs = [InputCoin coin]
               outputs = map mkReceiverOutput ccReceiverAmounts
-              returnSenderChange = False
               payload = "transfer locked payment"
         result <- exerciseAppTransfer context transfer
+        require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer

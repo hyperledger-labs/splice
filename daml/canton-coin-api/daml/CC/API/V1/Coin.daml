@@ -186,9 +186,6 @@ data Transfer = Transfer with
     provider : Party
     inputs : [TransferInput]
     outputs : [TransferOutput]
-    returnSenderChange : Bool
-    -- ^ If set, change is delivered to the sender.
-    -- If not set, a transfer whose outputs + fees don't match its input amount is aborted.
     payload : Text
   deriving (Eq, Ord, Show)
 

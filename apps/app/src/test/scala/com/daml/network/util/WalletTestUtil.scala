@@ -119,7 +119,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
                       ).toJava,
                     )
                   ).asJava,
-                  true,
                   "lock coins",
                 ),
                 new v1.coin.TransferContext(

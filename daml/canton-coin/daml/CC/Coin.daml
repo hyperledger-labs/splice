@@ -622,8 +622,6 @@ checkTransferConstraints transfer summary config
     | length transfer.outputs > config.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
     | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ ITR_Other $ "Payload length is above limit"
     | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
-    | summary.senderChangeFee > 0.0 && not transfer.returnSenderChange =
-        Left $ ITR_Other $ "Returning change to the sender is not enabled, but there is excess input amount " <> show (summary.senderChangeAmount + summary.senderChangeFee)
     | otherwise = Right ()
 
 -- | Execute a transfer.

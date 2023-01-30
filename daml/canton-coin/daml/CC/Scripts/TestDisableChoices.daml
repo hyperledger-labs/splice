@@ -103,7 +103,6 @@ testCoinRules = do
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId @API.Coin coin]
           outputs = []
-          returnSenderChange = True
           payload = "test"
         context = API.TransferContext with
           openMiningRound = toInterfaceContractId @API.OpenMiningRound round

@@ -311,7 +311,6 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
                expiresAt = now `addRelTime` lockDuration
              receiverFeeRatio = 0.0
          ]
-       returnSenderChange = True
        payload = "lock payment"
 
   result <- exercisePaymentTransfer context transfer
@@ -332,9 +331,9 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
         provider
         inputs = [InputCoin coin]
         outputs = [mkTransferOutput receiver targetAmount]
-        returnSenderChange = False
         payload = "transfer locked payment"
   result <- exerciseAppTransfer transferContext transfer
+  require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid
