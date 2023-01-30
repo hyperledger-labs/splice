@@ -134,7 +134,6 @@ object CoinUtil {
     defaultHoldingFee,
 
     // Fee for transferring some amount of coin to a new owner.
-    // TODO(M3-01) Finetuning required
     new cc.fees.SteppedRate(
       BigDecimal(0.01).bigDecimal,
       Seq(
