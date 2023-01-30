@@ -107,16 +107,6 @@ template SplitwiseInstall
            sender = user
            ..
 
-    nonconsuming choice SplitwiseInstall_CompleteTransfer : [ContractId BalanceUpdate]
-      with
-        group : ContractId Group
-        acceptedPaymentCid : ContractId AcceptedAppPayment
-        transferContext : AppTransferContext
-      controller provider
-      do exercise group Group_CompleteTransfer with
-           sender = user
-           ..
-
     nonconsuming choice SplitwiseInstall_Net : ContractId BalanceUpdate
       with
         group : ContractId Group
@@ -214,40 +204,6 @@ template Group
            collectionDuration = collectionDuration
            deliveryOffer = toInterfaceContractId deliveryOffer
 
-    nonconsuming choice Group_CompleteTransfer : [ContractId BalanceUpdate]
-      with
-        acceptedPaymentCid : ContractId AcceptedAppPayment
-        sender : Party
-        transferContext : AppTransferContext
-      controller provider
-      do acceptedPayment <- fetch acceptedPaymentCid
-         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
-         acceptedPayment.sender === sender
-         archive refCid
-
-         let  receivers = map (\r -> r.receiver) ref.receiverAmounts
-              expectedAcceptedPayment = AcceptedAppPayment with
-               sender = ref.sender
-               provider
-               ccReceiverAmounts = ref.receiverAmounts
-               svc
-               lockedCoin = acceptedPayment.lockedCoin
-               deliveryOffer = acceptedPayment.deliveryOffer
-         acceptedPayment === expectedAcceptedPayment
-         -- Check that sender and receiver are both still members.
-         require "Sender is member" (ref.sender `elem` groupMembers this)
-         require "Receivers are members" (receivers `subset` groupMembers this)
-         -- Check that this belongs to the right group.
-         getGroupKey ref.group === getGroupKey this
-         forA ref.receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
-           create BalanceUpdate with
-             group = this
-             update = Transfer with
-               sender = ref.sender
-               receiver
-               amount = ccAmount
-
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
         balanceChanges : Map Party (Map Party Decimal) -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero.
@@ -281,6 +237,33 @@ template TransferInProgress
         svc = group.svc
         sender
         description = "Transfer from " <> show sender <> " to " <> show receivers
+
+    postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
+      with
+        acceptedPaymentCid : ContractId AcceptedAppPayment
+        transferContext : AppTransferContext
+      controller group.provider
+      do acceptedPayment <- fetch acceptedPaymentCid
+         require "Payment is for this TransferInProgress" (toInterfaceContractId self == acceptedPayment.deliveryOffer)
+         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
+         acceptedPayment.sender === sender
+
+         let  receivers = map (\r -> r.receiver) receiverAmounts
+              expectedAcceptedPayment = AcceptedAppPayment with
+               sender = sender
+               provider = group.provider
+               ccReceiverAmounts = receiverAmounts
+               svc = group.svc
+               lockedCoin = acceptedPayment.lockedCoin
+               deliveryOffer = acceptedPayment.deliveryOffer
+         acceptedPayment === expectedAcceptedPayment
+         forA receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
+           create BalanceUpdate with
+             group
+             update = Transfer with
+               sender
+               receiver
+               amount = ccAmount
 
 template BalanceUpdate
   with

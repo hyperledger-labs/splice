@@ -107,14 +107,11 @@ initiateTransfer sender provider groupKey receiverAmounts = do
   group <- getGroup sender groupKey
   exerciseSplitwiseInstall sender provider SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : CCApp -> CCUser -> CCUser -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
-completeTransfer app sender provider groupKey acceptedPaymentCid = do
+completeTransfer : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer app provider acceptedPaymentCid = do
   transferContext <- getAppTransferContext app provider
-  group <- getGroup provider groupKey
-  splitwiseInstall <- getSplitwiseInstall sender provider
-  -- Not using exerciseSplitwiseInstall since we want this to be executed by the provider
-  -- not the user.
-  void $ submitUser provider.userId $ exerciseCmd splitwiseInstall SplitwiseInstall_CompleteTransfer with ..
+  Some AcceptedAppPayment{deliveryOffer} <- queryContractId provider.primaryParty acceptedPaymentCid
+  void $ submitUser provider.userId $ exerciseCmd (fromInterfaceContractId @TransferInProgress deliveryOffer) TransferInProgress_CompleteTransfer with ..
 
 testProviderHosted = script do
   app <- setupApp
@@ -195,7 +192,7 @@ testCase app Parties{..} = do
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice (getValidator alice) None request coin
 
-  completeTransfer app alice (getProvider alice) (getGroupKey group) receipt
+  completeTransfer app (getProvider alice) receipt
 
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]
@@ -210,7 +207,7 @@ testCase app Parties{..} = do
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request coin
-  completeTransfer app charlie (getProvider charlie) (getGroupKey group) receipt
+  completeTransfer app (getProvider charlie) receipt
 
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, -18.0)]
