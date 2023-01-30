@@ -55,6 +55,7 @@ lazy val root = (project in file("."))
     `directory-daml`,
     `splitwise-daml`,
     `svc-governance-daml`,
+    `validator-lifecycle-daml`,
     `canton-community-common`,
     `canton-research-services`,
     `canton-blake2b`,
@@ -112,6 +113,15 @@ lazy val `svc-governance-daml` =
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-daml` / Compile / damlBuild).value ++
           (`canton-coin-api-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `validator-lifecycle-daml` =
+  project
+    .in(file("daml/validator-lifecycle"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value,
     )
 
 // This defines the Daml model that we expose to app developers
@@ -291,13 +301,14 @@ lazy val `apps-svc` =
 lazy val `apps-sv` =
   project
     .in(file("apps/sv"))
-    .dependsOn(`apps-common` % "compile->compile;test->test", `svc-governance-daml`)
+    .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
     )
     .dependsOn(
-      `apps-svc`
+      `apps-svc`,
+      `validator-lifecycle-daml`,
     )
 
 lazy val `apps-scan` =

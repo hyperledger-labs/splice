@@ -1,6 +1,6 @@
 module CN.SvcRules where
 
-import DA.Action (void)
+import DA.Action (void, unless)
 import DA.Foldable (forA_)
 import DA.List as List
 import qualified DA.Map as Map
@@ -55,7 +55,7 @@ data ConsortiumSummary = ConsortiumSummary with
     -- it to a higher number to tolerate diverging views of honest SVs wrt the
     -- quality of a leader.
 
-    -- TODO(M2-01): review the above reasoning, and make the limits configurable so that we can trade-off performance vs. fault-tolerance
+    -- TODO(M3-46): review the above reasoning, and make the limits configurable so that we can trade-off performance vs. fault-tolerance
   deriving (Eq, Show)
 
 
@@ -64,7 +64,7 @@ data ConsortiumSummary = ConsortiumSummary with
 
 data ElectionRequestReason
   = ERR_LeaderUnavailable
-  -- TODO(M2-01): add case for leader asking to be relieved for a graceful shutdown
+  -- TODO(M3-46): add case for leader asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   deriving (Eq, Ord, Show)
 
@@ -88,7 +88,7 @@ template Confirmation with
     svc : Party
     confirmer : Party
     action : ActionRequiringConfirmation
-    -- TODO(M2-01): add expiry
+    -- TODO(M3-46): add expiry
   where
     -- As for 'ElectionRequest' we only make the 'svc' a signatory.
     signatory svc
@@ -120,7 +120,7 @@ template SvcRules with
     leader : Party
     config : SvcRulesConfig
   where
-    ensure 
+    ensure
       leader `Map.member` members &&
         config.numUnclaimedRewardsThreshold > 0
 
@@ -175,7 +175,7 @@ template SvcRules with
         ranking : [Party]
       controller requester
       do
-        -- TODO(M2-01): consider interaction with concurrent membership changes
+        -- TODO(M3-46): consider interaction with concurrent membership changes
         require "Requester is a consortium member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
         create ElectionRequest with
@@ -197,7 +197,7 @@ template SvcRules with
           pure req
         let numVotes = length reqs
             numVoters = numVotes
-            -- TODO(M2-01): consider whether that is the right number of votes to require
+            -- TODO(M3-46): consider whether that is the right number of votes to require
             -- as there might be more votes being taken into consideration
             numVotesForMajority = (summary.requiredNumVotes + 1) / 2
         require "Requests are from different members" (unique $ map (.requester) reqs)
@@ -256,12 +256,13 @@ template SvcRules with
         require "No duplicate confirmers" (unique confirmers)
         executeActionRequiringConfirmation self action
 
-    -- TODO(M2-01): remove expired confirmations
+    -- TODO(M3-46): remove expired confirmations
 
 
     -- Validator onboarding
     -----------------------
 
+    -- TODO(M3-46): deprecate this in favor of SV-sponsored `_OnboardValidator`
     nonconsuming choice SvcRules_CoinRulesRequest_Accept : ()
       with
         cid : ContractId CoinRulesRequest
@@ -275,7 +276,23 @@ template SvcRules with
         -- Moreover, this problem will be gone once we use explicit disclosure.
         exercise cid choiceArg
 
-
+    nonconsuming choice SvcRules_OnboardValidator : ()
+      with
+        sponsor : Party
+        validator : Party
+        coinRules : ContractId CoinRules
+        openRounds : [ContractId OpenMiningRound]
+        issuingRounds : [ContractId IssuingMiningRound]
+      controller sponsor
+      do
+        require "Sponsor is a consortium member" (sponsor `Map.member` members)
+        -- TODO(M3-46): sponsor<->candidate relationship must be recorded somewhere
+        rules <- fetch coinRules
+        require "SVC of CoinRules matches" (rules.svc == svc)
+        -- TODO(M3-82): remove workaround for explicit disclosure
+        unless (validator `elem` rules.observers) do
+          exercise coinRules (CoinRules_AddObserver validator openRounds issuingRounds)
+          pure ()
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

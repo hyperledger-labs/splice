@@ -1,0 +1,26 @@
+module CN.ValidatorOnboarding where
+
+import CN.Util.Assert
+
+-- | Template used by a sponsoring SV node to keep track of the onboarding of a validator candidate.
+-- We use a secret for authenticating the candidate once he has set up his participant.
+-- The secret should be unique, contain at least 256-bits of entropy,
+-- and be communicated to the candidate via a secure off-ledger channel.
+-- Once the candidate has set up his participants, he contacts the SV node via an API call
+-- and presents his secret, which triggers the SV node to add him as a validator
+-- (as a separate on-ledger action for reducing coupling with the `svc-governance` contracts).
+template ValidatorOnboarding with
+    sv : Party                  -- ^ The SV node sponsoring this onboarding.
+    candidateSecret : Text      -- ^ The unique secret given to the candidate.
+    expiresAt : Time            -- ^ Can be used by the SV for time-bounding the offer.
+  where
+    signatory sv
+
+    -- Archive the offer if the right secret was provided.
+    choice ValidatorOnboarding_Match: ()
+      with
+        providedSecret : Text
+      controller sv
+      do
+        require "provided secret matches the stored secret" (providedSecret == candidateSecret)
+        pure ()

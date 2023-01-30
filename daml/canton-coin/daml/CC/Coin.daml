@@ -533,8 +533,12 @@ template CoinRules
     choice CoinRules_AddObserver : ContractId CoinRules
       with
         obs : Party
+        openRounds : [ContractId OpenMiningRound]
+        issuingRounds : [ContractId IssuingMiningRound]
       controller svc
       do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+         forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver obs)
+         forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver obs)
          create this with
            observers = obs :: observers
 
@@ -547,6 +551,7 @@ template CoinRules
 -- Once explicit disclosure is available, we want to remove the request contracts and use an off-ledger flow
 -- to stream in the latest CoinRules contracts.
 -- TODO(M3-82): remove workaround for explicit disclosure
+-- TODO(M3-46): remove this in favor of SV-sponsored `_OnboardValidator` flow
 template CoinRulesRequest
   with
     user : Party
@@ -566,9 +571,7 @@ template CoinRulesRequest
         if user `elem` rules.observers
           then pure ()  -- ignore duplicate requests
           else do
-            exercise coinRules (CoinRules_AddObserver user)
-            forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver user)
-            forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver user)
+            exercise coinRules (CoinRules_AddObserver user openRounds issuingRounds)
             pure ()
 
 

@@ -1,0 +1,27 @@
+module CN.Scripts.TestValidatorOnboarding where
+
+import Daml.Script
+import DA.Time
+
+import CN.ValidatorOnboarding
+
+testValidatorOnboarding : Script ()
+testValidatorOnboarding = do
+
+  -- allocate the sponsoring sv
+  sv1 <- allocateParty "sv1"
+
+  -- sv1 creates an onboarding offer
+  let secret = "test"
+  now <- getTime
+  onboarding <- submit sv1 $ createCmd (ValidatorOnboarding sv1 secret (addRelTime now (days 2)))
+
+  -- The secret and the party ID of sv1 (the onboarding sponsor)
+  -- reaches the validator candidate via a secure off-ledger channel.
+  -- Once the candidate has set up his participants, he contacts the SV node via an API call
+  -- and presents his secret.
+  _ <- submitMustFail sv1 $ exerciseCmd onboarding $ (ValidatorOnboarding_Match "typo")
+  _ <- submit sv1 $ exerciseCmd onboarding $ (ValidatorOnboarding_Match "test")
+
+  -- sv1 can now onboard the validator with the authority granted it via the `SvcRules`
+  return ()

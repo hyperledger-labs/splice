@@ -21,18 +21,14 @@ import CN.SvcBootstrap
 
 import CC.Scripts.Parameters
 
-testSvcRules : Script ()
-testSvcRules = do
+testLeaderElection : Script ()
+testLeaderElection = do
 
   (app, svc, (mallory, sv1, sv2, sv3)) <- initConsortium
-  -- we now have a consortium with BFT for f = 1
+  -- we now have a consortium with BFT for f = 1, and mallory is the leader
 
   -- run an issuance
   runNextIssuanceD app 1.0
-
-  -- onboard a validator
-  v1 <- allocateParty "v1"
-  requestCoinRules app v1
 
   -- mallory stops acting, which the others detect; they thus request a re-election
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
@@ -61,9 +57,6 @@ testSvcRules = do
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   require "SV1 got elected" (svcRules.leader == sv1)
 
-  -- coin rules get accepted now that there's a leader that acts
-  runCoinRulesAcceptBotD app
-
   -- run a few more issuances
   runNextIssuanceD app 1.1
   runNextIssuanceD app 1.2
@@ -77,7 +70,7 @@ testSvcRules = do
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMember = sv4
           reason = "decision:123"  -- unambiguous reference to the decision
-          -- TODO(M2-01): streamline references to off-ledger decisions
+          -- TODO(M3-46): streamline references to off-ledger decisions
   executeAllConfirmedActions app
 
   -- kick out mallory, now that we have enough members to then still tolerate a failure
@@ -89,7 +82,7 @@ testSvcRules = do
         svcAction = SRARC_RemoveMember $ SvcRules_RemoveMember with
           member = mallory
           reason = "decision:124"  -- unambiguous reference to the decision
-          -- TODO(M2-01): streamline references to off-ledger decisions
+          -- TODO(M3-46): streamline references to off-ledger decisions
   executeAllConfirmedActions app
 
   -- check that mallory is no longer present
@@ -124,6 +117,25 @@ testUnclaimedRewards = do
 
   pure ()
 
+
+testOnboardValidator : Script ()
+testOnboardValidator = do
+  (app, svc, (_, sv2, _, _)) <- initConsortium
+  -- we now have a consortium with BFT for f = 1
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+
+  -- sv2 (not the leader) onboards the new validator
+  onboardValidator app sv2 v1
+
+  -- v1 is onboarded!
+  [(_, coinRules)] <- query @CoinRules svc
+  coinRules.observers === [v1]
+
+  pure ()
+
+
 -- Utils
 --------
 
@@ -133,7 +145,7 @@ initConsortium = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
   -- allocate consortium party
-  -- TODO(M2-02): make this a real consortium party
+  -- TODO(M3-46): make this a real consortium party
   svc <- allocateParty "svc"
 
   -- have mallory bootstrap the consortium
@@ -157,6 +169,7 @@ initConsortium = do
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 
+
 generateUnclaimedReward : CCApp -> CCUser -> Script ()
 generateUnclaimedReward app provider1 = do
   submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
@@ -170,29 +183,30 @@ generateUnclaimedReward app provider1 = do
 
   pure ()
 
+
 leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
 leaderSubmits app mkCommands = do
   [(consortiumCid, consortium)] <- query @SvcRules app.svc
   submitMulti [consortium.leader] [app.svc] $ mkCommands consortiumCid
 
+svSubmits : CCApp -> Party -> (ContractId SvcRules -> Commands a) -> Script a
+svSubmits app sv mkCommands = do
+  [(consortiumCid, consortium)] <- query @SvcRules app.svc
+  submitMulti [sv] [app.svc] $ mkCommands consortiumCid
 
 -- TODO(M3-82): remove workaround for explicit disclosure
--- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
-runCoinRulesAcceptBotD : CCApp -> Script ()
-runCoinRulesAcceptBotD app = do
+onboardValidator : CCApp -> Party -> Party -> Script ()
+onboardValidator app sponsor validator = do
   [(coinRulesCid, _)] <- query @CoinRules app.svc
   openRounds <- query @OpenMiningRound app.svc
   issuingRounds <- query @IssuingMiningRound app.svc
-  requests <- query @CoinRulesRequest app.svc
-  forA_ requests $ \(requestCid, request) -> do
-    leaderSubmits app $ \cid -> exerciseCmd cid $
-      SvcRules_CoinRulesRequest_Accept with
-        cid = requestCid
-        choiceArg = CoinRulesRequest_Accept coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
+  svSubmits app sponsor $ \cid -> exerciseCmd cid $
+    SvcRules_OnboardValidator sponsor validator coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
   pure ()
 
+
 -- | Run the next issuance.
--- TODO(M2-01): convert the whole script to use confirmations once rewards issuance has been finalized
+-- TODO(M3-46): convert the whole script to use confirmations once rewards issuance has been finalized
 runNextIssuanceD : CCApp -> Decimal -> Script ()
 runNextIssuanceD app coinPrice = do
     now <- getTime
@@ -218,7 +232,7 @@ runNextIssuanceD app coinPrice = do
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
 
-    -- TODO(M2-01): collect SvcRewards via SvRewards into per-SV coins
+    -- TODO(M3-46): collect SvcRewards via SvRewards into per-SV coins
 
     -- close current issuing rounds if there are any
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
@@ -265,8 +279,8 @@ confirmAWC_MiningRound_Archive app = do
     forA_ (Map.keys rules.members) $ \member -> do
       -- mallory does not act
       unless ("mallory" `T.isPrefixOf` partyToText member) $ do
-        -- TODO(M2-01): skip if there are left-over rewards for that round
-        -- TODO(M2-01): skip if there already exists a confirmation
+        -- TODO(M3-46): skip if there are left-over rewards for that round
+        -- TODO(M3-46): skip if there already exists a confirmation
         submitMulti [member] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
           action = ARC_CoinRules with
             coinRulesCid
