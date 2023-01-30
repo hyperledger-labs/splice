@@ -45,15 +45,18 @@ template Escrow
                returnSenderChange = True
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
-                 [ API.OutputSenderCoin with
+                 [ API.TransferOutput with
+                     receiver = p
                      amount = locked.amount.initialAmount
                      lock = Some API.TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
-                 , API.OutputReceiverCoin with
+                     receiverFeeRatio = 0.0
+                 , API.TransferOutput with
                      receiver = arbiter
                      amount = arbiterPaymentAmount
-                     senderTransferFeeRatio = 0.0
+                     lock = None
+                     receiverFeeRatio = 1.0
                  ]
          API.exerciseAppTransfer transferContext transfer
 
@@ -109,8 +112,7 @@ test = do
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    -- TODO(M3-01): adjust this once we properly handle self-transfers
-    amount = coinConfig.createFee.fee + chargeSteppedRate coinConfig.transferFee refreshCoinAmount
+    amount = coinConfig.createFee.fee
     round = API.Round 40002
 
   [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount == refreshCoinAmount)

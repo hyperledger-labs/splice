@@ -113,7 +113,7 @@ interface CoinRules where
 
   coinrules_Transfer_Controllers : Transfer -> [Party]
   coinrules_Transfer : ContractId CoinRules -> Transfer -> TransferContext -> Update TransferResult
-  coinrules_ComputeFees : TransferContext -> Party -> [Decimal] -> Update Decimal
+  coinrules_ComputeFees : TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
 
   nonconsuming choice CoinRules_Transfer : TransferResult
     with
@@ -122,13 +122,14 @@ interface CoinRules where
     controller coinrules_Transfer_Controllers this transfer
     do coinrules_Transfer this self transfer context
 
-  nonconsuming choice CoinRules_ComputeFees : Decimal
+  -- | Compute the output fees for transfer against the given context
+  nonconsuming choice CoinRules_ComputeFees : [Decimal]
     with
       context : TransferContext
       sender : Party
-      receiverAmounts : [Decimal]
+      outputs : [TransferOutput]
     controller sender
-    do coinrules_ComputeFees this context sender receiverAmounts
+    do coinrules_ComputeFees this context sender outputs
 
 data TransferResult
   = TransferResult
@@ -192,17 +193,16 @@ data Transfer = Transfer with
   deriving (Eq, Ord, Show)
 
 -- | An individual output for a batch transfer.
-data TransferOutput
-  -- TODO(M3-01): simplify the API by getting rid of the `OutputSenderCoin` in favor of only OutputCoins
-  = OutputSenderCoin with
-      amount : Decimal
-      lock : Optional TimeLock -- ^ The lock to be added.
-  | OutputReceiverCoin with
-      receiver : Party
-      amount : Decimal
-      senderTransferFeeRatio : Decimal
-      -- ^ The ratio of the transfer fee paid by the sender. Must be between 0.0 and 1.0.
-      -- 0.0 means the receiver pays the transfer fee, 1.0 means the sender pays it.
+data TransferOutput = TransferOutput with
+    receiver : Party -- ^ The reciver who will own the created output coin.
+    receiverFeeRatio : Decimal
+    -- ^ The ratio of the output fee paid from receiver's output amount.
+    -- 1.0 means the whole fee is deducted from the specified output amount,
+    -- 0.0 the whole fee is deducted from the sender's input balance.
+    --
+    -- If a receiver's fee is not covered by the specified output amount, the transfer is aborted.
+    amount : Decimal -- ^ The amount of coin to receive, before deducting the receiver's part of the output fee.
+    lock : Optional TimeLock -- ^ The lock to be added, if any.
   deriving (Eq, Ord, Show)
 
 data AppTransferContext = AppTransferContext
@@ -224,12 +224,12 @@ exercisePaymentTransfer PaymentTransferContext{..} transfer =
     transfer
     context
 
-exerciseComputeFees : PaymentTransferContext -> Party -> [Decimal] -> Update Decimal
-exerciseComputeFees PaymentTransferContext{..} sender receiverAmounts =
+exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+exerciseComputeFees PaymentTransferContext{..} sender outputs =
   exercise coinRules CoinRules_ComputeFees with
     context
     sender
-    receiverAmounts
+    outputs
 
 data PaymentTransferContext = PaymentTransferContext
   with

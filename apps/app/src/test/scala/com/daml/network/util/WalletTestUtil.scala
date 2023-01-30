@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.digitalasset.canton.topology.DomainId
 import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -106,10 +107,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
                     )
                   ).asJava,
                   Seq[v1.coin.TransferOutput](
-                    new v1.coin.transferoutput.OutputSenderCoin(
+                    new TransferOutput(
+                      userParty.toProtoPrimitive,
+                      BigDecimal(0.0).bigDecimal,
                       amount.bigDecimal,
                       Some(
-                        new v1.coin.TimeLock(
+                        new TimeLock(
                           Seq(userParty.toProtoPrimitive).asJava,
                           expiration.toInstant,
                         )

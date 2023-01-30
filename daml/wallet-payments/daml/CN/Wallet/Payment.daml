@@ -88,14 +88,12 @@ template AppPaymentRequest
          void $ fetch deliveryOffer
 
          -- Convert from USD to CC amounts
-
-         ccReceiverAmounts <- forA receiverAmounts (\rq -> receiverAmountToCCReceiverAmount svc sender context.context.openMiningRound rq)
+         ccReceiverAmounts <- forA receiverAmounts $ \rq ->
+           receiverAmountToCCReceiverAmount svc sender context.context.openMiningRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         ccAmounts <- forA ccReceiverAmounts (\ccq -> pure ccq.ccAmount)
-
          -- TODO(#1492) Lock to specific round to avoid fees changing
-         fees <- exerciseComputeFees context sender ccAmounts
+         outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
 
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
@@ -104,11 +102,13 @@ template AppPaymentRequest
               provider = walletProvider
               inputs
               outputs =
-                [ OutputSenderCoin with
-                    amount = fees + sum ccAmounts
+                [ TransferOutput with
+                    receiver = sender
+                    amount = sum outputFees + sum (map (.ccAmount) ccReceiverAmounts)
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
                       expiresAt = now `addRelTime` collectionDuration
+                    receiverFeeRatio = 0.0
                 ]
               returnSenderChange = True
               payload = "lock payment"
@@ -144,6 +144,14 @@ data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId 
 unzipReceiverCoins : [ReceiverCoin] -> ([Party], [ContractId LockedCoin])
 unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, lockedCoin :: cs)) ([], [])
 
+mkReceiverOutput : ReceiverCCAmount -> TransferOutput
+mkReceiverOutput receiverAmount =
+  TransferOutput with
+    receiver = receiverAmount.receiver
+    amount = receiverAmount.ccAmount
+    receiverFeeRatio = 0.0
+    lock = None
+
 template AcceptedAppPayment
   with
     sender : Party
@@ -166,12 +174,7 @@ template AcceptedAppPayment
               sender
               provider
               inputs = [InputCoin coin]
-              outputs = fmap
-                (\receiverAmount -> OutputReceiverCoin with
-                  receiver = receiverAmount.receiver
-                  amount = receiverAmount.ccAmount
-                  senderTransferFeeRatio = 1.0
-                ) ccReceiverAmounts
+              outputs = map mkReceiverOutput ccReceiverAmounts
               returnSenderChange = False
               payload = "transfer locked payment"
         result <- exerciseAppTransfer context transfer

@@ -267,9 +267,9 @@ template CoinRules
           enabledChoices = config.enabledChoices
         ..
       coinrules_Transfer_Controllers = Set.toList . transferControllers
-      coinrules_ComputeFees context sender receiverAmounts = do
+      coinrules_ComputeFees context sender outputs = do
         requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
-        computeFees context config receiverAmounts
+        computeFees config svc context sender outputs
       coinrules_Transfer coinRulesCid transfer context = do
         requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
         executeTransfer coinRulesCid context config svc transfer
@@ -538,16 +538,6 @@ template CoinRules
          create this with
            observers = obs :: observers
 
--- TODO(M3-01): generalize the fee computation API to cover all transfers
-computeFees : API.TransferContext -> CoinConfig USD -> [Decimal] -> Update Decimal
-computeFees context config0 receiverAmounts = do
-    -- TODO(M3-01): use transfer context summary
-    (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
-    let config = scaleConfig openRound config0
-    return $ foldl (transferFees config) 0.0 receiverAmounts
-  where
-    transferFees config s amount =
-      s + config.createFee.fee + chargeSteppedRate config.transferFee amount
 
 -- | Workaround for missing explicit disclosure.
 --
@@ -590,11 +580,27 @@ transferControllers : API.Transfer -> Set Party
 transferControllers t =
     foldl addOutputController (Set.fromList [t.sender, t.provider]) t.outputs
   where
-    addOutputController s (API.OutputSenderCoin with lock; ..) = optional s (foldl (flip Set.insert) s) (API.holders <$> lock)
-    addOutputController s (API.OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+    addOutputController s (API.TransferOutput with receiver; lock; ..) =
+      Set.insert receiver $ optional s (foldl (flip Set.insert) s) (API.holders <$> lock)
 
 scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
 scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
+
+computeFees : CoinConfig USD -> Party -> API.TransferContext -> Party -> [API.TransferOutput] -> Update [Decimal]
+computeFees configUsd svc context sender outputs = do
+  (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
+  require ("mining round matches svc") (openRound.svc == svc)
+  let config = scaleConfig openRound configUsd
+  return $ map (computeOutputFee config sender) outputs
+
+computeOutputFee : CoinConfig CC -> Party -> API.TransferOutput -> Decimal
+computeOutputFee config sender out =
+    config.createFee.fee + lockingFee + transferFee
+  where
+    lockingFee = optional 0.0 (\l -> config.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
+    transferFee
+      | sender == out.receiver = 0.0
+      | otherwise = chargeSteppedRate config.transferFee out.amount
 
 data InvalidTransferReason
   = ITR_InsufficientFunds with missingAmount : Decimal
@@ -775,38 +781,27 @@ preprocessOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update Tra
 preprocessOutputs config sender outs =
     mapA preprocessOutput outs
   where
-    preprocessOutput (API.OutputSenderCoin with amount; lock) = preprocessSenderCoin amount lock
-    preprocessOutput (API.OutputReceiverCoin with receiver; amount; senderTransferFeeRatio)
-      | not (0.0 <= senderTransferFeeRatio && senderTransferFeeRatio <= 1.0) = error "Transfer fee ratio must be between 0 and 1"
-      -- TODO(M3-01): reactivate this as part of removing sender-coins. The problem right now is that computeFees is off in case a transfer goes to the sender.
-      --  sender == receiver = preprocessSenderCoin amount None
+    preprocessOutput out@(API.TransferOutput with receiver; amount; lock; receiverFeeRatio)
+      | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
+          error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
       | otherwise = do
-        let transferFee = config.createFee.fee + chargeSteppedRate config.transferFee amount
-            senderTransferFee = transferFee * senderTransferFeeRatio
-            receiverTransferFee = transferFee - senderTransferFee
-        return PreprocessedTransferOutput with
-          owner = receiver
-          outputFee = transferFee
-          -- NOTE: the check for non-negative amount happens as part of coin creation.
-          amount = amount - receiverTransferFee
-          lock = None
-
-    preprocessSenderCoin amount lock = do
-      -- check validity of locking request
-      forA_ lock $ \l -> do
-        now <- getTime
-        let lockDuration = subTime l.expiresAt now
-        require "Positive lock duration" (days 0 <= lockDuration)
-        require "At least one lock holder" (not $ null l.holders)
-        require "Fewer than the allowed number of lock holders"
-          (length l.holders <= config.maxNumLockHolders)
-      -- compute output
-      let lockingFee = optional 0.0 (\l -> config.lockHolderFee.fee * intToDecimal (length l.holders)) lock
-      return PreprocessedTransferOutput with
-        owner = sender
-        outputFee = config.createFee.fee + lockingFee
-        amount = amount
-        lock
+          -- check validity of locking request
+          forA_ lock $ \l -> do
+            now <- getTime
+            let lockDuration = subTime l.expiresAt now
+            require "Positive lock duration" (days 0 <= lockDuration)
+            require "At least one lock holder" (not $ null l.holders)
+            require "Fewer than the allowed number of lock holders"
+              (length l.holders <= config.maxNumLockHolders)
+          -- compute output
+          let outputFee = computeOutputFee config sender out
+              receiverOutputFee = outputFee * receiverFeeRatio
+          require "Amount is larger than receiver output fee" (receiverOutputFee < amount)
+          return PreprocessedTransferOutput with
+            owner = receiver
+            outputFee = outputFee
+            amount = amount - receiverOutputFee
+            lock
 
 summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
 summarizeTransfer config inp preprocessedOutputs = do
@@ -877,7 +872,7 @@ createTransferOutputs currentTime currentOpenRound config svc sender summary pre
         Some lock -> do
           -- We require the lock to expire before the coin to allow CN app authors to
           -- assume that a locked coin is never archived by the SVC while the lock is held.
-          require "lock expires before coin" 
+          require "lock expires before coin"
             (doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount config.tickDuration)
           API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
 

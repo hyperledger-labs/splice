@@ -60,7 +60,8 @@ testTransferExceedsMaxOutputs = do
     bob <- setupUser app "bob" validator
     charlie <- setupUser app "charlie" validator
     coin <- tap app alice 100.0
-    let outputCoins = map (const $ API.OutputSenderCoin with amount = 1.0; lock = None) [1..101]
+    let outputCoin = API.TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0
+        outputCoins = map (const outputCoin) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
     submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
@@ -95,11 +96,14 @@ testTransferExceedsMaxLockHolders = do
         provider = alice.primaryParty
         inputs = [API.InputCoin $ toInterfaceContractId coin]
         outputs =
-          [ API.OutputSenderCoin with
+          [ API.TransferOutput with
+              receiver = alice.primaryParty
               amount = 1.0
               lock = Some API.TimeLock with
                 holders = lockHolders
-                expiresAt = now `addRelTime` (minutes 1) ]
+                expiresAt = now `addRelTime` (minutes 1)
+              receiverFeeRatio = 0.0
+          ]
         returnSenderChange = True
         payload = "test"
       context = context
@@ -123,7 +127,7 @@ testTransferExceedsMaxPayloadLength = do
           sender = alice.primaryParty
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId coin]
-          outputs = [ API.OutputSenderCoin with amount = 1.0; lock = None ]
+          outputs = [ API.TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0 ]
           returnSenderChange = True
           payload = payloadOfLength33
         context = context

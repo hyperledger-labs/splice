@@ -294,8 +294,8 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   targetAmount <- paymentAmountToCC svc subscriptionData.sender context.context.openMiningRound paymentAmount
 
   -- TODO(#1492) Lock to specific round to avoid fees changing
-  fees <- exerciseComputeFees context subscriptionData.sender [targetAmount]
-  let lockAmount = targetAmount + fees
+  outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
+  let lockAmount = targetAmount + sum outputFees
 
   let transfer = Transfer with
        sender
@@ -303,11 +303,13 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
        provider = walletProvider
        inputs
        outputs =
-         [ OutputSenderCoin with
+         [ TransferOutput with
+             receiver = sender
              amount = lockAmount
              lock = Some TimeLock with
                holders = dedupSort [provider, receiver]
                expiresAt = now `addRelTime` lockDuration
+             receiverFeeRatio = 0.0
          ]
        returnSenderChange = True
        payload = "lock payment"
@@ -329,15 +331,18 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
         sender
         provider
         inputs = [InputCoin coin]
-        outputs =
-          [ OutputReceiverCoin with
-              receiver
-              amount = targetAmount
-              senderTransferFeeRatio = 1.0
-          ]
+        outputs = [mkTransferOutput receiver targetAmount]
         returnSenderChange = False
         payload = "transfer locked payment"
   result <- exerciseAppTransfer transferContext transfer
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid
+
+mkTransferOutput : Party -> Decimal -> TransferOutput
+mkTransferOutput receiver amount =
+  TransferOutput with
+    receiver
+    amount
+    lock = None
+    receiverFeeRatio = 0.0

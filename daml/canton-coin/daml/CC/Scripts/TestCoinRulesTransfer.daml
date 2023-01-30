@@ -1,42 +1,59 @@
 module CC.Scripts.TestCoinRulesTransfer where
 
+import DA.Assert
+import DA.List
+import DA.Time
+import Daml.Script
+
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 import CC.Coin
 import CC.Fees
 import CC.Scripts.Parameters
 import CC.Scripts.Util
-import DA.Assert
-import DA.List
-import Daml.Script
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 
 
 testUsageFees: Script ()
 testUsageFees = do
   app <- setupApp
+  now <- getTime
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
+  provider <- setupUser app "provider" validator
   coin1 <- tap app alice 33.0
   coin2 <- tap app alice 33.0
   coin3 <- tap app alice 34.0
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
-  let outputAmount1 = 89.87
+  let outputAmount1 = 69.81
       outputAmount2 = 10.0
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
+      outputAmount3 = 20.0
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
     transfer = API.Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
       inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[coin1, coin2, coin3]
-      outputs = [ API.OutputSenderCoin with
+      outputs = [ API.TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
-                , API.OutputReceiverCoin with
+                , API.TransferOutput with
                     receiver = bob.primaryParty
+                    receiverFeeRatio = 0.4
                     amount = outputAmount2
-                    senderTransferFeeRatio = 0.6
+                    lock = None
+                  -- test locking a coin owned by a non-sender party
+                , API.TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.75
+                    amount = outputAmount3
+                    lock = Some API.TimeLock with
+                      expiresAt = addRelTime now (days 1)
+                      holders = [alice.primaryParty, provider.primaryParty]
+
                 ]
       returnSenderChange = True
       payload = "test"
@@ -46,13 +63,16 @@ testUsageFees = do
       expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
       expectedSenderTransferFee = expectedTransferFee * 0.6
       expectedReceiverTransferFee = expectedTransferFee * 0.4
+      expectedLockFee =
+        config.createFee.fee + chargeSteppedRate config.transferFee outputAmount3 +
+        2.0 * config.lockHolderFee.fee
+      expectedSenderLockFee = expectedLockFee * (1.0 - 0.75)
       holdingFees = config.holdingFee.rate * 3.0
-      outputFees = [config.createFee.fee, expectedTransferFee]
+      outputFees = [config.createFee.fee, expectedTransferFee, expectedLockFee]
       senderChangeFee =
-        100.0 - holdingFees - outputAmount1 - outputAmount2
+        100.0 - holdingFees - outputAmount1 - outputAmount2 - outputAmount3
         - config.createFee.fee - expectedSenderTransferFee
-  assertMsg "Partial sender change fee"
-    (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
+        - expectedSenderLockFee
   transferResult.summary === API.TransferSummary with
     inputRewardAmount = 0.0
     inputCoinAmount = 100.0
@@ -60,12 +80,17 @@ testUsageFees = do
     outputFees
     senderChangeFee
     senderChangeAmount = 0.0
+  assertMsg "Partial sender change fee"
+    (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
 
   aliceCoins <- query @Coin alice.primaryParty
   bobCoins <- query @Coin bob.primaryParty
   sort (map (\(_, c) -> c.amount.initialAmount) aliceCoins) === [1.0, outputAmount1]
   sort (map (\(_, c) -> c.amount.initialAmount) bobCoins) === [1.0, outputAmount2 - expectedReceiverTransferFee]
-  transferResult.summary.outputFees === [0.03, expectedTransferFee]
+
+  [(_, lockedCoin)] <- query @LockedCoin bob.primaryParty
+  lockedCoin.coin.owner === bob.primaryParty
+  lockedCoin.coin.amount.initialAmount === outputAmount3 - expectedLockFee * 0.75
 
   return ()
 
@@ -96,10 +121,11 @@ testCoinUsedInRoundBeforeItsCreation = do
       provider = alice.primaryParty
       inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
       returnSenderChange = True
-      outputs = [ API.OutputReceiverCoin with
+      outputs = [ API.TransferOutput with
                     receiver = bob.primaryParty
                     amount = 10.0
-                    senderTransferFeeRatio = 0.6 ]
+                    lock = None
+                    receiverFeeRatio = 0.4 ]
       payload = "test"
     context = contextWithRound1.context
 

@@ -267,7 +267,7 @@ queryCoinRulesByKey svc = do
 -- The left-over amount is kept.
 pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinAmount msg = do
-  payWithTransferFeeRatio app sender recipient coinAmount 1.0 msg
+  payWithTransferFeeRatio app sender recipient coinAmount 0.0 msg
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
@@ -284,10 +284,11 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = d
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         returnSenderChange = True
         outputs =
-          [  API.OutputReceiverCoin with
+          [  API.TransferOutput with
               receiver = recipient
               amount = coinAmount
-              senderTransferFeeRatio = transferFeeRatio
+              receiverFeeRatio = transferFeeRatio
+              lock = None
           ]
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
@@ -311,11 +312,13 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
         inputs = map (API.InputCoin . toInterfaceContractId) coins
         returnSenderChange = True
         outputs =
-          [ API.OutputSenderCoin with
+          [ API.TransferOutput with
+              receiver = sender.primaryParty
               amount = coinAmount
               lock = Some API.TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
+              receiverFeeRatio = 0.0
           ]
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty

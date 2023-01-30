@@ -64,10 +64,11 @@ template AcceptedTransferOffer
             provider = sender
             inputs = inputs
             outputs =
-              [ API.OutputReceiverCoin with
+              [ API.TransferOutput with
                   receiver
                   amount = ccAmount
-                  senderTransferFeeRatio = 1.0
+                  lock = None
+                  receiverFeeRatio = 0.0
               ]
             returnSenderChange = True
             payload = description
