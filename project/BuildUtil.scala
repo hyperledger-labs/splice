@@ -76,7 +76,7 @@ object BuildUtil {
             log.info("Retries exceeded, giving up ...")
             throw t
           } else {
-            log.info("Encountered error $t, retrying ...")
+            log.info(s"Encountered error $t, retrying ...")
             Thread.sleep(1000)
             go(n - 1)
           }

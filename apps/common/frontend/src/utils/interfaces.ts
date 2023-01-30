@@ -1,6 +1,6 @@
-import { Contract as OpenAPIContract } from 'common-openapi';
 import { Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import { Contract as ProtoContract } from 'common-protobuf/com/daml/network/v0/contract_pb';
+import { Contract as OpenAPIContract } from 'directory-openapi';
 
 import { ContractId, Template } from '@daml/types';
 

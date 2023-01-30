@@ -1,4 +1,4 @@
-import { ApiException } from 'common-openapi';
+import { ApiException } from 'directory-openapi';
 import React, { useState, useEffect } from 'react';
 
 import Tooltip from '@mui/material/Tooltip';

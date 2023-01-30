@@ -1,6 +1,6 @@
-import * as openapi from 'common-openapi';
-import { ServerConfiguration } from 'common-openapi';
-import { PromiseDirectoryApi } from 'common-openapi/dist/types/PromiseAPI';
+import * as openapi from 'directory-openapi';
+import { ServerConfiguration } from 'directory-openapi';
+import { PromiseDirectoryApi } from 'directory-openapi/dist/types/PromiseAPI';
 import React, { useContext } from 'react';
 
 const DirectoryContext = React.createContext<PromiseDirectoryApi | undefined>(undefined);

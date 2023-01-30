@@ -1,3 +1,4 @@
+import BuildUtil.runCommand
 import scalafix.sbt.ScalafixPlugin
 import sbt.Keys._
 import sbt._
@@ -11,6 +12,7 @@ import wartremover.WartRemover.autoImport._
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import DamlPlugin.autoImport._
 import sbt.internal.util.ManagedLogger
+import xsbti.compile.CompileAnalysis
 
 object BuildCommon {
 
@@ -22,12 +24,15 @@ object BuildCommon {
     lazy val damlTsCodegenSources = taskKey[Seq[File]]("dars to generate ts code from")
 
     lazy val npmInstallDeps = taskKey[Seq[File]]("Dependencies for npm install task")
+    lazy val npmInstallOpenApiDeps =
+      taskKey[Seq[(CompileAnalysis, File)]]("Dependencies for npm install task")
     lazy val npmRootDir = settingKey[File]("npm workspaces root directory")
     lazy val npmInstall = taskKey[Seq[File]]("install npm dependencies")
     lazy val npmLint =
       taskKey[Unit]("checks formatting of frontend code, but does not fix anything")
     lazy val npmFix = taskKey[Unit]("fixes formatting of frontend code")
 
+    lazy val compileOpenApi = taskKey[Seq[File]]("build typescript code")
     lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
     lazy val commonFrontendBundle =
       taskKey[Set[File]]("common frontend bundle task to run before the app frontend bundle")
@@ -837,6 +842,7 @@ object BuildCommon {
     */
   lazy val npmInstallTask: Def.Initialize[Task[Seq[File]]] = Def.task {
     val pkgs = npmInstallDeps.value
+    val openApiPkgs = npmInstallOpenApiDeps.value
     val log = streams.value.log
     val npmInstallScript = npmRootDir.value / "../build-tools/npm-install.sh"
     val cacheDir = streams.value.cacheDirectory
@@ -850,7 +856,10 @@ object BuildCommon {
         )
         Set(npmRootDir.value / "node_modules")
       }
-    cache(pkgs.toSet).toSeq
+    val openApiPackageJsons = openApiPkgs.map { case (_, baseDir) =>
+      baseDir / "openapi-ts-client" / "package.json"
+    }
+    cache(pkgs.toSet ++ openApiPackageJsons).toSeq
   }
 
   /** Builds frontend code for production by running 'npm run build -w $workspace' for the workspace
@@ -861,20 +870,115 @@ object BuildCommon {
     val commonFrontendFiles = commonFrontendBundle.value
     val log = streams.value.log
     val cacheDir = streams.value.cacheDirectory
-    val sourceFiles =
-      (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "build" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
-    val cache =
-      FileFunction.cached(cacheDir) { _ =>
-        BuildUtil.runCommand(
-          Seq("npm", "run", "build", "-w", frontendWorkspace.value),
-          log,
-          None,
-          Some(baseDirectory.value / "../../"),
-        )
-        val buildFiles = (baseDirectory.value / "build" ** "*").get.toSet
-        buildFiles
-      }
-    (baseDirectory.value / "build", cache(sourceFiles union commonFrontendFiles))
+    TS.buildFrontend(
+      commonFrontendFiles,
+      baseDirectory.value / "../../",
+      baseDirectory.value,
+      cacheDir,
+      frontendWorkspace.value,
+      log,
+    )
   }
 
+  object TS {
+    def buildFrontend(
+        commonFrontendFiles: Set[File],
+        workingDir: File,
+        baseDir: File,
+        cacheDir: File,
+        workspace: String,
+        log: ManagedLogger,
+    ): (File, Set[File]) = {
+      val sourceFiles =
+        (baseDir ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDir / "build" ** "*" --- baseDir / "node_modules" ** "*").get.toSet
+      val cache =
+        FileFunction.cached(cacheDir) { _ =>
+          runBuildCommand(workingDir, workspace, log)
+          val buildFiles = (baseDir / "build" ** "*").get.toSet
+          buildFiles
+        }
+      (baseDir / "build", cache(sourceFiles union commonFrontendFiles))
+    }
+    def runBuildCommand(workingDir: File, workspace: String, log: ManagedLogger) = runCommand(
+      Seq("npm", "run", "build", "--workspace", workspace),
+      log,
+      None,
+      Some(workingDir),
+    )
+    def openApiSettings(npmName: String, openApiSpec: String): Seq[Setting[_]] = Seq(
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val commonOpenApiFile = baseDirectory.value / ".." / "common/src/main/openapi/common.yaml"
+
+          generateOpenApiClient(
+            npmName = npmName,
+            npmModuleName = npmName,
+            npmProjectName = npmName,
+            openApiSpec = openApiSpec,
+            cacheFileDependencies = Set(commonOpenApiFile),
+          )
+        }
+    )
+
+    def generateOpenApiClient(
+        npmName: String,
+        npmModuleName: String,
+        npmProjectName: String,
+        openApiSpec: String,
+        cacheFileDependencies: Set[File] = Set.empty[File],
+    ): Def.Initialize[Task[Seq[File]]] = Def.task {
+      import better.files.*
+      import _root_.io.circe.*
+      import _root_.io.circe.parser.*
+      import _root_.io.circe.optics.JsonPath.*
+      import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
+      import _root_.io.circe.syntax._
+
+      val log = streams.value.log
+      val cacheDir = streams.value.cacheDirectory
+
+      val openApiSpecFile = baseDirectory.value / "src/main/openapi/" / openApiSpec
+      val cache = FileFunction.cached(cacheDir) { _ =>
+        runCommand(
+          Seq(
+            "openapi-generator-cli",
+            "generate",
+            "-g",
+            "typescript",
+            "-p",
+            s"npmName=${npmName}",
+            "-p",
+            s"moduleName=${npmModuleName}",
+            "-p",
+            s"projectName=${npmProjectName}",
+            "-p",
+            "useTags=true",
+            "-i",
+            openApiSpecFile.toString,
+            "-o",
+            (baseDirectory.value / "openapi-ts-client").getAbsolutePath,
+          ),
+          log,
+        )
+
+        // Add empty check task to make npm happy
+        val packageJson =
+          File((baseDirectory.value / "openapi-ts-client" / "package.json").toString)
+
+        val packageJsonContent = packageJson.contentAsString
+        val doc: Json =
+          parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
+        val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
+          obj.add("check", s"echo '[${npmProjectName}] no-op'".asJson)
+        )(doc)
+        packageJson.overwrite(updated.spaces2)
+
+        ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
+      }
+
+      cache(Set(openApiSpecFile) ++ cacheFileDependencies)
+      // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
+      Seq.empty[sbt.File]
+    }
+  }
 }

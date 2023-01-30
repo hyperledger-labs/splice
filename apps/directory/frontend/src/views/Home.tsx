@@ -5,7 +5,7 @@ import {
   usePrimaryParty,
   useUserState,
 } from 'common-frontend';
-import { PromiseDirectoryApi } from 'common-openapi/dist/types/PromiseAPI';
+import { PromiseDirectoryApi } from 'directory-openapi/dist/types/PromiseAPI';
 import { useEffect, useState } from 'react';
 
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';

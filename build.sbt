@@ -10,7 +10,7 @@ import sbtassembly.{MergeStrategy, PathList}
 
 BuildCommon.sbtSettings
 
-// sbt insists on these redeclarations
+// sbt insists on these re-declarations
 lazy val `canton-community-app` = BuildCommon.`canton-community-app`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
 lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
@@ -218,6 +218,10 @@ lazy val `apps-validator` =
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      BuildCommon.TS.openApiSettings(
+        npmName = "validator-openapi",
+        openApiSpec = "validator.yaml",
+      ),
       Compile / guardrailTasks :=
         List(
           ScalaServer(
@@ -232,58 +236,6 @@ lazy val `apps-validator` =
             framework = "akka-http",
           ),
         ),
-      Compile / sourceGenerators += Def.task {
-        import better.files.*
-        import _root_.io.circe.*
-        import _root_.io.circe.parser.*
-        import _root_.io.circe.optics.JsonPath.*
-        import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
-        import _root_.io.circe.syntax._
-
-        val log = streams.value.log
-        val cacheDir = streams.value.cacheDirectory
-        val commonSpec = baseDirectory.value / "../../common/src/main/openapi/common.yaml"
-        val validatorSpec = baseDirectory.value / "src/main/openapi/validator.yaml"
-        val cache = FileFunction.cached(cacheDir) { _ =>
-          runCommand(
-            Seq(
-              "openapi-generator-cli",
-              "generate",
-              "-g",
-              "typescript",
-              "-p",
-              "npmName=validator-openapi",
-              "-p",
-              "npmName=validator-openapi",
-              "-p",
-              "moduleName=validator-openapi",
-              "-p",
-              "projectName=validator-openapi",
-              "-p",
-              "useTags=true",
-              "-i",
-              validatorSpec.toString,
-              "-o",
-              "apps/validator/frontend-openapi",
-            ),
-            log,
-          )
-
-          // Add empty check task to make npm happy
-          val packageJson = File("apps/validator/frontend-openapi/package.json")
-          val packageJsonContent = packageJson.contentAsString
-          val doc: Json =
-            parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
-          val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
-            obj.add("check", "echo '[validator-frontend-openapi] no-op'".asJson)
-          )(doc)
-          packageJson.overwrite(updated.spaces2)
-          ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
-        }
-        cache(Set(validatorSpec, commonSpec))
-        // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
-        Seq()
-      }.taskValue,
     )
 
 lazy val `apps-svc` =
@@ -354,8 +306,18 @@ lazy val `apps-common-frontend` = {
           (`splitwise-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      // npm install settings:
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
+      npmInstallOpenApiDeps :=
+        Seq(
+          (
+            (`apps-validator` / Compile / compile).value,
+            (`apps-validator` / Compile / baseDirectory).value,
+          ),
+          (
+            (`apps-directory` / Compile / compile).value,
+            (`apps-directory` / Compile / baseDirectory).value,
+          ),
+        ),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value / "../..",
       Compile / compile := {
@@ -365,8 +327,6 @@ lazy val `apps-common-frontend` = {
       bundle := {
         (Compile / compile).value
         (`apps-common-frontend-protobuf` / Compile / compile).value
-        (`apps-common-frontend-openapi` / Compile / compile).value
-        (`apps-validator` / Compile / compile).value
         val log = streams.value.log
         val cacheDir = streams.value.cacheDirectory
         val sourceFiles =
@@ -377,23 +337,20 @@ lazy val `apps-common-frontend` = {
             // compile to get .d.ts and .js files. We cannot run this as part of
             // apps-common-frontend-openapi/compile because that does not yet run
             // npm install.
-            runCommand(
-              Seq("npm", "run", "build", "--workspace", "common/frontend-openapi"),
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "directory/openapi-ts-client",
               log,
-              None,
-              Some(npmRootDir.value),
             )
-            runCommand(
-              Seq("npm", "run", "build", "--workspace", "common-frontend"),
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "validator/openapi-ts-client",
               log,
-              None,
-              Some(npmRootDir.value),
             )
-            runCommand(
-              Seq("npm", "run", "build", "--workspace", "validator/frontend-openapi"),
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "common-frontend",
               log,
-              None,
-              Some(npmRootDir.value),
             )
             (baseDirectory.value / "lib" ** "*").get.toSet
           }
@@ -465,66 +422,6 @@ lazy val `apps-directory-frontend` = {
     )
 }
 
-lazy val `apps-common-frontend-openapi` = {
-  project
-    .in(file("apps/common/frontend-openapi"))
-    .settings(
-      Compile / sourceGenerators += Def.task {
-        import better.files.*
-        import _root_.io.circe.*
-        import _root_.io.circe.parser.*
-        import _root_.io.circe.optics.JsonPath.*
-        import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
-        import _root_.io.circe.syntax._
-
-        val log = streams.value.log
-        val cacheDir = streams.value.cacheDirectory
-        val commonSpec = baseDirectory.value / "../../common/src/main/openapi/common.yaml"
-        val directorySpec = baseDirectory.value / "../../directory/src/main/openapi/directory.yaml"
-        val cache = FileFunction.cached(cacheDir) { _ =>
-          runCommand(
-            Seq(
-              "openapi-generator-cli",
-              "generate",
-              "-g",
-              "typescript",
-              "-p",
-              "npmName=common-openapi",
-              "-p",
-              "npmName=common-openapi",
-              "-p",
-              "moduleName=common-openapi",
-              "-p",
-              "projectName=common-openapi",
-              "-p",
-              "useTags=true",
-              "-i",
-              directorySpec.toString,
-              "-o",
-              "apps/common/frontend-openapi",
-            ),
-            log,
-          )
-
-          // Add empty check task to make npm happy
-          val packageJson = File("apps/common/frontend-openapi/package.json")
-          val packageJsonContent = packageJson.contentAsString
-          val doc: Json =
-            parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
-          val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
-            obj.add("check", "echo '[common-protobuf] no-op'".asJson)
-          )(doc)
-          packageJson.overwrite(updated.spaces2)
-          ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
-        }
-        cache(Set(directorySpec, commonSpec))
-        // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
-        Seq()
-      }.taskValue,
-      cleanFiles += baseDirectory.value / "com",
-    )
-}
-
 lazy val `apps-common-frontend-protobuf` = {
   project
     .in(file("apps/common/frontend-protobuf"))
@@ -549,7 +446,6 @@ lazy val `apps-common-frontend-protobuf` = {
 lazy val `apps-frontends` = {
   project.aggregate(
     `apps-common-frontend-protobuf`,
-    `apps-common-frontend-openapi`,
     `apps-common-frontend`,
     `apps-wallet-frontend`,
     `apps-directory-frontend`,
@@ -588,6 +484,10 @@ lazy val `apps-directory` =
         scalapb_runtime_grpc,
         scalapb_runtime,
         akka_http_cors,
+      ),
+      BuildCommon.TS.openApiSettings(
+        npmName = "directory-openapi",
+        openApiSpec = "directory.yaml",
       ),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
