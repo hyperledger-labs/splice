@@ -4,9 +4,7 @@ target-canton := $(dir)/target/canton
 target-classpath := $(dir)/target/canton-classpath
 auth-service := ${REPO_ROOT}/canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class
 
-$(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh
-	mkdir -p $(@D)
-	cp $< $@
+include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
 $(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-canton) $(target-classpath)
 

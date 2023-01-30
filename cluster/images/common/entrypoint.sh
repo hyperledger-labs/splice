@@ -4,8 +4,8 @@ EXE=$(readlink -f cn-image-bin)
 
 ARGS="daemon --no-tty --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off"
 
-if [ -f /app/bootstrap.scala ]; then
-    ARGS="${ARGS} --bootstrap /app/bootstrap.scala"
+if [ -f /app/bootstrap.sc ]; then
+   ARGS="${ARGS} --bootstrap /app/bootstrap-entrypoint.sc"
 fi
 
 if [ -f /app/app.conf ]; then

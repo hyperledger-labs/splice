@@ -14,9 +14,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/coin-0.1.0-SNAPSHOT.tar.gz .
 
-# use this config until example configs are fixed
-COPY empty.conf .
-COPY target/entrypoint.sh .
+COPY empty.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sc /app/
 
 RUN ln -s coin-0.1.0-SNAPSHOT/bin/coin cn-image-bin
 

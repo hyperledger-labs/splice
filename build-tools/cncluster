@@ -128,11 +128,13 @@ function cluster_deploy() {
     cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
 
     make -C ${REPO_ROOT} clean -j
-    make -C ${REPO_ROOT} docker-build -j
+
+    if ! make -C ${REPO_ROOT} docker-build -j; then
+        _error "Error building images, cannot apply."
+    fi
 
     if ! make -C ${REPO_ROOT} docker-push-force; then
-        _error "Error building images, cannot apply."
-        exit 1
+        _error "Error pushing images, cannot apply."
     fi
 
     _cluster_apply ${SOURCE_IMAGE_TAG}

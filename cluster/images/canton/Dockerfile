@@ -20,9 +20,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/canton .
 
-# use this config until example configs are fixed
-COPY empty.conf .
-COPY target/entrypoint.sh .
+COPY empty.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sc /app/
 
 RUN ln -s bin/canton cn-image-bin
 

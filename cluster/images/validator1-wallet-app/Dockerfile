@@ -4,4 +4,4 @@ FROM --platform=linux/amd64 cn-app:${base_version}
 
 EXPOSE 5104
 
-COPY app.conf .
+COPY app.conf /app/

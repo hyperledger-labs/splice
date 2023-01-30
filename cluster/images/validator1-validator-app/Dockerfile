@@ -4,7 +4,5 @@ FROM --platform=linux/amd64 cn-app:${base_version}
 
 EXPOSE 5103
 
-COPY app.conf .
-COPY bootstrap.scala .
-COPY target/directory-service-0.1.0.dar .
-COPY target/splitwise-0.1.0.dar .
+COPY target/directory-service-0.1.0.dar target/splitwise-0.1.0.dar /app/
+COPY app.conf bootstrap.sc /app/

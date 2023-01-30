@@ -3,9 +3,8 @@ dir := $(call current_dir)
 target-bundle := $(dir)/target/coin-0.1.0-SNAPSHOT.tar.gz
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 
-$(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh
-	mkdir -p $(@D)
-	cp $< $@
+include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
+
 $(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-bundle)
 
 $(target-bundle): $(app-bundle)

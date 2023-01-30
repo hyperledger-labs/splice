@@ -6,4 +6,4 @@ EXPOSE 5008
 EXPOSE 5009
 EXPOSE 10013
 
-COPY app.conf .
+COPY app.conf /app/
