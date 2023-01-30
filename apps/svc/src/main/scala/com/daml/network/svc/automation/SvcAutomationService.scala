@@ -43,4 +43,5 @@ class SvcAutomationService(
   registerTrigger(new ClosedMiningRoundTrigger(triggerContext, store, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, store, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, store, connection))
+  registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, store, connection))
 }

@@ -18,6 +18,7 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as D
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
+import java.time.Duration
 
 class SvcTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -208,4 +209,37 @@ class SvcTimeBasedIntegrationTest
     }
   }
 
+  "auto-merge unclaimed rewards" in { implicit env =>
+    val threshold =
+      10 // TODO(M3-46): base this on the actual threshold read from the svcRules config
+    val numRewards = threshold + 1
+    val rewardAmount = 0.1
+
+    def getUnclaimedRewardContracts() = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      .filterJava(UnclaimedReward.COMPANION)(svcParty)
+
+    val existingUnclaimedRewards = getUnclaimedRewardContracts().length
+
+    actAndCheck(
+      s"Create as many unclaimed rewards as needed to have at least ${numRewards}", {
+        val unclaimedRewards = ((existingUnclaimedRewards + 1) to numRewards).map(_ =>
+          new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
+        )
+        if (!unclaimedRewards.isEmpty) {
+          svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+            actAs = Seq(svcParty),
+            optTimeout = None,
+            commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
+          )
+        }
+        advanceTime(Duration.ofSeconds(1))
+      },
+    )(
+      "Wait for the unclaimed rewards to get merged automagically",
+      _ => {
+        getUnclaimedRewardContracts().length should (be < threshold)
+      },
+    )
+
+  }
 }

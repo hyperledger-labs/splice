@@ -16,6 +16,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait SvcStore extends CoinAppStoreWithoutHistory {
@@ -162,6 +163,15 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       provider: String
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
     acs.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
+
+  def listUnclaimedRewards(
+      limit: Long
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
+    acs.listContracts(
+      cc.coin.UnclaimedReward.COMPANION,
+      (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
+      Some(limit),
+    )
 }
 
 object SvcStore {
@@ -212,6 +222,7 @@ object SvcStore {
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }
