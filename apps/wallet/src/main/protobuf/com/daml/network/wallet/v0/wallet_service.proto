@@ -178,13 +178,10 @@ message CreateTransferOfferRequest {
   // Expiration time for the offer (in epoch microseconds)
   uint64 expires_at = 4;
 
-  // Sender transfer fee ratio
-  string sender_transfer_fee_ratio = 5;
-
   // A unique key to be used to prevent accidental duplication of an offer.
   // The server guarantees that no two offers from the same sender to the same
   // receiver are accepted with the same idempotencyKey within a duration of 24 hours.
-  string idempotency_key = 6;
+  string idempotency_key = 5;
 }
 
 message CreateTransferOfferResponse {

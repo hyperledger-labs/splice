@@ -94,13 +94,11 @@ const TransferOffers: React.FC = () => {
       default:
         throw Error(`Unexpected unit: ${transferExpirationUnit}`);
     }
-    const senderTransferFeeRatio = new Decimal(1.0);
     await createTransferOffer(
       receiver,
       transferAmount,
       transferDescription,
       expires,
-      senderTransferFeeRatio,
       idempotencyKey
     );
   };

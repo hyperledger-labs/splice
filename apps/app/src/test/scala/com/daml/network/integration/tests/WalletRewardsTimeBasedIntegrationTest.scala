@@ -27,11 +27,11 @@ class WalletRewardsTimeBasedIntegrationTest
       // Tap coin and do a transfer from alice to bob
       aliceWallet.tap(50)
 
-      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
+      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0)
 
       // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
       eventually()(bobWallet.list().coins should have size 1)
-      p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, alice, 30.0, 0.0)
+      p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, alice, 30.0)
 
       eventually() {
         bobWallet.listAppRewardCoupons() should have size 1

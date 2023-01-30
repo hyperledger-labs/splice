@@ -125,10 +125,9 @@ trait TimeTestUtil extends CoinTestCommon {
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      senderTransferFeeRatio: BigDecimal = 1.0,
       advanceTimeBy: Duration = Duration.ofSeconds(1),
   )(implicit env: CoinTestConsoleEnvironment) = {
-    p2pTransfer(senderWallet, receiverWallet, receiver, amount, senderTransferFeeRatio)
+    p2pTransfer(senderWallet, receiverWallet, receiver, amount)
     eventually() {
       // wait until we observe the accepted transfer offer
       receiverWallet.listAcceptedTransferOffers() should have size 1

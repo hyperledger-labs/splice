@@ -428,15 +428,12 @@ class GrpcWalletService(
             val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
             val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
             val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
-            val senderTransferFeeRatio =
-              Proto.tryDecode(Proto.JavaBigDecimal)(request.senderTransferFeeRatio)
             Future.successful(
               installCid.exerciseWalletAppInstall_CreateTransferOffer(
                 receiver.toProtoPrimitive,
                 new PaymentAmount(amount, Currency.CC),
                 request.description,
                 expiresAt.toInstant,
-                senderTransferFeeRatio,
               )
             )
           })(

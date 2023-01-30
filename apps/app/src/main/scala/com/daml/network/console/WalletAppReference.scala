@@ -217,7 +217,6 @@ class WalletAppClientReference(
       description: String,
       expiresAt: CantonTimestamp,
       idempotencyKey: String,
-      senderFeeTransferRatio: BigDecimal = 1.0,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {
       adminCommand(
@@ -227,7 +226,6 @@ class WalletAppClientReference(
             amount,
             description,
             expiresAt,
-            senderFeeTransferRatio,
             idempotencyKey,
           ),
         callCredentials,

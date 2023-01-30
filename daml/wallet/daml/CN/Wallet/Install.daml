@@ -165,7 +165,6 @@ template WalletAppInstall
         amount : PaymentAmount
         description : Text
         expiresAt: Time
-        senderTransferFeeRatio : Decimal
       controller walletServiceParty
       do
         create TransferOffer with

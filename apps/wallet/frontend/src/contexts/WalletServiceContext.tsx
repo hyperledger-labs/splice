@@ -70,7 +70,6 @@ export interface WalletClient {
     amount: Decimal,
     description: string,
     expiresAt: Date,
-    senderTransferFeeRatio: Decimal,
     idempotencyKey: string
   ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
@@ -135,7 +134,6 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         amount,
         description,
         expiresAt,
-        senderTransferFeeRatio,
         idempotencyKey
       ) => {
         await walletClient.createTransferOffer(
@@ -144,11 +142,6 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             .setAmount(amount.isInt() ? amount.toFixed(1) : amount.toString())
             .setDescription(description)
             .setExpiresAt(expiresAt.getTime() * 1000)
-            .setSenderTransferFeeRatio(
-              senderTransferFeeRatio.isInt()
-                ? senderTransferFeeRatio.toFixed(1)
-                : senderTransferFeeRatio.toString()
-            )
             .setIdempotencyKey(idempotencyKey),
           getCreds()
         );

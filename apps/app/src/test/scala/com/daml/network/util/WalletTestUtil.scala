@@ -172,7 +172,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      senderTransferFeeRatio: BigDecimal = 1.0,
   ) = {
     val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
     val transferOfferId =
@@ -182,7 +181,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         "test transfer",
         expiration,
         idempotencyKey = UUID.randomUUID.toString,
-        senderTransferFeeRatio,
       )
     eventually() {
       receiverWallet.listTransferOffers() should have size 1

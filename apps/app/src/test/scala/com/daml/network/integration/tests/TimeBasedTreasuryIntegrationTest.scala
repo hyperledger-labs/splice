@@ -120,7 +120,7 @@ class TimeBasedTreasuryIntegrationTest
     checkWallet(alice, aliceWallet, Seq(exactly(50)))
 
     // run a transfer such that alice and her validator have some rewards
-    p2pTransfer(aliceWallet, bobWallet, bob, 40.0, 0.0)
+    p2pTransfer(aliceWallet, bobWallet, bob, 40.0)
     eventually()(aliceWallet.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
