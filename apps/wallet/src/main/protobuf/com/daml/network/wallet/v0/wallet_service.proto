@@ -3,7 +3,6 @@ package com.daml.network.wallet.v0;
 
 import "com/daml/network/v0/connected_domains.proto";
 import "com/daml/network/v0/contract.proto";
-import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
 
 service WalletService {
