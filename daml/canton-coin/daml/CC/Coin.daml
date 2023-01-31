@@ -7,6 +7,7 @@ import Prelude hiding (forA)
 import DA.Action (void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_, mapA_)
+import DA.List (dedupSort)
 import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Set (Set)
@@ -780,8 +781,17 @@ consumeInputs coinRulesCid csum svc sender inps = do
 
 preprocessOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs config sender outs =
-    mapA preprocessOutput outs
+    mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
+    -- deduplicate lock-holders to store them and charge for them at most once
+    dedupOutputLockHolders out = out with lock = fmap (dedupLockHolders out.receiver) out.lock
+
+    dedupLockHolders : Party -> API.TimeLock -> API.TimeLock
+    dedupLockHolders receiver (API.TimeLock with expiresAt; holders) =
+      API.TimeLock with
+        expiresAt
+        holders = dedupSort $ filter (receiver /=) holders
+
     preprocessOutput out@(API.TransferOutput with receiver; amount; lock; receiverFeeRatio)
       | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
           error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
@@ -791,7 +801,6 @@ preprocessOutputs config sender outs =
             now <- getTime
             let lockDuration = subTime l.expiresAt now
             require "Positive lock duration" (days 0 <= lockDuration)
-            require "At least one lock holder" (not $ null l.holders)
             require "Fewer than the allowed number of lock holders"
               (length l.holders <= config.maxNumLockHolders)
           -- compute output
