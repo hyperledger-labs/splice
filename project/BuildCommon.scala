@@ -774,7 +774,7 @@ object BuildCommon {
       )
   }
 
-  // TODO(#10617) remove when no longer needed
+  // https://github.com/DACH-NY/canton/issues/10617: remove when no longer needed
   lazy val `canton-akka-fork` = {
     import CantonDependencies._
     sbt.Project

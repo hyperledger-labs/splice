@@ -164,7 +164,6 @@ object CoinUtil {
     50,
 
     // Fits a hex-encoded SHA-256 or a UUID
-    // TODO(M3-01): charge per character
     32,
     // 2.5 min default duration
     new cc.api.v1.coin.EnabledChoices(

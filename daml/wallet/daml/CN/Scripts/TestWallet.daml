@@ -102,8 +102,6 @@ testSingleReceiverCCPaymentRequest = script do
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 30.0)
       ]
 
-  -- TODO(#2128): check rewards once we issue app rewards in this case
-
   pure ()
 
 testExpiringCCPaymentRequest : Script ()
