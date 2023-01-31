@@ -232,23 +232,6 @@ message ListValidatorRewardCouponsResponse {
   repeated com.daml.network.v0.Contract validator_reward_coupons = 1;
 }
 
-message RedistributeOutput {
-  string amount = 1; // Optional, corresponds to exactAmount in OutputSenderCoin.
-}
-
-message RedistributeRequest {
-  // The TransferInputs to be redistributed
-  repeated com.daml.network.v0.Value inputs = 1;
-  // The outputs to distribute to.
-  repeated RedistributeOutput outputs = 2;
-}
-
-message RedistributeResponse {
-  // The coins resulting from the transfer.
-  repeated string coin_contract_ids = 1;
-}
-
-
 message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
 }
