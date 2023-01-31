@@ -103,7 +103,8 @@ template SubscriptionRequest
     signatory signatory subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionRequest_AcceptAndMakePayment : (ContractId SubscriptionInitialPayment, ContractId Coin)
+    choice SubscriptionRequest_AcceptAndMakePayment
+      : (ContractId SubscriptionInitialPayment, Optional (ContractId Coin))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -190,7 +191,8 @@ template SubscriptionIdleState
     signatory signatory subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionIdleState_MakePayment : (ContractId SubscriptionPayment, ContractId Coin)
+    choice SubscriptionIdleState_MakePayment
+      : (ContractId SubscriptionPayment, Optional (ContractId Coin))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -285,7 +287,9 @@ template SubscriptionPayment
         pure (state, coin)
 
 
-lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Party -> Update (ContractId LockedCoin, ContractId Coin, Decimal)
+lockAndMakeChange
+  : PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Party
+  -> Update (ContractId LockedCoin, Optional (ContractId Coin), Decimal)
 lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentAmount; collectionDuration = lockDuration; .. } = payData
@@ -315,9 +319,8 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
 
   result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedCoin lockedCoin] = result.createdCoins
-  let Some senderChange = result.senderChangeCoin
 
-  pure(lockedCoin, senderChange, targetAmount)
+  pure(lockedCoin, result.senderChangeCoin, targetAmount)
 
 
 unlockAndTransfer: AppTransferContext -> Subscription -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)

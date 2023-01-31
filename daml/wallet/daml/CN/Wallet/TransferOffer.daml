@@ -49,7 +49,8 @@ template AcceptedTransferOffer
   where
     signatory sender, receiver
 
-    nonconsuming choice AcceptedTransferOffer_Complete : (API.TransferResult, ContractId API.Coin)
+    nonconsuming choice AcceptedTransferOffer_Complete
+      : (API.TransferResult, Optional (ContractId API.Coin))
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
@@ -73,9 +74,7 @@ template AcceptedTransferOffer
             payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
         archive self
-        -- TODO(M3-01): allow not returning change
-        let Some senderChange = result.senderChangeCoin
-        pure (result, senderChange)
+        pure (result, result.senderChangeCoin)
 
     choice AcceptedTransferOffer_Withdraw : ()
       controller receiver

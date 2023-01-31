@@ -77,7 +77,8 @@ template AppPaymentRequest
     signatory sender, receivers, provider
     ensure (collectionDuration > aunit && all (\rq -> rq.amount.amount > 0.0) receiverAmounts)
 
-    choice AppPaymentRequest_Accept : (ContractId AcceptedAppPayment, ContractId Coin)
+    choice AppPaymentRequest_Accept
+      : (ContractId AcceptedAppPayment, Optional (ContractId Coin))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -113,12 +114,10 @@ template AppPaymentRequest
               payload = "lock payment"
          result <- exercisePaymentTransfer context transfer
          let [TransferResultLockedCoin lockedCoin] = result.createdCoins
-         -- TODO(M3-01): allow not returning a sender change coin
-         let Some senderChange = result.senderChangeCoin
          acceptedPayment <- create AcceptedAppPayment
            with
              svc, provider, ccReceiverAmounts, sender, deliveryOffer, lockedCoin
-         return (acceptedPayment, senderChange)
+         return (acceptedPayment, result.senderChangeCoin)
 
     choice AppPaymentRequest_Withdraw : ()
       controller receivers

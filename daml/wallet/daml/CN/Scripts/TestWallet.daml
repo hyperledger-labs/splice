@@ -83,15 +83,20 @@ testSingleReceiverCCPaymentRequest = script do
 
   featureApp app provider
 
+  aliceInitialCoins <- query @Coin alice.primaryParty
+
+  let paymentAmount = 41.5 -- chosen to not return sender change
   coin <- tap app alice 42.0
   (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
     provider.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount 30.0 CC)
+    (PaymentAmount paymentAmount CC)
 
   acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
-  [(aliceChange, _), _] <- query @Coin alice.primaryParty
+  -- all of Alice's tapped coin is used up
+  aliceCoins <- query @Coin alice.primaryParty
+  aliceCoins === aliceInitialCoins
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider.primaryParty
@@ -99,7 +104,7 @@ testSingleReceiverCCPaymentRequest = script do
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 30.0)
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
       ]
 
   pure ()

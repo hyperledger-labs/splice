@@ -1,5 +1,6 @@
 module CN.Scripts.Wallet.TestTransferOffers where
 
+import DA.Assert
 import DA.Time
 import Daml.Script
 
@@ -93,10 +94,14 @@ testTransferOffers = script do
   outcomes <- completeTransfer accepted coin transferContext
   let [COO_Error errorMsg] = outcomes
   -- tap more coin and retry the transfer
-  tap app alice 150.0
+  aliceCoinsBefore <- query @Coin alice.primaryParty
+  tap app alice 101.05  -- chosen such that all coins of alice are consumed
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
   outcomes <- completeTransfer accepted coin transferContext
   trace outcomes $ pure ()
   let [COO_CompleteAcceptedTransfer result] = outcomes
+
+  aliceCoinsAfter <- query @Coin alice.primaryParty
+  aliceCoinsAfter === aliceCoinsBefore -- no sender change was created
 
   pure ()

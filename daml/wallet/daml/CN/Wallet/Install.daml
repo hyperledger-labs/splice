@@ -42,15 +42,17 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
       coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
       handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
-    handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle : Choice t c (r, Optional (ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
       resultE <- catchAll $ exercise cid (choiceConstructor inputs context validatorP)
       handleResult resultConstructor resultE
 
-    handleResult : (r -> CoinOperationOutcome) -> Either InvalidTransferReason (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
+    handleResult : (r -> CoinOperationOutcome) -> Either InvalidTransferReason (r, Optional (ContractId API.Coin)) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (result, change) -> executeCoinOperationRec endUserP validatorP context [API.InputCoin change] (resultConstructor result :: prevResults) remainingOperations
+      Right (result, change) -> do
+        let inputCoins = optional [] (\coin -> [API.InputCoin coin]) change
+        executeCoinOperationRec endUserP validatorP context inputCoins (resultConstructor result :: prevResults) remainingOperations
 
     handleResultMergeInputs : Either InvalidTransferReason (API.TransferResult) -> Update [CoinOperationOutcome]
     handleResultMergeInputs = \case
