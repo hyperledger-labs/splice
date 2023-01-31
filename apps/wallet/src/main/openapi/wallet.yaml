@@ -1,0 +1,657 @@
+openapi: 3.0.0
+info:
+  title: Wallet API
+  version: 0.0.1
+tags:
+  - name: wallet
+paths:
+  /user-status:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "userStatus"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatusResponse"
+
+  /coins:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "list"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+
+  /tap:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "tap"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TapRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TapResponse"
+
+  /self-grant-feature-app-right:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "selfGrantFeatureAppRight"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SelfGrantFeaturedAppRightRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SelfGrantFeaturedAppRightResponse"
+
+  /balance:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getBalance"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetBalanceResponse"
+
+  /app-payment-requests:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAppPaymentRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppPaymentRequestsResponse"
+
+  /app-payment-request/${contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptAppPaymentRequestResponse"
+
+  /app-payment-request/${contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  /accepted-app-payments:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAcceptedAppPayments"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAcceptedAppPaymentsResponse"
+
+  /subscription-requests:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptionRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionRequestsResponse"
+
+  /subscription-initial-payments:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptionInitialPayments"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionInitialPaymentsResponse"
+
+  /subscriptions:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listSubscriptions"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSubscriptionsResponse"
+
+  /subscription-requests/${contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptSubscriptionRequestResponse"
+
+  /subscription-requests/${contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  /subscription-requests/${contract_id}/cancel:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "cancelSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  /transfer-offers:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "createTransferOffer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTransferOfferRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateTransferOfferResponse"
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listTransferOffers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTransferOffersResponse"
+
+  /transfer-offers/${contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+  /transfer-offers/${contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptTransferOfferResponse"
+
+  /transfer-offers/${contract_id}/withdraw:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "withdrawTransferOffer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+
+
+  /accepted-transfer-offers:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAcceptedTransferOffers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAcceptedTransferOffersResponse"
+
+  /app-reward-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listAppRewardCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppRewardCouponsResponse"
+
+  /validator-reward-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorRewardCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorRewardCouponsResponse"
+
+  /connected-domains:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listConnectedDomains"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
+
+  /cancel-featured-app-rights:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "cancelFeaturedAppRights"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CancelFeaturedAppRightsRequest"
+      responses:
+        "200":
+          description: ok
+
+components:
+  schemas:
+    UserStatusResponse:
+      type: object
+      required:
+      - party_id
+      - user_onboarded
+      - has_featured_app_right
+      properties:
+        party_id:
+          type: string
+        user_onboarded:
+          type: boolean
+        has_featured_app_right:
+          type: boolean
+
+    ListResponse:
+      type: object
+      required:
+      - coins
+      - locked_coins
+      properties:
+        coins:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoinPosition"
+        locked_coins:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoinPosition"
+
+    CoinPosition:
+      type: object
+      required:
+      - round
+      - accrued_holding_fee
+      - effective_amount
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        round:
+          type: integer
+          format: int64
+        accrued_holding_fee:
+          type: string
+        effective_amount:
+          type: string
+
+    TapRequest:
+      type: object
+      required:
+      - amount
+      properties:
+        amount:
+          type: string
+
+    TapResponse:
+      type: object
+      required:
+      - contract_id
+      properties:
+        contract_id:
+          type: string
+
+    SelfGrantFeaturedAppRightRequest:
+      type: object
+      nullable: true
+
+    SelfGrantFeaturedAppRightResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          type: string
+
+    GetBalanceResponse:
+      type: object
+      required:
+      - round
+      - effective_unlocked_qty
+      - effective_locked_qty
+      - total_holding_fees
+      properties:
+        round:
+          type: integer
+          format: int64
+        effective_unlocked_qty:
+          type: string
+        effective_locked_qty:
+          type: string
+        total_holding_fees:
+          type: string
+
+    ListAppPaymentRequestsResponse:
+      type: object
+      required:
+        - payment_requests
+      properties:
+        payment_requests:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    AcceptAppPaymentRequestRequest:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
+
+    AcceptAppPaymentRequestResponse:
+      type: object
+      required:
+        - accepted_payment_contract_id
+      properties:
+        accepted_payment_contract_id:
+          type: string
+
+    RejectAppPaymentRequestRequest:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
+
+    ListAcceptedAppPaymentsResponse:
+      type: object
+      required:
+        - accepted_app_payments
+      properties:
+        accepted_app_payments:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListSubscriptionRequestsResponse:
+      type: object
+      required:
+        - subscription_requests
+      properties:
+        subscription_requests:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListSubscriptionInitialPaymentsResponse:
+      type: object
+      required:
+        - initial_payments
+      properties:
+        initial_payments:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    Subscription:
+      type: object
+      properties:
+        main:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        state:
+          $ref: "#/components/schemas/SubscriptionState"
+    SubscriptionState:
+      type: object
+      properties:
+        idle:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        payment:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListSubscriptionsResponse:
+      type: object
+      required:
+        - subscriptions
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+
+    AcceptSubscriptionRequestResponse:
+      type: object
+      required:
+        - initial_payment_contract_id
+      properties:
+        initial_payment_contract_id:
+          type: string
+
+    CreateTransferOfferRequest:
+      type: object
+      required:
+        - receiver_party_id
+        - amount
+        - description
+        - expires_at
+        - idempotency_key
+      properties:
+        receiver_party_id:
+          type: string
+        amount:
+          type: string
+        description:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+        idempotency_key:
+          type: string
+
+    CreateTransferOfferResponse:
+      type: object
+      required:
+        - offer_contract_id
+      properties:
+        offer_contract_id:
+          type: string
+
+    ListTransferOffersResponse:
+      type: object
+      required:
+        - offers
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    AcceptTransferOfferResponse:
+      type: object
+      required:
+        - accepted_offer_contract_id
+      properties:
+        accepted_offer_contract_id:
+          type: string
+
+    ListAcceptedTransferOffersResponse:
+      type: object
+      required:
+        - accepted_offers
+      properties:
+        accepted_offers:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListAppRewardCouponsResponse:
+      type: object
+      required:
+        - app_reward_coupons
+      properties:
+        app_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListValidatorRewardCouponsResponse:
+      type: object
+      required:
+        - validator_reward_coupons
+      properties:
+        validator_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    CancelFeaturedAppRightsRequest:
+      type: object
+      nullable: true
+
+    ListConnectedDomainsResponse:
+      type: object
+      required:
+        - connected_domains
+      properties:
+        connected_domains:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"

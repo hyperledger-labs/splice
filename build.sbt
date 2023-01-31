@@ -317,6 +317,10 @@ lazy val `apps-common-frontend` = {
             (`apps-directory` / Compile / compile).value,
             (`apps-directory` / Compile / baseDirectory).value,
           ),
+          (
+            (`apps-wallet` / Compile / compile).value,
+            (`apps-wallet` / Compile / baseDirectory).value,
+          ),
         ),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value / "../..",
@@ -345,6 +349,11 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runBuildCommand(
               npmRootDir.value,
               "validator/openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "wallet/openapi-ts-client",
               log,
             )
             BuildCommon.TS.runBuildCommand(
@@ -468,6 +477,24 @@ lazy val `apps-wallet` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      BuildCommon.TS.openApiSettings(
+        npmName = "wallet-openapi",
+        openApiSpec = "wallet.yaml",
+      ),
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/wallet/src/main/openapi/wallet.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+            customExtraction = true,
+          ),
+          ScalaClient(
+            new File("apps/wallet/src/main/openapi/wallet.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
 
 lazy val `apps-directory` =

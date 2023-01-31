@@ -1,8 +1,9 @@
 {
   "workspaces": [
     "common/frontend-protobuf",
-    "validator/openapi-ts-client",
     "directory/openapi-ts-client",
+    "validator/openapi-ts-client",
+    "wallet/openapi-ts-client",
     "common/frontend",
     "directory/frontend",
     "wallet/frontend",
