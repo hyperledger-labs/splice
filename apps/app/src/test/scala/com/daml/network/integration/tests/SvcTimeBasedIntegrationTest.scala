@@ -232,11 +232,11 @@ class SvcTimeBasedIntegrationTest
             commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
           )
         }
-        advanceTime(Duration.ofSeconds(1))
       },
     )(
       "Wait for the unclaimed rewards to get merged automagically",
       _ => {
+        advanceTime(Duration.ofSeconds(1))
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )
