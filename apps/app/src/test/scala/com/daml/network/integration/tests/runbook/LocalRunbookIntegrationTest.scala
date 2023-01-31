@@ -42,7 +42,7 @@ class LocalRunbookIntegrationTest
     // don't need to start two Canton instances.
     val bootstrapFile: File = Files.createTempFile("canton-bootstrap", "scala")
     val validatorBootstrapContent: String =
-      (validatorPath / "validator-participant.canton").contentAsString
+      (validatorPath / "validator-participant.sc").contentAsString
     bootstrapFile.overwrite("""
       |val svcUserName = "svc"
       |println("Allocating svc party")
@@ -138,7 +138,7 @@ class LocalRunbookIntegrationTest
 
   // TODO(#1983)
   "run through runbook against local SVC" in { implicit env =>
-    runScript(validatorPath / "validator.canton")(env.environment)
-    runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
+    runScript(validatorPath / "validator.sc")(env.environment)
+    runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
   }
 }

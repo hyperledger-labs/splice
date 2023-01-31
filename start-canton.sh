@@ -46,7 +46,7 @@ export CLASSPATH=$PWD/canton-classpath
 CANTON_TOKEN_FILENAME=canton.tokens canton \
     daemon --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
-    --bootstrap bootstrap-canton.canton &
+    --bootstrap bootstrap-canton.sc &
 PID=$!
 echo "$PID" > canton.pid
 
@@ -55,7 +55,7 @@ CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
     daemon --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
     --log-file-name log/canton-simtime.log \
-    --bootstrap bootstrap-canton.canton &
+    --bootstrap bootstrap-canton.sc &
 PID=$!
 echo "$PID" > canton-simtime.pid
 

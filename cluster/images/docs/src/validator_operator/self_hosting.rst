@@ -63,14 +63,14 @@ you extracted Canton research next to the Canton network tarball. If you placed 
 .. parsed-literal::
 
   DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
-      --bootstrap examples/validator/validator-participant.canton
+      --bootstrap examples/validator/validator-participant.sc
 
 Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps:
 
 .. parsed-literal::
 
   NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf \
-      --bootstrap examples/validator/validator.canton
+      --bootstrap examples/validator/validator.sc
 
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
@@ -267,7 +267,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 .. parsed-literal::
 
     DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
-      --bootstrap examples/validator/validator-participant.canton
+      --bootstrap examples/validator/validator-participant.sc
 
 4. Get participant id from the Canton console. We'll need to configure Auth0 to issue tokens for this participant. The actual participant id you see will vary slightly::
 
@@ -344,7 +344,7 @@ NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml
 .. parsed-literal::
 
     NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
-      --bootstrap examples/validator/validator.canton
+      --bootstrap examples/validator/validator.sc
 
 14. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 

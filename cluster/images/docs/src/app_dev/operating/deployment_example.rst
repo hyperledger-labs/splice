@@ -19,7 +19,7 @@ To start the validator node, first start the validator participant using the Can
 .. parsed-literal::
 
     DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwise/splitwise-participant.conf \
-      --bootstrap examples/splitwise/splitwise-participant.canton
+      --bootstrap examples/splitwise/splitwise-participant.sc
 
 Before starting the splitwise backend, some setup is required:
 

@@ -128,7 +128,7 @@ class PreflightIntegrationTest
         CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
       )
       // Disable autostart, because our apps require the participant to be connected to a domain
-      // when the app starts. The apps are started manually in `validator-participant.canton` below.
+      // when the app starts. The apps are started manually in `validator-participant.sc` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
@@ -267,11 +267,11 @@ class PreflightIntegrationTest
       "-C",
       "canton.participants.validatorParticipant.admin-api.port=6002",
       "--bootstrap",
-      (validatorPath / "validator-participant.canton").toString,
+      (validatorPath / "validator-participant.sc").toString,
     )
     Using.resource(startCanton(cantonArgs)) { process =>
-      runScript(validatorPath / "validator.canton")(env.environment)
-      runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
+      runScript(validatorPath / "validator.sc")(env.environment)
+      runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
     }
   }
 }

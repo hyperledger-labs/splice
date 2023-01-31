@@ -354,7 +354,7 @@ function _check_cluster_grpc_port() {
 function _check_cluster_ledger() {
     if ! CLUSTER_ADDR="${CLUSTER_DNS_NAME}" coin \
          --config ${REPO_ROOT}/build-tools/cluster-test.conf \
-         --bootstrap ${REPO_ROOT}/build-tools/cluster-test.canton; then
+         --bootstrap ${REPO_ROOT}/build-tools/cluster-test.sc; then
         _error "Cannot run ledger access test."
     fi
 }
