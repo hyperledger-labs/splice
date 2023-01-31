@@ -192,12 +192,12 @@ Next, start the envoy proxy. This proxies the wallet gRPC API on port
 
   envoy -c examples/validator/envoy.yaml
 
-Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs.
-For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:
+Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
+For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
 
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
-    :start-after: BEGIN_WALLET_DIRECTORY_CONFIG
-    :end-before: END_WALLET_DIRECTORY_CONFIG
+    :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
+    :end-before: END_WALLET_CLUSTER_BACKEND_CONFIG
 
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
@@ -258,24 +258,40 @@ Auth0 Example IAM Setup
 
 To integrate Auth0 as your validator's IAM provider, perform the following:
 
+.. TODO(#2567) Revisit the flow once we have customizable JWT audiences.
+
 1. Create an Auth0 tenant for your validator
-2. Create an Auth0 API for your applications:
+2. Set the environment variable ``NETWORK_AUTH_JWKS_URL`` to the "JSON Web Key Set" endpoint of your tenant. You can find this value at the bottom of any application's settings page (there will be one default application), in the "Advanced Settings" section, in the "Endpoints" tab.
+3. Start Canton and configure it to validate tokens against your new Auth0 tenant:
+
+.. parsed-literal::
+
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
+      --bootstrap examples/validator/validator-participant.canton
+
+4. Get participant id from the Canton console. We'll need to configure Auth0 to issue tokens for this participant. The actual participant id you see will vary slightly::
+
+     @ validatorParticipant.id.toProtoPrimitive
+     res1: String = "PAR::validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1"
+
+5. Create an Auth0 API that controls access to the ledger API:
 
     .. TODO(#2052) use a unique audience for each app
 
-    a. Navigate to Applications > APIs and click "Create API". Name can be anything, set identifier to https://canton.network.global (that is the audience that we will configure the backend to expect).
-    b. Under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice.
+    a. Navigate to Applications > APIs and click "Create API". Set name to ``Daml Ledger API``, set identifier to ``https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1`` (replace the participant id by the value you got from the previous step)
+    b. Under the Permissions tab in the new API, add a permission with scope ``daml_ledger_api``, and a description of your choice.
     c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
 
-3. Create an Auth0 Application for the validator backend:
+6. Create another API. Set name to ``CN App API``, set identifier to ``https://canton.network.global``. This API will be used by the wallet UI to authenticate itself towards the wallet & validator app.
+7. Create an Auth0 Application for the validator backend:
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
     b. Choose "Machine to Machine Applications", call it "Validator app backend", and click Create
-    c. Choose the API you created in step 2 in the "Authorize Machine to Machine Application" dialog, and click Authorize
+    c. Choose the ``Daml Ledger API`` API you created in step 2 in the "Authorize Machine to Machine Application" dialog and check the ``daml_ledger_api`` permission, and click Authorize.
 
-4. Create an Auth0 Application for the wallet backend.
-   Repeat step 2, this time calling your application "Wallet app backend"
-5. Create an Auth0 Application for the wallet web UI.
+8. Create an Auth0 Application for the wallet backend.
+   Repeat the steps used for creating the validator backend application, this time calling your application "Wallet app backend" and granting access to both ``Daml Ledger API`` and ``CN App API``.
+9. Create an Auth0 Application for the wallet web UI.
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
     b. Choose "Single Page Web Applications", call it "Wallet web UI", and click Create
@@ -287,10 +303,27 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
        - "Allowed Web Origins"
        - "Allowed Origins (CORS)"
     e. Save your application settings
+10. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://localhost:3001``)
+11. Allocate the validator service party and user.
 
-6. Create an Auth0 Application for the directory web UI.
-   Repeat step 4, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://localhost:3001``)
-7. Set the following environment variables on the system that will be running your wallet and validator app backends:
+   a. First, go to ``Validator app backend`` application that you configured earlier and copy the Client ID.
+   b. Next go to the terminal in which you started Canton earlier.
+   c. Create the party. Your output will look slightly different::
+
+        @ val validatorParty = validatorParticipant.parties.enable("validator_service_user")
+        validatorParty: PartyId = validator_service_user::12207d5f2bee...
+   d. Create the user. Replace the ``$CLIENT_ID`` by the client id you got from the ``Validator app backend``::
+
+        @ validatorParticipant.ledger_api.users.create(
+              id = "$CLIENT_ID@clients",
+              actAs = Set(validatorParty.toLf),
+              readAs = Set.empty,
+              primaryParty = Some(validatorParty.toLf),
+              participantAdmin = true,
+          )
+        res5: User = User(id = "0wricJfT4Zm5RfBYhGKnyi695mzTXGsn@clients", primaryParty = Some(value = "validator_service_user::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1"), isActive = true, annotations = Map())
+
+12. Set the following environment variables on the system that will be running your wallet and validator app backends:
 
 ====================================  =====
 Name                                  Value
@@ -299,29 +332,21 @@ NETWORK_AUTH_JWKS_URL                 The "JSON Web Key Set" endpoint of your te
 NETWORK_AUTH_WELLKNOWN_URL            The "OpenID Configuration" endpoint of your tenant. You can find this value at the bottom of any application's settings page, in the "Advanced Settings" section, in the "Endpoints" tab.
 NETWORK_AUTH_VALIDATOR_CLIENT_ID      The "Client ID" of your "Validator app backend" application (at the top of the application's settings page)
 NETWORK_AUTH_VALIDATOR_CLIENT_SECRET  The "Client Secret" of your "Validator app backend" application (at the top of the application's settings page)
-NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator app backend" application. Equal to the "Client ID" of the "Validator app backend" application with all upper case characters replaced by lower case characters, and `@clients` appended.
+NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator app backend" application. Equal to the "Client ID" of the "Validator app backend" application with `@clients` appended.
 NETWORK_AUTH_WALLET_CLIENT_ID         The "Client ID" of your "Wallet app backend" application (at the top of the application's settings page)
 NETWORK_AUTH_WALLET_CLIENT_SECRET     The "Client Secret" of your "Wallet app backend" application (at the top of the application's settings page)
-NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app backend" application. Equal to the "Client ID" of the "Wallet app backend" application with all upper case characters replaced by lower case characters, and `@clients` appended.
+NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app backend" application. Equal to the "Client ID" of the "Wallet app backend" application with `@clients` appended.
+NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml ledger API`` API in Auth0, e.g, ```https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1``
 ====================================  =====
 
-8. Kill the running processes started at the beginning (both the participant and the validator), and restart them with `*-secure.conf` config files:
-
-.. parsed-literal::
-
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
-      --bootstrap examples/validator/validator-participant.canton \
-      -DVALIDATOR_USER_NAME=${NETWORK_AUTH_VALIDATOR_USER_NAME}
-
-and
+13. Now start the validator & the wallet again:
 
 .. parsed-literal::
 
     NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
       --bootstrap examples/validator/validator.canton
 
-9. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block,
-   manually replacing variables with values described below:
+14. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
   ::
 
@@ -340,9 +365,9 @@ NETWORK_AUTH_DOMAIN_URL               The "Domain" of your tenant (at the top of
 NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" application (at the top of the application's settings page)
 ====================================  =====
 
-10. Repeat step 9 for the directory UI configuration, at ``web-uis/directory/config.js``
+15. Repeat step 9 for the directory UI configuration, at ``web-uis/directory/config.js``. This time, set the audience to the same value you set ``NETWORK_AUTH_LEDGER_API_AUDIENCE`` to earlier, e.g., ``https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1``.
 
-11. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
+16. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
