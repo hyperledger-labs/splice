@@ -42,7 +42,7 @@ test = script do
       observers = []
       openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
-      
+
   alice <- setupUser app "alice" app.svc
   -- Lock expires at T00:12:30
   let lockExpiresAt12_30 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
@@ -79,19 +79,19 @@ test = script do
   let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
   assert lockExpiresBeforeLargeCoin
 
--- From #2336, This test case is to make sure we handle DA.Time overflow 
+-- From #2336, This test case is to make sure we handle DA.Time overflow
 -- in estimateOpenRoundCreatedAt when the coin amount is too large
 testLargeCoinExpiry : Script ()
 testLargeCoinExpiry = script do
   app <- setupApp
   now <- getTime
-  
+
   let coinPrice = 2.5
       config = scaleFees (1.0 / coinPrice) defaultCoinConfig
       e = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = config.holdingFee
       Singleton r = amountExpiresAt e
       expiringRound = Singleton $ addRelRound r (RelRound 2)
-      currentMiningRound = OpenMiningRound with 
+      currentMiningRound = OpenMiningRound with
         svc = app.svc
         round = API.Round 1
         coinPrice = 1.0
@@ -99,7 +99,7 @@ testLargeCoinExpiry = script do
         opensAt = now
         targetClosesAt = addRelTime now (minutes 5)
         issuingFor = minutes 5
- 
+
   estimateOpenRoundCreatedAt config.tickDuration currentMiningRound expiringRound === AfterMaxBound
   pure ()
 
@@ -121,9 +121,14 @@ testExpireLockedCoin = do
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
   passTime (minutes 6)
+
+  -- Locking the coin with with initialAmount 0.000005 and created at round 2 but with a
+  -- lock for 1.5 minutes should fail, as round 2 ends in 1.5 minutes
+  getLockedCoinMustFail app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (seconds 90)
+
   -- Lock the coin with initialAmount 0.000005 and created at round 2
   -- As the holding fee is 0.000005 so the coin will be expired at round 3
-  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (minutes 1)
+  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
 
   roundCid <- advanceRound app (API.Round 3)
 
@@ -230,10 +235,41 @@ testChoiceFailed app actAs readAs buildCommand = do
   submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
   pure ()
 
+getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands API.TransferResult)
+getLockedCoinCmd app owner lockHolder amount lockDuration = do
+  now <- getTime
+  coin <- tap app owner (amount + 1.0)
+  let transfer = API.Transfer with
+        sender = owner.primaryParty
+        provider = owner.primaryParty
+        payload = "lock"
+        inputs = map (API.InputCoin . toInterfaceContractId) [coin]
+        outputs =
+          [ API.TransferOutput with
+              receiver = owner.primaryParty
+              amount = amount
+              lock = Some API.TimeLock with
+                holders = [lockHolder]
+                expiresAt = now `addRelTime` lockDuration
+              receiverFeeRatio = 0.0
+          ]
+  (openRound, _) <- getLatestOpenRound app
+  featuredAppRight <- getFeaturedAppRight app owner.primaryParty
+
+  (rules, _) <- fetchCoinRulesByKey app.svc
+  return $ exerciseCmd (toInterfaceContractId @API.CoinRules rules)
+    API.CoinRules_Transfer with
+      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
+
 getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
-getLockedCoin app owner lockHolder amount lockDuration =  do
--- tap amount + 1 to account for fees
-  _ <- tap app owner (amount + 1.0)
-  lockTo1 app owner lockHolder amount lockDuration "locktest"
-  [(cid, _)] <- query @LockedCoin lockHolder
-  pure cid
+getLockedCoin app owner lockHolder amount lockDuration = do
+  cmd <- getLockedCoinCmd app owner lockHolder amount lockDuration
+  result <- submitMulti [owner.primaryParty, lockHolder] [app.svc] cmd
+  let [API.TransferResultLockedCoin lockedCoinApi] = result.createdCoins
+  let lockedCoin = fromInterfaceContractId @LockedCoin lockedCoinApi
+  pure lockedCoin
+
+getLockedCoinMustFail : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script ()
+getLockedCoinMustFail app owner lockHolder amount lockDuration =  do
+  cmd <- getLockedCoinCmd app owner lockHolder amount lockDuration
+  submitMultiMustFail [owner.primaryParty, lockHolder] [app.svc] cmd
