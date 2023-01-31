@@ -6,7 +6,7 @@ package com.daml.network.util
 import cats.syntax.traverse.*
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
-import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId => JavaContractId}
+import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
 import com.daml.lf.data.Numeric
 import com.daml.network.v0
 import com.digitalasset.canton.data.CantonTimestamp

@@ -11,10 +11,10 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion,
 }
 import com.daml.ledger.javaapi.data.{
-  CreatedEvent => JavaCreatedEvent,
+  CreatedEvent as JavaCreatedEvent,
   ExercisedEvent,
   Template,
-  Transaction => JavaTransaction,
+  Transaction as JavaTransaction,
   TransactionTree,
 }
 

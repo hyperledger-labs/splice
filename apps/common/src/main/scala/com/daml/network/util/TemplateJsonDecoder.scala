@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{value => scalaValue}
+import com.daml.ledger.api.v1.{value as scalaValue}
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId, ValueDecoder}
 import com.daml.ledger.javaapi.data.{Template, Value}
 import com.daml.lf.archive.{ArchivePayload, Dar, DarReader}
@@ -14,7 +14,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
-import spray.json._
+import spray.json.*
 
 import java.util.zip.ZipInputStream
 

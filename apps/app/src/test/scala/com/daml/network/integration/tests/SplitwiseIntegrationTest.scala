@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
+import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -35,7 +35,7 @@ class SplitwiseIntegrationTest
 
     "allocate unique groups per party, even when multiple requests race for them" in {
       implicit env =>
-        import env._
+        import env.*
 
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 

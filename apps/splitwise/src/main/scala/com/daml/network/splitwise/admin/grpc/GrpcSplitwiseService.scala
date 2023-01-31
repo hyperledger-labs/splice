@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
-import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
+import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
@@ -33,7 +33,7 @@ class GrpcSplitwiseService(
     with Spanning
     with NamedLogging {
 
-  import GrpcSplitwiseService._
+  import GrpcSplitwiseService.*
 
   private val connection = ledgerClient.connection()
 

@@ -1,7 +1,7 @@
 package com.daml.network.config
 
 import cats.data.Validated
-import cats.syntax.either._
+import cats.syntax.either.*
 import cats.syntax.functor.*
 
 import com.daml.network.auth.AuthConfig
@@ -403,8 +403,8 @@ object CoinConfig {
     TraceContext.empty,
   )
 
-  import pureconfig.generic.semiauto._
-  import CantonConfig._
+  import pureconfig.generic.semiauto.*
+  import CantonConfig.*
 
   @nowarn("cat=unused")
   private implicit def coinConfigReader(implicit
@@ -412,8 +412,8 @@ object CoinConfig {
   ): ConfigReader[CoinConfig] = {
     val configReaders: ConfigReaders = new ConfigReaders()
     import configReaders.*
-    import DeprecatedConfigUtils._
-    import CantonDeprecationImplicits._
+    import DeprecatedConfigUtils.*
+    import CantonDeprecationImplicits.*
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
@@ -499,9 +499,9 @@ object CoinConfig {
   @nowarn("cat=unused")
   private implicit def coinConfigWriter: ConfigWriter[CoinConfig] = {
     val writers = new CantonConfig.ConfigWriters(confidential = false)
-    import writers._
-    import DeprecatedConfigUtils._
-    import CantonDeprecationImplicits._
+    import writers.*
+    import DeprecatedConfigUtils.*
+    import CantonDeprecationImplicits.*
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 

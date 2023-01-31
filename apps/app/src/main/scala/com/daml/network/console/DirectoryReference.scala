@@ -1,7 +1,7 @@
 package com.daml.network.console
 
-import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
-import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.codegen.java.cn.wallet.{subscriptions as subsCodegen}
+import com.daml.network.codegen.java.cn.{directory as codegen}
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}

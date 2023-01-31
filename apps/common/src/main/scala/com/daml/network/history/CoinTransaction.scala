@@ -1,6 +1,6 @@
 package com.daml.network.history
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError

@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.config.CoinConfigTransforms
-import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
+import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{

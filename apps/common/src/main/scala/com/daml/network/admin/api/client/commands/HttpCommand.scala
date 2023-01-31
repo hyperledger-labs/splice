@@ -3,7 +3,7 @@
 
 package com.daml.network.admin.api.client.commands
 
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.*
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.util.TemplateJsonDecoder

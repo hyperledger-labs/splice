@@ -45,10 +45,10 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.research.participant.multidomain.{
-  transfer => xfr,
-  transfer_command => xfrcmd,
-  transfer_submission_service => xfrsvc,
-  update_service => upsvc,
+  transfer as xfr,
+  transfer_command as xfrcmd,
+  transfer_submission_service as xfrsvc,
+  update_service as upsvc,
 }
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
@@ -477,7 +477,7 @@ object LedgerClient {
       }
       object In {
         private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In = {
-          import com.daml.ledger.api.v1.{event => scalaEvent}
+          import com.daml.ledger.api.v1.{event as scalaEvent}
           In(
             source = DomainId.tryFromString(proto.source),
             target = DomainId.tryFromString(proto.target),

@@ -12,7 +12,7 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
 }
 import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 
 /** Additional syntactic sugar for domains, participants, parties, and packages
   * Copied from Canton's enterprise code base.
@@ -41,7 +41,7 @@ trait EntitySyntax {
       env: CoinTestConsoleEnvironment
   ) {
 
-    import env._
+    import env.*
 
     def toReference: LocalParticipantReference =
       participants.local.find(_.id == participantId).value
@@ -64,7 +64,7 @@ trait EntitySyntax {
   }
 
   implicit class StringConversions(name: String)(implicit env: CoinTestConsoleEnvironment) {
-    import env._
+    import env.*
 
     def toDomainRef: LocalDomainReference = d(name)
 

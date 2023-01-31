@@ -2,10 +2,10 @@ package com.daml.network.directory.admin.api.client.commands
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.codegen.java.cn.{directory as codegen}
 import com.daml.network.http.v0.directory as http
 import com.daml.network.util.{JavaContract as Contract, Proto, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias

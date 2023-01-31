@@ -3,9 +3,9 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.api.v1.{value => scalaValue}
+import com.daml.ledger.api.v1.{value as scalaValue}
 import com.daml.ledger.javaapi.data.codegen.ValueDecoder
-import com.daml.ledger.javaapi.data.{Value => CodegenValue}
+import com.daml.ledger.javaapi.data.{Value as CodegenValue}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter

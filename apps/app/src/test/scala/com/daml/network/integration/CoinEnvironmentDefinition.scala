@@ -43,7 +43,7 @@ case class CoinEnvironmentDefinition(
 
   def withAllocatedSvcAndSvUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
-      import env._
+      import env.*
       this.preSetup(env)
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
@@ -74,7 +74,7 @@ case class CoinEnvironmentDefinition(
     })
   def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
-      import env._
+      import env.*
       this.preSetup(env)
       validators.local.foreach(validator => {
         val validatorParty =

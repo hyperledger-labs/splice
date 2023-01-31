@@ -3,7 +3,7 @@ package com.daml.network.validator.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.http.v0.validator as http

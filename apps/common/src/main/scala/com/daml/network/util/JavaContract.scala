@@ -4,10 +4,10 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{value => scalaValue}
+import com.daml.ledger.api.v1.{value as scalaValue}
 import com.daml.ledger.api.validation.NoLoggingValueValidator
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
+  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,

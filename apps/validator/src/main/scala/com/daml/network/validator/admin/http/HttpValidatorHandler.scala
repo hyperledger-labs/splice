@@ -2,7 +2,7 @@ package com.daml.network.validator.admin.http
 
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.http.v0.{definitions, validator => v0}
+import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.util.CoinUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil

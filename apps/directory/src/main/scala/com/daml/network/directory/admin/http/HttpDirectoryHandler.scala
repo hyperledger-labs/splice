@@ -1,7 +1,7 @@
 package com.daml.network.directory.admin.http
 
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.http.v0.{definitions, directory => v0}
+import com.daml.network.http.v0.{definitions, directory as v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning

@@ -1,6 +1,6 @@
 package com.daml.network.history
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Value
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc.api.v1
@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cc.coin.{
   LockedCoin,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract => Contract}
+import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract as Contract}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 

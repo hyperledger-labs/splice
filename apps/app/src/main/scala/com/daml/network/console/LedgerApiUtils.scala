@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.codegen.Update
-import com.daml.ledger.javaapi.data.{TransactionTree => JavaTransactionTree}
+import com.daml.ledger.javaapi.data.{TransactionTree as JavaTransactionTree}
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.topology.{DomainId, PartyId}

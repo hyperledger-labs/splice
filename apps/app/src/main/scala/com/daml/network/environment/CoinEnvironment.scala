@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.daml.network.config.CoinConfig
 import com.daml.network.directory.DirectoryAppBootstrap
 import com.daml.network.directory.config.LocalDirectoryAppConfig
@@ -26,7 +26,7 @@ import com.digitalasset.canton.console.{
   HealthDumpGenerator,
 }
 import com.digitalasset.canton.domain.DomainNodeBootstrap
-import com.digitalasset.canton.environment._
+import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
