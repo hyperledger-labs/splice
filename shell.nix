@@ -50,6 +50,7 @@ in pkgs.mkShell {
     nodejs
     openapi-generator-cli
     openjdk11
+    pigz
     postgresql_11
     pre-commit
     protobuf3_19
