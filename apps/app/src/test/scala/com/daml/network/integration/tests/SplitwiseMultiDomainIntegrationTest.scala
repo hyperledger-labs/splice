@@ -88,12 +88,20 @@ class SplitwiseMultiDomainIntegrationTest
         _ => aliceWallet.listAppPaymentRequests().headOption.value,
       )
 
-      actAndCheck(
+      val (_, balanceUpdate) = actAndCheck(
         "alice initiates payment accept request on global domain",
         aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
       )(
         "alice sees accepted app payment on global domain",
-        _ => aliceWallet.listAcceptedAppPayments() should have size 1,
+        _ =>
+          inside(aliceSplitwise.listBalanceUpdates(groupKey)) { case Seq(update) =>
+            update
+          },
+      )
+      val domains = aliceValidator.remoteParticipant.transfer
+        .lookup_contract_domain(balanceUpdate.contractId)
+      domains shouldBe Map(
+        javaToScalaContractId(balanceUpdate.contractId) -> "splitwise"
       )
     }
   }

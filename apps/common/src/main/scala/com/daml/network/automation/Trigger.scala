@@ -252,7 +252,9 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
   override protected val source: Source[JavaContract[TCid, T], NotUsed] =
     acs.streamContracts(templateCompanion)
 
-  override final protected def isStaleTask(
+  // TODO(M3-18) Revert to final once we no longer hack around this
+  // for the multi-domain PoC.
+  override protected def isStaleTask(
       task: JavaContract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] =
     acs

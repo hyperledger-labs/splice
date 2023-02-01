@@ -14,10 +14,8 @@ import com.daml.ledger.javaapi.data.codegen.{
   Update,
 }
 import com.daml.ledger.javaapi.data.{
-  ArchivedEvent,
   Command,
   CreatedEvent,
-  Event,
   ExercisedEvent,
   Identifier,
   LedgerOffset,
@@ -189,6 +187,22 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 
 object CoinLedgerConnection {
 
+  // TODO(M3-18) Remove this once we have a proper ACS endpoint
+  /** This represents an update to the ACS that we got through the update stream.
+    * We also represent transfer in/out as AcsTransactions here not just
+    * regular Daml transactions.
+    */
+  final case class AcsTransaction(
+      events: Seq[AcsEvent]
+  )
+
+  sealed abstract class AcsEvent extends Product with Serializable
+
+  object AcsEvent {
+    final case class Created(event: CreatedEvent) extends AcsEvent
+    final case class Archived(contractId: String) extends AcsEvent
+  }
+
   /** Abstract representation of a command-id for deduplication.
     *
     * @param methodName    : fully-classified name of the method whose calls should be deduplicated,
@@ -354,11 +368,9 @@ object CoinLedgerConnection {
               .updates(req)
               .via(treesAsTransactions)
               .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
-                val (creates, archives) = tx.getEvents.asScala.partitionMap {
-                  case ce: CreatedEvent => Left((ce.getContractId, ce))
-                  case ae: ArchivedEvent => Right(ae.getContractId)
-                  case e: Event =>
-                    sys.error(s"${e.getClass.getSimpleName} was not a create or archive")
+                val (creates, archives) = tx.events.partitionMap {
+                  case AcsEvent.Created(ce) => Left((ce.getContractId, ce))
+                  case AcsEvent.Archived(cid) => Right(cid)
                 }
                 val tpIdFilteredCreates = creates.view filter { case (_, ce) => filterCreates(ce) }
                 cidCe ++ tpIdFilteredCreates -- archives
@@ -433,43 +445,42 @@ object CoinLedgerConnection {
       }
 
       private def treesAsTransactions
-          : Flow[LedgerClient.GetTreeUpdatesResponse, Transaction, NotUsed] =
-        treesFromResponse.map(flattenTree)
+          : Flow[LedgerClient.GetTreeUpdatesResponse, AcsTransaction, NotUsed] =
+        Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).map {
+          case LedgerClient.GetTreeUpdatesResponse.TransactionTreeUpdate(tree) => flattenTree(tree)
+          case LedgerClient.GetTreeUpdatesResponse.TransferUpdate(transfer) =>
+            val ev = transfer.event match {
+              case in: LedgerClient.GetTreeUpdatesResponse.TransferEvent.In =>
+                AcsEvent.Created(in.createdEvent)
+              case out: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out =>
+                AcsEvent.Archived(
+                  out.contractId.contractId
+                )
+            }
+            AcsTransaction(
+              Seq(ev)
+            )
+        }
 
-      private def treesFromResponse
-          : Flow[LedgerClient.GetTreeUpdatesResponse, TransactionTree, NotUsed] =
-        Flow[LedgerClient.GetTreeUpdatesResponse]
-          .mapConcat(
-            _.discardTransfers // TODO (M3-18) do not simply discard transfers
-          )
-
-      private def flattenTree(tree: TransactionTree): Transaction = {
-        val events: mutable.Buffer[Event] = mutable.ListBuffer()
+      private def flattenTree(tree: TransactionTree): AcsTransaction = {
+        val events: mutable.Buffer[AcsEvent] = mutable.ListBuffer()
         Trees.traverseTree(
           tree,
           onCreate = (ev, _) => {
-            events.append(ev)
+            events.append(AcsEvent.Created(ev))
           },
           onExercise = (ev, _) => {
             if (ev.isConsuming) {
               events.append(
-                new ArchivedEvent(
-                  ev.getWitnessParties,
-                  ev.getEventId,
-                  ev.getTemplateId,
-                  ev.getContractId,
+                AcsEvent.Archived(
+                  ev.getContractId
                 )
               )
             }
           },
         )
-        new Transaction(
-          tree.getTransactionId(),
-          tree.getCommandId(),
-          tree.getWorkflowId(),
-          tree.getEffectiveAt(),
-          events.toSeq.asJava,
-          tree.getOffset(),
+        AcsTransaction(
+          events.toSeq
         )
       }
 

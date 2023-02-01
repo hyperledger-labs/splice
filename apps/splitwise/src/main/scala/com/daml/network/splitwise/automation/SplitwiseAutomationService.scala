@@ -1,8 +1,19 @@
 package com.daml.network.splitwise.automation
 
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.store.DomainStore
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId}
+import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
+import com.daml.network.automation.{
+  CoinAppAutomationService,
+  DomainOrchestrator,
+  Trigger,
+  TransferInTrigger,
+  TransferOutTrigger,
+}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.splitwise.config.SplitwiseDomainConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -50,6 +61,7 @@ class SplitwiseAutomationService(
       store,
       connection,
       domainConfig.global,
+      domainConfig.splitwise,
       scanConnection,
       readAs,
     )
@@ -60,6 +72,46 @@ class SplitwiseAutomationService(
   registerTrigger(
     new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwise)
   )
+
+  // TODO(#2472) Share Domain Orchestrator for multiple apps
+  def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(domainAdded: DomainStore.DomainAdded): Trigger =
+    new TransferOutTrigger(
+      triggerContext,
+      store.domains,
+      connection,
+      domainConfig.splitwise,
+      domainAdded.domainId,
+      store.providerParty,
+      companion,
+    )
+  def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
+    new TransferInTrigger(
+      triggerContext,
+      store.domains,
+      connection,
+      domainConfig.global,
+      domainAdded.domainId,
+      store.providerParty,
+    )
+
+  Seq(
+    createTransferOutTrigger(splitwiseCodegen.BalanceUpdate.COMPANION),
+    createTransferInTrigger,
+  ).foreach { createTrigger =>
+    registerTrigger(
+      new DomainOrchestrator(
+        triggerContext,
+        store.domains,
+        domainAdded => {
+          val trigger = createTrigger(domainAdded)
+          trigger.run()
+          trigger
+        },
+      )
+    )
+  }
 
   override def getIngestionDomain: () => Future[DomainId] = () =>
     store.domains.signalWhenConnected(domainConfig.splitwise)
