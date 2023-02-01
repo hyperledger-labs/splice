@@ -55,20 +55,20 @@ additional running costs.
 The GCE clusters currently expose all of their services to the
 outside world exclusively via four [Digital Asset VPNs](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
 
-* Internal Digital Asset (Cluster Services and Kubernetes Management API's)
+* Internal Digital Asset (Cluster Services and Kubernetes Management APIs)
    * GCP Virginia Full Tunnel
    * GCP Frankfurt Full Tunnel
    * GCP Sydney Full Tunnel
-* For External Users and Circle CI Prefligt Testing (Cluster Services Only)
+* For External Users and Circle CI Preflight Testing (Cluster Services Only)
    * GCP DA Canton DevNet
 * For consultants working on CN
    * AWS DA Consultant VPN
 
 Evven though the Kubernetes management API is accessible to all users
-connecting through one of the internal VPN's, there are Google IAM
-restrictions on those API's that grant access only to appropriate
-users. CircleCI has its access to the Kubernetes Management API's (for
-continuous deployemnt) through a specific grant to those servers' IP
+connecting through one of the internal VPNs, there are Google IAM
+restrictions on those APIs that grant access only to appropriate
+users. CircleCI has its access to the Kubernetes Management APIs (for
+continuous deployment) through a specific grant to those servers' IP
 addresses and a service account.
 
 ### Granting VPN Access to External Partners
@@ -92,7 +92,7 @@ The process by which access is granted is this:
   resolve this [support ticket](https://help.digitalasset.com/s/case/5004x00000GMkxTAAT).)
 * Wayne Collier must approve the addition of the new account, and
   Itai Segall must be notified.  Once the approval is complete, a
-  request goes to Edward Nnewman's team via a
+  request goes to Edward Newman's team via a
   [manual e-mail request to IT](mailto:help@digitalasset.com) to add the
   account and send documentation to the external user.
 * Once the account has been confirmed, the ticket can be closed.
@@ -165,7 +165,7 @@ connection to the remote participant node:
 res0: concurrent.duration.Duration = 2246 milliseconds
 ```
 
-The local participant node may connected to the CN domain as follows:
+The local participant node may connect to the CN domain as follows:
 
 
 ```
@@ -205,10 +205,10 @@ satisfy several key requirements:
 
 * Access to our clusters needs to be initially protected from general
   access by the use of a VPN. (As we increase the robustness of our
-  software stack, we will remove the requirment for the VPN.)
+  software stack, we will remove the requirement for the VPN.)
 * The difference in cluster configuration between VPN and non-VPN
   operation should be kept as minimal as possible.
-* We must support easy access to our gRPC API's from web clients.
+* We must support easy access to our gRPC APIs from web clients.
 
 To accomplish this, we use a Kubernetes `LoadBalancer` as an ingress
 to our cluster. This is the exclusive entry point for connections into
@@ -306,7 +306,7 @@ Available operations include:
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
 * `cncluster stats` - Show memory and CPU usage across the cluster.
-* `cncluster wait` - Wait for the cluster's pods to all be noted as in a ready state.
+* `cncluster wait` - Wait for the clusters' pods to all be noted as in a ready state.
 
 Internally, these operations rely on the following environment
 variables. As stated above, these are usually populated via `.envrc`.
