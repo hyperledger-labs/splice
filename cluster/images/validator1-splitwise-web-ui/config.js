@@ -21,7 +21,7 @@ window.canton_network_config = {
     },
     splitwise: {
       // URL of the gRPC-Web envoy proxy, proxying the splitwise gRPC API
-      grpcUrl: "https://" + window.location.hostname + "/api/v0/splitwise",
+      grpcUrl: `https://${cluster}:6213`,
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
