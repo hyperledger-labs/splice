@@ -36,4 +36,7 @@ window.canton_network_config = {
       grpcUrl: `https://${cluster}:6012`,
     },
   },
+  domains: {
+    splitwise: "global",
+  },
 };

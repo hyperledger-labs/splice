@@ -69,7 +69,8 @@ export class LedgerApiClient {
   async create<T extends object, K>(
     actAs: string[],
     template: Template<T, K>,
-    payload: T
+    payload: T,
+    domainId: string | undefined = undefined
   ): Promise<Contract<T>> {
     const templateId = this.templateIdToIdentifier(template.templateId);
     const cmd = new Command().setCreate(
@@ -77,7 +78,7 @@ export class LedgerApiClient {
         .setTemplateId(templateId)
         .setCreateArguments(template.encodeProto(payload).getRecord())
     );
-    const transaction = await this.submitCommand(actAs, [], cmd);
+    const transaction = await this.submitCommand(actAs, [], cmd, domainId);
     const createdEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -90,7 +91,8 @@ export class LedgerApiClient {
     readAs: string[],
     choice: Choice<T, C, R, K>,
     contractId: ContractId<T>,
-    argument: C
+    argument: C,
+    domainId: string | undefined = undefined
   ): Promise<R> {
     const encodedArg = choice.argumentSerializable().encodeProto(argument);
     const templateId = this.templateIdToIdentifier(choice.template().templateId);
@@ -101,7 +103,7 @@ export class LedgerApiClient {
         .setContractId(contractId)
         .setChoiceArgument(encodedArg)
     );
-    const transaction = await this.submitCommand(actAs, readAs, cmd);
+    const transaction = await this.submitCommand(actAs, readAs, cmd, domainId);
     const exerciseEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -113,7 +115,8 @@ export class LedgerApiClient {
   async submitCommand(
     actAs: string[],
     readAs: string[],
-    command: Command
+    command: Command,
+    domainId: string | undefined
   ): Promise<TransactionTree> {
     const cmds = new Commands()
       .setCommandsList([command])
@@ -121,6 +124,9 @@ export class LedgerApiClient {
       .setReadAsList(readAs)
       .setApplicationId(this.userId)
       .setCommandId(uuidv4());
+    if (domainId) {
+      cmds.setWorkflowId(`domain-id:${domainId}`);
+    }
     const request = new SubmitAndWaitRequest().setCommands(cmds);
     const response = await this.commandServiceClient.submitAndWaitForTransactionTree(
       request,
@@ -128,7 +134,6 @@ export class LedgerApiClient {
     );
     return response.getTransaction()!;
   }
-
   async queryAcs<T extends object, K, I extends string>(
     p: string,
     t: Template<T, K, I>

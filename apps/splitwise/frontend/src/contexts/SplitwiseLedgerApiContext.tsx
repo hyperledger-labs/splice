@@ -13,7 +13,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   collectionDuration: string = (5 * 60 * 1000000).toString();
   acceptDuration: string = (5 * 60 * 1000000).toString();
 
-  async requestGroup(user: string, provider: string, svc: string, id: string) {
+  async requestGroup(user: string, provider: string, svc: string, id: string, domainId: string) {
     const install = await this.getSplitwiseInstall(user, provider);
     await this.exercise(
       [user],
@@ -30,7 +30,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
           collectionDuration: { microseconds: this.collectionDuration },
           acceptDuration: { microseconds: this.acceptDuration },
         },
-      }
+      },
+      domainId
     );
   }
 
@@ -38,7 +39,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     group: ContractId<Group>,
-    observers: string[]
+    observers: string[],
+    domainId: string
   ) {
     const install = await this.getSplitwiseInstall(user, provider);
     await this.exercise(
@@ -49,11 +51,17 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       {
         group: group,
         observers: observers,
-      }
+      },
+      domainId
     );
   }
 
-  async acceptInvite(user: string, provider: string, inviteContractId: ContractId<GroupInvite>) {
+  async acceptInvite(
+    user: string,
+    provider: string,
+    inviteContractId: ContractId<GroupInvite>,
+    domainId: string
+  ) {
     const install = await this.getSplitwiseInstall(user, provider);
     await this.exercise(
       [user],
@@ -62,20 +70,29 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       install.contractId,
       {
         cid: inviteContractId,
-      }
+      },
+      domainId
     );
   }
   async joinGroup(
     user: string,
     provider: string,
     group: ContractId<Group>,
-    inviteContractId: ContractId<AcceptedGroupInvite>
+    inviteContractId: ContractId<AcceptedGroupInvite>,
+    domainId: string
   ) {
     const install = await this.getSplitwiseInstall(user, provider);
-    await this.exercise([user], [], SplitwiseInstall.SplitwiseInstall_Join, install.contractId, {
-      group: group,
-      cid: inviteContractId,
-    });
+    await this.exercise(
+      [user],
+      [],
+      SplitwiseInstall.SplitwiseInstall_Join,
+      install.contractId,
+      {
+        group: group,
+        cid: inviteContractId,
+      },
+      domainId
+    );
   }
 
   async enterPayment(
@@ -83,7 +100,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     provider: string,
     group: ContractId<Group>,
     amount: string,
-    description: string
+    description: string,
+    domainId: string
   ) {
     const install = await this.getSplitwiseInstall(user, provider);
     await this.exercise(
@@ -95,7 +113,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
         group: group,
         amount: amount,
         description: description,
-      }
+      },
+      domainId
     );
   }
 
@@ -103,7 +122,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     sender: string,
     provider: string,
     group: ContractId<Group>,
-    receiverAmounts: ReceiverCCAmount[]
+    receiverAmounts: ReceiverCCAmount[],
+    domainId: string
   ) {
     const install = await this.getSplitwiseInstall(sender, provider);
     return await this.exercise(
@@ -114,7 +134,8 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       {
         group: group,
         receiverAmounts: receiverAmounts,
-      }
+      },
+      domainId
     );
   }
 

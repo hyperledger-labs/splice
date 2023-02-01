@@ -16,14 +16,15 @@ interface GroupSetupProps {
   svc: string;
   provider: string;
   party: string;
+  domainId: string;
 }
 
-const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc }) => {
+const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
   const onCreateGroup = async () => {
-    await ledgerApiClient.requestGroup(party, provider, svc, groupId);
+    await ledgerApiClient.requestGroup(party, provider, svc, groupId, domainId);
   };
 
   const [groupInvites, setGroupInvites] = useState<Contract<GroupInvite>[]>([]);
@@ -42,7 +43,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc }) => {
   useInterval(fetchInvites, 500);
 
   const onAcceptInvite = async (invite: Contract<GroupInvite>) => {
-    await ledgerApiClient.acceptInvite(party, provider, invite.contractId);
+    await ledgerApiClient.acceptInvite(party, provider, invite.contractId, domainId);
   };
 
   return (

@@ -31,4 +31,8 @@ window.canton_network_config = {
       grpcUrl: 'http://localhost:6012',
     },
   },
+  domains: {
+    // TODO (M3-83) Replace by separate splitwise domain
+    splitwise = "global",
+  },
 };

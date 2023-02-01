@@ -51,6 +51,7 @@ function start_frontend() {
   jsonnet \
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
+    --tla-str app="$app" \
     $REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet \
     > "$config_file"
 

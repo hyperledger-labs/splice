@@ -55,14 +55,28 @@ local validatorNodes = {
   },
 };
 
+local domainConfigs = {
+  splitwise: {
+    // TODO (M3-18) Change this to separate splitwise domain.
+    splitwise: "global",
+  },
+};
+
 local services(node) =
   if (std.objectHas(validatorNodes, node)) then
     { services: validatorNodes[node] }
   else
     error "Unknown node name " + node;
 
+local domains(app) =
+  if (std.objectHas(domainConfigs, app)) then
+    { domains: domainConfigs[app] }
+  else
+    {};
+
 function(
   authAlgorithm="rs-256",
   enableTestAuth,
   validatorNode,
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode)
+  app,
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode) + domains(app)

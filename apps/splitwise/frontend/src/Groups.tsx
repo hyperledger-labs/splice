@@ -56,6 +56,7 @@ interface BalancesProps {
   group: Contract<CodegenGroup>;
   party: string;
   provider: string;
+  domainId: string;
 }
 
 const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean => {
@@ -69,7 +70,7 @@ const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean =
   return true;
 };
 
-const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
+const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
@@ -104,7 +105,13 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
         return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
       });
 
-    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, amounts);
+    return await ledgerApiClient.initiateTransfer(
+      party,
+      provider,
+      group.contractId,
+      amounts,
+      domainId
+    );
   };
 
   return (
@@ -146,9 +153,15 @@ interface MembershipRequestsProps {
   group: Contract<CodegenGroup>;
   provider: string;
   party: string;
+  domainId: string;
 }
 
-const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, provider }) => {
+const MembershipRequests: React.FC<MembershipRequestsProps> = ({
+  group,
+  party,
+  provider,
+  domainId,
+}) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
@@ -167,7 +180,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, p
   useInterval(fetchAcceptedInvites, 500);
 
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
-    await ledgerApiClient.joinGroup(party, provider, group.contractId, invite.contractId);
+    await ledgerApiClient.joinGroup(party, provider, group.contractId, invite.contractId, domainId);
   };
   return (
     <Box>
@@ -199,9 +212,10 @@ interface EntryProps {
   group: Contract<CodegenGroup>;
   provider: string;
   party: string;
+  domainId: string;
 }
 
-const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider }) => {
+const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider, domainId }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
@@ -211,15 +225,20 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
       provider,
       group.contractId,
       paymentAmount,
-      paymentDescription
+      paymentDescription,
+      domainId
     );
   };
   const [transferAmount, setTransferAmount] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const initiateTransfer = async () => {
-    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
-      { receiver: transferReceiverEntry!.user, ccAmount: transferAmount },
-    ]);
+    return await ledgerApiClient.initiateTransfer(
+      party,
+      provider,
+      group.contractId,
+      [{ receiver: transferReceiverEntry!.user, ccAmount: transferAmount }],
+      domainId
+    );
   };
   return (
     <div
@@ -340,9 +359,10 @@ interface GroupProps {
   group: Contract<CodegenGroup>;
   party: string;
   provider: string;
+  domainId: string;
 }
 
-const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider }) => {
+const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider, domainId }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const isOwner = party === group.payload.owner;
   const onCreateInvite = async () => {
@@ -350,7 +370,8 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
       party,
       provider,
       group.contractId,
-      directoryEntries.getAllParties()
+      directoryEntries.getAllParties(),
+      domainId
     );
   };
 
@@ -379,10 +400,18 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
         </Typography>
       </Stack>
       <Divider />
-      {isOwner && <MembershipRequests group={group} party={party} provider={provider} />}
-      <Entry group={group} directoryEntries={directoryEntries} party={party} provider={provider} />
+      {isOwner && (
+        <MembershipRequests group={group} party={party} provider={provider} domainId={domainId} />
+      )}
+      <Entry
+        group={group}
+        directoryEntries={directoryEntries}
+        party={party}
+        provider={provider}
+        domainId={domainId}
+      />
       <Divider />
-      <Balances group={group} party={party} provider={provider} />
+      <Balances group={group} party={party} provider={provider} domainId={domainId} />
       <Divider />
       <BalanceUpdates group={group} party={party} />
       <Divider />
@@ -394,9 +423,10 @@ interface GroupsProps {
   directoryEntries: DirectoryEntries;
   party: string;
   provider: string;
+  domainId: string;
 }
 
-const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) => {
+const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider, domainId }) => {
   const splitwiseClient = useSplitwiseClient();
 
   const [groups, setGroups] = useState<Contract<CodegenGroup>[]>([]);
@@ -423,6 +453,7 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
           group={group}
           party={party}
           provider={provider}
+          domainId={domainId}
         />
       ))}
     </Stack>

@@ -20,13 +20,15 @@ const HomeWithContext: React.FC<{
   userId: string;
   svc: string | undefined;
   dirEntries: DirectoryEntries;
-}> = ({ userId, svc, dirEntries }) => {
+  splitwiseDomainAlias: string;
+}> = ({ userId, svc, dirEntries, splitwiseDomainAlias }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
   const [install, setInstall] = useState<Contract<SplitwiseInstall> | undefined>();
+  const [splitwiseDomainId, setSplitwiseDomainId] = useState<string | undefined>();
 
   const primaryPartyId = usePrimaryParty(ledgerApiClient);
 
@@ -43,6 +45,37 @@ const HomeWithContext: React.FC<{
     };
     fetchProvider();
   }, [splitwiseClient]);
+
+  useEffect(() => {
+    const maxRetries = 30;
+    const delayMs = 500;
+    const querySplitwiseDomain = async (n: number) => {
+      if (n <= 0) {
+        throw new Error(`Splitwise domain not found after ${maxRetries} retries, giving up`);
+      }
+      // TODO(M3-18) Reconsider if we should query that from the user’s participant instead
+      // instead of the app backend once the ledger API exposes this.
+      console.debug('Querying backend for connected domains');
+      const domainsResponse = await splitwiseClient.listConnectedDomains(new Empty(), undefined);
+      const domains = domainsResponse.getDomains()!.getConnectedDomainsMap();
+      const domainId = domains.get(splitwiseDomainAlias);
+      if (domainId) {
+        console.debug('Splitwise domain id found');
+        setSplitwiseDomainId(domainId);
+      } else {
+        console.debug(
+          `Splitwise domain id not found, currently connected: ${JSON.stringify(
+            domains
+          )}. Retrying in ${delayMs}ms`
+        );
+        setTimeout(() => {
+          querySplitwiseDomain(n - 1);
+        }, delayMs);
+      }
+    };
+
+    querySplitwiseDomain(maxRetries);
+  }, [splitwiseClient, splitwiseDomainAlias]);
 
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.
@@ -85,12 +118,22 @@ const HomeWithContext: React.FC<{
     setupInstallContract();
   }, [primaryPartyId, provider, ledgerApiClient]);
 
-  if (provider && primaryPartyId && svc && install) {
+  if (provider && primaryPartyId && svc && install && splitwiseDomainId) {
     return (
       <Container>
         <Stack spacing={3}>
-          <GroupSetup party={primaryPartyId} provider={provider} svc={svc} />
-          <Groups directoryEntries={dirEntries} party={primaryPartyId} provider={provider} />
+          <GroupSetup
+            party={primaryPartyId}
+            provider={provider}
+            svc={svc}
+            domainId={splitwiseDomainId}
+          />
+          <Groups
+            directoryEntries={dirEntries}
+            party={primaryPartyId}
+            provider={provider}
+            domainId={splitwiseDomainId}
+          />
         </Stack>
       </Container>
     );
@@ -113,7 +156,12 @@ const Home: React.FC<HomeProps> = ({ userId, svc, dirEntries, ledgerApiToken }) 
       userId={userId}
       token={ledgerApiToken}
     >
-      <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
+      <HomeWithContext
+        userId={userId}
+        svc={svc}
+        dirEntries={dirEntries}
+        splitwiseDomainAlias={config.domains.splitwise}
+      />
     </SplitwiseLedgerApiClientProvider>
   );
 };
