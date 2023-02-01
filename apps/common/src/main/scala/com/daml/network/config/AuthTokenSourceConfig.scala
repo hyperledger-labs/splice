@@ -34,4 +34,17 @@ object AuthTokenSourceConfig {
       audience: String,
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig
+
+  def hideConfidential(config: AuthTokenSourceConfig): AuthTokenSourceConfig = {
+    val hidden = "****"
+    val hide = (t: Option[String]) => t.map(_ => hidden)
+    config match {
+      case None() => None()
+      case Static(_, adminToken) => Static(hidden, hide(adminToken))
+      case SelfSigned(audience, user, _, adminToken) =>
+        SelfSigned(audience, user, hidden, hide(adminToken))
+      case ClientCredentials(wellKnownConfigUrl, clientId, _, audience, adminToken) =>
+        ClientCredentials(wellKnownConfigUrl, clientId, hidden, audience, hide(adminToken))
+    }
+  }
 }

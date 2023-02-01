@@ -79,3 +79,17 @@ find_exceptions() {
 find_exceptions |
   # Output total number of exceptions
   echo "Total: $(wc -l) lines with stack traces."; echo
+
+### Look for leaked secrets
+
+find_secrets() {
+  set +o pipefail # rg returns 1 if there were not matches
+  rg -e "secret" -e "token=" "$LOGFILE" |
+    # we mask secrets as "****" in our logs
+    rg -v "=\"\*\*\*\*\"" || true
+}
+
+# Find leaked secrets
+find_secrets |
+  # Output unmasked secrets, failing if there are some
+  output_problems "unmasked secrets" "$LOGFILE"

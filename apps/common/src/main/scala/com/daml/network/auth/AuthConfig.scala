@@ -16,4 +16,14 @@ object AuthConfig {
       audience: String,
       jwksUrl: URL,
   ) extends AuthConfig
+
+  def hideConfidential(config: AuthConfig): AuthConfig = {
+    val hidden = "****"
+    config match {
+      case Hs256Unsafe(audience, _) => Hs256Unsafe(audience, hidden)
+      // being explicit here to avoid accidental leaks if we extend
+      // `AuthConfig` at some point
+      case Rs256(audience, jwksUrl) => Rs256(audience, jwksUrl)
+    }
+  }
 }

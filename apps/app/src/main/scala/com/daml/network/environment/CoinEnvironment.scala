@@ -316,6 +316,9 @@ class CoinEnvironmentImpl(
 ) extends CoinEnvironment {
   override type Config = CoinConfig
 
+  // dump config (without sensitive data) to ease debugging
+  logger.info(s"CoinEnvironment with config = {\n${config.dumpString}\n}")
+
   override def _createConsole(
       consoleOutput: ConsoleOutput,
       createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner,

@@ -384,7 +384,8 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  override def dumpString: String = "TODO(#736): remove or implement."
+  override def dumpString: String =
+    ConfigWriter[CoinConfig].to(this).render(CoinConfig.defaultConfigRenderer)
 
   override def withDefaults(ports: DefaultPorts): CoinConfig =
     this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
@@ -498,10 +499,15 @@ object CoinConfig {
 
   @nowarn("cat=unused")
   private implicit def coinConfigWriter: ConfigWriter[CoinConfig] = {
-    val writers = new CantonConfig.ConfigWriters(confidential = false)
+    // confidential because we use this for outputting the config in logs
+    val writers = new CantonConfig.ConfigWriters(confidential = true)
     import writers.*
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*
+
+    // Use a `confidentialWriter` if a config can contain confidential values!
+    // Also consider revisiting if the "leaked secrets check" in
+    // `.circleci/canton-scripts/check-logs.sh` catches the new type of secret.
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
@@ -510,7 +516,7 @@ object CoinConfig {
     implicit val rs256Config: ConfigWriter[AuthConfig.Rs256] =
       deriveWriter[AuthConfig.Rs256]
     implicit val authConfig: ConfigWriter[AuthConfig] =
-      deriveWriter[AuthConfig]
+      confidentialWriter[AuthConfig](AuthConfig.hideConfidential)
 
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
@@ -523,7 +529,7 @@ object CoinConfig {
     implicit val authTokenSourceCCWriter: ConfigWriter[AuthTokenSourceConfig.ClientCredentials] =
       deriveWriter[AuthTokenSourceConfig.ClientCredentials]
     implicit val authTokenSourceConfigWriter: ConfigWriter[AuthTokenSourceConfig] =
-      deriveWriter[AuthTokenSourceConfig]
+      confidentialWriter[AuthTokenSourceConfig](AuthTokenSourceConfig.hideConfidential)
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
@@ -611,6 +617,9 @@ object CoinConfig {
       .render(renderer) + "}"
     Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
   }
+
+  lazy val defaultConfigRenderer =
+    ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
 }
 
 object CoinConfigException {
