@@ -11,6 +11,7 @@ import Daml.Script
 import DA.Time
 
 import CN.Util.Assert
+import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
@@ -151,7 +152,7 @@ initConsortium = do
   -- have mallory bootstrap the consortium
   let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5
   submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founder = sv1, coinConfig = defaultCoinConfig, coinPrice = 1.0, config)
+    (SvcBootstrap with svc, founder = sv1, coinConfig = defaultCoinConfig, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices)
     SvcBootstrap_Bootstrap
 
   svcUserId <- validateUserId "svc-user"

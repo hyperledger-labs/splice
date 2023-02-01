@@ -53,6 +53,7 @@ setupApp = do
   cid <- submit svc $ createCmd CoinRules with
     config = defaultCoinConfig
     observers = []
+    enabledChoices = API.enableAllChoices
     ..
 
   now <- getTime

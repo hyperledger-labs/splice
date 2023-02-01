@@ -13,7 +13,7 @@ import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.SvStore
 import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CoinUtil.defaultCoinConfig
+import com.daml.network.util.CoinUtil.{defaultCoinConfig, defaultEnabledChoices}
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -178,6 +178,7 @@ class SvApp(
                     new cn.svcrules.SvcRulesConfig(
                       10
                     ), // TODO(M3-46) handle default config values better
+                    defaultEnabledChoices,
                   ).createAnd
                     .exerciseSvcBootstrap_Bootstrap()
                     .commands

@@ -3,6 +3,7 @@ module CN.SvcBootstrap where
 import qualified DA.Map as Map
 
 import CC.Coin
+import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
 
 import CN.SvcRules
@@ -14,6 +15,7 @@ template SvcBootstrap with
     coinConfig : CoinConfig USD
     coinPrice : Decimal
     config : SvcRulesConfig
+    enabledChoices : API.EnabledChoices
   where
     signatory svc
     observer founder
@@ -32,6 +34,7 @@ template SvcBootstrap with
           svc
           config = coinConfig
           observers = []
+          enabledChoices
 
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           coinPrice

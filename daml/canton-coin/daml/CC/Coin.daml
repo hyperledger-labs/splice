@@ -240,13 +240,12 @@ data CoinConfig currency = CoinConfig with
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
     maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
-    enabledChoices : API.EnabledChoices
   deriving (Eq, Show)
 
 
 requireChoiceIsEnabled : CanAssert m => Text -> (API.EnabledChoices -> Bool) -> API.CoinRulesView -> m ()
 requireChoiceIsEnabled desc getField rules =
-  require ("Choice " <> desc <> " is enabled") (getField rules.config.enabledChoices)
+  require ("Choice " <> desc <> " is enabled") (getField rules.enabledChoices)
 
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
@@ -254,8 +253,9 @@ template CoinRules
   with
     svc : Party
     config : CoinConfig USD
-    observers: [Party] -- TODO(M3-82): remove workaround for explicit disclosure
+    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     -- TODO(M3-07): use a schedule with effective dating to make fees predictable to users
+    enabledChoices : API.EnabledChoices
   where
     ensure validCoinConfig config
 
@@ -263,10 +263,7 @@ template CoinRules
     observer observers -- TODO(M3-82): remove workaround for explicit disclosure
 
     interface instance API.CoinRules for CoinRules where
-      view = API.CoinRulesView with
-        config = API.CoinRulesConfigView with
-          enabledChoices = config.enabledChoices
-        ..
+      view = API.CoinRulesView with ..
       coinrules_Transfer_Controllers = Set.toList . transferControllers
       coinrules_ComputeFees context sender outputs = do
         requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
@@ -543,6 +540,11 @@ template CoinRules
          create this with
            observers = obs :: observers
 
+    choice CoinRules_SetEnabledChoices : ContractId CoinRules
+      with
+        newEnabledChoices : API.EnabledChoices
+      controller svc
+      do create this with enabledChoices = newEnabledChoices
 
 -- | Workaround for missing explicit disclosure.
 --
@@ -899,7 +901,6 @@ scaleFees s c = CoinConfig with
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
     maxPayloadLength = c.maxPayloadLength
-    enabledChoices = c.enabledChoices
 
 requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()
 requireCoinExpiredForAllOpenRounds roundCid coin = do

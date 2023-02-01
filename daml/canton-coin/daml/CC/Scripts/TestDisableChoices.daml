@@ -123,22 +123,20 @@ testCoinRules = do
 
 testChoice : forall (c : GHC.Types.Symbol) a. HasField c API.EnabledChoices Bool => CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
 testChoice app actAs readAs buildCommand = do
-  cycleCoinConfig app (\c -> c { enabledChoices = setField @c False c.enabledChoices })
+  setEnabledChoices app (\r -> setField @c False r)
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
   submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
 
-  cycleCoinConfig app (\c -> c { enabledChoices = setField @c True c.enabledChoices })
+  setEnabledChoices app (\r -> setField @c True r)
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
   submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
   pure ()
 
-cycleCoinConfig : CCApp -> (CoinConfig USD -> CoinConfig USD) -> Script ()
-cycleCoinConfig app transform = do
+setEnabledChoices : CCApp -> (API.EnabledChoices -> API.EnabledChoices) -> Script ()
+setEnabledChoices app transform = do
   Some (rulesCid, rules) <- queryCoinRulesByKey app.svc
   submit app.svc $
-    archiveCmd rulesCid *>
-    createCmd rules with
-      config = transform rules.config
+    exerciseCmd rulesCid (CoinRules_SetEnabledChoices (transform rules.enabledChoices))
   pure ()
 
 getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)

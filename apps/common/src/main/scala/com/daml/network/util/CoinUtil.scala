@@ -166,10 +166,12 @@ object CoinUtil {
     // Fits a hex-encoded SHA-256 or a UUID
     32,
     // 2.5 min default duration
+  )
+
+  def defaultEnabledChoices: cc.api.v1.coin.EnabledChoices =
     new cc.api.v1.coin.EnabledChoices(
       true, true, true, true, true, true, true, true,
-    ),
-  )
+    )
 
   def holdingFee(
       coin: Coin,

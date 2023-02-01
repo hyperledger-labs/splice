@@ -3,7 +3,6 @@ module CC.Scripts.Parameters where
 import DA.Time
 
 import CC.Coin
-import qualified CC.API.V1.Coin as API
 import CC.Fees
 import CC.Issuance
 
@@ -54,10 +53,6 @@ defaultCoinConfig = CoinConfig with
     --
     -- TODO(M3-90): charge per character
     maxPayloadLength = 32
-
-    -- All choices are enabled by default
-    enabledChoices = API.enableAllChoices
-
 
 -- Issuance curve from the whitepaper
 -------------------------------------

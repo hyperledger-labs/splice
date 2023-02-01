@@ -73,9 +73,6 @@ data TimeLock = TimeLock with
 
 data CoinRulesView = CoinRulesView with
   svc : Party
-  config : CoinRulesConfigView
-
-data CoinRulesConfigView = CoinRulesConfigView with
   enabledChoices : EnabledChoices
 
 -- | Configuration that allows us to disable certain choices if we encounter a bug.
