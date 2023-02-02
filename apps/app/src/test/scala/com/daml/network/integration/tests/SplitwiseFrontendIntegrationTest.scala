@@ -1,15 +1,12 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.codegen.java.cn.{directory as dirCodegen, splitwise as splitwiseCodegen}
-import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
+import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{DirectoryTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.ShowUtil.*
 import org.openqa.selenium.Keys
 
 import scala.concurrent.duration.DurationInt
@@ -21,6 +18,7 @@ class SplitwiseFrontendIntegrationTest
       "bobSplitwise",
       "charlieSplitwise",
     )
+    with DirectoryTestUtil
     with WalletTestUtil {
 
   private val splitwiseDarPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
@@ -37,47 +35,6 @@ class SplitwiseFrontendIntegrationTest
           bobValidator.remoteParticipant.dars.upload(path)
         }
       })
-
-  def initialiseDirectoryApp(
-      userName: String,
-      userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
-      wallet: WalletAppClientReference,
-  ): Unit = {
-    actAndCheck("Request directory install", directory.requestDirectoryInstall())(
-      "Install created",
-      _ =>
-        directory.ledgerApi.ledger_api.acs
-          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty),
-    )
-
-    val (_, reqId) = actAndCheck(
-      show"Request directory entry ${userName.singleQuoted} for $userParty",
-      directory.requestDirectoryEntry(userName),
-    )(
-      "There is exactly one subscription request",
-      _ => {
-        val reqs = wallet.listSubscriptionRequests()
-        reqs should have length 1
-        reqs.head.contractId
-      },
-    )
-
-    actAndCheck(
-      "Tap and accept subscription request", {
-        wallet.tap(5.0)
-        wallet.acceptSubscriptionRequest(reqId)
-      },
-    )(
-      "There are no subscription request left",
-      _ => wallet.listSubscriptionRequests() should have length 0,
-    )
-  }
-
-  /** The `<TextInput>` in ts code is converted by react into a deep tree. This returns the input field. */
-  private def reactTextInput(textField: Element): TextField = new TextField(
-    textField.childElement(className("MuiInputBase-input")).underlying
-  )
 
   "A splitwise UI" should {
 

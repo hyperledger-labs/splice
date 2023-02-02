@@ -18,6 +18,7 @@ service SplitwiseService {
   // TODO(M3-18) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
+  rpc GetSplitwiseDomainId (google.protobuf.Empty) returns (GetSplitwiseDomainIdResponse);
 }
 
 // The context from which a request originates.
@@ -86,4 +87,8 @@ message GetProviderPartyIdResponse {
 
 message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
+}
+
+message GetSplitwiseDomainIdResponse {
+  string domain_id = 1;
 }

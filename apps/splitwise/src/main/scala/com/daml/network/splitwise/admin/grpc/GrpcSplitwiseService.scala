@@ -214,6 +214,13 @@ class GrpcSplitwiseService(
       }
     }
 
+  override def getSplitwiseDomainId(request: Empty): Future[v0.GetSplitwiseDomainIdResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      Future.successful(
+        v0.GetSplitwiseDomainIdResponse(splitwiseDomainId.toProtoPrimitive)
+      )
+    }
+
   private def groupKey(key: v0.GroupKey): splitwiseCodegen.GroupKey =
     new splitwiseCodegen.GroupKey(
       key.ownerPartyId,

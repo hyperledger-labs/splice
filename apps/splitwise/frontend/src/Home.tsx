@@ -47,41 +47,24 @@ const HomeWithContext: React.FC<{
   }, [splitwiseClient]);
 
   useEffect(() => {
-    const maxRetries = 30;
-    const delayMs = 500;
-    const querySplitwiseDomain = async (n: number) => {
-      if (n <= 0) {
-        throw new Error(`Splitwise domain not found after ${maxRetries} retries, giving up`);
-      }
+    const querySplitwiseDomain = async () => {
       // TODO(M3-18) Reconsider if we should query that from the user’s participant instead
       // instead of the app backend once the ledger API exposes this.
-      console.debug('Querying backend for connected domains');
-      const domainsResponse = await splitwiseClient.listConnectedDomains(new Empty(), undefined);
-      const domains = domainsResponse.getDomains()!.getConnectedDomainsMap();
-      const domainId = domains.get(splitwiseDomainAlias);
-      if (domainId) {
-        console.debug('Splitwise domain id found');
-        setSplitwiseDomainId(domainId);
-      } else {
-        console.debug(
-          `Splitwise domain id not found, currently connected: ${JSON.stringify(
-            domains
-          )}. Retrying in ${delayMs}ms`
-        );
-        setTimeout(() => {
-          querySplitwiseDomain(n - 1);
-        }, delayMs);
-      }
+      console.debug('Querying backend for splitwise domain');
+      const domainsResponse = await splitwiseClient.getSplitwiseDomainId(new Empty(), undefined);
+      const domainId = domainsResponse.getDomainId();
+      console.debug(`Using splitwise domain id ${domainId}`);
+      setSplitwiseDomainId(domainId);
     };
 
-    querySplitwiseDomain(maxRetries);
+    querySplitwiseDomain();
   }, [splitwiseClient, splitwiseDomainAlias]);
 
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.
   useEffect(() => {
     const setupInstallContract = async () => {
-      if (primaryPartyId && provider) {
+      if (primaryPartyId && provider && splitwiseDomainId) {
         console.debug('Searching for SplitwiseInstall');
         const install = await ledgerApiClient.querySplitwiseInstall(primaryPartyId, provider);
         if (install) {
@@ -89,10 +72,15 @@ const HomeWithContext: React.FC<{
           setInstall(install);
         } else {
           console.debug('SplitwiseInstall not found, creating SplitwiseInstallRequest');
-          await ledgerApiClient.create([primaryPartyId], SplitwiseInstallRequest, {
-            user: primaryPartyId,
-            provider: provider,
-          });
+          await ledgerApiClient.create(
+            [primaryPartyId],
+            SplitwiseInstallRequest,
+            {
+              user: primaryPartyId,
+              provider: provider,
+            },
+            splitwiseDomainId
+          );
           console.debug('Created SplitwiseInstallRequest, waiting for SplitwiseInstall');
           setTimeout(() => {
             const maxRetries = 30;
@@ -116,7 +104,7 @@ const HomeWithContext: React.FC<{
       }
     };
     setupInstallContract();
-  }, [primaryPartyId, provider, ledgerApiClient]);
+  }, [primaryPartyId, provider, ledgerApiClient, splitwiseDomainId]);
 
   if (provider && primaryPartyId && svc && install && splitwiseDomainId) {
     return (

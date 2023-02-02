@@ -170,6 +170,11 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
         )
     )
 
+  /** The `<TextInput>` in ts code is converted by react into a deep tree. This returns the input field. */
+  protected def reactTextInput(textField: Element): TextField = new TextField(
+    textField.childElement(className("MuiInputBase-input")).underlying
+  )
+
   // We override eventually to also retry on StaleElementReferenceException
   // because that’s very common in frontend tests and having
   // each call site try to catch that seems unlikely to be reliable.

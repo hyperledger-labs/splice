@@ -30,7 +30,7 @@ class SplitwiseMultiDomainIntegrationTest
       })
 
   "splitwise" should {
-    "go through install flow on private domain" in { implicit env =>
+    "go through install & payment flow on private domain" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
       val bob = onboardWalletUser(bobWallet, bobValidator)
 
