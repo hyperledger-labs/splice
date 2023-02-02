@@ -16,7 +16,7 @@ class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
     store: SvcStore,
     connection: CoinLedgerConnection,
-    waitForUnclaimedRewards: Boolean,
+    waitForUnclaimedRewardsToBeExpired: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -31,9 +31,9 @@ class ArchiveClosedMiningRoundsTrigger(
       appRewardCoupons <- store.listAppRewardCoupons(closedRound.payload.round.number, Some(1))
       validatorRewardCoupons <- store
         .listValidatorRewardCoupons(closedRound.payload.round.number, Some(1))
-      // TODO(M3-63) Once we are resilient to unavailable validators - always wait for unclaimed rewards
+      // TODO(M3-63) Once we are resilient to unavailable validators - always wait for unclaimed rewards to be expired by automation
       res <-
-        (waitForUnclaimedRewards && (appRewardCoupons.length + validatorRewardCoupons.length > 0)) match {
+        (waitForUnclaimedRewardsToBeExpired && (appRewardCoupons.length + validatorRewardCoupons.length > 0)) match {
           case true =>
             logger.debug(
               s"Round ${closedRound.payload.round.number} still has unclaimed reward coupons, not archiving yet"
