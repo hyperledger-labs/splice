@@ -59,6 +59,15 @@ function _error_msg(){
   return ${RC}
 }
 
+# issue a user friendly green informational message
+function _info(){
+  local first_line="INFO: "
+  while read -r; do
+    printf -- "\e[32;1m%s%s\e[0m\n" "${first_line:-     }" "${REPLY}"
+    unset first_line
+  done < <(echo -e "$@")
+}
+
 
 # issue a user friendly yellow warning
 function _warning(){
@@ -68,12 +77,6 @@ function _warning(){
     unset first_line
   done < <(echo -e "$@")
 }
-
-# TODO(tech-debt) - deprecated this misspelled function
-function _warnning(){
-  _warning $@
-}
-
 
 # prints a little green check mark before $@
 function _ok(){

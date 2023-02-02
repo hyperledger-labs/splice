@@ -237,21 +237,21 @@ function cluster_set_machine_type() {
         _error "Cluster does not exist."
     fi
 
-    _warning "Creating temporary node pool..."
+    _info "Creating temporary node pool..."
     gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
            || _error "Could not create node pool with machine type: ${GCP_CLUSTER_NODE_TYPE}"
 
-    _warning "Deleting default node pool..."
+    _info "Deleting default node pool..."
     gcloud container node-pools delete default-pool --quiet --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            || _error "Could not delete default node pool. Terminating early."
 
-    _warning "Recreading default node pool..."
+    _info "Recreading default node pool..."
     gcloud container node-pools create default-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
            || _error "Could not recreate default node pool. Terminating early."
 
-    _warning "Deleting temporary node pool  node pool..."
+    _info "Deleting temporary node pool..."
     gcloud container node-pools delete temp-pool --quiet --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            || _error "Could not delete temporary node pool."
 }
@@ -413,11 +413,19 @@ function cluster_check() {
 }
 
 function _cluster_reset() {
+    _info "Deleting all stateful sets..."
     kubectl delete StatefulSet --all
-    kubectl delete PersistentVolumeClaim --all
-    kubectl delete PersistentVolume --all
+
+    _info "Deleting all deployments..."
     kubectl delete Deployment --all
+
+    _info "Deleting all pods..."
     kubectl delete Pods --all
+
+    _info "Deleting all persistent volume claims..."
+    kubectl delete PersistentVolumeClaim --all
+
+    _info "Cluster in reset/idle state."
 }
 
 function cluster_ciapply() {
