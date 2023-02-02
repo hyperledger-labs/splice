@@ -296,12 +296,12 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 Current Canton commit: `fc624f76987f6a0893d8aa49b22bb8d1ddbc38eb`
 
 
-1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton) 
+1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
    In that repo, execute the following steps:
    1. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`
    2. Checkout `main` and learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
-   3. Check that a release for this Daml SDK version is available on https://github.com/digital-asset/daml/releases. 
-      If not ask on #team-daml when it will land. 
+   3. Check that a release for this Daml SDK version is available on https://github.com/digital-asset/daml/releases.
+      If not ask on #team-daml when it will land.
       In case we have not bumped our Canton fork recently, consider upgrading to an
       earlier Canton OSS version for which a Daml SDK release is available.
    4. Checkout the **current Canton commit listed above**, so we can diff our current fork against this checkout.
@@ -370,7 +370,7 @@ You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commit
 
 * Use `listXXX`, `acceptXXX`, `rejectXXX`, `withdrawXXX` for managing proposals, requests etc.
 * [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity)
-  between `amount`, `quantity` and `number`: To keep things simple across the repository, 
+  between `amount`, `quantity` and `number`: To keep things simple across the repository,
   we consistently use only the term **`amount`**
 * Between `sender`/`receiver` and `payer`/`payee`: please use **`sender`/`receiver`**
 

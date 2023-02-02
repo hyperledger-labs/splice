@@ -24,8 +24,8 @@ To avoid port collisions, tests run sequentially, see `ConcurrentEnvironmentLimi
 Port Allocation
 ===============
 
-Chosen ports should be between 4001 and 32767, 
-as the other ports tend to be either reserved or will be randomly chosen for client connections: 
+Chosen ports should be between 4001 and 32767,
+as the other ports tend to be either reserved or will be randomly chosen for client connections:
 https://en.wikipedia.org/wiki/Ephemeral_port
 
 ## Manually allocated ports

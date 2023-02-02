@@ -18,7 +18,7 @@ test = do
   -- -- -- -- bootstrap validators
   validator1 <- setupValidator app "validator1"
   validator2 <- setupValidator app "validator2"
-  
+
   -- -- -- -- bootstrap users
   user1 <- setupUser app "user1" validator1
   recordValidatorOf app user1.primaryParty validator1

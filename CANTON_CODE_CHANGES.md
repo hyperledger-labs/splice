@@ -12,7 +12,7 @@ NOTE: please refrain from creating extra files in the Canton code fork, as our f
 cannot distinguish them from actual deletions of files by the Canton team.
 
 ## Methods or classes with changed visibility
-* `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`, 
+* `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`,
     `MetricsFactory.registerReporter`, `BaseIntegrationTest` made public
 * `testingTimeService` made protected
 * `PrettyInstances.treeOfIterable` and `PrettyInstances.prettyUidString` made public
@@ -26,10 +26,10 @@ cannot distinguish them from actual deletions of files by the Canton team.
 * Added `class UnitCommand` for admin commands that do not take arguments
 * Adds some more utility methods to `PartyId`
 * Added `com.daml.network.integration.CoinEnvironmentDefinition` to `LogEntry.scala`
-* Added `DecodeUtil.decodeArchivedExercise` 
+* Added `DecodeUtil.decodeArchivedExercise`
 * Support `readAs` in `commands.submit`, should be upstreamed
 * Added `internalErrorGrpc` to `ErrorUtil`
-* Added `ApiClientRequestLogger` and factored out code shared with `ApiRequestLogger` 
+* Added `ApiClientRequestLogger` and factored out code shared with `ApiRequestLogger`
 * Make `applicationId` in console methods configurable everywhere
 * Fixed a bug where `RemoteClock` was not waiting for a proper channel shudown
 ## Build system

@@ -66,7 +66,7 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    """Same as `getCoinTransactionTree` except that it returns a custom type that contains an ASCII visualization 
+    """Same as `getCoinTransactionTree` except that it returns a custom type that contains an ASCII visualization
       |of the Daml transaction tree. """.stripMargin
   )
   def getCoinTransactionTreePretty(transactionId: String): CoinTransactionTreeView = {

@@ -2,7 +2,7 @@ Deploying Splitwise
 ===================
 
 This section walks you through the steps required to host a separate
-instance of the Splitwise back end. This can serve as an example 
+instance of the Splitwise back end. This can serve as an example
 for how to host other applications, including those you write yourself.
 
 We assume that you already setup a self-hosted validator here. If you

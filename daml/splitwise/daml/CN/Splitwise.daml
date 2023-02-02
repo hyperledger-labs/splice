@@ -155,7 +155,7 @@ template Group
     acceptDuration : RelTime -- Time user has to accept a transfer request in their wallet
   where
     signatory provider, owner, members
-    
+
     nonconsuming choice Group_CreateInvite : ContractId GroupInvite
       with
         observers : [Party]

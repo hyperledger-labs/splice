@@ -562,7 +562,7 @@ For details on the individual steps, read the above sections.
 
 If `kubectl get pods` times out for a given cluster and you know
 you are connected to the VPN, it may be necessary to
-force `.kubecfg` to be regenerated. This can be required 
+force `.kubecfg` to be regenerated. This can be required
 if someone else has fully rebuilt the cluster. (`cncluster delete`/`cncluster create`)
 
 To do so run the following commands from the cluster directory, e.g. `cluster/deployment/staging`:

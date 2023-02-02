@@ -10,7 +10,7 @@ module CC.Expiry
   , maxDecimal
   , minTime
   , maxTime
-  ) 
+  )
   where
 
 import CC.Fees
@@ -49,7 +49,7 @@ maxInt = maxBound
 
 -- | Add a positive integer to a bounded set.
 addBoundedInt : Int -> BoundedSet Int -> BoundedSet Int
-addBoundedInt x 
+addBoundedInt x
   | x < 0 = error $ "addBoundedInt: negative first operand " <> show x
   | otherwise = addBounded
   where
@@ -74,7 +74,7 @@ maxDecimal : Decimal
 maxDecimal = 9999999999999999999999999999.9999999999
 
 -- | Divide two positive decimal numbers such that a division by a number between 0.0 and 1.0 does
--- not result in an overflow, but is instead captured as a bounded set. 
+-- not result in an overflow, but is instead captured as a bounded set.
 -- Rounding mode RoundingCeiling is used for the division.
 boundedDivCeilingDecimal : Decimal -> Decimal -> BoundedSet Decimal
 boundedDivCeilingDecimal x y
@@ -101,11 +101,11 @@ boundedCeiling AfterMaxBound = AfterMaxBound
 maxRelRound : RelRound
 maxRelRound = RelRound maxInt
 
--- | Add a BoundedSet of RelRound to a positive Round. 
+-- | Add a BoundedSet of RelRound to a positive Round.
 addBoundedRelRound : API.Round -> BoundedSet RelRound -> BoundedSet API.Round
 addBoundedRelRound (API.Round x) y = API.Round <$> addBoundedInt x ((.diff) <$> y)
 
--- | Add a positive RelRound to BoundedSet of Round. 
+-- | Add a positive RelRound to BoundedSet of Round.
 addToBoundedRound : BoundedSet API.Round -> RelRound -> BoundedSet API.Round
 addToBoundedRound x (RelRound y) = API.Round <$> addBoundedInt y ((.number) <$> x)
 
@@ -120,8 +120,8 @@ minTime = time (date 1 Jan 1) 0 0 0
 maxTime = let oneSecMinusOneMicro = convertMicrosecondsToRelTime ( convertRelTimeToMicroseconds (seconds 1) - 1 )
           in addRelTime (time (date 9999 Dec 31) 23 59 59) oneSecMinusOneMicro
 
--- | Add a RelTime to a Time such that the addition will not result in 
--- an overflow , but is instead captured as a bounded set. 
+-- | Add a RelTime to a Time such that the addition will not result in
+-- an overflow , but is instead captured as a bounded set.
 addBoundedRelTime : Time -> BoundedSet RelTime -> BoundedSet Time
 addBoundedRelTime d (Singleton rt)
   | rt > subTime maxTime d = AfterMaxBound
