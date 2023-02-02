@@ -349,13 +349,17 @@ Current Canton commit: `fc624f76987f6a0893d8aa49b22bb8d1ddbc38eb`
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
 
 
-#### Message Definitions
+### Message Definitions
 
 * All Protobuf definitions should be using [`proto3`](https://developers.google.com/protocol-buffers/docs/proto3)
 * Avoid wrapping primitive types in a message structure unless future extensibility will likely be required
 * Use a plural name for `repeated` fields
 * Use `string` fields with a suffix `contract_id` to store contract ids
 * Use `string` fields with a suffix `party_id` to store party ids
+
+### Config parameters
+
+* name flags as `enableXXX` instead of `disableXXX` to avoid a double negation
 
 ### Code Layout
 

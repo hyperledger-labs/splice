@@ -35,12 +35,12 @@ class SvcTimeBasedIntegrationTest
       .addConfigTransform((_, config) => {
         // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
         CoinConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.disableAutomaticRewardsCollectionAndCoinMerging).replace(true)
+          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
         // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only here.
         // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
         CoinConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.disableUnclaimedRewardExpiration).replace(false)
+          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
         )(config)
       })
 

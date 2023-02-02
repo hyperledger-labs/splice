@@ -24,7 +24,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
         CoinConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.disableAutomaticRewardsCollectionAndCoinMerging).replace(true)
+          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
       )
       .addConfigTransform((_, config) =>

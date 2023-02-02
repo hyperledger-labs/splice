@@ -60,7 +60,7 @@ class UserWalletAutomationService(
   registerTrigger(
     new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection, globalDomain)
   )
-  if (!automationConfig.disableAutomaticRewardsCollectionAndCoinMerging) {
+  if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
     registerTrigger(
       new CollectRewardsAndMergeCoinsTrigger(triggerContext, store, treasury)
     )

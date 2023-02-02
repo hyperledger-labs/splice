@@ -15,8 +15,8 @@ case class AutomationConfig(
     /** Only intended for testing. Disables the polling trigger that periodically collects rewards
       * and merges coins.
       */
-    disableAutomaticRewardsCollectionAndCoinMerging: Boolean = false,
+    enableAutomaticRewardsCollectionAndCoinMerging: Boolean = true,
     /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
       */
-    disableUnclaimedRewardExpiration: Boolean = true,
+    enableUnclaimedRewardExpiration: Boolean = false,
 )
