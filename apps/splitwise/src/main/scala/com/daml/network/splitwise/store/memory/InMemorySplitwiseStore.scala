@@ -1,5 +1,6 @@
 package com.daml.network.splitwise.store.memory
 
+import com.daml.network.splitwise.config.SplitwiseDomainConfig
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -10,6 +11,7 @@ import scala.concurrent.ExecutionContext
 
 class InMemorySplitwiseStore(
     override val providerParty: PartyId,
+    override protected[this] val domainConfig: SplitwiseDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit override protected val ec: ExecutionContext)

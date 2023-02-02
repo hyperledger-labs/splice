@@ -1,6 +1,7 @@
 package com.daml.network.store
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.ExecutionContext
 
@@ -10,11 +11,13 @@ abstract class InMemoryCoinAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
 ](implicit protected val ec: ExecutionContext)
-    extends CoinAppStore[TXI, TXE] {
-  protected def acsContractFilter: AcsStore.ContractFilter
-
+    extends CoinAppStore[TXI, TXE]
+    with CoinAppStore.InMemoryMutableStoreMap[TXI, TXE] {
   protected def futureSupervisor: FutureSupervisor
 
+  private[network] override type PerDomainStore = InMemoryAcsWithTxLogStore[TXI, TXE]
+
+  // TODO (#2620) remove
   private lazy val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE] =
     new InMemoryAcsWithTxLogStore(
       loggerFactory,
@@ -24,12 +27,25 @@ abstract class InMemoryCoinAppStore[
       logAllStateUpdates = false,
     )
 
-  override def acs: AcsStore = acsWithTxLog
+  protected[this] override def newPerDomainStore(domain: DomainId) =
+    new InMemoryAcsWithTxLogStore(
+      loggerFactory,
+      contractFilter = acsContractFilter,
+      txLogParser = txLogParser,
+      futureSupervisor = futureSupervisor,
+      logAllStateUpdates = false,
+    )
+
+  private[network] override def storesIngestionSink(stores: PerDomainStore) = stores.ingestionSink
+
   override def txLog: TxLogStore[TXI, TXE] = acsWithTxLog
+
+  override protected[this] def storeAcs(store: PerDomainStore) = store
+
+  override protected[this] def storeTxLog(store: PerDomainStore) = store
 
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 
-  override lazy val acsIngestionSink: AcsStore.IngestionSink = acsWithTxLog.ingestionSink
   override lazy val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 
   override def close(): Unit = ()

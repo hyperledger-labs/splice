@@ -46,7 +46,15 @@ class UserWalletService(
   private val connection = ledgerClient.connection()
 
   val store: UserWalletStore =
-    UserWalletStore(key, storage, loggerFactory, timeouts, futureSupervisor, connection)
+    UserWalletStore(
+      key,
+      storage,
+      globalDomain,
+      loggerFactory,
+      timeouts,
+      futureSupervisor,
+      connection,
+    )
 
   val treasury: TreasuryService = new TreasuryService(
     connection,

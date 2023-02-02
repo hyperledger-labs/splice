@@ -48,9 +48,6 @@ import scala.jdk.CollectionConverters.*
 trait AcsStore extends AutoCloseable {
   import AcsStore.*
 
-  /** Defines which create events are to be ingested into the store. */
-  def contractFilter: ContractFilter
-
   /** Lookup a contract by id. */
   def lookupContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
@@ -198,6 +195,12 @@ trait AcsStore extends AutoCloseable {
 }
 
 object AcsStore {
+
+  // TODO (#2619) remove along with FutureAcsStore
+  private[network] def futureStore(store: Future[AcsStore])(implicit
+      ec: ExecutionContext
+  ): AcsStore =
+    new FutureAcsStore(store)
 
   // TODO (M3-18) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
   abstract class InterfaceDecoder {

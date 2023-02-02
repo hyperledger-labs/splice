@@ -3,6 +3,7 @@ package com.daml.network.wallet.store.memory
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.store.InMemoryCoinAppStore
 import com.daml.network.wallet.store.UserWalletStore
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,6 +13,7 @@ import scala.concurrent.*
 
 class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
+    override protected[this] val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,

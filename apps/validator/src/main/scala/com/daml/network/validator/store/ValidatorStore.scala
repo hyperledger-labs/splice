@@ -24,27 +24,31 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
   ): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
   ]] =
-    acs.findContractWithOffset(walletCodegen.WalletAppInstall.COMPANION)(co =>
-      co.payload.endUserName == endUserName
+    defaultAcs.flatMap(
+      _.findContractWithOffset(walletCodegen.WalletAppInstall.COMPANION)(co =>
+        co.payload.endUserName == endUserName
+      )
     )
 
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
-    acs.findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true))
 
   def lookupCoinRulesRequestWithOffset(): Future[QueryResult[Option[
     Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
   ]]] =
-    acs.findContractWithOffset(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(coinCodegen.CoinRulesRequest.COMPANION)(_ => true))
 
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   ): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
   ] =
-    acs.findContractWithOffset(coinCodegen.ValidatorRight.COMPANION)(co =>
-      co.payload.user == party.toProtoPrimitive
+    defaultAcs.flatMap(
+      _.findContractWithOffset(coinCodegen.ValidatorRight.COMPANION)(co =>
+        co.payload.user == party.toProtoPrimitive
+      )
     )
 }
 

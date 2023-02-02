@@ -22,10 +22,10 @@ import com.daml.network.splitwise.store.SplitwiseStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation that runs on an splitwise app. */
 class SplitwiseAutomationService(
@@ -112,7 +112,4 @@ class SplitwiseAutomationService(
       )
     )
   }
-
-  override def getIngestionDomain: () => Future[DomainId] = () =>
-    store.domains.signalWhenConnected(domainConfig.splitwise)
 }

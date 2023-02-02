@@ -14,7 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AcsIngestionService(
     name: String,
     ingestionSink: AcsStore.IngestionSink,
-    domain: () => Future[DomainId], // TODO (M3-18) delay service setup until domains available
+    domain: DomainId,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
     loggerFactory0: NamedLoggerFactory,
@@ -34,9 +34,8 @@ class AcsIngestionService(
   ): Future[CoinLedgerSubscription] =
     for {
       lastIngestedOffset <- ingestionSink.getLastIngestedOffset
-      domain <- domain()
       subscribeFrom <- lastIngestedOffset match {
-        case None => ingestAcs(domain)
+        case None => ingestAcs()
         case Some(off) => Future.successful(off)
       }
     } yield connection.subscribeAsync(
@@ -49,7 +48,7 @@ class AcsIngestionService(
     )
 
   /** Ingests the ACS and returns the offset of the ACS, as of which the transaction stream should be read. */
-  private def ingestAcs(domain: DomainId)(implicit traceContext: TraceContext): Future[String] = {
+  private def ingestAcs()(implicit traceContext: TraceContext): Future[String] = {
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
       (evs, off) <- connection.activeContractsWithOffset(domain, igFilter)

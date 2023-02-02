@@ -1,7 +1,5 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
@@ -13,12 +11,11 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation for the UserWalletManager. */
 class WalletAutomationService(
     automationConfig: AutomationConfig,
-    globalDomain: DomainAlias,
     clock: Clock,
     walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
@@ -40,7 +37,4 @@ class WalletAutomationService(
     ) {
 
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
-
-  override def getIngestionDomain: () => Future[DomainId] = () =>
-    walletManager.store.domains.signalWhenConnected(globalDomain)
 }

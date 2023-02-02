@@ -34,7 +34,7 @@ import scala.concurrent.*
   */
 class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
-    override val contractFilter: AcsStore.ContractFilter,
+    contractFilter: AcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     futureSupervisor: FutureSupervisor,
 

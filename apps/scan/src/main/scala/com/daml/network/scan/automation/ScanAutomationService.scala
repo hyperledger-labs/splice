@@ -1,5 +1,6 @@
 package com.daml.network.scan.automation
 
+import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.config.AutomationConfig
@@ -26,6 +27,7 @@ class ScanAutomationService(
     store: ScanStore,
 )(implicit
     ec: ExecutionContextExecutor,
+    mat: Materializer,
     tracer: Tracer,
 ) extends CoinAppAutomationService(
       automationConfig,

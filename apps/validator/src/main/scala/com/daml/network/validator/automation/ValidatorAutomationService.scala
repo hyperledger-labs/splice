@@ -1,5 +1,6 @@
 package com.daml.network.validator.automation
 
+import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.config.AutomationConfig
@@ -23,6 +24,7 @@ class ValidatorAutomationService(
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
+    mat: Materializer,
     tracer: Tracer,
 ) extends CoinAppAutomationService(
       automationConfig,

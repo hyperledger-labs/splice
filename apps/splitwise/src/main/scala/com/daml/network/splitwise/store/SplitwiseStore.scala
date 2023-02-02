@@ -2,6 +2,7 @@ package com.daml.network.splitwise.store
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.splitwise.config.SplitwiseDomainConfig
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.JavaContract as Contract
@@ -17,6 +18,9 @@ trait SplitwiseStore extends CoinAppStoreWithoutHistory {
   import AcsStore.QueryResult
 
   def providerParty: PartyId
+
+  protected[this] def domainConfig: SplitwiseDomainConfig
+  override final def defaultAcsDomain = domainConfig.splitwise
 
   def lookupInstallWithOffset(
       user: PartyId
@@ -67,6 +71,7 @@ object SplitwiseStore {
   def apply(
       providerParty: PartyId,
       storage: Storage,
+      domainConfig: SplitwiseDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit
@@ -74,7 +79,7 @@ object SplitwiseStore {
   ): SplitwiseStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySplitwiseStore(providerParty, loggerFactory, futureSupervisor)
+        new InMemorySplitwiseStore(providerParty, domainConfig, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

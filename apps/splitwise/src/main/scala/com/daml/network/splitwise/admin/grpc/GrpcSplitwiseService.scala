@@ -102,7 +102,6 @@ class GrpcSplitwiseService(
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      import com.daml.network.automation.CoinAppAutomationService.assertGlobalDomain
       for {
         balanceUpdates <- connection.activeContracts(
           splitwiseDomainId,

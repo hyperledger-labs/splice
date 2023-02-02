@@ -24,6 +24,7 @@ import com.daml.network.history.{Tap, Transfer}
 import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory, TxLogStore}
 import com.daml.network.util.{CoinUtil, ExerciseNode, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -281,6 +282,7 @@ object UserWalletStore {
   def apply(
       key: Key,
       storage: Storage,
+      globalDomain: DomainAlias,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
@@ -290,7 +292,14 @@ object UserWalletStore {
   ): UserWalletStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryUserWalletStore(key, loggerFactory, timeouts, futureSupervisor, connection)
+        new InMemoryUserWalletStore(
+          key,
+          globalDomain,
+          loggerFactory,
+          timeouts,
+          futureSupervisor,
+          connection,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

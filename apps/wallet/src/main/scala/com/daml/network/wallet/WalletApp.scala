@@ -122,6 +122,7 @@ class WalletApp(
         WalletStore(
           walletStoreKey,
           storage,
+          config.domains.global,
           loggerFactory,
           coinAppParameters.processingTimeouts,
           futureSupervisor,
@@ -144,7 +145,6 @@ class WalletApp(
         )
       automation = new WalletAutomationService(
         config.automation,
-        config.domains.global,
         clock,
         walletManager,
         ledgerClient,
