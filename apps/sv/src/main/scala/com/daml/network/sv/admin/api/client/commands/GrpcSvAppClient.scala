@@ -29,6 +29,7 @@ object GrpcSvAppClient {
       svcGovernancePackageId: String,
       coinRulesCid: String,
       svcRulesCid: String,
+      ongoingValidatorOnboardings: Int,
   )
 
   case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
@@ -53,6 +54,7 @@ object GrpcSvAppClient {
         svcGovernancePackageId = response.svcGovernancePackageId,
         coinRulesCid = response.coinRulesContractId,
         svcRulesCid = response.coinRulesContractId,
+        ongoingValidatorOnboardings = response.ongoingValidatorOnboardings,
       )
   }
 

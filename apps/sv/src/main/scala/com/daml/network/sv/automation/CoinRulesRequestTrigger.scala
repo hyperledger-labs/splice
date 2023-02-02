@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.sv.store.SvStore
+import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.*
 
 class CoinRulesRequestTrigger(
     override protected val context: TriggerContext,
-    store: SvStore,
+    store: SvSvcStore,
     connection: CoinLedgerConnection,
 )(implicit
     ec: ExecutionContext,

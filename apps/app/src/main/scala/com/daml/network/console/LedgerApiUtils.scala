@@ -41,9 +41,4 @@ object LedgerApiUtils {
     );
     PartyId.tryFromLfParty(primaryParty)
   }
-
-  def getUserReadAs(ledgerApi: BaseLedgerApiAdministration, userId: String): Set[PartyId] = {
-    val rights = ledgerApi.ledger_api.users.rights.list(userId)
-    rights.readAs.map(PartyId.tryFromLfParty(_))
-  }
 }

@@ -35,6 +35,10 @@ message GetDebugInfoResponse {
 
   // Contract IDs of the SvcRules contract associated with the SVC
   string svc_rules_contract_id = 7;
+
+  // Number of active validator onboarding contracts known to this SV
+  // TODO(#M3-46): remove if unused (was added for enabling a test)
+  uint32 ongoing_validator_onboardings = 8;
 }
 
 message ListConnectedDomainsResponse {

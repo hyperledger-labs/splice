@@ -30,7 +30,7 @@ class WalletAutomationService(
 ) extends CoinAppAutomationService(
       automationConfig,
       clock,
-      walletManager.store,
+      Map(walletManager.store.key.validatorParty -> walletManager.store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,

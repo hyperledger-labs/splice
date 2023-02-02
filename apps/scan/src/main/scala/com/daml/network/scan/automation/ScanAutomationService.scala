@@ -32,7 +32,7 @@ class ScanAutomationService(
 ) extends CoinAppAutomationService(
       automationConfig,
       clock,
-      store,
+      Map(store.svcParty -> store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,

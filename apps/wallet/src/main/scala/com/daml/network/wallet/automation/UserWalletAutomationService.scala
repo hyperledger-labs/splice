@@ -46,7 +46,7 @@ class UserWalletAutomationService(
 ) extends CoinAppAutomationService(
       automationConfig,
       clock,
-      store,
+      Map(store.key.endUserParty -> store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,

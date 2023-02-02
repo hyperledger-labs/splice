@@ -5,7 +5,7 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CoinAppAutomationService
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.sv.config.LocalSvAppConfig
-import com.daml.network.sv.store.SvStore
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -16,7 +16,8 @@ import scala.concurrent.ExecutionContextExecutor
 class SvAutomationService(
     clock: Clock,
     config: LocalSvAppConfig,
-    store: SvStore,
+    svStore: SvSvStore,
+    svcStore: SvSvcStore,
     ledgerClient: CoinLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
@@ -29,11 +30,11 @@ class SvAutomationService(
 ) extends CoinAppAutomationService(
       config.automation,
       clock,
-      store,
+      Map(svStore.key.svParty -> svStore, svcStore.key.svcParty -> svcStore),
       ledgerClient,
       participantAdminConnection,
       retryProvider,
     ) {
 
-  registerTrigger(new CoinRulesRequestTrigger(triggerContext, store, connection))
+  registerTrigger(new CoinRulesRequestTrigger(triggerContext, svcStore, connection))
 }

@@ -10,7 +10,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.grpc.GrpcSvAppService
 import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.LocalSvAppConfig
-import com.daml.network.sv.store.SvStore
+import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CoinUtil.{defaultCoinConfig, defaultEnabledChoices}
@@ -62,22 +62,25 @@ class SvApp(
   ): Future[SvApp.State] =
     for {
       svcPartyId <- retryProvider.retryForAutomationGrpc("get SVC party ID", getSvcPartyId, this)
-      svStoreKey = SvStore.Key(svPartyId, svcPartyId)
-      store = SvStore(svStoreKey, storage, loggerFactory, futureSupervisor)
+      storeKey = SvStore.Key(svPartyId, svcPartyId)
+      svStore = SvSvStore(storeKey, storage, loggerFactory, futureSupervisor)
+      svcStore = SvSvcStore(storeKey, storage, loggerFactory, futureSupervisor)
       automation = new SvAutomationService(
         clock,
         config,
-        store,
+        svStore,
+        svcStore,
         ledgerClient,
         participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,
       )
-      _ <- store.domains.signalWhenConnected()
+      _ <- svStore.domains.signalWhenConnected()
+      _ <- svcStore.domains.signalWhenConnected()
       _ <-
         if (config.foundConsortium) {
-          foundConsortium(store, ledgerClient, retryProvider, this)
+          foundConsortium(svcStore, ledgerClient, retryProvider, this)
         } else {
           retryProvider.retryForAutomationGrpc(
             "join existing SV consortium",
@@ -90,14 +93,21 @@ class SvApp(
       adminServerRegistry
         .addService(
           SvServiceGrpc.bindService(
-            new GrpcSvAppService(ledgerClient, config.ledgerApiUser, store, loggerFactory),
+            new GrpcSvAppService(
+              ledgerClient,
+              config.ledgerApiUser,
+              svStore,
+              svcStore,
+              loggerFactory,
+            ),
             ec,
           )
         )
         .discard
       SvApp.State(
         storage,
-        store,
+        svStore,
+        svcStore,
         automation,
         logger,
       )
@@ -122,7 +132,7 @@ class SvApp(
   }
 
   private def foundConsortium(
-      store: SvStore,
+      store: SvSvcStore,
       ledgerClient: CoinLedgerClient,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
@@ -145,11 +155,12 @@ class SvApp(
     for {
       _ <- ledgerConnection.uploadDarFile(SvApp.coinPackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
+      _ <- ledgerConnection.uploadDarFile(SvApp.validatorLifecyclePackage)
     } yield ()
 
   // Create SvcRules and CoinRules and open the first mining round
   private def bootstrapSvc(
-      store: SvStore,
+      store: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       domainId: DomainId,
   ): Future[Unit] = {
@@ -242,7 +253,8 @@ class SvApp(
 object SvApp {
   case class State(
       storage: Storage,
-      store: SvStore,
+      svStore: SvSvStore,
+      svcStore: SvSvcStore,
       automation: SvAutomationService,
       logger: TracedLogger,
   ) extends AutoCloseable
@@ -252,7 +264,8 @@ object SvApp {
     override def close(): Unit =
       Lifecycle.close(
         storage,
-        store,
+        svStore,
+        svcStore,
         automation,
       )(logger)
 
@@ -266,5 +279,10 @@ object SvApp {
   val svcGovernancePackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
     lazy val resourcePath: String = "dar/svc-governance-0.1.0.dar"
+  }
+  val validatorLifecyclePackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String =
+      cn.validatoronboarding.ValidatorOnboarding.COMPANION.TEMPLATE_ID.getPackageId
+    lazy val resourcePath: String = "dar/validator-lifecycle-0.1.0.dar"
   }
 }

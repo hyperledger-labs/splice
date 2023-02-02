@@ -29,7 +29,7 @@ class ValidatorAutomationService(
 ) extends CoinAppAutomationService(
       automationConfig,
       clock,
-      store,
+      Map(store.key.validatorParty -> store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,

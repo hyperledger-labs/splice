@@ -7,7 +7,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.CoinAppStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{PartyId, DomainId}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext
 abstract class CoinAppAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    store: CoinAppStore[?, ?],
+    stores: Map[PartyId, CoinAppStore[?, ?]],
     ledgerClient: CoinLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
@@ -27,10 +27,10 @@ abstract class CoinAppAutomationService(
 
   protected val connection = registerResource(ledgerClient.connection())
 
-  private[this] def registerDomainAcs(domain: DomainId) = {
+  private[this] def registerDomainAcs(store: CoinAppStore[?, ?], domain: DomainId) = {
     val stores = store.installNewPerDomainStore(domain)
     val ingestionService = new AcsIngestionService(
-      this.getClass.getSimpleName,
+      s"${this.getClass.getSimpleName}(${store.getClass.getSimpleName})",
       store.storesIngestionSink(stores),
       domain,
       connection,
@@ -38,12 +38,13 @@ abstract class CoinAppAutomationService(
       loggerFactory,
       timeouts,
     )
-    new DomainStoreLink(domain, ingestionService)
+    new DomainStoreLink(store, domain, ingestionService)
   }
 
   import com.daml.network.util.HasHealth
 
   private[this] final class DomainStoreLink[+A](
+      store: CoinAppStore[?, ?],
       domain: DomainId,
       child: A & HasHealth & AutoCloseable,
   ) extends HasHealth
@@ -55,16 +56,19 @@ abstract class CoinAppAutomationService(
     }
   }
 
-  registerTrigger(
-    new DomainIngestionService(
-      store.domainIngestionSink,
-      participantAdminConnection,
-      triggerContext,
+  stores.values.foreach(store => {
+    registerTrigger(
+      new DomainIngestionService(
+        store.domainIngestionSink,
+        participantAdminConnection,
+        triggerContext,
+      )
     )
-  )
-
-  private[this] val domainAcsOrchestrator =
-    new DomainOrchestrator(triggerContext, store.domains, da => registerDomainAcs(da.domainId))
-
-  registerTrigger(domainAcsOrchestrator)
+    val domainAcsOrchestrator = new DomainOrchestrator(
+      triggerContext,
+      store.domains,
+      da => registerDomainAcs(store, da.domainId),
+    )
+    registerTrigger(domainAcsOrchestrator)
+  })
 }

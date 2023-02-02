@@ -29,7 +29,7 @@ class SvcAutomationService(
 ) extends CoinAppAutomationService(
       config.automation,
       clock,
-      store,
+      Map(store.svcParty -> store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,

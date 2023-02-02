@@ -32,7 +32,7 @@ class DirectoryAutomationService(
 ) extends CoinAppAutomationService(
       automationConfig,
       clock,
-      store,
+      Map(store.providerParty -> store),
       ledgerClient,
       participantAdminConnection,
       retryProvider,
