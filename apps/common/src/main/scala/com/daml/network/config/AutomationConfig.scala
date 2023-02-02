@@ -16,4 +16,7 @@ case class AutomationConfig(
       * and merges coins.
       */
     disableAutomaticRewardsCollectionAndCoinMerging: Boolean = false,
+    /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
+      */
+    disableUnclaimedRewardExpiration: Boolean = true,
 )

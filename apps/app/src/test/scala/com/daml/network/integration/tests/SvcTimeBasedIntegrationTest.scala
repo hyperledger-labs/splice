@@ -16,9 +16,12 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import org.slf4j.event.Level
+import monocle.macros.syntax.lens.*
 
 import scala.jdk.CollectionConverters.*
 import java.time.Duration
+import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.util.JavaContract
 
 class SvcTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -29,6 +32,17 @@ class SvcTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransform((_, config) => {
+        // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+        CoinConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.disableAutomaticRewardsCollectionAndCoinMerging).replace(true)
+        )(config)
+        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only here.
+        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
+        CoinConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.disableUnclaimedRewardExpiration).replace(false)
+        )(config)
+      })
 
   "round management" in { implicit env =>
     // Sync with background automation that onboards validator.
@@ -85,6 +99,15 @@ class SvcTimeBasedIntegrationTest
         eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
           svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
+        )
+        // Advance time again to let automation kick-in and archive closed mining round
+        // TODO(tech-debt): generalize and reuse in other tests
+        advanceTime(
+          env.actualConfig.svcApp
+            .getOrElse(fail("svc backend config not found"))
+            .automation
+            .pollingInterval
+            .duration
         )
         eventually()( // closed round is archived eventually.
           svc.remoteParticipantWithAdminToken.ledger_api.acs
@@ -240,6 +263,62 @@ class SvcTimeBasedIntegrationTest
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )
+  }
 
+  "collect expired reward coupons" in { implicit env =>
+    def getNumRewardCoupons(
+        round: JavaContract[OpenMiningRound.ContractId, OpenMiningRound]
+    ): Int = {
+      svc.remoteParticipantWithAdminToken.ledger_api.acs
+        .filterJava(AppRewardCoupon.COMPANION)(
+          svcParty,
+          co => co.data.round.number == round.payload.round.number,
+        )
+        .length +
+        svc.remoteParticipantWithAdminToken.ledger_api.acs
+          .filterJava(ValidatorRewardCoupon.COMPANION)(
+            svcParty,
+            co => co.data.round.number == round.payload.round.number,
+          )
+          .length
+
+    }
+
+    val round =
+      scan.getTransferContext().latestOpenMiningRound.getOrElse(fail("No open mining round found"))
+    val numRewards = getNumRewardCoupons(round)
+
+    val (aliceParty, bobParty) = onboardAliceAndBob()
+    aliceWallet.tap(100.0)
+    bobWallet.tap(100.0)
+
+    actAndCheck(
+      "Generate some reward coupons by executing a few direct transfers", {
+        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
+        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
+      },
+    )(
+      "Wait for all reward coupons to be created",
+      _ => {
+        advanceTime(Duration.ofSeconds(1))
+        getNumRewardCoupons(round) should be(numRewards + 8) // 4 app rewards + 4 validator
+      },
+    )
+
+    actAndCheck(
+      "Advance 5 ticks, to close the round",
+      (1 to 5).foreach(_ => advanceRoundsByOneTick),
+    )(
+      "Wait for all unclaimed coupons to be archived and the closed round to be archived",
+      _ => {
+        advanceTime(Duration.ofSeconds(1))
+        getNumRewardCoupons(round) should be(0)
+        scan
+          .getClosedRounds()
+          .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
+      },
+    )
   }
 }

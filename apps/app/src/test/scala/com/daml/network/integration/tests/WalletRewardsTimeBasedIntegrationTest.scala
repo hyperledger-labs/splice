@@ -38,8 +38,10 @@ class WalletRewardsTimeBasedIntegrationTest
       }
       bobWallet.listValidatorRewardCoupons() shouldBe empty
 
-      // Wait for validator rewards to become visible in alice's wallet, check structure
-      aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
+      eventually() {
+        // Wait for validator rewards to become visible in alice's wallet, check structure
+        aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
+      }
 
       val prevCoins = bobWallet.list().coins
 
