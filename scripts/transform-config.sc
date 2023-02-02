@@ -16,7 +16,8 @@ object TransformConfig extends App {
     case "useSelfSignedTokensForLedgerApiAuth" =>
       val inputConfig = CoinConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
       val outputConfig = CoinConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
-      CoinConfig.writeToFile(outputConfig, outputFileName)
+      // Deliberately leaking secrets to file
+      CoinConfig.writeToFile(outputConfig, outputFileName, confidential = false)
     case _ =>
       println(s"Unknown mode '$mode'")
       sys.exit(-1)

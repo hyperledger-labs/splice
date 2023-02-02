@@ -384,8 +384,11 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  override def dumpString: String =
+  override def dumpString: String = {
+    val writers = new CoinConfig.ConfigWriters(confidential = true)
+    import writers.*
     ConfigWriter[CoinConfig].to(this).render(CoinConfig.defaultConfigRenderer)
+  }
 
   override def withDefaults(ports: DefaultPorts): CoinConfig =
     this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
@@ -498,9 +501,8 @@ object CoinConfig {
   }
 
   @nowarn("cat=unused")
-  private implicit def coinConfigWriter: ConfigWriter[CoinConfig] = {
-    // confidential because we use this for outputting the config in logs
-    val writers = new CantonConfig.ConfigWriters(confidential = true)
+  class ConfigWriters(confidential: Boolean) {
+    val writers = new CantonConfig.ConfigWriters(confidential)
     import writers.*
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*
@@ -587,7 +589,7 @@ object CoinConfig {
     implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
       deriveWriter[CommunityParticipantConfig]
 
-    deriveWriter[CoinConfig]
+    implicit val coinConfigWriter: ConfigWriter[CoinConfig] = deriveWriter[CoinConfig]
   }
 
   def load(config: Config)(implicit
@@ -606,7 +608,9 @@ object CoinConfig {
       .valueOr(error => throw CoinConfigException(error))
   }
 
-  def writeToFile(config: CoinConfig, path: Path): Unit = {
+  def writeToFile(config: CoinConfig, path: Path, confidential: Boolean = true): Unit = {
+    val writers = new CoinConfig.ConfigWriters(confidential)
+    import writers.*
     val renderer = ConfigRenderOptions
       .defaults()
       .setOriginComments(false)
