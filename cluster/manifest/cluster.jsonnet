@@ -95,7 +95,7 @@ local authEnvVars(s) = {
 local JVM_SYSTEM_MEMORY_MIB = 512;
 
 // `image` defaults to `name`
-local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
+local deployment(config, name, ports, cpuLimit=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
 
   local proxyPort =
     if proxyToGrpcWeb == null then null
@@ -155,9 +155,11 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
                   resources: {
                     requests: {
                       memory: memoryLimitMiB + "Mi",
+                      cpu: cpuLimit,
                     },
                     limits: {
                       memory: memoryLimitMiB + "Mi",
+                      cpu: cpuLimit,
                     },
                   },
                   volumeMounts: if mountConfig == null then [] else [

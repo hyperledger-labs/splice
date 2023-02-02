@@ -4,8 +4,12 @@
 // clusters with higher loads.
 
 {
+  domainCpu: 2,
   domainMemoryMib: 2048,
+  participantCpu: 2,
   participantMemoryMib: 8192,
+  postgresCpu: 2,
+  postgresMemoryMib: 4096,
   ledgerDatabaseGib: 20,
   externalIPRanges: [
     "35.194.81.56/32",

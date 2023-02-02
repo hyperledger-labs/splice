@@ -221,23 +221,46 @@ function cluster_logs() {
 
     if ! cluster_exists; then
         _error "Cluster does not exist, cannot push."
-        exit 1
     fi
 
     if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
         _error "Unknown module: $1"
-        exit 1
     fi
 
     kubectl logs -l app=${module} -c ${module} -f
+}
+
+function cluster_set_machine_type() {
+    cluster_confirm "Set cluster machine type to current default. (This will interrupt all workloads.)"
+
+    if ! cluster_exists; then
+        _error "Cluster does not exist."
+    fi
+
+    _warning "Creating temporary node pool..."
+    gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
+           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
+           || _error "Could not create node pool with machine type: ${GCP_CLUSTER_NODE_TYPE}"
+
+    _warning "Deleting default node pool..."
+    gcloud container node-pools delete default-pool --quiet --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
+           || _error "Could not delete default node pool. Terminating early."
+
+    _warning "Recreading default node pool..."
+    gcloud container node-pools create default-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
+           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
+           || _error "Could not recreate default node pool. Terminating early."
+
+    _warning "Deleting temporary node pool  node pool..."
+    gcloud container node-pools delete temp-pool --quiet --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
+           || _error "Could not delete temporary node pool."
 }
 
 function cluster_create() {
     cluster_confirm "Create cluster"
 
     if cluster_exists; then
-        echo "Cluster already exists."
-        exit 1
+        _error "Cluster already exists."
     else
         #### Cluster can be resized from deployment directories with the following command:
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
@@ -246,8 +269,8 @@ function cluster_create() {
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
-               --machine-type e2-highmem-8 \
-               --num-nodes 2 \
+               --machine-type ${GCP_CLUSTER_NODE_TYPE} \
+               --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
                --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME} \
@@ -259,10 +282,11 @@ function cluster_create() {
                --master-authorized-networks ${GCP_VPN_NETS}
 
         #### Delete default firewall rules, if they exist.
-        if (yes | gcloud compute firewall-rules delete \
+        if (gcloud compute firewall-rules delete\
                          default-allow-rdp \
                          default-allow-icmp \
-                         default-allow-ssh 2> /dev/null); then
+                         default-allow-ssh \
+                         --quiet 2> /dev/null); then
             _warning "Deleted default firewall rules."
         else
             _log "Default firewalls already removed and do not need to be deleted."
@@ -296,7 +320,6 @@ function cluster_create() {
 
     if [ -z ${IPADDR} ]; then
         _error "Could not determine cluster IP address."
-        exit 1
     fi
 
     gcloud dns record-sets create ${CLUSTER_DNS_NAME} \
@@ -439,7 +462,7 @@ function cluster_delete() {
             _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
         fi
 
-        yes | gcloud container clusters delete ${GCP_CLUSTER_NAME}
+        gcloud container clusters delete --quiet ${GCP_CLUSTER_NAME}
     else
         _error "Cluster does not exist, cannot delete."
         exit 1
@@ -493,6 +516,10 @@ function _show_ports() {
         | column -s ',' -t
 }
 
+function _show_pod_sizing() {
+    kubectl get pod -o custom-columns='POD-NAME:.metadata.name,MEMORY:.spec.containers[*].resources.limits.memory,CPU:.spec.containers[*].resources.limits.cpu'
+}
+
 function cluster_services() {
     cluster_show
 
@@ -509,14 +536,17 @@ function cluster_stats() {
     _show_ports
 
     _log ""
-    _log "Node Usage:"
-
+	_log "Node Usage:"
     kubectl top node
 
     _log ""
-    _log "Pod Usage:"
-
+	_log "Pod Usage:"
     kubectl top pod
+
+    _log ""
+    _log "Pod Resource Limits:"
+    _show_pod_sizing
+
 }
 
 function cluster_wait() {
@@ -628,6 +658,10 @@ case "${SUBCOMMAND_NAME}" in
 
     reset)
         cluster_reset $@
+        ;;
+
+    set_machine_type)
+        cluster_set_machine_type $@
         ;;
 
     services)

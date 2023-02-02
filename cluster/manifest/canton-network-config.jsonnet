@@ -61,6 +61,7 @@ local svcDeployments(config) = [
         periodSeconds: 10,
       },
     },
+    cpuLimit=config.domainCpu,
     memoryLimitMiB=config.domainMemoryMib
   ),
 
@@ -78,7 +79,7 @@ local svcDeployments(config) = [
       port: 10013,
       externalPort: 10013,
     },
-  ], image="canton-participant", memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
     authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME,
@@ -200,7 +201,7 @@ local validator1Deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=[
+  ], cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=[
     authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
   ]),
@@ -236,7 +237,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ]),
+  ], cpuLimit="500m"),
 
   c.deployment(config, "validator1-directory-web-ui", [
     {
@@ -244,7 +245,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ]),
+  ], cpuLimit="500m"),
 
   c.deployment(config, "validator1-splitwise-web-ui", [
     {
@@ -252,7 +253,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ]),
+  ], cpuLimit="500m"),
 ];
 
 local splitwiseDeployments(config) = [
@@ -273,7 +274,7 @@ local splitwiseDeployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=[
+  ], cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=[
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
   ]),
 
@@ -321,7 +322,7 @@ local cantonNetwork(config) =
         port: 8080,
         internalOnly: true,
       },
-    ], memoryLimitMiB=512),
+    ], cpuLimit="500m", memoryLimitMiB=512),
 
     svcDeployments(config),
     validator1Deployments(config),

@@ -54,9 +54,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -142,9 +144,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": "500m",
                               "memory": "512Mi"
                            },
                            "requests": {
+                              "cpu": "500m",
                               "memory": "512Mi"
                            }
                         },
@@ -246,6 +250,16 @@
                               "name": "postgresdb"
                            }
                         ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           }
+                        },
                         "volumeMounts": [
                            {
                               "mountPath": "/var/lib/postgresql/data",
@@ -365,9 +379,11 @@
                         },
                         "resources": {
                            "limits": {
+                              "cpu": 2,
                               "memory": "2048Mi"
                            },
                            "requests": {
+                              "cpu": 2,
                               "memory": "2048Mi"
                            }
                         },
@@ -543,9 +559,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            },
                            "requests": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            }
                         },
@@ -680,9 +698,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -808,9 +828,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -939,9 +961,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -1066,9 +1090,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -1193,9 +1219,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -1320,9 +1348,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -1443,9 +1473,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -1585,6 +1617,16 @@
                               "name": "postgresdb"
                            }
                         ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           }
+                        },
                         "volumeMounts": [
                            {
                               "mountPath": "/var/lib/postgresql/data",
@@ -1712,9 +1754,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            },
                            "requests": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            }
                         },
@@ -1893,9 +1937,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -2016,9 +2062,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -2137,9 +2185,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            }
                         },
@@ -2220,9 +2270,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            }
                         },
@@ -2303,9 +2355,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            }
                         },
@@ -2407,6 +2461,16 @@
                               "name": "postgresdb"
                            }
                         ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "4096Mi"
+                           }
+                        },
                         "volumeMounts": [
                            {
                               "mountPath": "/var/lib/postgresql/data",
@@ -2524,9 +2588,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            },
                            "requests": {
+                              "cpu": 2,
                               "memory": "8192Mi"
                            }
                         },
@@ -2705,9 +2771,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -2828,9 +2896,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -3080,9 +3150,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "512Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "512Mi"
                            }
                         },

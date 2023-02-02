@@ -63,6 +63,16 @@ local database(name, config) = {
                     command: ["psql", "-U", "cnadmin", "-d", "template1", "-c", "SELECT 1"],
                   },
                 },
+                resources: {
+                  requests: {
+                    memory: config.postgresMemoryMib + "Mi",
+                    cpu: config.postgresCpu,
+                  },
+                  limits: {
+                    memory: config.postgresMemoryMib + "Mi",
+                    cpu: config.postgresCpu,
+                  },
+                },
                 volumeMounts: [
                   {
                     name: "pg-data",
