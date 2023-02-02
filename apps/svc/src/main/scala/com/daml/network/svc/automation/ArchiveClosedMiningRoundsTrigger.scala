@@ -53,6 +53,11 @@ class ArchiveClosedMiningRoundsTrigger(
                   .toSeq,
                 domainId,
               )
+              .flatMap(tx =>
+                // make sure the store ingested our update so we don't
+                // attempt to archive the same round twice
+                store.acs.signalWhenIngested(tx.getOffset())
+              )
               .map(_ => {
                 logger.info(
                   s"successfully archived closed mining round ${closedRound.payload.round.number}"
