@@ -63,7 +63,7 @@ abstract class AppConnection(
   private def toFuture[T](e: Either[String, T]): Future[T] =
     e.fold(
       err => Future.failed(new StatusRuntimeException(Status.INTERNAL.withDescription(err))),
-      Future.successful(_),
+      Future.successful,
     )
 
   protected def runHttpCmd[Res, Result](

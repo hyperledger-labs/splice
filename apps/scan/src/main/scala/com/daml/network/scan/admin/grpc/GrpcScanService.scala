@@ -3,6 +3,7 @@ package com.daml.network.scan.admin.grpc
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.round as roundCodegen
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
@@ -49,8 +50,38 @@ class GrpcScanService(
         v0.GetTransferContextResponse(
           coinRules = coinRules.map(_.toProtoV0),
           latestOpenMiningRound = Some(latestOpen.toProtoV0),
-          // TODO(M3-09): consider just removing this attribute - not used except in tests.
           openMiningRounds = rounds.map(_.toProtoV0),
+        )
+      }
+    }
+
+  override def getLatestOpenAndIssuingMiningRounds(
+      request: Empty
+  ): Future[v0.GetLatestOpenAndIssuingMiningRoundsResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
+      val now = clock.now
+      for {
+        latestOpen <- store.getLatestOpenMiningRound(now)
+        issuingRounds <- store.acs
+          .listContracts(IssuingMiningRound.COMPANION)
+      } yield {
+        v0.GetLatestOpenAndIssuingMiningRoundsResponse(
+          latestOpenMiningRound = Some(latestOpen.toProtoV0),
+          // TODO(M3-09): consider just removing this attribute - not used except in tests.
+          issuingMiningRounds = issuingRounds.map(_.toProtoV0),
+        )
+      }
+    }
+
+  override def getCoinRules(
+      request: Empty
+  ): Future[v0.GetCoinRulesResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
+      for {
+        coinRules <- store.lookupCoinRules()
+      } yield {
+        v0.GetCoinRulesResponse(
+          coinRules = coinRules.map(_.toProtoV0)
         )
       }
     }

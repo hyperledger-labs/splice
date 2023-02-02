@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{HasHealth, JavaContract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
@@ -34,6 +35,7 @@ class UserWalletManager(
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: CoinRetries,
+    scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -85,6 +87,7 @@ class UserWalletManager(
       storage,
       retryProvider,
       loggerFactory,
+      scanConnection,
       timeouts,
       futureSupervisor,
     )

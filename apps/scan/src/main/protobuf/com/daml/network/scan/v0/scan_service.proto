@@ -12,6 +12,8 @@ service ScanService {
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
   rpc GetTransferContext (google.protobuf.Empty) returns (GetTransferContextResponse);
+  rpc GetLatestOpenAndIssuingMiningRounds (google.protobuf.Empty) returns (GetLatestOpenAndIssuingMiningRoundsResponse);
+  rpc GetCoinRules (google.protobuf.Empty) returns (GetCoinRulesResponse);
   rpc ListFeaturedAppRights (google.protobuf.Empty) returns (ListFeaturedAppRightsResponse);
   rpc LookupFeaturedAppRight (LookupFeaturedAppRightRequest) returns (LookupFeaturedAppRightResponse);
 
@@ -31,6 +33,15 @@ message GetTransferContextResponse {
   com.daml.network.v0.Contract coin_rules = 1;
   com.daml.network.v0.Contract latest_open_mining_round = 3;
   repeated com.daml.network.v0.Contract open_mining_rounds = 2;
+}
+
+message GetLatestOpenAndIssuingMiningRoundsResponse {
+  com.daml.network.v0.Contract latest_open_mining_round = 1;
+  repeated com.daml.network.v0.Contract issuing_mining_rounds = 2;
+}
+
+message GetCoinRulesResponse {
+  com.daml.network.v0.Contract coin_rules = 1;
 }
 
 message GetCoinTransactionDetailsRequest {

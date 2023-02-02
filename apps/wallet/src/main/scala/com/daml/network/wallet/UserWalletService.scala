@@ -4,6 +4,7 @@ import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
@@ -31,6 +32,7 @@ class UserWalletService(
     storage: Storage,
     retryProvider: CoinRetries,
     loggerFactory0: NamedLoggerFactory,
+    scanConnection: ScanConnection,
     override protected val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
@@ -54,6 +56,7 @@ class UserWalletService(
     store,
     walletManager,
     retryProvider,
+    scanConnection,
     loggerFactory,
     timeouts,
   )

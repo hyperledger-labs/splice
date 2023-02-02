@@ -1,8 +1,9 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
@@ -51,6 +52,23 @@ final class ScanConnection(
       traceContext: TraceContext
   ): Future[GrpcScanAppClient.TransferContext] = {
     runCmd(GrpcScanAppClient.GetTransferContext())
+  }
+
+  def getCoinRules()(implicit
+      traceContext: TraceContext
+  ): Future[JavaContract[CoinRules.ContractId, CoinRules]] = {
+    runCmd(GrpcScanAppClient.GetCoinRules())
+  }
+
+  def getLatestOpenAndIssuingMiningRounds()(implicit
+      traceContext: TraceContext
+  ): Future[
+    (
+        JavaContract[OpenMiningRound.ContractId, OpenMiningRound],
+        Seq[JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+    )
+  ] = {
+    runCmd(GrpcScanAppClient.GetLatestOpenAndIssuingMiningRounds())
   }
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit

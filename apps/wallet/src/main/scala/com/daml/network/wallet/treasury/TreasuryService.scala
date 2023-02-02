@@ -35,6 +35,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{HasHealth, JavaContract}
 import com.daml.network.wallet.UserWalletManager
@@ -73,6 +74,7 @@ class TreasuryService(
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
     retryProvider: CoinRetries,
+    scanConnection: ScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
@@ -423,12 +425,12 @@ class TreasuryService(
     )
   ]] =
     for {
-      coinRules <- walletManager.store.getCoinRules()
+      coinRules <- scanConnection.getCoinRules()
       config = coinRules.payload.config
       maxNumInputs = config.maxNumInputs.intValue()
-      openRound <- walletManager.store.getLatestOpenMiningRound(now)
-      issuingMiningRounds <- walletManager.store.getOpenIssuingRounds(now)
-      issuingRoundsMap = issuingMiningRounds
+      (openRound, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
+      openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))
+      issuingRoundsMap = openIssuingRounds
         .map(r => (r.payload.round, r.payload))
         .toMap
       validatorRights <- walletManager.store.acs
@@ -469,8 +471,9 @@ class TreasuryService(
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
-          openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-          issuingMiningRounds
+          openRound.contractId
+            .toInterface(v1.round.OpenMiningRound.INTERFACE),
+          openIssuingRounds
             // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
             .filter(r => rewardInputRounds.contains(r.payload.round))
             .map(r =>

@@ -40,7 +40,7 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
   )
-  def getAppTransferContext(): v1.coin.AppTransferContext = {
+  def getUnfeaturedAppTransferContext(): v1.coin.AppTransferContext = {
     def notFound(description: String) = new IllegalStateException(description)
 
     val transferContext = getTransferContext()

@@ -1,23 +1,20 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.codegen.java.cc.coin.{CoinRules, ValidatorRight}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight, ValidatorRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
@@ -50,26 +47,6 @@ trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRou
         co.payload.endUserName == endUserName
       )
       .map(_.value)
-
-  def getCoinRules()
-      : Future[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]] =
-    acs
-      .findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true)
-      .map(
-        _.value.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("No active CoinRules contract")
-          )
-        )
-      )
-
-  def getOpenIssuingRounds(
-      now: CantonTimestamp
-  ): Future[Seq[JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]]] = {
-    acs
-      .listContracts(roundCodegen.IssuingMiningRound.COMPANION)
-      .map(rounds => rounds.filter(c => c.payload.opensAt.isBefore(now.toInstant)))
-  }
 
   def lookupValidatorFeaturedAppRight()
       : Future[Option[JavaContract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] = {

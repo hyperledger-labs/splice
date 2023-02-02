@@ -46,7 +46,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         25,
-        scan.getAppTransferContext(),
+        scan.getUnfeaturedAppTransferContext(),
         Duration.ofDays(10),
       )
 
@@ -96,7 +96,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         lockedQty,
-        scan.getAppTransferContext(),
+        scan.getUnfeaturedAppTransferContext(),
         Duration.ofDays(10),
       )
 
@@ -295,7 +295,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         0.000005,
-        scan.getAppTransferContext(),
+        scan.getUnfeaturedAppTransferContext(),
         Duration.ofMinutes(1),
       )
 

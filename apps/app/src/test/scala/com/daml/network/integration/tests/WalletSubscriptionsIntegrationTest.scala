@@ -47,7 +47,7 @@ class WalletSubscriptionsIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val transferContext = scan.getAppTransferContext()
+        val transferContext = scan.getUnfeaturedAppTransferContext()
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 

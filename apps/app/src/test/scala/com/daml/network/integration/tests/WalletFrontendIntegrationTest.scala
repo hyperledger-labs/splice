@@ -58,7 +58,7 @@ class WalletFrontendIntegrationTest
           aliceValidatorParty,
           aliceWallet.list().coins,
           lockedQty,
-          scan.getAppTransferContext(),
+          scan.getUnfeaturedAppTransferContext(),
           Duration.ofDays(1),
         )
 

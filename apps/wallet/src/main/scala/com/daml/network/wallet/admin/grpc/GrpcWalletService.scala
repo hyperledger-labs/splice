@@ -2,10 +2,10 @@ package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
@@ -25,7 +25,8 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.CoinLedgerConnection.CommandId
 import com.daml.network.environment.*
-import com.daml.network.util.{CoinUtil, JavaContract as Contract, Proto}
+import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
@@ -49,6 +50,7 @@ class GrpcWalletService(
     walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
     clock: Clock,
+    scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: CoinRetries,
 )(implicit
@@ -192,7 +194,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
         for {
-          coinRules <- store.getCoinRules()
+          coinRules <- scanConnection.getCoinRules()
           result <- exerciseWalletAction((installCid, _) =>
             Future.successful(
               installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
