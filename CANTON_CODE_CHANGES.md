@@ -32,6 +32,7 @@ cannot distinguish them from actual deletions of files by the Canton team.
 * Added `ApiClientRequestLogger` and factored out code shared with `ApiRequestLogger`
 * Make `applicationId` in console methods configurable everywhere
 * Fixed a bug where `RemoteClock` was not waiting for a proper channel shudown
+* Changed default log file name to `log/canton_network.log` and `log/canton_network_test.log`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

@@ -513,7 +513,7 @@ To take screenshots (also in headless mode) of the browser at certain points of 
 You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle"
 in the gutter at the start of the test definition.
 You can also run them from `sbt` as explained in the section on `sbt` below.
-The logs from test executions are output to `/logs/canton_test.log`.
+The logs from test executions are output to `/log/canton_network_test.log`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
 
@@ -597,7 +597,7 @@ Be aware: these tokens allow the requester to perform any administrative action 
 If you have never used `lnav` to inspect Canton logs, then we recommend:
 1. Download the `canton.lnav.json` log format config file from https://github.com/DACH-NY/canton/blob/main/canton.lnav.json
 2. Install the Canton log format using `lnav -i canton.lnav.json`, which will install it in `~/.lnav/formats/installed/canton_log.json` and enable it for auto-detection in future `lnav` sessions.
-3. Type `lnav log/canton_test.log` to inspect the test logs.
+3. Type `lnav log/canton_network_test.log` to inspect the test logs.
 4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
    and [HotKeys](https://docs.lnav.org/en/latest/hotkeys.html), and learn to effectively navigate the test logs.
    The Canton docs also contain a [short tutorial](https://docs.daml.com/canton/usermanual/monitoring.html#viewing-logs) highlighting the most relevant features and hotkeys.
@@ -635,7 +635,7 @@ our own apps. Here we use the topology from our tests:
 2. Start the Coin apps and run the bootstrap script to
    initialize. This starts the necessary Canton Coin apps (in a single
    process) to run the front ends.
-   The logs from these apps are output to `/logs/coin.log`.
+   The logs from these apps are output to `log/canton_network.log`.
 
 ```
 ./scripts/start-backends-for-local-frontend-testing.sh

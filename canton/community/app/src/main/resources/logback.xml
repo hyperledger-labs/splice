@@ -38,7 +38,7 @@
   <if condition='isDefined("LOG_FILE_FLAT")'>
     <then>
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-      <file>${LOG_FILE_NAME:-log/canton.log}</file>
+      <file>${LOG_FILE_NAME:-log/canton_network.log}</file>
       <append>${LOG_FILE_APPEND:-true}</append>
       <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
       <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
