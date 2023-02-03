@@ -35,7 +35,6 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
@@ -123,12 +122,6 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: PartyId,
       domain: DomainId,
   )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription
-
-  def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      domainId: DomainId,
-      filter: PartyId,
-      companion: ContractCompanion[TC, TCid, T],
-  ): Source[Contract[TCid, T], NotUsed]
 
   def updateTransferOuts(
       domainId: DomainId,
@@ -495,25 +488,6 @@ object CoinLedgerConnection {
         subscription(subscriptionName, beginOffset, filter, domain)({
           Flow[TreeUpdate].mapAsync(1)(f)
         })
-
-      def updateCreates[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-          domainId: DomainId,
-          party: PartyId,
-          companion: ContractCompanion[TC, TCid, T],
-      ): Source[Contract[TCid, T], NotUsed] = {
-        coinLedgerClient.client
-          .updates(
-            LedgerClient.GetUpdatesRequest(
-              begin = LedgerOffset.LedgerBegin.getInstance,
-              end = None,
-              party = party,
-              domainId = domainId,
-            )
-          )
-          .mapConcat(_.discardTransfers.flatMap(DecodeUtil.treeToCreated(_)))
-          .filter(_.hasStakeholder(party))
-          .mapConcat(DecodeUtil.decodeCreated(companion)(_).toList)
-      }
 
       def updateTransferOuts(
           domainId: DomainId,

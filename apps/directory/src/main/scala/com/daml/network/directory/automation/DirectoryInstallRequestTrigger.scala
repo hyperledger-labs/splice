@@ -23,11 +23,15 @@ class DirectoryInstallRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       directoryCodegen.DirectoryInstallRequest.Contract,
       directoryCodegen.DirectoryInstallRequest.ContractId,
       directoryCodegen.DirectoryInstallRequest,
-    ](store, store.defaultAcsDomain, directoryCodegen.DirectoryInstallRequest.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
+      directoryCodegen.DirectoryInstallRequest.COMPANION,
+    ) {
 
   private val entryFee: BigDecimal = 1.0
   private val collectionDuration = new RelTime(

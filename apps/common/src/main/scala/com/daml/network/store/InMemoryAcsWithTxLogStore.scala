@@ -286,7 +286,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   ): Source[Contract[Id, View], NotUsed] = {
     requireInScope(interfaceCompanion)
-    streamContracts(Contract.fromCreatedEvent(interfaceCompanion))
+    streamContracts(contractFilter.decodeInterface(interfaceCompanion)(_))
   }
 
   def signalWhenIngested[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](

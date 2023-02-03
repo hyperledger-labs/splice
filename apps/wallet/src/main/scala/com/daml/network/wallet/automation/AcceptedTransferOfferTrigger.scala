@@ -32,11 +32,15 @@ class AcceptedTransferOfferTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       transferOffersCodegen.AcceptedTransferOffer.Contract,
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
-    ](store, globalDomain, transferOffersCodegen.AcceptedTransferOffer.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
+      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+    ) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
   override protected val source: Source[Contract[

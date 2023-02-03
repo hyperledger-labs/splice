@@ -388,11 +388,8 @@ object LedgerClient {
 
   final case class GetTreeUpdatesResponse(
       updates: Seq[GetTreeUpdatesResponse.TreeUpdate]
-  ) {
-    // TODO(M3-18) remove
-    private[environment] def discardTransfers: Seq[TransactionTree] =
-      updates collect { case GetTreeUpdatesResponse.TransactionTreeUpdate(t) => t }
-  }
+  )
+
   object GetTreeUpdatesResponse {
     sealed abstract class TreeUpdate extends Product with Serializable
 

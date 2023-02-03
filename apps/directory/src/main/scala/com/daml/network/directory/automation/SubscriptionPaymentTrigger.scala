@@ -27,11 +27,15 @@ class SubscriptionPaymentTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       subsCodegen.SubscriptionPayment.Contract,
       subsCodegen.SubscriptionPayment.ContractId,
       subsCodegen.SubscriptionPayment,
-    ](store, store.defaultAcsDomain, subsCodegen.SubscriptionPayment.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
+      subsCodegen.SubscriptionPayment.COMPANION,
+    ) {
 
   override def completeTask(
       payment: Contract[

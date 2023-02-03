@@ -19,11 +19,15 @@ class WalletAppInstallTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       installCodegen.WalletAppInstall.Contract,
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
-    ](walletManager.store, globalDomain, installCodegen.WalletAppInstall.COMPANION) {
+    ](
+      walletManager.store,
+      () => walletManager.store.domains.signalWhenConnected(globalDomain),
+      installCodegen.WalletAppInstall.COMPANION,
+    ) {
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   override def completeTask(

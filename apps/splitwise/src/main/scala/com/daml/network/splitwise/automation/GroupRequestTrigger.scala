@@ -24,11 +24,15 @@ class GroupRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       splitwiseCodegen.GroupRequest.Contract,
       splitwiseCodegen.GroupRequest.ContractId,
       splitwiseCodegen.GroupRequest,
-    ](store, splitwiseDomain, splitwiseCodegen.GroupRequest.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(splitwiseDomain),
+      splitwiseCodegen.GroupRequest.COMPANION,
+    ) {
 
   override def completeTask(
       req: Contract[

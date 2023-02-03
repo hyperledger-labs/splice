@@ -1,17 +1,18 @@
 package com.daml.network.automation
 
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
-import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
 import com.daml.ledger.javaapi.data.codegen.{
   Contract as CodegenContract,
   ContractCompanion,
+  InterfaceCompanion,
   ContractId,
+  DamlRecord,
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
@@ -242,67 +243,66 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 
 }
 
+object OnCreateTrigger {
+  trait Companion[C, TCid <: ContractId[_], T] {
+    def streamContracts(acs: AcsStore)(companion: C): Source[Contract[TCid, T], NotUsed]
+    def lookupContractById(acs: AcsStore)(companion: C)(id: TCid): Future[Option[Contract[TCid, T]]]
+  }
+
+  implicit def templateCompanion[TC <: CodegenContract[TCid, T], TCid <: ContractId[
+    T
+  ], T <: CodegenTemplate]: Companion[ContractCompanion[TC, TCid, T], TCid, T] =
+    new Companion[ContractCompanion[TC, TCid, T], TCid, T] {
+      override def streamContracts(acs: AcsStore)(companion: ContractCompanion[TC, TCid, T]) =
+        acs.streamContracts(companion)
+      override def lookupContractById(acs: AcsStore)(companion: ContractCompanion[TC, TCid, T])(
+          id: TCid
+      ): Future[Option[Contract[TCid, T]]] =
+        acs.lookupContractById(companion)(id)
+    }
+
+  implicit def interfaceCompanion[I, Id <: ContractId[I], View <: DamlRecord[View]] =
+    new Companion[InterfaceCompanion[I, Id, View], Id, View] {
+      override def streamContracts(acs: AcsStore)(companion: InterfaceCompanion[I, Id, View]) =
+        acs.streamContracts(companion)
+      override def lookupContractById(acs: AcsStore)(companion: InterfaceCompanion[I, Id, View])(
+          id: Id
+      ): Future[Option[Contract[Id, View]]] =
+        acs.lookupContractById(companion)(id)
+    }
+
+  type Template[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: CodegenTemplate] =
+    OnCreateTrigger[ContractCompanion[TC, TCid, T], TCid, T]
+}
+
 /** A trigger for processing contract create events.
   * This trigger assumes that the created contract is archived as part of processing it.
   */
-abstract class OnCreateTrigger[
-    TC <: CodegenContract[TCid, T],
-    TCid <: ContractId[T],
-    T <: Template,
-](
+abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
     store: CoinAppStore[_, _],
-    domain: DomainAlias,
-    templateCompanion: ContractCompanion[TC, TCid, T],
+    getDomainId: () => Future[DomainId],
+    companion: C,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
+    companionClass: OnCreateTrigger.Companion[C, TCid, T],
 ) extends SourceBasedTrigger[Contract[TCid, T]] {
 
   private val acsFuture: Future[AcsStore] =
-    store.domains.signalWhenConnected(domain).flatMap(store.acs(_))
+    getDomainId().flatMap(store.acs(_))
 
   override protected val source: Source[Contract[TCid, T], NotUsed] =
     Source
-      .lazyFutureSource(() => acsFuture.map(_.streamContracts(templateCompanion)))
+      .lazyFutureSource(() => acsFuture.map(companionClass.streamContracts(_)(companion)))
       .mapMaterializedValue(_ => NotUsed)
 
   override final def isStaleTask(
       task: Contract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] =
-    acsFuture.flatMap(_.lookupContractById(templateCompanion)(task.contractId)).map(_.isEmpty)
-}
-
-/** TODO(M3-18) This is only duplicated because we don’t have multi-domain stores yet.
-  */
-abstract class OnCreateUpdateTrigger[TC <: CodegenContract[TCid, T], TCid <: ContractId[
-  T
-], T <: Template](
-    connection: CoinLedgerConnection,
-    domainId: DomainId,
-    party: PartyId,
-    templateCompanion: ContractCompanion[TC, TCid, T],
-)(implicit
-    ec: ExecutionContext,
-    mat: Materializer,
-    tracer: Tracer,
-) extends SourceBasedTrigger[Contract[TCid, T]] {
-
-  override protected val source: Source[Contract[TCid, T], NotUsed] =
-    connection
-      .updateCreates(
-        domainId,
-        party,
-        templateCompanion,
-      )
-      .map(Contract.fromCodegenContract(_))
-
-  // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
-  // we can implement this properly.
-  override final protected def isStaleTask(
-      task: Contract[TCid, T]
-  )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
-
+    acsFuture
+      .flatMap(companionClass.lookupContractById(_)(companion)(task.contractId))
+      .map(_.isEmpty)
 }
 
 /** TODO(M3-18) Integrate into stores and support filtering.
@@ -543,7 +543,7 @@ object ScheduledTaskTrigger {
 abstract class ExpiredContractTrigger[
     TC <: CodegenContract[TCid, T],
     TCid <: ContractId[T],
-    T <: Template,
+    T <: CodegenTemplate,
 ](
     acs: AcsStore,
     listExpiredContracts: (CantonTimestamp, Int) => Future[Seq[Contract[TCid, T]]],

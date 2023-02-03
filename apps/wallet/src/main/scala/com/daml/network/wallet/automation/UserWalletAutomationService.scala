@@ -1,10 +1,5 @@
 package com.daml.network.wallet.automation
 
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId}
-import com.daml.ledger.javaapi.data.codegen.ContractCompanion
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
-import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
@@ -70,18 +65,6 @@ class UserWalletAutomationService(
   )
 
   // TODO(#2472) Share Domain Orchestrator for multiple apps
-  def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
-  )(domainAdded: DomainStore.DomainAdded): Trigger =
-    new TransferOutTrigger(
-      triggerContext,
-      store.domains,
-      connection,
-      globalDomain,
-      domainAdded.domainId,
-      store.key.endUserParty,
-      companion,
-    )
   def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
     new TransferInTrigger(
       triggerContext,
@@ -93,9 +76,26 @@ class UserWalletAutomationService(
     )
 
   Seq(
-    createTransferOutTrigger(paymentCodegen.AppPaymentRequest.COMPANION),
-    createTransferOutTrigger(testWalletCodegen.TestDeliveryOffer.COMPANION),
-    createTransferOutTrigger(splitwiseCodegen.TransferInProgress.COMPANION),
+    (domainAdded: DomainStore.DomainAdded) =>
+      new TransferOutTrigger.Template(
+        triggerContext,
+        store,
+        connection,
+        globalDomain,
+        domainAdded.domainId,
+        store.key.endUserParty,
+        paymentCodegen.AppPaymentRequest.COMPANION,
+      ),
+    (domainAdded: DomainStore.DomainAdded) =>
+      new TransferOutTrigger.Interface(
+        triggerContext,
+        store,
+        connection,
+        globalDomain,
+        domainAdded.domainId,
+        store.key.endUserParty,
+        paymentCodegen.DeliveryOffer.INTERFACE,
+      ),
     createTransferInTrigger,
   ).foreach { createTrigger =>
     registerTrigger(

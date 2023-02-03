@@ -103,6 +103,9 @@ object SplitwiseStore {
         mkFilter(splitwiseCodegen.GroupRequest.COMPANION)(co =>
           co.payload.group.provider == provider
         ),
+        mkFilter(splitwiseCodegen.BalanceUpdate.COMPANION)(co =>
+          co.payload.group.provider == provider
+        ),
         mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider),
       ),
     )

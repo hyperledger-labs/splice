@@ -19,11 +19,15 @@ class SummarizingMiningRoundTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       cc.round.SummarizingMiningRound.Contract,
       cc.round.SummarizingMiningRound.ContractId,
       cc.round.SummarizingMiningRound,
-    ](store, store.defaultAcsDomain, cc.round.SummarizingMiningRound.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
+      cc.round.SummarizingMiningRound.COMPANION,
+    ) {
 
   override def completeTask(
       summarizingRound: Contract[

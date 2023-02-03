@@ -22,11 +22,15 @@ class CoinRulesRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       cc.coin.CoinRulesRequest.Contract,
       cc.coin.CoinRulesRequest.ContractId,
       cc.coin.CoinRulesRequest,
-    ](store, store.defaultAcsDomain, cc.coin.CoinRulesRequest.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
+      cc.coin.CoinRulesRequest.COMPANION,
+    ) {
 
   override def completeTask(
       req: Contract[

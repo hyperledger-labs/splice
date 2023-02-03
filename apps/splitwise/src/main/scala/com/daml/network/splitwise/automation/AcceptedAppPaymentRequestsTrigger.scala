@@ -32,11 +32,15 @@ class AcceptedAppPaymentRequestsTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       walletCodegen.AcceptedAppPayment.Contract,
       walletCodegen.AcceptedAppPayment.ContractId,
       walletCodegen.AcceptedAppPayment,
-    ](store, globalDomain, walletCodegen.AcceptedAppPayment.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(globalDomain),
+      walletCodegen.AcceptedAppPayment.COMPANION,
+    ) {
 
   override def completeTask(
       payment: Contract[

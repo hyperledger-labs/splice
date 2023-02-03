@@ -77,9 +77,9 @@ class SplitwiseAutomationService(
   def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
   )(domainAdded: DomainStore.DomainAdded): Trigger =
-    new TransferOutTrigger(
+    new TransferOutTrigger.Template(
       triggerContext,
-      store.domains,
+      store,
       connection,
       domainConfig.splitwise,
       domainAdded.domainId,

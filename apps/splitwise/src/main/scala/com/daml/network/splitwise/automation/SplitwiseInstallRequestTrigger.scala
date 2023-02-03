@@ -24,11 +24,15 @@ class SplitwiseInstallRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger[
+) extends OnCreateTrigger.Template[
       splitwiseCodegen.SplitwiseInstallRequest.Contract,
       splitwiseCodegen.SplitwiseInstallRequest.ContractId,
       splitwiseCodegen.SplitwiseInstallRequest,
-    ](store, splitwiseDomain, splitwiseCodegen.SplitwiseInstallRequest.COMPANION) {
+    ](
+      store,
+      () => store.domains.signalWhenConnected(splitwiseDomain),
+      splitwiseCodegen.SplitwiseInstallRequest.COMPANION,
+    ) {
 
   override def completeTask(
       req: Contract[
