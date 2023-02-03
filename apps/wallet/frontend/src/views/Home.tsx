@@ -9,6 +9,14 @@ const Home: React.FC = () => {
     <>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 5, width: 1.0 }}>
         <Button
+          id="transactions-button"
+          onClick={() => {
+            navigate('/transactions');
+          }}
+        >
+          Transactions
+        </Button>
+        <Button
           id="coins-button"
           onClick={() => {
             navigate('/coins');

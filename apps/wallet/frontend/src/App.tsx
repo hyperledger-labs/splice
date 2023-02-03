@@ -41,6 +41,7 @@ import ConfirmSubscription from './views/ConfirmSubscription';
 import Home from './views/Home';
 import Onboarding from './views/Onboarding';
 import Subscriptions from './views/Subscriptions';
+import Transactions from './views/Transactions';
 import TransferOffers from './views/TransferOffers';
 
 const App: React.FC = () => {
@@ -123,6 +124,7 @@ const Content = () => {
         ></Route>
         <Route path="confirm-payment/:cid/" element={<ConfirmPayment coinPrice={coinPrice} />} />
         <Route path="confirm-subscription/:cid/" element={<ConfirmSubscription />} />
+        <Route path="transactions" element={<Transactions />} />
       </Route>
     )
   );
