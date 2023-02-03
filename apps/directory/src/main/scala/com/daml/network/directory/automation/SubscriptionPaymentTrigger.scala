@@ -31,7 +31,7 @@ class SubscriptionPaymentTrigger(
       subsCodegen.SubscriptionPayment.Contract,
       subsCodegen.SubscriptionPayment.ContractId,
       subsCodegen.SubscriptionPayment,
-    ](store.acs, subsCodegen.SubscriptionPayment.COMPANION) {
+    ](store, store.defaultAcsDomain, subsCodegen.SubscriptionPayment.COMPANION) {
 
   override def completeTask(
       payment: Contract[

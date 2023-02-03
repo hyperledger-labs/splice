@@ -1,5 +1,6 @@
 package com.daml.network.wallet.automation
 
+import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -13,6 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class WalletAppInstallTrigger(
     override protected val context: TriggerContext,
     walletManager: UserWalletManager,
+    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -21,7 +23,7 @@ class WalletAppInstallTrigger(
       installCodegen.WalletAppInstall.Contract,
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
-    ](walletManager.store.acs, installCodegen.WalletAppInstall.COMPANION) {
+    ](walletManager.store, globalDomain, installCodegen.WalletAppInstall.COMPANION) {
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   override def completeTask(

@@ -13,7 +13,7 @@ import scala.concurrent.*
 
 class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
-    override protected[this] val defaultAcsDomain: DomainAlias,
+    override val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,

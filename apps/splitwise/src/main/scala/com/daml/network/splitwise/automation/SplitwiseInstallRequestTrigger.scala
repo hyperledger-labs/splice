@@ -28,7 +28,7 @@ class SplitwiseInstallRequestTrigger(
       splitwiseCodegen.SplitwiseInstallRequest.Contract,
       splitwiseCodegen.SplitwiseInstallRequest.ContractId,
       splitwiseCodegen.SplitwiseInstallRequest,
-    ](store.acs, splitwiseCodegen.SplitwiseInstallRequest.COMPANION) {
+    ](store, splitwiseDomain, splitwiseCodegen.SplitwiseInstallRequest.COMPANION) {
 
   override def completeTask(
       req: Contract[

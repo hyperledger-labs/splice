@@ -23,7 +23,7 @@ class SummarizingMiningRoundTrigger(
       cc.round.SummarizingMiningRound.Contract,
       cc.round.SummarizingMiningRound.ContractId,
       cc.round.SummarizingMiningRound,
-    ](store.acs, cc.round.SummarizingMiningRound.COMPANION) {
+    ](store, store.defaultAcsDomain, cc.round.SummarizingMiningRound.COMPANION) {
 
   override def completeTask(
       summarizingRound: Contract[

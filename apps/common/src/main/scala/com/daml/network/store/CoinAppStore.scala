@@ -25,7 +25,7 @@ trait CoinAppStore[
   private[network] type PerDomainStore
 
   // only used by defaultAcs
-  protected[this] def defaultAcsDomain: DomainAlias = DomainAlias.tryCreate("global")
+  def defaultAcsDomain: DomainAlias = DomainAlias.tryCreate("global")
 
   // TODO (#2619) remove if unused after fixing `acs` users
   final lazy val defaultAcs: Future[AcsStore] =

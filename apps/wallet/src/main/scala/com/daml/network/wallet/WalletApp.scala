@@ -148,6 +148,7 @@ class WalletApp(
         clock,
         walletManager,
         ledgerClient,
+        config.domains.global,
         participantAdminConnection,
         retryProvider,
         loggerFactory,

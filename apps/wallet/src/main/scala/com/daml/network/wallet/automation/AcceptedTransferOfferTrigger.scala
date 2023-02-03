@@ -36,7 +36,7 @@ class AcceptedTransferOfferTrigger(
       transferOffersCodegen.AcceptedTransferOffer.Contract,
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
-    ](store.acs, transferOffersCodegen.AcceptedTransferOffer.COMPANION) {
+    ](store, globalDomain, transferOffersCodegen.AcceptedTransferOffer.COMPANION) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
   override protected val source: Source[Contract[

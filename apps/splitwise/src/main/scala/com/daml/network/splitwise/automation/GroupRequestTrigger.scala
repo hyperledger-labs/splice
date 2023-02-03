@@ -28,7 +28,7 @@ class GroupRequestTrigger(
       splitwiseCodegen.GroupRequest.Contract,
       splitwiseCodegen.GroupRequest.ContractId,
       splitwiseCodegen.GroupRequest,
-    ](store.acs, splitwiseCodegen.GroupRequest.COMPANION) {
+    ](store, splitwiseDomain, splitwiseCodegen.GroupRequest.COMPANION) {
 
   override def completeTask(
       req: Contract[

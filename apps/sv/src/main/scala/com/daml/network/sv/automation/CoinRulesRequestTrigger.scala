@@ -26,7 +26,7 @@ class CoinRulesRequestTrigger(
       cc.coin.CoinRulesRequest.Contract,
       cc.coin.CoinRulesRequest.ContractId,
       cc.coin.CoinRulesRequest,
-    ](store.acs, cc.coin.CoinRulesRequest.COMPANION) {
+    ](store, store.defaultAcsDomain, cc.coin.CoinRulesRequest.COMPANION) {
 
   override def completeTask(
       req: Contract[

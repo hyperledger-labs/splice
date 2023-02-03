@@ -1,10 +1,7 @@
 package com.daml.network.splitwise.automation
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.DomainAlias
-import akka.NotUsed
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
@@ -39,65 +36,7 @@ class AcceptedAppPaymentRequestsTrigger(
       walletCodegen.AcceptedAppPayment.Contract,
       walletCodegen.AcceptedAppPayment.ContractId,
       walletCodegen.AcceptedAppPayment,
-    ](store.acs, walletCodegen.AcceptedAppPayment.COMPANION) {
-
-  override protected val source: Source[
-    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
-    NotUsed,
-  ] =
-    // TODO (#2613) Remove this override once we have multi-domain stores.
-    if (globalDomain == splitwiseDomain) {
-      store.acs.streamContracts(walletCodegen.AcceptedAppPayment.COMPANION)
-    } else {
-      Source
-        .lazyFutureSource(() =>
-          store.domains.signalWhenConnected(globalDomain).map { domainId =>
-            connection
-              .updateCreates(
-                domainId,
-                store.providerParty,
-                walletCodegen.AcceptedAppPayment.COMPANION,
-              )
-              .map(Contract.fromCodegenContract(_))
-          }
-        )
-        .mapMaterializedValue(_ => NotUsed)
-    }
-
-  override final protected def isStaleTask(
-      task: Contract[
-        walletCodegen.AcceptedAppPayment.ContractId,
-        walletCodegen.AcceptedAppPayment,
-      ]
-  )(implicit tc: TraceContext): Future[Boolean] =
-    // TODO (#2613) Remove this override once we have multi-domain stores.
-    if (globalDomain == splitwiseDomain) {
-      super.isStaleTask(task)
-    } else {
-      Future.successful(false)
-    }
-
-  def lookupTransferInProgress(
-      cid: ContractId[splitwiseCodegen.TransferInProgress]
-  ): Future[Option[Contract[
-    splitwiseCodegen.TransferInProgress.ContractId,
-    splitwiseCodegen.TransferInProgress,
-  ]]] =
-    // TODO (#2613) Remove this override once we have multi-domain stores.
-    if (globalDomain == splitwiseDomain) {
-      store.acs.lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(cid)
-    } else {
-      for {
-        domainId <- store.domains.getDomainId(globalDomain)
-        allTransferInProgress <- connection.activeContracts(
-          domainId,
-          store.providerParty,
-          splitwiseCodegen.TransferInProgress.COMPANION,
-        )
-      } yield {
-        allTransferInProgress.find(c => c.id == cid).map(Contract.fromCodegenContract(_))
-      }
-    }
+    ](store, globalDomain, walletCodegen.AcceptedAppPayment.COMPANION) {
 
   override def completeTask(
       payment: Contract[
@@ -112,9 +51,11 @@ class AcceptedAppPaymentRequestsTrigger(
     for {
       domainId <- store.domains.getDomainId(globalDomain)
       transferContext <- scanConnection.getAppTransferContext(store.providerParty)
-      transferInProgress <- lookupTransferInProgress(
-        transferInProgressId
-      )
+      transferInProgress <- store
+        .acs(domainId)
+        .flatMap(
+          _.lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(transferInProgressId)
+        )
         .map(
           _.getOrElse(
             throw new IllegalStateException(

@@ -1,5 +1,6 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import akka.stream.scaladsl.{Keep, Sink, Source}
@@ -14,7 +15,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.AcsStore
+import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{HasHealth, Contract}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -249,7 +250,8 @@ abstract class OnCreateTrigger[
     TCid <: ContractId[T],
     T <: Template,
 ](
-    acs: AcsStore,
+    store: CoinAppStore[_, _],
+    domain: DomainAlias,
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
@@ -257,18 +259,18 @@ abstract class OnCreateTrigger[
     tracer: Tracer,
 ) extends SourceBasedTrigger[Contract[TCid, T]] {
 
-  override protected val source: Source[Contract[TCid, T], NotUsed] =
-    acs.streamContracts(templateCompanion)
+  private val acsFuture: Future[AcsStore] =
+    store.domains.signalWhenConnected(domain).flatMap(store.acs(_))
 
-  // TODO(M3-18) Revert to final once we no longer hack around this
-  // for the multi-domain PoC.
-  override protected def isStaleTask(
+  override protected val source: Source[Contract[TCid, T], NotUsed] =
+    Source
+      .lazyFutureSource(() => acsFuture.map(_.streamContracts(templateCompanion)))
+      .mapMaterializedValue(_ => NotUsed)
+
+  override final def isStaleTask(
       task: Contract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] =
-    acs
-      .lookupContractById(templateCompanion)(task.contractId)
-      .map(_.isEmpty)
-
+    acsFuture.flatMap(_.lookupContractById(templateCompanion)(task.contractId)).map(_.isEmpty)
 }
 
 /** TODO(M3-18) This is only duplicated because we don’t have multi-domain stores yet.

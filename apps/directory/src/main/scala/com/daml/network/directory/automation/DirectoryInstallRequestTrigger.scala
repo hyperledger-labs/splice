@@ -27,7 +27,7 @@ class DirectoryInstallRequestTrigger(
       directoryCodegen.DirectoryInstallRequest.Contract,
       directoryCodegen.DirectoryInstallRequest.ContractId,
       directoryCodegen.DirectoryInstallRequest,
-    ](store.acs, directoryCodegen.DirectoryInstallRequest.COMPANION) {
+    ](store, store.defaultAcsDomain, directoryCodegen.DirectoryInstallRequest.COMPANION) {
 
   private val entryFee: BigDecimal = 1.0
   private val collectionDuration = new RelTime(
