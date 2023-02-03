@@ -2906,9 +2906,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
@@ -3027,9 +3029,11 @@
                         ],
                         "resources": {
                            "limits": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            },
                            "requests": {
+                              "cpu": 1,
                               "memory": "1536Mi"
                            }
                         },
