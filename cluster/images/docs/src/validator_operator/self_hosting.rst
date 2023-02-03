@@ -99,17 +99,6 @@ Listing your Canton Coins
 You can list your balances with the following command: ::
 
   @ aliceWallet.list()
-  res4: Seq[...] = Vector(
-    Contract(
-      contractId = ...,
-      payload = Coin(
-        svc = ...,
-        owner = ...,
-        amount = ExpiringAmount(initialAmount = 100.00, ...)
-      )
-    )
-  )
-
 
 If you've followed the previous instructions, you should already see one coin.
 If not, try calling ``aliceWallet.tap(100.0)`` and then rerunning this command.
@@ -151,28 +140,8 @@ And accept the request: ::
 Check Alice and Bob's wallets to see that Alice now has slightly less than 90 coins (due to transfer fees), and Bob has 10: ::
 
   @ aliceWallet.list()
-  res12: Seq[...] = Vector(
-    Contract(
-      contractId = ...,
-      payload = Coin(
-        svc = ...,
-        owner = ...,
-        amount = ExpiringAmount(initialAmount = 89.8000000000, ...)
-      )
-    )
-  )
 
   @ bobWallet.list()
-  res13: Seq[...] = Vector(
-    Contract(
-      contractId = ...,
-      payload = Coin(
-        svc = ...,
-        owner = ...,
-        amount = ExpiringAmount(initialAmount = 10.0000000000, ...)
-      )
-    )
-  )
 
 Hosting the Wallet Web UI
 -------------------------
@@ -312,6 +281,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
         @ val validatorParty = validatorParticipant.parties.enable("validator_service_user")
         validatorParty: PartyId = validator_service_user::12207d5f2bee...
+
    d. Create the user. Replace the ``$CLIENT_ID`` by the client id you got from the ``Validator app backend``::
 
         @ validatorParticipant.ledger_api.users.create(

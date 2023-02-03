@@ -92,10 +92,3 @@ groups: ::
   @ aliceSplitwise.createGroup("mygroup")
 
   @ aliceSplitwise.listGroups()
-
-  res4: Seq[...]] = Vector(
-    Contract(
-      contractId = ...,
-      payload = ...,
-    )
-  )
