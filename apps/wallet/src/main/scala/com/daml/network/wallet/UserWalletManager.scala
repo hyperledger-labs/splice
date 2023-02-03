@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{HasHealth, JavaContract}
+import com.daml.network.util.{HasHealth, Contract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -64,7 +64,7 @@ class UserWalletManager(
     * @return true, if a new end-user wallet was created
     */
   final def getOrCreateUserWallet(
-      install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall]
+      install: Contract[WalletAppInstall.ContractId, WalletAppInstall]
   ): Boolean = {
     val endUserName = install.payload.endUserName
     val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
@@ -110,7 +110,7 @@ class UserWalletManager(
       tc: TraceContext
   ): Future[
     Seq[
-      JavaContract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+      Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
     ]
   ] =
     for {
@@ -118,7 +118,7 @@ class UserWalletManager(
       hostedUsers = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
       validatorRewardCouponsFs: Seq[
         Future[Seq[
-          JavaContract[
+          Contract[
             coinCodegen.ValidatorRewardCoupon.ContractId,
             coinCodegen.ValidatorRewardCoupon,
           ]

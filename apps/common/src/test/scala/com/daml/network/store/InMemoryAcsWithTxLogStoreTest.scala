@@ -17,7 +17,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -43,8 +43,8 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
   def appRewardCoupon(
       round: Int,
       provider: PartyId,
-  ): JavaContract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
-    JavaContract(
+  ): Contract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
+    Contract(
       identifier = directoryCodegen.AppRewardCoupon.TEMPLATE_ID,
       contractId = new directoryCodegen.AppRewardCoupon.ContractId(s"de#$round"),
       payload = new directoryCodegen.AppRewardCoupon(
@@ -59,11 +59,11 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
   def validatorRewardCoupon(
       round: Int,
       user: PartyId,
-  ): JavaContract[
+  ): Contract[
     directoryCodegen.ValidatorRewardCoupon.ContractId,
     directoryCodegen.ValidatorRewardCoupon,
   ] =
-    JavaContract(
+    Contract(
       identifier = directoryCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
       contractId = new directoryCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
       payload = new directoryCodegen.ValidatorRewardCoupon(
@@ -75,7 +75,7 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
     )
 
   def toCreatedEvent[TCid <: ContractId[T], T](
-      contract: JavaContract[TCid, T]
+      contract: Contract[TCid, T]
   ): CreatedEvent = {
     val contractP = contract.toProtoV0
     new CreatedEvent(
@@ -94,7 +94,7 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
   }
 
   def toArchivedEvent[TCid <: ContractId[T], T](
-      contract: JavaContract[TCid, T]
+      contract: Contract[TCid, T]
   ): ExercisedEvent = {
     new ExercisedEvent(
       eventId = "dummyEventId",
@@ -156,7 +156,7 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
   )
 
   private def toTransferInEvent[TCid <: ContractId[T], T](
-      contract: JavaContract[TCid, T]
+      contract: Contract[TCid, T]
   ): TransferEvent.In = TransferEvent.In(
     transferOutId = "",
     source = dummyDomain,
@@ -221,7 +221,7 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
 
   private def mkCreateTx[TCid <: ContractId[T], T](
       offset: String,
-      createRequests: Seq[JavaContract[TCid, T]],
+      createRequests: Seq[Contract[TCid, T]],
   ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
 
   val tx2: TransactionTree = mkTx(
@@ -359,7 +359,7 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
     }
 
     "stream ingested entry requests and wait for new ones to come in" in {
-      val acc: AtomicReference[List[JavaContract[
+      val acc: AtomicReference[List[Contract[
         directoryCodegen.ValidatorRewardCoupon.ContractId,
         directoryCodegen.ValidatorRewardCoupon,
       ]]] =

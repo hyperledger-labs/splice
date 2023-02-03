@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -37,7 +37,7 @@ class ExpireAppPaymentRequestsTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        JavaContract[
+        Contract[
           paymentCodegen.AppPaymentRequest.ContractId,
           paymentCodegen.AppPaymentRequest,
         ]

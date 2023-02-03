@@ -26,7 +26,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.CoinLedgerConnection.CommandId
 import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
+import com.daml.network.util.{CoinUtil, Proto, Contract}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*

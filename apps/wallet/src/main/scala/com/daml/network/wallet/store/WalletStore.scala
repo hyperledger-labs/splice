@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight, Valid
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -30,7 +30,7 @@ trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRou
   def lookupInstallByParty(
       endUserParty: PartyId
   ): Future[Option[
-    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] =
     acs
       .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
@@ -41,7 +41,7 @@ trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRou
   def lookupInstallByName(
       endUserName: String
   ): Future[Option[
-    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] =
     acs
       .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
@@ -50,7 +50,7 @@ trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRou
       .map(_.value)
 
   def lookupValidatorFeaturedAppRight()
-      : Future[Option[JavaContract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] = {
+      : Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] = {
     acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
       co.payload.provider == key.validatorParty.toProtoPrimitive
     )

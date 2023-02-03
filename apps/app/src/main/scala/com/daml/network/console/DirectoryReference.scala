@@ -6,7 +6,7 @@ import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.{Contract}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{
   BaseInspection,

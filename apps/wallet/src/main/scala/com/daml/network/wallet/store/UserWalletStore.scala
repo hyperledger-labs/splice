@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cn.{
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.{Tap, Transfer}
 import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory, TxLogStore}
-import com.daml.network.util.{CoinUtil, ExerciseNode, JavaContract}
+import com.daml.network.util.{CoinUtil, ExerciseNode, Contract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -47,7 +47,7 @@ trait UserWalletStore
   def key: UserWalletStore.Key
 
   def getInstall()(implicit ec: ExecutionContext): Future[
-    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] =
     acs
       .findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
@@ -60,7 +60,7 @@ trait UserWalletStore
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acs.signalWhenIngested(offset)
 
-  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int): Future[Seq[JavaContract[
+  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int): Future[Seq[Contract[
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
   ]]] =
@@ -75,7 +75,7 @@ trait UserWalletStore
 
   def listExpiredAcceptedTransferOffers(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[Seq[JavaContract[
+  ): Future[Seq[Contract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ]]] =
@@ -91,7 +91,7 @@ trait UserWalletStore
   def listExpiredAppPaymentRequests(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[
-    Seq[JavaContract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+    Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
   ] =
     acs
       .listContracts(walletCodegen.AppPaymentRequest.COMPANION)
@@ -105,7 +105,7 @@ trait UserWalletStore
   def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[Seq[
-    JavaContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
+    Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
   ]] = {
     def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
       state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
@@ -156,7 +156,7 @@ trait UserWalletStore
       maxNumInputs: Option[Int],
       activeIssuingRoundsO: Option[Set[Long]],
   ): Future[Seq[
-    JavaContract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+    Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]] = {
     def filterActiveRounds(round: Long) = activeIssuingRoundsO match {
       case Some(rounds) => rounds.contains(round)
@@ -180,7 +180,7 @@ trait UserWalletStore
       maxNumInputs: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   ): Future[Seq[
-    (JavaContract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
+    (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = {
     // TODO(M3-83): use an index to access sorted rounds in the DB schema.
     acs
@@ -204,7 +204,7 @@ trait UserWalletStore
           .sorted(
             Ordering[(Long, BigDecimal)].on(
               (x: (
-                  JavaContract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+                  Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
                   BigDecimal,
               )) => (x._1.payload.round.number, -x._2)
             )
@@ -214,14 +214,14 @@ trait UserWalletStore
   }
 
   def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[
-    Option[JavaContract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
+    Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] = {
     acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true)
   }
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   def getValidatorRightsWhereUserIsValidator()
-      : Future[Seq[JavaContract[ValidatorRight.ContractId, ValidatorRight]]] =
+      : Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
     acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
 
   // TODO(#2326): This is just a placeholder to showcase the tx log store API.

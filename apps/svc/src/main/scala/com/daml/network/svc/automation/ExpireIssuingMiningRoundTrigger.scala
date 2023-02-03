@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -36,7 +36,7 @@ class ExpireIssuingMiningRoundTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]
+        Contract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work

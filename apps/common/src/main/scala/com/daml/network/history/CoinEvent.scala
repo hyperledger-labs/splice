@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cc.coin.{
   LockedCoin,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract as Contract}
+import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, Contract}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 

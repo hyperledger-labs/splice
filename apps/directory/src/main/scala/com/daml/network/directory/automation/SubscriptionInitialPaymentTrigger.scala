@@ -10,7 +10,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -34,7 +34,7 @@ class SubscriptionInitialPaymentTrigger(
     ](store.acs, subsCodegen.SubscriptionInitialPayment.COMPANION) {
 
   override def completeTask(
-      payment: JavaContract[
+      payment: Contract[
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]

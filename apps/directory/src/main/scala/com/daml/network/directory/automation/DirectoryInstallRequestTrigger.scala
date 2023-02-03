@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -43,7 +43,7 @@ class DirectoryInstallRequestTrigger(
   )
 
   override def completeTask(
-      req: JavaContract[
+      req: Contract[
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]

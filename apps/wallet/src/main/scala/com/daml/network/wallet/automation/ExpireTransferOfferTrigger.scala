@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -38,7 +38,7 @@ class ExpireTransferOfferTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        JavaContract[
+        Contract[
           transferOffersCodegen.TransferOffer.ContractId,
           transferOffersCodegen.TransferOffer,
         ]

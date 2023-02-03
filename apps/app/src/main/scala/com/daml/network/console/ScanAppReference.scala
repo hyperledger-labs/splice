@@ -8,7 +8,7 @@ import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.CoinTransactionTreeView
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode

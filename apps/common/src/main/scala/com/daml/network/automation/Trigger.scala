@@ -7,11 +7,15 @@ import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract as CodegenContract,
+  ContractCompanion,
+  ContractId,
+}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
-import com.daml.network.util.{HasHealth, JavaContract}
+import com.daml.network.util.{HasHealth, Contract}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
@@ -240,22 +244,26 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 /** A trigger for processing contract create events.
   * This trigger assumes that the created contract is archived as part of processing it.
   */
-abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+abstract class OnCreateTrigger[
+    TC <: CodegenContract[TCid, T],
+    TCid <: ContractId[T],
+    T <: Template,
+](
     acs: AcsStore,
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[JavaContract[TCid, T]] {
+) extends SourceBasedTrigger[Contract[TCid, T]] {
 
-  override protected val source: Source[JavaContract[TCid, T], NotUsed] =
+  override protected val source: Source[Contract[TCid, T], NotUsed] =
     acs.streamContracts(templateCompanion)
 
   // TODO(M3-18) Revert to final once we no longer hack around this
   // for the multi-domain PoC.
   override protected def isStaleTask(
-      task: JavaContract[TCid, T]
+      task: Contract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] =
     acs
       .lookupContractById(templateCompanion)(task.contractId)
@@ -265,7 +273,9 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
 
 /** TODO(M3-18) This is only duplicated because we don’t have multi-domain stores yet.
   */
-abstract class OnCreateUpdateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+abstract class OnCreateUpdateTrigger[TC <: CodegenContract[TCid, T], TCid <: ContractId[
+  T
+], T <: Template](
     connection: CoinLedgerConnection,
     domainId: DomainId,
     party: PartyId,
@@ -274,21 +284,21 @@ abstract class OnCreateUpdateTrigger[TC <: Contract[TCid, T], TCid <: ContractId
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[JavaContract[TCid, T]] {
+) extends SourceBasedTrigger[Contract[TCid, T]] {
 
-  override protected val source: Source[JavaContract[TCid, T], NotUsed] =
+  override protected val source: Source[Contract[TCid, T], NotUsed] =
     connection
       .updateCreates(
         domainId,
         party,
         templateCompanion,
       )
-      .map(JavaContract.fromCodegenContract(_))
+      .map(Contract.fromCodegenContract(_))
 
   // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
   // we can implement this properly.
   override final protected def isStaleTask(
-      task: JavaContract[TCid, T]
+      task: Contract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
 
 }
@@ -529,25 +539,25 @@ object ScheduledTaskTrigger {
   */
 // TODO(tech-debt): if we happen to find LOTS of instances that just expire the contract based on its expiry date, then we should consider introducing a Daml-level interface 'ExpiringContract' and handle all of them using single trigger.
 abstract class ExpiredContractTrigger[
-    TC <: Contract[TCid, T],
+    TC <: CodegenContract[TCid, T],
     TCid <: ContractId[T],
     T <: Template,
 ](
     acs: AcsStore,
-    listExpiredContracts: (CantonTimestamp, Int) => Future[Seq[JavaContract[TCid, T]]],
+    listExpiredContracts: (CantonTimestamp, Int) => Future[Seq[Contract[TCid, T]]],
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ScheduledTaskTrigger[JavaContract[TCid, T]] {
+) extends ScheduledTaskTrigger[Contract[TCid, T]] {
 
   override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[JavaContract[TCid, T]]] =
+  ): Future[Seq[Contract[TCid, T]]] =
     listExpiredContracts(now, limit)
 
   override final protected def isStaleTask(
-      task: ScheduledTaskTrigger.ReadyTask[JavaContract[TCid, T]]
+      task: ScheduledTaskTrigger.ReadyTask[Contract[TCid, T]]
   )(implicit tc: TraceContext): Future[Boolean] =
     acs
       .lookupContractById(templateCompanion)(task.work.contractId)

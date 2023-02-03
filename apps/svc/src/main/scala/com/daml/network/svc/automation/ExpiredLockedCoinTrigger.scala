@@ -4,7 +4,7 @@ import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -29,7 +29,7 @@ class ExpiredLockedCoinTrigger(
     ) {
 
   override protected def completeTask(
-      co: ScheduledTaskTrigger.ReadyTask[JavaContract[
+      co: ScheduledTaskTrigger.ReadyTask[Contract[
         cc.coin.LockedCoin.ContractId,
         cc.coin.LockedCoin,
       ]]

@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion,
   ValueDecoder,
 }
-import com.daml.ledger.javaapi.data.{ExercisedEvent, Value}
+import com.daml.ledger.javaapi.data.{ExercisedEvent, Value as CodegenValue}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -20,8 +20,8 @@ import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
 final case class ExerciseNode[Arg, Res](
-    argument: JavaValue[Arg],
-    result: JavaValue[Res],
+    argument: Value[Arg],
+    result: Value[Res],
 ) {
   def toProtoV0: v0.ExerciseNode =
     v0.ExerciseNode(
@@ -43,9 +43,9 @@ trait ExerciseNodeCompanion {
 
   // The Java codegen does not provide generic en/decode functionality so we need to explicitly cary it around.
   val argDecoder: ValueDecoder[Arg]
-  def argToValue(a: Arg): Value
+  def argToValue(a: Arg): CodegenValue
   val resDecoder: ValueDecoder[Res]
-  def resToValue(r: Res): Value
+  def resToValue(r: Res): CodegenValue
 }
 
 object ExerciseNode {
@@ -55,11 +55,11 @@ object ExerciseNode {
       node: v0.ExerciseNode
   ): Either[ProtoDeserializationError, ExerciseNode[companion.Arg, companion.Res]] = for {
     argumentP <- ProtoConverter.required("ExerciseNode.argument", node.argument)
-    argument <- JavaValue.fromProto[companion.Arg](companion.argDecoder, companion.argToValue)(
+    argument <- Value.fromProto[companion.Arg](companion.argDecoder, companion.argToValue)(
       argumentP
     )
     resultP <- ProtoConverter.required("ExerciseNode.result", node.result)
-    result <- JavaValue.fromProto[companion.Res](companion.resDecoder, companion.resToValue)(
+    result <- Value.fromProto[companion.Res](companion.resDecoder, companion.resToValue)(
       resultP
     )
   } yield ExerciseNode[companion.Arg, companion.Res](argument, result)
@@ -103,10 +103,10 @@ object ExerciseNode {
   )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[companion.Arg, companion.Res]] =
     Option.when(isChoice(companion)(event))(ExerciseNode.tryFromProtoEvent(companion)(event))
 
-  private def decodeValue[A](valueDecoder: ValueDecoder[A], toValue: A => Value)(
+  private def decodeValue[A](valueDecoder: ValueDecoder[A], toValue: A => CodegenValue)(
       field: String,
-      value: Value,
-  ): Either[ProtoDeserializationError, JavaValue[A]] = {
+      value: CodegenValue,
+  ): Either[ProtoDeserializationError, Value[A]] = {
     Try(valueDecoder.decode(value)) match {
       case Failure(_) =>
         Left(
@@ -115,7 +115,7 @@ object ExerciseNode {
             s"Unexpectedly couldn't decode LF-value $value. Did you specify the wrong type to decode to?",
           )
         )
-      case Success(value) => Right(new JavaValue(value, toValue))
+      case Success(value) => Right(new Value(value, toValue))
     }
   }
 }

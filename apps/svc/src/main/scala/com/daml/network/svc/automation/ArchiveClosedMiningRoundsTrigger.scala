@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 

@@ -9,15 +9,19 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{OnCreateUpdateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract as CodegenContract,
+  ContractCompanion,
+  ContractId,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+class TransferOutTrigger[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
     override protected val context: TriggerContext,
     domains: DomainStore,
     connection: CoinLedgerConnection,
@@ -40,7 +44,7 @@ class TransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Te
     super.loggerFactory.append("domainId", domainId.toProtoPrimitive)
 
   override protected def completeTask(
-      contract: JavaContract[
+      contract: Contract[
         TCid,
         T,
       ]

@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -42,7 +42,7 @@ class AcceptedAppPaymentRequestsTrigger(
     ](store.acs, walletCodegen.AcceptedAppPayment.COMPANION) {
 
   override protected val source: Source[
-    JavaContract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
+    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
     NotUsed,
   ] =
     // TODO (#2613) Remove this override once we have multi-domain stores.
@@ -58,14 +58,14 @@ class AcceptedAppPaymentRequestsTrigger(
                 store.providerParty,
                 walletCodegen.AcceptedAppPayment.COMPANION,
               )
-              .map(JavaContract.fromCodegenContract(_))
+              .map(Contract.fromCodegenContract(_))
           }
         )
         .mapMaterializedValue(_ => NotUsed)
     }
 
   override final protected def isStaleTask(
-      task: JavaContract[
+      task: Contract[
         walletCodegen.AcceptedAppPayment.ContractId,
         walletCodegen.AcceptedAppPayment,
       ]
@@ -79,7 +79,7 @@ class AcceptedAppPaymentRequestsTrigger(
 
   def lookupTransferInProgress(
       cid: ContractId[splitwiseCodegen.TransferInProgress]
-  ): Future[Option[JavaContract[
+  ): Future[Option[Contract[
     splitwiseCodegen.TransferInProgress.ContractId,
     splitwiseCodegen.TransferInProgress,
   ]]] =
@@ -95,12 +95,12 @@ class AcceptedAppPaymentRequestsTrigger(
           splitwiseCodegen.TransferInProgress.COMPANION,
         )
       } yield {
-        allTransferInProgress.find(c => c.id == cid).map(JavaContract.fromCodegenContract(_))
+        allTransferInProgress.find(c => c.id == cid).map(Contract.fromCodegenContract(_))
       }
     }
 
   override def completeTask(
-      payment: JavaContract[
+      payment: Contract[
         walletCodegen.AcceptedAppPayment.ContractId,
         walletCodegen.AcceptedAppPayment,
       ]

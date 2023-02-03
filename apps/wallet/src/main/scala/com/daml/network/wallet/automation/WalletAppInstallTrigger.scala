@@ -3,7 +3,7 @@ package com.daml.network.wallet.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -25,7 +25,7 @@ class WalletAppInstallTrigger(
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   override def completeTask(
-      install: JavaContract[
+      install: Contract[
         installCodegen.WalletAppInstall.ContractId,
         installCodegen.WalletAppInstall,
       ]

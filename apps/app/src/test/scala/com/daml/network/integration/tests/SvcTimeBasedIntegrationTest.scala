@@ -21,7 +21,7 @@ import monocle.macros.syntax.lens.*
 import scala.jdk.CollectionConverters.*
 import java.time.Duration
 import com.daml.network.config.CoinConfigTransforms
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 
 class SvcTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -267,7 +267,7 @@ class SvcTimeBasedIntegrationTest
 
   "collect expired reward coupons" in { implicit env =>
     def getNumRewardCoupons(
-        round: JavaContract[OpenMiningRound.ContractId, OpenMiningRound]
+        round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
     ): Int = {
       svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(AppRewardCoupon.COMPANION)(

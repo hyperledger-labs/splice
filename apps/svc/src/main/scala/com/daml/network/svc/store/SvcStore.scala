@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.svc.store.memory.InMemorySvcStore
-import com.daml.network.util.{CoinUtil, JavaContract as Contract}
+import com.daml.network.util.{CoinUtil, Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory

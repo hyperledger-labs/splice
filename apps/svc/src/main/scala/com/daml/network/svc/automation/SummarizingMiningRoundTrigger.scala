@@ -5,7 +5,7 @@ import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, T
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -26,7 +26,7 @@ class SummarizingMiningRoundTrigger(
     ](store.acs, cc.round.SummarizingMiningRound.COMPANION) {
 
   override def completeTask(
-      summarizingRound: JavaContract[
+      summarizingRound: Contract[
         cc.round.SummarizingMiningRound.ContractId,
         cc.round.SummarizingMiningRound,
       ]
@@ -52,10 +52,10 @@ class SummarizingMiningRoundTrigger(
   private case class RoundRewards(
       round: Long,
       appRewardCoupons: Seq[
-        JavaContract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]
+        Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]
       ],
       validatorRewardCoupons: Seq[
-        JavaContract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
+        Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
       ],
   ) {
     lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
@@ -78,12 +78,12 @@ class SummarizingMiningRoundTrigger(
     for {
       appRewardCoupons <- store.acs.listContracts(
         cc.coin.AppRewardCoupon.COMPANION,
-        (c: JavaContract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
+        (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
       )
       validatorRewardCoupons <- store.acs.listContracts(
         cc.coin.ValidatorRewardCoupon.COMPANION,
-        (c: JavaContract[
+        (c: Contract[
           cc.coin.ValidatorRewardCoupon.ContractId,
           cc.coin.ValidatorRewardCoupon,
         ]) => c.payload.round.number == round,

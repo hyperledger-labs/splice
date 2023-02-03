@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory

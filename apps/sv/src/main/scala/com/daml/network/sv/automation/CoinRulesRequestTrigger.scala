@@ -5,7 +5,7 @@ import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, T
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -29,7 +29,7 @@ class CoinRulesRequestTrigger(
     ](store.acs, cc.coin.CoinRulesRequest.COMPANION) {
 
   override def completeTask(
-      req: JavaContract[
+      req: Contract[
         cc.coin.CoinRulesRequest.ContractId,
         cc.coin.CoinRulesRequest,
       ]
@@ -45,7 +45,7 @@ class CoinRulesRequestTrigger(
   }
 
   def completeTaskAsLeader(
-      req: JavaContract[
+      req: Contract[
         cc.coin.CoinRulesRequest.ContractId,
         cc.coin.CoinRulesRequest,
       ]
@@ -83,7 +83,7 @@ class CoinRulesRequestTrigger(
 
   @nowarn("cat=unused")
   def completeTaskAsFollower(
-      req: JavaContract[
+      req: Contract[
         cc.coin.CoinRulesRequest.ContractId,
         cc.coin.CoinRulesRequest,
       ]

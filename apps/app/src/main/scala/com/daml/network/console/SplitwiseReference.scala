@@ -9,7 +9,7 @@ import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{

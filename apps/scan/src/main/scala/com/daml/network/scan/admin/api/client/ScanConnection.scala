@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -56,7 +56,7 @@ final class ScanConnection(
 
   def getCoinRules()(implicit
       traceContext: TraceContext
-  ): Future[JavaContract[CoinRules.ContractId, CoinRules]] = {
+  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
     runCmd(GrpcScanAppClient.GetCoinRules())
   }
 
@@ -64,8 +64,8 @@ final class ScanConnection(
       traceContext: TraceContext
   ): Future[
     (
-        JavaContract[OpenMiningRound.ContractId, OpenMiningRound],
-        Seq[JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+        Contract[OpenMiningRound.ContractId, OpenMiningRound],
+        Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
     runCmd(GrpcScanAppClient.GetLatestOpenAndIssuingMiningRounds())
@@ -73,7 +73,7 @@ final class ScanConnection(
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       traceContext: TraceContext
-  ): Future[Option[JavaContract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
     runCmd(GrpcScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 

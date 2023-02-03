@@ -6,7 +6,7 @@ import com.daml.network.automation.PollingTrigger
 import com.daml.network.automation.TriggerContext
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import scala.concurrent.{Future, ExecutionContext}
 import io.opentelemetry.api.trace.Tracer
 import scala.jdk.CollectionConverters.*

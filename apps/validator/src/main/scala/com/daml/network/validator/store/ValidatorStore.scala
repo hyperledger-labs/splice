@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory

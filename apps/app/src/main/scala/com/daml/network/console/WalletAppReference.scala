@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOfferCodegen,
 }
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
   ListResponse,

@@ -53,7 +53,7 @@ object CoinUtil {
       lookupValidatorRightByParty: (
           PartyId
       ) => Future[
-        QueryResult[Option[JavaContract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
+        QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
       ],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     retryProvider.retryForAutomationGrpc(

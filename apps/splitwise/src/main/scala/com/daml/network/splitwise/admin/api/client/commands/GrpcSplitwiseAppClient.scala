@@ -4,7 +4,7 @@ import cats.implicits.*
 import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc.SplitwiseServiceStub
-import com.daml.network.util.{JavaContract as Contract, Proto}
+import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}

@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.data.CantonTimestamp
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -17,7 +17,7 @@ trait StoreWithOpenMiningRounds {
       now: CantonTimestamp
   )(implicit
       ec: ExecutionContext
-  ): Future[Seq[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
+  ): Future[Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
     acs
       .listContracts(OpenMiningRound.COMPANION)
       // only return open open rounds.
@@ -31,7 +31,7 @@ trait StoreWithOpenMiningRounds {
     */
   def getLatestOpenMiningRound(now: CantonTimestamp)(implicit
       ec: ExecutionContext
-  ): Future[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]] =
+  ): Future[Contract[OpenMiningRound.ContractId, OpenMiningRound]] =
     lookupSubmittableOpenMiningRounds(now).map(
       _.maxByOption { c =>
         c.payload.round.number: Long

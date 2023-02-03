@@ -37,7 +37,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{HasHealth, JavaContract}
+import com.daml.network.util.{HasHealth, Contract}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -340,7 +340,7 @@ class TreasuryService(
     * submission failed.
     */
   private def executeFilteredBatch(
-      install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall],
+      install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
       transferContext: PaymentTransferContext,
       inputs: Seq[TransferInput],
       batch: CoinOperationBatch,
@@ -675,7 +675,7 @@ object TreasuryService {
     }
 
     def computeExecuteBatchCmd(
-        install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall],
+        install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
         transferContext: PaymentTransferContext,
         inputs: Seq[TransferInput],
     ) = {

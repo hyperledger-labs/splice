@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}

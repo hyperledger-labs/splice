@@ -19,7 +19,7 @@ import scala.util.Try
   * @param toValue Conversion to protobuf value. Java codegen does not provide a generic
   *   mechanism for that so we explicitly carry the function around.
   */
-final class JavaValue[T](
+final class Value[T](
     val value: T,
     toValue: T => CodegenValue,
 ) {
@@ -30,17 +30,17 @@ final class JavaValue[T](
   // Overridden to avoid equality on toValue. toValue is uniquely defined
   // for codegen values so this is safe.
   override def equals(obj: Any) = obj match {
-    case that: JavaValue[_] => this.value == that.value
+    case that: Value[_] => this.value == that.value
     case _ => false
   }
 
   override def hashCode(): Int = this.value.hashCode()
 }
 
-object JavaValue {
+object Value {
   def fromProto[T](decoder: ValueDecoder[T], toValue: T => CodegenValue)(
       value: v0.Value
-  ): Either[ProtoDeserializationError, JavaValue[T]] = {
+  ): Either[ProtoDeserializationError, Value[T]] = {
     for {
       valueP <- ProtoConverter.required("Value.value", value.value)
       value <- Try(
@@ -50,7 +50,7 @@ object JavaValue {
           ProtoDeserializationError
             .ValueConversionError("value", s"Failed to decode $valueP")
         )
-    } yield new JavaValue(
+    } yield new Value(
       value = value,
       toValue = toValue,
     )

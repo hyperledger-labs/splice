@@ -30,13 +30,18 @@ import io.circe.parser as circe
 
 import scala.util.Try
 
-/** A class representing a Daml contract of a specific type (Daml template) with an assigned contract ID.
+/** A class representing a Daml contract of a specific type (Daml
+  * template) with an assigned contract ID. This is the type we use
+  * for all our own code apart from the few places where we need to
+  * integrate with the Java codegen APIs or the existing Canton code
+  * so if you are unsure which type to use, this is probably the right
+  * one.
   *
   * @param contractId     Contract ID.
   * @param payload          Contract instance as defined in Daml template (without `contractId` and `agreementText`).
   * @tparam T             Contract template type parameter.
   */
-final case class JavaContract[TCid <: ContractId[_], T](
+final case class Contract[TCid <: ContractId[_], T](
     identifier: Identifier,
     contractId: TCid,
     payload: T with DamlRecord[_],
@@ -57,17 +62,17 @@ final case class JavaContract[TCid <: ContractId[_], T](
     payload = circe
       .parse(
         ApiCodecCompressed
-          .apiValueToJsValue(JavaContract.javaValueToLfValue(payload.toValue))
+          .apiValueToJsValue(Contract.javaValueToLfValue(payload.toValue))
           .compactPrint
       )
       .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
   )
 
-  override def pretty: Pretty[JavaContract[TCid, T]] = {
+  override def pretty: Pretty[Contract[TCid, T]] = {
 
     import com.daml.network.util.PrettyInstances.*
 
-    prettyOfClass[JavaContract[TCid, T]](
+    prettyOfClass[Contract[TCid, T]](
       param("contractId", _.contractId),
       param("templateId", _.identifier),
       param("payload", _.payload),
@@ -75,7 +80,7 @@ final case class JavaContract[TCid <: ContractId[_], T](
   }
 }
 
-object JavaContract {
+object Contract {
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
     // Disabling logging and instead logging the result
     // because LF uses a different logging library.
@@ -85,7 +90,7 @@ object JavaContract {
 
   def fromProto[TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[_, TCid, T]
-  )(contract: v0.Contract): Either[ProtoDeserializationError, JavaContract[TCid, T]] = {
+  )(contract: v0.Contract): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val decoder: ValueDecoder[T] = ContractCompanion.valueDecoder[T](companion)
     for {
       templateId <- ProtoConverter.required("templateId", contract.templateId)
@@ -107,7 +112,7 @@ object JavaContract {
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
-    } yield JavaContract[TCid, T](
+    } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
@@ -118,7 +123,7 @@ object JavaContract {
       companion: ContractCompanion[_, TCid, T]
   )(contract: http.Contract)(implicit
       decoder: TemplateJsonDecoder
-  ): Either[ProtoDeserializationError, JavaContract[TCid, T]] = {
+  ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       templateId <- LfIdentifier
         .fromString(contract.templateId)
@@ -143,7 +148,7 @@ object JavaContract {
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
-    } yield JavaContract[TCid, T](
+    } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
@@ -152,8 +157,8 @@ object JavaContract {
 
   def fromCodegenContract[TCid <: ContractId[_], T <: DamlRecord[_]](
       contract: CodegenContract[TCid, T]
-  ): JavaContract[TCid, T] =
-    JavaContract(
+  ): Contract[TCid, T] =
+    Contract(
       identifier = contract.getContractTypeId,
       contractId = contract.id,
       payload = contract.data,
@@ -161,11 +166,11 @@ object JavaContract {
 
   def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
-  )(ev: CreatedEvent): Option[JavaContract[TCid, T]] =
-    JavaDecodeUtil.decodeCreated(companion)(ev).map(JavaContract.fromCodegenContract)
+  )(ev: CreatedEvent): Option[Contract[TCid, T]] =
+    JavaDecodeUtil.decodeCreated(companion)(ev).map(Contract.fromCodegenContract)
 
   def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[View]](
       companion: InterfaceCompanion[I, Id, View]
-  )(ev: CreatedEvent): Option[JavaContract[Id, View]] =
-    JavaDecodeUtil.decodeCreated(companion)(ev).map(JavaContract.fromCodegenContract)
+  )(ev: CreatedEvent): Option[Contract[Id, View]] =
+    JavaDecodeUtil.decodeCreated(companion)(ev).map(Contract.fromCodegenContract)
 }

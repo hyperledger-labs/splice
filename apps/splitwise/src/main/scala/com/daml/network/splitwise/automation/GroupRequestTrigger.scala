@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -31,7 +31,7 @@ class GroupRequestTrigger(
     ](store.acs, splitwiseCodegen.GroupRequest.COMPANION) {
 
   override def completeTask(
-      req: JavaContract[
+      req: Contract[
         splitwiseCodegen.GroupRequest.ContractId,
         splitwiseCodegen.GroupRequest,
       ]

@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.JavaContract
+import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -39,7 +39,7 @@ class AcceptedTransferOfferTrigger(
     ](store.acs, transferOffersCodegen.AcceptedTransferOffer.COMPANION) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
-  override protected val source: Source[JavaContract[
+  override protected val source: Source[Contract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ], NotUsed] =
@@ -50,7 +50,7 @@ class AcceptedTransferOfferTrigger(
       )
 
   override def completeTask(
-      acceptedOffer: JavaContract[
+      acceptedOffer: Contract[
         transferOffersCodegen.AcceptedTransferOffer.ContractId,
         transferOffersCodegen.AcceptedTransferOffer,
       ]
@@ -83,7 +83,7 @@ class AcceptedTransferOfferTrigger(
   }
 
   private def abortAcceptedTransferOffer(
-      acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
+      acceptedOffer: Contract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {

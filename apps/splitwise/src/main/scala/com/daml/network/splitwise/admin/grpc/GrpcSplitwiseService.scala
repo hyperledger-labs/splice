@@ -7,7 +7,7 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
-import com.daml.network.util.{JavaContract as Contract, Proto}
+import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
