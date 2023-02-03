@@ -19,6 +19,7 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
   ValidatorDomainConfig,
+  ValidatorOnboardingConfig,
 }
 import com.daml.network.wallet.config.{
   TreasuryConfig,
@@ -453,12 +454,6 @@ object CoinConfig {
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
-    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
-      deriveReader[ValidatorDomainConfig]
-    implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
-      deriveReader[ValidatorAppBackendConfig]
-    implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
-      deriveReader[ValidatorAppClientConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
     implicit val svcConfigReader: ConfigReader[SvcAppBackendConfig] =
@@ -469,8 +464,17 @@ object CoinConfig {
       deriveReader[LocalSvAppConfig]
     implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
       deriveReader[RemoteSvAppConfig]
+
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
+    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
+      deriveReader[ValidatorDomainConfig]
+    implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
+      deriveReader[ValidatorOnboardingConfig]
+    implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
+      deriveReader[ValidatorAppBackendConfig]
+    implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
+      deriveReader[ValidatorAppClientConfig]
     implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
       deriveReader[WalletRemoteValidatorAppConfig]
     implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
@@ -545,12 +549,6 @@ object CoinConfig {
       deriveWriter[AppInstance]
     implicit val remoteScanConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
-    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
-      deriveWriter[ValidatorDomainConfig]
-    implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
-      deriveWriter[ValidatorAppBackendConfig]
-    implicit val remoteValidatorConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
-      deriveWriter[ValidatorAppClientConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val svcConfigWriter: ConfigWriter[SvcAppBackendConfig] =
@@ -561,8 +559,17 @@ object CoinConfig {
       deriveWriter[LocalSvAppConfig]
     implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
       deriveWriter[RemoteSvAppConfig]
+
     implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
       deriveWriter[SharedCoinAppParameters]
+    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
+      deriveWriter[ValidatorDomainConfig]
+    implicit val validatorOnboardingConfigWriter: ConfigWriter[ValidatorOnboardingConfig] =
+      confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)
+    implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
+      deriveWriter[ValidatorAppBackendConfig]
+    implicit val remoteValidatorConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
+      deriveWriter[ValidatorAppClientConfig]
     implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =
       deriveWriter[WalletRemoteValidatorAppConfig]
     implicit val treasuryConfigWriter: ConfigWriter[TreasuryConfig] =

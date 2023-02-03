@@ -72,6 +72,19 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
   }
 
+  // TODO(M3-46) clean up once every validator uses this onboarding flow
+  "onboard validator via onboarding config" in { implicit env =>
+    initSvc()
+
+    // Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`
+    bobValidator.startSync()
+    // Check that Bob's validator can see the CoinRules
+    // TODO(#2656) actually use the new onboarding flow (:
+    val bobValidatorParty = bobValidator.getValidatorPartyId()
+    bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+      .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)
+  }
+
   "onboard users with party hint sanitizer" in { implicit env =>
     initSvc()
     aliceValidator.startSync()

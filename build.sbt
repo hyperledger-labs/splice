@@ -213,6 +213,7 @@ lazy val `apps-validator` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
+      `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
     )
     .settings(
