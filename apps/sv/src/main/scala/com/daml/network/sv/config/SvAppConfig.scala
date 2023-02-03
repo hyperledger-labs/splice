@@ -2,6 +2,7 @@ package com.daml.network.sv.config
 
 import com.daml.network.config.{
   AutomationConfig,
+  CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
   LocalCoinConfig,
   RemoteCoinConfig,
@@ -32,7 +33,7 @@ case class LocalSvAppConfig(
 }
 
 case class RemoteSvAppConfig(
-    adminApi: ClientConfig
+    adminApi: CoinHttpClientConfig
 ) extends RemoteCoinConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

@@ -1,24 +1,27 @@
 package com.daml.network.sv
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.sv.admin.grpc.GrpcSvAppService
+import com.daml.network.sv.admin.http.HttpSvHandler
 import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.v0.SvServiceGrpc
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CoinUtil.{defaultCoinConfig, defaultEnabledChoices}
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, FlagCloseable, Lifecycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -88,28 +91,41 @@ class SvApp(
             this,
           )
         }
+      routes = cors() {
+        SvResource.routes(
+          new HttpSvHandler(
+            ledgerClient,
+            config.ledgerApiUser,
+            svStore,
+            svcStore,
+            loggerFactory,
+          )
+          // TODO(M3-46) add client authentication via `AuthExtractor`
+        )
+      }
+      httpConfig = config.adminApi.clientConfig.copy(
+        // TODO(#2019) Remove once we disabled Canton's `CommunityAdminServer`.
+        port = config.adminApi.port + 1000
+      )
+      _ = logger.info(s"Starting http server on ${httpConfig}")
+      binding <- Http()
+        .newServerAt(
+          httpConfig.address,
+          httpConfig.port.unwrap,
+        )
+        .bind(
+          routes
+        )
       _ = logger.info(s"SV App is initialized")
     } yield {
-      adminServerRegistry
-        .addService(
-          SvServiceGrpc.bindService(
-            new GrpcSvAppService(
-              ledgerClient,
-              config.ledgerApiUser,
-              svStore,
-              svcStore,
-              loggerFactory,
-            ),
-            ec,
-          )
-        )
-        .discard
       SvApp.State(
         storage,
         svStore,
         svcStore,
         automation,
+        binding,
         logger,
+        timeouts,
       )
     }
 
@@ -256,13 +272,21 @@ object SvApp {
       svStore: SvSvStore,
       svcStore: SvSvcStore,
       automation: SvAutomationService,
+      binding: Http.ServerBinding,
       logger: TracedLogger,
-  ) extends AutoCloseable
+      timeouts: ProcessingTimeout,
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
+        AsyncCloseable(
+          "http binding",
+          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          timeouts.shutdownNetwork.unwrap,
+        ),
         storage,
         svStore,
         svcStore,

@@ -1,0 +1,70 @@
+openapi: 3.0.0
+info:
+  title: SV API
+  version: 0.0.1
+tags:
+  - name: sv
+paths:
+  /debug:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "getDebugInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDebugInfoResponse"
+  /connected-domains:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "listConnectedDomains"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
+components:
+  schemas:
+    GetDebugInfoResponse:
+      type: object
+      required:
+        - sv_user
+        - sv_party_id
+        - svc_party_id
+        - coin_rules_contract_id
+        - svc_rules_contract_id
+        - ongoing_validator_onboardings
+      properties:
+        # User representing the SV
+        sv_user:
+          type: string
+        # Party representing the SV
+        sv_party_id:
+          type: string
+        # Party representing the whole SVC
+        svc_party_id:
+          type: string
+        # Contract ID of the CoinRules contract associated with the SVC
+        coin_rules_contract_id:
+          type: string
+        # Contract IDs of the SvcRules contract associated with the SVC
+        svc_rules_contract_id:
+          type: string
+        # Number of active validator onboarding contracts known to this SV
+        # TODO(#M3-46): remove if unused (was added for enabling a test)
+        ongoing_validator_onboardings:
+          type: integer
+          format: int32
+
+    ListConnectedDomainsResponse:
+      type: object
+      required: ["connected_domains"]
+      properties:
+        connected_domains:
+          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"

@@ -1,7 +1,8 @@
 package com.daml.network.console
 
+import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.sv.admin.api.client.commands.GrpcSvAppClient
+import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -11,18 +12,24 @@ import com.digitalasset.canton.topology.DomainId
 abstract class SvAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends HttpCoinAppReference {
 
-  def getDebugInfo(): GrpcSvAppClient.DebugInfo = {
+  override protected val instanceType = "SV Client"
+
+  def getDebugInfo(): HttpSvAppClient.DebugInfo = {
     consoleEnvironment.run {
-      adminCommand(GrpcSvAppClient.GetDebugInfo())
+      httpCommand(
+        HttpSvAppClient.GetDebugInfo(List())
+      )
     }
   }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      adminCommand(GrpcSvAppClient.ListConnectedDomains())
+      httpCommand(
+        HttpSvAppClient.ListConnectedDomains(List())
+      )
     }
 }
 
@@ -34,7 +41,7 @@ class SvAppClientReference(
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "sv Client"
+  override def httpClientConfig = config.adminApi
 }
 
 /** Single sv app backend reference. Defines the console commands that can be run against a backend SV
@@ -47,7 +54,16 @@ class SvAppBackendReference(
     with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "sv"
+  override protected val instanceType = "SV"
+
+  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+    // For local references, we assume that they are reachable on localhost.
+    // TODO (#2019) Reconsider if we want these for local refs at all and if so
+    // if we should specify a url here. Also remove the "+ 1000" once we
+    // disabled Canton's `CommunityAdminServer`.
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 1000}",
+    config.clientAdminApi,
+  )
 
   protected val nodes = consoleEnvironment.environment.svs
 

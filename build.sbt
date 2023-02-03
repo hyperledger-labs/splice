@@ -216,7 +216,7 @@ lazy val `apps-validator` =
       `wallet-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(akka_http_cors),
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "validator-openapi",
@@ -255,8 +255,21 @@ lazy val `apps-sv` =
     .in(file("apps/sv"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(akka_http_cors),
       BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/sv/src/main/openapi/sv.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+          ScalaClient(
+            new File("apps/sv/src/main/openapi/sv.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
     .dependsOn(
       `apps-svc`,
@@ -507,11 +520,7 @@ lazy val `apps-directory` =
       `directory-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(
-        scalapb_runtime_grpc,
-        scalapb_runtime,
-        akka_http_cors,
-      ),
+      libraryDependencies ++= Seq(akka_http_cors),
       BuildCommon.TS.openApiSettings(
         npmName = "directory-openapi",
         openApiSpec = "directory.yaml",
