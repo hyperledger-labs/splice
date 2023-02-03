@@ -212,6 +212,19 @@ class PreflightIntegrationTest
     }
   }
 
+  "basic test for splitwise wallet ui" taggedAs LiveDevNetTest in { _ =>
+    val walletUiUrl = s"https://wallet.splitwise.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val aliceUser = auth0Users.get("alice-v1") match {
+      case Some(user) => user
+      case None => fail("could not get alice user from auth0")
+    }
+    withFrontEnd("alice-v1") { implicit webDriver =>
+      loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
+      copyPartyId()
+      findAll(className("coins-table-row")) should have size 0
+    }
+  }
+
   "test a directory entry allocation against cluster deployment" taggedAs LiveDevNetTest in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =

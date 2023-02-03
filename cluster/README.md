@@ -614,6 +614,21 @@ server {
 
 You can expect the certificate and certificate key to always be available at `/tmp/tls.crt` and `/tmp/tls.key` respectively, via the kubernetes secret volume mount mentioned above.
 
+### Force-updating the certificate
+
+The tls certificate is configured in
+[`tls.jsonnet`](/cluster/manifest/tls.jsonnet). If changes are required there, e.g. updating the DNS names covered it, you will need to propagate a new certificate in all clusters. To do that, follow these steps:
+```
+kubectl get certificate
+kubectl delete certificate <certificate_name>
+cncluster apply
+kubectl get secret
+kubectl delete secret cn-<cluster>-tls
+<poll kubectl get secret until the secret is recreated>
+kubectl get pods
+kubectl delete pod <external-proxy-pod-id>
+```
+
 ## Auth0 secrets
 
 Our apps need some secrets in order to interact with auth0.

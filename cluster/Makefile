@@ -14,6 +14,8 @@ images := \
 	validator1-wallet-app \
 	splitwise-validator-app \
 	splitwise-app \
+	splitwise-wallet-app \
+	splitwise-wallet-web-ui \
 	\
 	validator1-wallet-web-ui \
 	validator1-directory-web-ui \

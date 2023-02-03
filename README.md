@@ -760,6 +760,16 @@ and create a new key through `manage keys` and revoke the old one. The full JSON
 The above creates the key for `GCP_DA_CN_IMAGES_KEY`, for `GCP_DA_CN_DEVNET_KEY` and `GCP_DA_CN_SCRATCHNET_KEY` change the project in the drop down at the top
 and go through the same steps.
 
+### GCP Token in the cluster DNS challenge
+
+cert-manager on the cluster uses gcloud to solve the DNS challenge. It therefore needs the latest gcloud credentials. These are stored in a secret clouddns-dns01-solver-svc-acct. To refresh that secret:
+```
+gcloud iam service-accounts keys create /tmp/key.json --iam-account dns01-solver@da-gcp-canton-domain.iam.gserviceaccount.com
+kubectl delete secret clouddns-dns01-solver-svc-acct
+kubectl create secret generic clouddns-dns01-solver-svc-acct --from-file=key.json=/tmp/key.json
+rm /tmp/key.json
+```
+
 ### Github Tokens
 
 The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo-script/src/checkTodos.sc) to access the issue and PR list

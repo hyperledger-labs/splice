@@ -18,6 +18,7 @@ local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
   { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH", secret: "cn-app-directory-ledger-api-auth" },
   { env: "CN_APP_SPLITWISE_LEDGER_API_AUTH", secret: "cn-app-splitwise-ledger-api-auth" },
   { env: "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH", secret: "cn-app-splitwise-validator-ledger-api-auth" },
+  { env: "CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH", secret: "cn-app-splitwise-wallet-ledger-api-auth" },
 ], {});
 
 local svcDeployments(config) = [
@@ -280,8 +281,8 @@ local splitwiseDeployments(config) = [
 
   c.deployment(config, "splitwise-validator-app", [
     {
-      name: "sw-val-api",
-      port: 5203,
+      name: "sw-val-http",
+      port: 6203,
     },
   ], extraEnvVars=[
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_URL,
@@ -289,6 +290,27 @@ local splitwiseDeployments(config) = [
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET,
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME,
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME,
+  ]),
+
+  c.deployment(config, "splitwise-wallet-app", [
+    {
+      name: "sw-wal-api",
+      port: 5204,
+    },
+  ], proxyToGrpcWeb="sw-wal-api", extraEnvVars=[
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_URL,
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_ID,
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_SECRET,
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME,
+  ]),
+
+  c.deployment(config, "splitwise-wallet-web-ui", [
+    {
+      name: "sw-wal-ui",
+      port: 80,
+      internalOnly: true,
+    },
   ]),
 
   c.deployment(config, "splitwise-app", [

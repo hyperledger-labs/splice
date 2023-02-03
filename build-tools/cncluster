@@ -613,6 +613,7 @@ function cluster_update_secrets() {
   _set_auth0_secret "cn-app-directory-ledger-api-auth" "CN_APP_DIRECTORY_LEDGER_API_AUTH"
   _set_auth0_secret "cn-app-splitwise-ledger-api-auth" "CN_APP_SPLITWISE_LEDGER_API_AUTH"
   _set_auth0_secret "cn-app-splitwise-validator-ledger-api-auth" "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH"
+  _set_auth0_secret "cn-app-splitwise-wallet-ledger-api-auth" "CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH"
 }
 
 case "${SUBCOMMAND_NAME}" in
