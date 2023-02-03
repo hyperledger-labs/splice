@@ -231,6 +231,9 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       alice,
       5,
     )
+    eventually() {
+      aliceValidatorWallet.list().coins should have length 1
+    }
     aliceValidatorWallet.tap(50)
 
     eventually() {
