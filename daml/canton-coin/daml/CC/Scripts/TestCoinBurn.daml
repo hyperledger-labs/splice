@@ -1,8 +1,5 @@
 module CC.Scripts.TestCoinBurn where
 
--- import DA.Time
--- import DA.Foldable (maximum)
-
 import Daml.Script
 
 import CC.Scripts.Util

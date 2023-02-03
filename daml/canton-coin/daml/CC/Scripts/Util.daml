@@ -17,7 +17,7 @@ import CC.Issuance
 import CC.Round
 
 import CC.Scripts.Parameters
-
+import CN.Util.Assert
 
 -- Bootstrapping CC
 -------------------
@@ -93,12 +93,10 @@ setupUser app name validator = do
   tap app u 1.0
   return u
 
-
-
-getAllValidatorRights : CCApp -> Script [(ContractId ValidatorRight, ValidatorRight)]
+getAllValidatorRights : CCApp -> Script [ValidatorRight]
 getAllValidatorRights app = do
   parties <- listKnownParties
-  query @ValidatorRight (map party parties)
+  map snd <$> query @ValidatorRight (map party parties)
 
 recordValidatorOf : CCApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
@@ -225,10 +223,6 @@ skipNRounds app n = do
 -- Asset handling utilities
 ---------------------------
 
-unlockedCoins : Party -> Script [ContractId Coin]
-unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
-
-
 submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors readers arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
@@ -277,12 +271,12 @@ payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text
 payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
-  coins <- unlockedCoins sender.primaryParty
+  coins <- getCoinInputs app sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
         payload = msg
-        inputs = map (API.InputCoin . toInterfaceContractId) coins
+        inputs = coins
         outputs =
           [  API.TransferOutput with
               receiver = recipient
@@ -304,12 +298,12 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
-  coins <- unlockedCoins sender.primaryParty
+  coins <- getCoinInputs app sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
         payload = msg
-        inputs = map (API.InputCoin . toInterfaceContractId) coins
+        inputs = coins
         outputs =
           [ API.TransferOutput with
               receiver = sender.primaryParty
@@ -328,29 +322,33 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
 runCoinDepositBots app = do
-  validatorRights <- getAllValidatorRights app
   (openRound, _) <- getLatestOpenRound app
   issuingRounds <- getOpenIssuingRounds app
   let issuingRoundNumbers = map (._2.round) issuingRounds
-  let context = API.TransferContext with
+  let mkContext validatorRights = API.TransferContext with
         openMiningRound = toInterfaceContractId openRound
         issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
-        validatorRights = Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights ]
+        validatorRights
         featuredAppRight = None
-  forA_ validatorRights $ \(_, ValidatorRight{..}) -> do
+  -- iterate over all validator rights to use the right readAs values
+  -- TODO(M4-82): remove the need for reading as the validator
+  allValidatorRights <- getAllValidatorRights app
+  forA_ allValidatorRights $ \validatorRight -> do
     -- get all burns for this user
-    hostedUsers <- getValidatorUsers user
-    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc $ \r ->
-      r.round `elem` issuingRoundNumbers && r.provider == user
+    let user = validatorRight.user
+    validatorRights <- getValidatorRights user
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc $ \c ->
+      c.round `elem` issuingRoundNumbers && c.provider == user
 
-    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc $ \r ->
-      r.round `elem` issuingRoundNumbers && r.user `elem` hostedUsers
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc $ \c ->
+      c.round `elem` issuingRoundNumbers && c.user `Map.member` validatorRights
 
     -- get all coins of this user
-    coins <- queryFilter @Coin user (\coin -> coin.owner == user)
+    coins <- getCoinInputs app user
     -- Need readAs rights for all hosted users to collect their validator rewards,
     -- and readAs rights for the validator to see mining round state contracts
-    let readAs = hostedUsers ++ [validator]
+    -- TODO(M4-82): remove the need for reading as the validator
+    let readAs = Map.keys validatorRights ++ [validatorRight.validator]
     -- merge multiple of them into a single coin to minimize the holding fees
     let transfer = API.Transfer with
           sender = user
@@ -359,10 +357,24 @@ runCoinDepositBots app = do
           inputs =
               map (API.InputAppRewardCoupon . toInterfaceContractId . fst) appRewardCoupons ++
               map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++
-              map (API.InputCoin . toInterfaceContractId . fst) coins
+              coins
           outputs = []
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
-      submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with transfer, context
+      submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with
+        transfer
+        context = mkContext validatorRights
+
+  -- sanity check: test that the coin deposit bot merged all coins
+  coins <- query @Coin app.svc
+  let coinOwners = map (._2.owner) coins
+  require "Owners of coins must be unique" (unique coinOwners)
+  pure ()
+
+-- | Retrieve the list of all coins that the given party can use as transfer inputs.
+getCoinInputs : CCApp -> Party -> Script [API.TransferInput]
+getCoinInputs app sender = do
+  coins <- queryFilter @Coin sender (\coin -> coin.owner == sender)
+  pure [ API.InputCoin (toInterfaceContractId coinCid) | (coinCid, _) <- coins]
 
 -- | Retrieve a list of all issuing mining rounds that are currently open.
 getOpenIssuingRounds : CCApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
@@ -371,11 +383,11 @@ getOpenIssuingRounds app = do
   miningRounds <- query @IssuingMiningRound app.svc
   return [ (cid, r) | (cid, r) <- miningRounds, r.opensAt <= now ]
 
--- | All users of a specific validator.
-getValidatorUsers : Party -> Script [Party]
-getValidatorUsers validator = do
+-- | All validator rights for the given user.
+getValidatorRights : Party -> Script (Map.Map Party (ContractId API.ValidatorRight))
+getValidatorRights validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
-  return [ right.user | (_, right) <- rights ]
+  return $ Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- rights ]
 
 -- Primarily used by submitters to decide against which round they should try to transact.
 getLatestOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
@@ -436,11 +448,14 @@ getPaymentTransferContextFeaturedApp app user featuredAppRight = do
 getTransferContext : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script API.TransferContext
 getTransferContext app user featuredAppRight = do
   openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
+  now <- getTime
   issuingRounds <- query @IssuingMiningRound app.svc
   validatorRights <- query @ValidatorRight user.primaryParty
   pure API.TransferContext with
-    issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
-    validatorRights = Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights ]
+    issuingMiningRounds = Map.fromList
+      [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now ]
+    validatorRights = Map.fromList
+      [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
     openMiningRound
     featuredAppRight = fmap (\cid -> toInterfaceContractId cid) featuredAppRight
 

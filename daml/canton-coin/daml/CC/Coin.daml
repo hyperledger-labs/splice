@@ -6,7 +6,7 @@ import Prelude hiding (forA)
 
 import DA.Action (void, foldlA)
 import DA.Exception
-import DA.Foldable (forA_, mapA_)
+import DA.Foldable (forA_)
 import DA.List (dedupSort)
 import DA.Map (Map)
 import qualified DA.Map as Map
@@ -633,7 +633,7 @@ executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig 
 executeTransfer coinRulesCid context configUsd svc t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context configUsd svc t
-  isum <- summarizeAndValidateInputs csum svc t.sender t.inputs
+  isum <- summarizeAndConsumeInputs coinRulesCid csum svc t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer csum.config isum osum
   -- check that overall transfer constraints are satisfied
@@ -641,8 +641,6 @@ executeTransfer coinRulesCid context configUsd svc t = do
     Left err -> throw (InvalidTransfer err)
     Right _ -> pure ()
 
-  -- consume inputs only after all assertions have been checked
-  _ <- consumeInputs coinRulesCid csum svc t.sender t.inputs
   -- issue rewards for burns
   issueRewards csum t.sender t.provider summary
   -- record outputs
@@ -659,9 +657,8 @@ data TransferContextSummary = TransferContextSummary with
     featuredAppProvider : Optional Party
     config : CoinConfig CC
     openRound : OpenMiningRound
-    -- TODO(M3-06): pre-resolve them in summarizeAndValidateContext so that the tx fetches them exactly once
-    issuingMiningRounds : Map API.Round (ContractId API.IssuingMiningRound)
-    validatorRights : Map Party (ContractId API.ValidatorRight)
+    issuingMiningRounds : Map API.Round IssuingMiningRound
+    validatorRights : Map Party (ContractId ValidatorRight)
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
@@ -693,27 +690,62 @@ summarizeAndValidateContext context configUsd svc tf = do
     require "featured app right must match" (featuredAppRight == FeaturedAppRight with svc; provider = tf.provider)
     pure featuredAppRight.provider
 
+  -- pre-resolve issuing mining rounds
+  issuingMiningRounds <- forA (Map.toList context.issuingMiningRounds) $ \(round, issuingRoundCid) -> do
+    (_, issuingRound) <- downcastInterface @IssuingMiningRound "IssuingMiningRound" issuingRoundCid
+    require "SVC matches" (issuingRound.svc == svc)
+    require "Round matches" (issuingRound.round == round)
+    now <- getTime
+    require "issuing round is open" (issuingRound.opensAt <= now)
+    pure (round, issuingRound)
+
+  -- pre-resolve validator rights
+  validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
+      (rightCid, right) <- downcastInterface @ValidatorRight "ValidatorRight" rightCid
+      let expectedRight = ValidatorRight with
+            svc
+            validator = tf.sender
+            user
+      require "ValidatorRight matches" (right == expectedRight)
+      pure (user, rightCid)
+
   return TransferContextSummary with
     config = scaleConfig openRound configUsd
     featuredAppProvider
     openRound = openRound
-    issuingMiningRounds = context.issuingMiningRounds
-    validatorRights = context.validatorRights
+    issuingMiningRounds = Map.fromList issuingMiningRounds
+    validatorRights = Map.fromList validatorRights
 
-summarizeAndValidateInputs : TransferContextSummary -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
-summarizeAndValidateInputs csum svc sender inps = do
-    now <- getTime
-    foldlA (summarizeInput now csum.openRound.round) initialSummary inps
+getValidatorRight : TransferContextSummary -> Party -> Update (ContractId ValidatorRight)
+getValidatorRight csum user =
+  case Map.lookup user csum.validatorRights of
+    None -> abort $ "TransferContext did contain validator right for user: " <> show user
+    Some rightCid -> pure rightCid
+
+getIssuingMiningRound : TransferContextSummary -> API.Round -> Update IssuingMiningRound
+getIssuingMiningRound csum round = do
+  case Map.lookup round csum.issuingMiningRounds of
+    None -> abort $ "TransferContext did not contain issuing mining round found for " <> show round
+    Some issuingRound -> pure issuingRound
+
+summarizeAndConsumeInputs
+  : ContractId API.CoinRules -> TransferContextSummary -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
+    foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
       totalCoinAmount = 0.0
       totalRewardAmount = 0.0
       totalHoldingFees = 0.0
 
-    summarizeInput now round s (API.InputCoin coinCid) = do
+    summarizeAndConsumeInput round s (API.InputCoin coinCid) = do
+      -- fetch and archive
       (_, coin) <- downcastInterface @Coin "Coin" coinCid
+      archive coinCid
+      -- check validity
       require "SVC matches" (svc == coin.svc)
       require "Sender matches owner" (sender == coin.owner)
+      -- compute balance change
       let amount = actualAmount round coin.amount
           holdingFee = coin.amount.initialAmount - amount
       return TransferInputsSummary with
@@ -721,12 +753,15 @@ summarizeAndValidateInputs csum svc sender inps = do
         totalRewardAmount = s.totalRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
 
-    summarizeInput now round s (API.InputAppRewardCoupon couponCid) = do
+    summarizeAndConsumeInput round s (API.InputAppRewardCoupon couponCid) = do
+      -- fetch and archive
       (_, coupon) <- downcastInterface @AppRewardCoupon "AppRewardCoupon" couponCid
+      archive couponCid
+      -- check validity
       require "SVC matches" (svc == coupon.svc)
-      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
-      require "issuing round is open" (miningRound.opensAt <= now)
       require "Sender matches app provider" (sender == coupon.provider)
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
       let issuancePerCoupon
             | coupon.featured = miningRound.issuancePerFeaturedAppRewardCoupon
             | otherwise = miningRound.issuancePerUnfeaturedAppRewardCoupon
@@ -735,51 +770,24 @@ summarizeAndValidateInputs csum svc sender inps = do
         totalRewardAmount = s.totalRewardAmount + coupon.amount * issuancePerCoupon
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeInput now round s (API.InputValidatorRewardCoupon couponCid) = do
-      (_, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
+    summarizeAndConsumeInput round s (API.InputValidatorRewardCoupon couponCid) = do
+      -- fetch and archive
+      (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
+      do
+        -- we must use the validator right to actually archive the coupon of the user
+        rightCid <- getValidatorRight csum coupon.user
+        exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
+          validator = sender
+          rightCid
+          coinRulesCid
+      -- check coupon
       require "SVC matches" (svc == coupon.svc)
-      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
       return TransferInputsSummary with
         totalCoinAmount = s.totalCoinAmount
         totalRewardAmount = s.totalRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
-
-fetchValidatorRight : TransferContextSummary -> ValidatorRewardCoupon -> Update (ContractId ValidatorRight, ValidatorRight)
-fetchValidatorRight TransferContextSummary{validatorRights} ValidatorRewardCoupon{..} = do
-  case Map.lookup user validatorRights of
-    None -> abort $ "No validator right found for user " <> show user
-    Some rightCid -> do
-      (rightCid, right) <- downcastInterface @ValidatorRight "ValidatorRight" rightCid
-      require "SVC matches" (right.svc == svc)
-      require "User matches" (right.user == user)
-      pure (rightCid, right)
-
-fetchIssuingMiningRound : TransferContextSummary -> Party -> API.Round -> Update (ContractId IssuingMiningRound, IssuingMiningRound)
-fetchIssuingMiningRound TransferContextSummary{issuingMiningRounds} svc round = do
-  case Map.lookup round issuingMiningRounds of
-    None -> abort $ "No issuing mining round found for round " <> show round
-    Some miningRoundCid -> do
-      (miningRoundCid, miningRound) <- downcastInterface @IssuingMiningRound "IssuingMiningRound" miningRoundCid
-      require "SVC matches" (miningRound.svc == svc)
-      require "Round matches" (miningRound.round == round)
-      pure (miningRoundCid, miningRound)
-
-consumeInputs : ContractId API.CoinRules -> TransferContextSummary -> Party -> Party -> [API.TransferInput] -> Update ()
-consumeInputs coinRulesCid csum svc sender inps = do
-    mapA_ consumeInput inps
-  where
-    consumeInput (API.InputCoin coinCid) = do
-      archive coinCid
-
-    consumeInput (API.InputAppRewardCoupon couponCid) = do
-      archive couponCid
-
-    consumeInput (API.InputValidatorRewardCoupon couponCid) = do
-      (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
-      (_, miningRound) <- fetchIssuingMiningRound csum svc coupon.round
-      (rightCid, validatorRight) <- fetchValidatorRight csum coupon
-      require "Validator matches" (validatorRight.validator == sender)
-      exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
 
 preprocessOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs config sender outs =

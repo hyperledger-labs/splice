@@ -125,18 +125,19 @@ testCoinUsedInRoundBeforeItsCreation = do
   coinRound2.amount.createdAt.number === 2
   round1.round.number === 1
 
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd contextWithRound1.coinRules API.CoinRules_Transfer with
-    transfer = API.Transfer with
-      sender = alice.primaryParty
-      provider = alice.primaryParty
-      inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
-      outputs = [ API.TransferOutput with
-                    receiver = bob.primaryParty
-                    amount = 10.0
-                    lock = None
-                    receiverFeeRatio = 0.4 ]
-      payload = "test"
-    context = contextWithRound1.context
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
+    exerciseCmd contextWithRound1.coinRules API.CoinRules_Transfer with
+      transfer = API.Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
+        outputs = [ API.TransferOutput with
+                      receiver = bob.primaryParty
+                      amount = 10.0
+                      lock = None
+                      receiverFeeRatio = 0.4 ]
+        payload = "test"
+      context = contextWithRound1.context
 
   -- Input amount is exactly 100.0.
   -- There is no negative amount of holding fee
