@@ -9,7 +9,7 @@ window.canton_network_config = {
   auth: {
     algorithm: "rs-256",
     authority: "https://canton-network-dev.us.auth0.com",
-    client_id: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL",
+    client_id: "${CN_APP_WALLET_UI_AUTH_CLIENT_ID}",
     token_audience: "https://canton.network.global",
   },
   services: {
@@ -18,7 +18,7 @@ window.canton_network_config = {
       grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
     },
     validator: {
-      // URL of the gRPC-Web envoy proxy, proxying to the validator app gRPC API
+      // URL of the gRPC-Web envoy proxy, proxying to the validator app HTTP API
       grpcUrl: "https://" + window.location.hostname + "/api/v0/validator",
     },
     directory: {

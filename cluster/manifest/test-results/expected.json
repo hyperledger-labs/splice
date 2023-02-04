@@ -2159,7 +2159,7 @@
             "labels": {
                "app": "validator1-wallet-web-ui",
                "clusterName": "cluster",
-               "moduleName": "validator1-wallet-web-ui"
+               "moduleName": "wallet-web-ui"
             },
             "name": "validator1-wallet-web-ui"
          },
@@ -2178,7 +2178,7 @@
                   "labels": {
                      "app": "validator1-wallet-web-ui",
                      "clusterName": "cluster",
-                     "moduleName": "validator1-wallet-web-ui"
+                     "moduleName": "wallet-web-ui"
                   }
                },
                "spec": {
@@ -2188,9 +2188,13 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "value": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/validator1-wallet-web-ui:tag",
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
                         "name": "validator1-wallet-web-ui",
                         "ports": [
@@ -3019,7 +3023,7 @@
             "labels": {
                "app": "splitwise-wallet-web-ui",
                "clusterName": "cluster",
-               "moduleName": "splitwise-wallet-web-ui"
+               "moduleName": "wallet-web-ui"
             },
             "name": "splitwise-wallet-web-ui"
          },
@@ -3038,7 +3042,7 @@
                   "labels": {
                      "app": "splitwise-wallet-web-ui",
                      "clusterName": "cluster",
-                     "moduleName": "splitwise-wallet-web-ui"
+                     "moduleName": "wallet-web-ui"
                   }
                },
                "spec": {
@@ -3048,9 +3052,13 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "value": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL"
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/splitwise-wallet-web-ui:tag",
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
                         "name": "splitwise-wallet-web-ui",
                         "ports": [
@@ -3061,11 +3069,11 @@
                         ],
                         "resources": {
                            "limits": {
-                              "cpu": 1,
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            },
                            "requests": {
-                              "cpu": 1,
+                              "cpu": "500m",
                               "memory": "1536Mi"
                            }
                         },

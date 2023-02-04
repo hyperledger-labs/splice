@@ -243,7 +243,9 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], cpuLimit="500m"),
+  ], image="wallet-web-ui", cpuLimit="500m", extraEnvVars=[
+    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
+  ]),
 
   c.deployment(config, "validator1-directory-web-ui", [
     {
@@ -321,6 +323,8 @@ local splitwiseDeployments(config) = [
       port: 80,
       internalOnly: true,
     },
+  ], image="wallet-web-ui", cpuLimit="500m", extraEnvVars=[
+    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
   ]),
 
   c.deployment(config, "splitwise-app", [
