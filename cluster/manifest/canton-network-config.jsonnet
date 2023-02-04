@@ -223,13 +223,18 @@ local validator1Deployments(config) = [
   c.deployment(config, "validator1-wallet-app", [
     {
       name: "val1-wal-api",
-      port: 5104,
+      port: 5004,
+      externalPort: 5104,
     },
-  ], proxyToGrpcWeb="val1-wal-api", extraEnvVars=[
+  ], proxyToGrpcWeb="val1-wal-api", image="wallet-app", extraEnvVars=[
     authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_URL,
     authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID,
     authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET,
     authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME,
+    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "validator1-participant" },
+    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator1-validator-app" },
+    { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
+    { name: "CN_APP_WALLET_VALIDATOR_HTTP_PORT", value: "6103" },
   ]),
 
   c.deployment(config, "validator1-wallet-web-ui", [
@@ -296,13 +301,18 @@ local splitwiseDeployments(config) = [
   c.deployment(config, "splitwise-wallet-app", [
     {
       name: "sw-wal-api",
-      port: 5204,
+      port: 5004,
+      externalPort: 5204,
     },
-  ], proxyToGrpcWeb="sw-wal-api", extraEnvVars=[
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME,
+  ], proxyToGrpcWeb="sw-wal-api", image="wallet-app", extraEnvVars=[
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_URL { name: "CN_APP_WALLET_LEDGER_API_AUTH_URL" },
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID" },
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET" },
+    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME" },
+    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwise-participant" },
+    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwise-validator-app" },
+    { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
+    { name: "CN_APP_WALLET_VALIDATOR_HTTP_PORT", value: "6203" },
   ]),
 
   c.deployment(config, "splitwise-wallet-web-ui", [

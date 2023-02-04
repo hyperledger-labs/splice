@@ -10,11 +10,10 @@ images := \
 	svc-app \
 	scan-app \
 	directory-app \
+	wallet-app \
 	validator1-validator-app \
-	validator1-wallet-app \
 	splitwise-validator-app \
 	splitwise-app \
-	splitwise-wallet-app \
 	splitwise-wallet-web-ui \
 	\
 	validator1-wallet-web-ui \
