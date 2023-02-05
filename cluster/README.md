@@ -648,3 +648,47 @@ We expose prometheus metrics for our three participants and the domain on the fo
 - splitwise participant: http://$cluster.network.canton.global:10213/metrics
 - domain: http://$cluster.network.canton.global:10313/metrics
 
+## Participant User Configuration
+
+At least one user needs to be allocated as part of the bootstrap file
+of a participant for bootstrapping. The configuration for those users
+is specified through a `CANTON_PARTICIPANT_USERS` environment
+variable. That variable specifies an array of users in JSON format
+that will be allocated in the given order. Each user specifies the
+user name, the primary party which can either be taken from another
+user or allocated freshly as well as `actAs`, `readAs` and `admin`
+claims. `actAs` and `readAs` claims can also be set to the primary
+party of another user. References can go through environment variables
+which allows us to pick up k8s secrets which are exposed through other
+environment variables. Using the SVC participant as an example, here
+is how the SVC user, Scan user and Directory user are specified. Note
+how the Scan and Directory users share their primary party and
+`actAs`/`readAs`with the SVC user.
+
+```json
+[
+  {
+    name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
+    primaryParty: { allocate: "svc_party" },
+    actAs: [{ fromUser: "self" }],
+    readAs: [],
+    admin: true,
+  },
+  {
+    name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
+    primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+    actAs: [],
+    readAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+    admin: false,
+  },
+  {
+    name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
+    primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+    actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+    readAs: [],
+    admin: true,
+  }
+]
+```
+
+The exact JSON format is defined in `tools.sc`.

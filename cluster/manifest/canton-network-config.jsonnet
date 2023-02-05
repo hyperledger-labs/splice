@@ -88,6 +88,60 @@ local svcDeployments(config) = [
     authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME,
+    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
+    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+      {
+        name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "svc_party" },
+        actAs: [{ fromUser: "self" }],
+        readAs: [],
+        admin: true,
+      },
+      {
+        name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+        actAs: [],
+        readAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        admin: false,
+      },
+      {
+        name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+        actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        readAs: [],
+        admin: true,
+      },
+      {
+        name: { env: "CN_APP_SV1_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "sv1" },
+        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        readAs: [],
+        admin: true,
+      },
+      {
+        name: { env: "CN_APP_SV2_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "sv2" },
+        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        readAs: [],
+        admin: true,
+      },
+      {
+        name: { env: "CN_APP_SV3_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "sv3" },
+        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        readAs: [],
+        admin: true,
+      },
+      {
+        name: { env: "CN_APP_SV4_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "sv4" },
+        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+        readAs: [],
+        admin: true,
+      },
+
+    ]) },
   ]),
 
   c.deployment(config, "directory-app", [
@@ -202,9 +256,19 @@ local validator1Deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=[
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME,
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=[
     authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
+    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "val1-postgres" },
+    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
+    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+      {
+        name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "validator1_validator_service_user" },
+        actAs: [{ fromUser: "self" }],
+        readAs: [],
+        admin: true,
+      },
+    ]) },
   ]),
 
   c.deployment(config, "validator1-validator-app", [
@@ -282,8 +346,19 @@ local splitwiseDeployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=[
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=[
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
+    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
+    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwise_participant" },
+    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+      {
+        name: { env: "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+        primaryParty: { allocate: "splitwise_validator_service_user" },
+        actAs: [{ fromUser: "self" }],
+        readAs: [],
+        admin: true,
+      },
+    ]) },
   ]),
 
   c.deployment(config, "splitwise-validator-app", [

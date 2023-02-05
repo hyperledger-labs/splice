@@ -1,6 +1,0 @@
-dir := $(call current_dir)
-
-$(dir)/$(docker-build): $(dir)/app.conf $(dir)/bootstrap.sc
-$(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell version-gen)
-
-include cluster/images/canton-base-image-dep.mk

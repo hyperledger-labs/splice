@@ -2,8 +2,6 @@ images := \
 	canton \
 	canton-participant \
 	canton-domain \
-	splitwise-participant \
-	validator1-participant \
 	\
 	cn-app \
 	sv-app \
