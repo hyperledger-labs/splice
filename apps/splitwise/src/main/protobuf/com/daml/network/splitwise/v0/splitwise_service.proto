@@ -15,7 +15,7 @@ service SplitwiseService {
 
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 
-  // TODO(M3-18) Consider if we want to keep this
+  // TODO(#2701) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
   rpc GetSplitwiseDomainId (google.protobuf.Empty) returns (GetSplitwiseDomainIdResponse);

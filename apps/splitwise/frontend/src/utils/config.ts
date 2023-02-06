@@ -15,9 +15,6 @@ const reader = new ConfigReader(
       splitwise: serviceSchema,
       ledgerApi: serviceSchema,
     }),
-    domains: z.object({
-      splitwise: z.string(),
-    }),
   })
 );
 

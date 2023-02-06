@@ -186,7 +186,7 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 
 object CoinLedgerConnection {
 
-  // TODO(M3-18) Remove this once we have a proper ACS endpoint
+  // TODO(#2699) Remove this once we have a proper ACS endpoint
   /** This represents an update to the ACS that we got through the update stream.
     * We also represent transfer in/out as AcsTransactions here not just
     * regular Daml transactions.
@@ -414,7 +414,7 @@ object CoinLedgerConnection {
       ): Future[Seq[Contract[TCid, T]]] =
         activeContractsWithOffset(domain, party, companion).map(_._1)
 
-      // TODO (M3-18)
+      // TODO (#2706)
       // This is a hacked up wrapper that transforms transaction trees into flat transactions.
       // This is required because the update service initially only exposes transaction trees.
       //
@@ -483,7 +483,7 @@ object CoinLedgerConnection {
         )
       }
 
-      // TODO (M3-18)
+      // TODO (#2706)
       // See `subscribe` for limitations of this method.
       override def subscribeAsync(
           subscriptionName: String,

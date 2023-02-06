@@ -201,7 +201,7 @@ object AcsStore {
   ): AcsStore =
     new FutureAcsStore(store)
 
-  // TODO (M3-18) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
+  // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
   abstract class InterfaceDecoder {
     def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[_]](
         companion: InterfaceCompanion[I, Id, View]
@@ -322,7 +322,7 @@ object AcsStore {
 
     override def contains(ev: CreatedEvent): Boolean =
       templateFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev)) ||
-        // TODO (M3-18) Avoid linear search once we have proper interface support in multi-domain.
+        // TODO (#2676) Avoid linear search once we have proper interface support in multi-domain.
         interfaceFilters.exists { case (_, (evPredicate, _)) => evPredicate(ev) }
 
     override def mightContain[TC, TCid, T](

@@ -20,8 +20,7 @@ const HomeWithContext: React.FC<{
   userId: string;
   svc: string | undefined;
   dirEntries: DirectoryEntries;
-  splitwiseDomainAlias: string;
-}> = ({ userId, svc, dirEntries, splitwiseDomainAlias }) => {
+}> = ({ userId, svc, dirEntries }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const { updateStatus } = useUserState();
@@ -48,8 +47,6 @@ const HomeWithContext: React.FC<{
 
   useEffect(() => {
     const querySplitwiseDomain = async () => {
-      // TODO(M3-18) Reconsider if we should query that from the user’s participant instead
-      // instead of the app backend once the ledger API exposes this.
       console.debug('Querying backend for splitwise domain');
       const domainsResponse = await splitwiseClient.getSplitwiseDomainId(new Empty(), undefined);
       const domainId = domainsResponse.getDomainId();
@@ -58,7 +55,7 @@ const HomeWithContext: React.FC<{
     };
 
     querySplitwiseDomain();
-  }, [splitwiseClient, splitwiseDomainAlias]);
+  }, [splitwiseClient]);
 
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.
@@ -144,12 +141,7 @@ const Home: React.FC<HomeProps> = ({ userId, svc, dirEntries, ledgerApiToken }) 
       userId={userId}
       token={ledgerApiToken}
     >
-      <HomeWithContext
-        userId={userId}
-        svc={svc}
-        dirEntries={dirEntries}
-        splitwiseDomainAlias={config.domains.splitwise}
-      />
+      <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
     </SplitwiseLedgerApiClientProvider>
   );
 };

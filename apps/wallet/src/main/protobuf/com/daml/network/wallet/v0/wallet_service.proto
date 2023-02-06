@@ -35,7 +35,7 @@ service WalletService {
   rpc ListAppRewardCoupons (ListAppRewardCouponsRequest) returns (ListAppRewardCouponsResponse);
   rpc ListValidatorRewardCoupons (ListValidatorRewardCouponsRequest) returns (ListValidatorRewardCouponsResponse);
 
-  // TODO(M3-18) Consider if we want to keep this
+  // TODO(#2701) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 
@@ -234,4 +234,3 @@ message ListValidatorRewardCouponsResponse {
 message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
 }
-

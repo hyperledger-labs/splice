@@ -21,9 +21,6 @@ import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import cats.instances.future.*
-import cats.instances.seq.*
-import cats.syntax.foldable.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvcAppService(
@@ -43,14 +40,12 @@ class GrpcSvcAppService(
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       for {
-        // TODO (M3-18) either choose the correct domain or fold over the
-        // store's ACSes instead (for which there should be 1/domain)
-        domains <- store.domains.listConnectedDomains().map(_.values.toSeq)
-        coinRulesCids <- domains.foldMapA { domain =>
+        // TODO (#2705) Set domain id from config here.
+        domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+        coinRulesCids <-
           connection
-            .activeContracts(domain, store.svcParty, cc.coin.CoinRules.COMPANION)
+            .activeContracts(domainId, store.svcParty, cc.coin.CoinRules.COMPANION)
             .map(_.map(_.id))
-        }
       } yield v0.GetDebugInfoResponse(
         svcUser = svcUserName,
         svcPartyId = Proto.encode(store.svcParty),

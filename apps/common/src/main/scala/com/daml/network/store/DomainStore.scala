@@ -17,12 +17,12 @@ abstract class DomainStore extends AutoCloseable {
 
   /** Return the unique domain id in the store.
     * Fails if there is more than one domain.
-    * TODO(M3-18) Remove all usages of this
+    * TODO(#2698) Remove all usages of this
     */
   def getUniqueDomainId(): Future[DomainId]
 
   /** Wait for at least one domain to be connected.
-    * TODO(M3-18) Either make this wait for specific domains
+    * TODO(#2704) Either make this wait for specific domains
     * or remove usage.
     */
   def signalWhenConnected(): Future[Unit]

@@ -17,7 +17,7 @@ service ScanService {
   rpc ListFeaturedAppRights (google.protobuf.Empty) returns (ListFeaturedAppRightsResponse);
   rpc LookupFeaturedAppRight (LookupFeaturedAppRightRequest) returns (LookupFeaturedAppRightResponse);
 
-  // TODO(M3-18) Consider if we want to keep this
+  // TODO(#2701) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 }

@@ -305,7 +305,7 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
       .map(_.isEmpty)
 }
 
-/** TODO(M3-18) Integrate into stores and support filtering.
+/** TODO(#2677) Integrate into stores and support filtering.
   */
 abstract class OnTransferOutTrigger(
     connection: CoinLedgerConnection,
@@ -328,7 +328,7 @@ abstract class OnTransferOutTrigger(
         party,
       )
 
-  // TODO(M3-18) This implementation is obviously broken. Once we have multi-domain stores
+  // TODO(#2677) This implementation is obviously broken. Once we have multi-domain stores
   // we can implement this properly.
   override final protected def isStaleTask(
       task: LedgerClient.GetTreeUpdatesResponse.Transfer[

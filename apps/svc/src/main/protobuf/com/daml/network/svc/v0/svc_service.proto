@@ -14,7 +14,7 @@ service SvcService {
   // Withdraw a featured app right from an app provider, with a textual reasoning
   rpc WithdrawFeaturedAppRight (WithdrawFeaturedAppRightRequest) returns (google.protobuf.Empty);
 
-  // TODO(M3-18) Consider if we want to keep this
+  // TODO(#2701) Consider if we want to keep this
   // once we no longer need it for testing.
   rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
 
