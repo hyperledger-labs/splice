@@ -55,6 +55,12 @@ abstract class SplitwiseAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListConnectedDomains())
     }
+
+  @Help.Summary("Get the domain id for the private splitwise app domain")
+  def getSplitwiseDomainId(): DomainId =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.GetSplitwiseDomainId())
+    }
 }
 
 final class SplitwiseAppClientReference(
@@ -143,12 +149,9 @@ final class SplitwiseAppClientReference(
       readAs,
       update,
       commandId,
-      Some(getDomainId()),
+      Some(getSplitwiseDomainId()),
     )
   }
-
-  private def getDomainId() =
-    listConnectedDomains()(config.domains.splitwise)
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 

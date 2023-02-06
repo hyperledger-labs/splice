@@ -457,10 +457,7 @@ object CoinConfigTransforms {
   def useSeparateSplitwiseDomain(): CoinConfigTransform =
     updateAllSplitwiseAppConfigs_(c =>
       c.focus(_.domains.splitwise).replace(DomainAlias.tryCreate("splitwise"))
-    ) compose
-      updateAllRemoteSplitwiseAppConfigs_(c =>
-        c.focus(_.domains.splitwise).replace(DomainAlias.tryCreate("splitwise"))
-      )
+    )
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]

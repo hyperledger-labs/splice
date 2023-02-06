@@ -196,4 +196,20 @@ object GrpcSplitwiseAppClient {
     ): Either[String, Map[DomainAlias, DomainId]] =
       Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
+
+  case class GetSplitwiseDomainId(
+  ) extends BaseCommand[Empty, v0.GetSplitwiseDomainIdResponse, DomainId] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: SplitwiseServiceStub,
+        request: Empty,
+    ): Future[v0.GetSplitwiseDomainIdResponse] = service.getSplitwiseDomainId(request)
+
+    override def handleResponse(
+        response: v0.GetSplitwiseDomainIdResponse
+    ): Either[String, DomainId] =
+      Proto.decode(Proto.DomainId)(response.domainId)
+  }
 }

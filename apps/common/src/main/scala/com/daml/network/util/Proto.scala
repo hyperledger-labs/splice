@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as Ja
 import com.daml.lf.data.Numeric
 import com.daml.network.v0
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId as CantonDomainId, PartyId}
 import com.digitalasset.canton.{DomainAlias, LfTimestamp}
 
 /** Trait for values used in our protobuf requests.
@@ -113,12 +113,23 @@ object Proto {
     def instance = timestampValue
   }
 
-  implicit val connectedDomainsValue: Proto[Map[DomainAlias, DomainId], v0.ConnectedDomains] =
-    new Proto[Map[DomainAlias, DomainId], v0.ConnectedDomains] {
-      def encode(d: Map[DomainAlias, DomainId]) =
+  implicit val domainIdValue: Proto[CantonDomainId, String] =
+    new Proto[CantonDomainId, String] {
+      def encode(d: CantonDomainId) = d.toProtoPrimitive
+      def decode(e: String) = CantonDomainId.fromString(e)
+    }
+
+  object DomainId extends ProtoCompanion[CantonDomainId] {
+    type Enc = String
+    def instance = domainIdValue
+  }
+
+  implicit val connectedDomainsValue: Proto[Map[DomainAlias, CantonDomainId], v0.ConnectedDomains] =
+    new Proto[Map[DomainAlias, CantonDomainId], v0.ConnectedDomains] {
+      def encode(d: Map[DomainAlias, CantonDomainId]) =
         v0.ConnectedDomains(
           d.view.map { case (k, v) =>
-            k.toProtoPrimitive -> v.toProtoPrimitive
+            k.toProtoPrimitive -> Proto.encode(v)
           }.toMap
         )
       def decode(e: v0.ConnectedDomains) =
@@ -126,13 +137,13 @@ object Proto {
           .traverse { case (k, v) =>
             for {
               k <- DomainAlias.create(k)
-              v <- DomainId.fromString(v)
+              v <- Proto.decode(DomainId)(v)
             } yield (k, v)
           }
           .map(_.toMap)
     }
 
-  object ConnectedDomains extends ProtoCompanion[Map[DomainAlias, DomainId]] {
+  object ConnectedDomains extends ProtoCompanion[Map[DomainAlias, CantonDomainId]] {
     type Enc = v0.ConnectedDomains
     def instance = connectedDomainsValue
   }
