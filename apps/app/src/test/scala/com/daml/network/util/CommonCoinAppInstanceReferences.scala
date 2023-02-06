@@ -73,6 +73,11 @@ trait CommonCoinAppInstanceReferences {
     "bobWalletBackend"
   )
 
+  def splitwiseWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference =
+    wb(
+      "splitwiseWalletBackend"
+    )
+
   def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "bobWallet"
   )

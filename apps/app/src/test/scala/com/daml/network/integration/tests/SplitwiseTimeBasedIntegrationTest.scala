@@ -39,7 +39,9 @@ class SplitwiseTimeBasedIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
-      val splitwiseProviderParty = onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
+      // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready
+      waitForWalletUser(splitwiseProviderWallet)
+      val splitwiseProviderParty = providerSplitwiseBackend.getProviderPartyId()
 
       // Setup install contracts
       Seq(

@@ -1,9 +1,7 @@
 package com.daml.network.validator.admin.http
 
-import com.daml.ledger.javaapi.data.User
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.{definitions, validator as v0}
-import com.daml.network.util.CoinUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -81,40 +79,20 @@ class HttpValidatorHandler(
       )
     }
   }
-  private def onboard(name: String)(implicit traceContext: TraceContext) = {
-    for {
-      userPartyId <- connection.getOrAllocateParty(
+
+  private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
+    ValidatorUtil
+      .onboard(
         name,
-        Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
+        connection,
+        store,
+        validatorUserName,
+        walletServiceUser,
+        domainId,
+        retryProvider,
+        flagCloseable,
+        logger,
       )
-      // TODO(#713) Workaround for the lack of "act-as-any-party" rights
-      _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
-      _ <- ValidatorUtil.installWalletForUser(
-        endUserParty = userPartyId,
-        endUserName = name,
-        walletServiceUser = walletServiceUser,
-        walletServiceParty = store.key.walletServiceParty,
-        validatorServiceParty = store.key.validatorParty,
-        svcParty = store.key.svcParty,
-        connection = connection,
-        store = store,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        flagCloseable = flagCloseable,
-        logger = logger,
-      )
-      // Create validator right contract so validator can collect validator rewards
-      _ <- CoinUtil.createValidatorRight(
-        user = userPartyId,
-        validator = store.key.validatorParty,
-        svc = store.key.svcParty,
-        connection = connection,
-        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        flagCloseable = flagCloseable,
-        logger = logger,
-      )
-    } yield userPartyId.filterString
+      .map(p => p.filterString)
   }
 }

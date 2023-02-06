@@ -8,6 +8,8 @@ import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.daml.ledger.javaapi.data.User
+import com.daml.network.util.CoinUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -35,7 +37,6 @@ private[validator] object ValidatorUtil {
       s"Installing wallet for endUserParty=$endUserParty, walletServiceParty=$walletServiceParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
-      // TODO(#713): remove this workaround for missing `read-as-any-party` rights
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
       _ <- retryProvider.retryForAutomationGrpc(
         "installWalletForUser",
@@ -67,4 +68,51 @@ private[validator] object ValidatorUtil {
       )
     } yield ()
   }
+
+  def onboard(
+      endUserName: String,
+      connection: CoinLedgerConnection,
+      store: ValidatorStore,
+      validatorUserName: String,
+      walletServiceUser: String,
+      domainId: DomainId,
+      retryProvider: CoinRetries,
+      flagCloseable: FlagCloseable,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
+    for {
+      userPartyId <- connection.getOrAllocateParty(
+        endUserName,
+        Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
+      )
+      _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
+      _ <- installWalletForUser(
+        endUserParty = userPartyId,
+        endUserName = endUserName,
+        walletServiceUser = walletServiceUser,
+        walletServiceParty = store.key.walletServiceParty,
+        validatorServiceParty = store.key.validatorParty,
+        svcParty = store.key.svcParty,
+        connection = connection,
+        store = store,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        flagCloseable = flagCloseable,
+        logger = logger,
+      )
+      // Create validator right contract so validator can collect validator rewards
+      _ <- CoinUtil.createValidatorRight(
+        user = userPartyId,
+        validator = store.key.validatorParty,
+        svc = store.key.svcParty,
+        connection = connection,
+        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        flagCloseable = flagCloseable,
+        logger = logger,
+      )
+    } yield userPartyId
+  }
+
 }

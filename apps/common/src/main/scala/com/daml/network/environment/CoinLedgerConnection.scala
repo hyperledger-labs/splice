@@ -142,6 +142,12 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def createPartyAndUser(user: String, userRights: Seq[User.Right]): Future[PartyId]
 
+  def createUserWithPrimaryParty(
+      user: String,
+      party: PartyId,
+      userRights: Seq[User.Right],
+  ): Future[PartyId]
+
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
@@ -608,9 +614,18 @@ object CoinLedgerConnection {
       ): Future[PartyId] = {
         for {
           party <- allocatePartyViaLedgerApi(Some(sanitizeUserIdToLedgerString(user)), Some(user))
-          userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
-          userLf = new User(userId, party.toLf)
+          partyId <- createUserWithPrimaryParty(user, party, userRights)
+        } yield partyId
+      }
 
+      override def createUserWithPrimaryParty(
+          user: String,
+          party: PartyId,
+          userRights: Seq[User.Right],
+      ): Future[PartyId] = {
+        val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+        val userLf = new User(userId, party.toLf)
+        for {
           user <- client
             .createUser(userLf, new User.Right.CanActAs(party.toLf) +: userRights)
           partyId =

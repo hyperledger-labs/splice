@@ -68,7 +68,12 @@ object CoinConfigTransforms {
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           walletServiceUser = s"${c.walletServiceUser}-$suffix",
           appInstances = c.appInstances.view
-            .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
+            .mapValues(i =>
+              i.copy(
+                serviceUser = i.serviceUser.map(u => s"${u}-$suffix"),
+                walletUser = s"${i.walletUser}-$suffix",
+              )
+            )
             .toMap,
         )
       ),

@@ -89,17 +89,39 @@ class ValidatorApp(
       name: String,
       instance: AppInstance,
       validatorParty: PartyId,
+      store: ValidatorStore,
+      walletServiceUser: String,
+      domainId: DomainId,
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
-      party <- connection.getOrAllocateParty(
-        instance.serviceUser,
-        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-      )
+      party <- ValidatorUtil
+        .onboard(
+          instance.walletUser,
+          connection,
+          store,
+          validatorUserName = config.ledgerApiUser,
+          walletServiceUser,
+          domainId,
+          retryProvider,
+          flagCloseable = this,
+          logger,
+        )
+        .flatMap(party => {
+          instance.serviceUser match {
+            case Some(user) if user != instance.walletUser =>
+              connection.createUserWithPrimaryParty(
+                user,
+                party,
+                Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+              )
+            case _ => Future.successful(party)
+          }
+        })
     } yield {
       logger.info(
-        s"Setup app $name with service user ${instance.serviceUser},  primary party $party, and uploaded ${instance.dars}."
+        s"Setup app $name with service user ${instance.serviceUser}, wallet user ${instance.walletUser}  primary party $party, and uploaded ${instance.dars}."
       )
     }
   }
@@ -259,7 +281,15 @@ class ValidatorApp(
       _ <- store.domains.signalWhenConnected(config.domains.global)
       domainId <- store.domains.getDomainId(config.domains.global)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
-        setupAppInstance(connection, name, instance, validatorParty)
+        setupAppInstance(
+          connection,
+          name,
+          instance,
+          validatorParty,
+          store,
+          walletServiceUser,
+          domainId,
+        )
       })
       _ <- createWalletAppInstallAndValidatorRight(
         connection,

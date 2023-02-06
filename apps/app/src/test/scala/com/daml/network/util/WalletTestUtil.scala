@@ -152,12 +152,21 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
     clue(s"Onboard $ledgerApiUser on ${validator.name}") {
       val party = validator.onboardUser(ledgerApiUser)
-      // The wallet is not immediately usable by the onboarded user -
-      // the wallet app backend has to ingest the wallet install contract first.
-      eventually() {
-        walletAppClient.userStatus().userOnboarded shouldBe true
-      }
+      waitForWalletUser(walletAppClient)
       party
+    }
+  }
+
+  /** The wallet is not immediately usable by an onboarded user, specifically, the wallet
+    *  app backend needs to ingest the wallet install contract first. This function waits for
+    *  that to complete.
+    */
+
+  def waitForWalletUser(
+      walletAppClient: WalletAppClientReference
+  ) = {
+    eventually() {
+      walletAppClient.userStatus().userOnboarded shouldBe true
     }
   }
 

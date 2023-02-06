@@ -15,7 +15,12 @@ import com.digitalasset.canton.config.*
 import java.nio.file.Path
 
 case class AppInstance(
-    serviceUser: String,
+    // A user for the provider which is also auto-onboarded as a wallet user:
+    walletUser: String,
+    // An optional alternative username for the service backend. Specifying this can be useful if the
+    // backend uses a machine-to-machine token, as opposed to a login one used in the wallet user above.
+    // If not specified, or equal to the wallet user - no additional user is created.
+    serviceUser: Option[String],
     dars: Seq[Path],
 )
 
