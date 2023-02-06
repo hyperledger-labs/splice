@@ -18,6 +18,7 @@ case class LocalDirectoryAppConfig(
     override val remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
+    domains: DirectoryDomainConfig,
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "directory"
 

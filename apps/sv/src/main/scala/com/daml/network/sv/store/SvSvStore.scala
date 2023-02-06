@@ -2,6 +2,7 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -12,6 +13,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
 trait SvSvStore extends CoinAppStoreWithoutHistory {
+
+  protected[this] def domainConfig: SvDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
 
   def listValidatorOnboardings()
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
@@ -24,11 +29,12 @@ object SvSvStore {
   def apply(
       key: SvStore.Key,
       storage: Storage,
+      domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): SvSvStore =
     storage match {
-      case _: MemoryStorage => new InMemorySvSvStore(key, loggerFactory, futureSupervisor)
+      case _: MemoryStorage => new InMemorySvSvStore(key, domains, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

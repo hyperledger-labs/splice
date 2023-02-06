@@ -1,5 +1,6 @@
 package com.daml.network.scan.store.memory
 
+import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -10,6 +11,7 @@ import scala.concurrent.*
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
+    override protected[this] val domainConfig: ScanDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit

@@ -61,7 +61,9 @@ class ScanApp(
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
-      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory, futureSupervisor))
+      store <- Future.successful(
+        ScanStore(svcParty, storage, config.domains, loggerFactory, futureSupervisor)
+      )
       automation = new ScanAutomationService(
         config.automation,
         clock,

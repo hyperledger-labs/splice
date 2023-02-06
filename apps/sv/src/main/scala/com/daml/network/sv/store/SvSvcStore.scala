@@ -3,6 +3,7 @@ package com.daml.network.sv.store
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -17,6 +18,10 @@ import scala.concurrent.{ExecutionContext, Future}
 trait SvSvcStore extends CoinAppStoreWithoutHistory {
 
   def key: SvStore.Key
+
+  protected[this] def domainConfig: SvDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
 
   def lookupCoinRulesWithOffset(
   ): Future[
@@ -63,11 +68,12 @@ object SvSvcStore {
   def apply(
       key: SvStore.Key,
       storage: Storage,
+      domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): SvSvcStore =
     storage match {
-      case _: MemoryStorage => new InMemorySvSvcStore(key, loggerFactory, futureSupervisor)
+      case _: MemoryStorage => new InMemorySvSvcStore(key, domains, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

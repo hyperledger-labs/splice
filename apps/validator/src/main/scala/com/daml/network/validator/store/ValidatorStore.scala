@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.Contract
+import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -18,6 +19,10 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
+
+  protected[this] def domainConfig: ValidatorDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
 
   def lookupWalletInstallByNameWithOffset(
       endUserName: String
@@ -56,12 +61,13 @@ object ValidatorStore {
   def apply(
       key: Key,
       storage: Storage,
+      domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, loggerFactory, futureSupervisor)
+        new InMemoryValidatorStore(key, domains, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

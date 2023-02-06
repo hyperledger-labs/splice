@@ -1,6 +1,5 @@
 package com.daml.network.validator.config
 
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
@@ -18,10 +17,6 @@ import java.nio.file.Path
 case class AppInstance(
     serviceUser: String,
     dars: Seq[Path],
-)
-
-case class ValidatorDomainConfig(
-    global: DomainAlias
 )
 
 case class ValidatorOnboardingConfig(

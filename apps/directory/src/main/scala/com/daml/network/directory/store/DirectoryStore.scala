@@ -3,6 +3,7 @@ package com.daml.network.directory.store
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.Contract
@@ -32,6 +33,10 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
+
+  protected[this] def domainConfig: DirectoryDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
 
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(
@@ -134,6 +139,7 @@ object DirectoryStore {
       providerParty: PartyId,
       svcParty: PartyId,
       storage: Storage,
+      domains: DirectoryDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit
@@ -144,6 +150,7 @@ object DirectoryStore {
         new InMemoryDirectoryStore(
           providerParty = providerParty,
           svcParty = svcParty,
+          domains,
           loggerFactory,
           futureSupervisor,
         )

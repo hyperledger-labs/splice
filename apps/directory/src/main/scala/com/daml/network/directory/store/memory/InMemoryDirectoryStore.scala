@@ -1,5 +1,6 @@
 package com.daml.network.directory.store.memory
 
+import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -11,6 +12,7 @@ import scala.concurrent.*
 class InMemoryDirectoryStore(
     override val providerParty: PartyId,
     override val svcParty: PartyId,
+    override protected[this] val domainConfig: DirectoryDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
 )(implicit override protected val ec: ExecutionContext)

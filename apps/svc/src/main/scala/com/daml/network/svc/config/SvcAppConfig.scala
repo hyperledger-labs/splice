@@ -13,6 +13,7 @@ case class SvcAppBackendConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
+    domains: SvcDomainConfig,
     automation: AutomationConfig = AutomationConfig(),
     // TODO(M3-07): use price from SvcRules
     // TODO(M3-46): remove entirely once mining rounds automations moves into SvApp

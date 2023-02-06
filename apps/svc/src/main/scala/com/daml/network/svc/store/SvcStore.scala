@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{CoinUtil, Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -23,6 +24,10 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
+
+  protected[this] def domainConfig: SvcDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
 
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
@@ -258,6 +263,7 @@ object SvcStore {
   def apply(
       svcParty: PartyId,
       storage: Storage,
+      domains: SvcDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit
@@ -265,7 +271,7 @@ object SvcStore {
   ): SvcStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySvcStore(svcParty = svcParty, loggerFactory, futureSupervisor)
+        new InMemorySvcStore(svcParty = svcParty, domains, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

@@ -85,6 +85,7 @@ class DirectoryApp(
         providerParty = providerPartyId,
         svcParty = svcParty,
         storage,
+        config.domains,
         loggerFactory,
         futureSupervisor,
       )

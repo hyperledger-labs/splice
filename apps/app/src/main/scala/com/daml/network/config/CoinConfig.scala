@@ -454,6 +454,8 @@ object CoinConfig {
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
+    implicit val globalOnlyDomainConfigReader: ConfigReader[GlobalOnlyDomainConfig] =
+      deriveReader[GlobalOnlyDomainConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
     implicit val svcConfigReader: ConfigReader[SvcAppBackendConfig] =
@@ -467,8 +469,6 @@ object CoinConfig {
 
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
-    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
-      deriveReader[ValidatorDomainConfig]
     implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
       deriveReader[ValidatorOnboardingConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =

@@ -66,8 +66,8 @@ class SvApp(
     for {
       svcPartyId <- retryProvider.retryForAutomationGrpc("get SVC party ID", getSvcPartyId, this)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
-      svStore = SvSvStore(storeKey, storage, loggerFactory, futureSupervisor)
-      svcStore = SvSvcStore(storeKey, storage, loggerFactory, futureSupervisor)
+      svStore = SvSvStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
+      svcStore = SvSvcStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
       automation = new SvAutomationService(
         clock,
         config,

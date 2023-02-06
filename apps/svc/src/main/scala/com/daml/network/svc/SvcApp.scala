@@ -57,7 +57,9 @@ class SvcApp(
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
-      store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory, futureSupervisor))
+      store <- Future.successful(
+        SvcStore(svcPartyId, storage, config.domains, loggerFactory, futureSupervisor)
+      )
       connection = ledgerClient.connection()
       // We can't move this to the SV app at the moment because of init order;
       // without uploading this DAR here the `createValidatorRight` step below

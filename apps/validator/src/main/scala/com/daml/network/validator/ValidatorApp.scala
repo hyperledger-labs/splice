@@ -245,7 +245,7 @@ class ValidatorApp(
         svcParty = svcParty,
         walletServiceParty = walletServiceParty,
       )
-      store = ValidatorStore(key, storage, loggerFactory, futureSupervisor)
+      store = ValidatorStore(key, storage, config.domains, loggerFactory, futureSupervisor)
       automation = new ValidatorAutomationService(
         config.automation,
         clock,

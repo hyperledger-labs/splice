@@ -1,6 +1,7 @@
 package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
 import com.daml.network.util.Contract
@@ -17,6 +18,10 @@ trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRound
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
+  protected[this] def domainConfig: ScanDomainConfig
+
+  override final def defaultAcsDomain = domainConfig.global
+
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 }
@@ -25,6 +30,7 @@ object ScanStore {
   def apply(
       svcParty: PartyId,
       storage: Storage,
+      domainConfig: ScanDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
   )(implicit
@@ -32,7 +38,7 @@ object ScanStore {
   ): ScanStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryScanStore(svcParty = svcParty, loggerFactory, futureSupervisor)
+        new InMemoryScanStore(svcParty = svcParty, domainConfig, loggerFactory, futureSupervisor)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

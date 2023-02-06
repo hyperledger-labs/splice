@@ -18,6 +18,7 @@ case class LocalSvAppConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteSvc: SvcAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
+    domains: SvDomainConfig,
     // TODO(#2241): consider grouping below options into some form of `SvBootstrapConfig`
     foundConsortium: Boolean = false,
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),

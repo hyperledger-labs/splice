@@ -15,6 +15,7 @@ case class ScanAppBackendConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     svcUser: String,
     override val remoteParticipant: CoinRemoteParticipantConfig,
+    domains: ScanDomainConfig,
     automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
