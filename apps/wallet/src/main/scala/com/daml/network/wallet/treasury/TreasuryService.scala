@@ -133,12 +133,11 @@ class TreasuryService(
       case Enqueued =>
         logger.debug(show"Received operation (queue size: ${queue.size()}): $operation")
         p.future
-      // TODO(#2373): add a test for this back-pressure case.
       case Dropped =>
         Future.failed(
           new StatusRuntimeException(
             Status.ABORTED.withDescription(
-              show"Aborted operation as there are too many (currently ${queue
+              show"Aborted operation - likely because there are too many operations (currently ${queue
                   .size()}, max ${treasuryConfig.queueSize}) already in flight: $operation"
             )
           )

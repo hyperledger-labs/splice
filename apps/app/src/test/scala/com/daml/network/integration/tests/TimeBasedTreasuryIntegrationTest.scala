@@ -27,8 +27,8 @@ class TimeBasedTreasuryIntegrationTest
     with TimeTestUtil {
 
   private val batchSize = 10
-  // need a large queue size so we can guarantee that it is still pretty full once we shutdown.
-  private val queueSize = 150
+  // need a larger queue size so we can guarantee that it is still pretty full once we shutdown.
+  private val queueSize = 40
 
   override def environmentDefinition: CoinEnvironmentDefinition = {
     CoinEnvironmentDefinition
@@ -44,7 +44,7 @@ class TimeBasedTreasuryIntegrationTest
       )
   }
 
-  "shutdown cleanly with lots of coin operations in flight" in { implicit env =>
+  "operate and shutdown cleanly with lots of coin operations in flight" in { implicit env =>
     onboardWalletUser(aliceWallet, aliceValidator)
 
     def tapInRange(start: Int, end: Int) = {
@@ -63,9 +63,9 @@ class TimeBasedTreasuryIntegrationTest
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
         // waiting for a few taps succeed - so...
-        val futuresWait = tapInRange(1, batchSize)
+        val futuresWait = tapInRange(1, 6 * batchSize)
         // .. these taps here can fill up the queue
-        val futuresDontWait = tapInRange(batchSize + 1, queueSize + batchSize * 5)
+        val futuresDontWait = tapInRange(6 * batchSize + 1, (6 * batchSize + 1) + 5 * queueSize)
 
         Await.result(futuresWait, atMost = 15.seconds)
         // such that some of them will still be in-flight when we shutdown
@@ -79,18 +79,18 @@ class TimeBasedTreasuryIntegrationTest
         // sleeping 1s, as sometimes error from TODO(#1942) are logged delayed.
         Threading.sleep(1000)
       },
-      lines =>
+      lines => {
+        // \r is carriage return
+        val regexAnything = "(.|\\n|\\r)*"
+        val errorRegex = Seq(
+          "Request failed for aliceWallet",
+          "(ABORTED|UNAVAILABLE|CANCELLED|UNIMPLEMENTED)",
+        ).mkString(regexAnything)
+
+        val errorRegex2 = // TODO(#1942): these errors shouldn't occur during this test.
+          s"(Skipping batch due to unexpected execution failure|Unexpected coin operation execution failure)"
+
         forAll(lines) { line =>
-          // \r is carriage return
-          val regexAnything = "(.|\\n|\\r)*"
-          val errorRegex = Seq(
-            "Request failed for aliceWallet",
-            "(ABORTED|UNAVAILABLE|CANCELLED|UNIMPLEMENTED)",
-          ).mkString(regexAnything)
-
-          val errorRegex2 = // TODO(#1942): these errors shouldn't occur during this test.
-            s"(Skipping batch due to unexpected execution failure|Unexpected coin operation execution failure)"
-
           if (line.level == Level.ERROR) {
             line.throwable match {
               // TODO(#1942): we are only aware of this unhandled exception during shutdowns.
@@ -109,7 +109,8 @@ class TimeBasedTreasuryIntegrationTest
           } else {
             fail(s"unexpected warning or error: $line")
           }
-        },
+        }
+      },
     )
   }
 
