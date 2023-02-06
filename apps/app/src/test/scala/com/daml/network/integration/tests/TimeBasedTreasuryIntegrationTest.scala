@@ -28,7 +28,7 @@ class TimeBasedTreasuryIntegrationTest
 
   private val batchSize = 10
   // need a larger queue size so we can guarantee that it is still pretty full once we shutdown.
-  private val queueSize = 40
+  private val queueSize = 80
 
   override def environmentDefinition: CoinEnvironmentDefinition = {
     CoinEnvironmentDefinition
@@ -63,9 +63,9 @@ class TimeBasedTreasuryIntegrationTest
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
         // waiting for a few taps succeed - so...
-        val futuresWait = tapInRange(1, 6 * batchSize)
+        val futuresWait = tapInRange(1, 2 * batchSize)
         // .. these taps here can fill up the queue
-        val futuresDontWait = tapInRange(6 * batchSize + 1, (6 * batchSize + 1) + 5 * queueSize)
+        val futuresDontWait = tapInRange(2 * batchSize + 1, (2 * batchSize + 1) + 50 * queueSize)
 
         Await.result(futuresWait, atMost = 15.seconds)
         // such that some of them will still be in-flight when we shutdown
