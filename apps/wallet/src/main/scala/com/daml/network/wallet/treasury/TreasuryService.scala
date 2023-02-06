@@ -20,7 +20,6 @@ import com.daml.network.codegen.java.cc.api.v1.coin.{
 }
 import com.daml.network.codegen.java.cc.api.v1.round as roundApi
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
@@ -378,26 +377,26 @@ class TreasuryService(
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
       coinInputsAndQuantity: Seq[(BigDecimal, InputCoin)],
-      config: CoinConfig[USD],
+      createFeeUsd: BigDecimal,
   )(implicit tc: TraceContext): Boolean = {
     val numCoinInputs = coinInputsAndQuantity.length
     val totalCoinQuantity = coinInputsAndQuantity.map(_._1).sum
     if (numCoinInputs <= 1) {
-      val run = totalRewardsQuantity > config.createFee.fee
+      val run = totalRewardsQuantity > createFeeUsd
       // only log when there are actually some rewards to possibly collect.
       if (!run && totalRewardsQuantity != 0)
         logger.debug(
           "Not executing a merge operation because there no coins to merge " +
-            s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee ${config.createFee.fee}"
+            s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee $createFeeUsd"
         )
       run
     } else {
       val totalQuantity = totalRewardsQuantity + totalCoinQuantity
-      val run = totalQuantity > config.createFee.fee
+      val run = totalQuantity > createFeeUsd
       if (!run && totalQuantity != 0)
         logger.debug(
           "Not executing a merge operation because " +
-            s"the total rewards and coin quantity ${totalQuantity} is smaller than the create-fee ${config.createFee.fee}"
+            s"the total rewards and coin quantity ${totalQuantity} is smaller than the create-fee $createFeeUsd"
         )
       run
     }
@@ -425,9 +424,9 @@ class TreasuryService(
   ]] =
     for {
       coinRules <- scanConnection.getCoinRules()
-      config = coinRules.payload.config
-      maxNumInputs = config.maxNumInputs.intValue()
       (openRound, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
+      configCC = openRound.payload.coinConfig
+      maxNumInputs = configCC.maxNumInputs.intValue()
       openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))
       issuingRoundsMap = openIssuingRounds
         .map(r => (r.payload.round, r.payload))
@@ -451,11 +450,12 @@ class TreasuryService(
       )
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
+      val createFeeUsd = BigDecimal(configCC.createFee.fee) / openRound.payload.coinPrice
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,
           coinInputsAndQuantity,
-          config,
+          createFeeUsd,
         )
       ) {
         None

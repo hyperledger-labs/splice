@@ -1,26 +1,13 @@
 module CC.Round where
 
-import DA.Time
-
 import CN.Util.Assert
+
 import qualified CC.API.V1.Round as API
 import CC.API.V1.Round (Round(..))
+import CC.CoinConfig
 import CC.Issuance
 
--- | The equivalent of RelTime for rounds, i.e., a delta between
--- two rounds
-newtype RelRound = RelRound with diff : Int
-  deriving (Eq, Ord, Show)
-
-addRelRound : Round -> RelRound -> Round
-addRelRound round i = Round with number = round.number + i.diff
-
-subRound : Round -> Round -> RelRound
-subRound (Round a) (Round b) = RelRound (a - b)
-
-isDefinedRound : Round -> Bool
-isDefinedRound round = round.number >= 0
-
+import DA.Time
 
 -- | A mining round for which new rewards can be registered.
 -- Note that multiple mining rounds can be open at the same time to give some
@@ -35,6 +22,7 @@ template OpenMiningRound
     opensAt : Time -- ^ Time after which transfers can use this mining round
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
     issuingFor : RelTime -- ^ Time for which the SVC has been issuing rewards. Determines the configuration for the issuance round.
+    coinConfig : CoinConfig CC
   where
     signatory svc
     observer observers
@@ -60,6 +48,7 @@ template SummarizingMiningRound
     round : Round
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     issuanceConfig : IssuanceConfig
+    tickDuration : RelTime
   where
     signatory svc
     ensure isDefinedRound round
@@ -105,3 +94,7 @@ template ClosedMiningRound
     signatory svc
     observer observers
     ensure isDefinedRound round
+
+-- | Check if a round has a positive round number
+isDefinedRound : Round -> Bool
+isDefinedRound round = round.number >= 0

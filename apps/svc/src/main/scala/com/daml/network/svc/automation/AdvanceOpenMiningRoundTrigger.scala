@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -33,8 +32,7 @@ class AdvanceOpenMiningRoundTrigger(
     (for {
       rules <- OptionT(store.lookupCoinRules())
       rounds <- OptionT(store.lookupOpenMiningRoundTriple())
-      tickDuration = CoinUtil.relTimeToDuration(rules.payload.config.tickDuration)
-      if (rounds.readyToAdvanceAt(tickDuration).isBefore(now.toInstant))
+      if (rounds.readyToAdvanceAt.isBefore(now.toInstant))
       // NOTE: we store the coin-rules reference in the task, as otherwise its tickDuration and the one that is
       // actually used in the choice might go out of sync
     } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)

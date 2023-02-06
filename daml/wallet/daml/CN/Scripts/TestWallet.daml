@@ -6,7 +6,8 @@ import Daml.Script
 import DA.List
 
 import qualified CC.API.V1.Coin as API
-import CC.Coin hiding (CC, USD)
+import CC.Coin
+import CC.Schedule
 import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -194,7 +195,7 @@ testCCPaymentRequest = script do
   featuredValidator <- featureApp app (CCUser validatorUserId validator)
 
   -- retrieve the config
-  Some (_, CoinRules{config = coinConfig}) <- queryCoinRulesByKey app.svc
+  Some (_, CoinRules{configSchedule = Schedule{currentValue = coinConfig} }) <- queryCoinRulesByKey app.svc
 
   coin <- tap app alice 27.0
   t <- getTime

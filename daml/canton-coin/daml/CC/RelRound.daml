@@ -1,0 +1,17 @@
+module CC.RelRound where
+
+import CC.API.V1.Round (Round(..))
+
+-- Round utilities
+------------------
+
+-- | The equivalent of RelTime for rounds, i.e., a delta between
+-- two rounds
+newtype RelRound = RelRound with diff : Int
+  deriving (Eq, Ord, Show)
+
+addRelRound : Round -> RelRound -> Round
+addRelRound round i = Round with number = round.number + i.diff
+
+subRound : Round -> Round -> RelRound
+subRound (Round a) (Round b) = RelRound (a - b)

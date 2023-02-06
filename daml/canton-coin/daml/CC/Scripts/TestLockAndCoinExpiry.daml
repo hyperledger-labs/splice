@@ -8,6 +8,7 @@ import CC.Coin
 import CC.Fees
 import CC.Expiry
 import CC.Round
+import CC.RelRound
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
@@ -40,7 +41,8 @@ test = script do
       issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
 
       observers = []
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0
+      coinConfig = scaleConfig coinPrice defaultCoinConfig
+      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; coinConfig
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
 
   alice <- setupUser app "alice" app.svc
@@ -99,6 +101,7 @@ testLargeCoinExpiry = script do
         opensAt = now
         targetClosesAt = addRelTime now (minutes 5)
         issuingFor = minutes 5
+        coinConfig = config
 
   estimateOpenRoundCreatedAt config.tickDuration currentMiningRound expiringRound === AfterMaxBound
   pure ()

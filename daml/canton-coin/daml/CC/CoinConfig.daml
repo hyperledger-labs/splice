@@ -1,0 +1,32 @@
+module CC.CoinConfig where
+
+import CC.Fees
+import CC.Issuance
+import CC.Schedule
+import DA.Time
+
+data CC = CC deriving (Show, Eq)
+data USD = USD deriving (Show, Eq)
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+--
+-- See CC.Scripts.Parameters for concrete values.
+data CoinConfig currency = CoinConfig with
+    createFee : FixedFee -- ^ Fee to create a new coin.
+    holdingFee : RatePerRound -- ^ Fee for keeping a coin around
+    transferFee : SteppedRate -- ^ Fee for transferring some amount of coin to a new owner.
+    lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
+    maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
+    maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
+    maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
+  deriving (Eq, Show)
+
+-- Check constraints on config params on which the implementation of the choices relies
+validCoinConfig : CoinConfig currency -> Bool
+validCoinConfig CoinConfig{..} =
+    tickDuration > days 0
+  && validIssuanceCurve issuanceCurve

@@ -2,9 +2,10 @@ module CC.Scripts.Parameters where
 
 import DA.Time
 
-import CC.Coin
+import CC.CoinConfig
 import CC.Fees
 import CC.Issuance
+import CC.Schedule
 
 -- | Default proposal for cost-competitive fees.
 --
@@ -54,6 +55,12 @@ defaultCoinConfig = CoinConfig with
     -- TODO(M3-90): charge per character
     maxPayloadLength = 32
 
+-- | Default configuration schedule with single current coin config
+defaultCoinConfigSchedule : Schedule Time (CoinConfig USD)
+defaultCoinConfigSchedule = Schedule with
+    currentValue = defaultCoinConfig
+    futureValues = []
+
 -- Issuance curve from the whitepaper
 -------------------------------------
 
@@ -94,11 +101,11 @@ issuanceConfig_10plus = IssuanceConfig with
   unfeaturedAppRewardCap = 0.6
 
 
-defaultIssuanceCurve : IssuanceCurve
+defaultIssuanceCurve : Schedule RelTime IssuanceConfig
 defaultIssuanceCurve =
-    IssuanceCurve with
-      currentConfig = issuanceConfig_0_0p5
-      futureConfigs =
+    Schedule with
+      currentValue = issuanceConfig_0_0p5
+      futureValues =
         [ (hours hoursPerHalfYear, issuanceConfig_0p5_1p5)
         , (hours (3 * hoursPerHalfYear) , issuanceConfig_1p5_5)
         , (hours (5 * hoursPerYear), issuanceConfig_5_10)

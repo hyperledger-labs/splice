@@ -16,6 +16,7 @@ import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
 import CC.Round
+import CC.Schedule
 import CC.Scripts.Util
 import CN.SvcRules
 import CN.SvcBootstrap
@@ -151,8 +152,9 @@ initConsortium = do
 
   -- have mallory bootstrap the consortium
   let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5
+  let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
   submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founder = sv1, coinConfig = defaultCoinConfig, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices)
+    (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices)
     SvcBootstrap_Bootstrap
 
   svcUserId <- validateUserId "svc-user"

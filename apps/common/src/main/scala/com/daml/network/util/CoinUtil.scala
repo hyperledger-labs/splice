@@ -7,7 +7,8 @@ import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.issuance.{IssuanceConfig, IssuanceCurve}
+import com.daml.network.codegen.java.cc.schedule.Schedule
+import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
@@ -19,7 +20,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.math.RoundingMode
-import java.time.Duration
+import java.time.{Duration, Instant}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -108,20 +109,29 @@ object CoinUtil {
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
   // Curve taken as-is from whitepaper: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
-  private val defaultIssuanceCurve: cc.issuance.IssuanceCurve = new IssuanceCurve(
-    issuanceConfig(40e9, 0.5, 0.15),
-    Seq(
-      new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4)),
-      new Tuple2(hours(3 * 365 * 12), issuanceConfig(10e9, 0.18, 0.62)),
-      new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69)),
-      new Tuple2(hours(10 * 365 * 24), issuanceConfig(2.5e9, 0.20, 0.75)),
-    ).asJava,
+  private val defaultIssuanceCurve: cc.schedule.Schedule[RelTime, IssuanceConfig] =
+    new Schedule(
+      issuanceConfig(40e9, 0.5, 0.15),
+      Seq(
+        new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4)),
+        new Tuple2(hours(3 * 365 * 12), issuanceConfig(10e9, 0.18, 0.62)),
+        new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69)),
+        new Tuple2(hours(10 * 365 * 24), issuanceConfig(2.5e9, 0.20, 0.75)),
+      ).asJava,
+    )
+
+  def defaultCoinConfigSchedule(
+      initialTickDuration: NonNegativeFiniteDuration,
+      initialMaxNumInputs: Int,
+  ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
+    defaultCoinConfig(initialTickDuration, initialMaxNumInputs),
+    List.empty[Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]].asJava,
   )
 
   def defaultCoinConfig(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
-  ): cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
+  ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
     new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal),

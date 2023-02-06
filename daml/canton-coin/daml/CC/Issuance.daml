@@ -1,19 +1,15 @@
 -- | CC rewards issuance configuration and computation.
 module CC.Issuance where
 
-import DA.List
 import DA.Time
+
+import CC.Schedule
 
 import CN.Util.Assert (require)
 
 
 -- issuance curve
 -----------------
-
-data IssuanceCurve = IssuanceCurve with
-    currentConfig : IssuanceConfig
-    futureConfigs : [(RelTime, IssuanceConfig)]
-  deriving (Eq, Show)
 
 data IssuanceConfig = IssuanceConfig with
     coinToIssuePerYear : Decimal
@@ -24,14 +20,8 @@ data IssuanceConfig = IssuanceConfig with
     unfeaturedAppRewardCap : Decimal
   deriving (Eq, Show)
 
-
-validIssuanceCurve : IssuanceCurve -> Bool
-validIssuanceCurve IssuanceCurve{..} =
-       dedupSort ts == ts
-    && validIssuanceConfig currentConfig
-    && all (validIssuanceConfig . snd) futureConfigs
-  where
-    ts = map fst futureConfigs
+validIssuanceCurve : Schedule RelTime IssuanceConfig -> Bool
+validIssuanceCurve configSchedule = validSchedule configSchedule validIssuanceConfig
 
 validIssuanceConfig : IssuanceConfig -> Bool
 validIssuanceConfig IssuanceConfig{..} =
@@ -41,21 +31,6 @@ validIssuanceConfig IssuanceConfig{..} =
     && validatorRewardCap >= 0.0
     && featuredAppRewardCap >= 0.0
     && unfeaturedAppRewardCap >= 0.0
-
--- | Get the config for a round issuance as of a specific time since start of issuance.
--- We use this to step through the issuance curve using a logical clock.
--- See the `CoinRules_Advance_MiningRounds` choice for details.
-getIssuanceConfigAsOf : RelTime -> IssuanceCurve -> IssuanceConfig
-getIssuanceConfigAsOf t curve =
-  case curve.futureConfigs of
-    [] -> curve.currentConfig
-    ((effectiveAsOf, config) :: futureConfigs)
-      | t < effectiveAsOf ->
-          -- all future configs are effective later than our time of interest
-          curve.currentConfig
-      | otherwise ->
-          getIssuanceConfigAsOf t IssuanceCurve with currentConfig = config; futureConfigs
-
 
 -- computation of issuance per round
 ------------------------------------

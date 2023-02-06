@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.console.WalletAppClientReference
+import com.daml.network.console.{CoinRemoteParticipantReference, WalletAppClientReference}
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.concurrent.Threading
@@ -66,44 +66,36 @@ trait TimeTestUtil extends CoinTestCommon {
   @nowarn("msg=match may not be exhaustive")
   def advanceRoundsByOneTick(implicit env: CoinTestConsoleEnvironment) = {
 
-    val Seq(lowestOpen, middleOpen, highestOpen) =
-      aliceWalletBackend.remoteParticipant.ledger_api.acs
-        .filterJava(OpenMiningRound.COMPANION)(
-          aliceValidator.getValidatorPartyId()
-        )
-        .map(_.data.round.number)
-        .sorted
+    val Seq(lowestOpen, middleOpen, highestOpen) = getSortedOpenMiningRounds(
+      aliceWalletBackend.remoteParticipant,
+      aliceValidator.getValidatorPartyId(),
+    ).map(_.data.round.number)
 
-    val previousIssuingRounds = aliceWalletBackend.remoteParticipant.ledger_api.acs
-      .filterJava(IssuingMiningRound.COMPANION)(
-        aliceValidator.getValidatorPartyId()
-      )
-      .map(_.data.round.number)
-      .sorted
+    val previousIssuingRounds = getSortedIssuingRounds(
+      aliceWalletBackend.remoteParticipant,
+      aliceValidator.getValidatorPartyId(),
+    ).map(_.data.round.number)
 
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(Duration.ofSeconds(160)))(
       s"waiting for open and issuing round automation (should create OR ${highestOpen + 1}, should advance IR ${previousIssuingRounds}",
       _ =>
         eventually(5.seconds) {
-          val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
-            aliceWalletBackend.remoteParticipant.ledger_api.acs
-              .filterJava(OpenMiningRound.COMPANION)(
-                aliceValidator.getValidatorPartyId()
-              )
-              .map(_.data.round.number)
-              .sorted
+          val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) = getSortedOpenMiningRounds(
+            aliceWalletBackend.remoteParticipant,
+            aliceValidator.getValidatorPartyId(),
+          ).map(_.data.round.number)
 
           newLowestOpen shouldBe lowestOpen + 1
           newLowestOpen shouldBe middleOpen
           newMiddleOpen shouldBe highestOpen
           newHighestOpen shouldBe highestOpen + 1
 
-          val newIssuingRounds = aliceWalletBackend.remoteParticipant.ledger_api.acs
-            .filterJava(IssuingMiningRound.COMPANION)(
-              aliceValidator.getValidatorPartyId()
-            )
-            .map(_.data.round.number)
+          val newIssuingRounds = getSortedIssuingRounds(
+            aliceWalletBackend.remoteParticipant,
+            aliceValidator.getValidatorPartyId(),
+          ).map(_.data.round.number)
+
           if (previousIssuingRounds.size < 3)
             newIssuingRounds.size shouldBe previousIssuingRounds.size + 1
           else {
@@ -119,6 +111,22 @@ trait TimeTestUtil extends CoinTestCommon {
         },
     )
   }
+
+  def getSortedOpenMiningRounds(
+      remoteParticipant: CoinRemoteParticipantReference,
+      validatorPartyId: PartyId,
+  ): Seq[OpenMiningRound.Contract] = remoteParticipant.ledger_api.acs
+    .filterJava(OpenMiningRound.COMPANION)(validatorPartyId)
+    .sortBy(_.data.round.number)
+
+  def getSortedIssuingRounds(
+      remoteParticipant: CoinRemoteParticipantReference,
+      validatorPartyId: PartyId,
+  ): Seq[IssuingMiningRound.Contract] = remoteParticipant.ledger_api.acs
+    .filterJava(IssuingMiningRound.COMPANION)(
+      validatorPartyId
+    )
+    .sortBy(_.data.round.number)
 
   def p2pTransferAndTriggerAutomation(
       senderWallet: WalletAppClientReference,

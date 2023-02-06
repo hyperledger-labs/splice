@@ -2,10 +2,11 @@ module CC.Scripts.TestExpiry where
 
 import Daml.Script
 
+import CC.Coin
 import CC.Expiry
 import CC.Fees
 import CC.Round
-
+import CC.Scripts.Parameters
 import CC.Scripts.Util
 
 import DA.Action
@@ -58,7 +59,8 @@ testEstimateOpenRoundCreatedAt = script do
       issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
 
       observers = []
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0
+      coinConfig = scaleConfig coinPrice defaultCoinConfig
+      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; coinConfig
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
 
 

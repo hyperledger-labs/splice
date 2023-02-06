@@ -16,6 +16,8 @@ import qualified DA.Text
 import DA.Traversable (forA)
 import DA.Time
 
+import CC.CoinConfig
+import CC.Schedule
 import CC.Expiry
 import CC.Fees
 import CC.Issuance
@@ -222,27 +224,6 @@ template UnclaimedReward with
 -- Configuration of CoinRules behavior
 --------------------------------------
 
-data CC = CC deriving (Show, Eq)
-data USD = USD deriving (Show, Eq)
-
--- | Configuration determining the fees and limits for CC transfers granted by
--- the CoinRules.
---
--- See CC.Scripts.Parameters for concrete values.
-data CoinConfig currency = CoinConfig with
-    createFee : FixedFee -- ^ Fee to create a new coin.
-    holdingFee : RatePerRound -- ^ Fee for keeping a coin around
-    transferFee : SteppedRate -- ^ Fee for transferring some amount of coin to a new owner.
-    lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
-    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
-    issuanceCurve : IssuanceCurve -- ^ Issuance curve to use.
-    maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
-    maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
-    maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
-    maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
-  deriving (Eq, Show)
-
-
 requireChoiceIsEnabled : CanAssert m => Text -> (API.EnabledChoices -> Bool) -> API.CoinRulesView -> m ()
 requireChoiceIsEnabled desc getField rules =
   require ("Choice " <> desc <> " is enabled") (getField rules.enabledChoices)
@@ -252,12 +233,11 @@ requireChoiceIsEnabled desc getField rules =
 template CoinRules
   with
     svc : Party
-    config : CoinConfig USD
+    configSchedule : Schedule Time (CoinConfig USD)
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
-    -- TODO(M3-07): use a schedule with effective dating to make fees predictable to users
     enabledChoices : API.EnabledChoices
   where
-    ensure validCoinConfig config
+    ensure validSchedule configSchedule validCoinConfig
 
     signatory svc
     observer observers -- TODO(M3-82): remove workaround for explicit disclosure
@@ -267,10 +247,10 @@ template CoinRules
       coinrules_Transfer_Controllers = Set.toList . transferControllers
       coinrules_ComputeFees context sender outputs = do
         requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
-        computeFees config svc context sender outputs
+        computeFees svc context sender outputs
       coinrules_Transfer coinRulesCid transfer context = do
         requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
-        executeTransfer coinRulesCid context config svc transfer
+        executeTransfer coinRulesCid context svc transfer
 
     -- A choice for the SVC to mint coin for the cases where the
     -- consortium rules allow for that; e.g., when redeeming SVC rewards.
@@ -282,11 +262,11 @@ template CoinRules
       controller svc, receiver
       do
         openRound <- fetch openRound
-        let scaledConfig = scaleConfig openRound config
+        let config = openRound.coinConfig
             expiringAmount = ExpiringAmount with
                         initialAmount = amount
                         createdAt = openRound.round
-                        ratePerRound = scaledConfig.holdingFee
+                        ratePerRound = config.holdingFee
         create Coin with
                   owner = receiver
                   amount = expiringAmount
@@ -322,7 +302,9 @@ template CoinRules
       controller svc
       do
         now <- getTime
-        let tickDuration = config.tickDuration
+        let configUsd = getValueAsOf now configSchedule
+        let configCC = scaleConfig coinPrice configUsd
+        let tickDuration = configCC.tickDuration
         let opensAt0 = now
         let opensAt1 = now
         let opensAt2 = addRelTime now tickDuration
@@ -338,11 +320,11 @@ template CoinRules
         let issuingFor2 = issuingFor1 + tickDuration
 
         create OpenMiningRound with
-          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0
+          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; coinConfig = configCC
         create OpenMiningRound with
-          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1
+          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; coinConfig = configCC
         create OpenMiningRound with
-          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2
+          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; coinConfig = configCC
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
@@ -358,32 +340,38 @@ template CoinRules
         latestRound <- fetch latestRoundCid
 
         now <- getTime
-
-        let tickDuration = config.tickDuration
         require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
         require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
         require "latestRound is open" (latestRound.opensAt <= now)
-        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt tickDuration <= now)
-
-
-        -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
-        let opensAt = addRelTime (max now latestRound.opensAt) tickDuration
-        -- round is open for two ticks.
-        let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
-        let round = API.Round (latestRound.round.number + 1)
-        -- We advance the time for which the SVC has been issuing independent of how real world advances.
-        -- Note that given the checks above the real time can only be slower.
-        let issuingFor = latestRound.issuingFor + tickDuration
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.coinConfig.tickDuration <= now)
 
         -- archive and create the rounds
         archive roundToArchiveCid
         newSummarizingRound <- create SummarizingMiningRound with
-          svc
-          observers
-          round = roundToArchive.round
-          issuanceConfig = getIssuanceConfigAsOf roundToArchive.issuingFor config.issuanceCurve
-        newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt; issuingFor
+            svc
+            observers
+            round = roundToArchive.round
+            issuanceConfig = getValueAsOf roundToArchive.issuingFor roundToArchive.coinConfig.issuanceCurve
+            tickDuration = roundToArchive.coinConfig.tickDuration
+        newOpenRound <- do
+          let configUsd = getValueAsOf now configSchedule
+              configCC = scaleConfig coinPrice configUsd
+              tickDuration = configCC.tickDuration
+              -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
+              opensAt = addRelTime (max now latestRound.opensAt) tickDuration
+          create OpenMiningRound with
+              svc
+              observers
+              round = API.Round (latestRound.round.number + 1)
+              coinPrice
+              opensAt
+              -- round is open for two ticks.
+              targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
+              -- We advance the time for which the SVC has been issuing independent of how real world advances.
+              -- Note that given the checks above the real time can only be slower.
+              issuingFor = latestRound.issuingFor + latestRound.coinConfig.tickDuration
+              coinConfig = configCC
         return (newSummarizingRound, newOpenRound)
 
     nonconsuming choice CoinRules_MiningRound_StartIssuing
@@ -400,7 +388,7 @@ template CoinRules
         require "SVC matches" (miningRound.svc == svc)
         validateOpenMiningRoundSummary summary
 
-        let params = computeIssuingRoundParameters config.tickDuration miningRound.issuanceConfig summary
+        let params = computeIssuingRoundParameters miningRound.tickDuration miningRound.issuanceConfig summary
 
         -- record reward for the SVC
         create SvcReward with
@@ -415,7 +403,7 @@ template CoinRules
 
         -- create issuing round
         now <- getTime
-        let tickDuration = config.tickDuration
+        let tickDuration = miningRound.tickDuration
         let opensAt = addRelTime now tickDuration
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
@@ -546,6 +534,12 @@ template CoinRules
       controller svc
       do create this with enabledChoices = newEnabledChoices
 
+    choice CoinRules_SetConfigSchedule : ContractId CoinRules
+      with
+        newConfigSchedule : Schedule Time (CoinConfig USD)
+      controller svc
+      do create this with configSchedule = newConfigSchedule
+
 -- | Workaround for missing explicit disclosure.
 --
 -- The validator creates a request contract, the SVC archives the request and creates a CoinRules contract
@@ -589,15 +583,14 @@ transferControllers t =
     addOutputController s (API.TransferOutput with receiver; lock; ..) =
       Set.insert receiver $ optional s (foldl (flip Set.insert) s) (API.holders <$> lock)
 
-scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
-scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
+scaleConfig : Decimal -> CoinConfig USD -> CoinConfig CC
+scaleConfig coinPrice config = scaleFees (1.0 / coinPrice) config
 
-computeFees : CoinConfig USD -> Party -> API.TransferContext -> Party -> [API.TransferOutput] -> Update [Decimal]
-computeFees configUsd svc context sender outputs = do
+computeFees : Party -> API.TransferContext -> Party -> [API.TransferOutput] -> Update [Decimal]
+computeFees svc context sender outputs = do
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
   require ("mining round matches svc") (openRound.svc == svc)
-  let config = scaleConfig openRound configUsd
-  return $ map (computeOutputFee config sender) outputs
+  return $ map (computeOutputFee openRound.coinConfig sender) outputs
 
 computeOutputFee : CoinConfig CC -> Party -> API.TransferOutput -> Decimal
 computeOutputFee config sender out =
@@ -629,10 +622,10 @@ checkTransferConstraints transfer summary config
 
 -- | Execute a transfer.
 --
-executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update API.TransferResult
-executeTransfer coinRulesCid context configUsd svc t = do
+executeTransfer : ContractId API.CoinRules -> API.TransferContext -> Party -> API.Transfer -> Update API.TransferResult
+executeTransfer coinRulesCid context svc t = do
   -- compute summaries
-  csum <- summarizeAndValidateContext context configUsd svc t
+  csum <- summarizeAndValidateContext context svc t
   isum <- summarizeAndConsumeInputs coinRulesCid csum svc t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer csum.config isum osum
@@ -676,8 +669,8 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
     lock : Optional API.TimeLock -- ^ Whether to lock the coin or not
   deriving (Eq, Show)
 
-summarizeAndValidateContext : API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update TransferContextSummary
-summarizeAndValidateContext context configUsd svc tf = do
+summarizeAndValidateContext : API.TransferContext -> Party -> API.Transfer -> Update TransferContextSummary
+summarizeAndValidateContext context svc tf = do
   now <- getTime
   -- check that the current mining round is open and issued by the svc
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
@@ -710,7 +703,7 @@ summarizeAndValidateContext context configUsd svc tf = do
       pure (user, rightCid)
 
   return TransferContextSummary with
-    config = scaleConfig openRound configUsd
+    config = openRound.coinConfig
     featuredAppProvider
     openRound = openRound
     issuingMiningRounds = Map.fromList issuingMiningRounds
@@ -919,8 +912,3 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
 
--- Check constraints on config params on which the implementation of the choices relies
-validCoinConfig : CoinConfig currency -> Bool
-validCoinConfig CoinConfig{..} =
-     tickDuration > days 0
-  && validIssuanceCurve issuanceCurve

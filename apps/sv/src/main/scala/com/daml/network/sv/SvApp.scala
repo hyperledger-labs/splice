@@ -15,7 +15,7 @@ import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CoinUtil.{defaultCoinConfig, defaultEnabledChoices}
+import com.daml.network.util.CoinUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -200,7 +200,10 @@ class SvApp(
                   commands = new cn.svcbootstrap.SvcBootstrap(
                     svcParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
-                    defaultCoinConfig(config.initialTickDuration, config.initialMaxNumInputs),
+                    defaultCoinConfigSchedule(
+                      config.initialTickDuration,
+                      config.initialMaxNumInputs,
+                    ),
                     config.coinPrice.bigDecimal,
                     new cn.svcrules.SvcRulesConfig(
                       10

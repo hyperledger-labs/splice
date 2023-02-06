@@ -3,6 +3,8 @@ module CN.SvcBootstrap where
 import qualified DA.Map as Map
 
 import CC.Coin
+import CC.CoinConfig
+import CC.Schedule
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
 
@@ -12,7 +14,7 @@ import CN.SvcRules
 template SvcBootstrap with
     svc : Party
     founder : Party -- ^ the founding SV
-    coinConfig : CoinConfig USD
+    coinConfigSchedule : Schedule Time (CoinConfig USD)
     coinPrice : Decimal
     config : SvcRulesConfig
     enabledChoices : API.EnabledChoices
@@ -32,9 +34,10 @@ template SvcBootstrap with
           config
         coinRulesCid <- create CoinRules with
           svc
-          config = coinConfig
+          configSchedule = coinConfigSchedule
           observers = []
           enabledChoices
+
 
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           coinPrice

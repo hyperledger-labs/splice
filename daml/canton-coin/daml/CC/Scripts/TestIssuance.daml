@@ -6,6 +6,7 @@ import DA.Time
 import Daml.Script
 
 import CC.Issuance
+import CC.Schedule
 import CC.Scripts.Parameters
 
 -- Shared parameters
@@ -34,9 +35,9 @@ testIssuanceCurve = script do
     t100 = days (100 * 365)
 
     test from to config = do
-      getIssuanceConfigAsOf from defaultIssuanceCurve === config
-      getIssuanceConfigAsOf (from + days 1) defaultIssuanceCurve === config
-      getIssuanceConfigAsOf (to - oneMicro) defaultIssuanceCurve === config
+      getValueAsOf from defaultIssuanceCurve === config
+      getValueAsOf (from + days 1) defaultIssuanceCurve === config
+      getValueAsOf (to - oneMicro) defaultIssuanceCurve === config
 
 
 -- Example 1: medium activity

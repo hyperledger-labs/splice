@@ -5,6 +5,8 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
+import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -19,9 +21,13 @@ import org.slf4j.event.Level
 import monocle.macros.syntax.lens.*
 
 import scala.jdk.CollectionConverters.*
-import java.time.Duration
+import java.time.{Duration, Instant}
 import com.daml.network.config.CoinConfigTransforms
 import com.daml.network.util.Contract
+import com.daml.network.util.CoinUtil.defaultCoinConfig
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
+
+import scala.concurrent.duration.*
 
 class SvcTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -47,8 +53,7 @@ class SvcTimeBasedIntegrationTest
   "round management" in { implicit env =>
     // Sync with background automation that onboards validator.
     eventually()({
-      val rounds = svc.remoteParticipantWithAdminToken.ledger_api.acs
-        .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
+      val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
       rounds.map {
         _.data.observers should have length 4
       }
@@ -58,20 +63,17 @@ class SvcTimeBasedIntegrationTest
     // one tick - round 0 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipantWithAdminToken.ledger_api.acs
-        .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 1
+      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
     )
     // next tick - round 1 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipantWithAdminToken.ledger_api.acs
-        .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 2
+      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 2
     )
     // next tick - round 2 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipantWithAdminToken.ledger_api.acs
-        .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
+      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
     )
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
@@ -97,8 +99,7 @@ class SvcTimeBasedIntegrationTest
           rounds should have size 1
         }
         eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
-          svc.remoteParticipantWithAdminToken.ledger_api.acs
-            .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
+          getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
         )
         // Advance time again to let automation kick-in and archive closed mining round
         // TODO(tech-debt): generalize and reuse in other tests
@@ -127,7 +128,285 @@ class SvcTimeBasedIntegrationTest
         )
       },
     )
+  }
 
+  "round management with scheduled config change of doubled tickDuration" in { implicit env =>
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+
+    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
+    val doubledTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(300))
+    val configSchedule = new cc.schedule.Schedule(
+      mkCoinConfig(defaultTickDuration),
+      List(
+        new Tuple2(
+          now.add(Duration.ofSeconds(150)).toInstant,
+          mkCoinConfig(doubledTickDuration),
+        )
+      ).asJava,
+    )
+
+    // set configSchedule
+    setCoinConfigSchedule(configSchedule)
+    advanceRoundsByOneTick
+
+    // latest OpenMiningRound was created with doubled tick duration.
+    eventually()({
+      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+
+      rounds.latestOpen.data.opensAt shouldBe (now + doubledTickDuration).toInstant
+      rounds.latestOpen.data.targetClosesAt shouldBe (
+        now + doubledTickDuration + doubledTickDuration + doubledTickDuration
+      ).toInstant
+    })
+
+    clue("advance to OpenMiningRound 4") {
+      // First IssuingRounds is active
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      // As the latest round is with doubled tick duration,
+      // latest.opensAt is expected to be after middle.opensAt + tickDuration and oldest.opensAt
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 5") {
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration,
+          1L -> defaultTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 6") {
+      assertTickDurationOfIssuingRound(
+        Map(
+          1L -> defaultTickDuration.duration,
+          2L -> defaultTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      // all active open mining rounds are created with doubled tick
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 7") {
+      assertTickDurationOfIssuingRound(
+        Map(
+          2L -> defaultTickDuration.duration,
+          3L -> doubledTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+  }
+
+  "round management with scheduled config change of reduced tickDuration" in { implicit env =>
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+
+    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
+    val reducedTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(75))
+    val configSchedule = new cc.schedule.Schedule(
+      mkCoinConfig(defaultTickDuration),
+      List(
+        new Tuple2(
+          now.add(Duration.ofSeconds(150)).toInstant,
+          mkCoinConfig(reducedTickDuration),
+        )
+      ).asJava,
+    )
+
+    // set configSchedule
+    setCoinConfigSchedule(configSchedule)
+    advanceRoundsByOneTick
+
+    // latest OpenMiningRound was created with reduced tick duration.
+    eventually()({
+      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+
+      rounds.latestOpen.data.opensAt shouldBe (now + reducedTickDuration).toInstant
+      rounds.latestOpen.data.targetClosesAt shouldBe (
+        now + reducedTickDuration + reducedTickDuration + reducedTickDuration
+      ).toInstant
+    })
+
+    clue("advance to OpenMiningRound 4") {
+      // First IssuingRounds is active
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      // As tick duration of latestOpen is reduced,
+      // latestOpen.opensAt is now before middleOpen + tickDuration
+      // Instead of latestOpen.opensAt middleOpen + tickDuration becomes the time when it is ready to advance rounds
+      expectedAdvanceRoundAt shouldBe (
+        rounds.middleOpen.data.opensAt plus fromRelTime(
+          rounds.middleOpen.data.coinConfig.tickDuration
+        )
+      )
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 5") {
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration,
+          1L -> defaultTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      // As both tick durations of middleOpen and latestOpen are reduced,
+      // latestOpen.opensAt and middleOpen + tickDuration are now before oldestOpen.targetCloseAt
+      // oldestOpen.targetCloseAt becomes the time when it is ready to advance rounds
+      expectedAdvanceRoundAt shouldBe rounds.oldestOpen.data.targetClosesAt
+
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 6") {
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration,
+          1L -> defaultTickDuration.duration,
+          2L -> defaultTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      // all active open mining rounds are created with reduced tick
+      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      // rounds.latestOpen is the time when it is ready to advance rounds
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 7") {
+      // Issuing mining rounds created earlier rounds have a longer tick duration
+      // Therefore, when issuing mining rounds with reduced tick duration is created later,
+      // There are still issuing mining rounds with longer tick duration not yet closed
+      assertTickDurationOfIssuingRound(
+        Map(
+          0L -> defaultTickDuration.duration,
+          1L -> defaultTickDuration.duration,
+          2L -> defaultTickDuration.duration,
+          3L -> reducedTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 8") {
+      // Issuing mining rounds created earlier rounds have a longer tick duration
+      // Therefore, when issuing mining rounds with reduced tick duration is created later,
+      // There are still issuing mining rounds with longer tick duration not yet closed
+      assertTickDurationOfIssuingRound(
+        Map(
+          1L -> defaultTickDuration.duration,
+          2L -> defaultTickDuration.duration,
+          3L -> reducedTickDuration.duration,
+          4L -> reducedTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 9") {
+      // Issuing mining rounds created earlier rounds have a longer tick duration
+      // Therefore, when issuing mining rounds with reduced tick duration is created later,
+      // There are still issuing mining rounds with longer tick duration not yet closed
+      assertTickDurationOfIssuingRound(
+        Map(
+          1L -> defaultTickDuration.duration,
+          2L -> defaultTickDuration.duration,
+          3L -> reducedTickDuration.duration,
+          4L -> reducedTickDuration.duration,
+          5L -> reducedTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
+
+    clue("advance to OpenMiningRound 10") {
+      // Issuing mining rounds created earlier rounds have a longer tick duration
+      // Therefore, when issuing mining rounds with reduced tick duration is created later,
+      // There are still issuing mining rounds with longer tick duration not yet closed
+      assertTickDurationOfIssuingRound(
+        Map(
+          2L -> defaultTickDuration.duration,
+          4L -> reducedTickDuration.duration,
+          5L -> reducedTickDuration.duration,
+          6L -> reducedTickDuration.duration,
+        )
+      )
+
+      val rounds = getOpenMiningRounds()
+      val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
+      expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
+      advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
+    }
   }
 
   "calculation of issuance per coin" in { implicit env =>
@@ -209,8 +488,7 @@ class SvcTimeBasedIntegrationTest
       {
         advanceRoundsByOneTick
         eventually() {
-          svc.remoteParticipantWithAdminToken.ledger_api.acs
-            .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 1
+          getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
         }
       },
       entries =>
@@ -222,8 +500,7 @@ class SvcTimeBasedIntegrationTest
     )
 
     def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
-    val issuingRounds = svc.remoteParticipantWithAdminToken.ledger_api.acs
-      .filterJava(IssuingMiningRound.COMPANION)(svcParty)
+    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
 
     inside(issuingRounds) { case Seq(issuingRound) =>
       issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
@@ -321,5 +598,115 @@ class SvcTimeBasedIntegrationTest
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
       },
     )
+  }
+
+  private def mkCoinConfig(
+      tickDuration: NonNegativeFiniteDuration
+  ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
+    defaultCoinConfig(
+      NonNegativeFiniteDuration.ofMicros(tickDuration.getMicros),
+      100,
+    )
+
+  private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
+    duration.getMicros
+  )
+
+  private def fromRelTime(duration: RelTime): Duration =
+    Duration.ofMillis(duration.microseconds / 1000)
+
+  private def setCoinConfigSchedule(
+      configSchedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+    coinRules should have length 1
+    svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      actAs = Seq(svcParty),
+      optTimeout = None,
+      commands =
+        coinRules.head.id.exerciseCoinRules_SetConfigSchedule(configSchedule).commands.asScala.toSeq,
+    )
+  }
+
+  private case class OpenMiningRoundsTriplet(
+      oldestOpen: OpenMiningRound.Contract,
+      middleOpen: OpenMiningRound.Contract,
+      latestOpen: OpenMiningRound.Contract,
+  )
+
+  private def getOpenMiningRounds()(implicit
+      env: CoinTestConsoleEnvironment
+  ): OpenMiningRoundsTriplet = {
+    val rounds = getSortedOpenMiningRounds(
+      svc.remoteParticipantWithAdminToken,
+      svcParty,
+    )
+    rounds should have length 3
+    OpenMiningRoundsTriplet(rounds.head, rounds(1), rounds(2))
+  }
+
+  private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
+    Ordering[Instant].max(
+      rounds.oldestOpen.data.targetClosesAt,
+      Ordering[Instant].max(
+        rounds.middleOpen.data.opensAt plus fromRelTime(
+          rounds.middleOpen.data.coinConfig.tickDuration
+        ),
+        rounds.latestOpen.data.opensAt,
+      ),
+    )
+  }
+
+  private def advanceTimeAndCheckOpenRounds(
+      toAdvanceAt: Instant
+  )(implicit env: CoinTestConsoleEnvironment): Unit = {
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val duration = Duration.between(now.toInstant, toAdvanceAt)
+    val timeShift = Duration.ofSeconds(10)
+    val skew = timeShift
+    val rounds = getOpenMiningRounds()
+    actAndCheck(
+      s"advance time to shortly before the rounds should change",
+      advanceTime(duration minus timeShift),
+    )(
+      s"waiting for ",
+      _ =>
+        always(durationOfSuccess = 1.second) {
+          val newRounds = getOpenMiningRounds()
+          newRounds.oldestOpen shouldBe rounds.oldestOpen
+          newRounds.middleOpen shouldBe rounds.middleOpen
+          newRounds.latestOpen shouldBe rounds.latestOpen
+        },
+    )
+
+    actAndCheck(
+      s"advancing time by duration of 2 * $timeShift and rounds should change",
+      advanceTime(timeShift plus skew),
+    )(
+      s"waiting for ",
+      _ =>
+        eventually(5.seconds) {
+          val newRounds = getOpenMiningRounds()
+          newRounds.oldestOpen.data.round.number shouldBe rounds.middleOpen.data.round.number
+          newRounds.middleOpen.data.round.number shouldBe rounds.latestOpen.data.round.number
+          newRounds.latestOpen.data.round.number shouldBe rounds.latestOpen.data.round.number + 1L
+        },
+    )
+  }
+
+  private def assertTickDurationOfIssuingRound(
+      roundNumberToTickDuration: Map[Long, Duration]
+  )(implicit env: CoinTestConsoleEnvironment): Unit = eventually() {
+    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
+    issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
+    issuingRounds.map { issuingRound =>
+      val expectedDuration = roundNumberToTickDuration(issuingRound.data.round.number)
+      Duration
+        .between(
+          issuingRound.data.opensAt,
+          issuingRound.data.targetClosesAt,
+        ) shouldBe (expectedDuration plus expectedDuration)
+    }
   }
 }

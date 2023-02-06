@@ -14,7 +14,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 
@@ -309,12 +309,15 @@ object SvcStore {
       prettyOfClass(param("oldest", _.oldest), param("middle", _.middle), param("newest", _.newest))
 
     /** The time after which these can be advanced at assuming the given tick duration. */
-    def readyToAdvanceAt(tickDuration: Duration): Instant = {
+    def readyToAdvanceAt: Instant = {
+      val middleTickDuration = CoinUtil.relTimeToDuration(
+        middle.payload.coinConfig.tickDuration
+      )
       Ordering[Instant].max(
         oldest.payload.targetClosesAt,
         Ordering[Instant].max(
           // TODO(M3-07): when changing CoinConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
-          middle.payload.opensAt.plus(tickDuration),
+          middle.payload.opensAt.plus(middleTickDuration),
           newest.payload.opensAt,
         ),
       )
