@@ -3,17 +3,18 @@
 
 package com.digitalasset.canton.logging
 
-import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.digitalasset.canton.util.ErrorUtil
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j
+import org.slf4j.event.Level
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration.*
 import scala.concurrent.{Future, Promise}
 
-class SuppressingLoggerTest extends AnyWordSpec with BaseTest {
+class SuppressingLoggerTest extends AnyWordSpec with BaseTest with HasExecutionContext {
 
   "suppress" should {
 
@@ -82,9 +83,9 @@ class SuppressingLoggerTest extends AnyWordSpec with BaseTest {
       )
 
       ex.getMessage() should startWith regex
-        """forEvery failed, because: 
+        """forEvery failed, because:
           |  at index 1, "\[foo\]" was not equal to "\[Test2\]"
-          |  
+          |
           |  Remaining log entries:
           |  	## ERROR c\.d\.c\.l\.SuppressingLoggerTest.*:TestLogger - Test3
           |  	## ERROR c\.d\.c\.l\.SuppressingLoggerTest.*:TestLogger - Test4
@@ -308,6 +309,126 @@ class SuppressingLoggerTest extends AnyWordSpec with BaseTest {
         _.errorMessage shouldBe "yet another message",
       )
       verify(underlyingLogger, times(2)).info(s"Suppressed ERROR: message")
+    }
+
+    "check sequence of log entries" in new LoggingTester {
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        {
+          logger.error("Test1")
+          logger.error("Test2")
+          logger.error("Test3")
+          logger.error("Test4")
+        },
+        entries =>
+          forAtLeast(1, entries)(
+            _.errorMessage shouldBe ("Test2")
+          ),
+      )
+    }
+
+    "point out failed assertion against sequence of log entries" in new LoggingTester {
+      the[TestFailedException] thrownBy loggerFactory.assertLogsSeq(
+        SuppressionRule.LevelAndAbove(Level.WARN)
+      )(
+        {
+          logger.error("Test1")
+          logger.error("Test2")
+          logger.error("Test3")
+          logger.error("Test4")
+        },
+        entries =>
+          forEvery(entries)(
+            _.errorMessage shouldBe "Test2"
+          ),
+      )
+    }
+
+    "check sequence of log entries eventually" in new LoggingTester {
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        {
+          logger.error("Test1")
+          logger.error("Test2")
+          logger.error("Test3")
+          logger.error("Test4")
+        },
+        entries =>
+          forAtLeast(1, entries)(
+            _.errorMessage shouldBe ("Test2")
+          ),
+      )
+
+      Future {
+        Thread.sleep(1.seconds.toMillis)
+        logger.error("Test3")
+        logger.error("Test4")
+      }
+
+      loggerFactory.assertEventuallyLogsSeq(
+        SuppressionRule.LevelAndAbove(Level.WARN)
+      )(
+        {},
+        entries =>
+          forAtLeast(1, entries)(
+            _.errorMessage shouldBe "Test4"
+          ),
+      )
+
+      val async = Future {
+        logger.error("Test1")
+        logger.error("Test2")
+        Thread.sleep(1.seconds.toMillis)
+        logger.error("Test3")
+        logger.error("Test4")
+      }
+
+      loggerFactory
+        .assertEventuallyLogsSeq(
+          SuppressionRule.LevelAndAbove(Level.WARN)
+        )(
+          async,
+          entries =>
+            forAtLeast(1, entries)(
+              _.errorMessage shouldBe "Test4"
+            ),
+        )
+        .futureValue
+    }
+
+    "point out failed assertion against sequence of log entries eventually" in new LoggingTester {
+      the[TestFailedException] thrownBy loggerFactory.assertEventuallyLogsSeq(
+        SuppressionRule.LevelAndAbove(Level.WARN)
+      )(
+        {
+          logger.error("Test1")
+          logger.error("Test2")
+          logger.error("Test3")
+          logger.error("Test4")
+        },
+        entries =>
+          forEvery(entries)(
+            _.errorMessage shouldBe "Test2"
+          ),
+        timeUntilSuccess = 1.seconds,
+      )
+
+      the[TestFailedException] thrownBy loggerFactory
+        .assertEventuallyLogsSeq(
+          SuppressionRule.LevelAndAbove(Level.WARN)
+        )(
+          Future {
+            Thread.sleep(1.seconds.toMillis)
+            logger.error("Test1")
+            logger.error("Test2")
+            logger.error("Test3")
+            logger.error("Test4")
+          },
+          entries =>
+            forAtLeast(1, entries)(
+              _.errorMessage shouldBe "Never happen"
+            ),
+          timeUntilSuccess = 2.seconds,
+        )
+        .futureValue
     }
   }
 

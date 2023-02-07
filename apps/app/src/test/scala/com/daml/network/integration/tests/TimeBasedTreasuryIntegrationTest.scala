@@ -208,11 +208,10 @@ class TimeBasedTreasuryIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
           // reward is now collectable..
           advanceRoundsByOneTick
-          Threading.sleep(3.seconds.toMillis)
         },
         entries => {
           forAtLeast(1, entries)( // however, we see that we choose not to the validator reward..
@@ -223,14 +222,13 @@ class TimeBasedTreasuryIntegrationTest
         },
       )
 
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
           aliceValidatorWallet.tap(1)
           eventually() {
             aliceValidatorWallet.list().coins should have length 1
           }
           advanceTime(Duration.ofMinutes(1))
-          Threading.sleep(3.seconds.toMillis)
         },
         entries => {
           forAtLeast(
@@ -255,12 +253,10 @@ class TimeBasedTreasuryIntegrationTest
       aliceWallet.list().coins should have length 2
     }
 
-    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
         // trigger automation.
         advanceRoundsByOneTick
-        // TODO(#2414): remove magic number.
-        Threading.sleep(3.seconds.toMillis)
       },
       entries => {
         forAtLeast(
