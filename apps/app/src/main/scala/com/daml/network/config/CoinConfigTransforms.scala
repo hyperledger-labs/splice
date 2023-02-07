@@ -66,13 +66,13 @@ object CoinConfigTransforms {
       updateAllValidatorConfigs_(c =>
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
-          validatorWalletUser = s"${c.validatorWalletUser}-$suffix",
+          validatorWalletUser = c.validatorWalletUser.map(u => s"$u-$suffix"),
           walletServiceUser = s"${c.walletServiceUser}-$suffix",
           appInstances = c.appInstances.view
             .mapValues(i =>
               i.copy(
-                serviceUser = i.serviceUser.map(u => s"${u}-$suffix"),
-                walletUser = s"${i.walletUser}-$suffix",
+                serviceUser = s"${i.serviceUser}-$suffix",
+                walletUser = i.walletUser.map(u => s"$u-$suffix"),
               )
             )
             .toMap,

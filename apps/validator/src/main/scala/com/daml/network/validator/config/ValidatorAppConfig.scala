@@ -15,12 +15,13 @@ import com.digitalasset.canton.config.*
 import java.nio.file.Path
 
 case class AppInstance(
-    // A user for the provider which is also auto-onboarded as a wallet user:
-    walletUser: String,
-    // An optional alternative username for the service backend. Specifying this can be useful if the
-    // backend uses a machine-to-machine token, as opposed to a login one used in the wallet user above.
-    // If not specified, or equal to the wallet user - no additional user is created.
-    serviceUser: Option[String],
+    serviceUser: String,
+    // An optional separate user name for the provider to be used as its user in the wallet.
+    // May be useful if the IAM provider does not allow tokens that are used both by
+    // machine-to-machine services and login users - in that case, set serviceUser to the m2m
+    // one, and walletUser to the login one. If not provided, the serviceUser is onboarded
+    // to the wallet automatically.
+    walletUser: Option[String],
     dars: Seq[Path],
 )
 
@@ -39,8 +40,12 @@ case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
-    // TODO(#2154): Make walletServiceUser optional
-    validatorWalletUser: String,
+    // An optional separate user name for the validator operator to be used as its user in the
+    // wallet. May be useful if the IAM provider does not allow tokens that are used both by
+    // machine-to-machine services and login users - in that case, set ledgerApiUser to the m2m
+    // one, and validatorWalletUser to the login one. If not provided, the ledgerApiUser is onboarded
+    // to the wallet automatically.
+    validatorWalletUser: Option[String],
     walletServiceUser: String,
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],

@@ -97,10 +97,14 @@ class ValidatorApp(
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
-      party <- ValidatorUtil
+      party <- connection.getOrAllocateParty(
+        instance.serviceUser,
+        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+      )
+      _ <- ValidatorUtil
         .onboard(
-          instance.walletUser,
-          None,
+          instance.walletUser.getOrElse(instance.serviceUser),
+          Some(party),
           connection,
           store,
           validatorUserName = config.ledgerApiUser,
@@ -110,17 +114,6 @@ class ValidatorApp(
           flagCloseable = this,
           logger,
         )
-        .flatMap(party => {
-          instance.serviceUser match {
-            case Some(user) if user != instance.walletUser =>
-              connection.createUserWithPrimaryParty(
-                user,
-                party,
-                Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-              )
-            case _ => Future.successful(party)
-          }
-        })
     } yield {
       logger.info(
         s"Setup app $name with service user ${instance.serviceUser}, wallet user ${instance.walletUser}  primary party $party, and uploaded ${instance.dars}."
@@ -268,7 +261,7 @@ class ValidatorApp(
         )
       })
       _ <- ValidatorUtil.onboard(
-        endUserName = config.validatorWalletUser,
+        endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
         knownParty = Some(validatorParty),
         connection,
         store,
