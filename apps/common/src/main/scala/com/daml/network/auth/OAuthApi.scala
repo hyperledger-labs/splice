@@ -4,12 +4,13 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
-import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import spray.json.{DefaultJsonProtocol, *}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Failure
 
 object OAuthApi {
   final case class ClientCredentialRequest(
@@ -49,6 +50,20 @@ class OAuthApi(
 
   import OAuthApi.*
 
+  private def decodeAndLog[T](res: HttpResponse, description: String)(implicit
+      um: Unmarshaller[HttpResponse, T],
+      tc: TraceContext,
+  ): Future[T] = {
+    logger.debug(s"$description response status: ${res.status}")
+    Unmarshal(res)
+      .to[T]
+      .andThen { case Failure(e) =>
+        Unmarshal(res)
+          .to[String]
+          .foreach(b => logger.warn(s"$description - failed to unmarshal: $b", e))
+      }
+  }
+
   def getWellKnown(
       url: String
   )(implicit tc: TraceContext): Future[WellKnownResponse] = {
@@ -61,7 +76,7 @@ class OAuthApi(
           uri = url,
         )
       )
-      body <- Unmarshal(res).to[WellKnownResponse]
+      body <- decodeAndLog[WellKnownResponse](res, "OIDC Well-Known configuration")
     } yield {
       logger.debug(s"Well-Known configuration is $body")
       body
@@ -91,7 +106,7 @@ class OAuthApi(
 
     for {
       res <- responseFuture
-      body <- Unmarshal(res).to[TokenResponse]
+      body <- decodeAndLog[TokenResponse](res, "OAuth token")
     } yield {
       body.access_token
     }
