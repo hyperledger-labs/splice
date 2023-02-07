@@ -540,10 +540,6 @@ function cluster_stats() {
     cluster_show
 
     _log ""
-    _log "Available Ports:"
-    _show_ports
-
-    _log ""
 	_log "Node Usage:"
     kubectl top node
 
@@ -554,6 +550,10 @@ function cluster_stats() {
     _log ""
     _log "Pod Resource Limits:"
     _show_pod_sizing
+
+    _log ""
+    _log "Available Ports:"
+    _show_ports
 
 }
 
