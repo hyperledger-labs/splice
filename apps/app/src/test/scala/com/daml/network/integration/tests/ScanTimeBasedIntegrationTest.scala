@@ -20,8 +20,8 @@ class ScanTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 
   "report correct reference data" in { implicit env =>
-    scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(1)
+    scan.getTransferContext().latestOpenMiningRound.payload.round.number shouldBe 1
     advanceRoundsByOneTick
-    scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(2)
+    scan.getTransferContext().latestOpenMiningRound.payload.round.number shouldBe 2
   }
 }

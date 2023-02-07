@@ -6,25 +6,34 @@ import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as ro
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.util.Contract
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
+import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.util.TemplateJsonDecoder
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.HttpResponse
+import akka.stream.Materializer
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
   */
 final class ScanConnection(
-    config: ClientConfig,
+    config: CoinHttpClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContextExecutor)
-    extends AppConnection(config, timeouts, loggerFactory) {
+)(implicit
+    ec: ExecutionContextExecutor,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateDecoder: TemplateJsonDecoder,
+) extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
 
@@ -49,45 +58,48 @@ final class ScanConnection(
   }
 
   def getTransferContext()(implicit
-      traceContext: TraceContext
-  ): Future[GrpcScanAppClient.TransferContext] = {
-    runCmd(GrpcScanAppClient.GetTransferContext())
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[HttpScanAppClient.TransferContext] = {
+    runHttpCmd(config.url, HttpScanAppClient.GetTransferContext(List()))
   }
 
   def getCoinRules()(implicit
-      traceContext: TraceContext
+      ec: ExecutionContext,
+      mat: Materializer,
   ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
-    runCmd(GrpcScanAppClient.GetCoinRules())
+    runHttpCmd(config.url, HttpScanAppClient.GetCoinRules(List()))
   }
 
   def getLatestOpenAndIssuingMiningRounds()(implicit
-      traceContext: TraceContext
+      ec: ExecutionContext,
+      mat: Materializer,
   ): Future[
     (
         Contract[OpenMiningRound.ContractId, OpenMiningRound],
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
-    runCmd(GrpcScanAppClient.GetLatestOpenAndIssuingMiningRounds())
+    runHttpCmd(config.url, HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(List()))
   }
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
-      traceContext: TraceContext
+      ec: ExecutionContext,
+      mat: Materializer,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    runCmd(GrpcScanAppClient.LookupFeaturedAppRight(providerPartyId))
+    runHttpCmd(config.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId, List()))
   }
 
   def getAppTransferContext(providerPartyId: PartyId)(implicit
-      traceContext: TraceContext
+      ec: ExecutionContext,
+      mat: Materializer,
   ): Future[coinCodegen.AppTransferContext] = {
     for {
       context <- getTransferContext()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
       val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
-      val openMiningRound = context.latestOpenMiningRound.getOrElse(
-        throw notFound("No active OpenMiningRound contract")
-      )
+      val openMiningRound = context.latestOpenMiningRound
       new coinCodegen.AppTransferContext(
         coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
         openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),

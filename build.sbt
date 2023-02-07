@@ -283,7 +283,7 @@ lazy val `apps-scan` =
     .in(file("apps/scan"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
         List(

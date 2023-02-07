@@ -1,13 +1,10 @@
 package com.daml.network.validator
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.http.scaladsl.{Http, HttpExt}
+import akka.http.scaladsl.Http
 import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId}
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
@@ -19,7 +16,7 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.util.{HasHealth, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
@@ -34,10 +31,8 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
-import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
-import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -66,18 +61,6 @@ class ValidatorApp(
       tracerProvider,
       retryProvider,
     ) {
-
-  private val httpExt = Http()(ac)
-  implicit val httpClient: HttpRequest => Future[HttpResponse] = (req: HttpRequest) =>
-    httpExt.singleRequest(req)
-
-  implicit val placeholderTemplateJsonDecoder = new TemplateJsonDecoder() {
-    override def decodeTemplate[TCid <: ContractId[T], T <: Template](
-        companion: ContractCompanion[_, TCid, T]
-    )(json: Json): T = throw new UnsupportedOperationException(
-      "Placeholder template json decoder cannot decode templates"
-    )
-  }
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
@@ -341,7 +324,6 @@ class ValidatorApp(
         automation,
         scanConnection,
         binding,
-        httpExt,
         timeouts,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
       )
@@ -360,7 +342,6 @@ object ValidatorApp {
       automation: ValidatorAutomationService,
       scanConnection: ScanConnection,
       binding: Http.ServerBinding,
-      http: HttpExt,
       timeouts: ProcessingTimeout,
       logger: TracedLogger,
   )(implicit el: ErrorLoggingContext)
@@ -379,24 +360,6 @@ object ValidatorApp {
         store,
         scanConnection,
         storage,
-        toCloseableHttpPools(http, logger, timeouts),
       )(logger)
-
-    def toCloseableHttpPools(
-        http: HttpExt,
-        logger: TracedLogger,
-        timeouts: ProcessingTimeout,
-    ): AutoCloseable =
-      new AutoCloseable() {
-        private val name = http.system.name
-        override def close(): Unit =
-          timeouts.shutdownProcessing.await_(
-            s"Http connection pools in Actor system ($name)",
-            logFailing = Some(Level.WARN),
-          )(
-            http.shutdownAllConnectionPools()
-          )
-        override def toString: String = s"Http connection pools in Actor system ($name)"
-      }
   }
 }

@@ -1,5 +1,8 @@
 package com.daml.network.environment
 
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
@@ -49,6 +52,19 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   private val isInitializedVar: AtomicReference[Boolean] = new AtomicReference(false)
 
   protected def isInitialized = isInitializedVar.get()
+
+  protected val packages = Seq("dar/canton-coin-0.1.0.dar")
+
+  private val packageSignatures =
+    ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
+
+  protected implicit val templateDecoder: TemplateJsonDecoder =
+    new ResourceTemplateDecoder(packageSignatures, loggerFactory)
+
+  private val httpExt = Http()(ac)
+
+  protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (req: HttpRequest) =>
+    httpExt.singleRequest(req)
 
   def isActive: Boolean = {
     // initialized and the state reports itself as healthy
@@ -198,6 +214,11 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       SyncCloseable(
         s"$name Participant Admin connection",
         participantAdminConnection.close(),
+      ),
+      AsyncCloseable(
+        "http pool",
+        httpExt.shutdownAllConnectionPools(),
+        closingTimeout,
       ),
     )
   }

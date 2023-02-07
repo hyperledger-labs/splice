@@ -1,12 +1,9 @@
 package com.daml.network.console
 
-import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.history.CoinTransactionTreeView
-import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.DomainAlias
@@ -15,6 +12,8 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.jdk.OptionConverters.*
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.config.CoinHttpClientConfig
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -22,19 +21,19 @@ import scala.jdk.OptionConverters.*
 abstract class ScanAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends HttpCoinAppReference {
 
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetSvcPartyId())
+      httpCommand(HttpScanAppClient.GetSvcPartyId(List()))
     }
 
   @Help.Summary(
     "Returns contracts required as inputs for a transfer."
   )
-  def getTransferContext(): GrpcScanAppClient.TransferContext =
+  def getTransferContext(): HttpScanAppClient.TransferContext =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetTransferContext())
+      httpCommand(HttpScanAppClient.GetTransferContext(List()))
     }
 
   @Help.Summary(
@@ -44,9 +43,7 @@ abstract class ScanAppReference(
     def notFound(description: String) = new IllegalStateException(description)
 
     val transferContext = getTransferContext()
-    val openMiningRound = transferContext.latestOpenMiningRound.getOrElse(
-      throw notFound("No active OpenMiningRound contract")
-    )
+    val openMiningRound = transferContext.latestOpenMiningRound
     val coinRules =
       transferContext.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
     new v1.coin.AppTransferContext(
@@ -58,48 +55,31 @@ abstract class ScanAppReference(
   }
 
   @Help.Summary(
-    """Returns the Daml transaction tree for a Coin transaction as visible to the SVC. """
-  )
-  def getCoinTransactionTree(transactionId: String): TransactionTree =
-    consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetCoinTransactionDetails(transactionId))
-    }
-
-  @Help.Summary(
-    """Same as `getCoinTransactionTree` except that it returns a custom type that contains an ASCII visualization
-      |of the Daml transaction tree. """.stripMargin
-  )
-  def getCoinTransactionTreePretty(transactionId: String): CoinTransactionTreeView = {
-    val tree = getCoinTransactionTree(transactionId)
-    CoinTransactionTreeView.fromTree(tree)
-  }
-
-  @Help.Summary(
     "Lists all closed rounds with their collected statistics"
   )
   def getClosedRounds()
       : Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetClosedRounds())
+      httpCommand(HttpScanAppClient.GetClosedRounds(List()))
     }
 
   @Help.Summary("List all issued featured app rights")
   def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.ListFeaturedAppRight())
+      httpCommand(HttpScanAppClient.ListFeaturedAppRight(List()))
     }
 
   def lookupFeaturedAppRight(
       providerPartyId: PartyId
   ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.LookupFeaturedAppRight(providerPartyId))
+      httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId, List()))
     }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.ListConnectedDomains())
+      httpCommand(HttpScanAppClient.ListConnectedDomains(List()))
     }
 }
 
@@ -111,6 +91,14 @@ final class ScanAppBackendReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Scan Backend"
+
+  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+    // For local references, we assume that they are reachable on localhost.
+    // TODO (#2019) Reconsider if we want these for local refs at all and if so
+    // if we should specify a url here.
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 2000}",
+    config.clientAdminApi,
+  )
 
   protected val nodes = coinConsoleEnvironment.environment.scans
 
@@ -147,6 +135,8 @@ final class ScanAppClientReference(
 ) extends ScanAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override def httpClientConfig = config.adminApi
 
   override protected val instanceType = "Scan Client"
 }

@@ -26,7 +26,7 @@ class WalletCoinPriceIntegrationTest
     "see round with coin price 2.0" in { implicit env =>
       // Eventually to make sure we wait until Scan has ingested the round.
       eventually() {
-        scan.getTransferContext().latestOpenMiningRound.value.payload.coinPrice shouldBe BigDecimal(
+        scan.getTransferContext().latestOpenMiningRound.payload.coinPrice shouldBe BigDecimal(
           2
         ).bigDecimal.setScale(10)
       }

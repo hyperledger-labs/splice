@@ -45,6 +45,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
+import akka.stream.Materializer
 
 class GrpcWalletService(
     walletManager: UserWalletManager,
@@ -54,6 +55,7 @@ class GrpcWalletService(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: CoinRetries,
 )(implicit
+    mat: Materializer,
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends WalletServiceGrpc.WalletService

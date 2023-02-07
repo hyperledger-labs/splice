@@ -1,6 +1,7 @@
 package com.daml.network.scan
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
@@ -16,7 +17,7 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -25,6 +26,12 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import com.digitalasset.canton.lifecycle.AsyncCloseable
+import com.daml.network.scan.admin.http.HttpScanHandler
+import com.daml.network.http.v0.scan.ScanResource
+
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import com.digitalasset.canton.config.ProcessingTimeout
 
 /** Class representing a Scan app instance.
   *
@@ -77,6 +84,33 @@ class ScanApp(
       )
       _ <- store.domains.signalWhenConnected()
       _ <- store.acs.signalWhenIngested(OpenMiningRound.COMPANION)
+
+      routes = cors() {
+        ScanResource.routes(
+          new HttpScanHandler(
+            ledgerClient,
+            store,
+            clock,
+            retryProvider,
+            loggerFactory,
+          )
+        )
+      }
+
+      httpConfig = config.adminApi.clientConfig.copy(
+        // TODO(#2501) Remove once we disabled gRPC Servers completely.
+        // + 2000 since envoy frontends runs on + 1000
+        port = config.adminApi.port + 2000
+      )
+      _ = logger.info(s"Starting http server on ${httpConfig}")
+      binding <- Http()
+        .newServerAt(
+          httpConfig.address,
+          httpConfig.port.unwrap,
+        )
+        .bind(
+          routes
+        )
     } yield {
       adminServerRegistry
         .addService(
@@ -96,7 +130,9 @@ class ScanApp(
         storage,
         store,
         automation,
+        binding,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
+        timeouts,
       )
     }
 
@@ -111,13 +147,21 @@ object ScanApp {
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
+      binding: Http.ServerBinding,
       logger: TracedLogger,
-  ) extends AutoCloseable
+      timeouts: ProcessingTimeout,
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
+        AsyncCloseable(
+          "http binding",
+          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          timeouts.shutdownNetwork.unwrap,
+        ),
         storage,
         store,
         automation,

@@ -7,6 +7,7 @@ import com.daml.network.config.{
   RemoteCoinConfig,
 }
 import com.digitalasset.canton.config.*
+import com.daml.network.config.CoinHttpClientConfig
 
 trait BaseScanAppConfig {}
 
@@ -27,8 +28,8 @@ case class ScanAppBackendConfig(
 }
 
 case class ScanAppClientConfig(
-    adminApi: ClientConfig
+    adminApi: CoinHttpClientConfig
 ) extends RemoteCoinConfig
     with BaseScanAppConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

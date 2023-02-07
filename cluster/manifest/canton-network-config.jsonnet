@@ -230,6 +230,10 @@ local svcDeployments(config) = [
       name: "scan-api",
       port: 5012,
     },
+    {
+      name: "scan-api-http",
+      port: 7012,
+    },
   ], proxyToGrpcWeb="scan-api", extraEnvVars=[
     authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_URL,
     authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_ID,

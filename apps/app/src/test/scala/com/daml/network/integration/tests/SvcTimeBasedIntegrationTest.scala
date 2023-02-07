@@ -560,8 +560,7 @@ class SvcTimeBasedIntegrationTest
           .length
     }
 
-    val round =
-      scan.getTransferContext().latestOpenMiningRound.getOrElse(fail("No open mining round found"))
+    val round = scan.getTransferContext().latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
     // number of existing ones, and compare to that below
     val numRewards = getNumRewardCoupons(round)
