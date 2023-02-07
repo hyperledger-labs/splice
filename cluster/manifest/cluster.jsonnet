@@ -45,54 +45,71 @@ local toContainerPortDefn(p) = {
   containerPort: p.port,
 };
 
-local authEnvVars(s) = {
-  [s.env + "_URL"]: {
-    name: s.env + "_URL",
-    valueFrom: {
-      secretKeyRef: {
-        name: s.secret,
-        key: "url",
-        optional: false,
+local appUserNameEnvBinding(appName, varBaseName=appName) =
+  local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_LEDGER_API_AUTH";
+  local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
+  [
+    {
+      name: name + "_USER_NAME",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "ledger-api-user",
+          optional: false,
+        },
       },
     },
-  },
-  [s.env + "_CLIENT_ID"]: {
-    name: s.env + "_CLIENT_ID",
-    valueFrom: {
-      secretKeyRef: {
-        name: s.secret,
-        key: "client-id",
-        optional: false,
+  ];
+
+local appUserNameEnvBindings(appNames) = std.flatMap(appUserNameEnvBinding, appNames);
+
+local appAuthEnvBinding(appName, varBaseName=appName) =
+  local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_LEDGER_API_AUTH";
+  local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
+  [
+    {
+      name: name + "_URL",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "url",
+          optional: false,
+        },
       },
     },
-  },
-  [s.env + "_CLIENT_SECRET"]: {
-    name: s.env + "_CLIENT_SECRET",
-    valueFrom: {
-      secretKeyRef: {
-        name: s.secret,
-        key: "client-secret",
-        optional: false,
+    {
+      name: name + "_CLIENT_ID",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "client-id",
+          optional: false,
+        },
       },
     },
-  },
-  [s.env + "_USER_NAME"]: {
-    name: s.env + "_USER_NAME",
-    valueFrom: {
-      secretKeyRef: {
-        name: s.secret,
-        key: "ledger-api-user",
-        optional: false,
+    {
+      name: name + "_CLIENT_SECRET",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "client-secret",
+          optional: false,
+        },
       },
     },
-  },
-};
+  ] + appUserNameEnvBinding(appName, varBaseName);
 
 // The amount of memory reserved for the operating system in containers
 // hosting a JVM. The JVM heap size is the container limit less this
 // amount. The number here is a best estimate and may need to be
 // adjusted.
 local JVM_SYSTEM_MEMORY_MIB = 512;
+
+local expandEnvironment(env) =
+  std.map(function(binding) (
+    local json = std.get(binding, "json");
+    if json == null then binding else { name: binding.name, value: std.toString(json) }
+  ), env);
 
 // `image` defaults to `name`
 local deployment(config, name, ports, cpuLimit=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
@@ -151,7 +168,7 @@ local deployment(config, name, ports, cpuLimit=1, memoryLimitMiB=1536, ext={}, p
                       name: "JAVA_TOOL_OPTIONS",
                       value: "-Xms%sM -Xmx%sM" % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
                     },
-                  ] + extraEnvVars,
+                  ] + expandEnvironment(extraEnvVars),
                   resources: {
                     requests: {
                       memory: memoryLimitMiB + "Mi",
@@ -331,5 +348,7 @@ local cluster(config, clusterDeployments) =
 {
   deployment:: deployment,
   cluster:: cluster,
-  authEnvVars:: authEnvVars,
+  appAuthEnvBinding:: appAuthEnvBinding,
+  appUserNameEnvBinding:: appUserNameEnvBinding,
+  appUserNameEnvBindings:: appUserNameEnvBindings,
 }

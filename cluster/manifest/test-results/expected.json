@@ -914,10 +914,6 @@
                               "value": "-Xms1024M -Xmx1024M"
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5014"
-                           },
-                           {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -956,6 +952,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5014"
                            },
                            {
                               "name": "CN_APP_SV_FOUND_CONSORTIUM",
@@ -1047,10 +1047,6 @@
                               "value": "-Xms1024M -Xmx1024M"
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5015"
-                           },
-                           {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -1089,6 +1085,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5015"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1176,10 +1176,6 @@
                               "value": "-Xms1024M -Xmx1024M"
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5016"
-                           },
-                           {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -1218,6 +1214,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5016"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1305,10 +1305,6 @@
                               "value": "-Xms1024M -Xmx1024M"
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5017"
-                           },
-                           {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -1347,6 +1343,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SV_ADMIN_API_PORT",
+                              "value": "5017"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

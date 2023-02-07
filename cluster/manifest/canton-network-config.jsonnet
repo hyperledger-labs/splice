@@ -4,23 +4,6 @@ local postgres = import "./postgres.jsonnet";
 
 local c = import "./cluster.jsonnet";
 
-// A dictionary of all auth-related environment variables.
-// Some variables are used by multiple apps.
-local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
-  { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH", secret: "cn-app-validator-ledger-api-auth" },
-  { env: "CN_APP_WALLET_LEDGER_API_AUTH", secret: "cn-app-wallet-ledger-api-auth" },
-  { env: "CN_APP_SVC_LEDGER_API_AUTH", secret: "cn-app-svc-ledger-api-auth" },
-  { env: "CN_APP_SV1_LEDGER_API_AUTH", secret: "cn-app-sv1-ledger-api-auth" },
-  { env: "CN_APP_SV2_LEDGER_API_AUTH", secret: "cn-app-sv2-ledger-api-auth" },
-  { env: "CN_APP_SV3_LEDGER_API_AUTH", secret: "cn-app-sv3-ledger-api-auth" },
-  { env: "CN_APP_SV4_LEDGER_API_AUTH", secret: "cn-app-sv4-ledger-api-auth" },
-  { env: "CN_APP_SCAN_LEDGER_API_AUTH", secret: "cn-app-scan-ledger-api-auth" },
-  { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH", secret: "cn-app-directory-ledger-api-auth" },
-  { env: "CN_APP_SPLITWISE_LEDGER_API_AUTH", secret: "cn-app-splitwise-ledger-api-auth" },
-  { env: "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH", secret: "cn-app-splitwise-validator-ledger-api-auth" },
-  { env: "CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH", secret: "cn-app-splitwise-wallet-ledger-api-auth" },
-], {});
-
 local svcDeployments(config) = [
   postgres.database("postgres", config),
   c.deployment(
@@ -80,17 +63,11 @@ local svcDeployments(config) = [
       port: 10013,
       externalPort: 10013,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
-    authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME,
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
+               c.appUserNameEnvBindings(["svc", "sv1", "sv2", "sv3", "sv4", "scan", "directory"]) + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+    { name: "CANTON_PARTICIPANT_USERS", json: [
       {
         name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
         primaryParty: { allocate: "svc_party" },
@@ -141,7 +118,7 @@ local svcDeployments(config) = [
         admin: true,
       },
 
-    ]) },
+    ] },
   ]),
 
   c.deployment(config, "directory-app", [
@@ -153,36 +130,22 @@ local svcDeployments(config) = [
       name: "dir-http-api",
       port: 6010,
     },
-  ], extraEnvVars=[
-    authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME,
-  ]),
+  ], extraEnvVars=c.appAuthEnvBinding("directory")),
 
   c.deployment(config, "svc-app", [
     {
       name: "svc-app-adm-api",
       port: 5005,
     },
-  ], extraEnvVars=[
-    authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_SVC_LEDGER_API_AUTH_USER_NAME,
-  ]),
+  ], extraEnvVars=c.appAuthEnvBinding("svc")),
 
   c.deployment(config, "sv-app-1", [
     {
       name: "sv1-adm-api",
       port: 5014,
     },
-  ], image="sv-app", extraEnvVars=[
+  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv1", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5014" },
-    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_URL { name: "CN_APP_SV_LEDGER_API_AUTH_URL" },
-    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID" },
-    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET" },
-    authEnvVars.CN_APP_SV1_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
     { name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" },
   ]),
 
@@ -191,12 +154,8 @@ local svcDeployments(config) = [
       name: "sv2-adm-api",
       port: 5015,
     },
-  ], image="sv-app", extraEnvVars=[
+  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv2", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5015" },
-    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_URL { name: "CN_APP_SV_LEDGER_API_AUTH_URL" },
-    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID" },
-    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET" },
-    authEnvVars.CN_APP_SV2_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
   ]),
 
   c.deployment(config, "sv-app-3", [
@@ -204,12 +163,8 @@ local svcDeployments(config) = [
       name: "sv3-adm-api",
       port: 5016,
     },
-  ], image="sv-app", extraEnvVars=[
+  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv3", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5016" },
-    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_URL { name: "CN_APP_SV_LEDGER_API_AUTH_URL" },
-    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID" },
-    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET" },
-    authEnvVars.CN_APP_SV3_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
   ]),
 
   c.deployment(config, "sv-app-4", [
@@ -217,12 +172,8 @@ local svcDeployments(config) = [
       name: "sv4-adm-api",
       port: 5017,
     },
-  ], image="sv-app", extraEnvVars=[
+  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv4", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5017" },
-    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_URL { name: "CN_APP_SV_LEDGER_API_AUTH_URL" },
-    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID" },
-    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET" },
-    authEnvVars.CN_APP_SV4_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
   ]),
 
   c.deployment(config, "scan-app", [
@@ -234,12 +185,7 @@ local svcDeployments(config) = [
       name: "scan-api-http",
       port: 7012,
     },
-  ], proxyToGrpcWeb="scan-api", extraEnvVars=[
-    authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME,
-  ]),
+  ], proxyToGrpcWeb="scan-api", extraEnvVars=c.appAuthEnvBinding("scan")),
 ];
 
 local validator1Deployments(config) = [
@@ -260,11 +206,10 @@ local validator1Deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=[
-    authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "val1-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+    { name: "CANTON_PARTICIPANT_USERS", json: [
       {
         name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
         primaryParty: { allocate: "validator1_validator_service_user" },
@@ -272,7 +217,7 @@ local validator1Deployments(config) = [
         readAs: [],
         admin: true,
       },
-    ]) },
+    ] },
   ]),
 
   c.deployment(config, "validator1-validator-app", [
@@ -280,13 +225,7 @@ local validator1Deployments(config) = [
       name: "val1-val-http",
       port: 6103,
     },
-  ], extraEnvVars=[
-    authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME,
-  ]),
+  ], extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet")),
 
   c.deployment(config, "validator1-wallet-app", [
     {
@@ -294,11 +233,7 @@ local validator1Deployments(config) = [
       port: 5004,
       externalPort: 5104,
     },
-  ], proxyToGrpcWeb="val1-wal-api", image="wallet-app", extraEnvVars=[
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME,
+  ], proxyToGrpcWeb="val1-wal-api", image="wallet-app", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "validator1-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator1-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
@@ -350,11 +285,11 @@ local splitwiseDeployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=[
-    authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
+  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
+               c.appUserNameEnvBinding("splitwise_validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwise_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", value: std.toString([
+    { name: "CANTON_PARTICIPANT_USERS", json: [
       {
         name: { env: "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
         primaryParty: { allocate: "splitwise_validator_service_user" },
@@ -362,7 +297,7 @@ local splitwiseDeployments(config) = [
         readAs: [],
         admin: true,
       },
-    ]) },
+    ] },
   ]),
 
   c.deployment(config, "splitwise-validator-app", [
@@ -370,16 +305,8 @@ local splitwiseDeployments(config) = [
       name: "sw-val-http",
       port: 6203,
     },
-  ], extraEnvVars=[
-    authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME,
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME,
-    // wallet user for the splitwise provider - corresponds to admin@sw.com user on auth0
-    { name: "CN_APP_SPLITWISE_PROVIDER_WALLET_USER", value: "auth0|63e12e0415ad881ffe914e61" },
-  ]),
+  ], extraEnvVars=c.appAuthEnvBinding("splitwise_validator") + c.appUserNameEnvBindings(["splitwise", "splitwise_wallet"]) + [{ name: "CN_APP_SPLITWISE_PROVIDER_WALLET_USER", value: "auth0|63e12e0415ad881ffe914e61" }]),
+
 
   c.deployment(config, "splitwise-wallet-app", [
     {
@@ -387,11 +314,7 @@ local splitwiseDeployments(config) = [
       port: 5004,
       externalPort: 5204,
     },
-  ], proxyToGrpcWeb="sw-wal-api", image="wallet-app", extraEnvVars=[
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_URL { name: "CN_APP_WALLET_LEDGER_API_AUTH_URL" },
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_ID { name: "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID" },
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_CLIENT_SECRET { name: "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET" },
-    authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME { name: "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME" },
+  ], proxyToGrpcWeb="sw-wal-api", image="wallet-app", extraEnvVars=c.appAuthEnvBinding("splitwise_wallet", "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwise-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwise-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
@@ -413,12 +336,7 @@ local splitwiseDeployments(config) = [
       name: "sw-api",
       port: 5213,
     },
-  ], proxyToGrpcWeb="sw-api", extraEnvVars=[
-    authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_URL,
-    authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_ID,
-    authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_SECRET,
-    authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME,
-  ]),
+  ], proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding("splitwise")),
 ];
 
 local cantonNetwork(config) =
