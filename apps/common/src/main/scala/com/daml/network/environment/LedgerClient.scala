@@ -60,6 +60,7 @@ import io.grpc.stub.{AbstractStub, StreamObserver}
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
+import io.grpc.StatusRuntimeException
 
 sealed abstract class DedupConfig
 
@@ -268,6 +269,15 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] = {
     val request = new GetUserRequest(userId).toProto
     wrapFuture(userManagementServiceStub.getUser(request, _)).map(r => User.fromProto(r.getUser))
+  }
+
+  def getOrCreateUser(user: User, initialRights: Seq[User.Right])(implicit
+      ec: ExecutionContext
+  ): Future[User] = {
+    getUser(user.getId()).recoverWith {
+      case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+        createUser(user, initialRights)
+    }
   }
 
   def allocateParty(hint: Option[String], displayName: Option[String])(implicit

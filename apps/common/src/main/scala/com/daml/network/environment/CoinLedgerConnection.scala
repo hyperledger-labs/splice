@@ -627,7 +627,7 @@ object CoinLedgerConnection {
         val userLf = new User(userId, party.toLf)
         for {
           user <- client
-            .createUser(userLf, new User.Right.CanActAs(party.toLf) +: userRights)
+            .getOrCreateUser(userLf, new User.Right.CanActAs(party.toLf) +: userRights)
           partyId =
             PartyId.tryFromProtoPrimitive(
               user.getPrimaryParty.toScala

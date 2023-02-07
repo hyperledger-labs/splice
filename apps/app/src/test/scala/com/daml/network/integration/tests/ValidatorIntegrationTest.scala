@@ -37,9 +37,9 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
   "start and restart cleanly" in { implicit env =>
     initSvc()
-    aliceValidator.startSync()
-    aliceValidator.stop()
-    aliceValidator.startSync()
+    splitwiseValidator.startSync()
+    splitwiseValidator.stop()
+    splitwiseValidator.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
