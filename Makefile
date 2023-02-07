@@ -13,10 +13,10 @@ auth-service := ${REPO_ROOT}/canton/community/participant/target/scala-2.13/clas
 build: $(app-bundle)	## Build the Canton Coin app bundle
 
 $(app-bundle):
-	sbt bundle
+	sbt --batch bundle
 
 $(auth-service):
-	sbt canton-community-participant/compile
+	sbt --batch canton-community-participant/compile
 
 .PHONY: clean
 clean: images/clean
@@ -24,11 +24,11 @@ clean: images/clean
 
 .PHONY: clean-all
 clean-all: clean	## Completely clean all local build state, including model codegen.
-	sbt clean-cn
+	sbt --batch clean-cn
 
 .PHONY: format
 format:	## Automatically reformat and apply scalaFix to source code
-	sbt formatFix
+	sbt --batch formatFix
 
 .PHONY: help
 help:	## Show list of available make targets
@@ -36,4 +36,3 @@ help:	## Show list of available make targets
 
 include cluster/images/common.mk
 include cluster/Makefile
-

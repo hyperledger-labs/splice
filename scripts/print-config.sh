@@ -4,7 +4,7 @@ set -eou pipefail
 
 ( echo "Running sbt bundle for an up-to-date config file definition"
   echo "If you wish to skip this step, comment out the corresponding line"
-  sbt bundle
+  sbt --batch bundle
 ) >&2
 
 if [[ $# -ne 1 ]]; then

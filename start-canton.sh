@@ -33,7 +33,7 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwise_simtime"
 
 # TODO(#1836) Avoid having to inject our patched auth service.
-sbt canton-community-participant/compile
+sbt --batch canton-community-participant/compile
 # We only want one file in the classpath so create a separate directory rather than
 # pointing directly to the SBT output dir.
 rm -rf canton-classpath

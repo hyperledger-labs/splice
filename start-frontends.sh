@@ -104,7 +104,7 @@ start_envoy
 # envoy kills itself if we spend too much time in `start-envoy.sh`, hence we check this here...
 sleep 0.5s && check_envoy_running
 
-(cd $REPO_ROOT && sbt apps-frontends/compile)
+(cd $REPO_ROOT && sbt --batch apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 
