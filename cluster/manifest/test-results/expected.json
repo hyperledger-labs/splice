@@ -2814,6 +2814,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_PROVIDER_WALLET_USER",
+                              "value": "auth0|63e12e0415ad881ffe914e61"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-validator-app:tag",

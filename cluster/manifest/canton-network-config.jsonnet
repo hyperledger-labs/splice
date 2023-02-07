@@ -373,6 +373,8 @@ local splitwiseDeployments(config) = [
     authEnvVars.CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME,
     authEnvVars.CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME,
+    // wallet user for the splitwise provider - corresponds to admin@sw.com user on auth0
+    { name: "CN_APP_SPLITWISE_PROVIDER_WALLET_USER", value: "auth0|63e12e0415ad881ffe914e61" },
   ]),
 
   c.deployment(config, "splitwise-wallet-app", [
