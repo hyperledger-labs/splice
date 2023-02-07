@@ -1,5 +1,6 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.DomainId
@@ -14,11 +15,14 @@ import akka.stream.scaladsl.Source
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.util.control.NonFatal
+
+import DomainOrchestrator.*
 
 /** Orchestrator that spins up exactly one instance of the given service per domain.
   * This can be used to spin up per-domain.
   */
-class DomainOrchestrator[Svc <: HasHealth & AutoCloseable](
+final class DomainOrchestrator private (
     triggerContext: TriggerContext,
     domainStore: DomainStore,
     startService: DomainStore.DomainAdded => Svc,
@@ -96,4 +100,56 @@ class DomainOrchestrator[Svc <: HasHealth & AutoCloseable](
       "Per-domain services",
       Lifecycle.close(services.values.toSeq: _*)(logger),
     ) +: super.closeAsync()
+}
+
+object DomainOrchestrator {
+  private type Svc = HasHealth & AutoCloseable
+
+  def apply(
+      triggerContext: TriggerContext,
+      domainStore: DomainStore,
+      startService: DomainStore.DomainAdded => Svc,
+  )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): DomainOrchestrator =
+    new DomainOrchestrator(triggerContext, domainStore, startService)
+
+  def multipleServices(
+      services: Seq[DomainStore.DomainAdded => Svc],
+      loggerFactory: NamedLoggerFactory,
+  ): DomainStore.DomainAdded => Svc = { event =>
+    val lf = loggerFactory
+    new HasHealth with AutoCloseable with NamedLogging {
+      private val (started, failure) = mapOrAbort(services)(f =>
+        try Right(f(event))
+        catch { case NonFatal(t) => Left(t) }
+      )
+      failure.foreach { err =>
+        close()
+        throw err
+      }
+
+      override def isHealthy = started.forall(_.isHealthy)
+
+      override def close(): Unit = Lifecycle.close(started: _*)(logger)
+
+      protected override def loggerFactory = lf
+    }
+  }
+
+  import collection.immutable.SeqOps
+
+  private[automation] def mapOrAbort[A, CC[_], Abort, B](
+      fa: SeqOps[A, CC, ?]
+  )(f: A => Either[Abort, B]): (CC[B], Option[Abort]) = {
+    val bccb = fa.iterableFactory.iterableFactory[B].newBuilder
+    val abort = fa.iterator.collectFirst(Function unlift { a =>
+      f(a).fold(
+        Some(_),
+        { b =>
+          bccb += b
+          None
+        },
+      )
+    })
+    (bccb.result(), abort)
+  }
 }

@@ -64,7 +64,6 @@ class UserWalletAutomationService(
     new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
   )
 
-  // TODO(#2472) Share Domain Orchestrator for multiple apps
   def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
     new TransferInTrigger(
       triggerContext,
@@ -75,39 +74,40 @@ class UserWalletAutomationService(
       store.key.endUserParty,
     )
 
-  Seq(
-    (domainAdded: DomainStore.DomainAdded) =>
-      new TransferOutTrigger.Template(
-        triggerContext,
-        store,
-        connection,
-        globalDomain,
-        domainAdded.domainId,
-        store.key.endUserParty,
-        paymentCodegen.AppPaymentRequest.COMPANION,
-      ),
-    (domainAdded: DomainStore.DomainAdded) =>
-      new TransferOutTrigger.Interface(
-        triggerContext,
-        store,
-        connection,
-        globalDomain,
-        domainAdded.domainId,
-        store.key.endUserParty,
-        paymentCodegen.DeliveryOffer.INTERFACE,
-      ),
-    createTransferInTrigger,
-  ).foreach { createTrigger =>
-    registerTrigger(
-      new DomainOrchestrator(
-        triggerContext,
-        store.domains,
-        domainAdded => {
+  registerTrigger(
+    DomainOrchestrator(
+      triggerContext,
+      store.domains,
+      DomainOrchestrator.multipleServices(
+        Seq(
+          (domainAdded: DomainStore.DomainAdded) =>
+            new TransferOutTrigger.Template(
+              triggerContext,
+              store,
+              connection,
+              globalDomain,
+              domainAdded.domainId,
+              store.key.endUserParty,
+              paymentCodegen.AppPaymentRequest.COMPANION,
+            ),
+          (domainAdded: DomainStore.DomainAdded) =>
+            new TransferOutTrigger.Interface(
+              triggerContext,
+              store,
+              connection,
+              globalDomain,
+              domainAdded.domainId,
+              store.key.endUserParty,
+              paymentCodegen.DeliveryOffer.INTERFACE,
+            ),
+          createTransferInTrigger,
+        ).map { createTrigger => domainAdded =>
           val trigger = createTrigger(domainAdded)
           trigger.run()
           trigger
         },
-      )
+        triggerContext.loggerFactory,
+      ),
     )
-  }
+  )
 }

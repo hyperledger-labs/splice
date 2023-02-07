@@ -179,6 +179,7 @@ lazy val `apps-common` =
     .settings(
       libraryDependencies ++= Seq(
         Dependencies.daml_lf_value_json,
+        scalatestScalacheck % Test,
         scalapb_runtime_grpc,
         scalapb_runtime,
         daml_ledger_api_scalapb,

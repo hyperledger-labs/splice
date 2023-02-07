@@ -73,7 +73,6 @@ class SplitwiseAutomationService(
     new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwise)
   )
 
-  // TODO(#2472) Share Domain Orchestrator for multiple apps
   def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
   )(domainAdded: DomainStore.DomainAdded): Trigger =
@@ -96,20 +95,21 @@ class SplitwiseAutomationService(
       store.providerParty,
     )
 
-  Seq(
-    createTransferOutTrigger(splitwiseCodegen.BalanceUpdate.COMPANION),
-    createTransferInTrigger,
-  ).foreach { createTrigger =>
-    registerTrigger(
-      new DomainOrchestrator(
-        triggerContext,
-        store.domains,
-        domainAdded => {
+  registerTrigger(
+    DomainOrchestrator(
+      triggerContext,
+      store.domains,
+      DomainOrchestrator.multipleServices(
+        Seq(
+          createTransferOutTrigger(splitwiseCodegen.BalanceUpdate.COMPANION),
+          createTransferInTrigger,
+        ).map { createTrigger => domainAdded =>
           val trigger = createTrigger(domainAdded)
           trigger.run()
           trigger
         },
-      )
+        triggerContext.loggerFactory,
+      ),
     )
-  }
+  )
 }

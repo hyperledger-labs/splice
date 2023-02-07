@@ -38,21 +38,14 @@ abstract class CoinAppAutomationService(
       loggerFactory,
       timeouts,
     )
-    new DomainStoreLink(store, domain, ingestionService)
-  }
+    import com.daml.network.util.HasHealth
+    new HasHealth with AutoCloseable {
+      override def isHealthy = ingestionService.isHealthy
 
-  import com.daml.network.util.HasHealth
-
-  private[this] final class DomainStoreLink[+A](
-      store: CoinAppStore[?, ?],
-      domain: DomainId,
-      child: A & HasHealth & AutoCloseable,
-  ) extends HasHealth
-      with AutoCloseable {
-    override def isHealthy = child.isHealthy
-    override def close() = {
-      store.uninstallPerDomainStore(domain)
-      Lifecycle.close(child)(logger)
+      override def close() = {
+        store.uninstallPerDomainStore(domain)
+        Lifecycle.close(ingestionService)(logger)
+      }
     }
   }
 
@@ -64,7 +57,7 @@ abstract class CoinAppAutomationService(
         triggerContext,
       )
     )
-    val domainAcsOrchestrator = new DomainOrchestrator(
+    val domainAcsOrchestrator = DomainOrchestrator(
       triggerContext,
       store.domains,
       da => registerDomainAcs(store, da.domainId),

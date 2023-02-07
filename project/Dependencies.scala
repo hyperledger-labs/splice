@@ -1,11 +1,15 @@
 import sbt.*
 
 object Dependencies {
+  private final val CD = CantonDependencies
+
   lazy val scala_version = "2.13.9"
 
   lazy val scalatest_version = "3.2.9"
 
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
+
+  lazy val scalatestScalacheck = CD.scalatestScalacheck
 
   // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
   lazy val scalapb_runtime =
