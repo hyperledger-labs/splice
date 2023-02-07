@@ -71,6 +71,7 @@ private[validator] object ValidatorUtil {
 
   def onboard(
       endUserName: String,
+      knownParty: Option[PartyId],
       connection: CoinLedgerConnection,
       store: ValidatorStore,
       validatorUserName: String,
@@ -81,10 +82,19 @@ private[validator] object ValidatorUtil {
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     for {
-      userPartyId <- connection.getOrAllocateParty(
-        endUserName,
-        Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
-      )
+      userPartyId <- knownParty match {
+        case Some(party) =>
+          connection.createUserWithPrimaryParty(
+            endUserName,
+            party,
+            Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
+          )
+        case None =>
+          connection.getOrAllocateParty(
+            endUserName,
+            Seq(new User.Right.CanReadAs(store.key.validatorParty.toProtoPrimitive)),
+          )
+      }
       _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
       _ <- installWalletForUser(
         endUserParty = userPartyId,

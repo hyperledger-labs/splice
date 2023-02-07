@@ -39,6 +39,8 @@ case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
+    // TODO(#2154): Make walletServiceUser optional
+    validatorWalletUser: String,
     walletServiceUser: String,
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],

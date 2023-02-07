@@ -21,8 +21,10 @@ class WalletRewardsTimeBasedIntegrationTest
 
   "A wallet" should {
 
-    "list and manually collect app & validator rewards" in { implicit env =>
+    "list and automatically collect app & validator rewards" in { implicit env =>
       val (alice, bob) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWallet)
+      waitForWalletUser(bobValidatorWallet)
 
       // Tap coin and do a transfer from alice to bob
       aliceWallet.tap(50)

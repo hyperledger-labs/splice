@@ -84,6 +84,7 @@ class HttpValidatorHandler(
     ValidatorUtil
       .onboard(
         name,
+        None,
         connection,
         store,
         validatorUserName,

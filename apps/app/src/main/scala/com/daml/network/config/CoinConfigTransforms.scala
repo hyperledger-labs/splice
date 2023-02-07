@@ -66,6 +66,7 @@ object CoinConfigTransforms {
       updateAllValidatorConfigs_(c =>
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
+          validatorWalletUser = s"${c.validatorWalletUser}-$suffix",
           walletServiceUser = s"${c.walletServiceUser}-$suffix",
           appInstances = c.appInstances.view
             .mapValues(i =>

@@ -19,7 +19,7 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.util.{CoinUtil, HasHealth, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{HasHealth, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
@@ -117,6 +117,7 @@ class ValidatorApp(
       party <- ValidatorUtil
         .onboard(
           instance.walletUser,
+          None,
           connection,
           store,
           validatorUserName = config.ledgerApiUser,
@@ -140,52 +141,6 @@ class ValidatorApp(
     } yield {
       logger.info(
         s"Setup app $name with service user ${instance.serviceUser}, wallet user ${instance.walletUser}  primary party $party, and uploaded ${instance.dars}."
-      )
-    }
-  }
-
-  private def createWalletAppInstallAndValidatorRight(
-      connection: CoinLedgerConnection,
-      store: ValidatorStore,
-      svcParty: PartyId,
-      validatorParty: PartyId,
-      validatorUser: String,
-      walletServiceParty: PartyId,
-      walletServiceUser: String,
-      domainId: DomainId,
-  ): Future[Unit] = {
-    logger.info(
-      s"Attempting to create wallet install and validator right for validator party $validatorParty..."
-    )
-    for {
-      _ <- ValidatorUtil.installWalletForUser(
-        validatorServiceParty = validatorParty,
-        walletServiceParty = walletServiceParty,
-        walletServiceUser = walletServiceUser,
-        endUserName = validatorUser,
-        endUserParty = validatorParty,
-        svcParty = svcParty,
-        connection = connection,
-        store = store,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        flagCloseable = this,
-        logger = logger,
-      )
-      _ <- CoinUtil.createValidatorRight(
-        user = validatorParty,
-        validator = validatorParty,
-        svc = svcParty,
-        connection = connection,
-        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        flagCloseable = this,
-        logger = logger,
-      )
-    } yield {
-      logger.info(
-        s"Created wallet install and validator right for validator party $validatorParty, svc $svcParty."
       )
     }
   }
@@ -329,15 +284,17 @@ class ValidatorApp(
           domainId,
         )
       })
-      _ <- createWalletAppInstallAndValidatorRight(
+      _ <- ValidatorUtil.onboard(
+        endUserName = config.validatorWalletUser,
+        knownParty = Some(validatorParty),
         connection,
         store,
-        svcParty = svcParty,
-        validatorParty = validatorParty,
-        validatorUser = config.ledgerApiUser,
-        walletServiceParty = walletServiceParty,
-        walletServiceUser = walletServiceUser,
-        domainId = domainId,
+        validatorUserName = config.ledgerApiUser,
+        walletServiceUser,
+        domainId,
+        retryProvider,
+        flagCloseable = this,
+        logger,
       )
       _ <- config.onboarding match {
         case Some(oc) => requestOnboarding(oc.remoteSv.adminApi, validatorParty)
