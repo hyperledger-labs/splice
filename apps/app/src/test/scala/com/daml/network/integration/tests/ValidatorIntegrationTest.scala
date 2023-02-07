@@ -76,10 +76,12 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   "onboard validator via onboarding config" in { implicit env =>
     initSvc()
 
+    // Stop sv1 (the leader), so we are sure that `CoinRulesRequests` won't be processed.
+    sv1.stop()
+
     // Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`
     bobValidator.startSync()
     // Check that Bob's validator can see the CoinRules
-    // TODO(#2656) actually use the new onboarding flow (:
     val bobValidatorParty = bobValidator.getValidatorPartyId()
     bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
       .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)

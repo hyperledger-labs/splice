@@ -36,7 +36,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
 
     clue("alice's validator starts successfully")(aliceValidator.startSync())
 
-    clue("disable all SV connections to the ledger API server for 2 seconds") {
+    clue("disable all SV connections to the ledger API server") {
       svs.foreach(sv => toxiproxy.disable(s"${sv.name}-ledger-api"))
     }
 
@@ -47,15 +47,9 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
     }
 
     clue(
-      "start bob's validator and wait for its 'CoinRulesRequest' appearing on the SVC participant"
+      "start bob's validator"
     ) {
       bobValidator.start()
-      eventually() {
-        // Using scan's remoteParticipant as that points to the non-toxied API
-        val results = scan.remoteParticipantWithAdminToken.ledger_api.acs
-          .filterJava(CoinRulesRequest.COMPANION)(svcParty)
-        inside(results)(_.size shouldBe 1)
-      }
     }
     clue("bob's validator reports as not active") {
       bobValidator.health.active shouldBe false

@@ -91,6 +91,7 @@ class SvApp(
             this,
           )
         }
+      // TODO(M3-46) split the SV API into a client API and an admin API with auth
       routes = cors() {
         SvResource.routes(
           new HttpSvHandler(
@@ -98,6 +99,8 @@ class SvApp(
             config.ledgerApiUser,
             svStore,
             svcStore,
+            retryProvider,
+            flagCloseable = this,
             loggerFactory,
           )
           // TODO(M3-46) add client authentication via `AuthExtractor`

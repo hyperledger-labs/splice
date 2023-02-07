@@ -1,21 +1,25 @@
 package com.daml.network.validator
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.{Http, HttpExt}
 import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId}
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
+import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.util.{CoinUtil, HasHealth, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
@@ -30,8 +34,10 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
+import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -60,6 +66,18 @@ class ValidatorApp(
       tracerProvider,
       retryProvider,
     ) {
+
+  private val httpExt = Http()(ac)
+  implicit val httpClient: HttpRequest => Future[HttpResponse] = (req: HttpRequest) =>
+    httpExt.singleRequest(req)
+
+  implicit val placeholderTemplateJsonDecoder = new TemplateJsonDecoder() {
+    override def decodeTemplate[TCid <: ContractId[T], T <: Template](
+        companion: ContractCompanion[_, TCid, T]
+    )(json: Json): T = throw new UnsupportedOperationException(
+      "Placeholder template json decoder cannot decode templates"
+    )
+  }
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
@@ -197,6 +215,26 @@ class ValidatorApp(
     )
   }
 
+  private def requestOnboarding(
+      svConfig: CoinHttpClientConfig,
+      validatorParty: PartyId,
+      // TODO(#2657) use secret
+  ): Future[Unit] = {
+    retryProvider.retryForAutomationHttp(
+      "request onboarding", {
+        val svConnection = new SvConnection(
+          svConfig,
+          coinAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+        svConnection
+          .onboardValidator(validatorParty)
+          .andThen(_ => svConnection.close())
+      },
+      this,
+    )
+  }
+
   private def createCoinRulesRequest(
       connection: CoinLedgerConnection,
       store: ValidatorStore,
@@ -301,7 +339,10 @@ class ValidatorApp(
         walletServiceUser = walletServiceUser,
         domainId = domainId,
       )
-      _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
+      _ <- config.onboarding match {
+        case Some(oc) => requestOnboarding(oc.remoteSv.adminApi, validatorParty)
+        case None => createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
+      }
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
 
       verifier = config.auth match {
@@ -343,8 +384,9 @@ class ValidatorApp(
         automation,
         scanConnection,
         binding,
-        loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
+        httpExt,
         timeouts,
+        loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
       )
     }
 
@@ -361,8 +403,9 @@ object ValidatorApp {
       automation: ValidatorAutomationService,
       scanConnection: ScanConnection,
       binding: Http.ServerBinding,
-      logger: TracedLogger,
+      http: HttpExt,
       timeouts: ProcessingTimeout,
+      logger: TracedLogger,
   )(implicit el: ErrorLoggingContext)
       extends AutoCloseable
       with HasHealth {
@@ -379,6 +422,24 @@ object ValidatorApp {
         store,
         scanConnection,
         storage,
+        toCloseableHttpPools(http, logger, timeouts),
       )(logger)
+
+    def toCloseableHttpPools(
+        http: HttpExt,
+        logger: TracedLogger,
+        timeouts: ProcessingTimeout,
+    ): AutoCloseable =
+      new AutoCloseable() {
+        private val name = http.system.name
+        override def close(): Unit =
+          timeouts.shutdownProcessing.await_(
+            s"Http connection pools in Actor system ($name)",
+            logFailing = Some(Level.WARN),
+          )(
+            http.shutdownAllConnectionPools()
+          )
+        override def toString: String = s"Http connection pools in Actor system ($name)"
+      }
   }
 }

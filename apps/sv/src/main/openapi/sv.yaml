@@ -5,6 +5,27 @@ info:
 tags:
   - name: sv
 paths:
+  /onboard:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardValidator"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardValidatorRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+          # TODO(#2657) 401 wrong secret + test that
   /debug:
     get:
       tags: [sv]
@@ -31,6 +52,16 @@ paths:
                 "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
+    OnboardValidatorRequest:
+      type: object
+      required:
+      - party_id
+      properties:
+        party_id:
+          type: string
+        secret:
+          type: string
+
     GetDebugInfoResponse:
       type: object
       required:

@@ -35,10 +35,30 @@ object HttpSvAppClient {
       ongoingValidatorOnboardings: Int,
   )
 
+  // TODO(#2657) use secret
+  case class OnboardValidator(candidate: PartyId, headers: List[HttpHeader])
+      extends BaseCommand[http.OnboardValidatorResponse, Unit] {
+
+    override def submitRequest(
+        client: Client
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardValidatorResponse] =
+      client.onboardValidator(
+        body = definitions.OnboardValidatorRequest(candidate.toProtoPrimitive, None),
+        headers = headers,
+      )
+
+    override def handleResponse(response: http.OnboardValidatorResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Unit] = response match {
+      case http.OnboardValidatorResponse.OK => Right(())
+      case http.OnboardValidatorResponse.BadRequest(e) => Left(e)
+    }
+  }
+
   case class GetDebugInfo(headers: List[HttpHeader])
       extends BaseCommand[http.GetDebugInfoResponse, DebugInfo] {
 
-    def submitRequest(
+    override def submitRequest(
         client: Client
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDebugInfoResponse] =
       client.getDebugInfo(headers = headers)

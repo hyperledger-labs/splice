@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.LedgerApiUtils
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -59,11 +59,32 @@ class SvIntegrationTest extends CoinIntegrationTest {
       )
   }
 
+  "Non-leader SVs can onboard new validators" in { implicit env =>
+    val candidate = clue("create a dummy party") {
+      bobValidator.remoteParticipantWithAdminToken.parties.enable(
+        "dummy" + env.environment.config.name.getOrElse("")
+      )
+    }
+    actAndCheck("request to onboard the candidate", sv2.onboardValidator(candidate))
+    (
+      "the candidate is now an observer to the CoinRules",
+      () => getCoinRules().observers should contain(candidate.toProtoPrimitive),
+    )
+  }
+
   def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one SvcRules contract") {
       val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
       foundSvcRules should have length 1
       foundSvcRules.head
+    }
+
+  def getCoinRules()(implicit env: CoinTestConsoleEnvironment) =
+    clue("There is exactly one CoinRules contract") {
+      val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+        .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+      foundCoinRules should have length 1
+      foundCoinRules.head
     }
 }

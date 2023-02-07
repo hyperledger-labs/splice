@@ -7,7 +7,7 @@ import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 abstract class SvAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -15,6 +15,15 @@ abstract class SvAppReference(
 ) extends HttpCoinAppReference {
 
   override protected val instanceType = "SV Client"
+
+  // TODO(#2657) use secret
+  def onboardValidator(validator: PartyId): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAppClient.OnboardValidator(validator, List())
+      )
+    }
+  }
 
   def getDebugInfo(): HttpSvAppClient.DebugInfo = {
     consoleEnvironment.run {
