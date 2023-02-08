@@ -14,16 +14,22 @@ def getCnAppLedgerApiAuthUserNameFromEnv(app: String) = {
     .getOrElse(sys.error(s"Environment variable ${envVar} does not exist"))
 }
 
-def connectGlobalDomain(p: ParticipantReference) {
-    val domainLabel = "global"
-    val domainUrl = "http://canton-domain:5008"
+case class DomainDef(
+  alias: String,
+  url: String,
+)
 
-    logger.info("Ensuring connection to global domain.")
-    p.domains.connect(domainLabel, domainUrl)
-    utils.retry_until_true(p.domains.active(domainLabel))
+def connectDomain(p: ParticipantReference, domain: DomainDef) {
+    logger.info(s"Ensuring connection to ${domain.alias} domain.")
+    p.domains.connect(domain.alias, domain.url)
+    utils.retry_until_true(p.domains.active(domain.alias))
 
-    logger.info("Executing self ping to verify connection to global domain...")
+    logger.info(s"Executing self ping to verify connection to ${domain.alias} domain...")
     p.health.ping(p)
+}
+
+def connectGlobalDomain(p: ParticipantReference) {
+    connectDomain(p, DomainDef("global", "http://global-domain:5008"))
 }
 
 def ensureParticipantUser(p: ParticipantReference, userName: String, createUser: => User): User = {

@@ -313,17 +313,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "canton-domain",
+               "app": "global-domain",
                "clusterName": "cluster",
                "moduleName": "canton-domain"
             },
-            "name": "canton-domain"
+            "name": "global-domain"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "canton-domain"
+                  "app": "global-domain"
                }
             },
             "strategy": {
@@ -332,7 +332,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "canton-domain",
+                     "app": "global-domain",
                      "clusterName": "cluster",
                      "moduleName": "canton-domain"
                   }
@@ -344,6 +344,10 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1536M -Xmx1536M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CANTON_DOMAIN_POSTGRES_SERVER",
+                              "value": "postgres"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -355,7 +359,7 @@
                               "port": "cd-pub-api"
                            }
                         },
-                        "name": "canton-domain",
+                        "name": "global-domain",
                         "ports": [
                            {
                               "containerPort": 5008,
@@ -404,7 +408,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "canton-domain"
+            "name": "global-domain"
          },
          "spec": {
             "ports": [
@@ -425,7 +429,132 @@
                }
             ],
             "selector": {
-               "app": "canton-domain"
+               "app": "global-domain"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "splitwise-domain",
+               "clusterName": "cluster",
+               "moduleName": "canton-domain"
+            },
+            "name": "splitwise-domain"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "splitwise-domain"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "splitwise-domain",
+                     "clusterName": "cluster",
+                     "moduleName": "canton-domain"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1536M -Xmx1536M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CANTON_DOMAIN_POSTGRES_SERVER",
+                              "value": "sw-postgres"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "name": "splitwise-domain",
+                        "ports": [
+                           {
+                              "containerPort": 5008,
+                              "name": "swd-pub-api"
+                           },
+                           {
+                              "containerPort": 5009,
+                              "name": "swd-adm-api"
+                           },
+                           {
+                              "containerPort": 10013,
+                              "name": "swd-metrics"
+                           }
+                        ],
+                        "readinessProbe": {
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "resources": {
+                           "limits": {
+                              "memory": "2048Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "2048Mi"
+                           }
+                        },
+                        "startupProbe": {
+                           "failureThreshold": 20,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "splitwise-domain"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "swd-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10013,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "splitwise-domain"
             }
          }
       },
@@ -1745,6 +1874,10 @@
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
                               "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"validator1_validator_service_user\"}, \"readAs\": [ ]}]"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
+                              "value": "[{\"alias\": \"splitwise\", \"url\": \"http://splitwise-domain:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2605,6 +2738,10 @@
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
                               "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"splitwise_validator_service_user\"}, \"readAs\": [ ]}]"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
+                              "value": "[{\"alias\": \"splitwise\", \"url\": \"http://splitwise-domain:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -3288,7 +3425,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-adm-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-adm-api\",\n      \"port\": 5015,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-adm-api\",\n      \"port\": 5016,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-adm-api\",\n      \"port\": 5017,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 7012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 5104,\n      \"name\": \"val1-wal-api\",\n      \"port\": 5004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"externalPort\": 6104,\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6004,\n      \"proxyToGrpc\": 5004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwise-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"externalPort\": 5204,\n      \"name\": \"sw-wal-api\",\n      \"port\": 5004,\n      \"service\": \"splitwise-wallet-app\"\n    },\n    {\n      \"externalPort\": 6204,\n      \"name\": \"sw-wal-api-gw\",\n      \"port\": 6004,\n      \"proxyToGrpc\": 5004,\n      \"service\": \"splitwise-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwise-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-adm-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-adm-api\",\n      \"port\": 5015,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-adm-api\",\n      \"port\": 5016,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-adm-api\",\n      \"port\": 5017,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 7012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 5104,\n      \"name\": \"val1-wal-api\",\n      \"port\": 5004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"externalPort\": 6104,\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6004,\n      \"proxyToGrpc\": 5004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwise-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"externalPort\": 5204,\n      \"name\": \"sw-wal-api\",\n      \"port\": 5004,\n      \"service\": \"splitwise-wallet-app\"\n    },\n    {\n      \"externalPort\": 6204,\n      \"name\": \"sw-wal-api-gw\",\n      \"port\": 6004,\n      \"proxyToGrpc\": 5004,\n      \"service\": \"splitwise-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwise-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",
@@ -3357,6 +3494,18 @@
                            {
                               "containerPort": 10313,
                               "name": "cd-metrics"
+                           },
+                           {
+                              "containerPort": 5108,
+                              "name": "swd-pub-api"
+                           },
+                           {
+                              "containerPort": 5109,
+                              "name": "swd-adm-api"
+                           },
+                           {
+                              "containerPort": 10413,
+                              "name": "swd-metrics"
                            },
                            {
                               "containerPort": 5002,
@@ -3550,6 +3699,21 @@
                   "protocol": "TCP"
                },
                {
+                  "name": "swd-pub-api",
+                  "port": 5108,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5109,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10413,
+                  "protocol": "TCP"
+               },
+               {
                   "name": "svcp-adm-api",
                   "port": 5002,
                   "protocol": "TCP"
@@ -3740,6 +3904,21 @@
                {
                   "name": "cd-metrics",
                   "port": 10313,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-pub-api",
+                  "port": 5108,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5109,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10413,
                   "protocol": "TCP"
                },
                {

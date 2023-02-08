@@ -8,7 +8,7 @@ local svcDeployments(config) = [
   postgres.database("postgres", config),
   c.deployment(
     config,
-    "canton-domain",
+    "global-domain",
     [
       {
         name: "cd-pub-api",
@@ -24,6 +24,7 @@ local svcDeployments(config) = [
         externalPort: 10313,
       },
     ],
+    image="canton-domain",
     ext={
       readinessProbe: {
         tcpSocket: {
@@ -46,7 +47,58 @@ local svcDeployments(config) = [
       },
     },
     cpuRequest=config.domainCpu,
-    memoryLimitMiB=config.domainMemoryMib
+    memoryLimitMiB=config.domainMemoryMib,
+    extraEnvVars=[
+      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
+    ]
+  ),
+  c.deployment(
+    config,
+    "splitwise-domain",
+    [
+      {
+        name: "swd-pub-api",
+        port: 5008,
+        externalPort: 5108,
+      },
+      {
+        name: "swd-adm-api",
+        port: 5009,
+        externalPort: 5109,
+      },
+      {
+        name: "swd-metrics",
+        port: 10013,
+        externalPort: 10413,
+      },
+    ],
+    image="canton-domain",
+    ext={
+      readinessProbe: {
+        tcpSocket: {
+          port: "swd-pub-api",
+        },
+      },
+      livenessProbe: {
+        tcpSocket: {
+          port: "swd-pub-api",
+        },
+        failureThreshold: 5,
+        periodSeconds: 10,
+      },
+      startupProbe: {
+        tcpSocket: {
+          port: "swd-pub-api",
+        },
+        failureThreshold: 20,
+        periodSeconds: 10,
+      },
+    },
+    cpuRequest=config.domainCpu,
+    memoryLimitMiB=config.domainMemoryMib,
+    extraEnvVars=[
+      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres" },
+    ]
   ),
 
   c.deployment(config, "svc-participant", [
@@ -218,6 +270,12 @@ local validator1Deployments(config) = [
         admin: true,
       },
     ] },
+    { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
+      {
+        alias: "splitwise",
+        url: "http://splitwise-domain:5008",
+      },
+    ] },
   ]),
 
   c.deployment(config, "validator1-validator-app", [
@@ -296,6 +354,12 @@ local splitwiseDeployments(config) = [
         actAs: [{ fromUser: "self" }],
         readAs: [],
         admin: true,
+      },
+    ] },
+    { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
+      {
+        alias: "splitwise",
+        url: "http://splitwise-domain:5008",
       },
     ] },
   ]),

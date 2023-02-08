@@ -19,4 +19,11 @@ def main() {
   users.foreach { user =>
     tools.createUser(participant, user)
   }
+
+  val domains = decode[Seq[tools.DomainDef]](sys.env.get("CANTON_PARTICIPANT_EXTRA_DOMAINS").getOrElse("[]")).getOrElse(
+    sys.error("Failed to parse domains config")
+  )
+  domains.foreach { domain =>
+    tools.connectDomain(participant, domain)
+  }
 }
