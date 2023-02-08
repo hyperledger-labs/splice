@@ -2090,6 +2090,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_WALLET_USER_NAME",
+                              "value": "auth0|63e3d75ff4114d87a2c1e4f5"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
@@ -2969,7 +2973,7 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_PROVIDER_WALLET_USER",
+                              "name": "CN_APP_SPLITWISE_PROVIDER_WALLET_USER_NAME",
                               "value": "auth0|63e12e0415ad881ffe914e61"
                            }
                         ],

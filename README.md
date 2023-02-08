@@ -696,6 +696,8 @@ Currently we maintain two tenants with some application clients in them:
 
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 
+We also have a few username-password combinations in use in our clusters, who are maintained as users in the `canton-network-dev` tenant. Their details are in [this Google doc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#).
+
 ## CircleCI Tokens
 
 Our CI setup requires access to a number of secrets. This section documents how they have been created

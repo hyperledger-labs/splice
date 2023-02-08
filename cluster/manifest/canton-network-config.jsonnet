@@ -287,7 +287,7 @@ local validator1Deployments(config) = [
       name: "val1-val-http",
       port: 6103,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet")),
+  ], extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet") + [{ name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" }]),
 
   c.deployment(config, "validator1-wallet-app", [
     {
@@ -373,7 +373,7 @@ local splitwiseDeployments(config) = [
       name: "sw-val-http",
       port: 6203,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("splitwise_validator") + c.appUserNameEnvBindings(["splitwise", "splitwise_wallet"]) + [{ name: "CN_APP_SPLITWISE_PROVIDER_WALLET_USER", value: "auth0|63e12e0415ad881ffe914e61" }]),
+  ], extraEnvVars=c.appAuthEnvBinding("splitwise_validator") + c.appUserNameEnvBindings(["splitwise", "splitwise_wallet"]) + [{ name: "CN_APP_SPLITWISE_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }]),
 
 
   c.deployment(config, "splitwise-wallet-app", [
