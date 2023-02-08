@@ -25,7 +25,7 @@ import DomainOrchestrator.*
 final class DomainOrchestrator private (
     triggerContext: TriggerContext,
     domainStore: DomainStore,
-    startService: DomainStore.DomainAdded => Svc,
+    startService: (DomainStore.DomainAdded, NamedLoggerFactory) => Svc,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends SourceBasedTrigger[DomainStore.DomainConnectionEvent]
     with HasHealth
@@ -69,7 +69,10 @@ final class DomainOrchestrator private (
             logger.warn(msg)
             (services, TaskSuccess(msg))
           } else {
-            val newServices = services + (event.domainId -> startService(event))
+            val perDomainLoggerFactory =
+              loggerFactory.append("domainId", event.domainId.toProtoPrimitive)
+            val newServices =
+              services + (event.domainId -> startService(event, perDomainLoggerFactory))
             (newServices, TaskSuccess(show"Started new service for ${event.domainId}"))
           }
         )
@@ -108,31 +111,32 @@ object DomainOrchestrator {
   def apply(
       triggerContext: TriggerContext,
       domainStore: DomainStore,
-      startService: DomainStore.DomainAdded => Svc,
+      startService: (DomainStore.DomainAdded, NamedLoggerFactory) => Svc,
   )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): DomainOrchestrator =
     new DomainOrchestrator(triggerContext, domainStore, startService)
 
   def multipleServices(
-      services: Seq[DomainStore.DomainAdded => Svc],
+      services: Seq[(DomainStore.DomainAdded, NamedLoggerFactory) => Svc],
       loggerFactory: NamedLoggerFactory,
-  ): DomainStore.DomainAdded => Svc = { event =>
-    val lf = loggerFactory
-    new HasHealth with AutoCloseable with NamedLogging {
-      private val (started, failure) = mapOrAbort(services)(f =>
-        try Right(f(event))
-        catch { case NonFatal(t) => Left(t) }
-      )
-      failure.foreach { err =>
-        close()
-        throw err
+  ): (DomainStore.DomainAdded, NamedLoggerFactory) => Svc = {
+    case (event, perDomainLoggerFactory) =>
+      val lf = loggerFactory
+      new HasHealth with AutoCloseable with NamedLogging {
+        private val (started, failure) = mapOrAbort(services)(f =>
+          try Right(f(event, perDomainLoggerFactory))
+          catch { case NonFatal(t) => Left(t) }
+        )
+        failure.foreach { err =>
+          close()
+          throw err
+        }
+
+        override def isHealthy = started.forall(_.isHealthy)
+
+        override def close(): Unit = Lifecycle.close(started: _*)(logger)
+
+        protected override def loggerFactory = lf
       }
-
-      override def isHealthy = started.forall(_.isHealthy)
-
-      override def close(): Unit = Lifecycle.close(started: _*)(logger)
-
-      protected override def loggerFactory = lf
-    }
   }
 
   import collection.immutable.SeqOps

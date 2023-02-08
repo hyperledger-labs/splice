@@ -2,7 +2,7 @@ package com.daml.network.store
 
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.{Future, ExecutionContext}
@@ -14,6 +14,7 @@ trait CoinAppStore[
     TXE <: TxLogStore.Entry[TXI],
 ] extends NamedLogging
     with AutoCloseable {
+
   implicit protected def ec: ExecutionContext
 
   /** Defines which create events are to be ingested into the store. */
@@ -43,7 +44,10 @@ trait CoinAppStore[
   def domains: DomainStore
 
   /** Orchestrate store and an ingestion sink for a newly-discovered domain. */
-  private[network] def installNewPerDomainStore(domain: DomainId): PerDomainStore
+  private[network] def installNewPerDomainStore(
+      domain: DomainId,
+      perDomainLoggerFactory: NamedLoggerFactory,
+  ): PerDomainStore
 
   /** Undo [[#installNewStoreByDomain]]. */
   private[network] def uninstallPerDomainStore(domain: DomainId): Unit
@@ -75,9 +79,10 @@ object CoinAppStore {
     private[this] def fetchState(domain: DomainId) = state.computeIfAbsent(domain, _ => Promise())
 
     private[network] override final def installNewPerDomainStore(
-        domain: DomainId
+        domain: DomainId,
+        perDomainLoggerFactory: NamedLoggerFactory,
     ): PerDomainStore = {
-      val store = newPerDomainStore(domain)
+      val store = newPerDomainStore(domain, perDomainLoggerFactory)
       fetchState(domain).success(store): Unit
       store
     }
@@ -86,7 +91,10 @@ object CoinAppStore {
       state.remove(domain): Unit
 
     /** Reentrantly create stores and an ingestion sink for a newly-discovered domain. */
-    protected[this] def newPerDomainStore(domain: DomainId): PerDomainStore
+    protected[this] def newPerDomainStore(
+        domain: DomainId,
+        perDomainLoggerFactory: NamedLoggerFactory,
+    ): PerDomainStore
 
     override final def acs(domain: DomainId) = fetchState(domain).future map storeAcs
 

@@ -1,6 +1,7 @@
 package com.daml.network.store
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.ExecutionContext
@@ -27,9 +28,12 @@ abstract class InMemoryCoinAppStore[
       logAllStateUpdates = false,
     )
 
-  protected[this] override def newPerDomainStore(domain: DomainId) =
+  protected[this] override def newPerDomainStore(
+      domain: DomainId,
+      perDomainLoggerFactory: NamedLoggerFactory,
+  ) =
     new InMemoryAcsWithTxLogStore(
-      loggerFactory,
+      perDomainLoggerFactory,
       contractFilter = acsContractFilter,
       txLogParser = txLogParser,
       futureSupervisor = futureSupervisor,

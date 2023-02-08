@@ -4,6 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.store.CoinAppStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
@@ -27,15 +28,19 @@ abstract class CoinAppAutomationService(
 
   protected val connection = registerResource(ledgerClient.connection())
 
-  private[this] def registerDomainAcs(store: CoinAppStore[?, ?], domain: DomainId) = {
-    val stores = store.installNewPerDomainStore(domain)
+  private[this] def registerDomainAcs(
+      store: CoinAppStore[?, ?],
+      domain: DomainId,
+      perDomainLoggerFactory: NamedLoggerFactory,
+  ) = {
+    val stores = store.installNewPerDomainStore(domain, perDomainLoggerFactory)
     val ingestionService = new AcsIngestionService(
       s"${this.getClass.getSimpleName}(${store.getClass.getSimpleName})",
       store.storesIngestionSink(stores),
       domain,
       connection,
       retryProvider,
-      loggerFactory,
+      perDomainLoggerFactory,
       timeouts,
     )
     import com.daml.network.util.HasHealth
@@ -60,7 +65,7 @@ abstract class CoinAppAutomationService(
     val domainAcsOrchestrator = DomainOrchestrator(
       triggerContext,
       store.domains,
-      da => registerDomainAcs(store, da.domainId),
+      (da, perDomainLoggerFactory) => registerDomainAcs(store, da.domainId, perDomainLoggerFactory),
     )
     registerTrigger(domainAcsOrchestrator)
   })

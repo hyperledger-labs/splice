@@ -13,6 +13,7 @@ import com.daml.network.automation.{
   Trigger,
   TransferInTrigger,
   TransferOutTrigger,
+  TriggerContext,
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.splitwise.config.SplitwiseDomainConfig
@@ -75,7 +76,7 @@ class SplitwiseAutomationService(
 
   def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
-  )(domainAdded: DomainStore.DomainAdded): Trigger =
+  )(domainAdded: DomainStore.DomainAdded, triggerContext: TriggerContext): Trigger =
     new TransferOutTrigger.Template(
       triggerContext,
       store,
@@ -85,7 +86,10 @@ class SplitwiseAutomationService(
       store.providerParty,
       companion,
     )
-  def createTransferInTrigger(domainAdded: DomainStore.DomainAdded): Trigger =
+  def createTransferInTrigger(
+      domainAdded: DomainStore.DomainAdded,
+      triggerContext: TriggerContext,
+  ): Trigger =
     new TransferInTrigger(
       triggerContext,
       store.domains,
@@ -103,10 +107,15 @@ class SplitwiseAutomationService(
         Seq(
           createTransferOutTrigger(splitwiseCodegen.BalanceUpdate.COMPANION),
           createTransferInTrigger,
-        ).map { createTrigger => domainAdded =>
-          val trigger = createTrigger(domainAdded)
-          trigger.run()
-          trigger
+        ).map { createTrigger =>
+          { case (domainAdded, perDomainLoggerFactory) =>
+            val trigger = createTrigger(
+              domainAdded,
+              triggerContext.copy(loggerFactory = perDomainLoggerFactory),
+            )
+            trigger.run()
+            trigger
+          }
         },
         triggerContext.loggerFactory,
       ),

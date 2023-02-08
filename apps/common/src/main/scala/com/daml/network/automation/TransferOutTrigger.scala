@@ -1,7 +1,6 @@
 package com.daml.network.automation
 
 import com.daml.network.store.CoinAppStore
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
@@ -42,9 +41,6 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
       () => Future.successful(sourceDomainId),
       companion,
     ) {
-
-  override protected lazy val loggerFactory: NamedLoggerFactory =
-    super.loggerFactory.append("domainId", sourceDomainId.toProtoPrimitive)
 
   override protected def completeTask(
       contract: Contract[

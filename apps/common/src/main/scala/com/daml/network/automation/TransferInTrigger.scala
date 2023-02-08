@@ -1,7 +1,6 @@
 package com.daml.network.automation
 
 import com.daml.network.store.DomainStore
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
@@ -30,9 +29,6 @@ class TransferInTrigger(
       domainId,
       partyId,
     ) {
-
-  override protected lazy val loggerFactory: NamedLoggerFactory =
-    super.loggerFactory.append("domainId", domainId.toProtoPrimitive)
 
   override protected def completeTask(
       transferOut: LedgerClient.GetTreeUpdatesResponse.Transfer[
