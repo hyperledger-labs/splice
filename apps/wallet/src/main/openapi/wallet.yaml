@@ -49,6 +49,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TapResponse"
+        "410":
+          description: aborted
+        "404":
+          description: not_found
 
   /self-grant-feature-app-right:
     post:
@@ -94,7 +98,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListAppPaymentRequestsResponse"
 
-  /app-payment-request/${contract_id}/accept:
+  /app-payment-requests/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -112,8 +116,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcceptAppPaymentRequestResponse"
+        "404":
+          description: not_found
 
-  /app-payment-request/${contract_id}/reject:
+  /app-payment-requests/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -127,6 +133,8 @@ paths:
       responses:
         "200":
           description: ok
+        "404":
+          description: not_found
 
   /accepted-app-payments:
     get:
@@ -180,7 +188,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListSubscriptionsResponse"
 
-  /subscription-requests/${contract_id}/accept:
+  /subscription-requests/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -198,8 +206,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcceptSubscriptionRequestResponse"
+        "404":
+          description: not_found
 
-  /subscription-requests/${contract_id}/reject:
+  /subscription-requests/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -213,9 +223,11 @@ paths:
       responses:
         "200":
           description: ok
+        "404":
+          description: not_found
 
-  /subscription-requests/${contract_id}/cancel:
-    post:
+  /subscription-requests/{contract_id}:
+    delete:
       tags: [wallet]
       x-jvm-package: wallet
       operationId: "cancelSubscriptionRequest"
@@ -228,6 +240,8 @@ paths:
       responses:
         "200":
           description: ok
+        "404":
+          description: not_found
 
   /transfer-offers:
     post:
@@ -247,6 +261,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateTransferOfferResponse"
+        "409":
+          description: duplicate_command
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -259,7 +275,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListTransferOffersResponse"
 
-  /transfer-offers/${contract_id}/reject:
+  /transfer-offers/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -273,8 +289,10 @@ paths:
       responses:
         "200":
           description: ok
+        "404":
+          description: not_found
 
-  /transfer-offers/${contract_id}/accept:
+  /transfer-offers/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -292,8 +310,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcceptTransferOfferResponse"
+        "404":
+          description: not_found
 
-  /transfer-offers/${contract_id}/withdraw:
+  /transfer-offers/{contract_id}/withdraw:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -307,7 +327,8 @@ paths:
       responses:
         "200":
           description: ok
-
+        "404":
+          description: not_found
 
   /accepted-transfer-offers:
     get:
@@ -362,16 +383,10 @@ paths:
                 "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 
   /cancel-featured-app-rights:
-    post:
+    delete:
       tags: [wallet]
       x-jvm-package: wallet
       operationId: "cancelFeaturedAppRights"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CancelFeaturedAppRightsRequest"
       responses:
         "200":
           description: ok
@@ -410,6 +425,7 @@ components:
     CoinPosition:
       type: object
       required:
+      - contract
       - round
       - accrued_holding_fee
       - effective_amount
@@ -643,10 +659,6 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-
-    CancelFeaturedAppRightsRequest:
-      type: object
-      nullable: true
 
     ListConnectedDomainsResponse:
       type: object

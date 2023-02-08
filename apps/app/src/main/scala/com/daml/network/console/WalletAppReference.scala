@@ -1,6 +1,7 @@
 package com.daml.network.console
 
-import com.daml.network.auth.{AuthUtil, JwtCallCredential}
+import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
@@ -9,8 +10,8 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.Contract
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
   ListResponse,
   UserStatusData,
 }
@@ -21,24 +22,16 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
-class WalletAppClientReference(
+abstract class WalletAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-    override val config: WalletAppClientConfig,
-) extends CoinAppReference
-    with GrpcRemoteInstanceReference
-    with BaseInspection[ParticipantNode] {
+) extends HttpCoinAppReference {
 
   override protected val instanceType = "Wallet user"
 
-  private def token: String = {
-    AuthUtil.testToken(
-      audience = AuthUtil.testAudience,
-      user = config.ledgerApiUser,
-    )
-  }
+  protected def token: String
 
-  private def callCredentials = Some(new JwtCallCredential(token))
+  private def headers = List(Authorization(OAuth2BearerToken(token)))
 
   @Help.Summary("List all coins associated with the configured user")
   @Help.Description(
@@ -47,7 +40,7 @@ class WalletAppClientReference(
   )
   def list(): ListResponse = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.List(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListPositions(headers))
     }
   }
 
@@ -58,7 +51,7 @@ class WalletAppClientReference(
   )
   def tap(amount: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.Tap(amount), callCredentials)
+      httpCommand(HttpWalletAppClient.Tap(amount, headers))
     }
   }
 
@@ -68,7 +61,7 @@ class WalletAppClientReference(
   )
   def selfGrantFeaturedAppRight(): coinCodegen.FeaturedAppRight.ContractId = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.SelfGrantFeaturedAppRight(), callCredentials)
+      httpCommand(HttpWalletAppClient.SelfGrantFeaturedAppRight(headers))
     }
   }
 
@@ -76,9 +69,9 @@ class WalletAppClientReference(
   @Help.Description(
     "Display a count across all coin holdings, consisting of: total unlocked coin balance, total locked coin balance, total holding fees accumulated. Balances are calculated after holding fees are applied."
   )
-  def balance(): GrpcWalletAppClient.Balance = {
+  def balance(): HttpWalletAppClient.Balance = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.GetBalance(), callCredentials)
+      httpCommand(HttpWalletAppClient.GetBalance(headers))
     }
   }
 
@@ -91,7 +84,7 @@ class WalletAppClientReference(
     Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
   ] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAppPaymentRequests(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListAppPaymentRequests(headers))
     }
   }
 
@@ -104,9 +97,8 @@ class WalletAppClientReference(
       requestId: walletCodegen.AppPaymentRequest.ContractId
   ): walletCodegen.AcceptedAppPayment.ContractId = {
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.AcceptAppPaymentRequest(requestId),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient.AcceptAppPaymentRequest(requestId, headers)
       )
     }
   }
@@ -119,9 +111,8 @@ class WalletAppClientReference(
       requestId: walletCodegen.AppPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.RejectAppPaymentRequest(requestId),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient.RejectAppPaymentRequest(requestId, headers)
       )
     }
   }
@@ -131,7 +122,7 @@ class WalletAppClientReference(
     Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListAcceptedAppPayments(headers))
     }
 
   @Help.Summary("List all subscription requests of the configured user")
@@ -143,7 +134,7 @@ class WalletAppClientReference(
     Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
   ] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListSubscriptionRequests(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListSubscriptionRequests(headers))
     }
   }
 
@@ -157,7 +148,7 @@ class WalletAppClientReference(
     subsCodegen.SubscriptionInitialPayment,
   ]] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListSubscriptionInitialPayments(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListSubscriptionInitialPayments(headers))
     }
   }
 
@@ -166,9 +157,9 @@ class WalletAppClientReference(
     "Queries the configured remote participant for all Subscription contracts of the configured user. " +
       "Returns them, joining each of them with its current state contract."
   )
-  def listSubscriptions(): Seq[GrpcWalletAppClient.Subscription] = {
+  def listSubscriptions(): Seq[HttpWalletAppClient.Subscription] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListSubscriptions(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListSubscriptions(headers))
     }
   }
 
@@ -181,7 +172,7 @@ class WalletAppClientReference(
       requestId: subsCodegen.SubscriptionRequest.ContractId
   ): subsCodegen.SubscriptionInitialPayment.ContractId = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.AcceptSubscriptionRequest(requestId), callCredentials)
+      httpCommand(HttpWalletAppClient.AcceptSubscriptionRequest(requestId, headers))
     }
   }
 
@@ -193,7 +184,7 @@ class WalletAppClientReference(
       requestId: subsCodegen.SubscriptionRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.RejectSubscriptionRequest(requestId), callCredentials)
+      httpCommand(HttpWalletAppClient.RejectSubscriptionRequest(requestId, headers))
     }
   }
 
@@ -205,7 +196,7 @@ class WalletAppClientReference(
       stateId: subsCodegen.SubscriptionIdleState.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.CancelSubscription(stateId), callCredentials)
+      httpCommand(HttpWalletAppClient.CancelSubscription(stateId, headers))
     }
   }
 
@@ -219,16 +210,9 @@ class WalletAppClientReference(
       idempotencyKey: String,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient
-          .CreateTransferOffer(
-            receiver,
-            amount,
-            description,
-            expiresAt,
-            idempotencyKey,
-          ),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient
+          .CreateTransferOffer(receiver, amount, description, expiresAt, idempotencyKey, headers)
       )
     }
 
@@ -243,7 +227,7 @@ class WalletAppClientReference(
     ]
   ] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListTransferOffers(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListTransferOffers(headers))
     }
   }
 
@@ -255,9 +239,8 @@ class WalletAppClientReference(
       offerId: transferOfferCodegen.TransferOffer.ContractId
   ): transferOfferCodegen.AcceptedTransferOffer.ContractId = {
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.AcceptTransferOffer(offerId),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient.AcceptTransferOffer(offerId, headers)
       )
     }
   }
@@ -273,7 +256,7 @@ class WalletAppClientReference(
     ]
   ] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAcceptedTransferOffers(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListAcceptedTransferOffers(headers))
     }
   }
 
@@ -285,9 +268,8 @@ class WalletAppClientReference(
       offerId: transferOfferCodegen.TransferOffer.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.RejectTransferOffer(offerId),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient.RejectTransferOffer(offerId, headers)
       )
     }
   }
@@ -300,9 +282,8 @@ class WalletAppClientReference(
       offerId: transferOfferCodegen.TransferOffer.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.WithdrawTransferOffer(offerId),
-        callCredentials,
+      httpCommand(
+        HttpWalletAppClient.WithdrawTransferOffer(offerId, headers)
       )
     }
   }
@@ -312,7 +293,7 @@ class WalletAppClientReference(
   def listAppRewardCoupons()
       : Seq[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAppRewardCoupons(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListAppRewardCoupons(headers))
     }
 
   @Help.Summary("List validator rewards")
@@ -323,20 +304,26 @@ class WalletAppClientReference(
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListValidatorRewardCoupons(), callCredentials)
+      httpCommand(HttpWalletAppClient.ListValidatorRewardCoupons(headers))
     }
 
   @Help.Summary("User status")
   @Help.Description("Get the user status")
   def userStatus(): UserStatusData =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.UserStatus(), callCredentials)
+      httpCommand(HttpWalletAppClient.UserStatus(headers))
     }
 
   @Help.Summary("Cancel user's featured app rights")
   def cancelFeaturedAppRight(): Unit =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.CancelFeaturedAppRight(), callCredentials)
+      httpCommand(HttpWalletAppClient.CancelFeaturedAppRight(headers))
+    }
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListConnectedDomains(headers))
     }
 }
 
@@ -344,10 +331,9 @@ class WalletAppClientReference(
   * app reference.
   */
 class WalletAppBackendReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
-    override val name: String,
-) extends CoinAppReference
-    with LocalCoinAppReference
+    val coinConsoleEnvironment: CoinConsoleEnvironment,
+    val name: String,
+) extends LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Wallet"
@@ -376,12 +362,28 @@ class WalletAppBackendReference(
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListConnectedDomains())
-    }
-
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
+}
+
+/** Client (aka remote) reference to a wallet app in the style of CoinRemoteParticipantReference, i.e.,
+  * it accepts the config as an argument rather than reading it from the global map.
+  */
+final class WalletAppClientReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+    override val config: WalletAppClientConfig,
+) extends WalletAppReference(consoleEnvironment, name)
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  override def httpClientConfig = config.adminApi
+  override def token: String = {
+    AuthUtil.testToken(
+      audience = AuthUtil.testAudience,
+      user = config.ledgerApiUser,
+    )
+  }
+
+  override protected val instanceType = "Wallet Client"
 }

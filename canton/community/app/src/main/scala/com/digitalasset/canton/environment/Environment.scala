@@ -166,7 +166,8 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     Some(mon)
   } else None
 
-  implicit val actorSystem: ActorSystem = AkkaUtil.createActorSystem(loggerFactory.threadName)
+  implicit val actorSystem: ActorSystem =
+    AkkaUtil.createActorSystem(loggerFactory.threadName, config.akkaConfig)
 
   implicit val executionSequencerFactory: ExecutionSequencerFactory =
     AkkaUtil.createExecutionSequencerFactory(

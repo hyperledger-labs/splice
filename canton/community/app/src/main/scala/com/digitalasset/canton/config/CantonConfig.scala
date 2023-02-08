@@ -342,6 +342,9 @@ trait CantonConfig {
   /** per-environment parameters to control enabled features and set testing parameters */
   def parameters: CantonParameters
 
+  /** Akka configuration */
+  def akkaConfig: Option[Config] = None
+
   /** control which features are enabled */
   def features: CantonFeatures
 

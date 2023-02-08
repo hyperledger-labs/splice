@@ -6,10 +6,12 @@ package com.daml.network.console
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.environment.CoinEnvironment
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   CustomClientTimeout,
@@ -26,7 +28,6 @@ import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   StringErrorEitherToCommandResultExtensions,
 }
-import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
@@ -38,7 +39,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** HTTP version of Canton’s GrpcAdminCommandRunner
   */
 class ConsoleHttpCommandRunner(
-    environment: Environment,
+    environment: CoinEnvironment,
     timeouts: ProcessingTimeout,
     commandTimeouts: ConsoleCommandTimeout,
 )(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
@@ -53,14 +54,16 @@ class ConsoleHttpCommandRunner(
   private val httpRunner = new HttpCtlRunner(
     loggerFactory
   )
-
-  implicit val actorSystem = ActorSystem("ConsoleHttpCommandRunner")
+  implicit val actorSystem = ActorSystem("ConsoleHttpCommandRunner", environment.config.akkaConfig)
   implicit val mat: Materializer = Materializer(actorSystem)
 
   val httpExt = Http()(actorSystem)
 
   implicit val httpClient: HttpRequest => Future[HttpResponse] = (req: HttpRequest) =>
-    httpExt.singleRequest(req)
+    httpExt.singleRequest(
+      req,
+      settings = ConnectionPoolSettings(actorSystem),
+    )
 
   def runCommand[Result](
       instanceName: String,

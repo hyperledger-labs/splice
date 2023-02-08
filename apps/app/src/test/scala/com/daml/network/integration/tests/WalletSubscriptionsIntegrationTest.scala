@@ -11,7 +11,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
@@ -105,7 +105,7 @@ class WalletSubscriptionsIntegrationTest
           _ =>
             inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
               sub.main.payload should equal(request.subscriptionData)
-              inside(sub.state) { case GrpcWalletAppClient.SubscriptionPayment(state) =>
+              inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
                 state.payload.subscription shouldBe sub.main.contractId
                 state.payload.payData should equal(request.payData)
                 state.contractId
@@ -132,7 +132,7 @@ class WalletSubscriptionsIntegrationTest
           _ =>
             inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
               sub.main.payload should equal(request.subscriptionData)
-              inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
+              inside(sub.state) { case HttpWalletAppClient.SubscriptionIdleState(state) =>
                 state.payload.subscription should equal(sub.main.contractId)
                 state.payload.payData should equal(request.payData)
                 state.contractId

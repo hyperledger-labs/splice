@@ -21,7 +21,7 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
@@ -80,7 +80,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       userWallet: WalletAppBackendReference,
       userParty: PartyId,
       validatorParty: PartyId,
-      coins: Seq[GrpcWalletAppClient.CoinPosition],
+      coins: Seq[HttpWalletAppClient.CoinPosition],
       amount: BigDecimal,
       transferContext: v1.coin.AppTransferContext,
       expiredDuration: Duration,

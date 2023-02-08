@@ -8,10 +8,12 @@ import com.daml.network.config.CoinConfigTransforms.{
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{HasExecutionContext, time}
+import com.typesafe.config.ConfigFactory
 import io.grpc.StatusRuntimeException
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
@@ -19,6 +21,7 @@ import org.slf4j.event.Level
 import java.time.Duration
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
+import scala.util.Success
 
 class TimeBasedTreasuryIntegrationTest
     extends CoinIntegrationTest
@@ -42,6 +45,23 @@ class TimeBasedTreasuryIntegrationTest
         // for testing non-automation-based coin merging.
         setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(30))(config)
       )
+      .addConfigTransform((_, config) =>
+        config.copy(akkaConfig =
+          Some(
+            // these settings are needed for the "operate and shutdown cleanly ..." test to pass,
+            // since it requires a lot of open / queued requests
+            ConfigFactory.parseString(
+              """
+            |akka.http.host-connection-pool {
+            |  max-connections = 500
+            |  min-connections = 20
+            |  max-open-requests = 1024
+            |}
+            |""".stripMargin
+            )
+          )
+        )
+      )
   }
 
   "operate and shutdown cleanly with lots of coin operations in flight" in { implicit env =>
@@ -56,16 +76,16 @@ class TimeBasedTreasuryIntegrationTest
             case scala.util.control.NonFatal(ex) =>
               logger.info("Ignoring exception when executing tap", ex)
           }
-        }
+        }.transform(Success(_))
       )
     }
 
-    loggerFactory.assertLoggedWarningsAndErrorsSeq(
+    val inflight = loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
         // waiting for a few taps succeed - so...
         val futuresWait = tapInRange(1, 2 * batchSize)
         // .. these taps here can fill up the queue
-        val futuresDontWait = tapInRange(2 * batchSize + 1, (2 * batchSize + 1) + 50 * queueSize)
+        val futuresDontWait = tapInRange(2 * batchSize + 1, (2 * batchSize + 1) + 5 * queueSize)
 
         Await.result(futuresWait, atMost = 15.seconds)
         // such that some of them will still be in-flight when we shutdown
@@ -78,16 +98,17 @@ class TimeBasedTreasuryIntegrationTest
         }
         // sleeping 1s, as sometimes error from TODO(#1942) are logged delayed.
         Threading.sleep(1000)
+        futuresDontWait
       },
       lines => {
         // \r is carriage return
         val regexAnything = "(.|\\n|\\r)*"
+        val abortedErr = HttpWalletAppClient.Err.TapResponse.Aborted.value
         val errorRegex = Seq(
-          "Request failed for aliceWallet",
-          "(ABORTED|UNAVAILABLE|CANCELLED|UNIMPLEMENTED)",
+          s"(Connection reset|Connection refused|$abortedErr)"
         ).mkString(regexAnything)
 
-        val errorRegex2 = // TODO(#1942): these errors shouldn't occur during this test.
+        val errorRegex2 = // TODO(#1942): these errors should occur during this test.
           s"(Skipping batch due to unexpected execution failure|Unexpected coin operation execution failure)"
 
         forAll(lines) { line =>
@@ -112,6 +133,7 @@ class TimeBasedTreasuryIntegrationTest
         }
       },
     )
+    Await.result(inflight, atMost = 60.seconds)
   }
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>

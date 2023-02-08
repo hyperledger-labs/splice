@@ -1,7 +1,9 @@
 package com.daml.network.wallet
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import akka.stream.Materializer
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.*
@@ -9,10 +11,12 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
+import com.daml.network.wallet.admin.http.HttpWalletHandler
 import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
@@ -20,8 +24,8 @@ import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -138,13 +142,38 @@ class WalletApp(
       )
       _ <- walletStore.domains.signalWhenConnected()
       _ <- walletStore.acs.signalWhenIngested(OpenMiningRound.COMPANION)
-    } yield {
-
-      val verifier: SignatureVerifier = config.auth match {
+      verifier: SignatureVerifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
+      routes = cors() {
+        WalletResource.routes(
+          new HttpWalletHandler(
+            walletManager,
+            ledgerClient,
+            clock,
+            scanConnection,
+            loggerFactory,
+            retryProvider,
+          ),
+          AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+        )
+      }
+      httpConfig = config.adminApi.clientConfig.copy(
+        port = config.adminApi.port + 2000
+      )
+      _ = logger.info(s"Starting http server on ${httpConfig}")
+      binding <- Http()
+        .newServerAt(
+          httpConfig.address,
+          httpConfig.port.unwrap,
+        )
+        .bind(
+          routes
+        )
+
+    } yield {
       adminServerRegistry
         .addService(
           ServerInterceptors.intercept(
@@ -174,6 +203,7 @@ class WalletApp(
         walletManager,
         scanConnection,
         validatorConnection,
+        binding,
         timeouts,
         loggerFactory.getTracedLogger(WalletApp.State.getClass),
       )
@@ -195,15 +225,22 @@ object WalletApp {
       walletManager: UserWalletManager,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
+      binding: Http.ServerBinding,
       timeouts: ProcessingTimeout,
       logger: TracedLogger,
-  ) extends AutoCloseable
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean =
       storage.isActive && automation.isHealthy && walletManager.isHealthy
 
     override def close(): Unit = {
       Lifecycle.close(
+        AsyncCloseable(
+          "http binding",
+          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          timeouts.shutdownNetwork.unwrap,
+        ),
         automation,
         storage,
         walletStore,

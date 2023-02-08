@@ -3,7 +3,6 @@ package com.daml.network.config
 import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
-
 import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
@@ -85,6 +84,7 @@ case class CoinConfig(
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
+    override val akkaConfig: Option[Config] = None,
 ) extends CantonConfig // TODO(#736): generalize or fork this trait.
     with ConfigDefaults[DefaultPorts, CoinConfig] {
 

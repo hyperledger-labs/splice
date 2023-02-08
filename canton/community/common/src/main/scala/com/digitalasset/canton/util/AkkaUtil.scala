@@ -10,7 +10,7 @@ import com.daml.grpc.adapter.{AkkaExecutionSequencerPool, ExecutionSequencerFact
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, Threading}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,11 +33,13 @@ object AkkaUtil extends HasLoggerName {
 
   /** Create an Actor system using the existing execution context `ec`
     */
-  def createActorSystem(namePrefix: String)(implicit ec: ExecutionContext): ActorSystem =
+  def createActorSystem(namePrefix: String, config: Option[Config] = None)(implicit
+      ec: ExecutionContext
+  ): ActorSystem =
     ActorSystem(
       namePrefix + "-actor-system",
       defaultExecutionContext = Some(ec),
-      config = Some(ConfigFactory.load),
+      config = config.map(_.withFallback(ConfigFactory.load())),
     )
 
   /** Create a new execution sequencer factory (mainly used to create a ledger client) with the existing actor system `actorSystem`

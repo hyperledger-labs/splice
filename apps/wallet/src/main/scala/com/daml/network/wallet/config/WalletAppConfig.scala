@@ -45,8 +45,8 @@ case class WalletRemoteValidatorAppConfig(
 }
 
 case class WalletAppClientConfig(
-    adminApi: ClientConfig,
+    adminApi: CoinHttpClientConfig,
     ledgerApiUser: String,
 ) extends RemoteCoinConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

@@ -6,11 +6,14 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.WalletTestUtil
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
+import com.typesafe.config.ConfigFactory
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
@@ -19,6 +22,28 @@ class WalletIntegrationTest
     extends CoinIntegrationTest // TODO(#2100): investigate whether we can make this a shared environment again
     with HasExecutionContext
     with WalletTestUtil {
+
+  override def environmentDefinition: CoinEnvironmentDefinition = {
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .addConfigTransform((_, config) =>
+        config.copy(akkaConfig =
+          Some(
+            // these settings are needed for the batching tests to pass,
+            // since they require a lot of open / queued requests
+            ConfigFactory.parseString(
+              """
+            |akka.http.host-connection-pool {
+            |  max-connections = 100
+            |  min-connections = 100
+            |  max-open-requests = 128
+            |}
+            |""".stripMargin
+            )
+          )
+        )
+      )
+  }
 
   "A wallet" should {
 
@@ -193,7 +218,8 @@ class WalletIntegrationTest
           val failedAcceptF = Future(
             loggerFactory.assertThrowsAndLogs[CommandFailure](
               aliceWallet.acceptAppPaymentRequest(request),
-              _.errorMessage should include regex ("NOT_FOUND/.*(AppPaymentRequest|DeliveryOffer)"),
+              _.errorMessage should include regex ("acceptAppPaymentRequest: contract_id not found.*"),
+              _.errorMessage should include regex (HttpWalletAppClient.Err.AcceptAppPaymentRequestResponse.NotFound.value),
             )
           )
           val tap3F = Future(aliceWallet.tap(10))
@@ -201,6 +227,7 @@ class WalletIntegrationTest
           tap1F.futureValue
           tap2F.futureValue
           tap3F.futureValue
+
           failedAcceptF.futureValue
 
           eventually() {
@@ -244,9 +271,14 @@ class WalletIntegrationTest
                 "The operation 'execute coin operation batch' has failed with an exception. Retrying after 200 milliseconds."
               )
             )
-            forAtLeast(1, entries)( // fails
+            forAtLeast(1, entries)( // fails in HttpWalletHandler
               _.message should include regex (
-                "GrpcRequestRefusedByServer: NOT_FOUND/.*(AppPaymentRequest|DeliveryOffer)"
+                "contract_id not found.*"
+              )
+            )
+            forAtLeast(1, entries)( // fails in HttpWalletAppClient
+              _.message should include regex (
+                "AcceptAppPayment request not found.*"
               )
             )
           },

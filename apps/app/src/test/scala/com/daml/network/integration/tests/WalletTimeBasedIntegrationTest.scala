@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
@@ -169,11 +169,11 @@ class WalletTimeBasedIntegrationTest
           subs should have length 3
           subs
             .collect(_.state match {
-              case s: GrpcWalletAppClient.SubscriptionIdleState => s
+              case s: HttpWalletAppClient.SubscriptionIdleState => s
             }) should have length 2
           subs
             .collect(_.state match {
-              case s: GrpcWalletAppClient.SubscriptionPayment => s
+              case s: HttpWalletAppClient.SubscriptionPayment => s
             }) should have length 1
         },
       )

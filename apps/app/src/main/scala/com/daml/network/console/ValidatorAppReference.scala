@@ -23,12 +23,14 @@ abstract class ValidatorAppReference(
 
   protected def token: String
 
+  private def headers = List(Authorization(OAuth2BearerToken(token)))
+
   @Help.Summary("Get validator user info")
   @Help.Description("Return the user info of the validator operator")
   def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.GetValidatorUserInfo(List(Authorization(OAuth2BearerToken(token))))
+        HttpValidatorAppClient.GetValidatorUserInfo(headers)
       )
     }
   }
@@ -44,7 +46,7 @@ abstract class ValidatorAppReference(
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.OnboardUser(user, List(Authorization(OAuth2BearerToken(token))))
+        HttpValidatorAppClient.OnboardUser(user, headers)
       )
     }
   }
@@ -57,7 +59,7 @@ abstract class ValidatorAppReference(
   def register(): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.Register(List(Authorization(OAuth2BearerToken(token))))
+        HttpValidatorAppClient.Register(headers)
       )
     }
   }
@@ -66,7 +68,7 @@ abstract class ValidatorAppReference(
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.ListConnectedDomains(List(Authorization(OAuth2BearerToken(token))))
+        HttpValidatorAppClient.ListConnectedDomains(headers)
       )
     }
 }
