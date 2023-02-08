@@ -28,8 +28,8 @@ source "$SRCDIR"/io-utils.sh
 # Load ignore patterns for later use
 IGNORE_PATTERNS=$(remove_comment_and_blank_lines < "$FILE_WITH_IGNORE_PATTERNS")
 
-# Keywords are based on `canton.lnav.json`
-MIN_LOG_LEVEL_WARNING="] WARN  |] WARNING  |] CRITICAL  |] ERROR  |] SEVERE  |] FATAL"
+# Keywords are based on `canton-json.lnav.json`
+MIN_LOG_LEVEL_WARNING="\"level\":\"WARN\"|\"level\":\"ERROR\""
 
 ### Output ignored log lines
 
@@ -86,7 +86,7 @@ find_secrets() {
   set +o pipefail # rg returns 1 if there were not matches
   rg -e "secret=" -e "token=" "$LOGFILE" |
     # we mask secrets as "****" in our logs
-    rg -v "=\"\*\*\*\*\"" || true
+    rg -v "=\\\\\"\*\*\*\*\\\\\"" || true
 }
 
 # Find leaked secrets

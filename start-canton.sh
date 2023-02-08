@@ -44,17 +44,24 @@ export CLASSPATH=$PWD/canton-classpath
 
 # Start Canton
 CANTON_TOKEN_FILENAME=canton.tokens canton \
-    daemon --log-level-canton=DEBUG \
-    --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
+    daemon --no-tty \
+    -c ./apps/app/src/test/resources/simple-topology-canton.conf \
+    -C canton.parameters.ports-file=canton.ports \
+    --log-level-canton=DEBUG \
+    --log-encoder json \
+    --log-file-name log/canton.clog \
     --bootstrap bootstrap-canton.sc &
 PID=$!
 echo "$PID" > canton.pid
 
 # Start second Canton with simulated time, for time-based tests
 CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
-    daemon --log-level-canton=DEBUG \
-    --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
-    --log-file-name log/canton-simtime.log \
+    daemon --no-tty \
+    -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
+    -C canton.parameters.ports-file=canton-simtime.ports \
+    --log-level-canton=DEBUG \
+    --log-encoder json \
+    --log-file-name log/canton-simtime.clog \
     --bootstrap bootstrap-canton.sc &
 PID=$!
 echo "$PID" > canton-simtime.pid

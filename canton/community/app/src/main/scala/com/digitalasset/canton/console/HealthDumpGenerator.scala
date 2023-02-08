@@ -92,7 +92,7 @@ trait HealthDumpGenerator[Status <: CantonStatus] {
         sys.env
           .get("LOG_FILE_NAME")
           .orElse(sys.props.get("LOG_FILE_NAME")) // This is set in Cli.installLogging
-          .getOrElse("log/canton_network.log")
+          .getOrElse("log/canton_network.clog")
       )
 
     val logLastErrorsFile = File(

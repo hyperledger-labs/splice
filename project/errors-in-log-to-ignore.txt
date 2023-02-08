@@ -33,11 +33,11 @@ HMAC256 JWT Validator is NOT recommended for production environments
 
 # Using an access token for a user that has not yet been allocated produces the following warning.
 # Users are allocated by the validator app, and all apps are starting concurrently.
-AuthorizationInterceptor.*Could not resolve is_deactivated status for user
+PERMISSION_DENIED.*Could not resolve is_deactivated status for user
 
 # Using multiple auth configs for the long-running Canton instances produces the following warning
 # when authenticating using an auth config that is not the first in the list.
-AuthServiceJWT.*Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
+Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
 
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)

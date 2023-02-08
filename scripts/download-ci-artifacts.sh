@@ -26,7 +26,7 @@ ARTIFACTS_URL=https://circleci.com/api/v1.1/project/$CI_VCSTYPE/$CI_ORGNAME/$CI_
 curl $ARTIFACTS_URL -s | grep -o 'https://[^"]*' > "$BASE_TARGET_DIRECTORY/artifacts.txt"
 
 while read p; do
-  if [[ $p =~ ".log.gz" ]]; then
+  if [[ $p =~ ".log.gz" ]] || [[ $p =~ ".clog.gz" ]]; then
     PARALLEL_RUN="$(echo $p | sed -e 's?.*\/artifacts\/??' | sed -e 's?\/.*??')"
     if [ -z "$PARALLEL_RUN" ]; then
       TARGET_DIRECTORY="$BASE_TARGET_DIRECTORY/logs"
