@@ -245,7 +245,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       fromCreatedEvent: CreatedEvent => Option[T]
   )(id: ContractId[_]): Future[Option[T]] = {
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
-      st.createEventsById.get(id.contractId) match {
+      st.createEventsById.get(id) match {
         case None => None
         case Some(evRev) =>
           st.createEvents.get(evRev).flatMap(ev => fromCreatedEvent(ev))
@@ -330,7 +330,7 @@ object InMemoryAcsWithTxLogStore {
       offset: Option[String],
       nextEventNumber: Long,
       createEvents: immutable.SortedMap[Long, CreatedEvent],
-      createEventsById: immutable.Map[String, Long],
+      createEventsById: immutable.Map[ContractId[_], Long],
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
       txLog: immutable.Queue[TXI],
@@ -354,14 +354,14 @@ object InMemoryAcsWithTxLogStore {
         offset = offset,
         nextEventNumber = nextEventNumber + 1,
         createEvents = createEvents + (nextEventNumber -> ev),
-        createEventsById = createEventsById + (ev.getContractId -> nextEventNumber),
+        createEventsById = createEventsById + (new ContractId(ev.getContractId) -> nextEventNumber),
         offsetChanged = offsetChanged,
         offsetIngestionsToSignal = offsetIngestionsToSignal,
         txLog = txLog,
       )
     }
 
-    def ingestArchivedEvent(contractId: String): (State[TXI, TXE], Boolean) =
+    def ingestArchivedEvent(contractId: ContractId[_]): (State[TXI, TXE], Boolean) = {
       createEventsById.get(contractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
@@ -382,6 +382,7 @@ object InMemoryAcsWithTxLogStore {
           )
         }
       }
+    }
 
     def ingestCreatedEvents(
         evs: Seq[CreatedEvent],
@@ -439,8 +440,6 @@ object InMemoryAcsWithTxLogStore {
         in: TransferEvent.In,
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], Boolean) =
-      // TODO (M3-83) Consider if we want to treat those differently
-      // than plain creates.
       if (p(in.createdEvent)) {
         (ingestCreatedEvent(in.createdEvent), true)
       } else {
@@ -448,10 +447,7 @@ object InMemoryAcsWithTxLogStore {
       }
 
     def ingestTransferOutEvent(out: TransferEvent.Out): (State[TXI, TXE], Boolean) =
-      // TODO (M3-83) Consider if we want to treat those differently
-      // than plain archives. In particular, we may want to
-      // mark a contract as pending when we submit the transfer out until we get the completion.
-      ingestArchivedEvent(out.contractId.contractId)
+      ingestArchivedEvent(out.contractId)
 
     def switchToIngestingTransactions(
         acsOffset: String
@@ -513,7 +509,7 @@ object InMemoryAcsWithTxLogStore {
           val txLogEntry = txLogParser.parseExercise(tx, ev)
           txLogEntry.foreach(ale => ingestedTxLogEntries.append(ale))
           if (ev.isConsuming) {
-            val (newSt, ingested) = st.ingestArchivedEvent(ev.getContractId)
+            val (newSt, ingested) = st.ingestArchivedEvent(new ContractId(ev.getContractId))
             if (ingested)
               ingestedArchivedEvents.append(ev)
             else
