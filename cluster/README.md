@@ -632,15 +632,12 @@ cncluster apply
 ## Auth0 secrets
 
 Our apps need some secrets in order to interact with auth0.
-Our tooling expects that these secrets are stored in environment variables on your machine. It is recommended you store them in `.envrc.private`.
-From there, the secrets are copied to kubernetes secrets and mapped to environment variables on the target pods.
-These values of these environment variables are then inserted into app config files using standard HOCON environment variables substitution.
+In order to update these secrets, please set an environment variable `AUTH0_MANAGEMENT_API_TOKEN` with
+the token obtained from [Auth0 Management API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer). It is recommended you store this in `.envrc.private`.
 
-In order to update secrets on a deployed cluster, run `cncluster update_secrets`.
-It will expect the following environment variables:
-
-- `CN_APP_<APP>_LEDGER_API_AUTH_CLIENT_ID`: client ID of the given auth0 application on the [dev tenant](https://manage.auth0.com/dashboard/us/canton-network-dev).
-- `CN_APP_<APP>_LEDGER_API_AUTH_CLIENT_SECRET`: client secret of the given auth0 application on the [dev tenant](https://manage.auth0.com/dashboard/us/canton-network-dev).
+In order to update secrets on a deployed cluster, run `cncluster update_secrets`. It will fetch all
+relevant secrets from Auth0 using the management API token obtained above, and store them in
+kubernetes secrets.
 
 ## Canton Metrics
 
