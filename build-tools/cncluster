@@ -80,6 +80,9 @@ function cluster_show() {
     echo "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
     echo "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
 
+    echo "GCP_CLUSTER_NODE_TYPE   : ${GCP_CLUSTER_NODE_TYPE}"
+    echo "GCP_CLUSTER_MAX_NODES   : ${GCP_CLUSTER_MAX_NODES}"
+
     echo "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
     echo "SOURCE_IMAGE_TAG        : ${SOURCE_IMAGE_TAG}"
 }
@@ -239,7 +242,7 @@ function cluster_set_machine_type() {
 
     _info "Creating temporary node pool..."
     gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
-           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
+           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes 1 \
            || _error "Could not create node pool with machine type: ${GCP_CLUSTER_NODE_TYPE}"
 
     _info "Deleting default node pool..."
@@ -248,7 +251,11 @@ function cluster_set_machine_type() {
 
     _info "Recreading default node pool..."
     gcloud container node-pools create default-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
-           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
+           --machine-type ${GCP_CLUSTER_NODE_TYPE} \
+           --num-nodes 1 \
+           --enable-autoscaling \
+           --min-nodes 1 \
+           --max-nodes ${GCP_CLUSTER_MAX_NODES} \
            || _error "Could not recreate default node pool. Terminating early."
 
     _info "Deleting temporary node pool..."
@@ -270,11 +277,14 @@ function cluster_create() {
                --enable-ip-alias \
                --enable-private-nodes \
                --machine-type ${GCP_CLUSTER_NODE_TYPE} \
-               --num-nodes ${GCP_CLUSTER_NODE_COUNT} \
+               --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
                --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME} \
-               --addons=GcePersistentDiskCsiDriver
+               --addons=GcePersistentDiskCsiDriver \
+               --enable-autoscaling \
+               --min-nodes 1 \
+               --max-nodes ${GCP_CLUSTER_MAX_NODES}
 
         #### Enable Firewall Access
         gcloud container clusters update ${GCP_CLUSTER_NAME} \
@@ -359,9 +369,16 @@ function cluster_create() {
         _log "NAT config ${GCP_NAT_CONFIG_NAME} exists, skipping..."
     fi
 
+    _log "Authenticating to newly created cluster."
+    cluster_activate
+
+    _log "Updating cluster secrets"
     cluster_update_secrets
 
+    _log "Applying current manifest to cluster."
     _cluster_apply ${SOURCE_IMAGE_TAG}
+
+    _log "Cluster ready."
 }
 
 function _check_cluster_grpc_port() {
@@ -576,7 +593,7 @@ function _set_auth0_secret() {
   WELL_KNOWN_URL='https://canton-network-dev.us.auth0.com/.well-known/openid-configuration'
 
   # Delete secret if it exists, easier than editing existing secrets
-  if kubectl get secret ${SECRET_NAME} > /dev/null; then
+  if kubectl get secret ${SECRET_NAME} > /dev/null 2>&1; then
       kubectl delete secret ${SECRET_NAME}
   fi
 
