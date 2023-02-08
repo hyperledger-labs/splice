@@ -11,6 +11,17 @@ import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFiniteDurationT
 
+case class ExpectedOnboardingConfig(
+    secret: String,
+    expiresIn: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofHours(1),
+)
+object ExpectedOnboardingConfig {
+  def hideConfidential(config: ExpectedOnboardingConfig): ExpectedOnboardingConfig = {
+    val hidden = "****"
+    config.copy(secret = hidden)
+  }
+}
+
 case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -21,6 +32,7 @@ case class LocalSvAppConfig(
     domains: SvDomainConfig,
     // TODO(#2241): consider grouping below options into some form of `SvBootstrapConfig`
     foundConsortium: Boolean = false,
+    expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
     // TODO(#2168): test edge cases.
     initialMaxNumInputs: Int = 100,

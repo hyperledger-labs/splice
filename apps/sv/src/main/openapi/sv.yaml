@@ -25,7 +25,12 @@ paths:
             text/plain:
               schema:
                 type: string
-          # TODO(#2657) 401 wrong secret + test that
+        "401":
+          description: unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
   /debug:
     get:
       tags: [sv]
@@ -56,6 +61,7 @@ components:
       type: object
       required:
       - party_id
+      - secret
       properties:
         party_id:
           type: string

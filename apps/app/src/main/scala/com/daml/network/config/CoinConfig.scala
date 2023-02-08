@@ -12,7 +12,7 @@ import com.daml.network.splitwise.config.{
   SplitwiseAppClientConfig,
   SplitwiseDomainConfig,
 }
-import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
+import com.daml.network.sv.config.{ExpectedOnboardingConfig, LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
@@ -462,6 +462,8 @@ object CoinConfig {
       deriveReader[SvcAppBackendConfig]
     implicit val remoteSvcConfigReader: ConfigReader[SvcAppClientConfig] =
       deriveReader[SvcAppClientConfig]
+    implicit val expectedOnboardingConfigReader: ConfigReader[ExpectedOnboardingConfig] =
+      deriveReader[ExpectedOnboardingConfig]
     implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
       deriveReader[LocalSvAppConfig]
     implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
@@ -555,6 +557,8 @@ object CoinConfig {
       deriveWriter[SvcAppBackendConfig]
     implicit val remoteSvcConfigWriter: ConfigWriter[SvcAppClientConfig] =
       deriveWriter[SvcAppClientConfig]
+    implicit val expectedOnboardingConfigWriter: ConfigWriter[ExpectedOnboardingConfig] =
+      confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)
     implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
       deriveWriter[LocalSvAppConfig]
     implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =

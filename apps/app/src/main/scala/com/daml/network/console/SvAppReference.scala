@@ -16,11 +16,10 @@ abstract class SvAppReference(
 
   override protected val instanceType = "SV Client"
 
-  // TODO(#2657) use secret
-  def onboardValidator(validator: PartyId): Unit = {
+  def onboardValidator(validator: PartyId, secret: String): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAppClient.OnboardValidator(validator, List())
+        HttpSvAppClient.OnboardValidator(validator, secret, List())
       )
     }
   }

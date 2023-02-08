@@ -69,6 +69,13 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       domainId: DomainId,
   )(implicit traceContext: TraceContext): Future[Transaction]
 
+  def submitCommandsNoDedupTransactionTree(
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      commands: Seq[Command],
+      domainId: DomainId,
+  )(implicit traceContext: TraceContext): Future[TransactionTree]
+
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
@@ -257,6 +264,23 @@ object CoinLedgerConnection {
           domainId: DomainId,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
+          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+          applicationId = coinLedgerClient.applicationId,
+          actAs = actAs.map(_.toProtoPrimitive),
+          readAs = readAs.map(_.toProtoPrimitive),
+          commands = commands,
+          commandId = uniqueId,
+          deduplicationConfig = NoDedup,
+        )
+      }
+
+      def submitCommandsNoDedupTransactionTree(
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
+          commands: Seq[Command],
+          domainId: DomainId,
+      )(implicit traceContext: TraceContext): Future[TransactionTree] = {
+        client.submitAndWaitForTransactionTree(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           actAs = actAs.map(_.toProtoPrimitive),

@@ -23,8 +23,7 @@ final class SvConnection(
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */
-  // TODO(#2657) use secret
-  def onboardValidator(validator: PartyId)(implicit
+  def onboardValidator(validator: PartyId, secret: String)(implicit
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
@@ -32,6 +31,6 @@ final class SvConnection(
   ): Future[Unit] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.OnboardValidator(validator, List()),
+      HttpSvAppClient.OnboardValidator(validator, secret, List()),
     )
 }

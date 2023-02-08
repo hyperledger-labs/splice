@@ -149,7 +149,7 @@ class ValidatorApp(
   private def requestOnboarding(
       svConfig: CoinHttpClientConfig,
       validatorParty: PartyId,
-      // TODO(#2657) use secret
+      secret: String,
   ): Future[Unit] = {
     retryProvider.retryForAutomationHttp(
       "request onboarding", {
@@ -159,7 +159,7 @@ class ValidatorApp(
           loggerFactory,
         )
         svConnection
-          .onboardValidator(validatorParty)
+          .onboardValidator(validatorParty, secret)
           .andThen(_ => svConnection.close())
       },
       this,
@@ -273,7 +273,7 @@ class ValidatorApp(
         logger,
       )
       _ <- config.onboarding match {
-        case Some(oc) => requestOnboarding(oc.remoteSv.adminApi, validatorParty)
+        case Some(oc) => requestOnboarding(oc.remoteSv.adminApi, validatorParty, oc.secret)
         case None => createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
       }
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)

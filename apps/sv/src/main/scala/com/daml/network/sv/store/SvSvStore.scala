@@ -2,6 +2,7 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.Contract
@@ -17,6 +18,16 @@ trait SvSvStore extends CoinAppStoreWithoutHistory {
   protected[this] def domainConfig: SvDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global
+
+  def lookupValidatorOnboardingBySecretWithOffset(
+      secret: String
+  ): Future[
+    QueryResult[Option[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]]
+  ] =
+    acs
+      .findContractWithOffset(vo.ValidatorOnboarding.COMPANION)(co =>
+        co.payload.candidateSecret == secret
+      )
 
   def listValidatorOnboardings()
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =

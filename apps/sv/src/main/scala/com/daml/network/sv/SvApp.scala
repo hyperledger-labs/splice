@@ -24,7 +24,7 @@ import com.digitalasset.canton.lifecycle.{AsyncCloseable, FlagCloseable, Lifecyc
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import com.digitalasset.canton.util.ShowUtil.*
@@ -81,9 +81,10 @@ class SvApp(
       )
       _ <- svStore.domains.signalWhenConnected()
       _ <- svcStore.domains.signalWhenConnected()
+      ledgerConnection = ledgerClient.connection()
       _ <-
         if (config.foundConsortium) {
-          foundConsortium(svcStore, ledgerClient, retryProvider, this)
+          foundConsortium(svcStore, ledgerConnection, retryProvider, this)
         } else {
           retryProvider.retryForAutomationGrpc(
             "join existing SV consortium",
@@ -91,6 +92,11 @@ class SvApp(
             this,
           )
         }
+      _ <- Future.sequence(
+        config.expectedOnboardings.map(c =>
+          expectValidatorOnboarding(c.secret, c.expiresIn, svStore, ledgerConnection, clock)
+        )
+      )
       // TODO(M3-46) split the SV API into a client API and an admin API with auth
       routes = cors() {
         SvResource.routes(
@@ -151,22 +157,21 @@ class SvApp(
   }
 
   private def foundConsortium(
-      store: SvSvcStore,
-      ledgerClient: CoinLedgerClient,
+      svcStore: SvSvcStore,
+      ledgerConnection: CoinLedgerConnection,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
   ): Future[Unit] = {
     for {
-      domainId <- store.domains.getUniqueDomainId()
-      ledgerConnection = ledgerClient.connection()
+      domainId <- svcStore.domains.getUniqueDomainId()
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomationGrpc(
         "boostrapping SVC",
-        bootstrapSvc(store, ledgerConnection, domainId),
+        bootstrapSvc(svcStore, ledgerConnection, domainId),
         flagCloseable,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
-      _ <- waiveSvcRights(store.key.svcParty, ledgerConnection)
+      _ <- waiveSvcRights(svcStore.key.svcParty, ledgerConnection)
     } yield ()
   }
 
@@ -270,6 +275,49 @@ class SvApp(
       .joinConsortium(svPartyId)
       .andThen(_ => svcConnection.close())
   }
+
+  private def expectValidatorOnboarding(
+      secret: String,
+      expiresIn: NonNegativeFiniteDuration,
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      clock: Clock,
+  ): Future[Unit] = {
+    logger.info("Ensuring that a validator lifecycle contract exists for preconfigured secret")
+    val svParty = svStore.key.svParty
+    val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+      svParty.toProtoPrimitive,
+      secret,
+      (clock.now + expiresIn).toInstant,
+    )
+    for {
+      domainId <- svStore.domains.getUniqueDomainId()
+      _ <- svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
+        case QueryResult(off, None) => {
+          logger.info("Creating new ValidatorOnboarding contract.")
+          ledgerConnection
+            .submitCommands(
+              actAs = Seq(svParty),
+              readAs = Seq.empty,
+              commands = validatorOnboarding.create.commands.asScala.toSeq,
+              commandId = CoinLedgerConnection
+                .CommandId(
+                  "com.daml.network.sv.expectValidatorOnboarding",
+                  Seq(svParty),
+                ),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+        }
+        case QueryResult(_, Some(_)) => {
+          logger
+            .info("A validator lifecycle contract with this secret already exists; doing nothing.")
+          Future.successful(())
+        }
+      }
+    } yield ()
+  }
+
 }
 
 object SvApp {
