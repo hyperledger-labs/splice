@@ -31,6 +31,6 @@ final class SvConnection(
   ): Future[Unit] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.OnboardValidator(validator, secret, List()),
+      HttpSvAppClient.OnboardValidator(validator, secret),
     )
 }

@@ -104,14 +104,15 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListPositions(headers: List[HttpHeader])
+  case object ListPositions
       extends BaseCommand[
         http.ListResponse,
         ListResponse,
       ] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListResponse] =
       client.list(headers = headers)
 
@@ -166,11 +167,12 @@ object HttpWalletAppClient {
     }
   }
 
-  case class Tap(amount: BigDecimal, headers: List[HttpHeader])
+  case class Tap(amount: BigDecimal)
       extends BaseCommand[http.TapResponse, coinCodegen.Coin.ContractId] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.TapResponse] =
       client.tap(definitions.TapRequest(Proto.encode(amount)), headers = headers)
 
@@ -222,13 +224,14 @@ object HttpWalletAppClient {
     }
   }
 
-  case class SelfGrantFeaturedAppRight(headers: List[HttpHeader])
+  case object SelfGrantFeaturedAppRight
       extends BaseCommand[
         http.SelfGrantFeatureAppRightResponse,
         coinCodegen.FeaturedAppRight.ContractId,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.SelfGrantFeatureAppRightResponse] =
       client.selfGrantFeatureAppRight(headers = headers)
 
@@ -244,13 +247,14 @@ object HttpWalletAppClient {
     }
   }
 
-  case class GetBalance(headers: List[HttpHeader])
+  case object GetBalance
       extends BaseCommand[
         http.GetBalanceResponse,
         Balance,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetBalanceResponse] =
       client.getBalance(headers = headers)
 
@@ -277,7 +281,7 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListAppPaymentRequests(headers: List[HttpHeader])
+  case object ListAppPaymentRequests
       extends BaseCommand[
         http.ListAppPaymentRequestsResponse,
         Seq[
@@ -285,7 +289,8 @@ object HttpWalletAppClient {
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAppPaymentRequestsResponse] =
       client.listAppPaymentRequests(headers = headers)
 
@@ -306,14 +311,14 @@ object HttpWalletAppClient {
   }
 
   case class AcceptAppPaymentRequest(
-      requestId: walletCodegen.AppPaymentRequest.ContractId,
-      headers: List[HttpHeader],
+      requestId: walletCodegen.AppPaymentRequest.ContractId
   ) extends BaseCommand[
         http.AcceptAppPaymentRequestResponse,
         walletCodegen.AcceptedAppPayment.ContractId,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptAppPaymentRequestResponse] =
       client.acceptAppPaymentRequest(Proto.encodeContractId(requestId), headers = headers)
 
@@ -334,14 +339,14 @@ object HttpWalletAppClient {
   }
 
   case class RejectAppPaymentRequest(
-      requestId: walletCodegen.AppPaymentRequest.ContractId,
-      headers: List[HttpHeader],
+      requestId: walletCodegen.AppPaymentRequest.ContractId
   ) extends BaseCommand[
         http.RejectAppPaymentRequestResponse,
         Unit,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAppPaymentRequestResponse] =
       client.rejectAppPaymentRequest(Proto.encodeContractId(requestId), headers = headers)
 
@@ -358,7 +363,7 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListAcceptedAppPayments(headers: List[HttpHeader])
+  case object ListAcceptedAppPayments
       extends BaseCommand[
         http.ListAcceptedAppPaymentsResponse,
         Seq[
@@ -366,7 +371,8 @@ object HttpWalletAppClient {
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAcceptedAppPaymentsResponse] =
       client.listAcceptedAppPayments(headers = headers)
 
@@ -386,7 +392,7 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListSubscriptionRequests(headers: List[HttpHeader])
+  case object ListSubscriptionRequests
       extends BaseCommand[
         http.ListSubscriptionRequestsResponse,
         Seq[
@@ -394,7 +400,8 @@ object HttpWalletAppClient {
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSubscriptionRequestsResponse] =
       client.listSubscriptionRequests(headers = headers)
 
@@ -413,7 +420,7 @@ object HttpWalletAppClient {
       }
     }
   }
-  case class ListSubscriptionInitialPayments(headers: List[HttpHeader])
+  case object ListSubscriptionInitialPayments
       extends BaseCommand[
         http.ListSubscriptionInitialPaymentsResponse,
         Seq[
@@ -424,7 +431,8 @@ object HttpWalletAppClient {
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
@@ -449,13 +457,14 @@ object HttpWalletAppClient {
       }
   }
 
-  case class ListSubscriptions(headers: List[HttpHeader])
+  case object ListSubscriptions
       extends BaseCommand[
         http.ListSubscriptionsResponse,
         Seq[Subscription],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSubscriptionsResponse] =
       client.listSubscriptions(headers = headers)
 
@@ -499,14 +508,14 @@ object HttpWalletAppClient {
   }
 
   case class AcceptSubscriptionRequest(
-      requestId: subsCodegen.SubscriptionRequest.ContractId,
-      headers: List[HttpHeader],
+      requestId: subsCodegen.SubscriptionRequest.ContractId
   ) extends BaseCommand[
         http.AcceptSubscriptionRequestResponse,
         subsCodegen.SubscriptionInitialPayment.ContractId,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptSubscriptionRequestResponse] =
       client.acceptSubscriptionRequest(Proto.encodeContractId(requestId), headers = headers)
 
@@ -527,14 +536,14 @@ object HttpWalletAppClient {
   }
 
   case class RejectSubscriptionRequest(
-      requestId: subsCodegen.SubscriptionRequest.ContractId,
-      headers: List[HttpHeader],
+      requestId: subsCodegen.SubscriptionRequest.ContractId
   ) extends BaseCommand[
         http.RejectSubscriptionRequestResponse,
         Unit,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectSubscriptionRequestResponse] =
       client.rejectSubscriptionRequest(Proto.encodeContractId(requestId), headers = headers)
 
@@ -553,14 +562,14 @@ object HttpWalletAppClient {
   }
 
   case class CancelSubscription(
-      stateId: subsCodegen.SubscriptionIdleState.ContractId,
-      headers: List[HttpHeader],
+      stateId: subsCodegen.SubscriptionIdleState.ContractId
   ) extends BaseCommand[
         http.CancelSubscriptionRequestResponse,
         Unit,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.CancelSubscriptionRequestResponse] =
       client.cancelSubscriptionRequest(Proto.encodeContractId(stateId), headers = headers)
 
@@ -584,13 +593,13 @@ object HttpWalletAppClient {
       description: String,
       expiresAt: CantonTimestamp,
       idempotencyKey: String,
-      headers: List[HttpHeader],
   ) extends BaseCommand[
         http.CreateTransferOfferResponse,
         transferOfferCodegen.TransferOffer.ContractId,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateTransferOfferResponse] = {
       val request = definitions.CreateTransferOfferRequest(
         Proto.encode(receiver),
@@ -619,9 +628,8 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListTransferOffers(
-      headers: List[HttpHeader]
-  ) extends BaseCommand[
+  case object ListTransferOffers
+      extends BaseCommand[
         http.ListTransferOffersResponse,
         Seq[Contract[
           transferOfferCodegen.TransferOffer.ContractId,
@@ -629,7 +637,8 @@ object HttpWalletAppClient {
         ]],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListTransferOffersResponse] =
       client.listTransferOffers(headers = headers)
 
@@ -651,14 +660,14 @@ object HttpWalletAppClient {
   }
 
   case class AcceptTransferOffer(
-      requestId: transferOfferCodegen.TransferOffer.ContractId,
-      headers: List[HttpHeader],
+      requestId: transferOfferCodegen.TransferOffer.ContractId
   ) extends BaseCommand[
         http.AcceptTransferOfferResponse,
         transferOfferCodegen.AcceptedTransferOffer.ContractId,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptTransferOfferResponse] =
       client.acceptTransferOffer(Proto.encodeContractId(requestId), headers = headers)
 
@@ -678,7 +687,7 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListAcceptedTransferOffers(headers: List[HttpHeader])
+  case object ListAcceptedTransferOffers
       extends BaseCommand[
         http.ListAcceptedTransferOffersResponse,
         Seq[Contract[
@@ -687,7 +696,8 @@ object HttpWalletAppClient {
         ]],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAcceptedTransferOffersResponse] =
       client.listAcceptedTransferOffers(headers = headers)
 
@@ -711,14 +721,14 @@ object HttpWalletAppClient {
   }
 
   case class RejectTransferOffer(
-      requestId: transferOfferCodegen.TransferOffer.ContractId,
-      headers: List[HttpHeader],
+      requestId: transferOfferCodegen.TransferOffer.ContractId
   ) extends BaseCommand[
         http.RejectTransferOfferResponse,
         Unit,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectTransferOfferResponse] =
       client.rejectTransferOffer(Proto.encodeContractId(requestId), headers = headers)
 
@@ -736,14 +746,14 @@ object HttpWalletAppClient {
   }
 
   case class WithdrawTransferOffer(
-      requestId: transferOfferCodegen.TransferOffer.ContractId,
-      headers: List[HttpHeader],
+      requestId: transferOfferCodegen.TransferOffer.ContractId
   ) extends BaseCommand[
         http.WithdrawTransferOfferResponse,
         Unit,
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.WithdrawTransferOfferResponse] =
       client.withdrawTransferOffer(Proto.encodeContractId(requestId), headers = headers)
 
@@ -760,16 +770,16 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListAppRewardCoupons(
-      headers: List[HttpHeader]
-  ) extends BaseCommand[
+  case object ListAppRewardCoupons
+      extends BaseCommand[
         http.ListAppRewardCouponsResponse,
         Seq[
           Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAppRewardCouponsResponse] =
       client.listAppRewardCoupons(headers = headers)
 
@@ -789,16 +799,16 @@ object HttpWalletAppClient {
     }
   }
 
-  case class ListValidatorRewardCoupons(
-      headers: List[HttpHeader]
-  ) extends BaseCommand[
+  case object ListValidatorRewardCoupons
+      extends BaseCommand[
         http.ListValidatorRewardCouponsResponse,
         Seq[
           Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
         ],
       ] {
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListValidatorRewardCouponsResponse] =
       client.listValidatorRewardCoupons(headers = headers)
 
@@ -817,10 +827,10 @@ object HttpWalletAppClient {
       }
     }
   }
-  case class UserStatus(headers: List[HttpHeader])
-      extends BaseCommand[http.UserStatusResponse, UserStatusData] {
+  case object UserStatus extends BaseCommand[http.UserStatusResponse, UserStatusData] {
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ) =
       client.userStatus(headers = headers)
 
@@ -835,11 +845,12 @@ object HttpWalletAppClient {
       }
   }
 
-  case class ListConnectedDomains(headers: List[HttpHeader])
+  case object ListConnectedDomains
       extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ) =
       client.listConnectedDomains(headers)
 
@@ -859,11 +870,12 @@ object HttpWalletAppClient {
       }
   }
 
-  case class CancelFeaturedAppRight(headers: List[HttpHeader])
+  case object CancelFeaturedAppRight
       extends BaseCommand[http.CancelFeaturedAppRightsResponse, Unit] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ) =
       client.cancelFeaturedAppRights(headers = headers)
 

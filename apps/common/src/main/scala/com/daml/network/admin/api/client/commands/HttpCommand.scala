@@ -27,7 +27,10 @@ trait HttpCommand[Res, Result] {
       mat: Materializer,
   ): Client
 
-  def submitRequest(client: Client): EitherT[Future, Either[Throwable, HttpResponse], Res]
+  def submitRequest(
+      client: Client,
+      headers: List[HttpHeader],
+  ): EitherT[Future, Either[Throwable, HttpResponse], Res]
 
   def handleResponse(response: Res)(implicit decoder: TemplateJsonDecoder): Either[String, Result]
 

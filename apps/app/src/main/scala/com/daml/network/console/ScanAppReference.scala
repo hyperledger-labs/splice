@@ -33,7 +33,7 @@ abstract class ScanAppReference(
   )
   def getTransferContext(): HttpScanAppClient.TransferContext =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTransferContext(List()))
+      httpCommand(HttpScanAppClient.GetTransferContext)
     }
 
   @Help.Summary(
@@ -60,26 +60,26 @@ abstract class ScanAppReference(
   def getClosedRounds()
       : Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetClosedRounds(List()))
+      httpCommand(HttpScanAppClient.GetClosedRounds)
     }
 
   @Help.Summary("List all issued featured app rights")
   def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.ListFeaturedAppRight(List()))
+      httpCommand(HttpScanAppClient.ListFeaturedAppRight)
     }
 
   def lookupFeaturedAppRight(
       providerPartyId: PartyId
   ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId, List()))
+      httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.ListConnectedDomains(List()))
+      httpCommand(HttpScanAppClient.ListConnectedDomains)
     }
 }
 
@@ -91,7 +91,6 @@ final class ScanAppBackendReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Scan Backend"
-
   override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so

@@ -3,7 +3,7 @@
 
 package com.daml.network.admin.api.client
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
@@ -25,6 +25,7 @@ class HttpCtlRunner(
       instanceName: String,
       host: String,
       command: HttpCommand[Res, Result],
+      headers: List[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
       httpClient: HttpRequest => Future[HttpResponse],
@@ -36,7 +37,7 @@ class HttpCtlRunner(
       .createClient(host)
 
     for {
-      response <- command.submitRequest(client).leftMap(_.toString)
+      response <- command.submitRequest(client, headers).leftMap(_.toString)
       result <- EitherT.fromEither[Future](command.handleResponse(response))
     } yield result
   }

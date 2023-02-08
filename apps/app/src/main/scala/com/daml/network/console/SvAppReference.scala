@@ -21,33 +21,27 @@ abstract class SvAppReference(
   def prepareValidatorOnboarding(expiresIn: FiniteDuration): String = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn, List())
+        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn)
       )
     }
   }
 
   def onboardValidator(validator: PartyId, secret: String): Unit = {
     consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.OnboardValidator(validator, secret, List())
-      )
+      httpCommand(HttpSvAppClient.OnboardValidator(validator, secret))
     }
   }
 
   def getDebugInfo(): HttpSvAppClient.DebugInfo = {
     consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.GetDebugInfo(List())
-      )
+      httpCommand(HttpSvAppClient.GetDebugInfo)
     }
   }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.ListConnectedDomains(List())
-      )
+      httpCommand(HttpSvAppClient.ListConnectedDomains)
     }
 }
 

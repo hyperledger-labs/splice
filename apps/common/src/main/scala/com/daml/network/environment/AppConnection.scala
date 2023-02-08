@@ -1,6 +1,6 @@
 package com.daml.network.admin.api.client
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.version.GrpcVersionClient
@@ -69,6 +69,7 @@ abstract class AppConnection(
   protected def runHttpCmd[Res, Result](
       url: String,
       command: HttpCommand[Res, Result],
+      headers: List[HttpHeader] = List.empty[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
       httpClient: HttpRequest => Future[HttpResponse],
@@ -77,7 +78,7 @@ abstract class AppConnection(
   ): Future[Result] = {
     val client: command.Client = command.createClient(url)
     for {
-      response <- EitherTUtil.toFuture(command.submitRequest(client).leftMap[Throwable] {
+      response <- EitherTUtil.toFuture(command.submitRequest(client, headers).leftMap[Throwable] {
         case Left(throwable) => throwable
         case Right(response) => new AppConnection.UnexpectedHttpResponse(response)
       })
@@ -113,5 +114,6 @@ abstract class AppConnection(
 }
 
 object AppConnection {
-  final class UnexpectedHttpResponse(response: HttpResponse) extends Throwable
+  final class UnexpectedHttpResponse(response: HttpResponse)
+      extends Throwable(s"Unexpected Http Response: $response")
 }

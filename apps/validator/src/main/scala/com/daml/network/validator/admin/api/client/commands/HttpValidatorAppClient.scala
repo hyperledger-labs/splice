@@ -26,11 +26,12 @@ object HttpValidatorAppClient {
       http.ValidatorClient(host)
   }
 
-  case class GetValidatorUserInfo(headers: List[HttpHeader])
+  case object GetValidatorUserInfo
       extends BaseCommand[http.GetValidatorUserInfoResponse, UserInfo] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorUserInfoResponse] =
       client.getValidatorUserInfo(headers = headers)
 
@@ -45,11 +46,11 @@ object HttpValidatorAppClient {
       }
     }
   }
-  case class OnboardUser(name: String, headers: List[HttpHeader])
-      extends BaseCommand[http.OnboardUserResponse, PartyId] {
+  case class OnboardUser(name: String) extends BaseCommand[http.OnboardUserResponse, PartyId] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardUserResponse] =
       client.onboardUser(OnboardUserRequest(name), headers)
 
@@ -65,11 +66,11 @@ object HttpValidatorAppClient {
     }
   }
 
-  case class Register(headers: List[HttpHeader])
-      extends BaseCommand[http.RegisterResponse, PartyId] {
+  case object Register extends BaseCommand[http.RegisterResponse, PartyId] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterResponse] =
       client.register(headers = headers)
 
@@ -85,11 +86,12 @@ object HttpValidatorAppClient {
     }
   }
 
-  case class ListConnectedDomains(headers: List[HttpHeader])
+  case object ListConnectedDomains
       extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ) =
       client.listConnectedDomains(headers)
 

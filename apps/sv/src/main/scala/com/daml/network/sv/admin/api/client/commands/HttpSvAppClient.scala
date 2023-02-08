@@ -36,11 +36,12 @@ object HttpSvAppClient {
       ongoingValidatorOnboardings: Int,
   )
 
-  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration, headers: List[HttpHeader])
+  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration)
       extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.PrepareValidatorOnboardingResponse] =
       client.prepareValidatorOnboarding(
         body = definitions.PrepareValidatorOnboardingRequest(expiresIn.toSeconds),
@@ -58,11 +59,12 @@ object HttpSvAppClient {
     }
   }
 
-  case class OnboardValidator(candidate: PartyId, secret: String, headers: List[HttpHeader])
+  case class OnboardValidator(candidate: PartyId, secret: String)
       extends BaseCommand[http.OnboardValidatorResponse, Unit] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardValidatorResponse] =
       client.onboardValidator(
         body = definitions.OnboardValidatorRequest(candidate.toProtoPrimitive, secret),
@@ -78,11 +80,11 @@ object HttpSvAppClient {
     }
   }
 
-  case class GetDebugInfo(headers: List[HttpHeader])
-      extends BaseCommand[http.GetDebugInfoResponse, DebugInfo] {
+  case object GetDebugInfo extends BaseCommand[http.GetDebugInfoResponse, DebugInfo] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDebugInfoResponse] =
       client.getDebugInfo(headers = headers)
 
@@ -117,11 +119,12 @@ object HttpSvAppClient {
     }
   }
 
-  case class ListConnectedDomains(headers: List[HttpHeader])
+  case object ListConnectedDomains
       extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ) =
       client.listConnectedDomains(headers)
 

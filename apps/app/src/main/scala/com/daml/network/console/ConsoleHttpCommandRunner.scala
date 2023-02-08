@@ -5,7 +5,7 @@ package com.daml.network.console
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.HttpCtlRunner
@@ -68,6 +68,7 @@ class ConsoleHttpCommandRunner(
   def runCommand[Result](
       instanceName: String,
       command: HttpCommand[_, Result],
+      headers: List[HttpHeader],
       clientConfig: CoinHttpClientConfig,
   ): ConsoleCommandResult[Result] =
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
@@ -87,7 +88,7 @@ class ConsoleHttpCommandRunner(
           s"Running on ${instanceName} command ${command} against ${clientConfig}"
         )(
           httpRunner
-            .run(instanceName, host, command)
+            .run(instanceName, host, command, headers)
             .value
         )
       apiResult.toResult

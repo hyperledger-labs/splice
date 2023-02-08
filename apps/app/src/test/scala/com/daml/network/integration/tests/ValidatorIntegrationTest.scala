@@ -151,9 +151,9 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       .futureValue
     responseForInvalidAudience.status should be(StatusCodes.Unauthorized)
 
-    val validToken = aliceValidator.token
+    val headers = aliceValidator.headers
     val validResponse = Http()
-      .singleRequest(registerPost.withHeaders(tokenHeader(validToken)))
+      .singleRequest(registerPost.withHeaders(headers))
       .futureValue
     validResponse.status should be(StatusCodes.OK)
   }

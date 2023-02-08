@@ -1,6 +1,5 @@
 package com.daml.network.console
 
-import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -29,10 +28,6 @@ abstract class WalletAppReference(
 
   override protected val instanceType = "Wallet user"
 
-  protected def token: String
-
-  private def headers = List(Authorization(OAuth2BearerToken(token)))
-
   @Help.Summary("List all coins associated with the configured user")
   @Help.Description(
     "Queries the configured remote participant for the Coins owned by the configured user. " +
@@ -40,7 +35,7 @@ abstract class WalletAppReference(
   )
   def list(): ListResponse = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListPositions(headers))
+      httpCommand(HttpWalletAppClient.ListPositions)
     }
   }
 
@@ -51,7 +46,7 @@ abstract class WalletAppReference(
   )
   def tap(amount: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.Tap(amount, headers))
+      httpCommand(HttpWalletAppClient.Tap(amount))
     }
   }
 
@@ -61,7 +56,7 @@ abstract class WalletAppReference(
   )
   def selfGrantFeaturedAppRight(): coinCodegen.FeaturedAppRight.ContractId = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.SelfGrantFeaturedAppRight(headers))
+      httpCommand(HttpWalletAppClient.SelfGrantFeaturedAppRight)
     }
   }
 
@@ -71,7 +66,7 @@ abstract class WalletAppReference(
   )
   def balance(): HttpWalletAppClient.Balance = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.GetBalance(headers))
+      httpCommand(HttpWalletAppClient.GetBalance)
     }
   }
 
@@ -84,7 +79,7 @@ abstract class WalletAppReference(
     Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
   ] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListAppPaymentRequests(headers))
+      httpCommand(HttpWalletAppClient.ListAppPaymentRequests)
     }
   }
 
@@ -98,7 +93,7 @@ abstract class WalletAppReference(
   ): walletCodegen.AcceptedAppPayment.ContractId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpWalletAppClient.AcceptAppPaymentRequest(requestId, headers)
+        HttpWalletAppClient.AcceptAppPaymentRequest(requestId)
       )
     }
   }
@@ -112,7 +107,7 @@ abstract class WalletAppReference(
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpWalletAppClient.RejectAppPaymentRequest(requestId, headers)
+        HttpWalletAppClient.RejectAppPaymentRequest(requestId)
       )
     }
   }
@@ -122,7 +117,7 @@ abstract class WalletAppReference(
     Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
   ] =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListAcceptedAppPayments(headers))
+      httpCommand(HttpWalletAppClient.ListAcceptedAppPayments)
     }
 
   @Help.Summary("List all subscription requests of the configured user")
@@ -134,7 +129,7 @@ abstract class WalletAppReference(
     Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
   ] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListSubscriptionRequests(headers))
+      httpCommand(HttpWalletAppClient.ListSubscriptionRequests)
     }
   }
 
@@ -148,7 +143,7 @@ abstract class WalletAppReference(
     subsCodegen.SubscriptionInitialPayment,
   ]] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListSubscriptionInitialPayments(headers))
+      httpCommand(HttpWalletAppClient.ListSubscriptionInitialPayments)
     }
   }
 
@@ -159,7 +154,7 @@ abstract class WalletAppReference(
   )
   def listSubscriptions(): Seq[HttpWalletAppClient.Subscription] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListSubscriptions(headers))
+      httpCommand(HttpWalletAppClient.ListSubscriptions)
     }
   }
 
@@ -172,7 +167,7 @@ abstract class WalletAppReference(
       requestId: subsCodegen.SubscriptionRequest.ContractId
   ): subsCodegen.SubscriptionInitialPayment.ContractId = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.AcceptSubscriptionRequest(requestId, headers))
+      httpCommand(HttpWalletAppClient.AcceptSubscriptionRequest(requestId))
     }
   }
 
@@ -184,7 +179,7 @@ abstract class WalletAppReference(
       requestId: subsCodegen.SubscriptionRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.RejectSubscriptionRequest(requestId, headers))
+      httpCommand(HttpWalletAppClient.RejectSubscriptionRequest(requestId))
     }
   }
 
@@ -196,7 +191,7 @@ abstract class WalletAppReference(
       stateId: subsCodegen.SubscriptionIdleState.ContractId
   ): Unit = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.CancelSubscription(stateId, headers))
+      httpCommand(HttpWalletAppClient.CancelSubscription(stateId))
     }
   }
 
@@ -212,7 +207,7 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient
-          .CreateTransferOffer(receiver, amount, description, expiresAt, idempotencyKey, headers)
+          .CreateTransferOffer(receiver, amount, description, expiresAt, idempotencyKey)
       )
     }
 
@@ -227,7 +222,7 @@ abstract class WalletAppReference(
     ]
   ] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListTransferOffers(headers))
+      httpCommand(HttpWalletAppClient.ListTransferOffers)
     }
   }
 
@@ -240,7 +235,7 @@ abstract class WalletAppReference(
   ): transferOfferCodegen.AcceptedTransferOffer.ContractId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpWalletAppClient.AcceptTransferOffer(offerId, headers)
+        HttpWalletAppClient.AcceptTransferOffer(offerId)
       )
     }
   }
@@ -256,7 +251,7 @@ abstract class WalletAppReference(
     ]
   ] = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListAcceptedTransferOffers(headers))
+      httpCommand(HttpWalletAppClient.ListAcceptedTransferOffers)
     }
   }
 
@@ -269,7 +264,7 @@ abstract class WalletAppReference(
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpWalletAppClient.RejectTransferOffer(offerId, headers)
+        HttpWalletAppClient.RejectTransferOffer(offerId)
       )
     }
   }
@@ -283,7 +278,7 @@ abstract class WalletAppReference(
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpWalletAppClient.WithdrawTransferOffer(offerId, headers)
+        HttpWalletAppClient.WithdrawTransferOffer(offerId)
       )
     }
   }
@@ -293,7 +288,7 @@ abstract class WalletAppReference(
   def listAppRewardCoupons()
       : Seq[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]] =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListAppRewardCoupons(headers))
+      httpCommand(HttpWalletAppClient.ListAppRewardCoupons)
     }
 
   @Help.Summary("List validator rewards")
@@ -304,26 +299,26 @@ abstract class WalletAppReference(
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ] =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListValidatorRewardCoupons(headers))
+      httpCommand(HttpWalletAppClient.ListValidatorRewardCoupons)
     }
 
   @Help.Summary("User status")
   @Help.Description("Get the user status")
   def userStatus(): UserStatusData =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.UserStatus(headers))
+      httpCommand(HttpWalletAppClient.UserStatus)
     }
 
   @Help.Summary("Cancel user's featured app rights")
   def cancelFeaturedAppRight(): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.CancelFeaturedAppRight(headers))
+      httpCommand(HttpWalletAppClient.CancelFeaturedAppRight)
     }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListConnectedDomains(headers))
+      httpCommand(HttpWalletAppClient.ListConnectedDomains)
     }
 }
 
@@ -378,10 +373,12 @@ final class WalletAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi
-  override def token: String = {
-    AuthUtil.testToken(
-      audience = AuthUtil.testAudience,
-      user = config.ledgerApiUser,
+  override def token: Option[String] = {
+    Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = config.ledgerApiUser,
+      )
     )
   }
 

@@ -60,9 +60,8 @@ final class ValidatorConnection(
         for {
           userInfo <- runHttpCmd(
             config.url,
-            HttpValidatorAppClient.GetValidatorUserInfo(
-              List(Authorization(OAuth2BearerToken(credentials.jwt)))
-            ),
+            HttpValidatorAppClient.GetValidatorUserInfo,
+            List(Authorization(OAuth2BearerToken(credentials.jwt))),
           )
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.

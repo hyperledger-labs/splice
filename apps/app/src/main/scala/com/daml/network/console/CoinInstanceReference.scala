@@ -1,5 +1,7 @@
 package com.daml.network.console
 
+import akka.http.scaladsl.model.HttpHeader
+import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
@@ -88,6 +90,10 @@ trait CoinAppReference extends InstanceReference {
 }
 
 trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
+  def token: Option[String] = None
+
+  def headers =
+    token.map(t => List(Authorization(OAuth2BearerToken(t)))).getOrElse(List.empty[HttpHeader])
 
   def httpClientConfig: CoinHttpClientConfig
 
@@ -97,6 +103,7 @@ trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
     coinConsoleEnvironment.httpCommandRunner.runCommand(
       name,
       httpCommand,
+      headers,
       httpClientConfig,
     )
 }

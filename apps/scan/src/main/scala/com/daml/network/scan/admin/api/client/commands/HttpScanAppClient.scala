@@ -34,7 +34,8 @@ object HttpScanAppClient {
       extends BaseCommand[http.GetSvcPartyIdResponse, PartyId] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcPartyIdResponse] =
       client.getSvcPartyId(headers)
 
@@ -61,11 +62,12 @@ object HttpScanAppClient {
       ],
   )
 
-  case class GetTransferContext(headers: List[HttpHeader])
+  case object GetTransferContext
       extends BaseCommand[http.GetTransferContextResponse, TransferContext] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTransferContextResponse] =
       client.getTransferContext(headers)
 
@@ -98,7 +100,7 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetLatestOpenAndIssuingMiningRounds(headers: List[HttpHeader])
+  case object GetLatestOpenAndIssuingMiningRounds
       extends BaseCommand[
         http.GetLatestOpenAndIssuingMiningRoundsResponse,
         (
@@ -108,7 +110,8 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
@@ -139,14 +142,15 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetCoinRules(headers: List[HttpHeader])
+  case object GetCoinRules
       extends BaseCommand[
         http.GetCoinRulesResponse,
         Contract[CoinRules.ContractId, CoinRules],
       ] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesResponse] =
       client.getCoinRules(headers)
 
@@ -167,14 +171,15 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetClosedRounds(headers: List[HttpHeader])
+  case object GetClosedRounds
       extends BaseCommand[
         http.GetClosedRoundsResponse,
         Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]],
       ] {
 
     def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetClosedRoundsResponse] =
       client.getClosedRounds(headers)
 
@@ -194,14 +199,15 @@ object HttpScanAppClient {
     }
   }
 
-  case class ListFeaturedAppRight(headers: List[HttpHeader])
+  case object ListFeaturedAppRight
       extends BaseCommand[
         http.ListFeaturedAppRightsResponse,
         Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
       ] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListFeaturedAppRightsResponse] =
       client.listFeaturedAppRights(headers)
 
@@ -218,14 +224,15 @@ object HttpScanAppClient {
       }
   }
 
-  case class LookupFeaturedAppRight(providerPartyId: PartyId, headers: List[HttpHeader])
+  case class LookupFeaturedAppRight(providerPartyId: PartyId)
       extends BaseCommand[
         http.LookupFeaturedAppRightResponse,
         Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
       ] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupFeaturedAppRightResponse] =
       client.lookupFeaturedAppRight(providerPartyId.toProtoPrimitive, headers)
 
@@ -242,11 +249,12 @@ object HttpScanAppClient {
       }
   }
 
-  case class ListConnectedDomains(headers: List[HttpHeader])
+  case object ListConnectedDomains
       extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
 
     override def submitRequest(
-        client: Client
+        client: Client,
+        headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListConnectedDomainsResponse] =
       client.listConnectedDomains(headers)
 

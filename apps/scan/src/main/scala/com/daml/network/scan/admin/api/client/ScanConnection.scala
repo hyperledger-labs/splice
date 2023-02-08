@@ -61,14 +61,14 @@ final class ScanConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[HttpScanAppClient.TransferContext] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetTransferContext(List()))
+    runHttpCmd(config.url, HttpScanAppClient.GetTransferContext)
   }
 
   def getCoinRules()(implicit
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetCoinRules(List()))
+    runHttpCmd(config.url, HttpScanAppClient.GetCoinRules)
   }
 
   def getLatestOpenAndIssuingMiningRounds()(implicit
@@ -80,14 +80,14 @@ final class ScanConnection(
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(List()))
+    runHttpCmd(config.url, HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds)
   }
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    runHttpCmd(config.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId, List()))
+    runHttpCmd(config.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
   def getAppTransferContext(providerPartyId: PartyId)(implicit

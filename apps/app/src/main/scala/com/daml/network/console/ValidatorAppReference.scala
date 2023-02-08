@@ -1,6 +1,5 @@
 package com.daml.network.console
 
-import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
@@ -21,16 +20,12 @@ abstract class ValidatorAppReference(
 
   override protected val instanceType = "Validator"
 
-  protected def token: String
-
-  private def headers = List(Authorization(OAuth2BearerToken(token)))
-
   @Help.Summary("Get validator user info")
   @Help.Description("Return the user info of the validator operator")
   def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.GetValidatorUserInfo(headers)
+        HttpValidatorAppClient.GetValidatorUserInfo
       )
     }
   }
@@ -46,7 +41,7 @@ abstract class ValidatorAppReference(
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.OnboardUser(user, headers)
+        HttpValidatorAppClient.OnboardUser(user)
       )
     }
   }
@@ -59,7 +54,7 @@ abstract class ValidatorAppReference(
   def register(): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.Register(headers)
+        HttpValidatorAppClient.Register
       )
     }
   }
@@ -68,7 +63,7 @@ abstract class ValidatorAppReference(
   def listConnectedDomains(): Map[DomainAlias, DomainId] =
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.ListConnectedDomains(headers)
+        HttpValidatorAppClient.ListConnectedDomains
       )
     }
 }
@@ -82,10 +77,12 @@ final class ValidatorAppBackendReference(
 
   override protected val instanceType = "Local Validator"
 
-  override def token: String = {
-    AuthUtil.testToken(
-      audience = AuthUtil.testAudience,
-      user = config.ledgerApiUser,
+  override def token: Option[String] = {
+    Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = config.ledgerApiUser,
+      )
     )
   }
 
@@ -137,8 +134,6 @@ final class ValidatorAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi
-
-  override def token: String = ""
 
   override protected val instanceType = "Validator Client"
 }
