@@ -217,6 +217,7 @@ class SvApp(
                       10
                     ), // TODO(M3-46) handle default config values better
                     defaultEnabledChoices,
+                    config.isDevNet,
                   ).createAnd
                     .exerciseSvcBootstrap_Bootstrap()
                     .commands

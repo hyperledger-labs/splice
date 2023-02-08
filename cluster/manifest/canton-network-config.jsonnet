@@ -199,6 +199,7 @@ local svcDeployments(config) = [
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv1", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5014" },
     { name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" },
+    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-2", [
@@ -208,6 +209,7 @@ local svcDeployments(config) = [
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv2", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5015" },
+    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-3", [
@@ -217,6 +219,7 @@ local svcDeployments(config) = [
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv3", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5016" },
+    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-4", [
@@ -226,6 +229,7 @@ local svcDeployments(config) = [
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv4", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5017" },
+    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "scan-app", [

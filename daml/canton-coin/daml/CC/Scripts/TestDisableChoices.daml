@@ -90,8 +90,8 @@ testCoinRules = do
   alice <- setupUser app "alice" app.svc
 
   (round, _) <- getLatestOpenRound app
-  testChoice @"enable_CoinRules_Tap" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_Tap alice.primaryParty 5.0 round)
+  testChoice @"enable_CoinRules_DevNet_Tap" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_Tap alice.primaryParty 5.0 round)
 
   (round, _) <- getLatestOpenRound app
   coin <- tap app alice 5.0

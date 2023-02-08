@@ -86,7 +86,7 @@ data EnabledChoices = EnabledChoices
 
     enable_ValidatorRewardCoupon_ArchiveAsValidator : Bool
 
-    enable_CoinRules_Tap : Bool
+    enable_CoinRules_DevNet_Tap : Bool
     enable_CoinRules_Transfer : Bool
     enable_CoinRules_ComputeFees : Bool
   deriving (Eq, Ord, Show)
@@ -101,7 +101,7 @@ enableAllChoices = EnabledChoices with
 
   enable_ValidatorRewardCoupon_ArchiveAsValidator = True
 
-  enable_CoinRules_Tap = True
+  enable_CoinRules_DevNet_Tap = True
   enable_CoinRules_Transfer = True
   enable_CoinRules_ComputeFees = True
 

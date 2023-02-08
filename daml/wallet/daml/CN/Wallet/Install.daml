@@ -4,7 +4,7 @@ import DA.Exception
 
 import qualified CC.API.V1.Coin as API
 import CC.Round (OpenMiningRound)
-import CC.Coin (CoinRules, CoinRules_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..))
+import CC.Coin (CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -39,7 +39,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         result <- catchAll (API.exercisePaymentTransfer context transfer)
         handleResultMergeInputs result
     CO_Tap tapAmount -> do
-      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
+      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_DevNet_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
       handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
     handle : Choice t c (r, Optional (ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]

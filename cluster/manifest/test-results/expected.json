@@ -1083,6 +1083,10 @@
                            {
                               "name": "CN_APP_SV_FOUND_CONSORTIUM",
                               "value": "true"
+                           },
+                           {
+                              "name": "CN_APP_SV_IS_DEV_NET",
+                              "value": "true"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1211,6 +1215,10 @@
                            {
                               "name": "CN_APP_SV_ADMIN_API_PORT",
                               "value": "5015"
+                           },
+                           {
+                              "name": "CN_APP_SV_IS_DEV_NET",
+                              "value": "true"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1339,6 +1347,10 @@
                            {
                               "name": "CN_APP_SV_ADMIN_API_PORT",
                               "value": "5016"
+                           },
+                           {
+                              "name": "CN_APP_SV_IS_DEV_NET",
+                              "value": "true"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1467,6 +1479,10 @@
                            {
                               "name": "CN_APP_SV_ADMIN_API_PORT",
                               "value": "5017"
+                           },
+                           {
+                              "name": "CN_APP_SV_IS_DEV_NET",
+                              "value": "true"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

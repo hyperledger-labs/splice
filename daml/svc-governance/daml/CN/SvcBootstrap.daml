@@ -18,6 +18,7 @@ template SvcBootstrap with
     coinPrice : Decimal
     config : SvcRulesConfig
     enabledChoices : API.EnabledChoices
+    isDevNet : Bool
   where
     signatory svc
     observer founder
@@ -37,7 +38,7 @@ template SvcBootstrap with
           configSchedule = coinConfigSchedule
           observers = []
           enabledChoices
-
+          isDevNet
 
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           coinPrice

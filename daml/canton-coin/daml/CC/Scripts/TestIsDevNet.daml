@@ -1,0 +1,45 @@
+module CC.Scripts.TestIsDevNet where
+
+import Daml.Script
+
+import qualified CC.API.V1.Coin as API
+import CC.Coin
+
+import CC.Scripts.Util
+
+
+testCoinRules : Script ()
+testCoinRules = do
+  app <- setupApp
+
+  validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
+  alice <- setupUser app "alice" app.svc
+
+  (round, _) <- getLatestOpenRound app
+  testChoice app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_Tap alice.primaryParty 5.0 round)
+
+  testChoice app [provider.primaryParty, app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_FeatureApp provider.primaryParty)
+
+  pure ()
+
+testChoice : CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+testChoice app actAs readAs buildCommand = do
+  setIsDevNetFlag app False
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+
+  setIsDevNetFlag app True
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  pure ()
+
+setIsDevNetFlag : CCApp -> Bool -> Script ()
+setIsDevNetFlag app isDevNet = do
+  Some (rulesCid, rules) <- queryCoinRulesByKey app.svc
+  submit app.svc $
+    archiveCmd rulesCid *>
+    createCmd rules with isDevNet
+  pure ()

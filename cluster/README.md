@@ -64,7 +64,7 @@ outside world exclusively via four [Digital Asset VPNs](https://digitalasset.atl
 * For consultants working on CN
    * AWS DA Consultant VPN
 
-Evven though the Kubernetes management API is accessible to all users
+Even though the Kubernetes management API is accessible to all users
 connecting through one of the internal VPNs, there are Google IAM
 restrictions on those APIs that grant access only to appropriate
 users. CircleCI has its access to the Kubernetes Management APIs (for

@@ -236,6 +236,7 @@ template CoinRules
     configSchedule : Schedule Time (CoinConfig USD)
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     enabledChoices : API.EnabledChoices
+    isDevNet : Bool
   where
     ensure validSchedule configSchedule validCoinConfig
 
@@ -272,23 +273,22 @@ template CoinRules
                   amount = expiringAmount
                   ..
 
-
-    -- TODO(M3-07): guard this choice by an `isDevNet` flag in the config.
-    nonconsuming choice CoinRules_Tap: ContractId Coin
+    nonconsuming choice CoinRules_DevNet_Tap: ContractId Coin
       with
         receiver: Party
         amount: Decimal
         openRound: ContractId OpenMiningRound
       controller receiver
-      do requireChoiceIsEnabled "CoinRules_Tap" (\c -> c.enable_CoinRules_Tap) (view $ toInterface @API.CoinRules this)
+      do require "isDevNet flag is true" isDevNet
+         requireChoiceIsEnabled "CoinRules_DevNet_Tap" (\c -> c.enable_CoinRules_DevNet_Tap) (view $ toInterface @API.CoinRules this)
          exercise self CoinRules_Mint with ..
 
-    -- TODO(M3-07): guard this choice by an `isDevNet` flag in the config.
     nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
       with
         provider : Party
       controller provider
-      do create FeaturedAppRight with svc; provider
+      do require "isDevNet flag is true" isDevNet
+         create FeaturedAppRight with svc; provider
 
     -- Bootstrap the open mining rounds by creating
     -- - one immediately open-mining-round with 1 tick left

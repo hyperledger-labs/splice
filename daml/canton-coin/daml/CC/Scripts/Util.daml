@@ -55,6 +55,7 @@ setupApp = do
     configSchedule = defaultCoinConfigSchedule
     observers = []
     enabledChoices = API.enableAllChoices
+    isDevNet = True
     ..
 
   now <- getTime
@@ -463,7 +464,7 @@ getTransferContext app user featuredAppRight = do
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
-  submitExerciseCoinRulesByKey' app user CoinRules_Tap with
+  submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
     receiver = user.primaryParty
     amount
     openRound

@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.coin.{
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Mint,
-  CoinRules_Tap,
+  CoinRules_DevNet_Tap,
   LockedCoin,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
@@ -89,21 +89,21 @@ object Mint extends ParentNodeCompanion {
   } yield Mint(node)
 }
 
-case class Tap(node: ExerciseNode[CoinRules_Tap, Coin.ContractId]) extends ParentNode {
+case class Tap(node: ExerciseNode[CoinRules_DevNet_Tap, Coin.ContractId]) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withTap(node.toProtoV0)
 }
 
 object Tap extends ParentNodeCompanion {
   override type Tpl = CoinRules
-  override type Arg = CoinRules_Tap
+  override type Arg = CoinRules_DevNet_Tap
   override type Res = Coin.ContractId
 
   override val templateOrInterface = Left(CoinRules.COMPANION)
-  override val choice = CoinRules.CHOICE_CoinRules_Tap
+  override val choice = CoinRules.CHOICE_CoinRules_DevNet_Tap
 
-  override val argDecoder = CoinRules_Tap.valueDecoder()
-  override def argToValue(arg: CoinRules_Tap) = arg.toValue
+  override val argDecoder = CoinRules_DevNet_Tap.valueDecoder()
+  override def argToValue(arg: CoinRules_DevNet_Tap) = arg.toValue
 
   override val resDecoder = (cid: Value) =>
     Coin.ContractId.fromContractId(

@@ -31,6 +31,7 @@ case class LocalSvAppConfig(
     automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     // TODO(#2241): consider grouping below options into some form of `SvBootstrapConfig`
+    isDevNet: Boolean = false,
     foundConsortium: Boolean = false,
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),

@@ -154,7 +154,7 @@ initConsortium = do
   let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
   submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices)
+    (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet = True)
     SvcBootstrap_Bootstrap
 
   svcUserId <- validateUserId "svc-user"
