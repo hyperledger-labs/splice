@@ -8,6 +8,7 @@ local database(name, config) = {
         name: name + "-configuration",
         labels: {
           app: name,
+          clusterName: config.clusterName,
         },
       },
       data: {
@@ -24,6 +25,7 @@ local database(name, config) = {
         name: name,
         labels: {
           app: name,
+          clusterName: config.clusterName,
         },
       },
       spec: {
@@ -38,6 +40,7 @@ local database(name, config) = {
           metadata: {
             labels: {
               app: name,
+              clusterName: config.clusterName,
             },
           },
           spec: {

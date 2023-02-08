@@ -189,7 +189,8 @@
          "kind": "ConfigMap",
          "metadata": {
             "labels": {
-               "app": "postgres"
+               "app": "postgres",
+               "clusterName": "cluster"
             },
             "name": "postgres-configuration"
          }
@@ -199,7 +200,8 @@
          "kind": "StatefulSet",
          "metadata": {
             "labels": {
-               "app": "postgres"
+               "app": "postgres",
+               "clusterName": "cluster"
             },
             "name": "postgres"
          },
@@ -214,7 +216,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "postgres"
+                     "app": "postgres",
+                     "clusterName": "cluster"
                   }
                },
                "spec": {
@@ -1713,7 +1716,8 @@
          "kind": "ConfigMap",
          "metadata": {
             "labels": {
-               "app": "val1-postgres"
+               "app": "val1-postgres",
+               "clusterName": "cluster"
             },
             "name": "val1-postgres-configuration"
          }
@@ -1723,7 +1727,8 @@
          "kind": "StatefulSet",
          "metadata": {
             "labels": {
-               "app": "val1-postgres"
+               "app": "val1-postgres",
+               "clusterName": "cluster"
             },
             "name": "val1-postgres"
          },
@@ -1738,7 +1743,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "val1-postgres"
+                     "app": "val1-postgres",
+                     "clusterName": "cluster"
                   }
                },
                "spec": {
@@ -2577,7 +2583,8 @@
          "kind": "ConfigMap",
          "metadata": {
             "labels": {
-               "app": "sw-postgres"
+               "app": "sw-postgres",
+               "clusterName": "cluster"
             },
             "name": "sw-postgres-configuration"
          }
@@ -2587,7 +2594,8 @@
          "kind": "StatefulSet",
          "metadata": {
             "labels": {
-               "app": "sw-postgres"
+               "app": "sw-postgres",
+               "clusterName": "cluster"
             },
             "name": "sw-postgres"
          },
@@ -2602,7 +2610,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "sw-postgres"
+                     "app": "sw-postgres",
+                     "clusterName": "cluster"
                   }
                },
                "spec": {
