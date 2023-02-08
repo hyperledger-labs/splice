@@ -5,7 +5,31 @@ info:
 tags:
   - name: sv
 paths:
-  /onboard:
+  /admin/validator/onboarding/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "prepareValidatorOnboarding"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PrepareValidatorOnboardingRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
+        "500":
+          description: internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+  /onboard/validator:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -57,7 +81,33 @@ paths:
                 "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
+    PrepareValidatorOnboardingRequest:
+      type: object
+      required:
+      - expires_in # duration in seconds
+      properties:
+        expires_in:
+          type: integer
+          minimum: 1
+
+    PrepareValidatorOnboardingResponse:
+      type: object
+      required:
+      - secret
+      properties:
+        secret:
+          type: string
+
     OnboardValidatorRequest:
+      type: object
+      required:
+      - party_id
+      - secret
+      properties:
+        party_id:
+          type: string
+        secret:
+          type: string
       type: object
       required:
       - party_id

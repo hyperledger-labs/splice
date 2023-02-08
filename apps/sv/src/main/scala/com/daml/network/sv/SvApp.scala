@@ -26,11 +26,11 @@ import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 class SvApp(
@@ -105,6 +105,7 @@ class SvApp(
             config.ledgerApiUser,
             svStore,
             svcStore,
+            clock,
             retryProvider,
             flagCloseable = this,
             loggerFactory,
@@ -285,40 +286,13 @@ class SvApp(
       clock: Clock,
   ): Future[Unit] = {
     logger.info("Ensuring that a validator lifecycle contract exists for preconfigured secret")
-    val svParty = svStore.key.svParty
-    val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
-      svParty.toProtoPrimitive,
-      secret,
-      (clock.now + expiresIn).toInstant,
-    )
-    for {
-      domainId <- svStore.domains.getUniqueDomainId()
-      _ <- svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
-        case QueryResult(off, None) => {
-          logger.info("Creating new ValidatorOnboarding contract.")
-          ledgerConnection
-            .submitCommands(
-              actAs = Seq(svParty),
-              readAs = Seq.empty,
-              commands = validatorOnboarding.create.commands.asScala.toSeq,
-              commandId = CoinLedgerConnection
-                .CommandId(
-                  "com.daml.network.sv.expectValidatorOnboarding",
-                  Seq(svParty),
-                ),
-              deduplicationOffset = off,
-              domainId = domainId,
-            )
-        }
-        case QueryResult(_, Some(_)) => {
-          logger
-            .info("A validator lifecycle contract with this secret already exists; doing nothing.")
-          Future.successful(())
-        }
+    SvApp
+      .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+      .map {
+        case Left(reason) => logger.info(s"Doing nothing: $reason")
+        case Right(()) => ()
       }
-    } yield ()
   }
-
 }
 
 object SvApp {
@@ -348,6 +322,48 @@ object SvApp {
         automation,
       )(logger)
 
+  }
+  def prepareValidatorOnboarding(
+      secret: String,
+      expiresIn: NonNegativeFiniteDuration,
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      clock: Clock,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    val svParty = svStore.key.svParty
+    val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+      svParty.toProtoPrimitive,
+      secret,
+      (clock.now + expiresIn).toInstant,
+    ).create.commands.asScala.toSeq
+    for {
+      domainId <- svStore.domains.getUniqueDomainId()
+      res <- svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
+        case QueryResult(off, None) => {
+          ledgerConnection
+            .submitCommands(
+              actAs = Seq(svParty),
+              readAs = Seq.empty,
+              commands = validatorOnboarding,
+              commandId = CoinLedgerConnection
+                .CommandId(
+                  "com.daml.network.sv.expectValidatorOnboarding",
+                  Seq(svParty),
+                ),
+              deduplicationOffset = off,
+              domainId = domainId,
+            )
+            .map(_ => {
+              logger.info("Created new ValidatorOnboarding contract.")
+              Right(())
+            })
+        }
+        case QueryResult(_, Some(_)) => {
+          Future.successful(Left("A validator lifecycle contract with this secret already exists."))
+        }
+      }
+    } yield res
   }
   val coinPackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId

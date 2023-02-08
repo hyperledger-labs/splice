@@ -4,15 +4,19 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import java.security.SecureRandom
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -21,6 +25,7 @@ class HttpSvHandler(
     svUserName: String,
     svStore: SvSvStore,
     svcStore: SvSvcStore,
+    clock: Clock,
     retryProvider: CoinRetries,
     flagCloseable: FlagCloseable,
     protected val loggerFactory: NamedLoggerFactory,
@@ -31,9 +36,27 @@ class HttpSvHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val connection = ledgerClient.connection()
+  private val ledgerConnection = ledgerClient.connection()
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
+
+  def prepareValidatorOnboarding(respond: v0.SvResource.PrepareValidatorOnboardingResponse.type)(
+      body: definitions.PrepareValidatorOnboardingRequest
+  ): Future[v0.SvResource.PrepareValidatorOnboardingResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val secret = generateRandomOnboardingSecret()
+      val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
+      SvApp
+        .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+        .map {
+          case Left(reason) =>
+            v0.SvResource.PrepareValidatorOnboardingResponseInternalServerError(
+              s"Could not prepare onboarding: $reason"
+            )
+          case Right(()) => definitions.PrepareValidatorOnboardingResponse(secret)
+        }
+    }
+  }
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -96,6 +119,14 @@ class HttpSvHandler(
     }
   }
 
+  private def generateRandomOnboardingSecret(): String = {
+    val rng = new SecureRandom();
+    // 256 bits of entropy
+    val bytes = new Array[Byte](32)
+    rng.nextBytes(bytes)
+    Base64.getEncoder().encodeToString(bytes)
+  }
+
   private def onboardValidator(
       candidateParty: PartyId,
       secret: String,
@@ -128,7 +159,7 @@ class HttpSvHandler(
       // No command-dedup required, as the CoinRules contract is archived and recreated.
       // We need this special variant of `submitCommands` because of a bug that is triggered
       // by the fact that we submit as the SV but want to read as the SVC.
-      _ <- connection.submitCommandsNoDedupTransactionTree(
+      _ <- ledgerConnection.submitCommandsNoDedupTransactionTree(
         Seq(svParty),
         Seq(svcParty),
         cmds,

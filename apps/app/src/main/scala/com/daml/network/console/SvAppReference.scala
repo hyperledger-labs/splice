@@ -9,12 +9,22 @@ import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceRefere
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
+import scala.concurrent.duration.FiniteDuration
+
 abstract class SvAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
 ) extends HttpCoinAppReference {
 
   override protected val instanceType = "SV Client"
+
+  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn, List())
+      )
+    }
+  }
 
   def onboardValidator(validator: PartyId, secret: String): Unit = {
     consoleEnvironment.run {

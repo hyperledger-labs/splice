@@ -13,6 +13,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.FiniteDuration
 
 object HttpSvAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -35,7 +36,28 @@ object HttpSvAppClient {
       ongoingValidatorOnboardings: Int,
   )
 
-  // TODO(#2657) use secret
+  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration, headers: List[HttpHeader])
+      extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
+
+    override def submitRequest(
+        client: Client
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.PrepareValidatorOnboardingResponse] =
+      client.prepareValidatorOnboarding(
+        body = definitions.PrepareValidatorOnboardingRequest(expiresIn.toSeconds),
+        headers = headers,
+      )
+
+    override def handleResponse(response: http.PrepareValidatorOnboardingResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, String] = response match {
+      case http.PrepareValidatorOnboardingResponse.OK(
+            definitions.PrepareValidatorOnboardingResponse(secret)
+          ) =>
+        Right(secret)
+      case http.PrepareValidatorOnboardingResponse.InternalServerError(e) => Left(e)
+    }
+  }
+
   case class OnboardValidator(candidate: PartyId, secret: String, headers: List[HttpHeader])
       extends BaseCommand[http.OnboardValidatorResponse, Unit] {
 

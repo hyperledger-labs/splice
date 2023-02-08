@@ -12,6 +12,7 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class SvIntegrationTest extends CoinIntegrationTest {
@@ -84,20 +85,8 @@ class SvIntegrationTest extends CoinIntegrationTest {
   "Non-leader SVs can onboard new validators" in { implicit env =>
     initSvc()
     val sv = sv2 // not a leader
-    clue("create an onboarding contract") {
-      // TODO(#2657) use an api call for this
-      val svParty = sv.getDebugInfo().svParty
-      LedgerApiUtils.submitWithResult(
-        sv.remoteParticipant,
-        sv.config.ledgerApiUser,
-        actAs = Seq(svParty),
-        readAs = Seq.empty,
-        update = new cn.validatoronboarding.ValidatorOnboarding(
-          svParty.toProtoPrimitive,
-          "dummysecret",
-          env.environment.clock.now.toInstant.plusSeconds(3600),
-        ).create,
-      )
+    val secret = clue("the sv operator prepares the onboarding") {
+      sv.prepareValidatorOnboarding(1.hour)
     }
     val candidate = clue("create a dummy party") {
       bobValidator.remoteParticipantWithAdminToken.parties.enable(
@@ -113,7 +102,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
     actAndCheck(
       "request to onboard the candidate",
-      sv.onboardValidator(candidate, "dummysecret"),
+      sv.onboardValidator(candidate, secret),
     )(
       "the candidate is now an observer to the CoinRules",
       Unit => getCoinRules().observers should contain(candidate.toProtoPrimitive),
