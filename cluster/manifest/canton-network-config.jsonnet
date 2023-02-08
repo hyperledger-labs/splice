@@ -45,7 +45,7 @@ local svcDeployments(config) = [
         periodSeconds: 10,
       },
     },
-    cpuLimit=config.domainCpu,
+    cpuRequest=config.domainCpu,
     memoryLimitMiB=config.domainMemoryMib
   ),
 
@@ -63,7 +63,7 @@ local svcDeployments(config) = [
       port: 10013,
       externalPort: 10013,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
+  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
                c.appUserNameEnvBindings(["svc", "sv1", "sv2", "sv3", "sv4", "scan", "directory"]) + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
@@ -206,7 +206,7 @@ local validator1Deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
+  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "val1-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -246,7 +246,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", cpuLimit="500m", extraEnvVars=[
+  ], image="wallet-web-ui", cpuRequest=0.5, extraEnvVars=[
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
   ]),
 
@@ -256,7 +256,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], cpuLimit="500m"),
+  ], cpuRequest=0.5),
 
   c.deployment(config, "validator1-splitwise-web-ui", [
     {
@@ -264,7 +264,7 @@ local validator1Deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], cpuLimit="500m"),
+  ], cpuRequest=0.5),
 ];
 
 local splitwiseDeployments(config) = [
@@ -285,7 +285,7 @@ local splitwiseDeployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], image="canton-participant", cpuLimit=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
+  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
                c.appUserNameEnvBinding("splitwise_validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwise_participant" },
@@ -327,7 +327,7 @@ local splitwiseDeployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", cpuLimit="500m", extraEnvVars=[
+  ], image="wallet-web-ui", cpuRequest=0.5, extraEnvVars=[
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
   ]),
 
@@ -357,7 +357,7 @@ local cantonNetwork(config) =
         port: 8080,
         internalOnly: true,
       },
-    ], cpuLimit="500m", memoryLimitMiB=512),
+    ], cpuRequest=0.5, memoryLimitMiB=512),
 
     svcDeployments(config),
     validator1Deployments(config),

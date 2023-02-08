@@ -4,9 +4,9 @@
 // clusters with higher loads.
 
 {
-  domainCpu: 2,
+  domainCpu: 1,
   domainMemoryMib: 2048,
-  participantCpu: 2,
+  participantCpu: 1,
   participantMemoryMib: 8192,
   postgresCpu: 2,
   postgresMemoryMib: 4096,

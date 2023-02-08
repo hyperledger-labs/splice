@@ -112,7 +112,7 @@ local expandEnvironment(env) =
   ), env);
 
 // `image` defaults to `name`
-local deployment(config, name, ports, cpuLimit=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
+local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
 
   local proxyPort =
     if proxyToGrpcWeb == null then null
@@ -166,17 +166,16 @@ local deployment(config, name, ports, cpuLimit=1, memoryLimitMiB=1536, ext={}, p
                   env: [
                     {
                       name: "JAVA_TOOL_OPTIONS",
-                      value: "-Xms%sM -Xmx%sM" % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
+                      value: "-Xms%sM -Xmx%sM -Dscala.concurrent.context.minThreads=4" % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
                     },
                   ] + expandEnvironment(extraEnvVars),
                   resources: {
                     requests: {
                       memory: memoryLimitMiB + "Mi",
-                      cpu: cpuLimit,
+                      cpu: cpuRequest,
                     },
                     limits: {
                       memory: memoryLimitMiB + "Mi",
-                      cpu: cpuLimit,
                     },
                   },
                   volumeMounts: if mountConfig == null then [] else [
