@@ -557,6 +557,9 @@ For details on the individual steps, read the above sections.
    1. Run `CLUSTER_ADDR=scratch.network.canton.global coin -v -c ./build-tools/cluster.conf` to connect a CN console
       to the scratchnet cluster. The config file should allow you to use any component deployed to the cluster.
       1. E.g., run `validator1_validator.onboardUser("dave")` inside the coin console to onboard a new end-user onto the validator1 node.
+9. Once you are done with scratchnet, run `cncluster reset`. This isn't strictly required
+   but makes sure that the next person starts with a clean state as well as not consuming
+   unnecessary resources.
 
 ## Fixing connection issues in kubectl
 
