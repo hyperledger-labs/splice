@@ -414,16 +414,16 @@ function cluster_check() {
 
 function _cluster_reset() {
     _info "Deleting all stateful sets..."
-    kubectl delete StatefulSet --all
+    kubectl delete StatefulSet --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
     _info "Deleting all deployments..."
-    kubectl delete Deployment --all
+    kubectl delete Deployment --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
     _info "Deleting all pods..."
-    kubectl delete Pods --all
+    kubectl delete Pods --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
     _info "Deleting all persistent volume claims..."
-    kubectl delete PersistentVolumeClaim --all
+    kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
     _info "Cluster in reset/idle state."
 }
@@ -525,7 +525,7 @@ function _show_ports() {
 }
 
 function _show_pod_sizing() {
-    kubectl get pod -o custom-columns='POD-NAME:.metadata.name,MEMORY:.spec.containers[*].resources.limits.memory,CPU:.spec.containers[*].resources.limits.cpu'
+    kubectl get pod -o custom-columns='POD-NAME:.metadata.name,MEMORY:.spec.containers[*].resources.limits.memory,CPU:.spec.containers[*].resources.limits.cpu'  --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 }
 
 function cluster_services() {
@@ -545,7 +545,7 @@ function cluster_stats() {
 
     _log ""
 	_log "Pod Usage:"
-    kubectl top pod
+    kubectl top pod --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
     _log ""
     _log "Pod Resource Limits:"
