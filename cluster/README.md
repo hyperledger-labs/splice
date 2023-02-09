@@ -294,9 +294,14 @@ Available operations include:
   the cluster. This will force push, and overwrite any existing images. The
   intent of this command is to allow developers to bring a cluster to a known
   good state.
+* `cncluster info` - Display a table showing all deployed images and resource
+  allocation settinos.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
 * `cncluster log` or `cncluster logs` - Stream the logs for the
-  specified module running in the cluster.
+  specified module running in the cluster. This will attempt to apply
+  JSON log formatting, unless you specify `--raw`.n
+* `cncluster ports` - Show a table of all ports exposed from the
+  cluster, along with what is on each port.
 * `cncluster preflight` - Run the preflight check against the cluster.
 * `cncluster push` - Rebuild and push one or more modules into a
   cluster. This command takes care to ensure that the specified modules
@@ -305,7 +310,7 @@ Available operations include:
   corresponding cluster modules.)
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
-* `cncluster stats` - Show memory and CPU usage across the cluster.
+* `cncluster top` - Show memory and CPU usage across the cluster.
 * `cncluster wait` - Wait for the clusters' pods to all be noted as in a ready state.
 
 Internally, these operations rely on the following environment

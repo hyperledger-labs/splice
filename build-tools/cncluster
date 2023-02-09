@@ -33,6 +33,12 @@ function cluster_exists() {
   fi
 }
 
+function cluster_must_exist() {
+    if ! cluster_exists; then
+        _error "Cluster does not exist, cannot continue."
+    fi
+}
+
 function cluster_ip() {
     gcloud compute addresses list \
            --regions=${CLOUDSDK_COMPUTE_REGION} \
@@ -72,37 +78,35 @@ function _cluster_apply() {
 }
 
 function cluster_show() {
-    echo "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
-    echo "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
-    echo "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
+    _log "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
+    _log "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
+    _log "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
 
-    echo "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
-    echo "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
-    echo "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
+    _log "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
+    _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
+    _log "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
 
-    echo "GCP_CLUSTER_NODE_TYPE   : ${GCP_CLUSTER_NODE_TYPE}"
-    echo "GCP_CLUSTER_MAX_NODES   : ${GCP_CLUSTER_MAX_NODES}"
+    _log "GCP_CLUSTER_NODE_TYPE   : ${GCP_CLUSTER_NODE_TYPE}"
+    _log "GCP_CLUSTER_MAX_NODES   : ${GCP_CLUSTER_MAX_NODES}"
 
-    echo "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
-    echo "SOURCE_IMAGE_TAG        : ${SOURCE_IMAGE_TAG}"
+    _log "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
+    _log "SOURCE_IMAGE_TAG        : ${SOURCE_IMAGE_TAG}"
+
+    _log ""
 }
 
 function cluster_confirm() {
     cluster_show
 
-    _confirm "\nGKE Cluster Operation: $@"
+    _confirm "GKE Cluster Operation: $@"
 }
 
 ### Commands
 
 function cluster_activate() {
-    # Sets kubeconfig if cluster exists, else does nothing
-    if cluster_exists; then
-        gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
-    else
-        _log "Cluster must be created before activation."
-        exit 1
-    fi
+    cluster_must_exist
+
+    gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
 }
 
 function cluster_apply() {
@@ -180,10 +184,7 @@ function cluster_push() {
 
     cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
 
-    if ! cluster_exists; then
-        _error "Cluster does not exist, cannot push."
-        exit 1
-    fi
+    cluster_must_exist
 
     # Assemble target lists for parallel clean and then build.
     clean_targets=""
@@ -219,26 +220,45 @@ function cluster_push() {
     done
 }
 
+function _json_log_format() {
+    jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
+}
+
 function cluster_logs() {
+    if [ "${1-}" = "--raw" ]; then
+        raw=yes
+        shift
+    fi
+
     module=$1
 
-    if ! cluster_exists; then
-        _error "Cluster does not exist, cannot push."
+    if [ -z "${module}" ]; then
+        _error "No module specified"
     fi
 
-    if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
-        _error "Unknown module: $1"
-    fi
+    cluster_must_exist
 
-    kubectl logs -l app=${module} -c ${module} -f
+    if POD_SPEC=$(kubectl get pod \
+                          --all-namespaces \
+                          -l app=${module} \
+                          -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
+                          2> /dev/null); then
+
+        if [ -n "${raw-}" ] ; then
+            kubectl logs ${POD_SPEC} ${module} -f
+        else
+            kubectl logs ${POD_SPEC} ${module} -f | _json_log_format
+        fi
+    else
+        _error "No pod for module found: ${module}"
+    fi
 }
 
 function cluster_set_machine_type() {
     cluster_confirm "Set cluster machine type to current default. (This will interrupt all workloads.)"
 
-    if ! cluster_exists; then
-        _error "Cluster does not exist."
-    fi
+    cluster_must_exist
+
 
     _info "Creating temporary node pool..."
     gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
@@ -465,44 +485,37 @@ function cluster_ciapply() {
 
 function cluster_delete() {
     cluster_confirm "Delete cluster"
+    cluster_must_exist
 
-    if cluster_exists; then
-        if gcloud dns record-sets delete \
-                  --project="${GCP_DNS_PROJECT}" \
-                  --zone="canton-global" \
-                  --type=A \
-                  ${CLUSTER_DNS_NAME}; then
-            _log "DNS record deleted for ${CLUSTER_DNS_NAME}"
-        else
-            _warning "No DNS record to delete for ${CLUSTER_DNS_NAME}"
-        fi
-
-        if gcloud dns record-sets delete \
-                  --project="${GCP_DNS_PROJECT}" \
-                  --zone="canton-global" \
-                  --type=A \
-                  "*.${CLUSTER_DNS_NAME}"; then
-            _log "DNS record deleted for *.${CLUSTER_DNS_NAME}"
-        else
-            _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
-        fi
-
-        gcloud container clusters delete --quiet ${GCP_CLUSTER_NAME}
+    if gcloud dns record-sets delete \
+              --project="${GCP_DNS_PROJECT}" \
+              --zone="canton-global" \
+              --type=A \
+              ${CLUSTER_DNS_NAME}; then
+        _log "DNS record deleted for ${CLUSTER_DNS_NAME}"
     else
-        _error "Cluster does not exist, cannot delete."
-        exit 1
+        _warning "No DNS record to delete for ${CLUSTER_DNS_NAME}"
     fi
+
+    if gcloud dns record-sets delete \
+              --project="${GCP_DNS_PROJECT}" \
+              --zone="canton-global" \
+              --type=A \
+              "*.${CLUSTER_DNS_NAME}"; then
+        _log "DNS record deleted for *.${CLUSTER_DNS_NAME}"
+    else
+        _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
+    fi
+
+    gcloud container clusters delete --quiet ${GCP_CLUSTER_NAME}
 
     echo "Cluster deleted."
 }
 
 function cluster_ipaddr() {
-    if cluster_exists; then
-        cluster_ip
-    else
-        _error "Cluster does not exist, no IP address."
-        exit 1
-    fi
+    cluster_must_exist
+
+    cluster_ip
 }
 
 
@@ -535,43 +548,42 @@ function cluster_reset() {
     _cluster_reset
 }
 
-function _show_ports() {
-    curl -L http://scratch.network.canton.global/manifest.json 2> /dev/null \
-        | jq -r '(["SERVICE","PORT NAME","PORT","AS GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@csv' \
-        | column -s ',' -t
-}
+function cluster_ports() {
+    cluster_show
+    cluster_must_exist
 
-function _show_pod_sizing() {
-    kubectl get pod -o custom-columns='POD-NAME:.metadata.name,MEMORY:.spec.containers[*].resources.limits.memory,CPU:.spec.containers[*].resources.limits.cpu'  --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    curl -L http://scratch.network.canton.global/manifest.json 2> /dev/null \
+        | jq -r '(["SERVICE","PORT-NAME","PORT","AS-GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@tsv' \
+        | column -t
 }
 
 function cluster_services() {
     cluster_show
 
-    _log ""
-    _log "Available Ports:"
     _show_ports
 }
 
-function cluster_stats() {
+function cluster_info() {
     cluster_show
+    cluster_must_exist
 
-    _log ""
+    kubectl get po -o json \
+        | jq -r '(["NAMESPACE", "POD-NAME", "CONTAINER", "IMAGE", "MEM-LIMIT", "CPU-REQ", "CPU-LIMIT"],(.items[] | .metadata as $pod | .spec.containers[] as $c | $c.resources as $r | [$pod.namespace, $pod.name, $c.name, ($c.image | split(":")[1]), $r.limits.memory, $r.requests.cpu, $r.limits.cpu]))|@tsv' \
+        | sort \
+        | column -t
+
+}
+
+function cluster_top() {
+    cluster_show
+    cluster_must_exist
+
 	_log "Node Usage:"
     kubectl top node
 
     _log ""
 	_log "Pod Usage:"
     kubectl top pod --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
-
-    _log ""
-    _log "Pod Resource Limits:"
-    _show_pod_sizing
-
-    _log ""
-    _log "Available Ports:"
-    _show_ports
-
 }
 
 function cluster_wait() {
@@ -668,8 +680,16 @@ case "${SUBCOMMAND_NAME}" in
         cluster_ipaddr $@
         ;;
 
+    info)
+        cluster_info $@
+        ;;
+
     log | logs)
         cluster_logs $@
+        ;;
+
+    ports)
+        cluster_ports $@
         ;;
 
     preflight)
@@ -696,8 +716,8 @@ case "${SUBCOMMAND_NAME}" in
         cluster_services $@
         ;;
 
-    stats)
-        cluster_stats $@
+    top)
+        cluster_top $@
         ;;
 
     wait)
@@ -709,7 +729,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|push|reset|stats|wait|update_secrets}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|image_tags|ipaddr|ports|push|reset|top|wait|update_secrets}" >&2
 	    exit 3
 	    ;;
 esac
