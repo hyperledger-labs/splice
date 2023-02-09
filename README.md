@@ -10,6 +10,7 @@
 1. [Contributing Changes](#contributing-changes)
     1. [Contributing as a New Joiner](#contributing-as-a-new-joiner)
     1. [Contribution Guide](#contribution-guide)
+    1. [Branch naming](#branch-naming)
     1. [Unused Import Warnings](#unused-import-warnings)
     1. [TODO Comments](#todo-comments)
     1. [Configuration](#configuration)
@@ -219,6 +220,16 @@ as a baseline, and list below only the points where we differ.
 Please read the above guide in particular to learn about metrics, logging, tracing, Scala guidelines, Protobuf guidelines, TODO notes, formatting and git hooks.
 
 Committed code must adhere to our formatting guidelines. To automatically reformat all code, run `sbt formatFix`.
+
+### Branch naming
+
+Branches should be prefixed by your name, followed by a slash and a descriptive name:
+
+`<yourname>/<descriptivename>`
+
+For example, if Bob is working on issue 4242 to "fix FooTest", he could name his branch:
+
+`bob/fix-footest/4242`
 
 ### Unused Import Warnings
 
