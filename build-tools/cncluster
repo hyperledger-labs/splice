@@ -613,7 +613,7 @@ function cluster_update_secrets() {
 
   _log "Fetching secrets from auth0"
   AUTH0_MANAGEMENT_API_URL="https://canton-network-dev.us.auth0.com/api/v2"
-  all=$(curl -s -H "Authorization: Bearer ${AUTH0_MANAGEMENT_API_TOKEN}" ${AUTH0_MANAGEMENT_API_URL}/clients)
+  all=$(curl -s --show-error --fail -H "Authorization: Bearer ${AUTH0_MANAGEMENT_API_TOKEN}" ${AUTH0_MANAGEMENT_API_URL}/clients)
 
   for i in \
     "cn-app-wallet-ledger-api-auth KChYVPmxvHHUebLDXnNo3Z125WrxJiLb" \
