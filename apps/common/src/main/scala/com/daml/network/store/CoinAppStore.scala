@@ -41,6 +41,8 @@ trait CoinAppStore[
 
   def txLog(domain: DomainId): Future[TxLogStore[TXI, TXE]]
 
+  def transferStore(domain: DomainId): Future[TransferStore]
+
   def domains: DomainStore
 
   /** Orchestrate store and an ingestion sink for a newly-discovered domain. */
@@ -54,6 +56,7 @@ trait CoinAppStore[
 
   protected[this] def storeAcs(store: PerDomainStore): AcsStore
   protected[this] def storeTxLog(store: PerDomainStore): TxLogStore[TXI, TXE]
+  protected[this] def storeTransfer(store: PerDomainStore): TransferStore
 
   /** Fetch the ingestion sink that feeds into the given stores. */
   private[network] def storesIngestionSink(store: PerDomainStore): AcsStore.IngestionSink
@@ -99,6 +102,8 @@ object CoinAppStore {
     override final def acs(domain: DomainId) = fetchState(domain).future map storeAcs
 
     override final def txLog(domain: DomainId) = fetchState(domain).future map storeTxLog
+
+    override final def transferStore(domain: DomainId) = fetchState(domain).future map storeTransfer
   }
 }
 

@@ -16,7 +16,7 @@ abstract class InMemoryCoinAppStore[
     with CoinAppStore.InMemoryMutableStoreMap[TXI, TXE] {
   protected def futureSupervisor: FutureSupervisor
 
-  private[network] override type PerDomainStore = InMemoryAcsWithTxLogStore[TXI, TXE]
+  private[network] override type PerDomainStore = InMemoryCoinAppStore.PerDomainStore[TXI, TXE]
 
   // TODO (#2620) remove
   private lazy val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE] =
@@ -32,27 +32,40 @@ abstract class InMemoryCoinAppStore[
       domain: DomainId,
       perDomainLoggerFactory: NamedLoggerFactory,
   ) =
-    new InMemoryAcsWithTxLogStore(
-      perDomainLoggerFactory,
-      contractFilter = acsContractFilter,
-      txLogParser = txLogParser,
-      futureSupervisor = futureSupervisor,
-      logAllStateUpdates = false,
+    new InMemoryCoinAppStore.PerDomainStore(
+      new InMemoryAcsWithTxLogStore(
+        perDomainLoggerFactory,
+        contractFilter = acsContractFilter,
+        txLogParser = txLogParser,
+        futureSupervisor = futureSupervisor,
+        logAllStateUpdates = false,
+      ),
+      new InMemoryTransferStore(loggerFactory, acsContractFilter.ingestionFilter.primaryParty),
     )
 
-  private[network] override def storesIngestionSink(stores: PerDomainStore) = stores.ingestionSink
+  private[network] override def storesIngestionSink(stores: PerDomainStore) =
+    stores.acsWithTxLog.ingestionSink
 
   override def txLog: TxLogStore[TXI, TXE] = acsWithTxLog
 
-  override protected[this] def storeAcs(store: PerDomainStore) = store
+  override protected[this] def storeAcs(store: PerDomainStore) = store.acsWithTxLog
 
-  override protected[this] def storeTxLog(store: PerDomainStore) = store
+  override protected[this] def storeTxLog(store: PerDomainStore) = store.acsWithTxLog
+
+  override protected[this] def storeTransfer(store: PerDomainStore) = store.transfers
 
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 
   override lazy val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 
   override def close(): Unit = ()
+}
+
+object InMemoryCoinAppStore {
+  class PerDomainStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
+      val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE],
+      val transfers: InMemoryTransferStore,
+  )
 }
 
 abstract class InMemoryCoinAppStoreWithoutHistory(implicit

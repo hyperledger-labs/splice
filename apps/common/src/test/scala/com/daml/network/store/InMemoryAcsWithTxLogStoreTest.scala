@@ -2,173 +2,28 @@ package com.daml.network.store
 
 import cats.instances.list.*
 import cats.syntax.foldable.*
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
-import com.daml.ledger.javaapi.data.LedgerOffset
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  ExercisedEvent,
-  TransactionTree,
-  TreeEvent,
-  Unit as damlUnit,
-}
-import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
+import com.daml.network.codegen.java.cc.{coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
-import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.scalatest.wordspec.AsyncWordSpec
 
-import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
-class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
+class InMemoryAcsWithTxLogStoreTest extends StoreTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryAcsStoreTest")
-
-  def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
-  val svcParty: PartyId = mkPartyId("svc")
-  def userParty(i: Int) = mkPartyId(s"user-$i")
-  def providerParty(i: Int) = mkPartyId(s"provider-$i")
-
-  def appRewardCoupon(
-      round: Int,
-      provider: PartyId,
-  ): Contract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
-    Contract(
-      identifier = directoryCodegen.AppRewardCoupon.TEMPLATE_ID,
-      contractId = new directoryCodegen.AppRewardCoupon.ContractId(s"de#$round"),
-      payload = new directoryCodegen.AppRewardCoupon(
-        svcParty.toProtoPrimitive,
-        provider.toProtoPrimitive,
-        false,
-        BigDecimal(1.0).bigDecimal,
-        new apiCodegen.v1.round.Round(round),
-      ),
-    )
-
-  def validatorRewardCoupon(
-      round: Int,
-      user: PartyId,
-  ): Contract[
-    directoryCodegen.ValidatorRewardCoupon.ContractId,
-    directoryCodegen.ValidatorRewardCoupon,
-  ] =
-    Contract(
-      identifier = directoryCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
-      contractId = new directoryCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
-      payload = new directoryCodegen.ValidatorRewardCoupon(
-        svcParty.toProtoPrimitive,
-        user.toProtoPrimitive,
-        BigDecimal(1.0).bigDecimal,
-        new apiCodegen.v1.round.Round(round),
-      ),
-    )
-
-  def toCreatedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
-  ): CreatedEvent = {
-    val contractP = contract.toProtoV0
-    new CreatedEvent(
-      eventId = "dummyEventId",
-      contractId = contractP.contractId,
-      interfaceViews = Map.empty.asJava,
-      failedInterfaceViews = Map.empty.asJava,
-      templateId = contract.identifier,
-      arguments = contract.payload.toValue,
-      witnessParties = Seq.empty.asJava,
-      signatories = Seq.empty.asJava,
-      observers = Seq.empty.asJava,
-      agreementText = None.toJava,
-      contractKey = None.toJava,
-    )
-  }
-
-  def toArchivedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
-  ): ExercisedEvent = {
-    new ExercisedEvent(
-      eventId = "dummyEventId",
-      contractId = contract.contractId.contractId,
-      templateId = contract.identifier,
-      interfaceId = None.toJava,
-      witnessParties = Seq.empty.asJava,
-      consuming = true,
-      choice = "DummyChoiceName",
-      choiceArgument = damlUnit.getInstance(),
-      exerciseResult = damlUnit.getInstance(),
-      actingParties = Seq.empty.asJava,
-      childEventIds = Seq.empty.asJava,
-    )
-  }
-
-  def withEventId(
-      event: TreeEvent,
-      eventId: String,
-  ): TreeEvent = event match {
-    case created: CreatedEvent =>
-      new CreatedEvent(
-        eventId = eventId,
-        contractId = created.getContractId,
-        interfaceViews = created.getInterfaceViews,
-        failedInterfaceViews = created.getFailedInterfaceViews,
-        templateId = created.getTemplateId,
-        arguments = created.getArguments,
-        witnessParties = created.getWitnessParties,
-        signatories = created.getSignatories,
-        observers = created.getObservers,
-        agreementText = created.getAgreementText,
-        contractKey = created.getContractKey,
-      )
-    case exercised: ExercisedEvent =>
-      new ExercisedEvent(
-        eventId = eventId,
-        contractId = exercised.getContractId,
-        templateId = exercised.getTemplateId,
-        interfaceId = exercised.getInterfaceId,
-        witnessParties = exercised.getWitnessParties,
-        consuming = exercised.isConsuming,
-        choice = exercised.getChoice,
-        choiceArgument = exercised.getChoiceArgument,
-        exerciseResult = exercised.getExerciseResult,
-        actingParties = exercised.getActingParties,
-        childEventIds = exercised.getChildEventIds,
-      )
-    case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
-  }
-
-  private val dummyDomain = DomainId.tryFromString("dummy::domain")
-
-  private def toTransferOutEvent(contractId: ContractId[_]): TransferEvent.Out = TransferEvent.Out(
-    transferOutId = "",
-    contractId = contractId,
-    source = dummyDomain,
-    target = dummyDomain,
-  )
-
-  private def toTransferInEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
-  ): TransferEvent.In = TransferEvent.In(
-    transferOutId = "",
-    source = dummyDomain,
-    target = dummyDomain,
-    createdEvent = toCreatedEvent(contract),
-  )
 
   // test values
   val (validatorRewardCouponsForAcs, validatorRewardCouponsForTxs) =
     Seq(0, 1, 2, 3).map(i => mkValidatorRewardCoupon(i)).splitAt(2)
-
-  private def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
   private val appRewardCoupons = Seq(0, 1).map(i => appRewardCoupon(i, providerParty(i)))
   private val appRewardCouponsToArchive = Seq(2, 3).map(i => appRewardCoupon(i, providerParty(i)))
@@ -184,31 +39,6 @@ class InMemoryAcsWithTxLogStoreTest extends AsyncWordSpec with BaseTest {
   val tx3Offset = "013"
   val tx4Offset = "014"
   val tx5Offset = "015"
-
-  val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
-
-  private def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
-    val eventsWithId = events.zipWithIndex.map { case (e, i) => withEventId(e, s"$offset:$i") }
-    val eventsById = eventsWithId.map(e => e.getEventId -> e).toMap
-    val rootEventIds = eventsWithId.map(_.getEventId)
-    new TransactionTree(
-      transactionId = "",
-      commandId = "",
-      workflowId = "",
-      effectiveAt = effectiveAt,
-      offset = offset,
-      eventsById = eventsById.asJava,
-      rootEventIds = rootEventIds.asJava,
-    )
-  }
-
-  private def mkTransfer(offset: String, event: TransferEvent): Transfer[TransferEvent] =
-    Transfer(
-      updateId = "",
-      submitter = userParty(1),
-      offset = new LedgerOffset.Absolute(offset),
-      event = event,
-    )
 
   val tx1: TransactionTree = mkTx(
     tx1Offset,
