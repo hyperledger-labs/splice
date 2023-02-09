@@ -6,6 +6,7 @@ import {
   Login,
   useInterval,
   Contract,
+  FeaturedAppRight,
 } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
@@ -32,6 +33,7 @@ import {
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 
 import './App.css';
+import SelfFeatureButton from './components/SelfFeatureButton';
 import { useWalletClient } from './contexts/WalletServiceContext';
 import { config } from './utils/config';
 import AppPaymentRequests from './views/AppPaymentRequests';
@@ -56,8 +58,12 @@ const App: React.FC = () => {
             <Typography variant="h6" sx={{ flexGrow: 1 }} id="app-title">
               CC Wallet
               {primaryPartyId && (
-                <div id="logged-in-user">
-                  <DirectoryEntry partyId={primaryPartyId} />
+                <div>
+                  <div id="logged-in-user">
+                    <DirectoryEntry partyId={primaryPartyId} />
+                  </div>
+                  <FeaturedAppRight partyId={primaryPartyId} />
+                  <SelfFeatureButton />
                 </div>
               )}
             </Typography>

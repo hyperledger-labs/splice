@@ -92,6 +92,7 @@ export interface WalletClient {
   cancelSubscription: (subscriptionContractId: string) => Promise<void>;
 
   userStatus: () => Promise<UserStatusResponse>;
+  selfGrantFeaturedAppRights: () => Promise<void>;
 }
 
 class ApiMiddleware implements Middleware {
@@ -236,6 +237,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       userStatus: async () => {
         const res = await walletClient.userStatus();
         return { userOnboarded: res.userOnboarded, partyId: res.partyId };
+      },
+      selfGrantFeaturedAppRights: async () => {
+        await walletClient.selfGrantFeaturedAppRight(new Empty(), getCreds());
       },
     };
   }, [url, userAccessToken]);

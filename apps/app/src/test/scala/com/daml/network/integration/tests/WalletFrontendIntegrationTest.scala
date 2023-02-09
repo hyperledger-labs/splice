@@ -191,5 +191,28 @@ class WalletFrontendIntegrationTest
         )("Alice sees the login screen again", _ => find(id("login-button")) should not be empty)
       }
     }
+
+    "show featured status and support self-featuring" in { implicit env =>
+      onboardWalletUser(aliceWallet, aliceValidator)
+      withFrontEnd("alice") { implicit webDrivers =>
+        actAndCheck("Alice logs in", browseToAliceWallet(aliceWallet.config.ledgerApiUser))(
+          "Alice is initially not featured",
+          _ => {
+            find(id("featured-status")).value.text should be("")
+          },
+        )
+
+        actAndCheck("Alice self-features herself", click on "self-feature")(
+          "Alice keeps reloading the page until she sees herself has featured",
+          _ => {
+            go to s"http://localhost:3000"
+            find(id("featured-status")).value.text should be("FEATURED")
+            find(id("self-feature")) should be(None)
+          },
+        )
+
+      }
+
+    }
   }
 }
