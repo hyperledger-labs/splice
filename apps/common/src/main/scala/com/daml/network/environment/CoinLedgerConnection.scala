@@ -59,7 +59,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commandId: CoinLedgerConnection.CommandId,
       deduplicationOffset: String,
       domainId: DomainId,
-  )(implicit traceContext: TraceContext): Future[Transaction]
+  )(implicit traceContext: TraceContext): Future[Unit]
 
   // TODO(M3-60): review all uses of command submission w/o deduplication
   def submitCommandsNoDedup(
@@ -67,14 +67,14 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
-  )(implicit traceContext: TraceContext): Future[Transaction]
+  )(implicit traceContext: TraceContext): Future[Unit]
 
-  def submitCommandsNoDedupTransactionTree(
+  def submitCommandsNoDedupTransaction(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
-  )(implicit traceContext: TraceContext): Future[TransactionTree]
+  )(implicit traceContext: TraceContext): Future[Transaction]
 
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
@@ -262,8 +262,8 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           commands: Seq[Command],
           domainId: DomainId,
-      )(implicit traceContext: TraceContext): Future[Transaction] = {
-        client.submitAndWaitForTransaction(
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        client.submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
@@ -274,13 +274,13 @@ object CoinLedgerConnection {
         )
       }
 
-      def submitCommandsNoDedupTransactionTree(
+      def submitCommandsNoDedupTransaction(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           commands: Seq[Command],
           domainId: DomainId,
-      )(implicit traceContext: TraceContext): Future[TransactionTree] = {
-        client.submitAndWaitForTransactionTree(
+      )(implicit traceContext: TraceContext): Future[Transaction] = {
+        client.submitAndWaitForTransaction(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
@@ -298,8 +298,8 @@ object CoinLedgerConnection {
           commandId: CommandId,
           deduplicationOffset: String,
           domainId: DomainId,
-      )(implicit traceContext: TraceContext): Future[Transaction] = {
-        client.submitAndWaitForTransaction(
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        client.submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = coinLedgerClient.applicationId,
           commandId = commandId.commandIdForSubmission,

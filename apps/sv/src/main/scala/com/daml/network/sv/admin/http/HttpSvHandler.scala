@@ -157,9 +157,7 @@ class HttpSvHandler(
           .asScala
       ).toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated.
-      // We need this special variant of `submitCommands` because of a bug that is triggered
-      // by the fact that we submit as the SV but want to read as the SVC.
-      _ <- ledgerConnection.submitCommandsNoDedupTransactionTree(
+      _ <- ledgerConnection.submitCommandsNoDedup(
         Seq(svParty),
         Seq(svcParty),
         cmds,

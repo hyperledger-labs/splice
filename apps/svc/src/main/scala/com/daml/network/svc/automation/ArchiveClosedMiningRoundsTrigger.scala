@@ -41,7 +41,7 @@ class ArchiveClosedMiningRoundsTrigger(
             Future(false)
           case false => {
             connection
-              .submitCommandsNoDedup(
+              .submitCommandsNoDedupTransaction(
                 Seq(store.svcParty),
                 Seq.empty,
                 coinRules.contractId

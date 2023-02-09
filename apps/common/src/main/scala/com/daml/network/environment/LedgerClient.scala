@@ -206,6 +206,27 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .build()
   }
 
+  def submitAndWait(
+      workflowId: String,
+      applicationId: String,
+      commandId: String,
+      deduplicationConfig: DedupConfig,
+      actAs: Seq[String],
+      readAs: Seq[String],
+      commands: Seq[Command],
+  )(implicit ec: ExecutionContext): Future[Unit] = {
+    val request = submitAndWaitRequest(
+      workflowId,
+      applicationId,
+      commandId,
+      deduplicationConfig,
+      actAs,
+      readAs,
+      commands,
+    )
+    wrapFuture(commandServiceStub.submitAndWait(request, _)).map(_ => ())
+  }
+
   def submitAndWaitForTransaction(
       workflowId: String,
       applicationId: String,
