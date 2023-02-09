@@ -113,6 +113,7 @@ object CoinConfigTransforms {
       def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig = {
         config.focus(_.pollingInterval).replace(newInterval)
       }
+
       updateAllAutomationConfigs(setPollingIntervalInternal)(config)
   }
 

@@ -575,7 +575,7 @@ cd cluster/deployment/devnet
 cncluster preflight
 ```
 
-Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
+Note that the preflight check will fail if your branch is sufficiently divergent from the main branch
 (in particular, if you made any changes to the Daml model).
 
 You can also launch an SBT shell that is configured to run the

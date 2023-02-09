@@ -7,11 +7,18 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
-import com.daml.network.util.{Auth0User, CantonProcessTestUtil}
+import com.daml.network.util.{
+  Auth0User,
+  CantonProcessTestUtil,
+  SplitwiseFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
+import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Using
@@ -22,7 +29,9 @@ import scala.util.Using
 class PreflightIntegrationTest
     extends FrontendIntegrationTest("alice-v1", "bob-v1")
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil {
+    with CantonProcessTestUtil
+    with WalletTestUtil
+    with SplitwiseFrontendTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
@@ -55,66 +64,6 @@ class PreflightIntegrationTest
     auth0Users.values.map(user => retryAuth0Calls(user.close))
   }
 
-  private def loginAndOnboardToWalletUi(
-      user: Auth0User,
-      walletUiUrl: String,
-  )(implicit webDriver: WebDriverType): Unit = {
-    clue(s"Logging in and onboarding as user: ${user.email}") {
-      go to walletUiUrl
-      click on "oidc-login-button"
-      completeAuth0Prompts(
-        user.email,
-        user.password,
-        () => find(id("onboard-button")).isDefined,
-      )
-
-      eventually() {
-        find(id("onboard-button"))
-      }
-
-      click on "onboard-button"
-
-      eventually() {
-        findAll(className("party-id")) should have size 1
-      }
-    }
-  }
-
-  private def copyPartyId()(implicit webDriver: WebDriverType): String = {
-    clue(s"Copying party ID") {
-      find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
-        elm => elm.text
-      )
-    }
-  }
-
-  private def createTransferOffer(receiverPartyId: String, amount: String, description: String)(
-      implicit webDriver: WebDriverType
-  ): Unit = {
-    clue(s"Creating transfer offer for: $receiverPartyId") {
-      click on "transfer-offers-button"
-
-      click on "create-offer-button"
-
-      setDirectoryField(textField("create-offer-receiver"), receiverPartyId, receiverPartyId)
-
-      click on "create-offer-amount"
-      numberField("create-offer-amount").underlying.sendKeys(amount)
-
-      click on "create-offer-description"
-      textField("create-offer-description").value = description
-
-      click on "create-offer-expiration-value"
-      numberField("create-offer-expiration-value").underlying.sendKeys("120")
-
-      click on "submit-create-offer-button"
-
-      eventually() {
-        findAll(className("transfer-offers-row")) should have size 1
-      }
-    }
-  }
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
@@ -122,6 +71,8 @@ class PreflightIntegrationTest
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
       )
+      // clearing default config transforms because they have settings
+      // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
       .addConfigTransforms((_, conf) =>
@@ -137,30 +88,21 @@ class PreflightIntegrationTest
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
-    val aliceUser = auth0Users.get("alice-v1") match {
-      case Some(user) => user
-      case None => fail("could not get alice user from auth0")
-    }
+    val aliceUser = auth0Users.get("alice-v1").value
 
-    val bobUser = auth0Users.get("bob-v1") match {
-      case Some(user) => user
-      case None => fail("could not get bob user from auth0")
-    }
+    val bobUser = auth0Users.get("bob-v1").value
 
     var alicePartyId = ""
 
     withFrontEnd("alice-v1") { implicit webDriver =>
-      loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
-      alicePartyId = copyPartyId()
-
+      alicePartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       findAll(className("coins-table-row")) should have size 0
     }
 
     var bobPartyId = ""
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      loginAndOnboardToWalletUi(bobUser, walletUiUrl)
-      bobPartyId = copyPartyId()
+      bobPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
       findAll(className("coins-table-row")) should have size 0
     }
@@ -212,17 +154,85 @@ class PreflightIntegrationTest
     }
   }
 
-  "basic test for splitwise wallet ui" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet.splitwise.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val aliceUser = auth0Users.get("alice-v1") match {
-      case Some(user) => user
-      case None => fail("could not get alice user from auth0")
+  // test is similar to 'settle debts with a single party' in SplitwiseFrontendIntegrationTest
+  "test splitwise group creation and payment" taggedAs LiveDevNetTest in { _ =>
+    var aliceUserPartyId = ""
+    var bobUserPartyId = ""
+    val aliceDirectoryNameRaw = s"alice.cns-${UUID.randomUUID().toString.take(10)}"
+    val bobDirectoryNameRaw = s"bob.cns-${UUID.randomUUID().toString.take(10)}"
+
+    val groupName = "troika"
+
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val splitwiseUiUrl = s"https://splitwise.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val directoryUiUrl =
+      s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val aliceUser = auth0Users.get("alice-v1").value
+    val bobUser = auth0Users.get("bob-v1").value
+
+    withFrontEnd("bob-v1") { implicit webDriver =>
+      bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
+
+      tapViaUi(710)
+      // bob needs a directory name because as our no-explicit-disclosure workaround, we send splitwise group invites
+      // to all parties who have a directory name
+      reserveDirectoryNameFor(bobUser, directoryUiUrl, bobDirectoryNameRaw)
     }
+
     withFrontEnd("alice-v1") { implicit webDriver =>
-      loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
-      copyPartyId()
-      findAll(className("coins-table-row")) should have size 0
+      aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
+      tapViaUi(50)
+      reserveDirectoryNameFor(aliceUser, directoryUiUrl, aliceDirectoryNameRaw)
+      loginToSplitwiseUi(aliceUser, splitwiseUiUrl)
+
+      click on "group-id-field"
+      textField("group-id-field").value = groupName
+      click on "create-group-button"
+      click on className("create-invite-link")
     }
+
+    // can assign these now after party id's of alice & bob are known.
+    val aliceCns =
+      expectedCns(PartyId.tryFromProtoPrimitive(aliceUserPartyId), aliceDirectoryNameRaw)
+    val bobCns = expectedCns(PartyId.tryFromProtoPrimitive(bobUserPartyId), bobDirectoryNameRaw)
+
+    withFrontEnd("bob-v1") { implicit webDriver =>
+      loginToSplitwiseUi(bobUser, splitwiseUiUrl)
+      eventually() {
+        find(className("request-membership-link"))
+      }
+      click on className("request-membership-link")
+    }
+
+    withFrontEnd("alice-v1") { implicit webDriver =>
+      click on className("add-user-link")
+      addTeamLunch(100)
+    }
+
+    withFrontEnd("bob-v1") { implicit webDriver =>
+      enterSplitwisePayment(aliceDirectoryNameRaw, 50)
+
+      // Bob is redirected to wallet ..
+      click on className("accept-button")
+
+      // And then back to splitwise, where he is already logged in
+      eventually(scaled(5 seconds)) {
+        inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
+          row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
+          row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
+        }
+        inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
+          case Seq(row1, row2) =>
+            row1.text should matchText(
+              s"${aliceCns} paid 100.0000000000 CC for Team lunch"
+            )
+            row2.text should matchText(
+              s"${bobCns} sent 50.0000000000 CC to ${aliceCns}"
+            )
+        }
+      }
+    }
+
   }
 
   "test a directory entry allocation against cluster deployment" taggedAs LiveDevNetTest in { _ =>
@@ -230,10 +240,7 @@ class PreflightIntegrationTest
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
-    val aliceUser = auth0Users.get("alice-v1") match {
-      case Some(user) => user
-      case None => fail("could not get alice user from auth0")
-    }
+    val aliceUser = auth0Users.get("alice-v1").value
 
     withFrontEnd("alice-v1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
@@ -269,6 +276,47 @@ class PreflightIntegrationTest
     }
   }
 
+  def reserveDirectoryNameFor(auth0User: Auth0User, directoryUiUrl: String, entryName: String)(
+      implicit webDrive: WebDriverType
+  ): String = {
+    go to directoryUiUrl
+    click on "oidc-login-button"
+    completeAuth0Prompts(
+      auth0User.email,
+      auth0User.password,
+      () => find(id("entry-name-field")).isDefined,
+    )
+
+    eventually() {
+      find(id("entry-name-field"))
+    }
+
+    click on "entry-name-field"
+    textField("entry-name-field").value = entryName
+
+    click on "request-entry-with-sub-button"
+
+    eventually() {
+      findAll(className("sub-requests-table-row")) should have size 1
+    }
+    // user is redirected to their wallet...
+    eventually() {
+      findAll(className("sub-request-accept-button")) should have size 1
+    }
+    click on className("sub-request-accept-button")
+
+    // And then back to directory, where they are already logged in
+    eventually(scaled(10 seconds)) {
+      findAll(className("entries-table-row")) should have size 1
+    }
+    val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
+      row
+    }
+    val name = row.childElement(className("entries-table-name"))
+    name.text should be(entryName)
+    entryName
+  }
+
   "run through runbook against cluster deployment" taggedAs LiveDevNetTest in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
@@ -285,6 +333,109 @@ class PreflightIntegrationTest
     Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
+    }
+  }
+
+  private def loginAndOnboardToWalletUi(
+      user: Auth0User,
+      walletUiUrl: String,
+  )(implicit webDriver: WebDriverType): String = {
+    loginAndOnboardToUiViaAuth0(user, walletUiUrl, onboardUserToWallet = true)
+  }
+
+  private def loginToSplitwiseUi(
+      user: Auth0User,
+      url: String,
+  )(implicit webDriver: WebDriverType): String = {
+    clue(s"Logging in and onboarding as user: ${user.email}") {
+      go to url
+      click on "oidc-login-button"
+      completeAuth0Prompts(
+        user.email,
+        user.password,
+        () => find(id("group-id-field")).isDefined,
+      )
+
+      eventually() {
+        find(id("group-id-field"))
+      }
+
+      eventually() {
+        findAll(className("party-id")) should have size 1
+      }
+      copyPartyId()
+    }
+  }
+
+  private def loginAndOnboardToUiViaAuth0(
+      user: Auth0User,
+      url: String,
+      onboardUserToWallet: Boolean,
+  )(implicit webDriver: WebDriverType): String = {
+    clue(s"Logging in and onboarding as user: ${user.email}") {
+      go to url
+      click on "oidc-login-button"
+      completeAuth0Prompts(
+        user.email,
+        user.password,
+        () => find(id("onboard-button")).isDefined,
+      )
+
+      eventually() {
+        find(id("onboard-button"))
+      }
+
+      if (onboardUserToWallet)
+        click on "onboard-button"
+
+      eventually() {
+        findAll(className("party-id")) should have size 1
+      }
+      copyPartyId()
+    }
+  }
+
+  private def copyPartyId()(implicit webDriver: WebDriverType): String = {
+    clue(s"Copying party ID") {
+      find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
+        elm => elm.text
+      )
+    }
+  }
+
+  private def tapViaUi(quantity: Double)(implicit webDriver: WebDriverType) = {
+    click on "tap-amount-field"
+    numberField("tap-amount-field").underlying.sendKeys(quantity.toString)
+    click on "tap-button"
+    eventually() {
+      findAll(className("coins-table-row")) should have size 1
+    }
+  }
+
+  private def createTransferOffer(receiverPartyId: String, amount: String, description: String)(
+      implicit webDriver: WebDriverType
+  ): Unit = {
+    clue(s"Creating transfer offer for: $receiverPartyId") {
+      click on "transfer-offers-button"
+
+      click on "create-offer-button"
+
+      setDirectoryField(textField("create-offer-receiver"), receiverPartyId, receiverPartyId)
+
+      click on "create-offer-amount"
+      numberField("create-offer-amount").underlying.sendKeys(amount)
+
+      click on "create-offer-description"
+      textField("create-offer-description").value = description
+
+      click on "create-offer-expiration-value"
+      numberField("create-offer-expiration-value").underlying.sendKeys("120")
+
+      click on "submit-create-offer-button"
+
+      eventually() {
+        findAll(className("transfer-offers-row")) should have size 1
+      }
     }
   }
 }

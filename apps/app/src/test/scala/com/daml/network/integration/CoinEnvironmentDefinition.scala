@@ -72,6 +72,7 @@ case class CoinEnvironmentDefinition(
         })
       })
     })
+
   def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
@@ -88,11 +89,13 @@ case class CoinEnvironmentDefinition(
         )
       })
     })
+
   def withInitializedNodes(): CoinEnvironmentDefinition =
     copy(setup = implicit env => {
       this.setup(env)
       CoinEnvironmentDefinition.waitForNodeInitialization(env)
     })
+
   def withPreSetup(preSetup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(preSetup = preSetup)
 
@@ -110,12 +113,15 @@ case class CoinEnvironmentDefinition(
   /** Remove any previously registered setup */
   def withNoSetup(): CoinEnvironmentDefinition =
     copy(setup = _ => ())
+
   def clearConfigTransforms(): CoinEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
+
   def addConfigTransforms(
       transforms: (String, CoinConfig) => CoinConfig*
   ): CoinEnvironmentDefinition =
     transforms.foldLeft(this)((ed, ct) => ed.addConfigTransform(ct))
+
   def addConfigTransform(
       transform: (String, CoinConfig) => CoinConfig
   ): CoinEnvironmentDefinition =
@@ -128,6 +134,7 @@ case class CoinEnvironmentDefinition(
       transforms: (String, CoinConfig) => CoinConfig*
   ): CoinEnvironmentDefinition =
     transforms.foldRight(this)((ct, ed) => ed.addConfigTransformToFront(ct))
+
   def addConfigTransformToFront(
       transform: (String, CoinConfig) => CoinConfig
   ): CoinEnvironmentDefinition =
@@ -200,6 +207,7 @@ object CoinEnvironmentDefinition {
     val config = CoinConfig.parseAndLoadOrThrow(files.map(_.toJava))
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
+
   def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
 }

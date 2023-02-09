@@ -1,13 +1,12 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.codegen.java.cn.{splitwise as splitwiseCodegen}
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.{DirectoryTestUtil, WalletTestUtil}
+import com.daml.network.util.{DirectoryTestUtil, SplitwiseFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import org.openqa.selenium.Keys
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
@@ -19,7 +18,8 @@ class SplitwiseFrontendIntegrationTest
       "charlieSplitwise",
     )
     with DirectoryTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with SplitwiseFrontendTestUtil {
 
   private val splitwiseDarPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
   private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -213,31 +213,11 @@ class SplitwiseFrontendIntegrationTest
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         click on className("add-user-link")
-        inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
-          field.underlying.click()
-          reactTextInput(field).value = "1000.0"
-        }
-        inside(find(className("enter-payment-description-field"))) { case Some(field) =>
-          field.underlying.click()
-          reactTextInput(field).value = "Team lunch"
-        }
-        click on className("enter-payment-link")
+        addTeamLunch(1000)
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
-        inside(find(className("transfer-amount-field"))) { case Some(field) =>
-          field.underlying.click()
-          reactTextInput(field).value = "500"
-        }
-        inside(find(className("transfer-receiver-field"))) { case Some(field) =>
-          field.underlying.click()
-          val input = reactTextInput(field)
-          // TODO(#2206) change aliceEntryName back to "alice" for better UX testing
-          input.underlying.sendKeys(aliceEntryName)
-          input.underlying.sendKeys(Keys.ARROW_DOWN)
-          input.underlying.sendKeys(Keys.ENTER)
-        }
-        click on className("transfer-link")
+        enterSplitwisePayment(aliceEntryName, 500)
 
         // Bob is redirected to wallet ..
         click on "user-id-field"
