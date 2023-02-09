@@ -17,6 +17,9 @@ import scala.jdk.CollectionConverters.*
 
 class SvIntegrationTest extends CoinIntegrationTest {
 
+  private val cantonCoinDarPath =
+    "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
@@ -84,6 +87,9 @@ class SvIntegrationTest extends CoinIntegrationTest {
 
   "Non-leader SVs can onboard new validators" in { implicit env =>
     initSvc()
+    // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
+    // but because here we don't start one, we need to perform this step manually.
+    bobValidator.remoteParticipant.dars.upload(cantonCoinDarPath)
     val sv = sv2 // not a leader
     val secret = clue("the sv operator prepares the onboarding") {
       sv.prepareValidatorOnboarding(1.hour)
