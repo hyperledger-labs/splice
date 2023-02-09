@@ -239,7 +239,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         return { userOnboarded: res.userOnboarded, partyId: res.partyId };
       },
       selfGrantFeaturedAppRights: async () => {
-        await walletClient.selfGrantFeaturedAppRight(new Empty(), getCreds());
+        await walletClient.selfGrantFeatureAppRight();
       },
     };
   }, [url, userAccessToken]);
