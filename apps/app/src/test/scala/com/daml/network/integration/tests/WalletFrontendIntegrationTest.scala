@@ -193,7 +193,7 @@ class WalletFrontendIntegrationTest
     }
 
     "show featured status and support self-featuring" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       withFrontEnd("alice") { implicit webDrivers =>
         actAndCheck("Alice logs in", browseToAliceWallet(aliceWallet.config.ledgerApiUser))(
           "Alice is initially not featured",
@@ -203,9 +203,17 @@ class WalletFrontendIntegrationTest
         )
 
         actAndCheck("Alice self-features herself", click on "self-feature")(
-          "Alice keeps reloading the page until she sees herself has featured",
+          "Scan ingests a featured app right for alice",
           _ => {
-            go to s"http://localhost:3000"
+            scan
+              .lookupFeaturedAppRight(aliceParty)
+              .valueOrFail("Scan did not ingest alice's featured app right")
+          },
+        )
+
+        actAndCheck("Alice refreshes the page", go to s"http://localhost:3000")(
+          "Alice sees herself as featured",
+          _ => {
             find(id("featured-status")).value.text should be("FEATURED")
             find(id("self-feature")) should be(None)
           },
