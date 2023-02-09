@@ -552,6 +552,9 @@ components:
 
     Subscription:
       type: object
+      required:
+      - main
+      - state
       properties:
         main:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"

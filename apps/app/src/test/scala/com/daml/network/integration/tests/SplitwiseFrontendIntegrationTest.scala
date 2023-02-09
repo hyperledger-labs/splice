@@ -13,7 +13,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class SplitwiseFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment(
+    extends FrontendIntegrationTestWithSharedEnvironment(
       "aliceSplitwise",
       "bobSplitwise",
       "charlieSplitwise",

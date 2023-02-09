@@ -38,8 +38,10 @@ const Coins: React.FC = () => {
     const newCoins = (await list()).coins;
 
     const decoded = newCoins.reduce((accumulator, c) => {
-      const contractData = c.getContract();
-      return contractData ? [...accumulator, Contract.decode(contractData, Coin)] : accumulator;
+      const contractData = c.contract;
+      return contractData
+        ? [...accumulator, Contract.decodeOpenAPI(contractData, Coin)]
+        : accumulator;
     }, [] as Contract<Coin>[]);
 
     setCoins(prev => (sameContracts(prev, decoded) ? prev : decoded));

@@ -7,7 +7,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class WalletSubscriptionsFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment("alice")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil {
 
   "A wallet UI" should {
@@ -150,7 +150,7 @@ class WalletSubscriptionsFrontendIntegrationTest
           eventually() {
             inside(findAll(className("sub-requests-table-row")).toList) { case Seq(row) =>
               row.childElement(className("sub-request-amount")).text should matchText(
-                "42.0000000000USD"
+                "42.0USD"
               )
             }
           }
@@ -158,7 +158,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         clue("Check that the subscription displays the currency") {
           eventually() {
             inside(findAll(className("subs-table-row")).toList) { case Seq(row) =>
-              row.childElement(className("sub-amount")).text should matchText("42.0000000000USD")
+              row.childElement(className("sub-amount")).text should matchText("42.0USD")
             }
           }
         }

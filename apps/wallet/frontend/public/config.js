@@ -15,8 +15,8 @@ window.canton_network_config = {
   //   },
   services: {
     wallet: {
-      // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API
-      grpcUrl: 'http://localhost:6004',
+      // URL of the wallet app HTTP API
+      grpcUrl: 'http://localhost:7004',
     },
     validator: {
       // URL of the validator app HTTP API

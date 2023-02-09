@@ -9,7 +9,7 @@ import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletCoinPriceFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil {
 
   override def environmentDefinition
@@ -53,8 +53,8 @@ class WalletCoinPriceFrontendIntegrationTest
             )
 
           amounts should contain theSameElementsAs Seq(
-            "22.0000000000CC",
-            "20.0000000000USD",
+            "22.0CC",
+            "20.0USD",
           )
         }
       }

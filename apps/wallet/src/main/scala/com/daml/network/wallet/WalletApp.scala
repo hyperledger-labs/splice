@@ -2,8 +2,10 @@ package com.daml.network.wallet
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpMethods
 import akka.stream.Materializer
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.*
@@ -147,7 +149,17 @@ class WalletApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
-      routes = cors() {
+      routes = cors(
+        CorsSettings(ac).withAllowedMethods(
+          List(
+            HttpMethods.DELETE,
+            HttpMethods.GET,
+            HttpMethods.POST,
+            HttpMethods.HEAD,
+            HttpMethods.OPTIONS,
+          )
+        )
+      ) {
         WalletResource.routes(
           new HttpWalletHandler(
             walletManager,

@@ -291,11 +291,11 @@ local validator1Deployments(config) = [
 
   c.deployment(config, "validator1-wallet-app", [
     {
-      name: "val1-wal-api",
-      port: 5004,
+      name: "val1-wal-http",
+      port: 7004,
       externalPort: 5104,
     },
-  ], proxyToGrpcWeb="val1-wal-api", image="wallet-app", extraEnvVars=c.appAuthEnvBinding("wallet") + [
+  ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "validator1-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator1-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
@@ -378,11 +378,11 @@ local splitwiseDeployments(config) = [
 
   c.deployment(config, "splitwise-wallet-app", [
     {
-      name: "sw-wal-api",
-      port: 5004,
+      name: "sw-wal-http",
+      port: 7004,
       externalPort: 5204,
     },
-  ], proxyToGrpcWeb="sw-wal-api", image="wallet-app", extraEnvVars=c.appAuthEnvBinding("splitwise_wallet", "wallet") + [
+  ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("splitwise_wallet", "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwise-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwise-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },

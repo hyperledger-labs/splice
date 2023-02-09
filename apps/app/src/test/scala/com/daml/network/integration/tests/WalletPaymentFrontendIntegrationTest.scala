@@ -5,7 +5,7 @@ import com.daml.network.util.WalletTestUtil
 import org.openqa.selenium.{Keys, WebDriver}
 
 class WalletPaymentFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil {
 
   "A wallet UI" should {
@@ -63,7 +63,7 @@ class WalletPaymentFrontendIntegrationTest
 
               // Verify that the currency and amount are properly displayed
               row.childElement(className("app-request-payment-amount")).text should matchText(
-                "42.0000000000CC"
+                "42.0CC"
               )
             }
           }
@@ -101,7 +101,7 @@ class WalletPaymentFrontendIntegrationTest
 
               // Verify that the currency and amount are properly displayed
               row.childElement(className("app-request-payment-amount")).text should matchText(
-                "42.0000000000USD"
+                "42.0USD"
               )
             }
           }
@@ -142,8 +142,8 @@ class WalletPaymentFrontendIntegrationTest
             )
 
           amounts should contain theSameElementsAs Seq(
-            "22.0000000000CC",
-            "20.0000000000CC",
+            "22.0CC",
+            "20.0CC",
           )
         }
       }
@@ -223,7 +223,7 @@ class WalletPaymentFrontendIntegrationTest
               row
             }
             row.childElement(className("transfer-offers-table-amount")).text should be(
-              "1.0000000000CC"
+              "1.0CC"
             )
           },
         )

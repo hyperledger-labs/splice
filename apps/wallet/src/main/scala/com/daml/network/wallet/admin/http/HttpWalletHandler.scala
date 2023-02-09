@@ -449,7 +449,7 @@ class HttpWalletHandler(
           subsCodegen.SubscriptionPayment.COMPANION
         )
       } yield {
-        val mainMap = subscriptions.map(sub => (sub.contractId -> Some(sub.toJson))).toMap
+        val mainMap = subscriptions.map(sub => (sub.contractId -> sub.toJson)).toMap
         val idleStates = subscriptionIdleStates.map(state =>
           (state.payload.subscription, definitions.SubscriptionState(idle = Some(state.toJson)))
         )
@@ -461,7 +461,7 @@ class HttpWalletHandler(
             (mainId, state) <- idleStates ++ payments
             main <- mainMap.get(mainId)
           } yield {
-            definitions.Subscription(main, Some(state))
+            definitions.Subscription(main, state)
           }).toVector
         )
       }

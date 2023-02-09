@@ -4,15 +4,15 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{value as scalaValue}
+import com.daml.ledger.api.v1.value as scalaValue
 import com.daml.ledger.api.validation.NoLoggingValueValidator
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,
   InterfaceCompanion,
   ValueDecoder,
+  Contract as CodegenContract,
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
@@ -53,20 +53,22 @@ final case class Contract[TCid <: ContractId[_], T](
     payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
   )
 
-  def toJson(implicit elc: ErrorLoggingContext): http.Contract = http.Contract(
-    templateId =
-      s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",
-    contractId = contractId.contractId,
-    // TODO(#2019) Improve conversion between JSON libraries
-    // once we switched to the native JSON encoding in the Java codeegn.
-    payload = circe
-      .parse(
-        ApiCodecCompressed
-          .apiValueToJsValue(Contract.javaValueToLfValue(payload.toValue))
-          .compactPrint
-      )
-      .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
-  )
+  def toJson(implicit elc: ErrorLoggingContext): http.Contract = {
+    http.Contract(
+      templateId =
+        s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",
+      contractId = contractId.contractId,
+      // TODO(#2019) Improve conversion between JSON libraries
+      // once we switched to the native JSON encoding in the Java codegen.
+      payload = circe
+        .parse(
+          ApiCodecCompressed
+            .apiValueToJsValue(Contract.javaValueToLfValue(payload.toValue))
+            .compactPrint
+        )
+        .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
+    )
+  }
 
   override def pretty: Pretty[Contract[TCid, T]] = {
 

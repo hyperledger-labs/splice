@@ -9,7 +9,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.Keys
 
 class SplitwiseMultiDomainFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment(
+    extends FrontendIntegrationTestWithSharedEnvironment(
       "aliceSplitwise",
       "bobSplitwise",
     )

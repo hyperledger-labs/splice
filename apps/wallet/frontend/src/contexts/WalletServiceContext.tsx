@@ -1,11 +1,16 @@
-import * as v0 from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { Contract, UserStatusResponse } from 'common-frontend';
 import { useUserState } from 'common-frontend';
-import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
 import { Decimal } from 'decimal.js';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
-import { Metadata } from 'grpc-web';
 import React, { useContext, useMemo } from 'react';
+import {
+  Middleware,
+  createConfiguration,
+  WalletApi,
+  ServerConfiguration,
+  RequestContext,
+  ResponseContext,
+  CoinPosition,
+} from 'wallet-openapi';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import {
@@ -30,8 +35,8 @@ export interface GetBalanceResponse {
 }
 
 export interface ListResponse {
-  lockedCoins: v0.CoinPosition[];
-  coins: v0.CoinPosition[];
+  lockedCoins: CoinPosition[];
+  coins: CoinPosition[];
 }
 
 export interface ListTransferOffersResponse {
@@ -89,8 +94,22 @@ export interface WalletClient {
   userStatus: () => Promise<UserStatusResponse>;
 }
 
-interface Credentials extends Metadata {
-  Authorization: string;
+class ApiMiddleware implements Middleware {
+  private token: string | undefined;
+
+  async pre(context: RequestContext): Promise<RequestContext> {
+    if (!this.token) {
+      throw new Error('Request issued before access token was set');
+    }
+    context.setHeaderParam('Authorization', `Bearer ${this.token}`);
+    return context;
+  }
+  post(context: ResponseContext): Promise<ResponseContext> {
+    return Promise.resolve(context);
+  }
+  constructor(accessToken: string | undefined) {
+    this.token = accessToken;
+  }
 }
 
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
@@ -101,32 +120,29 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
 
   // Collection of methods that wrap the raw grpc codegen client methods because everything in that API is constructor-chain based, requires auth headers, and just generally awkward to use
   const friendlyClient: WalletClient | undefined = useMemo(() => {
-    const getCreds = (): Credentials => {
-      if (!userAccessToken) {
-        throw new Error('Request issued before access token was set');
-      }
-      return {
-        Authorization: `Bearer ${userAccessToken}`,
-      };
-    };
+    const configuration = createConfiguration({
+      baseServer: new ServerConfiguration(url, {}),
+      promiseMiddleware: [new ApiMiddleware(userAccessToken)],
+    });
 
-    const walletClient = new WalletServicePromiseClient(url, null, null);
+    const walletClient = new WalletApi(configuration);
 
     return {
       list: async (): Promise<ListResponse> => {
-        const res = await walletClient.list(new v0.ListRequest(), getCreds());
-        return { coins: res.getCoinsList(), lockedCoins: res.getLockedCoinsList() };
+        const res = await walletClient.list();
+        return { coins: res.coins, lockedCoins: res.lockedCoins };
       },
       tap: async amount => {
-        await walletClient.tap(new v0.TapRequest().setAmount(amount), getCreds());
+        const request = { amount: amount };
+        await walletClient.tap(request);
       },
       getBalance: async (): Promise<GetBalanceResponse> => {
-        const balance = await walletClient.getBalance(new v0.GetBalanceRequest(), getCreds());
+        const balance = await walletClient.getBalance();
         return {
-          round: balance.getRound(),
-          effectiveUnlockedQty: balance.getEffectiveUnlockedQty(),
-          effectiveLockedQty: balance.getEffectiveLockedQty(),
-          totalHoldingFees: balance.getTotalHoldingFees(),
+          round: balance.round,
+          effectiveUnlockedQty: balance.effectiveUnlockedQty,
+          effectiveLockedQty: balance.effectiveLockedQty,
+          totalHoldingFees: balance.totalHoldingFees,
         };
       },
       createTransferOffer: async (
@@ -136,121 +152,90 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         expiresAt,
         idempotencyKey
       ) => {
-        await walletClient.createTransferOffer(
-          new v0.CreateTransferOfferRequest()
-            .setReceiverPartyId(receiverPartyId)
-            .setAmount(amount.isInt() ? amount.toFixed(1) : amount.toString())
-            .setDescription(description)
-            .setExpiresAt(expiresAt.getTime() * 1000)
-            .setIdempotencyKey(idempotencyKey),
-          getCreds()
-        );
+        const request = {
+          receiverPartyId: receiverPartyId,
+          amount: amount.isInt() ? amount.toFixed(1) : amount.toString(),
+          description: description,
+          expiresAt: expiresAt.getTime() * 1000,
+          idempotencyKey: idempotencyKey,
+        };
+        await walletClient.createTransferOffer(request);
       },
       listTransferOffers: async (): Promise<ListTransferOffersResponse> => {
-        const res = await walletClient.listTransferOffers(new Empty(), getCreds());
+        const res = await walletClient.listTransferOffers();
         return {
-          offersList: res.getOffersList().map(c => Contract.decode(c, TransferOffer)),
+          offersList: res.offers.map(c => Contract.decodeOpenAPI(c, TransferOffer)),
         };
       },
       acceptTransferOffer: async offerContractId => {
-        await walletClient.acceptTransferOffer(
-          new v0.AcceptTransferOfferRequest().setOfferContractId(offerContractId),
-          getCreds()
-        );
+        await walletClient.acceptTransferOffer(offerContractId);
       },
       rejectTransferOffer: async offerContractId => {
-        await walletClient.rejectTransferOffer(
-          new v0.RejectTransferOfferRequest().setOfferContractId(offerContractId),
-          getCreds()
-        );
+        await walletClient.rejectTransferOffer(offerContractId);
       },
       withdrawTransferOffer: async offerContractId => {
-        await walletClient.withdrawTransferOffer(
-          new v0.WithdrawTransferOfferRequest().setOfferContractId(offerContractId),
-          getCreds()
-        );
+        await walletClient.withdrawTransferOffer(offerContractId);
       },
       listAcceptedTransferOffers: async (): Promise<ListAcceptedTransferOffersResponse> => {
-        const res = await walletClient.listAcceptedTransferOffers(new Empty(), getCreds());
+        const res = await walletClient.listAcceptedTransferOffers();
         return {
-          acceptedOffersList: res
-            .getAcceptedOffersList()
-            .map(c => Contract.decode(c, AcceptedTransferOffer)),
+          acceptedOffersList: res.acceptedOffers.map(c =>
+            Contract.decodeOpenAPI(c, AcceptedTransferOffer)
+          ),
         };
       },
 
       listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
-        const res = await walletClient.listAppPaymentRequests(
-          new v0.ListAppPaymentRequestsRequest(),
-          getCreds()
-        );
+        const res = await walletClient.listAppPaymentRequests();
         return {
-          paymentRequestsList: res
-            .getPaymentRequestsList()
-            .map(c => Contract.decode(c, AppPaymentRequest)),
+          paymentRequestsList: res.paymentRequests.map(c =>
+            Contract.decodeOpenAPI(c, AppPaymentRequest)
+          ),
         };
       },
       acceptAppPaymentRequest: async requestContractId => {
-        await walletClient.acceptAppPaymentRequest(
-          new v0.AcceptAppPaymentRequestRequest().setRequestContractId(requestContractId),
-          getCreds()
-        );
+        await walletClient.acceptAppPaymentRequest(requestContractId);
       },
       rejectAppPaymentRequest: async requestContractId => {
-        await walletClient.rejectAppPaymentRequest(
-          new v0.RejectAppPaymentRequestRequest().setRequestContractId(requestContractId),
-          getCreds()
-        );
+        await walletClient.rejectAppPaymentRequest(requestContractId);
       },
 
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
-        const res = await walletClient.listSubscriptionRequests(
-          new v0.ListSubscriptionRequestsRequest(),
-          getCreds()
-        );
+        const res = await walletClient.listSubscriptionRequests();
         return {
-          subscriptionRequestsList: res
-            .getSubscriptionRequestsList()
-            .map(c => Contract.decode(c, SubscriptionRequest)),
+          subscriptionRequestsList: res.subscriptionRequests.map(c =>
+            Contract.decodeOpenAPI(c, SubscriptionRequest)
+          ),
         };
       },
       acceptSubscriptionRequest: async requestContractId => {
-        await walletClient.acceptSubscriptionRequest(
-          new v0.AcceptSubscriptionRequestRequest().setRequestContractId(requestContractId),
-          getCreds()
-        );
+        await walletClient.acceptSubscriptionRequest(requestContractId);
       },
       listSubscriptions: async (): Promise<ListSubscriptionsResponse> => {
-        const res = await walletClient.listSubscriptions(
-          new v0.ListSubscriptionsRequest(),
-          getCreds()
-        );
+        const res = await walletClient.listSubscriptions();
         return {
-          subscriptionsList: res.getSubscriptionsList().map(sub => {
-            const main = Contract.decode(sub.getMain()!, Subscription);
-            const state = sub.hasPayment()
+          subscriptionsList: res.subscriptions.map(sub => {
+            const main = Contract.decodeOpenAPI(sub.main, Subscription);
+            const state = sub.state.payment
               ? {
                   type: 'payment' as 'payment',
-                  value: Contract.decode(sub.getPayment()!, SubscriptionPayment),
+                  value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
                 }
               : {
                   type: 'idle' as 'idle',
-                  value: Contract.decode(sub.getIdle()!, SubscriptionIdleState),
+                  value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
                 };
             return [main, state];
           }),
         };
       },
       cancelSubscription: async (subscriptionContractId: string): Promise<void> => {
-        await walletClient.cancelSubscription(
-          new v0.CancelSubscriptionRequest().setIdleStateContractId(subscriptionContractId),
-          getCreds()
-        );
+        await walletClient.cancelSubscriptionRequest(subscriptionContractId);
       },
 
       userStatus: async () => {
-        const res = await walletClient.userStatus(new v0.UserStatusRequest(), getCreds());
-        return { userOnboarded: res.getUserOnboarded(), partyId: res.getPartyId() };
+        const res = await walletClient.userStatus();
+        return { userOnboarded: res.userOnboarded, partyId: res.partyId };
       },
     };
   }, [url, userAccessToken]);

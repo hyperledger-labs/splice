@@ -76,7 +76,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
   }
 }
 
-abstract class FrontendIntegrationTestWithSharedEnvirontment(override val frontendNames: String*)
+abstract class FrontendIntegrationTestWithSharedEnvironment(override val frontendNames: String*)
     extends CoinIntegrationTestWithSharedEnvironment
     with FrontendTestCommon {
 

@@ -6,7 +6,7 @@ import java.time.Duration
 import scala.util.Try
 
 class WalletFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvirontment("alice")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil {
 
   "A wallet UI" should {
@@ -25,7 +25,7 @@ class WalletFrontendIntegrationTest
         }
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val amount = row.childElement(className("coins-table-amount"))
-        amount.text should be("15.0000000000CC")
+        amount.text should be("15.0CC")
       }
     }
 

@@ -14,11 +14,11 @@ window.canton_network_config = {
   },
   services: {
     wallet: {
-      // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API
+      // URL of the envoy proxy, proxying to the wallet app HTTP API
       grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
     },
     validator: {
-      // URL of the gRPC-Web envoy proxy, proxying to the validator app HTTP API
+      // URL of the envoy proxy, proxying to the validator app HTTP API
       grpcUrl: "https://" + window.location.hostname + "/api/v0/validator",
     },
     directory: {

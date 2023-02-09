@@ -28,8 +28,8 @@ window.canton_network_config = {
       grpcUrl: 'http://localhost:6201',
     },
     wallet: {
+      grpcUrl: "http://localhost:7004",
       // URL of the web-ui, used to forward payment workflows to wallet
-      grpcUrl: "http://localhost:6004",
       uiUrl: "http://localhost:3000",
     },
   },

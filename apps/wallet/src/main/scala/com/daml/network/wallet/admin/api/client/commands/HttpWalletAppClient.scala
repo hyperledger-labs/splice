@@ -93,11 +93,11 @@ object HttpWalletAppClient {
       extends SubscriptionStateContract
 
   object SubscriptionStateContract {
-    def unapply(state: Option[definitions.SubscriptionState]): Option[SubscriptionStateContract] = {
+    def unapply(state: definitions.SubscriptionState): Option[SubscriptionStateContract] = {
       state match {
-        case Some(definitions.SubscriptionState(Some(state), None)) =>
+        case definitions.SubscriptionState(Some(state), None) =>
           Some(SubscriptionStateIdleContract(state))
-        case Some(definitions.SubscriptionState(None, Some(state))) =>
+        case definitions.SubscriptionState(None, Some(state)) =>
           Some(SubscriptionStatePaymentContract(state))
         case _ => None
       }
@@ -478,11 +478,9 @@ object HttpWalletAppClient {
           response.subscriptions
             .traverse(sub =>
               for {
-                main <- sub.main
-                  .toRight("Could not find main subscription contract")
-                  .flatMap(
-                    Contract.fromJson(subsCodegen.Subscription.COMPANION)(_).leftMap(_.toString)
-                  )
+                main <- Contract
+                  .fromJson(subsCodegen.Subscription.COMPANION)(sub.main)
+                  .leftMap(_.toString)
                 state <- (sub.state match {
                   case SubscriptionStateContract(SubscriptionStateIdleContract(contract)) =>
                     Contract
@@ -492,8 +490,6 @@ object HttpWalletAppClient {
                     Contract
                       .fromJson(subsCodegen.SubscriptionPayment.COMPANION)(contract)
                       .map(SubscriptionPayment)
-                  case None =>
-                    Left(ProtoDeserializationError.FieldNotSet("Subscription.state"))
                   case other =>
                     Left(
                       ProtoDeserializationError.UnrecognizedField(
