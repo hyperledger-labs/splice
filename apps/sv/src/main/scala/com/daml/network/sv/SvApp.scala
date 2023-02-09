@@ -79,8 +79,8 @@ class SvApp(
         loggerFactory,
         timeouts,
       )
-      _ <- svStore.domains.signalWhenConnected()
-      _ <- svcStore.domains.signalWhenConnected()
+      _ <- waitForDomainConnection(svStore.domains, config.domains.global)
+      _ <- waitForDomainConnection(svcStore.domains, config.domains.global)
       ledgerConnection = ledgerClient.connection()
       _ <-
         if (config.foundConsortium) {

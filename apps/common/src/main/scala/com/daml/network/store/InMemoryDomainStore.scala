@@ -53,9 +53,6 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
     }
   }
 
-  override def signalWhenConnected(): Future[Unit] =
-    stateVar.oneDomainConnected.future
-
   override def signalWhenConnected(alias: DomainAlias): Future[DomainId] =
     updateState[Future[DomainId]](state =>
       state.connectedDomains.get(alias) match {

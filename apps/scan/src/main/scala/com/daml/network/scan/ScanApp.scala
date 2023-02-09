@@ -82,8 +82,8 @@ class ScanApp(
         timeouts,
         store,
       )
-      _ <- store.domains.signalWhenConnected()
-      _ <- store.acs.signalWhenIngested(OpenMiningRound.COMPANION)
+      domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      _ <- store.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
 
       routes = cors() {
         ScanResource.routes(

@@ -21,12 +21,6 @@ abstract class DomainStore extends AutoCloseable {
     */
   def getUniqueDomainId(): Future[DomainId]
 
-  /** Wait for at least one domain to be connected.
-    * TODO(#2704) Either make this wait for specific domains
-    * or remove usage.
-    */
-  def signalWhenConnected(): Future[Unit]
-
   def signalWhenConnected(alias: DomainAlias): Future[DomainId]
 
   /** Stream all domain connection events, starts with

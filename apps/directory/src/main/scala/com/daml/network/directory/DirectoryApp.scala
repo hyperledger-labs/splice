@@ -100,7 +100,7 @@ class DirectoryApp(
         loggerFactory,
         timeouts,
       )
-      _ <- store.domains.signalWhenConnected()
+      _ <- waitForDomainConnection(store.domains, config.domains.global)
       // TODO(#2024) Validate that this is secure.
       settings = CorsSettings.defaultSettings
         .withAllowGenericHttpRequests(true)

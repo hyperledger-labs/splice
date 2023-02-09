@@ -142,8 +142,8 @@ class WalletApp(
         loggerFactory,
         timeouts,
       )
-      _ <- walletStore.domains.signalWhenConnected()
-      _ <- walletStore.acs.signalWhenIngested(OpenMiningRound.COMPANION)
+      domainId <- waitForDomainConnection(walletStore.domains, config.domains.global)
+      _ <- walletStore.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
       verifier: SignatureVerifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

@@ -3,6 +3,7 @@ package com.daml.network.environment
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.store.DomainStore
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
@@ -10,6 +11,7 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -21,8 +23,9 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.HasUptime
-import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{DomainId, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -78,6 +81,17 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     * package in the set.
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
+
+  protected def waitForDomainConnection(
+      store: DomainStore,
+      domain: DomainAlias,
+  ): Future[DomainId] = {
+    logger.info(show"Waiting for domain $domain to be connected")
+    store.signalWhenConnected(domain).map { r =>
+      logger.info(show"Connection to domain $domain has been established")
+      r
+    }
+  }
 
   // TODO(#736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
