@@ -7,6 +7,6 @@
     "common/frontend",
     "directory/frontend",
     "wallet/frontend",
-    "splitwise/frontend"
+    "splitwell/frontend"
   ]
 }

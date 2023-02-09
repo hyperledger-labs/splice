@@ -40,7 +40,7 @@ lazy val root = (project in file("."))
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
-    `apps-splitwise`,
+    `apps-splitwell`,
     `apps-svc`,
     `apps-sv`,
     `apps-app`,
@@ -53,7 +53,7 @@ lazy val root = (project in file("."))
     `wallet-payments-daml`,
     `wallet-daml`,
     `directory-daml`,
-    `splitwise-daml`,
+    `splitwell-daml`,
     `svc-governance-daml`,
     `validator-lifecycle-daml`,
     `canton-community-common`,
@@ -157,9 +157,9 @@ lazy val `directory-daml` =
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
     )
 
-lazy val `splitwise-daml` =
+lazy val `splitwell-daml` =
   project
-    .in(file("daml/splitwise"))
+    .in(file("daml/splitwell"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -307,7 +307,7 @@ lazy val `apps-common-frontend` = {
       `apps-common`,
       `apps-directory`,
       `apps-wallet`,
-      `apps-splitwise`,
+      `apps-splitwell`,
       `apps-validator`,
     )
     .settings(
@@ -318,7 +318,7 @@ lazy val `apps-common-frontend` = {
           (`wallet-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`directory-daml` / Compile / damlBuild).value ++
-          (`splitwise-daml` / Compile / damlBuild).value,
+          (`splitwell-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
@@ -424,13 +424,13 @@ lazy val `apps-wallet-frontend` = {
     )
 }
 
-lazy val `apps-splitwise-frontend` = {
+lazy val `apps-splitwell-frontend` = {
   project
-    .in(file("apps/splitwise/frontend"))
+    .in(file("apps/splitwell/frontend"))
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwise-frontend",
+      frontendWorkspace := "splitwell-frontend",
       sharedFrontendSettings,
     )
 }
@@ -453,7 +453,7 @@ lazy val `apps-common-frontend-protobuf` = {
       `apps-common` % "compile->protocGenerate",
       `apps-directory` % "compile->protocGenerate",
       `apps-wallet` % "compile->protocGenerate",
-      `apps-splitwise` % "compile->protocGenerate",
+      `apps-splitwell` % "compile->protocGenerate",
       `apps-validator` % "compile->protocGenerate",
       `apps-scan` % "compile->protocGenerate",
     )
@@ -473,7 +473,7 @@ lazy val `apps-frontends` = {
     `apps-common-frontend`,
     `apps-wallet-frontend`,
     `apps-directory-frontend`,
-    `apps-splitwise-frontend`,
+    `apps-splitwell-frontend`,
   )
 }
 
@@ -487,7 +487,7 @@ lazy val `apps-wallet` =
       `wallet-daml`,
       // TODO (#2676) Remove this once we have multi-domain interface support.
       `directory-daml`,
-      `splitwise-daml`,
+      `splitwell-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -543,13 +543,13 @@ lazy val `apps-directory` =
         ),
     )
 
-lazy val `apps-splitwise` =
+lazy val `apps-splitwell` =
   project
-    .in(file("apps/splitwise"))
+    .in(file("apps/splitwell"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-directory` % "compile->compile;test->test",
-      `splitwise-daml`,
+      `splitwell-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -600,13 +600,13 @@ lazy val bundleTask = {
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
         ((`apps-directory-frontend` / bundle).value, "directory"),
-        ((`apps-splitwise-frontend` / bundle).value, "splitwise"),
+        ((`apps-splitwell-frontend` / bundle).value, "splitwell"),
       )
     val dars =
       Seq(
         (`canton-coin-daml` / Compile / damlBuild).value,
         (`wallet-daml` / Compile / damlBuild).value,
-        (`splitwise-daml` / Compile / damlBuild).value,
+        (`splitwell-daml` / Compile / damlBuild).value,
         (`directory-daml` / Compile / damlBuild).value,
       )
     val args: Seq[String] = examples ++ webUis.flatMap({ case ((source, _), name) =>
@@ -681,7 +681,7 @@ lazy val `apps-app` =
     .dependsOn(
       `wallet-payments-daml`,
       `wallet-daml`,
-      `apps-splitwise`,
+      `apps-splitwell`,
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,

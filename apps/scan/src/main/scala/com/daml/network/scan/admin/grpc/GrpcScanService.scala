@@ -130,7 +130,7 @@ class GrpcScanService(
     }
 
   override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
-    withSpanFromGrpcContext("GrpcSplitwiseService") { _ => span =>
+    withSpanFromGrpcContext("GrpcSplitwellService") { _ => span =>
       for {
         domains <- store.domains.listConnectedDomains()
       } yield {

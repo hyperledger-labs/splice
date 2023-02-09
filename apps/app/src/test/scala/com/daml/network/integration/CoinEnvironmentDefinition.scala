@@ -189,7 +189,7 @@ object CoinEnvironmentDefinition {
         CoinConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
       )
       .addConfigTransformsToFront((_, conf) =>
-        CoinConfigTransforms.bumpRemoteSplitwisePortsBy(10_000)(conf)
+        CoinConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =

@@ -56,9 +56,9 @@ object ConfigSummaryPrinter extends App {
         i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Wallet App '${name.unwrap}', Admin API"
       )
     }
-    config.splitwiseApps.foreach { case (name, i) =>
+    config.splitwellApps.foreach { case (name, i) =>
       ports.addOne(
-        i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Splitwise App '${name.unwrap}', Admin API"
+        i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Splitwell App '${name.unwrap}', Admin API"
       )
     }
 

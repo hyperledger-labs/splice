@@ -120,10 +120,10 @@ done
 # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth>
 start_frontend wallet    3000 alice   "alice" $enable_test_auth
 start_frontend wallet    3001 bob     "bob"   $enable_test_auth
-start_frontend splitwise 3002 alice   "alice" $enable_test_auth
-start_frontend splitwise 3003 bob     "bob"   $enable_test_auth
+start_frontend splitwell 3002 alice   "alice" $enable_test_auth
+start_frontend splitwell 3003 bob     "bob"   $enable_test_auth
 start_frontend directory 3004 alice   "alice" $enable_test_auth
-start_frontend splitwise 3005 charlie "alice" $enable_test_auth
+start_frontend splitwell 3005 charlie "alice" $enable_test_auth
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

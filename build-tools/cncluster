@@ -440,10 +440,10 @@ function cluster_check() {
     _check_cluster_grpc_port 5103 "Validator1: Validator App API"
     _check_cluster_grpc_port 5104 "Validator1: Wallet App API"
 
-    _check_cluster_grpc_port 5201 "Splitwise: Ledger Participant API"
-    _check_cluster_grpc_port 5202 "Splitwise: Ledger Participant Admin API"
-    _check_cluster_grpc_port 5203 "Splitwise: Validator App API"
-    _check_cluster_grpc_port 5213 "Splitwise: Splitwise App API"
+    _check_cluster_grpc_port 5201 "Splitwell: Ledger Participant API"
+    _check_cluster_grpc_port 5202 "Splitwell: Ledger Participant Admin API"
+    _check_cluster_grpc_port 5203 "Splitwell: Validator App API"
+    _check_cluster_grpc_port 5213 "Splitwell: Splitwell App API"
 
     _log "Checking cluster via ping test..."
     _check_cluster_ledger
@@ -637,9 +637,9 @@ function cluster_update_secrets() {
     "cn-app-sv4-ledger-api-auth CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN" \
     "cn-app-scan-ledger-api-auth nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6" \
     "cn-app-directory-ledger-api-auth PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs" \
-    "cn-app-splitwise-ledger-api-auth ekPlYxilradhEnpWdS80WfW63z1nHvKy" \
-    "cn-app-splitwise-validator-ledger-api-auth hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW" \
-    "cn-app-splitwise-wallet-ledger-api-auth BMSnkJmJMGQqTQY8sabXNHVEzvNW5MMo"
+    "cn-app-splitwell-ledger-api-auth ekPlYxilradhEnpWdS80WfW63z1nHvKy" \
+    "cn-app-splitwell-validator-ledger-api-auth hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW" \
+    "cn-app-splitwell-wallet-ledger-api-auth BMSnkJmJMGQqTQY8sabXNHVEzvNW5MMo"
   do
     set -- $i
     secret=$(echo $all | jq -r ".[] | select(.client_id==\"$2\") | .client_secret")

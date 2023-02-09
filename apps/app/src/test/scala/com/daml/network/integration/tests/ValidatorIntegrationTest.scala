@@ -37,9 +37,9 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
   "start and restart cleanly" in { implicit env =>
     initSvc()
-    splitwiseValidator.startSync()
-    splitwiseValidator.stop()
-    splitwiseValidator.startSync()
+    splitwellValidator.startSync()
+    splitwellValidator.stop()
+    splitwellValidator.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
@@ -180,7 +180,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     initSvc()
     aliceValidator.startSync()
     eventually() {
-      aliceValidator.listConnectedDomains().keySet shouldBe Set("global", "splitwise")
+      aliceValidator.listConnectedDomains().keySet shouldBe Set("global", "splitwell")
     }
   }
 }

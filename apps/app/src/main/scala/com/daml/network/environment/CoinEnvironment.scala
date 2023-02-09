@@ -7,8 +7,8 @@ import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.splitwise.SplitwiseAppBootstrap
-import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
+import com.daml.network.splitwell.SplitwellAppBootstrap
+import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.sv.SvAppBootstrap
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.SvcAppBootstrap
@@ -240,18 +240,18 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
-  protected def createSplitwise(
+  protected def createSplitwell(
       name: String,
-      splitwiseConfig: SplitwiseAppBackendConfig,
-  ): SplitwiseAppBootstrap = {
-    val appLoggerFactory = loggerFactory.append(SplitwiseAppBootstrap.LoggerFactoryKeyName, name)
-    SplitwiseAppBootstrap(
+      splitwellConfig: SplitwellAppBackendConfig,
+  ): SplitwellAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(SplitwellAppBootstrap.LoggerFactoryKeyName, name)
+    SplitwellAppBootstrap(
       name,
-      splitwiseConfig,
-      config.trySplitwiseAppParametersByString(name),
+      splitwellConfig,
+      config.trySplitwellAppParametersByString(name),
       createClock(appLoggerFactory),
       testingTimeService,
-      coinMetrics.forSplitwise(name),
+      coinMetrics.forSplitwell(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -265,12 +265,12 @@ trait CoinEnvironment extends Environment {
       )
   }
 
-  lazy val splitwises = new SplitwiseApps(
-    createSplitwise,
+  lazy val splitwells = new SplitwellApps(
+    createSplitwell,
     migrationsFactory,
     timeouts,
-    config.splitwisesByString,
-    config.trySplitwiseAppParametersByString,
+    config.splitwellsByString,
+    config.trySplitwellAppParametersByString,
     loggerFactory,
   )
 
@@ -285,13 +285,13 @@ trait CoinEnvironment extends Environment {
         validators.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
         directories.startAll.left.getOrElse(Seq.empty) ++
-        splitwises.startAll.left.getOrElse(Seq.empty)
+        splitwells.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
   // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(svcs, svs, scans, validators, wallets, directories, splitwises)
+    List(svcs, svs, scans, validators, wallets, directories, splitwells)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

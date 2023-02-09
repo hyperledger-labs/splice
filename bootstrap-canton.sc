@@ -9,8 +9,8 @@ println("Running canton bootstrap script...")
 
 println("Connecting all participants to global domain...")
 participants.all.domains.connect_local(global)
-println("Connecting splitwise, alice & bob participant to splitwise domain...")
-Seq(aliceParticipant, bobParticipant, splitwiseParticipant).foreach(_.domains.connect_local(splitwise))
+println("Connecting splitwell, alice & bob participant to splitwell domain...")
+Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(_.domains.connect_local(splitwell))
 
 def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[PartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
   val party = participant.parties.enable(user)
@@ -29,7 +29,7 @@ Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
   (directoryParticipant, "directory_validator_user"),
-  (splitwiseParticipant, "splitwise_validator_user"),
+  (splitwellParticipant, "splitwell_validator_user"),
 ).foreach { case (participant, user) =>
   createUser(participant, user)
 }

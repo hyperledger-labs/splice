@@ -7,7 +7,7 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
   RemoteDirectoryAppReference,
-  SplitwiseAppClientReference,
+  SplitwellAppClientReference,
   WalletAppClientReference,
 }
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -74,10 +74,10 @@ object CoinTests {
         env: CoinTestConsoleEnvironment
     ): RemoteDirectoryAppReference = extendLedgerApiUserWithCaseId(super.rdp(name))
 
-    // make `aliceSplitwise` etc. use updated usernames
+    // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
         env: CoinTestConsoleEnvironment
-    ): SplitwiseAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
+    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
 
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
 
@@ -104,12 +104,12 @@ object CoinTests {
       )
     }
     private def extendLedgerApiUserWithCaseId(
-        ref: SplitwiseAppClientReference
-    ): SplitwiseAppClientReference = {
+        ref: SplitwellAppClientReference
+    ): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
-      new SplitwiseAppClientReference(
+      new SplitwellAppClientReference(
         ref.coinConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),

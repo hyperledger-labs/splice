@@ -4,8 +4,8 @@ import com.daml.network.console.{
   LocalDirectoryAppReference,
   RemoteDirectoryAppReference,
   ScanAppBackendReference,
-  SplitwiseAppBackendReference,
-  SplitwiseAppClientReference,
+  SplitwellAppBackendReference,
+  SplitwellAppClientReference,
   SvAppBackendReference,
   SvcAppBackendReference,
   SvcAppClientReference,
@@ -73,9 +73,9 @@ trait CommonCoinAppInstanceReferences {
     "bobWalletBackend"
   )
 
-  def splitwiseWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference =
+  def splitwellWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference =
     wb(
-      "splitwiseWalletBackend"
+      "splitwellWalletBackend"
     )
 
   def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
@@ -101,14 +101,14 @@ trait CommonCoinAppInstanceReferences {
       "directoryValidator"
     )
 
-  def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
+  def splitwellValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
     v(
-      "splitwiseValidator"
+      "splitwellValidator"
     )
 
-  def splitwiseProviderWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
+  def splitwellProviderWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
     uwc(
-      "splitwiseProviderWallet"
+      "splitwellProviderWallet"
     )
 
   def directory(implicit
@@ -138,28 +138,28 @@ trait CommonCoinAppInstanceReferences {
     "charlieDirectory"
   )
 
-  def aliceSplitwise(implicit
+  def aliceSplitwell(implicit
       env: CoinTestConsoleEnvironment
-  ): SplitwiseAppClientReference = rsw(
-    "aliceSplitwise"
+  ): SplitwellAppClientReference = rsw(
+    "aliceSplitwell"
   )
 
-  def bobSplitwise(implicit
+  def bobSplitwell(implicit
       env: CoinTestConsoleEnvironment
-  ): SplitwiseAppClientReference = rsw(
-    "bobSplitwise"
+  ): SplitwellAppClientReference = rsw(
+    "bobSplitwell"
   )
 
-  def charlieSplitwise(implicit
+  def charlieSplitwell(implicit
       env: CoinTestConsoleEnvironment
-  ): SplitwiseAppClientReference = rsw(
-    "charlieSplitwise"
+  ): SplitwellAppClientReference = rsw(
+    "charlieSplitwell"
   )
 
-  def providerSplitwiseBackend(implicit
+  def providerSplitwellBackend(implicit
       env: CoinTestConsoleEnvironment
-  ): SplitwiseAppBackendReference = sw(
-    "providerSplitwiseBackend"
+  ): SplitwellAppBackendReference = sw(
+    "providerSplitwellBackend"
   )
 
   def svb(name: String)(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference =
@@ -196,15 +196,15 @@ trait CommonCoinAppInstanceReferences {
 
   def sw(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): SplitwiseAppBackendReference =
-    env.splitwises.local
+  )(implicit env: CoinTestConsoleEnvironment): SplitwellAppBackendReference =
+    env.splitwells.local
       .find(_.name == name)
-      .getOrElse(sys.error(s"local splitwise [$name] not configured"))
+      .getOrElse(sys.error(s"local splitwell [$name] not configured"))
 
   def rsw(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): SplitwiseAppClientReference =
-    env.splitwises.remote
+  )(implicit env: CoinTestConsoleEnvironment): SplitwellAppClientReference =
+    env.splitwells.remote
       .find(_.name == name)
-      .getOrElse(sys.error(s"remote splitwise [$name] not configured"))
+      .getOrElse(sys.error(s"remote splitwell [$name] not configured"))
 }

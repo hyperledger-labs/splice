@@ -650,7 +650,7 @@ We expose prometheus metrics for our three participants and the domain on the fo
 
 - svc participant: http://$cluster.network.canton.global:10013/metrics
 - validator1 participant: http://$cluster.network.canton.global:10113/metrics
-- splitwise participant: http://$cluster.network.canton.global:10213/metrics
+- splitwell participant: http://$cluster.network.canton.global:10213/metrics
 - domain: http://$cluster.network.canton.global:10313/metrics
 
 ## Participant User Configuration

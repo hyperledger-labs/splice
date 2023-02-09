@@ -1,0 +1,94 @@
+syntax = "proto3";
+package com.daml.network.splitwell.v0;
+
+import "com/daml/network/v0/contract.proto";
+import "com/daml/network/v0/connected_domains.proto";
+import "google/protobuf/empty.proto";
+
+service SplitwellService {
+  // Read-only
+  rpc ListGroups (ListGroupsRequest) returns (ListGroupsResponse);
+  rpc ListGroupInvites (ListGroupInvitesRequest) returns (ListGroupInvitesResponse);
+  rpc ListAcceptedGroupInvites (ListAcceptedGroupInvitesRequest) returns (ListAcceptedGroupInvitesResponse);
+  rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
+  rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
+
+  rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
+
+  // TODO(#2701) Consider if we want to keep this
+  // once we no longer need it for testing.
+  rpc ListConnectedDomains (google.protobuf.Empty) returns (ListConnectedDomainsResponse);
+  rpc GetSplitwellDomainId (google.protobuf.Empty) returns (GetSplitwellDomainIdResponse);
+}
+
+// The context from which a request originates.
+// Used to distinguish requests from UIs run by different end-users.
+message SplitwellContext {
+  // The party of the user of the client sending a request to the backend.
+  string user_party_id = 1;
+}
+
+message InitializeRequest {
+  string validator_party_id = 2;
+}
+
+message GroupKey {
+  string owner_party_id = 1;
+  string provider_party_id = 2;
+  string id = 3;
+}
+
+message ListGroupsRequest {
+  SplitwellContext context = 1;
+}
+
+message ListGroupsResponse {
+  repeated com.daml.network.v0.Contract groups = 1;
+}
+
+message ListGroupInvitesRequest {
+  SplitwellContext context = 1;
+}
+
+message ListGroupInvitesResponse {
+  repeated com.daml.network.v0.Contract group_invites = 1;
+}
+
+message ListAcceptedGroupInvitesRequest {
+  string group_id = 2;
+  SplitwellContext context = 3;
+}
+
+message ListAcceptedGroupInvitesResponse {
+  repeated com.daml.network.v0.Contract accepted_group_invites = 1;
+}
+
+message ListBalanceUpdatesRequest {
+  GroupKey group_key = 1;
+  SplitwellContext context = 2;
+}
+
+message ListBalanceUpdatesResponse {
+  repeated com.daml.network.v0.Contract balance_updates = 1;
+}
+
+message ListBalancesRequest {
+  GroupKey group_key = 1;
+  SplitwellContext context = 2;
+}
+
+message ListBalancesResponse {
+  map<string, string> balances = 1;
+}
+
+message GetProviderPartyIdResponse {
+  string party_id = 1;
+}
+
+message ListConnectedDomainsResponse {
+  com.daml.network.v0.ConnectedDomains domains = 1;
+}
+
+message GetSplitwellDomainIdResponse {
+  string domain_id = 1;
+}

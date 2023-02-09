@@ -40,9 +40,9 @@
         1. [Configure Auth0 Environment](#configure-auth0-environment)
         1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
         1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
-1. [Building and Running the Wallet and Splitwise Apps](#building-and-running-the-wallet-and-splitwise-apps)
-    1. [Building the Wallet and Splitwise Frontend](#building-the-wallet-and-splitwise-frontend)
-    1. [Running the Wallet and Splitwise Frontend](#running-the-wallet-and-splitwise-frontend)
+1. [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
+    1. [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
+    1. [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
     1. [NPM Lock file issues](#npm-lock-file-issues)
 1. [Auth0 Configuration](#auth0-configuration)
     1. [Tenant & Application Layout](#tenant-application-layout)
@@ -443,7 +443,7 @@ Startup proceeds as follows:
 
 #### Background
 
-This section discusses how to contribute, or add new frontend code for an app. To understand how to run frontends locally, see [Building and Running the Wallet and Splitwise Apps](#building-and-running-the-wallet-and-splitwise-apps).
+This section discusses how to contribute, or add new frontend code for an app. To understand how to run frontends locally, see [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps).
 
 Frontend code projects are managed via [`npm workspaces`](https://docs.npmjs.com/cli/v8/using-npm/workspaces). This gives us a way to manage multiple distinct NPM packages all co-located in the same monorepo, and confers several benefits:
 
@@ -626,14 +626,14 @@ or errors.
 The easiest way to how to use `SuppressingLogger` is by looking at existing usages of its methods.
 If you don't find an usage of a given method within the CN network repo, you can look for usages in the Canton repo.
 
-## Building and Running the Wallet and Splitwise Apps
+## Building and Running the Wallet and Splitwell Apps
 
-### Building the Wallet and Splitwise Frontend
+### Building the Wallet and Splitwell Frontend
 
 Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends
 (specifically, all ts code for our daml models and protobuf definitions), and build anything required for the frontends (e.g. install dependencies in `node_modules`).
 
-### Running the Wallet and Splitwise Frontend
+### Running the Wallet and Splitwell Frontend
 
 To test out the wallet frontend, you first need to start Canton and
 our own apps. Here we use the topology from our tests:
@@ -662,7 +662,7 @@ Once this is complete, the front ends will be running on the following URL's:
 | App       | Alice                     | Bob                      | Charlie                 |
 |:----------|:-------------------------:|:------------------------:|:-----------------------:|
 | Wallet    | <http://localhost:3000>   | <http://localhost:3001>  |                         |
-| Splitwise | <http://localhost:3002>   | <http://localhost:3003>  | <http://localhost:3005> |
+| Splitwell | <http://localhost:3002>   | <http://localhost:3003>  | <http://localhost:3005> |
 | Directory | <http://localhost:3004>   |                          |                         |
 
 For the UI's running as Alice and Bob, you can login as the
@@ -703,7 +703,7 @@ Currently we maintain two tenants with some application clients in them:
     - `CN validator backend`: An application for all validator app backends running on all cluster deployments (scratch, staging, dev, and test)
     - `CN wallet backend`: An application for all wallet app backends running on all cluster deployments (scratch, staging, dev, and test)
     - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
-    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
+    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwell, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
 
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 

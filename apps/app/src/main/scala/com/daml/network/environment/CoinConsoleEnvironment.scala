@@ -10,9 +10,9 @@ import com.daml.network.console.{
   ScanAppBackendReference,
   ScanAppClientReference,
   ScanAppReference,
-  SplitwiseAppBackendReference,
-  SplitwiseAppClientReference,
-  SplitwiseAppReference,
+  SplitwellAppBackendReference,
+  SplitwellAppClientReference,
+  SplitwellAppReference,
   SvAppBackendReference,
   SvAppClientReference,
   SvcAppBackendReference,
@@ -143,12 +143,12 @@ class CoinConsoleEnvironment(
   /* Local apps that are (in the target deployment) operated by a third party */
   lazy val appsHostedByThirdParty =
     NodeReferences[
-      SplitwiseAppReference,
-      SplitwiseAppClientReference,
-      SplitwiseAppBackendReference,
+      SplitwellAppReference,
+      SplitwellAppClientReference,
+      SplitwellAppBackendReference,
     ](
-      splitwises.local,
-      splitwises.remote,
+      splitwells.local,
+      splitwells.remote,
     )
 
   lazy val validators: NodeReferences[
@@ -205,14 +205,14 @@ class CoinConsoleEnvironment(
         .toSeq,
     )
 
-  lazy val splitwises: NodeReferences[
-    SplitwiseAppReference,
-    SplitwiseAppClientReference,
-    SplitwiseAppBackendReference,
+  lazy val splitwells: NodeReferences[
+    SplitwellAppReference,
+    SplitwellAppClientReference,
+    SplitwellAppBackendReference,
   ] =
     NodeReferences(
-      environment.config.splitwisesByString.keys.map(createSplitwiseReference).toSeq,
-      environment.config.remoteSplitwisesByString.keys.map(createRemoteSplitwiseReference).toSeq,
+      environment.config.splitwellsByString.keys.map(createSplitwellReference).toSeq,
+      environment.config.remoteSplitwellsByString.keys.map(createRemoteSplitwellReference).toSeq,
     )
 
   private def createValidatorReference(name: String): ValidatorAppBackendReference =
@@ -265,11 +265,11 @@ class CoinConsoleEnvironment(
       this.environment.config.remoteDirectoriesByString(name),
     )
 
-  private def createSplitwiseReference(name: String): SplitwiseAppBackendReference =
-    new SplitwiseAppBackendReference(this, name)
+  private def createSplitwellReference(name: String): SplitwellAppBackendReference =
+    new SplitwellAppBackendReference(this, name)
 
-  private def createRemoteSplitwiseReference(name: String): SplitwiseAppClientReference =
-    new SplitwiseAppClientReference(this, name, environment.config.remoteSplitwisesByString(name))
+  private def createRemoteSplitwellReference(name: String): SplitwellAppClientReference =
+    new SplitwellAppClientReference(this, name, environment.config.remoteSplitwellsByString(name))
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -340,25 +340,25 @@ class CoinConsoleEnvironment(
         ),
         directories.remote,
         Seq("App References"),
-      ) :++ splitwises.local.map(v =>
-        TopLevelValue(v.name, helpText("local splitwise app", v.name), v, Seq("App References"))
-      ) :++ splitwises.remote.map(v =>
-        TopLevelValue(v.name, helpText("remote splitwise app", v.name), v, Seq("App References"))
+      ) :++ splitwells.local.map(v =>
+        TopLevelValue(v.name, helpText("local splitwell app", v.name), v, Seq("App References"))
+      ) :++ splitwells.remote.map(v =>
+        TopLevelValue(v.name, helpText("remote splitwell app", v.name), v, Seq("App References"))
       ) :+ TopLevelValue(
-        "splitwises",
+        "splitwells",
         helpText(
-          "All local splitwise instances" + genericNodeReferencesDoc,
-          "Splitwises",
+          "All local splitwell instances" + genericNodeReferencesDoc,
+          "Splitwells",
         ),
-        splitwises.local,
+        splitwells.local,
         Seq("App References"),
       ) :+ TopLevelValue(
-        "remoteSplitwises",
+        "remoteSplitwells",
         helpText(
-          "All remote splitwise instances" + genericNodeReferencesDoc,
-          "Splitwises",
+          "All remote splitwell instances" + genericNodeReferencesDoc,
+          "Splitwells",
         ),
-        splitwises.remote,
+        splitwells.remote,
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))

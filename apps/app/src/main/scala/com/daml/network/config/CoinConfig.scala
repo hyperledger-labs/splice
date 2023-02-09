@@ -6,10 +6,10 @@ import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.splitwise.config.{
-  SplitwiseAppBackendConfig,
-  SplitwiseAppClientConfig,
-  SplitwiseDomainConfig,
+import com.daml.network.splitwell.config.{
+  SplitwellAppBackendConfig,
+  SplitwellAppClientConfig,
+  SplitwellDomainConfig,
 }
 import com.daml.network.sv.config.{ExpectedOnboardingConfig, LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
@@ -74,8 +74,8 @@ case class CoinConfig(
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     directoryApp: Option[LocalDirectoryAppConfig] = None,
     remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
-    splitwiseApps: Map[InstanceName, SplitwiseAppBackendConfig] = Map.empty,
-    splitwiseAppClients: Map[InstanceName, SplitwiseAppClientConfig] = Map.empty,
+    splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
+    splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -342,46 +342,46 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  private lazy val splitwiseAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
-    splitwiseApps.fmap { splitwiseConfig =>
+  private lazy val splitwellAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    splitwellApps.fmap { splitwellConfig =>
       SharedCoinAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
-        splitwiseConfig.caching,
+        splitwellConfig.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
-        splitwiseConfig.sequencerClient,
+        splitwellConfig.sequencerClient,
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
-  private[network] def splitwiseAppParameters(
+  private[network] def splitwellAppParameters(
       appName: InstanceName
   ): SharedCoinAppParameters =
-    nodeParametersFor(splitwiseAppParameters_, "splitwise-app", appName)
+    nodeParametersFor(splitwellAppParameters_, "splitwell-app", appName)
 
-  /** Use `splitwiseAppParameters` instead!
+  /** Use `splitwellAppParameters` instead!
     */
-  def trySplitwiseAppParametersByString(name: String): SharedCoinAppParameters =
-    splitwiseAppParameters(
+  def trySplitwellAppParametersByString(name: String): SharedCoinAppParameters =
+    splitwellAppParameters(
       InstanceName.tryCreate(name)
     )
 
-  /** Use `splitwises` instead!
+  /** Use `splitwells` instead!
     */
-  def splitwisesByString: Map[String, SplitwiseAppBackendConfig] =
-    splitwiseApps.map { case (n, c) =>
+  def splitwellsByString: Map[String, SplitwellAppBackendConfig] =
+    splitwellApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
-  def remoteSplitwisesByString: Map[String, SplitwiseAppClientConfig] =
-    splitwiseAppClients.map { case (n, c) =>
+  def remoteSplitwellsByString: Map[String, SplitwellAppClientConfig] =
+    splitwellAppClients.map { case (n, c) =>
       n.unwrap -> c
     }
 
@@ -491,12 +491,12 @@ object CoinConfig {
       deriveReader[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
       deriveReader[RemoteDirectoryAppConfig]
-    implicit val splitwiseDomainConfigReader: ConfigReader[SplitwiseDomainConfig] =
-      deriveReader[SplitwiseDomainConfig]
-    implicit val splitwiseConfigReader: ConfigReader[SplitwiseAppBackendConfig] =
-      deriveReader[SplitwiseAppBackendConfig]
-    implicit val remoteSplitwiseConfigReader: ConfigReader[SplitwiseAppClientConfig] =
-      deriveReader[SplitwiseAppClientConfig]
+    implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
+      deriveReader[SplitwellDomainConfig]
+    implicit val splitwellConfigReader: ConfigReader[SplitwellAppBackendConfig] =
+      deriveReader[SplitwellAppBackendConfig]
+    implicit val remoteSplitwellConfigReader: ConfigReader[SplitwellAppClientConfig] =
+      deriveReader[SplitwellAppClientConfig]
 
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig].applyDeprecations
@@ -588,12 +588,12 @@ object CoinConfig {
       deriveWriter[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
       deriveWriter[RemoteDirectoryAppConfig]
-    implicit val splitwiseDomainConfigWriter: ConfigWriter[SplitwiseDomainConfig] =
-      deriveWriter[SplitwiseDomainConfig]
-    implicit val splitwiseConfigWriter: ConfigWriter[SplitwiseAppBackendConfig] =
-      deriveWriter[SplitwiseAppBackendConfig]
-    implicit val remoteSplitwiseConfigWriter: ConfigWriter[SplitwiseAppClientConfig] =
-      deriveWriter[SplitwiseAppClientConfig]
+    implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =
+      deriveWriter[SplitwellDomainConfig]
+    implicit val splitwellConfigWriter: ConfigWriter[SplitwellAppBackendConfig] =
+      deriveWriter[SplitwellAppBackendConfig]
+    implicit val remoteSplitwellConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
+      deriveWriter[SplitwellAppClientConfig]
 
     implicit val communityDomainConfigWriter: ConfigWriter[CommunityDomainConfig] =
       deriveWriter[CommunityDomainConfig]

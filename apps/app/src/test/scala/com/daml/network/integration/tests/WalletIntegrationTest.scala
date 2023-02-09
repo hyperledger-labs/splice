@@ -358,62 +358,62 @@ class WalletIntegrationTest
 
     "list one connected domain" in { implicit env =>
       eventually() {
-        providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("global", "splitwise")
+        providerSplitwellBackend.listConnectedDomains().keySet shouldBe Set("global", "splitwell")
       }
     }
 
     "support featured app rewards" in { implicit env =>
-      val splitwiseProvider = onboardWalletUser(splitwiseProviderWallet, splitwiseValidator)
-      splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+      val splitwellProvider = onboardWalletUser(splitwellProviderWallet, splitwellValidator)
+      splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
 
       clue("Canceling a featured app right before getting it, nothing bad should happen")(
-        splitwiseProviderWallet.cancelFeaturedAppRight()
+        splitwellProviderWallet.cancelFeaturedAppRight()
       )
 
       actAndCheck(
-        "grant a featured app right to splitwise provider", {
-          svcClient.grantFeaturedAppRight(splitwiseProvider)
+        "grant a featured app right to splitwell provider", {
+          svcClient.grantFeaturedAppRight(splitwellProvider)
         },
       )(
-        "splitwise provider is featured",
+        "splitwell provider is featured",
         { _ =>
           inside(scan.listFeaturedAppRights()) { case Seq(r) =>
-            r.payload.provider shouldBe splitwiseProvider.toProtoPrimitive
+            r.payload.provider shouldBe splitwellProvider.toProtoPrimitive
           }
-          splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+          splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
         },
       )
 
       actAndCheck(
-        "splitwise cancels its own featured app right",
-        splitwiseProviderWallet.cancelFeaturedAppRight(),
+        "splitwell cancels its own featured app right",
+        splitwellProviderWallet.cancelFeaturedAppRight(),
       )(
-        "splitwise provider is no longer featured",
+        "splitwell provider is no longer featured",
         { _ =>
           scan.listFeaturedAppRights() shouldBe empty
-          splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+          splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
         },
       )
 
       actAndCheck(
-        "Splitwise provider grants itself a featured app right",
-        splitwiseProviderWallet.selfGrantFeaturedAppRight(),
+        "Splitwell provider grants itself a featured app right",
+        splitwellProviderWallet.selfGrantFeaturedAppRight(),
       )(
-        "splitwise provider is featured",
+        "splitwell provider is featured",
         { featuredAppRight =>
           {
             inside(scan.listFeaturedAppRights()) { case Seq(r) =>
               r.contractId shouldBe featuredAppRight
             }
-            splitwiseProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+            splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
           }
         },
       )
     }
 
     "transfer AppPaymentRequest and DeliveryOffer to global domain" in { implicit env =>
-      val splitwiseDomainId = aliceValidator.remoteParticipantWithAdminToken.domains.id_of(
-        DomainAlias.tryCreate("splitwise")
+      val splitwellDomainId = aliceValidator.remoteParticipantWithAdminToken.domains.id_of(
+        DomainAlias.tryCreate("splitwell")
       )
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       aliceWallet.tap(50)
@@ -423,7 +423,7 @@ class WalletIntegrationTest
           aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceParty,
-          domainId = Some(splitwiseDomainId),
+          domainId = Some(splitwellDomainId),
         ),
       )(
         "request and delivery offer get transferred to public domain",

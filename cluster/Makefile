@@ -11,11 +11,11 @@ images := \
 	wallet-app \
 	wallet-web-ui \
 	validator1-validator-app \
-	splitwise-validator-app \
-	splitwise-app \
+	splitwell-validator-app \
+	splitwell-app \
 	\
 	validator1-directory-web-ui \
-	validator1-splitwise-web-ui \
+	validator1-splitwell-web-ui \
 	\
 	docs \
 	external-proxy \

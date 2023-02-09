@@ -19,18 +19,18 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory"
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global"
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwise"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell"
 
 # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory_simtime"
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwise_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
 
 # TODO(#1836) Avoid having to inject our patched auth service.
 sbt --batch canton-community-participant/compile

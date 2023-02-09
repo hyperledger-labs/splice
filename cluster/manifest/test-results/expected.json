@@ -444,17 +444,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-domain",
+               "app": "splitwell-domain",
                "clusterName": "cluster",
                "moduleName": "canton-domain"
             },
-            "name": "splitwise-domain"
+            "name": "splitwell-domain"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-domain"
+                  "app": "splitwell-domain"
                }
             },
             "strategy": {
@@ -463,7 +463,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-domain",
+                     "app": "splitwell-domain",
                      "clusterName": "cluster",
                      "moduleName": "canton-domain"
                   }
@@ -490,7 +490,7 @@
                               "port": "swd-pub-api"
                            }
                         },
-                        "name": "splitwise-domain",
+                        "name": "splitwell-domain",
                         "ports": [
                            {
                               "containerPort": 5008,
@@ -539,7 +539,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-domain"
+            "name": "splitwell-domain"
          },
          "spec": {
             "ports": [
@@ -560,7 +560,7 @@
                }
             ],
             "selector": {
-               "app": "splitwise-domain"
+               "app": "splitwell-domain"
             }
          }
       },
@@ -1905,7 +1905,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwise\", \"url\": \"http://splitwise-domain:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2465,17 +2465,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-splitwise-web-ui",
+               "app": "validator1-splitwell-web-ui",
                "clusterName": "cluster",
-               "moduleName": "validator1-splitwise-web-ui"
+               "moduleName": "validator1-splitwell-web-ui"
             },
-            "name": "validator1-splitwise-web-ui"
+            "name": "validator1-splitwell-web-ui"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-splitwise-web-ui"
+                  "app": "validator1-splitwell-web-ui"
                }
             },
             "strategy": {
@@ -2484,9 +2484,9 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-splitwise-web-ui",
+                     "app": "validator1-splitwell-web-ui",
                      "clusterName": "cluster",
-                     "moduleName": "validator1-splitwise-web-ui"
+                     "moduleName": "validator1-splitwell-web-ui"
                   }
                },
                "spec": {
@@ -2498,9 +2498,9 @@
                               "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/validator1-splitwise-web-ui:tag",
+                        "image": "region-docker.pkg.dev/project/repo/validator1-splitwell-web-ui:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-splitwise-web-ui",
+                        "name": "validator1-splitwell-web-ui",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -2529,7 +2529,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-splitwise-web-ui"
+            "name": "validator1-splitwell-web-ui"
          },
          "spec": {
             "ports": [
@@ -2540,7 +2540,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-splitwise-web-ui"
+               "app": "validator1-splitwell-web-ui"
             }
          }
       },
@@ -2685,17 +2685,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-participant",
+               "app": "splitwell-participant",
                "clusterName": "cluster",
                "moduleName": "canton-participant"
             },
-            "name": "splitwise-participant"
+            "name": "splitwell-participant"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-participant"
+                  "app": "splitwell-participant"
                }
             },
             "strategy": {
@@ -2704,7 +2704,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-participant",
+                     "app": "splitwell-participant",
                      "clusterName": "cluster",
                      "moduleName": "canton-participant"
                   }
@@ -2718,11 +2718,11 @@
                               "value": "-Xms7680M -Xmx7680M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2733,20 +2733,20 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
-                              "value": "splitwise_participant"
+                              "value": "splitwell_participant"
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"splitwise_validator_service_user\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"splitwell_validator_service_user\"}, \"readAs\": [ ]}]"
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwise\", \"url\": \"http://splitwise-domain:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
-                        "name": "splitwise-participant",
+                        "name": "splitwell-participant",
                         "ports": [
                            {
                               "containerPort": 5002,
@@ -2816,7 +2816,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-participant"
+            "name": "splitwell-participant"
          },
          "spec": {
             "ports": [
@@ -2842,7 +2842,7 @@
                }
             ],
             "selector": {
-               "app": "splitwise-participant"
+               "app": "splitwell-participant"
             }
          }
       },
@@ -2851,17 +2851,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-validator-app",
+               "app": "splitwell-validator-app",
                "clusterName": "cluster",
-               "moduleName": "splitwise-validator-app"
+               "moduleName": "splitwell-validator-app"
             },
-            "name": "splitwise-validator-app"
+            "name": "splitwell-validator-app"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-validator-app"
+                  "app": "splitwell-validator-app"
                }
             },
             "strategy": {
@@ -2870,9 +2870,9 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-validator-app",
+                     "app": "splitwell-validator-app",
                      "clusterName": "cluster",
-                     "moduleName": "splitwise-validator-app"
+                     "moduleName": "splitwell-validator-app"
                   }
                },
                "spec": {
@@ -2884,73 +2884,73 @@
                               "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "name": "cn-app-splitwell-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_WALLET_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_WALLET_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-wallet-ledger-api-auth",
+                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_PROVIDER_WALLET_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME",
                               "value": "auth0|63e12e0415ad881ffe914e61"
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/splitwise-validator-app:tag",
+                        "image": "region-docker.pkg.dev/project/repo/splitwell-validator-app:tag",
                         "imagePullPolicy": "Always",
-                        "name": "splitwise-validator-app",
+                        "name": "splitwell-validator-app",
                         "ports": [
                            {
                               "containerPort": 6203,
@@ -2979,7 +2979,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-validator-app"
+            "name": "splitwell-validator-app"
          },
          "spec": {
             "ports": [
@@ -2990,7 +2990,7 @@
                }
             ],
             "selector": {
-               "app": "splitwise-validator-app"
+               "app": "splitwell-validator-app"
             }
          }
       },
@@ -2999,17 +2999,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-wallet-app",
+               "app": "splitwell-wallet-app",
                "clusterName": "cluster",
                "moduleName": "wallet-app"
             },
-            "name": "splitwise-wallet-app"
+            "name": "splitwell-wallet-app"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-wallet-app"
+                  "app": "splitwell-wallet-app"
                }
             },
             "strategy": {
@@ -3018,7 +3018,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-wallet-app",
+                     "app": "splitwell-wallet-app",
                      "clusterName": "cluster",
                      "moduleName": "wallet-app"
                   }
@@ -3036,7 +3036,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-splitwise-wallet-ledger-api-auth",
+                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3046,7 +3046,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-splitwise-wallet-ledger-api-auth",
+                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3056,7 +3056,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-splitwise-wallet-ledger-api-auth",
+                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3066,18 +3066,18 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-wallet-ledger-api-auth",
+                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
                               "name": "CN_APP_WALLET_PARTICIPANT_ADDRESS",
-                              "value": "splitwise-participant"
+                              "value": "splitwell-participant"
                            },
                            {
                               "name": "CN_APP_WALLET_VALIDATOR_ADDRESS",
-                              "value": "splitwise-validator-app"
+                              "value": "splitwell-validator-app"
                            },
                            {
                               "name": "CN_APP_WALLET_VALIDATOR_GRPC_PORT",
@@ -3090,7 +3090,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-app:tag",
                         "imagePullPolicy": "Always",
-                        "name": "splitwise-wallet-app",
+                        "name": "splitwell-wallet-app",
                         "ports": [
                            {
                               "containerPort": 7004,
@@ -3119,7 +3119,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-wallet-app"
+            "name": "splitwell-wallet-app"
          },
          "spec": {
             "ports": [
@@ -3130,7 +3130,7 @@
                }
             ],
             "selector": {
-               "app": "splitwise-wallet-app"
+               "app": "splitwell-wallet-app"
             }
          }
       },
@@ -3139,17 +3139,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-wallet-web-ui",
+               "app": "splitwell-wallet-web-ui",
                "clusterName": "cluster",
                "moduleName": "wallet-web-ui"
             },
-            "name": "splitwise-wallet-web-ui"
+            "name": "splitwell-wallet-web-ui"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-wallet-web-ui"
+                  "app": "splitwell-wallet-web-ui"
                }
             },
             "strategy": {
@@ -3158,7 +3158,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-wallet-web-ui",
+                     "app": "splitwell-wallet-web-ui",
                      "clusterName": "cluster",
                      "moduleName": "wallet-web-ui"
                   }
@@ -3178,7 +3178,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
-                        "name": "splitwise-wallet-web-ui",
+                        "name": "splitwell-wallet-web-ui",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -3207,7 +3207,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-wallet-web-ui"
+            "name": "splitwell-wallet-web-ui"
          },
          "spec": {
             "ports": [
@@ -3218,7 +3218,7 @@
                }
             ],
             "selector": {
-               "app": "splitwise-wallet-web-ui"
+               "app": "splitwell-wallet-web-ui"
             }
          }
       },
@@ -3227,17 +3227,17 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "splitwise-app",
+               "app": "splitwell-app",
                "clusterName": "cluster",
-               "moduleName": "splitwise-app"
+               "moduleName": "splitwell-app"
             },
-            "name": "splitwise-app"
+            "name": "splitwell-app"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "splitwise-app"
+                  "app": "splitwell-app"
                }
             },
             "strategy": {
@@ -3246,9 +3246,9 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "splitwise-app",
+                     "app": "splitwell-app",
                      "clusterName": "cluster",
-                     "moduleName": "splitwise-app"
+                     "moduleName": "splitwell-app"
                   }
                },
                "spec": {
@@ -3260,49 +3260,49 @@
                               "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_URL",
+                              "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_URL",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "name": "cn-app-splitwell-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_ID",
+                              "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_CLIENT_ID",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "name": "cn-app-splitwell-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_CLIENT_SECRET",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "name": "cn-app-splitwell-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            },
                            {
-                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "name": "cn-app-splitwell-ledger-api-auth",
                                     "optional": false
                                  }
                               }
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/splitwise-app:tag",
+                        "image": "region-docker.pkg.dev/project/repo/splitwell-app:tag",
                         "imagePullPolicy": "Always",
-                        "name": "splitwise-app",
+                        "name": "splitwell-app",
                         "ports": [
                            {
                               "containerPort": 5213,
@@ -3364,7 +3364,7 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwise-app"
+            "name": "splitwell-app"
          },
          "spec": {
             "ports": [
@@ -3380,14 +3380,14 @@
                }
             ],
             "selector": {
-               "app": "splitwise-app"
+               "app": "splitwell-app"
             }
          }
       },
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-adm-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-adm-api\",\n      \"port\": 5015,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-adm-api\",\n      \"port\": 5016,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-adm-api\",\n      \"port\": 5017,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 7012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 5104,\n      \"name\": \"val1-wal-http\",\n      \"port\": 7004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwise-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"externalPort\": 5204,\n      \"name\": \"sw-wal-http\",\n      \"port\": 7004,\n      \"service\": \"splitwise-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwise-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-adm-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-adm-api\",\n      \"port\": 5015,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-adm-api\",\n      \"port\": 5016,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-adm-api\",\n      \"port\": 5017,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 7012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 6012,\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"externalPort\": 5104,\n      \"name\": \"val1-wal-http\",\n      \"port\": 7004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwell-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwell-validator-app\"\n    },\n    {\n      \"externalPort\": 5204,\n      \"name\": \"sw-wal-http\",\n      \"port\": 7004,\n      \"service\": \"splitwell-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwell-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwell-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",
@@ -4048,7 +4048,7 @@
                "cluster.network.global",
                "*.cluster.network.global",
                "*.validator1.cluster.network.global",
-               "*.splitwise.cluster.network.global"
+               "*.splitwell.cluster.network.global"
             ],
             "issuerRef": {
                "name": "letsencrypt-production"

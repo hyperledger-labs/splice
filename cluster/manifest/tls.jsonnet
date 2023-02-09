@@ -44,7 +44,7 @@ local certificate(issuerRef, tlsCertSecret, clusterName, clusterDnsName) = {
         issuerRef: {
           name: issuerRef,
         },
-        dnsNames: [clusterDnsName, "*." + clusterDnsName, "*.validator1." + clusterDnsName, "*.splitwise." + clusterDnsName],
+        dnsNames: [clusterDnsName, "*." + clusterDnsName, "*.validator1." + clusterDnsName, "*.splitwell." + clusterDnsName],
       },
     },
   ],

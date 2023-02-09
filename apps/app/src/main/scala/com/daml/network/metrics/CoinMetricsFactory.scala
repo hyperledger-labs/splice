@@ -3,7 +3,7 @@ package com.daml.network.metrics
 import com.codahale.metrics
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
-import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
+import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
@@ -32,10 +32,10 @@ case class CoinMetricsFactory(
   private val scans = TrieMap[String, ScanAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
   private val directories = TrieMap[String, DirectoryAppMetrics]()
-  private val splitwises = TrieMap[String, SplitwiseAppMetrics]()
+  private val splitwells = TrieMap[String, SplitwellAppMetrics]()
 
   override protected def allNodeMetrics: Seq[TrieMap[String, _]] =
-    Seq(validators, svcs, svs, scans, wallets, directories, splitwises)
+    Seq(validators, svcs, svs, scans, wallets, directories, splitwells)
 
   def forValidator(name: String): ValidatorAppMetrics = {
     validators.getOrElseUpdate(
@@ -115,14 +115,14 @@ case class CoinMetricsFactory(
     )
   }
 
-  def forSplitwise(name: String): SplitwiseAppMetrics = {
-    splitwises.getOrElseUpdate(
+  def forSplitwell(name: String): SplitwellAppMetrics = {
+    splitwells.getOrElseUpdate(
       name, {
-        val metricName = deduplicateName(name, "Splitwise", splitwises)
-        new SplitwiseAppMetrics(
+        val metricName = deduplicateName(name, "Splitwell", splitwells)
+        new SplitwellAppMetrics(
           MetricsFactory.prefix,
           newRegistry(metricName),
-          grpcMetricsForComponent("Splitwise"),
+          grpcMetricsForComponent("Splitwell"),
         )
       },
     )

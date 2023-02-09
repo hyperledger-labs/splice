@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.cn.{
   directory as directoryCodegen,
-  splitwise as splitwiseCodegen,
+  splitwell as splitwellCodegen,
 }
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.{Tap, Transfer}
@@ -443,7 +443,7 @@ object UserWalletStore {
               co.payload.sender == endUser,
           Seq(
             InterfaceImplementation(
-              splitwiseCodegen.TransferInProgress.COMPANION
+              splitwellCodegen.TransferInProgress.COMPANION
             )(offer =>
               new walletCodegen.DeliveryOfferView(
                 offer.group.svc,

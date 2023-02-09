@@ -42,7 +42,7 @@ const Transactions: React.FC = () => {
                 <TableCell>
                   <Stack direction="column">
                     <Typography>Thomas Edison</Typography>
-                    <Typography variant="caption">via Splitwise</Typography>
+                    <Typography variant="caption">via Splitwell</Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>

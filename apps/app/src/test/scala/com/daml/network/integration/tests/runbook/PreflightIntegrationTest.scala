@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
   Auth0User,
   CantonProcessTestUtil,
-  SplitwiseFrontendTestUtil,
+  SplitwellFrontendTestUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -31,7 +31,7 @@ class PreflightIntegrationTest
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
     with WalletTestUtil
-    with SplitwiseFrontendTestUtil {
+    with SplitwellFrontendTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
@@ -154,8 +154,8 @@ class PreflightIntegrationTest
     }
   }
 
-  // test is similar to 'settle debts with a single party' in SplitwiseFrontendIntegrationTest
-  "test splitwise group creation and payment" taggedAs LiveDevNetTest in { _ =>
+  // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
+  "test splitwell group creation and payment" taggedAs LiveDevNetTest in { _ =>
     var aliceUserPartyId = ""
     var bobUserPartyId = ""
     val aliceDirectoryNameRaw = s"alice.cns-${UUID.randomUUID().toString.take(10)}"
@@ -164,7 +164,7 @@ class PreflightIntegrationTest
     val groupName = "troika"
 
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val splitwiseUiUrl = s"https://splitwise.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val splitwellUiUrl = s"https://splitwell.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val aliceUser = auth0Users.get("alice-v1").value
@@ -174,7 +174,7 @@ class PreflightIntegrationTest
       bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
       tapViaUi(710)
-      // bob needs a directory name because as our no-explicit-disclosure workaround, we send splitwise group invites
+      // bob needs a directory name because as our no-explicit-disclosure workaround, we send splitwell group invites
       // to all parties who have a directory name
       reserveDirectoryNameFor(bobUser, directoryUiUrl, bobDirectoryNameRaw)
     }
@@ -183,7 +183,7 @@ class PreflightIntegrationTest
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       tapViaUi(50)
       reserveDirectoryNameFor(aliceUser, directoryUiUrl, aliceDirectoryNameRaw)
-      loginToSplitwiseUi(aliceUser, splitwiseUiUrl)
+      loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
       click on "group-id-field"
       textField("group-id-field").value = groupName
@@ -197,7 +197,7 @@ class PreflightIntegrationTest
     val bobCns = expectedCns(PartyId.tryFromProtoPrimitive(bobUserPartyId), bobDirectoryNameRaw)
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      loginToSplitwiseUi(bobUser, splitwiseUiUrl)
+      loginToSplitwellUi(bobUser, splitwellUiUrl)
       eventually() {
         find(className("request-membership-link"))
       }
@@ -210,12 +210,12 @@ class PreflightIntegrationTest
     }
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      enterSplitwisePayment(aliceDirectoryNameRaw, 50)
+      enterSplitwellPayment(aliceDirectoryNameRaw, 50)
 
       // Bob is redirected to wallet ..
       click on className("accept-button")
 
-      // And then back to splitwise, where he is already logged in
+      // And then back to splitwell, where he is already logged in
       eventually(scaled(5 seconds)) {
         inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
           row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
@@ -343,7 +343,7 @@ class PreflightIntegrationTest
     loginAndOnboardToUiViaAuth0(user, walletUiUrl, onboardUserToWallet = true)
   }
 
-  private def loginToSplitwiseUi(
+  private def loginToSplitwellUi(
       user: Auth0User,
       url: String,
   )(implicit webDriver: WebDriverType) = {

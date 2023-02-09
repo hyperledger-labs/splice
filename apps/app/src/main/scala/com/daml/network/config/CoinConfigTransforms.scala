@@ -4,7 +4,7 @@ import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
@@ -81,8 +81,8 @@ object CoinConfigTransforms {
       updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix")),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateDirectoryAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
-      updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
-      updateAllRemoteSplitwiseAppConfigs_(c =>
+      updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
+      updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
       updateAllRemoteDirectoryAppConfigs_(c =>
@@ -103,7 +103,7 @@ object CoinConfigTransforms {
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(transform)),
         updateDirectoryAppConfig(c => c.focus(_.automation).modify(transform)),
-        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(transform)),
+        updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform)),
       )
       transforms.foldLeft(config)((c, tf) => tf(c))
   }
@@ -158,8 +158,8 @@ object CoinConfigTransforms {
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type SvcAppTransform = CnAppConfigTransform[SvcAppBackendConfig]
   type ScanAppTransform = CnAppConfigTransform[ScanAppBackendConfig]
-  type SplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppBackendConfig]
-  type RemoteSplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppClientConfig]
+  type SplitwellAppTransform = CnAppConfigTransform[SplitwellAppBackendConfig]
+  type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
   def setCoinPrice(price: BigDecimal): CoinConfigTransform =
@@ -243,17 +243,17 @@ object CoinConfigTransforms {
   ): CoinConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 
-  def updateAllSplitwiseAppConfigs_(
-      update: SplitwiseAppTransform
+  def updateAllSplitwellAppConfigs_(
+      update: SplitwellAppTransform
   ): CoinConfigTransform =
-    _.focus(_.splitwiseApps).modify(_.map { case (name, config) =>
+    _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
-  def updateAllRemoteSplitwiseAppConfigs_(
-      update: RemoteSplitwiseAppTransform
+  def updateAllRemoteSplitwellAppConfigs_(
+      update: RemoteSplitwellAppTransform
   ): CoinConfigTransform =
-    _.focus(_.splitwiseAppClients).modify(_.map { case (name, config) =>
+    _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -323,7 +323,7 @@ object CoinConfigTransforms {
       updateDirectoryAppConfig(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
       ),
-      updateAllSplitwiseAppConfigs_(
+      updateAllSplitwellAppConfigs_(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
       ),
     )
@@ -338,8 +338,8 @@ object CoinConfigTransforms {
     )
   }
 
-  def bumpRemoteSplitwisePortsBy(bump: Int): CoinConfigTransform = {
-    updateAllRemoteSplitwiseAppConfigs_(
+  def bumpRemoteSplitwellPortsBy(bump: Int): CoinConfigTransform = {
+    updateAllRemoteSplitwellAppConfigs_(
       _.focus(_.ledgerApi).modify(portTransform(bump, _))
     )
   }
@@ -426,10 +426,10 @@ object CoinConfigTransforms {
       updateAllRemoteDirectoryAppConfigs_(c => {
         c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
-      updateAllSplitwiseAppConfigs_(c => {
+      updateAllSplitwellAppConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
-      updateAllRemoteSplitwiseAppConfigs_(c => {
+      updateAllRemoteSplitwellAppConfigs_(c => {
         c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
     )
@@ -456,9 +456,9 @@ object CoinConfigTransforms {
     })
   }
 
-  def useSeparateSplitwiseDomain(): CoinConfigTransform =
-    updateAllSplitwiseAppConfigs_(c =>
-      c.focus(_.domains.splitwise).replace(DomainAlias.tryCreate("splitwise"))
+  def useSeparateSplitwellDomain(): CoinConfigTransform =
+    updateAllSplitwellAppConfigs_(c =>
+      c.focus(_.domains.splitwell).replace(DomainAlias.tryCreate("splitwell"))
     )
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",

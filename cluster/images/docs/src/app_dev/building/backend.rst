@@ -41,7 +41,7 @@ Codegens
 Ledger Views
 ------------
 
-* Apps operating on small data (splitwise) can read directly from ledger API, anything larger cannot
+* Apps operating on small data (splitwell) can read directly from ledger API, anything larger cannot
 * Ingest all data required from a ledger into a ledger view store
 * Read through that store rather than querying the ledger API directly
 * Direct ledger API access can still be used for pointwise (by
