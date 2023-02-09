@@ -54,7 +54,12 @@ class AdvanceOpenMiningRoundTrigger(
       .toSeq
     store.domains.getUniqueDomainId().flatMap { domainId =>
       connection
-        .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds, domainId)
+        .submitCommandsNoDedupTransaction(Seq(store.svcParty), Seq(), cmds, domainId)
+        .flatMap(tx =>
+          // make sure the store ingested our update so we don't
+          // attempt to advance the same round twice
+          store.acs.signalWhenIngested(tx.getOffset())
+        )
         .map(_ =>
           TaskSuccess(
             s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
