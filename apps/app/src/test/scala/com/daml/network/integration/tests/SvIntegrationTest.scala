@@ -66,7 +66,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
         "creating a `ValidatorOnboarding` contract readable only by sv3", {
           val sv = sv3 // it doesn't really matter which sv we pick
           val svParty = sv.getDebugInfo().svParty
-          sv.getDebugInfo().ongoingValidatorOnboardings shouldBe 0
+          sv.listOngoingValidatorOnboardings() shouldBe empty
           LedgerApiUtils.submitWithResult(
             sv.remoteParticipant,
             sv.config.ledgerApiUser,
@@ -81,7 +81,10 @@ class SvIntegrationTest extends CoinIntegrationTest {
         },
       )(
         "sv3's store ingests the contract",
-        _ => sv3.getDebugInfo().ongoingValidatorOnboardings shouldBe 1,
+        created =>
+          inside(sv3.listOngoingValidatorOnboardings()) { case Seq(visible) =>
+            visible.contractId shouldBe created.contractId
+          },
       )
   }
 
@@ -90,10 +93,22 @@ class SvIntegrationTest extends CoinIntegrationTest {
     // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
     // but because here we don't start one, we need to perform this step manually.
     bobValidator.remoteParticipant.dars.upload(cantonCoinDarPath)
-    val sv = sv2 // not a leader
-    val secret = clue("the sv operator prepares the onboarding") {
-      sv.prepareValidatorOnboarding(1.hour)
-    }
+    val sv = sv4 // not a leader
+    sv.listOngoingValidatorOnboardings() should have length 0
+    val secret = actAndCheck(
+      "the sv operator prepares the onboarding", {
+        sv.prepareValidatorOnboarding(1.hour)
+      },
+    )(
+      "a validator onboarding contract is created",
+      { secret =>
+        {
+          inside(sv.listOngoingValidatorOnboardings()) { case Seq(vo) =>
+            vo.payload.candidateSecret shouldBe secret
+          }
+        }
+      },
+    )._1
     val candidate = clue("create a dummy party") {
       bobValidator.remoteParticipantWithAdminToken.parties.enable(
         "dummy" + env.environment.config.name.getOrElse("")
@@ -113,6 +128,8 @@ class SvIntegrationTest extends CoinIntegrationTest {
       "the candidate is now an observer to the CoinRules",
       Unit => getCoinRules().observers should contain(candidate.toProtoPrimitive),
     )
+    // TODO(#2733) extend this to check if next lifecycle stage was created correctly
+    eventually()(sv.listOngoingValidatorOnboardings() should have length 0)
     clue("try to reuse the same secret for a second onboarding, which should fail") {
       assertThrows[CommandFailure](
         loggerFactory.assertLogs(
@@ -125,20 +142,20 @@ class SvIntegrationTest extends CoinIntegrationTest {
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV2 has created many ValidatorOnboarding contracts as it's configured to.") {
-      sv2.getDebugInfo().ongoingValidatorOnboardings shouldBe 1
+      sv2.listOngoingValidatorOnboardings() should have length 1
     }
     clue("SV2 doesn't recreate ValidatorOnboarding contracts on restart...") {
       sv2.stop()
       sv2.startSync()
-      sv2.getDebugInfo().ongoingValidatorOnboardings shouldBe 1
+      sv2.listOngoingValidatorOnboardings() should have length 1
     }
     // TODO(#2733) finish/activate this test
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
-      sv2.getDebugInfo().ongoingValidatorOnboardings shouldBe 0
+      sv2.listOngoingValidatorOnboardings() should have length 0
       sv2.stop()
       sv2.startSync()
-      // sv2.getDebugInfo().ongoingValidatorOnboardings shouldBe 1
+      // sv2.listOngoingValidatorOnboardings() should have length 0
     }
   }
 

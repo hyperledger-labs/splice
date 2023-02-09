@@ -59,7 +59,11 @@ class CoinConsoleEnvironment(
     {
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-    Seq("dar/directory-service-0.1.0.dar", "dar/wallet-0.1.0.dar")
+    Seq(
+      "dar/directory-service-0.1.0.dar",
+      "dar/validator-lifecycle-0.1.0.dar",
+      "dar/wallet-0.1.0.dar",
+    )
   )
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
 

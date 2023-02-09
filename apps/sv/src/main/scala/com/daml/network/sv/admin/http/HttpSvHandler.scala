@@ -40,6 +40,20 @@ class HttpSvHandler(
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
 
+  def listOngoingValidatorOnboardings(
+      respond: v0.SvResource.ListOngoingValidatorOnboardingsResponse.type
+  )(): Future[v0.SvResource.ListOngoingValidatorOnboardingsResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        validatorOnboardings <- svStore.listValidatorOnboardings()
+      } yield {
+        definitions.ListOngoingValidatorOnboardingsResponse(
+          validatorOnboardings.map(_.toJson).toVector
+        )
+      }
+    }
+  }
+
   def prepareValidatorOnboarding(respond: v0.SvResource.PrepareValidatorOnboardingResponse.type)(
       body: definitions.PrepareValidatorOnboardingRequest
   ): Future[v0.SvResource.PrepareValidatorOnboardingResponse] = {
@@ -91,14 +105,12 @@ class HttpSvHandler(
       for {
         coinRules <- svcStore.getCoinRules()
         svcRules <- svcStore.getSvcRules()
-        validatorOnboardings <- svStore.listValidatorOnboardings()
       } yield definitions.GetDebugInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
         coinRulesContractId = coinRules.contractId.toString,
         svcRulesContractId = svcRules.contractId.toString,
-        ongoingValidatorOnboardings = validatorOnboardings.length,
       )
     }
 

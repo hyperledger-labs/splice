@@ -3,12 +3,14 @@ package com.daml.network.sv.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.{Materializer}
 import cats.data.EitherT
+import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.TemplateJsonDecoder
+import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -33,8 +35,31 @@ object HttpSvAppClient {
       svcParty: PartyId,
       coinRules: CoinRules.ContractId,
       svcRules: SvcRules.ContractId,
-      ongoingValidatorOnboardings: Int,
   )
+
+  case object ListOngoingValidatorOnboardings
+      extends BaseCommand[http.ListOngoingValidatorOnboardingsResponse, Seq[
+        Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]
+      ]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListOngoingValidatorOnboardingsResponse] =
+      client.listOngoingValidatorOnboardings(headers = headers)
+
+    override def handleResponse(response: http.ListOngoingValidatorOnboardingsResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Seq[Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]]] =
+      response match {
+        case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
+          response.ongoingValidatorOnboardings
+            .traverse(req => Contract.fromJson(ValidatorOnboarding.COMPANION)(req))
+            .leftMap(_.toString)
+      }
+  }
 
   case class PrepareValidatorOnboarding(expiresIn: FiniteDuration)
       extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
@@ -101,7 +126,6 @@ object HttpSvAppClient {
                 svcPartyId,
                 coinRulesContractId,
                 svcRulesContractId,
-                ongoingValidatorOnboardings,
               )
             ) =>
           for {
@@ -113,7 +137,6 @@ object HttpSvAppClient {
             svcPartyId,
             new CoinRules.ContractId(coinRulesContractId),
             new SvcRules.ContractId(svcRulesContractId),
-            ongoingValidatorOnboardings,
           )
       }
     }

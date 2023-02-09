@@ -1,9 +1,11 @@
 package com.daml.network.console
 
+import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
@@ -18,25 +20,30 @@ abstract class SvAppReference(
 
   override protected val instanceType = "SV Client"
 
-  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String = {
+  def listOngoingValidatorOnboardings()
+      : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAppClient.ListOngoingValidatorOnboardings
+      )
+    }
+
+  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
     consoleEnvironment.run {
       httpCommand(
         HttpSvAppClient.PrepareValidatorOnboarding(expiresIn)
       )
     }
-  }
 
-  def onboardValidator(validator: PartyId, secret: String): Unit = {
+  def onboardValidator(validator: PartyId, secret: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.OnboardValidator(validator, secret))
     }
-  }
 
-  def getDebugInfo(): HttpSvAppClient.DebugInfo = {
+  def getDebugInfo(): HttpSvAppClient.DebugInfo =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.GetDebugInfo)
     }
-  }
 
   @Help.Summary("List the connected domains of the participant the app is running on")
   def listConnectedDomains(): Map[DomainAlias, DomainId] =

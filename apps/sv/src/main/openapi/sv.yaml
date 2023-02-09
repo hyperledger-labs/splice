@@ -5,6 +5,18 @@ info:
 tags:
   - name: sv
 paths:
+  /admin/validator/onboarding/ongoing:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "listOngoingValidatorOnboardings"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListOngoingValidatorOnboardingsResponse"
   /admin/validator/onboarding/prepare:
     post:
       tags: [sv]
@@ -81,6 +93,16 @@ paths:
                 "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
+    ListOngoingValidatorOnboardingsResponse:
+      type: object
+      required:
+        - ongoing_validator_onboardings
+      properties:
+        ongoing_validator_onboardings:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
     PrepareValidatorOnboardingRequest:
       type: object
       required:
@@ -126,7 +148,6 @@ components:
         - svc_party_id
         - coin_rules_contract_id
         - svc_rules_contract_id
-        - ongoing_validator_onboardings
       properties:
         # User representing the SV
         sv_user:
@@ -143,11 +164,6 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules_contract_id:
           type: string
-        # Number of active validator onboarding contracts known to this SV
-        # TODO(#M3-46): remove if unused (was added for enabling a test)
-        ongoing_validator_onboardings:
-          type: integer
-          format: int32
 
     ListConnectedDomainsResponse:
       type: object
