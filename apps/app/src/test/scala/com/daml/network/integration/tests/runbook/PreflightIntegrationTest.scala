@@ -346,7 +346,7 @@ class PreflightIntegrationTest
   private def loginToSplitwiseUi(
       user: Auth0User,
       url: String,
-  )(implicit webDriver: WebDriverType): String = {
+  )(implicit webDriver: WebDriverType) = {
     clue(s"Logging in and onboarding as user: ${user.email}") {
       go to url
       click on "oidc-login-button"
@@ -357,13 +357,8 @@ class PreflightIntegrationTest
       )
 
       eventually() {
-        find(id("group-id-field"))
+        find(id("logged-in-user")).valueOrFail("Could not find logged-in-user field")
       }
-
-      eventually() {
-        findAll(className("party-id")) should have size 1
-      }
-      copyPartyId()
     }
   }
 
