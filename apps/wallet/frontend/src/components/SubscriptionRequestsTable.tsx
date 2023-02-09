@@ -8,6 +8,7 @@ import { SubscriptionRequest as DamlSubscriptionRequest } from '@daml.js/wallet-
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { PaymentAmountDisplay } from './AmountDisplay';
+import { IntervalDisplay } from './IntervalDisplay';
 
 interface SubscriptionsProps {
   requests: Contract<DamlSubscriptionRequest>[];
@@ -20,7 +21,7 @@ const SubscriptionRequestsTable: React.FC<SubscriptionsProps> = ({ requests }) =
         <TableRow>
           <TableCell>Receiver</TableCell>
           <TableCell>Payment amount</TableCell>
-          <TableCell>Payment interval (μs)</TableCell>
+          <TableCell>Payment interval</TableCell>
           <TableCell>Provider</TableCell>
         </TableRow>
       </TableHead>
@@ -55,7 +56,9 @@ const SubscriptionRequest: React.FC<{ request: Contract<DamlSubscriptionRequest>
       <TableCell className="sub-request-amount">
         <PaymentAmountDisplay amount={request.payload.payData.paymentAmount} />
       </TableCell>
-      <TableCell>{request.payload.payData.paymentInterval.microseconds}</TableCell>
+      <TableCell>
+        <IntervalDisplay microseconds={request.payload.payData.paymentInterval.microseconds} />
+      </TableCell>
       <TableCell className="sub-request-provider">
         <DirectoryEntry partyId={request.payload.subscriptionData.provider} />
       </TableCell>

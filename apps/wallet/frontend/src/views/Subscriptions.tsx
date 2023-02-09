@@ -19,6 +19,7 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import { PaymentAmountDisplay } from '../components/AmountDisplay';
+import { IntervalDisplay } from '../components/IntervalDisplay';
 import SubscriptionRequestsTable from '../components/SubscriptionRequestsTable';
 import Timestamp from '../components/Timestamp';
 import {
@@ -84,7 +85,9 @@ const SubscriptionsTable: React.FC = () => {
       <TableCell className="sub-amount">
         <PaymentAmountDisplay amount={state.value.payload.payData.paymentAmount} />
       </TableCell>
-      <TableCell>{state.value.payload.payData.paymentInterval.microseconds}</TableCell>
+      <TableCell>
+        <IntervalDisplay microseconds={state.value.payload.payData.paymentInterval.microseconds} />
+      </TableCell>
       <TableCell>
         <Timestamp time={paymentDueAt(state)} />
       </TableCell>
@@ -110,7 +113,7 @@ const SubscriptionsTable: React.FC = () => {
         <TableRow>
           <TableCell>Receiver</TableCell>
           <TableCell>Payment amount</TableCell>
-          <TableCell>Payment interval (μs)</TableCell>
+          <TableCell>Payment interval</TableCell>
           <TableCell>Next payment due at</TableCell>
           <TableCell>Provider</TableCell>
           <TableCell>State</TableCell>
