@@ -606,7 +606,7 @@ Be aware: these tokens allow the requester to perform any administrative action 
 #### Setting up `lnav` to Inspect Canton logs
 
 If you have never used `lnav` to inspect Canton logs, then we recommend:
-1. Download the `canton.lnav.json` log format config file from https://github.com/DACH-NY/canton/blob/main/canton.lnav.json
+1. Download the `canton-json.lnav.json` log format config file from https://github.com/DACH-NY/canton/blob/main/canton-json.lnav.json
 2. Install the Canton log format using `lnav -i canton-json.lnav.json`, which will install it in `~/.lnav/formats/installed/logstash_dam.json` and enable it for auto-detection in future `lnav` sessions.
 3. Type `lnav log/canton_network_test.clog` to inspect the test logs.
 4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
