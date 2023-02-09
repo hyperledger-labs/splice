@@ -274,6 +274,9 @@
             "volumeClaimTemplates": [
                {
                   "metadata": {
+                     "labels": {
+                        "clusterName": "cluster"
+                     },
                      "name": "pg-data"
                   },
                   "spec": {
@@ -1801,6 +1804,9 @@
             "volumeClaimTemplates": [
                {
                   "metadata": {
+                     "labels": {
+                        "clusterName": "cluster"
+                     },
                      "name": "pg-data"
                   },
                   "spec": {
@@ -2634,6 +2640,9 @@
             "volumeClaimTemplates": [
                {
                   "metadata": {
+                     "labels": {
+                        "clusterName": "cluster"
+                     },
                      "name": "pg-data"
                   },
                   "spec": {

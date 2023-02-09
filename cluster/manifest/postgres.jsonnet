@@ -90,6 +90,9 @@ local database(name, config) = {
           {
             metadata: {
               name: "pg-data",
+              labels: {
+                clusterName: config.clusterName,
+              },
             },
             spec: {
               accessModes: ["ReadWriteOnce"],
