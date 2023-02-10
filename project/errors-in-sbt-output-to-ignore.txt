@@ -83,4 +83,7 @@ WARN  c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
 ledger subscription for admin service .* has completed with error
 io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
 
+# TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
+.*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
+
 # Make sure to have a trailing newline
