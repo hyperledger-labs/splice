@@ -19,6 +19,7 @@ import com.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.lf.value as lf
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -155,6 +156,24 @@ object Contract {
       contractId = contractId,
       payload = payload,
     )
+  }
+
+  def handleMaybeCachedContract[TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[_, TCid, T]
+  )(
+      cachedValue: Option[Contract[TCid, T]],
+      maybeCached: MaybeCachedContract,
+  )(implicit decoder: TemplateJsonDecoder): Either[String, Contract[TCid, T]] = {
+    for {
+      res <- maybeCached.contract match {
+        case None =>
+          cachedValue.toRight(
+            "The server indicated that we have cached a certain contract, but we don't have it cached. "
+          )
+        case Some(contract) =>
+          Contract.fromJson(companion)(contract).leftMap(_.toString)
+      }
+    } yield res
   }
 
   def fromCodegenContract[TCid <: ContractId[_], T <: DamlRecord[_]](

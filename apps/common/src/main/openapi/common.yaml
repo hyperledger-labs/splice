@@ -15,7 +15,26 @@ components:
         payload:
           type: object
       required: ["template_id", "contract_id", "payload"]
+    ContractId:
+      type: string
     ConnectedDomains:
       type: object
       additionalProperties:
         type: string
+    # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
+    # matches the contract the server would respond with, the server responds with an empty contract property to indicate
+    # that the client's cache is correct.
+    MaybeCachedContract:
+          type: object
+          properties:
+            contract:
+              $ref: '#/components/schemas/Contract'
+    # A map from 'active-contract-id' -> 'MaybeCachedContract'.
+    # At the moment this type is used to let clients know which mining rounds they already have cached,
+    # which mining rounds they should add to their cache and which they should remove from their cache
+    # (those mining rounds who aren't included in the map at all).
+    MaybeCachedContractMap:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/MaybeCachedContract'
+

@@ -10,6 +10,7 @@ import com.digitalasset.canton.time.Clock
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.http.v0.definitions.MaybeCachedContract
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -36,31 +37,70 @@ class HttpScanHandler(
 
   def getLatestOpenAndIssuingMiningRounds(
       response: v0.ScanResource.GetLatestOpenAndIssuingMiningRoundsResponse.type
-  )(): Future[v0.ScanResource.GetLatestOpenAndIssuingMiningRoundsResponse] =
+  )(
+      body: com.daml.network.http.v0.definitions.GetLatestOpenAndIssuingMiningRoundsRequest
+  ): Future[v0.ScanResource.GetLatestOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       val now = clock.now
       for {
         latestOpen <- store.getLatestOpenMiningRound(now)
         issuingRounds <- store.acs
           .listContracts(IssuingMiningRound.COMPANION)
+        issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
+        issuingRoundsResponseMap = issuingRounds
+          .map(round => {
+            val roundIsAlreadyCached =
+              issuingRoundsCachedByClient.contains(round.contractId.contractId)
+            (
+              round.contractId.contractId,
+              if (roundIsAlreadyCached) {
+                logger.debug(
+                  s"Not sending issuing mining round ${round.payload.round.number} again because it is already cached by the client."
+                )
+                MaybeCachedContract(None)
+              } else MaybeCachedContract(Some(round.toJson)),
+            )
+          })
+          .toMap
+        omrResponse = body.cachedOpenMiningRoundContractId match {
+          case Some(contractId) if contractId == latestOpen.contractId.contractId =>
+            MaybeCachedContract(Some(latestOpen.toJson))
+          case _ =>
+            MaybeCachedContract(Some(latestOpen.toJson))
+        }
       } yield {
         definitions.GetLatestOpenAndIssuingMiningRoundsResponse(
-          latestOpenMiningRound = latestOpen.toJson,
-          // TODO(M3-09): consider just removing this attribute - not used except in tests.
-          issuingMiningRounds = issuingRounds.toVector.map(_.toJson),
+          latestOpenMiningRound = omrResponse,
+          issuingMiningRounds = issuingRoundsResponseMap,
         )
       }
     }
 
   def getCoinRules(
       response: v0.ScanResource.GetCoinRulesResponse.type
-  )(): Future[v0.ScanResource.GetCoinRulesResponse] =
+  )(
+      body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
+  ): Future[v0.ScanResource.GetCoinRulesResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
-        coinRules <- store.lookupCoinRules()
+        coinRulesO <- store.lookupCoinRules()
+        coinRules = coinRulesO.getOrElse(
+          throw new NoSuchElementException("found no coinrules instance")
+        )
       } yield {
+        val response = body.cachedCoinRulesContractId match {
+          case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
+            logger.debug(
+              s"Not sending coin rules with contract-id $cachedContractId again because they are already cached by the client."
+            )
+            MaybeCachedContract(None)
+          case Some(_) => // else: coin rules are cached but outdated.
+            MaybeCachedContract(Some(coinRules.toJson))
+          case None =>
+            MaybeCachedContract(Some(coinRules.toJson))
+        }
         definitions.GetCoinRulesResponse(
-          coinRules = coinRules.map(_.toJson)
+          coinRulesUpdate = response
         )
       }
     }

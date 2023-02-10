@@ -42,22 +42,34 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTransferContextResponse"
   /latest-open-and-issuing-mining-rounds:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getLatestOpenAndIssuingMiningRounds"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetLatestOpenAndIssuingMiningRoundsResponse"
+      post:
+        tags: [scan]
+        x-jvm-package: scan
+        operationId: "getLatestOpenAndIssuingMiningRounds"
+        requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  "$ref": "#/components/schemas/GetLatestOpenAndIssuingMiningRoundsRequest"
+        responses:
+          "200":
+            description: ok
+            content:
+              application/json:
+                schema:
+                  "$ref": "#/components/schemas/GetLatestOpenAndIssuingMiningRoundsResponse"
   /coin-rules:
-    get:
+    post:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getCoinRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref" : "#/components/schemas/GetCoinRulesRequest"
       responses:
         "200":
           description: ok
@@ -135,21 +147,36 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
       required: ["latest_open_mining_round", "open_mining_rounds"]
+    GetLatestOpenAndIssuingMiningRoundsRequest:
+      type: object
+      required: ["cached_issuing_round_contract_ids"]
+      properties:
+        cached_open_mining_round_contract_id:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
+        cached_issuing_round_contract_ids:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
     GetLatestOpenAndIssuingMiningRoundsResponse:
       type: object
       required: ["latest_open_mining_round", "issuing_mining_rounds"]
       properties:
         latest_open_mining_round:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContract"
         issuing_mining_rounds:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractMap"
+    GetCoinRulesRequest:
+      type: object
+      properties:
+        cached_coin_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
     GetCoinRulesResponse:
       type: object
       properties:
-        coin_rules:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        coin_rules_update:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContract"
+      required:
+        - coin_rules_update
     ListFeaturedAppRightsResponse:
       type: object
       required: ["featured_apps"]

@@ -34,10 +34,19 @@ final class ScanConnection(
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
 ) extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
+
+  override def serviceName: String = "scan"
+
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
-
-  override val serviceName = "scan"
+  private val coinRulesCache: AtomicReference[Option[Contract[CoinRules.ContractId, CoinRules]]] =
+    new AtomicReference(None)
+  private val cachedIssuingRounds
+      : AtomicReference[Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]]] =
+    new AtomicReference(Map())
+  private val cachedOpenMiningRound
+      : AtomicReference[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
+    new AtomicReference(None)
 
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
@@ -68,7 +77,15 @@ final class ScanConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetCoinRules)
+    for {
+      coinRules <- runHttpCmd(
+        config.url,
+        HttpScanAppClient.GetCoinRules(coinRulesCache.get()),
+      )
+    } yield {
+      coinRulesCache.set(Some(coinRules))
+      coinRules
+    }
   }
 
   def getLatestOpenAndIssuingMiningRounds()(implicit
@@ -80,7 +97,21 @@ final class ScanConnection(
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds)
+
+    for {
+      (omr, issuingRounds) <- runHttpCmd(
+        config.url,
+        HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(
+          cachedOpenMiningRound.get(),
+          cachedIssuingRounds.get(),
+        ),
+      )
+    } yield {
+      cachedIssuingRounds.set(issuingRounds)
+      cachedOpenMiningRound.set(Some(omr))
+      (omr, issuingRounds.values.toSeq)
+    }
+
   }
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
@@ -111,4 +142,5 @@ final class ScanConnection(
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)
   )
+
 }

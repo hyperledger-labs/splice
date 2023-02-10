@@ -317,4 +317,51 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       },
     )
   }
+
+  "egress caching avoids re-sending contracts if they are already known by the client" in {
+    implicit env =>
+      val (_, _) = onboardAliceAndBob()
+      val coinRules = scan.getUnfeaturedAppTransferContext().coinRules
+
+      clue("create issuing round 1") {
+        advanceRoundsByOneTick
+        advanceRoundsByOneTick
+      }
+      // run a tx so alice wallet's cache is hydrated  up to issuing round 1.
+      aliceWallet.tap(5)
+
+      clue("create issuing round 2") {
+        advanceRoundsByOneTick
+      }
+
+      clue("gametime") {
+
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+          {
+            aliceWallet.tap(5)
+          },
+          entries => {
+            forAtLeast(
+              1,
+              entries,
+            )(
+              // but only the non-expired coin is selected as input.
+              _.message should include regex (
+                "Not sending issuing mining round 1 again because it is already cached by the client."
+              )
+            )
+            forAtLeast(
+              1,
+              entries,
+            )(
+              // but only the non-expired coin is selected as input.
+              _.message should include regex (
+                s"Not sending coin rules with contract-id ${coinRules.contractId} again because they are already cached by the client."
+              )
+            )
+          },
+        )
+
+      }
+  }
 }
