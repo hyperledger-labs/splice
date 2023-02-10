@@ -80,8 +80,13 @@ class HttpSvHandler(
         case Right(partyId) =>
           svStore.lookupValidatorOnboardingBySecretWithOffset(body.secret).flatMap {
             case QueryResult(_, None) =>
-              Future
-                .successful(v0.SvResource.OnboardValidatorResponseUnauthorized("Unknown secret."))
+              svStore.lookupUsedSecret(body.secret).map {
+                case QueryResult(_, Some(_)) =>
+                  v0.SvResource
+                    .OnboardValidatorResponseUnauthorized(s"Secret has already been used.")
+                case QueryResult(_, None) =>
+                  v0.SvResource.OnboardValidatorResponseUnauthorized("Unknown secret.")
+              }
             case QueryResult(_, Some(vo)) =>
               for {
                 // We retry here because this mutates the CoinRules and rounds contracts,

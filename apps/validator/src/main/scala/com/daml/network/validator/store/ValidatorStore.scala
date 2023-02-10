@@ -1,6 +1,7 @@
 package com.daml.network.validator.store
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
@@ -39,6 +40,18 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
     defaultAcs.flatMap(_.findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true))
+
+  def lookupValidatorLicenseWithOffset(): Future[
+    QueryResult[Option[Contract[
+      validatorLicenseCodegen.ValidatorLicense.ContractId,
+      validatorLicenseCodegen.ValidatorLicense,
+    ]]]
+  ] =
+    defaultAcs.flatMap(
+      _.findContractWithOffset(validatorLicenseCodegen.ValidatorLicense.COMPANION)(vl =>
+        vl.payload.validator == key.validatorParty.toProtoPrimitive
+      )
+    )
 
   def lookupCoinRulesRequestWithOffset(): Future[QueryResult[Option[
     Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
@@ -102,6 +115,9 @@ object ValidatorStore {
             co.payload.svcParty == svc
         ),
         mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
+          co.payload.validator == validator && co.payload.svc == svc
+        ),
         mkFilter(coinCodegen.CoinRulesRequest.COMPANION)(co =>
           co.payload.user == validator &&
             co.payload.svc == svc

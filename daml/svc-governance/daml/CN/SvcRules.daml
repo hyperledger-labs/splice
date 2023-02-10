@@ -12,6 +12,7 @@ import CC.Coin
 import CC.Round
 import CC.API.V1.Round (Round(..))
 
+import CC.ValidatorLicense
 
 -- Types
 ---------
@@ -276,7 +277,7 @@ template SvcRules with
         -- Moreover, this problem will be gone once we use explicit disclosure.
         exercise cid choiceArg
 
-    nonconsuming choice SvcRules_OnboardValidator : ()
+    nonconsuming choice SvcRules_OnboardValidator : ContractId ValidatorLicense
       with
         sponsor : Party
         validator : Party
@@ -293,6 +294,7 @@ template SvcRules with
         unless (validator `elem` rules.observers) do
           exercise coinRules (CoinRules_AddObserver validator openRounds issuingRounds)
           pure ()
+        create ValidatorLicense with ..
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

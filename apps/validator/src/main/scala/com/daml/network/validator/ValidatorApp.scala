@@ -19,7 +19,11 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
-import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
+import com.daml.network.validator.config.{
+  AppInstance,
+  ValidatorAppBackendConfig,
+  ValidatorOnboardingConfig,
+}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -127,7 +131,7 @@ class ValidatorApp(
       svcParty: PartyId,
       validatorParty: PartyId,
   ): Future[Unit] = {
-    logger.info("Waiting for CoinRules contract to be created")
+    logger.info("Waiting for CoinRules contract to become visible")
     retryProvider.retryForAutomationGrpc(
       "Wait for CoinRules",
       for {
@@ -146,11 +150,57 @@ class ValidatorApp(
     )
   }
 
+  private def ensureOnboarded(
+      connection: CoinLedgerConnection,
+      store: ValidatorStore,
+      validatorParty: PartyId,
+      onboardingConfig: Option[ValidatorOnboardingConfig],
+  ): Future[Unit] = {
+    store.lookupValidatorLicenseWithOffset().flatMap {
+      case QueryResult(_, Some(_)) =>
+        logger.info("ValidatorLicense found => already onboarded.")
+        Future.successful(())
+      case _ =>
+        onboardingConfig match {
+          case Some(oc) =>
+            for {
+              _ <- requestOnboarding(oc.remoteSv.adminApi, validatorParty, oc.secret)
+              _ <- waitForValidatorLicense(connection, store)
+            } yield ()
+          case None => sys.error("Not onboarded but no onboarding config found; exiting.")
+        }
+    }
+  }
+
+  private def waitForValidatorLicense(
+      connection: CoinLedgerConnection,
+      store: ValidatorStore,
+  ): Future[Unit] = {
+    logger.info("Waiting for ValidatorLicense contract to become visible")
+    retryProvider.retryForAutomationGrpc(
+      "Wait for ValidatorLicense",
+      for {
+        validatorLicenseResult <- store.lookupValidatorLicenseWithOffset()
+        _ <- validatorLicenseResult match {
+          case QueryResult(_, Some(_)) =>
+            logger.info("ValidatorLicense found, done waiting")
+            Future.successful(())
+          case _ =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(s"ValidatorLicense contract not found yet")
+            )
+        }
+      } yield (),
+      this,
+    )
+  }
+
   private def requestOnboarding(
       svConfig: CoinHttpClientConfig,
       validatorParty: PartyId,
       secret: String,
   ): Future[Unit] = {
+    logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
     retryProvider.retryForAutomationHttp(
       "request onboarding", {
         val svConnection = new SvConnection(
@@ -272,12 +322,13 @@ class ValidatorApp(
         flagCloseable = this,
         logger,
       )
-      _ <- config.onboarding match {
-        case Some(oc) => requestOnboarding(oc.remoteSv.adminApi, validatorParty, oc.secret)
-        case None => createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
-      }
+      _ <- // TODO(#2241) activate this for all nodes
+        if (config.onboarding.isDefined) {
+          ensureOnboarded(connection, store, validatorParty, config.onboarding)
+        } else {
+          createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
+        }
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
-
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

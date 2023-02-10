@@ -79,12 +79,31 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     // Stop sv1 (the leader), so we are sure that `CoinRulesRequests` won't be processed.
     sv1.stop()
 
-    // Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`
-    bobValidator.startSync()
-    // Check that Bob's validator can see the CoinRules
+    clue("Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`") {
+      bobValidator.startSync()
+    }
     val bobValidatorParty = bobValidator.getValidatorPartyId()
-    bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
-      .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)
+
+    clue("Bob's validator can see its own ValidatorLicense") {
+      inside(
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+          .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
+            bobValidatorParty
+          )
+      ) {
+        case Seq(license) => {
+          license.data.validator shouldBe bobValidatorParty.toProtoPrimitive
+        }
+      }
+    }
+    clue("Bob's validator can see the CoinRules") {
+      bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)
+    }
+    clue("Bob's validator can restart cleanly.") {
+      bobValidator.stop()
+      bobValidator.startSync()
+    }
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>

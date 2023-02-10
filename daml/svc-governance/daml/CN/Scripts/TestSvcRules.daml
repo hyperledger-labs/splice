@@ -20,6 +20,7 @@ import CC.Schedule
 import CC.Scripts.Util
 import CN.SvcRules
 import CN.SvcBootstrap
+import CC.ValidatorLicense
 
 import CC.Scripts.Parameters
 
@@ -131,10 +132,18 @@ testOnboardValidator = do
   -- sv2 (not the leader) onboards the new validator
   onboardValidator app sv2 v1
 
-  -- v1 is onboarded!
+  -- v1 was added as an observer to the CoinRules
   [(_, coinRules)] <- query @CoinRules svc
   coinRules.observers === [v1]
 
+  -- v1 received a validator license
+  [(_, validatorLicense)] <- query @ValidatorLicense svc
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    svc
+
+  -- so v1 is onboarded!
   pure ()
 
 
