@@ -95,7 +95,7 @@ class WalletApp(
         validatorConnection.getValidatorUserInfo(),
         this,
       )
-      svcParty <- retryProvider.retryForAutomationGrpc(
+      svcParty <- retryProvider.retryForAutomationHttp(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

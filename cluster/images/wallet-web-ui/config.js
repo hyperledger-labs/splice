@@ -27,7 +27,7 @@ window.canton_network_config = {
     },
     scan: {
       // URL of the scan app's HTTP API
-      grpcUrl: `https://${cluster}:7012`,
+      grpcUrl: `https://${cluster}:6012`,
     },
   },
 };

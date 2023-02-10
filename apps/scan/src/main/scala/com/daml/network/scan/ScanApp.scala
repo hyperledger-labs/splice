@@ -8,11 +8,9 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
-import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -98,9 +96,7 @@ class ScanApp(
       }
 
       httpConfig = config.adminApi.clientConfig.copy(
-        // TODO(#2501) Remove once we disabled gRPC Servers completely.
-        // + 2000 since envoy frontends runs on + 1000
-        port = config.adminApi.port + 2000
+        port = config.adminApi.port + 1000
       )
       _ = logger.info(s"Starting http server on ${httpConfig}")
       binding <- Http()
@@ -112,20 +108,6 @@ class ScanApp(
           routes
         )
     } yield {
-      adminServerRegistry
-        .addService(
-          ScanServiceGrpc.bindService(
-            new GrpcScanService(
-              ledgerClient,
-              store,
-              clock,
-              retryProvider,
-              loggerFactory,
-            ),
-            ec,
-          )
-        )
-        .discard
       ScanApp.State(
         storage,
         store,

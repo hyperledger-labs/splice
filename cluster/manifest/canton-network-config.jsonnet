@@ -239,9 +239,9 @@ local svcDeployments(config) = [
     },
     {
       name: "scan-api-http",
-      port: 7012,
+      port: 6012,
     },
-  ], proxyToGrpcWeb="scan-api", extraEnvVars=c.appAuthEnvBinding("scan")),
+  ], extraEnvVars=c.appAuthEnvBinding("scan")),
 ];
 
 local validator1Deployments(config) = [

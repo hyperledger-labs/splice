@@ -43,7 +43,7 @@ local validatorNodes = {
     wallet: { grpcUrl: "http://localhost:7204", uiUrl: "http://localhost:3000" },
     splitwell: { grpcUrl: "http://localhost:6113" },
     directory: { grpcUrl: "http://localhost:6110" },
-    scan: { grpcUrl: "http://localhost:7012" },
+    scan: { grpcUrl: "http://localhost:6012" },
   },
   bob: {
     ledgerApi: { grpcUrl: "http://localhost:6301" },
@@ -51,7 +51,7 @@ local validatorNodes = {
     wallet: { grpcUrl: "http://localhost:7304", uiUrl: "http://localhost:3001" },
     splitwell: { grpcUrl: "http://localhost:6113" },
     directory: { grpcUrl: "http://localhost:6110" },
-    scan: { grpcUrl: "http://localhost:7012" },
+    scan: { grpcUrl: "http://localhost:6012" },
   },
 };
 

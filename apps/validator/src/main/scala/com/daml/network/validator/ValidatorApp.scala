@@ -275,7 +275,7 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection()
-      svcParty <- retryProvider.retryForAutomationGrpc(
+      svcParty <- retryProvider.retryForAutomationHttp(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

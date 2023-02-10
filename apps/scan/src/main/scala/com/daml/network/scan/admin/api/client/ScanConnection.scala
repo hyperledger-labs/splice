@@ -4,12 +4,10 @@ import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.{ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -51,13 +49,13 @@ final class ScanConnection(
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
     */
-  def getSvcPartyId()(implicit traceContext: TraceContext): Future[PartyId] = {
+  def getSvcPartyId()(implicit mat: Materializer): Future[PartyId] = {
     val prev = svcRef.get()
     prev match {
       case Some(partyId) => Future.successful(partyId)
       case None =>
         for {
-          partyId <- runCmd(GrpcScanAppClient.GetSvcPartyId())
+          partyId <- runHttpCmd(config.url, HttpScanAppClient.GetSvcPartyId(List()))
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           svcRef.set(Some(partyId))
