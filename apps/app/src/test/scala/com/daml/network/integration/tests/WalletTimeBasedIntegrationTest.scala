@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
@@ -13,9 +13,11 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 import java.util.UUID
+import com.daml.network.config.CoinConfigTransforms
+import monocle.macros.syntax.lens.*
 
 class WalletTimeBasedIntegrationTest
-    extends CoinIntegrationTest // TODO(#2100): investigate whether we can make this a shared environment again
+    extends CoinIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -23,6 +25,13 @@ class WalletTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransform((_, config) => {
+        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
+        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
+        CoinConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
+        )(config)
+      })
 
   "A wallet" should {
 
@@ -343,6 +352,10 @@ class WalletTimeBasedIntegrationTest
       aliceValidatorWallet.selfGrantFeaturedAppRight()
       aliceWallet.tap(20.0)
 
+      eventually() {
+        aliceValidatorWallet.listAppRewardCoupons() should be(empty)
+      }
+
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
@@ -374,13 +387,32 @@ class WalletTimeBasedIntegrationTest
         _ => {
           aliceValidatorWallet
             .listAppRewardCoupons() should have length 1 // Award for the first (locking) leg goes to the sender's validator
-          // TODO(#2100) In this test, we don't yet collect the app payment, so the provider (alice's wallet) doesn't currently get a reward
         },
       )
 
       inside(aliceValidatorWallet.listAppRewardCoupons()) { case Seq(c) =>
         c.payload.featured shouldBe true
       }
+
+      val balanceBefore = aliceValidatorWallet.balance()
+
+      actAndCheck(
+        "Advance rounds until reward coupons can be collected",
+        Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "Wait for reward to be collected",
+        _ => {
+          aliceValidatorWallet
+            .listAppRewardCoupons() should be(empty)
+          checkBalance(
+            aliceValidatorWallet,
+            balanceBefore.round + 2,
+            (balanceBefore.unlockedQty + 2.5, balanceBefore.unlockedQty + 3.0),
+            (balanceBefore.lockedQty, balanceBefore.lockedQty),
+            (0, 1),
+          )
+        },
+      )
     }
 
   }
