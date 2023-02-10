@@ -11,7 +11,7 @@ val bobUserName = bobWallet.config.ledgerApiUser
 println(s"Onboarding Alice user: " + aliceUserName)
 val aliceParty = validatorApp.onboardUser(aliceUserName)
 
-println(s"Onboarding Bob user: " + aliceUserName)
+println(s"Onboarding Bob user: " + bobUserName)
 val bobParty = validatorApp.onboardUser(bobUserName)
 
 aliceWallet.tap(100.0)
@@ -26,4 +26,7 @@ utils.retry_until_true(bobWallet.listTransferOffers().length == 1)
 bobWallet.acceptTransferOffer(transferOffer)
 
 utils.retry_until_true(bobWallet.list().coins.length == 1)
-bobWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.amount.initialAmount) == 10))
+bobWallet
+  .list()
+  .coins
+  .foreach(coin => require(BigDecimal(coin.contract.payload.amount.initialAmount) == 10))

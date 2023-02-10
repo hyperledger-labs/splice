@@ -37,6 +37,7 @@ class LocalRunbookIntegrationTest
     // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
     // Note that system properties can only be used in tests at this point.
     System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
+    System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
     // We merge the bootstrap we need for the SVC & the domain
     // with the bootstrap for the validator so we
     // don't need to start two Canton instances.

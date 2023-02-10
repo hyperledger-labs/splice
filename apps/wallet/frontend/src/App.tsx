@@ -9,7 +9,6 @@ import {
   FeaturedAppRight,
 } from 'common-frontend';
 import { Decimal } from 'decimal.js';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 import {
   createBrowserRouter,
@@ -103,10 +102,10 @@ const Content = () => {
   const scanClient = useScanClient();
 
   const fetchCoinPrice = useCallback(async () => {
-    const tctx = await scanClient.getTransferContext(new Empty(), undefined);
-    const omr = tctx.getLatestOpenMiningRound();
+    const tctx = await scanClient.getTransferContext();
+    const omr = tctx.latestOpenMiningRound;
     if (omr) {
-      const p = Contract.decode(omr, OpenMiningRound);
+      const p = Contract.decodeOpenAPI(omr, OpenMiningRound);
       const newCoinPrice = new Decimal(p.payload.coinPrice);
       // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
       setCoinPrice(prevCoinPrice =>

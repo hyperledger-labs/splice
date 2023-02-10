@@ -9,7 +9,6 @@ import {
 } from 'common-frontend';
 import { ErrorBoundary } from 'common-frontend';
 import { useScanClient } from 'common-frontend/lib/contexts/ScanServiceContext';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 
 import { AppBar, Box, Button, CssBaseline, Toolbar, Typography } from '@mui/material';
@@ -39,8 +38,8 @@ const App: React.FC = () => {
   const [svc, setSvc] = useState<string | undefined>();
   useEffect(() => {
     const fetchSvc = async () => {
-      const svc = await scanClient.getSvcPartyId(new Empty(), undefined);
-      setSvc(svc.getSvcPartyId());
+      const svcPartyId = await scanClient.getSvcPartyId().then(r => r.svcPartyId);
+      setSvc(svcPartyId);
     };
     fetchSvc();
   }, [scanClient]);

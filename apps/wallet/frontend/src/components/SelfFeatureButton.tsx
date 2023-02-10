@@ -1,6 +1,5 @@
 import { useScanClient } from 'common-frontend';
 import { useUserState } from 'common-frontend';
-import { LookupFeaturedAppRightRequest } from 'common-protobuf/com/daml/network/scan/v0/scan_service_pb';
 import React, { useEffect, useState } from 'react';
 
 import { Button } from '@mui/material';
@@ -16,10 +15,9 @@ const SelfFeatureButton: React.FC = () => {
   useEffect(() => {
     const getFeatured = async () => {
       if (primaryPartyId !== undefined) {
-        const request = new LookupFeaturedAppRightRequest().setProviderPartyId(primaryPartyId);
-        const value = await scanClient.lookupFeaturedAppRight(request);
-        const featured = value.getFeaturedAppRight();
-        setFeatured(featured !== undefined);
+        const value = await scanClient.lookupFeaturedAppRight(primaryPartyId);
+        const featured = value.featuredAppRight;
+        setFeatured(!!featured); // HTTP api might return null
       }
     };
     getFeatured();

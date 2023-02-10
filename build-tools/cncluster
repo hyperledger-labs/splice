@@ -539,6 +539,7 @@ function run_sbt_for_preflight() {
     (cd ${REPO_ROOT} && \
          DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
+         NETWORK_APPS_ADDRESS_PROTOCOL=https \
              sbt -DAUTH0_TENANT=dev "$@")
 }
 

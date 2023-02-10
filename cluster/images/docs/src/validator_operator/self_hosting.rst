@@ -69,7 +69,7 @@ Next, open a second terminal, navigate to the extracted bundle's root directory,
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf \
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf \
       --bootstrap examples/validator/validator.sc
 
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
@@ -313,7 +313,7 @@ NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
       --bootstrap examples/validator/validator.sc
 
 14. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:

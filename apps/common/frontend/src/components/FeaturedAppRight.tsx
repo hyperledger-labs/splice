@@ -1,4 +1,3 @@
-import { LookupFeaturedAppRightRequest } from 'common-protobuf/com/daml/network/scan/v0/scan_service_pb';
 import React, { useEffect, useState } from 'react';
 
 import { useScanClient } from '../contexts/ScanServiceContext';
@@ -9,11 +8,9 @@ const FeaturedAppRight: React.FC<{ partyId: string }> = ({ partyId }) => {
   const [featured, setFeatured] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     const getFeatured = async () => {
-      const request = new LookupFeaturedAppRightRequest();
-      request.setProviderPartyId(partyId);
-      const value = await scanClient.lookupFeaturedAppRight(request);
-      const featured = value.getFeaturedAppRight();
-      setFeatured(featured !== undefined);
+      const value = await scanClient.lookupFeaturedAppRight(partyId);
+      const featured = value.featuredAppRight;
+      setFeatured(!!featured); // HTTP api might return null
     };
     getFeatured();
   }, [scanClient, partyId]);

@@ -285,6 +285,10 @@ lazy val `apps-scan` =
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      BuildCommon.TS.openApiSettings(
+        npmName = "scan-openapi",
+        openApiSpec = "scan.yaml",
+      ),
       Compile / guardrailTasks :=
         List(
           ScalaServer(
@@ -356,6 +360,11 @@ lazy val `apps-common-frontend` = {
             // compile to get .d.ts and .js files. We cannot run this as part of
             // apps-common-frontend-openapi/compile because that does not yet run
             // npm install.
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "scan/openapi-ts-client",
+              log,
+            )
             BuildCommon.TS.runBuildCommand(
               npmRootDir.value,
               "directory/openapi-ts-client",
