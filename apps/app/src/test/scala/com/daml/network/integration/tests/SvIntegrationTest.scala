@@ -94,6 +94,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
     // but because here we don't start one, we need to perform this step manually.
     bobValidator.remoteParticipant.dars.upload(cantonCoinDarPath)
     val sv = sv4 // not a leader
+    val svParty = sv.getDebugInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
     val secret = actAndCheck(
       "the sv operator prepares the onboarding", {
@@ -125,11 +126,20 @@ class SvIntegrationTest extends CoinIntegrationTest {
       "request to onboard the candidate",
       sv.onboardValidator(candidate, secret),
     )(
-      "the candidate is now an observer to the CoinRules",
-      Unit => getCoinRules().observers should contain(candidate.toProtoPrimitive),
+      "the candidate is now an observer to the CoinRules and the secret is marked as used",
+      Unit => {
+        getCoinRules().observers should contain(candidate.toProtoPrimitive)
+        inside(
+          svc.remoteParticipantWithAdminToken.ledger_api.acs
+            .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)
+        ) {
+          case Seq(usedSecret) => {
+            usedSecret.data.secret shouldBe secret
+            usedSecret.data.validator shouldBe candidate.toProtoPrimitive
+          }
+        }
+      },
     )
-    // TODO(#2733) extend this to check if next lifecycle stage was created correctly
-    eventually()(sv.listOngoingValidatorOnboardings() should have length 0)
     clue("try to reuse the same secret for a second onboarding, which should fail") {
       assertThrows[CommandFailure](
         loggerFactory.assertLogs(
@@ -149,13 +159,12 @@ class SvIntegrationTest extends CoinIntegrationTest {
       sv2.startSync()
       sv2.listOngoingValidatorOnboardings() should have length 1
     }
-    // TODO(#2733) finish/activate this test
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
-      sv2.listOngoingValidatorOnboardings() should have length 0
+      sv2.listOngoingValidatorOnboardings() shouldBe empty
       sv2.stop()
       sv2.startSync()
-      // sv2.listOngoingValidatorOnboardings() should have length 0
+      sv2.listOngoingValidatorOnboardings() shouldBe empty
     }
   }
 

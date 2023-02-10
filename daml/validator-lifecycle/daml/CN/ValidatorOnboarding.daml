@@ -16,11 +16,22 @@ template ValidatorOnboarding with
   where
     signatory sv
 
-    -- Archive the offer if the right secret was provided.
-    choice ValidatorOnboarding_Match: ()
+    -- Archive the offer if the right secret was provided, noting which validator (party) used it.
+    choice ValidatorOnboarding_Match: ContractId UsedSecret
       with
         providedSecret : Text
+        validator : Party
       controller sv
       do
         require "provided secret matches the stored secret" (providedSecret == candidateSecret)
-        pure ()
+        create UsedSecret with
+          secret = candidateSecret
+          ..
+
+-- | Template used by a sponsoring SV node for enforcing that an onboarding secret is used only once.
+template UsedSecret with
+    sv : Party                  -- ^ The SV node that sponsored the onboarding.
+    secret : Text               -- ^ An onboarding secret.
+    validator : Party           -- ^ The validator that onboarded using the secret.
+  where
+    signatory sv

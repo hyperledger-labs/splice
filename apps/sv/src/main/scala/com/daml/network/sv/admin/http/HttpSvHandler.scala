@@ -164,7 +164,7 @@ class HttpSvHandler(
           )
           .commands
           .asScala ++ validatorOnboarding.contractId
-          .exerciseValidatorOnboarding_Match(secret)
+          .exerciseValidatorOnboarding_Match(secret, candidateParty.toProtoPrimitive)
           .commands
           .asScala
       ).toSeq

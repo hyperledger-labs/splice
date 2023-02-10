@@ -289,7 +289,7 @@ class SvApp(
     SvApp
       .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
       .map {
-        case Left(reason) => logger.info(s"Doing nothing: $reason")
+        case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
         case Right(()) => ()
       }
   }
@@ -339,28 +339,40 @@ object SvApp {
     ).create.commands.asScala.toSeq
     for {
       domainId <- svStore.domains.getUniqueDomainId()
-      res <- svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
-        case QueryResult(off, None) => {
-          ledgerConnection
-            .submitCommands(
-              actAs = Seq(svParty),
-              readAs = Seq.empty,
-              commands = validatorOnboarding,
-              commandId = CoinLedgerConnection
-                .CommandId(
-                  "com.daml.network.sv.expectValidatorOnboarding",
-                  Seq(svParty),
-                ),
-              deduplicationOffset = off,
-              domainId = domainId,
-            )
-            .map(_ => {
-              logger.info("Created new ValidatorOnboarding contract.")
-              Right(())
-            })
+      res <- svStore.lookupUsedSecret(secret).flatMap {
+        case QueryResult(_, Some(usedSecret)) => {
+          val validator = usedSecret.payload.validator
+          Future.successful(
+            Left(s"This secret has already been used before, for onboarding validator $validator")
+          )
         }
-        case QueryResult(_, Some(_)) => {
-          Future.successful(Left("A validator lifecycle contract with this secret already exists."))
+        case QueryResult(off, None) => {
+          svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
+            case QueryResult(_, Some(_)) => {
+              Future.successful(
+                Left("A validator onboarding contract with this secret already exists.")
+              )
+            }
+            case QueryResult(_, None) => {
+              ledgerConnection
+                .submitCommands(
+                  actAs = Seq(svParty),
+                  readAs = Seq.empty,
+                  commands = validatorOnboarding,
+                  commandId = CoinLedgerConnection
+                    .CommandId(
+                      "com.daml.network.sv.expectValidatorOnboarding",
+                      Seq(svParty),
+                    ),
+                  deduplicationOffset = off,
+                  domainId = domainId,
+                )
+                .map(_ => {
+                  logger.info("Created new ValidatorOnboarding contract.")
+                  Right(())
+                })
+            }
+          }
         }
       }
     } yield res

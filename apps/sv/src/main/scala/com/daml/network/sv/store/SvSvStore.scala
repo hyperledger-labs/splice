@@ -29,6 +29,14 @@ trait SvSvStore extends CoinAppStoreWithoutHistory {
         co.payload.candidateSecret == secret
       )
 
+  def lookupUsedSecret(
+      secret: String
+  ): Future[
+    QueryResult[Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]]
+  ] =
+    acs
+      .findContractWithOffset(vo.UsedSecret.COMPANION)(co => co.payload.secret == secret)
+
   def listValidatorOnboardings()
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     acs.listContracts(vo.ValidatorOnboarding.COMPANION)
@@ -56,7 +64,10 @@ object SvSvStore {
 
     AcsStore.SimpleContractFilter(
       key.svParty,
-      Map(mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv)),
+      Map(
+        mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
+        mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
+      ),
     )
   }
 }
