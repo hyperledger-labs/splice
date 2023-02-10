@@ -189,6 +189,11 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     }
   }
 
+  protected def waitForQuery(query: Query)(implicit webDriver: WebDriver): Unit =
+    eventually() {
+      find(query).valueOrFail(s"Could not find $query")
+    }
+
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
     val text = inside(findAll(id("error")).toList) { case Seq(elem) => elem.text }
     text shouldBe err

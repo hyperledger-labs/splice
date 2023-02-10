@@ -118,9 +118,7 @@ class PreflightIntegrationTest
       createTransferOffer(bobPartyId, "10", "p2ptransfer")
 
       click on "logout-button"
-      eventually() {
-        find(id("oidc-login-button"))
-      }
+      waitForQuery(id("oidc-login-button"))
     }
 
     withFrontEnd("bob-v1") { implicit webDriver =>
@@ -148,9 +146,7 @@ class PreflightIntegrationTest
       coinsTableRows.toSeq.head.underlying.getText() contains ("10.0000000000CC")
 
       click on "logout-button"
-      eventually() {
-        find(id("oidc-login-button"))
-      }
+      waitForQuery(id("oidc-login-button"))
     }
   }
 
@@ -198,9 +194,7 @@ class PreflightIntegrationTest
 
     withFrontEnd("bob-v1") { implicit webDriver =>
       loginToSplitwellUi(bobUser, splitwellUiUrl)
-      eventually() {
-        find(className("request-membership-link"))
-      }
+      waitForQuery(className("request-membership-link"))
       click on className("request-membership-link")
     }
 
@@ -261,9 +255,7 @@ class PreflightIntegrationTest
         () => find(id("entry-name-field")).isDefined,
       )
 
-      eventually() {
-        find(id("entry-name-field"))
-      }
+      waitForQuery(id("entry-name-field"))
 
       click on "entry-name-field"
       textField("entry-name-field").value = "alice.cns"
@@ -287,9 +279,7 @@ class PreflightIntegrationTest
       () => find(id("entry-name-field")).isDefined,
     )
 
-    eventually() {
-      find(id("entry-name-field"))
-    }
+    waitForQuery(id("entry-name-field"))
 
     click on "entry-name-field"
     textField("entry-name-field").value = entryName
@@ -356,9 +346,7 @@ class PreflightIntegrationTest
         () => find(id("group-id-field")).isDefined,
       )
 
-      eventually() {
-        find(id("logged-in-user")).valueOrFail("Could not find logged-in-user field")
-      }
+      waitForQuery(id("logged-in-user"))
     }
   }
 
@@ -376,9 +364,7 @@ class PreflightIntegrationTest
         () => find(id("onboard-button")).isDefined,
       )
 
-      eventually() {
-        find(id("onboard-button"))
-      }
+      waitForQuery(id("onboard-button"))
 
       if (onboardUserToWallet)
         click on "onboard-button"
