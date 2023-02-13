@@ -430,9 +430,9 @@ function cluster_check() {
 
     _check_cluster_grpc_port 5005 "SVC App API"
     _check_cluster_grpc_port 5014 "SV1 App API"
-    _check_cluster_grpc_port 5015 "SV2 App API"
-    _check_cluster_grpc_port 5016 "SV3 App API"
-    _check_cluster_grpc_port 5017 "SV4 App API"
+    _check_cluster_grpc_port 5114 "SV2 App API"
+    _check_cluster_grpc_port 5214 "SV3 App API"
+    _check_cluster_grpc_port 5314 "SV4 App API"
     _check_cluster_grpc_port 5012 "Scan App API"
 
     _check_cluster_grpc_port 5101 "Validator1: Ledger Participant API"

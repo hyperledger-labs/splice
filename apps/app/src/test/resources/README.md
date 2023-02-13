@@ -70,10 +70,8 @@ all network indices must be odd numbers.
 - `11`: Directory user, Admin API
 - `12`: Scan, Admin API
 - `13`: Splitwell, Admin API
-- `14`: SV 1, Admin API
-- `15`: SV 2, Admin API
-- `16`: SV 3, Admin API
-- `17`: SV 4, Admin API
+- `14`: SV, Public API + Admin API
+- `15`: SV, Admin API (reserved)
 
 ### Examples
 

@@ -209,42 +209,42 @@ local svcDeployments(config) = [
   c.deployment(config, "sv-app-2", [
     {
       name: "sv2-api",
-      port: 5015,
+      port: 5114,
     },
     {
       name: "sv2-api-http",
-      port: 6015,
+      port: 6114,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv2", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5015" },
+    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5114" },
     { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-3", [
     {
       name: "sv3-api",
-      port: 5016,
+      port: 5214,
     },
     {
       name: "sv3-api-http",
-      port: 6016,
+      port: 6214,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv3", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5016" },
+    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5214" },
     { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
   c.deployment(config, "sv-app-4", [
     {
       name: "sv4-api",
-      port: 5017,
+      port: 5314,
     },
     {
       name: "sv4-api-http",
-      port: 6017,
+      port: 6314,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv4", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5017" },
+    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5314" },
     { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
   ]),
 
