@@ -193,8 +193,12 @@ local svcDeployments(config) = [
 
   c.deployment(config, "sv-app-1", [
     {
-      name: "sv1-adm-api",
+      name: "sv1-api",
       port: 5014,
+    },
+    {
+      name: "sv1-api-http",
+      port: 6014,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv1", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5014" },
@@ -204,8 +208,12 @@ local svcDeployments(config) = [
 
   c.deployment(config, "sv-app-2", [
     {
-      name: "sv2-adm-api",
+      name: "sv2-api",
       port: 5015,
+    },
+    {
+      name: "sv2-api-http",
+      port: 6015,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv2", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5015" },
@@ -214,8 +222,12 @@ local svcDeployments(config) = [
 
   c.deployment(config, "sv-app-3", [
     {
-      name: "sv3-adm-api",
+      name: "sv3-api",
       port: 5016,
+    },
+    {
+      name: "sv3-api-http",
+      port: 6016,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv3", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5016" },
@@ -224,8 +236,12 @@ local svcDeployments(config) = [
 
   c.deployment(config, "sv-app-4", [
     {
-      name: "sv4-adm-api",
+      name: "sv4-api",
       port: 5017,
+    },
+    {
+      name: "sv4-api-http",
+      port: 6017,
     },
   ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv4", "sv") + [
     { name: "CN_APP_SV_ADMIN_API_PORT", value: "5017" },
