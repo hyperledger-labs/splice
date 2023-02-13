@@ -16,7 +16,7 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the wallet app HTTP API
-      grpcUrl: 'http://localhost:7004',
+      grpcUrl: 'http://localhost:6004',
     },
     validator: {
       // URL of the validator app HTTP API

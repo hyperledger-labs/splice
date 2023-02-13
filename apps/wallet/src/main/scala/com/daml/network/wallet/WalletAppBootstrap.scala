@@ -72,7 +72,6 @@ class WalletAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           retryProvider,
           futureSupervisor,
         )

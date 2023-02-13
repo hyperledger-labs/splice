@@ -17,23 +17,19 @@ import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.admin.http.HttpWalletHandler
 import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
-import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import io.grpc.ServerInterceptors
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -50,7 +46,6 @@ class WalletApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    adminServerRegistry: CantonMutableHandlerRegistry,
     retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
@@ -144,7 +139,7 @@ class WalletApp(
       )
       domainId <- waitForDomainConnection(walletStore.domains, config.domains.global)
       _ <- walletStore.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
-      verifier: SignatureVerifier = config.auth match {
+      verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
@@ -173,7 +168,7 @@ class WalletApp(
         )
       }
       httpConfig = config.adminApi.clientConfig.copy(
-        port = config.adminApi.port + 2000
+        port = config.adminApi.port + 1000
       )
       _ = logger.info(s"Starting http server on ${httpConfig}")
       binding <- Http()
@@ -186,28 +181,6 @@ class WalletApp(
         )
 
     } yield {
-      adminServerRegistry
-        .addService(
-          ServerInterceptors.intercept(
-            WalletServiceGrpc.bindService(
-              new GrpcWalletService(
-                walletManager,
-                ledgerClient,
-                clock,
-                scanConnection,
-                loggerFactory,
-                retryProvider,
-              ),
-              ec,
-            ),
-            new AuthInterceptor(
-              verifier,
-              loggerFactory,
-            ),
-          )
-        )
-        .discard
-
       WalletApp.State(
         automation,
         storage,

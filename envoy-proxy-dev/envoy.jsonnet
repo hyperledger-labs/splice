@@ -16,15 +16,11 @@ function(hostname="host.docker.internal") {
   },
   static_resources: {
     listeners: [
-      utils.listener("alice_wallet", 6204),
-      utils.listener("bob_wallet", 6304),
       utils.listener("splitwell", 6113),
       utils.listener("alice_lapi", 6201),
       utils.listener("bob_lapi", 6301),
     ],
     clusters: [
-      cluster("alice_wallet", 5204),
-      cluster("bob_wallet", 5304),
       cluster("splitwell", 5113),
       cluster("alice_lapi", 5201),
       cluster("bob_lapi", 5301),

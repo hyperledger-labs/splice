@@ -33,7 +33,6 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.environment.CoinLedgerConnection.CommandId
 import com.daml.network.http.v0.{definitions, wallet as v0}
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
-import com.daml.network.wallet.v0 as protov0
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -116,10 +115,8 @@ class HttpWalletHandler(
         )
       })(
         user,
-        cid => protov0.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
-      ).map { pv0 =>
-        definitions.AcceptTransferOfferResponse(pv0.acceptedOfferContractId)
-      }
+        cid => definitions.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+      )
     }
 
   override def rejectTransferOffer(respond: v0.WalletResource.RejectTransferOfferResponse.type)(
@@ -177,14 +174,12 @@ class HttpWalletHandler(
           new coinoperation.CO_AppPayment(requestCid),
           user,
           (outcome: COO_AcceptedAppPayment) =>
-            protov0.AcceptAppPaymentRequestResponse(
-              Proto.encodeContractId(outcome.contractIdValue)
+            v0.WalletResource.AcceptAppPaymentRequestResponse.OK(
+              definitions.AcceptAppPaymentRequestResponse(
+                Proto.encodeContractId(outcome.contractIdValue)
+              )
             ),
-        ).map { pv0 =>
-          v0.WalletResource.AcceptAppPaymentRequestResponse.OK(
-            definitions.AcceptAppPaymentRequestResponse(pv0.acceptedPaymentContractId)
-          )
-        },
+        ),
       )
     }
   private def handleContractIdNotFound[T, N](
@@ -239,12 +234,10 @@ class HttpWalletHandler(
           new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
           user,
           (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
-            protov0.AcceptSubscriptionRequestResponse(
+            definitions.AcceptSubscriptionRequestResponse(
               Proto.encodeContractId(outcome.contractIdValue)
             ),
-        ).map { pv0 =>
-          definitions.AcceptSubscriptionRequestResponse(pv0.initialPaymentContractId)
-        },
+        ),
       )
     }
 
@@ -389,7 +382,10 @@ class HttpWalletHandler(
         )
       })(
         user,
-        cid => protov0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+        cid =>
+          v0.WalletResource.CreateTransferOfferResponse.OK(
+            definitions.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult))
+          ),
         dedup = Some(
           (
             CoinLedgerConnection.CommandId(
@@ -405,11 +401,7 @@ class HttpWalletHandler(
             ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
           )
         ),
-      ).map { pv0 =>
-        v0.WalletResource.CreateTransferOfferResponse.OK(
-          definitions.CreateTransferOfferResponse(pv0.offerContractId)
-        )
-      }.recover {
+      ).recover {
         case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
           v0.WalletResource.CreateTransferOfferResponse.Conflict
       }
@@ -480,10 +472,10 @@ class HttpWalletHandler(
           ),
           user,
           (outcome: coinoperationoutcome.COO_Tap) =>
-            protov0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
-        ).map { pv0 =>
-          v0.WalletResource.TapResponseOK(definitions.TapResponse(pv0.contractId))
-        }
+            v0.WalletResource.TapResponseOK(
+              definitions.TapResponse(Proto.encodeContractId(outcome.contractIdValue))
+            ),
+        )
       } yield result).recover {
         case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
           v0.WalletResource.TapResponseNotFound
@@ -637,17 +629,17 @@ class HttpWalletHandler(
     */
   private def exerciseWalletCoinAction[
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
-      ProtoResponse <: scalapb.GeneratedMessage,
+      R,
   ](
       operation: installCodegen.CoinOperation,
       user: String,
-      processResponse: ExpectedCOO => ProtoResponse,
-  )(implicit tc: TraceContext): Future[ProtoResponse] =
+      processResponse: ExpectedCOO => R,
+  )(implicit tc: TraceContext): Future[R] =
     for {
       userTreasury <- getUserTreasury(user)
       res <- userTreasury
         .enqueueCoinOperation(operation)
-        .map(processCOO[ExpectedCOO, ProtoResponse](processResponse))
+        .map(processCOO[ExpectedCOO, R](processResponse))
     } yield res
 
   /** Helper function to process a CoinOperationOutcome.
@@ -655,12 +647,12 @@ class HttpWalletHandler(
     */
   private def processCOO[
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
-      ProtoReturnType <: scalapb.GeneratedMessage,
+      R,
   ](
-      process: ExpectedCOO => ProtoReturnType
+      process: ExpectedCOO => R
   )(
       actual: installCodegen.CoinOperationOutcome
-  )(implicit tc: TraceContext): ProtoReturnType = {
+  )(implicit tc: TraceContext): R = {
     // I (Arne) did not find a way to avoid ClassTag usage (or passing along a partial function) here
     // For example, passing along the `ExpectedCOO` type to the treasury service doesn't work
     // because inside the TreasuryService we have a Queue of

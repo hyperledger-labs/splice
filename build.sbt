@@ -499,7 +499,6 @@ lazy val `apps-wallet` =
       `splitwell-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "wallet-openapi",

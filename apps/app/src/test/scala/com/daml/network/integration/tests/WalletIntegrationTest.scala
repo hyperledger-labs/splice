@@ -1,10 +1,17 @@
 package com.daml.network.integration.tests
 
+import akka.Done
+import akka.actor.CoordinatedShutdown
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.http.v0.definitions.TapRequest
+import com.daml.network.http.v0.wallet.WalletClient
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.WalletTestUtil
@@ -291,69 +298,65 @@ class WalletIntegrationTest
       }
     }
 
-    "rejects HS256 JWTs with invalid signatures" in { implicit env =>
+    "reject HS256 JWTs with invalid signatures" in { implicit env =>
+      implicit val sys = env.actorSystem
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
       import com.auth0.jwt.JWT
       import com.auth0.jwt.algorithms.Algorithm
-      import com.daml.network.auth.JwtCallCredential
-      import com.daml.network.wallet.v0
-      import io.grpc.ManagedChannelBuilder
 
-      val token = JWT
+      val invalidSignatureToken = JWT
         .create()
         .withAudience(aliceWalletBackend.config.auth.audience)
         .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(Algorithm.HMAC256("wrong-secret"))
 
-      val channel =
-        ManagedChannelBuilder
-          .forAddress("localhost", aliceWalletBackend.config.adminApi.port.unwrap)
-          .usePlaintext()
-          .build()
+      implicit val httpClient: HttpRequest => Future[HttpResponse] =
+        request => Http().singleRequest(request = request)
+      val walletClient = WalletClient(aliceWallet.httpClientConfig.url)
 
-      val client =
-        v0.WalletServiceGrpc
-          .blockingStub(channel)
-          .withCallCredentials(new JwtCallCredential(token))
+      def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 
-      val error = intercept[io.grpc.StatusRuntimeException] {
-        client.tap(new v0.TapRequest("10.0"))
-      }
-
-      error.getStatus.getCode.value shouldBe com.google.rpc.Code.UNAUTHENTICATED.getNumber
-
-      channel.shutdown() // to avoid error about improperly shut down channel
+      val responseForInvalidSignature =
+        walletClient
+          .tap(TapRequest(amount = "10.0"), headers = tokenHeader(invalidSignatureToken))
+          .leftOrFail("should fail with unauthorized")
+          .futureValue
+          .value
+      responseForInvalidSignature.status should be(StatusCodes.Unauthorized)
     }
 
-    "rejects HS256 JWTs with invalid audiences" in { implicit env =>
-      import com.auth0.jwt.JWT
-      import com.daml.network.auth.JwtCallCredential
-      import com.daml.network.wallet.v0
-      import io.grpc.ManagedChannelBuilder
+    "reject HS256 JWTs with invalid audiences" in { implicit env =>
+      implicit val sys = env.actorSystem
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
 
-      val token = JWT
+      import com.auth0.jwt.JWT
+
+      val invalidAudienceToken = JWT
         .create()
         .withAudience("wrong-audience")
         .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(AuthUtil.testSignatureAlgorithm)
 
-      val channel =
-        ManagedChannelBuilder
-          .forAddress("localhost", aliceWalletBackend.config.adminApi.port.unwrap)
-          .usePlaintext()
-          .build()
+      implicit val httpClient: HttpRequest => Future[HttpResponse] =
+        request => Http().singleRequest(request = request)
+      val walletClient = WalletClient(aliceWallet.httpClientConfig.url)
 
-      val client =
-        v0.WalletServiceGrpc
-          .blockingStub(channel)
-          .withCallCredentials(new JwtCallCredential(token))
+      def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 
-      val error = intercept[io.grpc.StatusRuntimeException] {
-        client.tap(new v0.TapRequest("10.0"))
-      }
+      val responseForInvalidSignature =
+        walletClient
+          .tap(TapRequest(amount = "10.0"), headers = tokenHeader(invalidAudienceToken))
+          .leftOrFail("should fail with unauthorized")
+          .futureValue
+          .value
 
-      error.getStatus.getCode.value shouldBe com.google.rpc.Code.UNAUTHENTICATED.getNumber
-
-      channel.shutdown() // to avoid error about improperly shut down channel
+      responseForInvalidSignature.status should be(StatusCodes.Unauthorized)
     }
 
     "list one connected domain" in { implicit env =>

@@ -292,8 +292,7 @@ local validator1Deployments(config) = [
   c.deployment(config, "validator1-wallet-app", [
     {
       name: "val1-wal-http",
-      port: 7004,
-      externalPort: 5104,
+      port: 6004,
     },
   ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "validator1-participant" },
@@ -379,8 +378,7 @@ local splitwellDeployments(config) = [
   c.deployment(config, "splitwell-wallet-app", [
     {
       name: "sw-wal-http",
-      port: 7004,
-      externalPort: 5204,
+      port: 6004,
     },
   ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("splitwell_wallet", "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
