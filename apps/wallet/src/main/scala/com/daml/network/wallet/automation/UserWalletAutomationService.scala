@@ -71,9 +71,8 @@ class UserWalletAutomationService(
   ): Trigger =
     new TransferInTrigger(
       triggerContext,
-      store.domains,
+      store,
       connection,
-      globalDomain,
       domainAdded.domainId,
       store.key.endUserParty,
     )

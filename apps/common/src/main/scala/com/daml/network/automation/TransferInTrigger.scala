@@ -1,12 +1,16 @@
 package com.daml.network.automation
 
-import com.daml.network.store.DomainStore
+import com.daml.network.store.CoinAppStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.DomainAlias
-import com.daml.network.automation.{OnTransferOutTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyForTransferInTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -15,17 +19,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferInTrigger(
     override protected val context: TriggerContext,
-    domains: DomainStore,
+    store: CoinAppStore[_, _],
     connection: CoinLedgerConnection,
-    globalDomain: DomainAlias,
     domainId: DomainId,
     partyId: PartyId,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnTransferOutTrigger(
-      connection,
+) extends OnReadyForTransferInTrigger(
+      store,
       domainId,
       partyId,
     ) {
@@ -36,7 +39,6 @@ class TransferInTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      globalDomainId <- domains.getDomainId(globalDomain)
       outcome <-
         if (partyId == transferOut.submitter) {
           for {

@@ -92,9 +92,8 @@ class SplitwellAutomationService(
   ): Trigger =
     new TransferInTrigger(
       triggerContext,
-      store.domains,
+      store,
       connection,
-      domainConfig.global,
       domainAdded.domainId,
       store.providerParty,
     )

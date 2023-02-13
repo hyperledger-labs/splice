@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
+import com.daml.network.environment.LedgerClient
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
@@ -305,10 +305,8 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
       .map(_.isEmpty)
 }
 
-/** TODO(#2677) Integrate into stores and support filtering.
-  */
-abstract class OnTransferOutTrigger(
-    connection: CoinLedgerConnection,
+abstract class OnReadyForTransferInTrigger(
+    store: CoinAppStore[_, _],
     domainId: DomainId,
     party: PartyId,
 )(implicit
@@ -322,19 +320,16 @@ abstract class OnTransferOutTrigger(
   override protected val source: Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
     LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
   ], NotUsed] =
-    connection
-      .updateTransferOuts(
-        domainId,
-        party,
-      )
+    Source
+      .lazyFutureSource(() => store.transferStore(domainId).map(_.streamReadyForTransferIn()))
+      .mapMaterializedValue(_ => NotUsed)
 
-  // TODO(#2677) This implementation is obviously broken. Once we have multi-domain stores
-  // we can implement this properly.
   override final protected def isStaleTask(
       task: LedgerClient.GetTreeUpdatesResponse.Transfer[
         LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
       ]
-  )(implicit tc: TraceContext): Future[Boolean] = Future.successful(false)
+  )(implicit tc: TraceContext): Future[Boolean] =
+    store.transferStore(domainId).flatMap(store => store.isReadyForTransferIn(task).map(!_))
 
 }
 
