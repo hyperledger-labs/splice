@@ -16,6 +16,8 @@ testSchedule = script do
     assert $ validSchedule schedule (T.isPrefixOf "s")
     assert $ not $ validSchedule schedule (T.isPrefixOf "minBound")
 
+    nextChangeScheduledAt schedule === Some 10
+
     allValues schedule === ["s minBound", "s 10", "s 1000", "s maxBound -1"]
   where
     schedule =
@@ -26,6 +28,7 @@ testSchedule = script do
           , (1000, "s 1000")
           , (maxBound - 1, "s maxBound -1")
           ]
+    scheduleWithEmptyFuture = schedule with futureValues = []
     testGetValueAsOf from to config = do
       getValueAsOf from schedule === config
       getValueAsOf (from + 1) schedule === config

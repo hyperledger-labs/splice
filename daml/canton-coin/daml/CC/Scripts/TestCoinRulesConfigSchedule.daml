@@ -1,0 +1,78 @@
+module CC.Scripts.TestCoinRulesConfigSchedule where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CC.CoinConfig
+import CC.Fees
+import CC.Schedule
+import CC.Scripts.Parameters
+import CC.Scripts.Util
+
+testSetConfigSchedule: Script ()
+testSetConfigSchedule = do
+  app <- setupApp
+  now <- getTime
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  provider <- setupUser app "provider" validator
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+
+  runNextIssuance app
+  let hundredYearsBefore = addRelTime now (days (-100 * 365))
+      thirteenHoursLater = addRelTime now (hours 13)
+      oneYearLater = addRelTime now (days 365)
+      hundredYearsLater = addRelTime now (days (100 * 365))
+
+      coinConfig_initial = makeCoinConfig (seconds 150) (RatePerRound 0.000005)
+      coinConfig1 = makeCoinConfig (seconds 0) (RatePerRound 0.000001)
+      coinConfig2 = makeCoinConfig (seconds 120) (RatePerRound 0.000004)
+      coinConfig3 = makeCoinConfig (seconds 170) (RatePerRound 0.000003)
+      coinConfig4 = makeCoinConfig (seconds 100) (RatePerRound 0.00001)
+      existingSchedule = Schedule with
+        currentValue = coinConfig_initial
+        futureValues =
+          [ (thirteenHoursLater, coinConfig2)
+          , (oneYearLater, coinConfig3)
+          , (hundredYearsLater, coinConfig4)
+          ]
+      newScheduleWithOutdatedConfigs = Schedule with
+        currentValue = coinConfig_initial
+        futureValues =
+          [ (hundredYearsBefore, coinConfig1)
+          , (thirteenHoursLater, coinConfig2)
+          , (oneYearLater, coinConfig3)
+          , (hundredYearsLater, coinConfig4)
+          ]
+      newScheduleWithDifferentCurrentConfig = Schedule with
+        currentValue = coinConfig3
+        futureValues = []
+
+  submitMulti [app.svc] [app.svc] $
+    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_SetConfigSchedule with
+      newConfigSchedule = existingSchedule
+
+
+  context <- getPaymentTransferContext app alice
+  Some (_, coinRules) <- queryCoinRulesByKey app.svc
+  coinRules.configSchedule === existingSchedule
+  -- Fail to set new coinfig schedule as outdated future config is not allowed
+  submitMultiMustFail [app.svc] [app.svc] $
+    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_SetConfigSchedule with
+      newConfigSchedule = newScheduleWithOutdatedConfigs
+
+  -- Fail to set new coinfig schedule as computed current config is not the same as currentValue of new config schedule
+  submitMulti [app.svc] [app.svc] $
+    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_SetConfigSchedule with
+      newConfigSchedule = newScheduleWithDifferentCurrentConfig
+
+  Some (_, coinRules) <- queryCoinRulesByKey app.svc
+  coinRules.configSchedule === newScheduleWithDifferentCurrentConfig
+  return ()
+
+makeCoinConfig : RelTime -> RatePerRound -> CoinConfig USD
+makeCoinConfig tickDuration holdingFee = defaultCoinConfig with tickDuration; holdingFee

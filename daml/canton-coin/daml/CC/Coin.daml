@@ -538,7 +538,10 @@ template CoinRules
       with
         newConfigSchedule : Schedule Time (CoinConfig USD)
       controller svc
-      do create this with configSchedule = newConfigSchedule
+      do forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
+           now <- getTime
+           require "Next change is not scheduled in the future" (now < t)
+         create this with configSchedule = newConfigSchedule
 
 -- | Workaround for missing explicit disclosure.
 --
@@ -911,4 +914,3 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
-

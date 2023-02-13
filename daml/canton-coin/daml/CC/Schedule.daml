@@ -1,6 +1,6 @@
 module CC.Schedule where
 
-import DA.List (dedupSort)
+import DA.List (dedupSort, head)
 
 -- | A schedule of values that change over time.
 data Schedule t a = Schedule with
@@ -30,3 +30,8 @@ validSchedule schedule validateValue =
 
 allValues : Schedule t a -> [a]
 allValues schedule = schedule.currentValue :: map snd schedule.futureValues
+
+nextChangeScheduledAt : Schedule t a -> Optional t
+nextChangeScheduledAt schedule
+  | null schedule.futureValues = None
+  | otherwise = Some (fst(head schedule.futureValues))
