@@ -316,7 +316,13 @@ NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml
     NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
       --bootstrap examples/validator/validator.sc
 
-14. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
+14. Upload the directory DAR.
+
+  ::
+
+    validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
+
+15. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
   ::
 
@@ -335,9 +341,25 @@ NETWORK_AUTH_DOMAIN_URL               The "Domain" of your tenant (at the top of
 NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" application (at the top of the application's settings page)
 ====================================  =====
 
-15. Repeat step 9 for the directory UI configuration, at ``web-uis/directory/config.js``. This time, set the audience to the same value you set ``NETWORK_AUTH_LEDGER_API_AUDIENCE`` to earlier, e.g., ``https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1``.
+16. Repeat step 9 for the directory UI configuration, at
+    ``web-uis/directory/config.js``. In addition to changing
+    ``authority`` and ``client_id``, change ``token_audience`` to the
+    same value you set ``NETWORK_AUTH_LEDGER_API_AUDIENCE`` to
+    earlier, e.g.,
+    ``https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1``.
+    The final section ``auth`` section should look close to this but the exact URLs and IDs will look slightly different.
 
-16. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
+  ::
+
+    auth: {
+      algorithm: "rs-256",
+      authority: "https://example-secure-validator.eu.auth0.com",
+      client_id: "d4tMBFslGeI3Nf3lDyryLIll7Y2SZo3J",
+      token_audience: "https://daml.com/jwt/aud/participant/validatorParticipant::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1",
+      token_scope: "daml_ledger_api",
+    },
+
+17. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
