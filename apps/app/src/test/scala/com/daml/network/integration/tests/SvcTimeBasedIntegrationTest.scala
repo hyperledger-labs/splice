@@ -409,6 +409,85 @@ class SvcTimeBasedIntegrationTest
     }
   }
 
+  "round management with very tightly scheduled config" in { implicit env =>
+    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
+    val config101 = mkCoinConfig(defaultTickDuration, 101)
+    val config102 = mkCoinConfig(defaultTickDuration, 102)
+
+    {
+      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+      val configSchedule = {
+        new cc.schedule.Schedule(
+          mkCoinConfig(defaultTickDuration),
+          List(
+            new Tuple2(
+              now.add(Duration.ofSeconds(150)).toInstant,
+              config101,
+            ),
+            new Tuple2(
+              now.add(Duration.ofSeconds(151)).toInstant,
+              config102,
+            ),
+          ).asJava,
+        )
+      }
+      // set configSchedule
+      setCoinConfigSchedule(configSchedule)
+    }
+
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+
+    // config101 is never used as there is no round created at a time between now + 150 and now + 151 seconds
+    eventually()({
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.maxNumInputs shouldBe 100
+      rounds.middleOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
+      rounds.latestOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
+    })
+
+    val config201 = mkCoinConfig(defaultTickDuration, 201)
+    val config202 = mkCoinConfig(defaultTickDuration, 202)
+
+    {
+      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+      val configSchedule = {
+        new cc.schedule.Schedule(
+          mkCoinConfig(defaultTickDuration),
+          List(
+            new Tuple2(
+              now.add(Duration.ofSeconds(160)).toInstant,
+              config201,
+            ),
+            new Tuple2(
+              now.add(Duration.ofSeconds(161)).toInstant,
+              config202,
+            ),
+          ).asJava,
+        )
+      }
+
+      // set configSchedule
+      setCoinConfigSchedule(configSchedule)
+    }
+
+    // Each advanceRoundsByOneTick will advance the time by exactly 160 second.
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+
+    // As the first advanceRoundsByOneTick above advances the time by exactly 160 seconds
+    // and this is when the svc automaotion exercise the svc choice to advance rounds,
+    // a new open mining round is created at the time when config201 is the active config.
+    // After that, the second advanceRoundsByOneTick advances the time by another 160 seconds
+    // another new round is created with the config202 as it was the active config at that time.
+    eventually()({
+      val rounds = getOpenMiningRounds()
+      rounds.oldestOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
+      rounds.middleOpen.data.coinConfig.maxNumInputs shouldBe config201.maxNumInputs
+      rounds.latestOpen.data.coinConfig.maxNumInputs shouldBe config202.maxNumInputs
+    })
+  }
+
   "calculation of issuance per coin" in { implicit env =>
     // 3 unfeatured app rewards & 3 featured app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
@@ -600,11 +679,12 @@ class SvcTimeBasedIntegrationTest
   }
 
   private def mkCoinConfig(
-      tickDuration: NonNegativeFiniteDuration
+      tickDuration: NonNegativeFiniteDuration,
+      initialMaxNumInputs: Int = 100,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
     defaultCoinConfig(
       NonNegativeFiniteDuration.ofMicros(tickDuration.getMicros),
-      100,
+      initialMaxNumInputs,
     )
 
   private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(

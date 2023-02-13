@@ -146,3 +146,77 @@ testCoinUsedInRoundBeforeItsCreation = do
   transferResult.summary.holdingFees === 0.0
 
   return ()
+
+testCoinUsedAfterHoldingFeeChanged: Script ()
+testCoinUsedAfterHoldingFeeChanged = do
+  let holdingFee = 0.000005
+      smallerHoldingFee = 0.00005
+      transferAmount = 10.0
+  app <- setupApp
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  now <- getTime
+
+  Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
+
+  context <- getPaymentTransferContext app alice
+  submitMulti [app.svc] [app.svc] $ exerciseCmd coinRulesCid CoinRules_SetConfigSchedule with
+    newConfigSchedule = coinRules.configSchedule with
+      futureValues = [(
+          addRelTime now (minutes 1),
+          coinRules.configSchedule.currentValue with holdingFee = RatePerRound smallerHoldingFee
+        )]
+
+  runNextIssuance app
+  coinRound2Cid <- tap app alice 100.0
+  Some coinRound2 <- queryContractId @Coin alice.primaryParty coinRound2Cid
+
+  runNextIssuance app
+  coinRound3Cid <- tap app alice 100.0
+  Some coinRound3 <- queryContractId @Coin alice.primaryParty coinRound3Cid
+
+  coinRound2.amount.createdAt.number === 2
+  coinRound2.amount.ratePerRound === RatePerRound holdingFee
+
+  coinRound3.amount.createdAt.number === 3
+  coinRound3.amount.ratePerRound === RatePerRound smallerHoldingFee
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  context <- getPaymentTransferContext app alice
+
+  -- use the coin created in round 2 before holding fee changes
+  transferResult2 <- transfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound2Cid transferAmount
+
+  -- use the coin created in round 3 when holding fee changes
+  transferResult3 <- transfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound3Cid transferAmount
+
+  -- Both coins are used as transfer input at round 7
+
+  -- Actual amount of a coin created before holding fee change will be computed using the old holding fee
+  -- even if it is used as transfer input at a round with conifig that holding fee is reduced.
+  transferResult2.summary.holdingFees === 0.000005 * (7.0 - 2.0)
+
+  -- Smaller holding fee is used as the coin is created in round 3 when holding fee is redueced
+  transferResult3.summary.holdingFees === 0.00005 * (7.0 - 3.0)
+
+transfer: ContractId API.CoinRules -> API.TransferContext -> Party -> Party -> Party -> ContractId Coin -> Decimal -> Script API.TransferResult
+transfer coinRulesCid transferContext svc sender receiver coinCid amount = do
+  submitMulti [sender, receiver] [svc] $
+    exerciseCmd coinRulesCid API.CoinRules_Transfer with
+      transfer = API.Transfer with
+        sender = sender
+        provider = sender
+        inputs = [API.InputCoin $ toInterfaceContractId coinCid]
+        outputs = [ API.TransferOutput with
+                      receiver
+                      amount
+                      lock = None
+                      receiverFeeRatio = 1.0]
+        payload = "test"
+      context = transferContext
+
