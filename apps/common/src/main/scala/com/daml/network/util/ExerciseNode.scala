@@ -10,10 +10,8 @@ import com.daml.ledger.javaapi.data.codegen.{
   ValueDecoder,
 }
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Value as CodegenValue}
-import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
 
 import scala.jdk.OptionConverters.*
@@ -22,16 +20,9 @@ import scala.util.{Failure, Success, Try}
 final case class ExerciseNode[Arg, Res](
     argument: Value[Arg],
     result: Value[Res],
-) {
-  def toProtoV0: v0.ExerciseNode =
-    v0.ExerciseNode(
-      argument = Some(argument.toProtoV0),
-      result = Some(result.toProtoV0),
-    )
-}
+)
 
 /** Trait for companions of exercise nodes. For each exercise node that should be decoded, you must define an object that implements this.
-  * The object can then be passed to ExerciseNode.fromProto.
   */
 trait ExerciseNodeCompanion {
   type Tpl
@@ -56,21 +47,6 @@ trait ExerciseNodeCompanion {
 }
 
 object ExerciseNode {
-  def fromProto(
-      companion: ExerciseNodeCompanion
-  )(
-      node: v0.ExerciseNode
-  ): Either[ProtoDeserializationError, ExerciseNode[companion.Arg, companion.Res]] = for {
-    argumentP <- ProtoConverter.required("ExerciseNode.argument", node.argument)
-    argument <- Value.fromProto[companion.Arg](companion.argDecoder, companion.argToValue)(
-      argumentP
-    )
-    resultP <- ProtoConverter.required("ExerciseNode.result", node.result)
-    result <- Value.fromProto[companion.Res](companion.resDecoder, companion.resToValue)(
-      resultP
-    )
-  } yield ExerciseNode[companion.Arg, companion.Res](argument, result)
-
   def fromProtoEvent(
       companion: ExerciseNodeCompanion
   )(
