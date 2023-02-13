@@ -342,3 +342,35 @@ NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" ap
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
 If this user is logging in for the first time, a page will appear in the wallet UI prompting the user to onboard themselves. This creates the Daml user & its primary party on the ledger, associated with the external account.
+
+Validator Operator Login
+++++++++++++++++++++++++
+
+So far, we enabled the validator backend and its end-users to use Auth0 as an IAM provider. The validator backend has
+been using a username that we configured above, of the form "$CLIENT_ID@clients", which corresponds to a machine-to-machine
+user in Auth0. However, Auth0 does not support human login using the same account, so in order to view and operate
+the wallet of the validator provider itself (e.g. in order to see validator rewards received by your validator), you will
+need to create a separate user for it, and configure your validator app accordingly. To achieve that, please follow these steps:
+
+1. Login to auth0, and find the user that you wish to make the administrator for your validator, or create a new user for it.
+2. Open that user's details in Auth0, and locate its user_id, e.g. auth0|63e3d75ff4114d87a2c1e4f5
+3. Set one more environment variable on your system:
+
+=========================================  =====
+Name                                       Value
+-----------------------------------------  -----
+NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to adminster the validator's wallet, e.g. auth0|63e3d75ff4114d87a2c1e4f5
+=========================================  =====
+
+4. Stop the validator and wallet that you started above
+5. Edit the examples/validator/validator-secure.conf file, locate the commented-out out line "validator-wallet-user = ${NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME}", and uncomment it. This will instruct the validator app to automatically onboard that user to the wallet, and allocate the validator app's primary party as the primary party of that user.
+6. Start the validator and wallet again:
+
+.. parsed-literal::
+
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
+      --bootstrap examples/validator/validator.sc
+
+7. Refresh your browser with the wallet UI, log out of any user you may be logged in as, and login again using the validator admin user defined above.
+
+This user should be automatically onboarded to the wallet, so you should NOT be seeing a prompt to onboard yourself. This user will now administer the rewards earned by your validator.
