@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -15,11 +16,19 @@ import java.time.Duration
 import java.util.UUID
 import com.daml.network.config.CoinConfigTransforms
 import monocle.macros.syntax.lens.*
+import com.daml.network.util.SplitwellTestUtil
+import scala.util.Try
 
 class WalletTimeBasedIntegrationTest
     extends CoinIntegrationTestWithSharedEnvironment
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with SplitwellTestUtil {
+
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val directoryDarPath =
+    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
+  private val testEntryName = "mycoolentry"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -31,6 +40,12 @@ class WalletTimeBasedIntegrationTest
         CoinConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableUnclaimedRewardExpiration).replace(true)
         )(config)
+      })
+      .withAdditionalSetup(implicit env => {
+        aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
+        bobValidator.remoteParticipant.dars.upload(splitwellDarPath)
+        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+        bobValidator.remoteParticipant.dars.upload(directoryDarPath)
       })
 
   "A wallet" should {
@@ -130,8 +145,6 @@ class WalletTimeBasedIntegrationTest
         aliceWallet.tap(50)
       }
       clue("Setting up directory as provider for the created subscriptions") {
-        val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         aliceDirectory.requestDirectoryInstall()
         aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
@@ -186,6 +199,11 @@ class WalletTimeBasedIntegrationTest
             }) should have length 1
         },
       )
+
+      // TODO(tech-debt): find a better way to guarantee this happens even if the test fails
+      clue("Starting directory backend again so other tests can use it") {
+        directory.startSync()
+      }
     }
 
     "auto-expire payment requests" in { implicit env =>
@@ -415,5 +433,143 @@ class WalletTimeBasedIntegrationTest
       )
     }
 
+    "handles rewards correctly in the context of 3rd party apps" in { implicit env =>
+      val (_, bobUserParty, _, splitwellProviderParty, key) =
+        initSplitwellTest()
+
+      aliceWallet.tap(350.0)
+
+      def transferAndCheckRewards(expectedAppRewardsRange: (BigDecimal, BigDecimal)) = {
+        clue("Transfer some cc through splitwell") {
+          splitwellTransfer(aliceSplitwell, aliceWallet, bobUserParty, BigDecimal(100.0), key)
+        }
+
+        val aliceValidatorStartBalance = aliceValidatorWallet.balance()
+        val providerStartBalance = splitwellProviderWallet.balance()
+
+        actAndCheck(
+          "Advance rounds until reward coupons are issued",
+          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "Wait for all reward coupons",
+          _ => {
+            // App reward coupon to alice's validator for the first (locking) leg
+            aliceValidatorWallet.listAppRewardCoupons() should have length 1
+            // App reward to splitwell provider for the second leg
+            splitwellProviderWallet.listAppRewardCoupons() should have length 1
+            // One validator reward coupon per leg to alice's validator
+            aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
+          },
+        )
+
+        actAndCheck(
+          "Advance rounds again to get rewards",
+          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "Earn rewards",
+          _ => {
+            aliceValidatorWallet.listAppRewardCoupons() should be(empty)
+            splitwellProviderWallet.listAppRewardCoupons() should be(empty)
+            aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
+            checkBalance(
+              aliceValidatorWallet,
+              aliceValidatorStartBalance.round + 4,
+              (
+                aliceValidatorStartBalance.unlockedQty,
+                aliceValidatorStartBalance.unlockedQty + 5.0,
+              ),
+              (0, 0),
+              (0, 1),
+            )
+            checkBalance(
+              splitwellProviderWallet,
+              providerStartBalance.round + 4,
+              (
+                providerStartBalance.unlockedQty + expectedAppRewardsRange._1,
+                providerStartBalance.unlockedQty + expectedAppRewardsRange._2,
+              ),
+              (0, 0),
+              (0, 1),
+            )
+          },
+        )
+      }
+
+      transferAndCheckRewards((102.9, 103))
+
+      actAndCheck(
+        "Splitwell cancels its own featured app right",
+        splitwellProviderWallet.cancelFeaturedAppRight(),
+      )(
+        "Splitwell is no longer featured",
+        _ => scan.lookupFeaturedAppRight(splitwellProviderParty) should be(None),
+      )
+
+      transferAndCheckRewards((0.5, 0.6))
+
+    }
+
+    "generate rewards for subscriptions" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+
+      val dirParty = clue(
+        "Getting directory party ID (will fail if another test stopped the directory and failed before starting it again)"
+      ) {
+        directory.getProviderPartyId()
+      }
+
+      clue("Request install and wait for provider to auto-accept") {
+        aliceDirectory.requestDirectoryInstall()
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
+      }
+
+      val (_, subReqId) = clue("Alice requests a directory entry") {
+        aliceDirectory.requestDirectoryEntry(testEntryName)
+      }
+      clue("Alice obtains some coins and accepts the subscription") {
+        aliceWallet.tap(50.0)
+        aliceWallet.acceptSubscriptionRequest(subReqId)
+      }
+      clue("Getting Alice's new entry") {
+        def tryGetEntry() =
+          Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+        eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+      }
+
+      clue("Wait for reward coupons to be issued") {
+        eventually()({
+          aliceValidatorWallet.listAppRewardCoupons() should have length 1
+          aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
+          directory.remoteParticipant.ledger_api.acs
+            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should have length 1
+        })
+      }
+
+      actAndCheck(
+        "Advance six rounds - all rewards should be claimed or expired",
+        Range(1, 7).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "",
+        _ => {
+          aliceValidatorWallet.listAppRewardCoupons() should be(empty)
+          aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
+          directory.remoteParticipant.ledger_api.acs
+            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should be(empty)
+        },
+      )
+
+      actAndCheck(
+        "Advance time until directory entry is up for renewal",
+        advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10))),
+      )(
+        "Wait for another coupon to be generated upon renewal",
+        // We test here that subscription renewal leads to issuing reward coupons.
+        // Since we are using a shared environment, there may be leftover subscriptions from other
+        // tests which will also be renewed here, and generate reward coupons, thus we are not checking
+        // for any exact number of coupons here, just that some reward coupons have been issued.
+        _ => aliceValidatorWallet.listAppRewardCoupons() should not be (empty),
+      )
+    }
   }
 }

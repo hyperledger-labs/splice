@@ -107,7 +107,7 @@ trait CommonCoinAppInstanceReferences {
     )
 
   def splitwellProviderWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
-    uwc(
+    wc(
       "splitwellProviderWallet"
     )
 

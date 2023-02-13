@@ -88,7 +88,7 @@ testUSDSubscription = script do
   pizzeria <- setupUser app "pizzeria" validator
   provider <- setupUser app "la_famiglia" validator
 
-  -- TODO(#2100): more thoroughly test rewards
+  -- TODO(M3-06): more thoroughly test rewards
   featureApp app provider
   validatorUserId <- validateUserId "validator1"
   featuredValidator <- featureApp app (CCUser validatorUserId validator)
@@ -134,9 +134,9 @@ testUSDSubscription = script do
 
   coins3 <- query @Coin pizzeria.primaryParty
   let amounts = map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2)
-  sort amounts === [1.9849825, 2.0] -- TODO(#2100): double-check these values
+  sort amounts === [1.9849825, 2.0] -- TODO(M3-06): double-check these values
 
-  -- TODO(#2100): more thoroughly test rewards
+  -- TODO(M3-06): more thoroughly test rewards
   [(_, coupon1), (_, coupon2), (_, coupon3)] <- query @AppRewardCoupon provider.primaryParty
   coupon1.featured === True
   coupon2.featured === True

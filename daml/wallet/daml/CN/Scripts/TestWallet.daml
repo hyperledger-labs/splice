@@ -239,11 +239,11 @@ testCCPaymentRequest = script do
   checkCoinPositions charlie [1.0, 10.0]
 
   [(_, coupon)] <- query @AppRewardCoupon provider.primaryParty
-  coupon.amount === 0.31 -- TODO(#2100) check these values
+  coupon.amount === 0.31 -- TODO(M3-06) check these values
   coupon.featured === False
 
   [(_, coupon)] <- query @AppRewardCoupon validator
-  coupon.amount === 0.045 -- TODO(#2100) check these values
+  coupon.amount === 0.045 -- TODO(M3-06) check these values
   coupon.provider === validator
   coupon.featured === True
 

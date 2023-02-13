@@ -49,7 +49,6 @@ abstract class ScanAppReference(
     new v1.coin.AppTransferContext(
       coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
       openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-      // TODO(#2154) revisit how apps get access to app transfer contexts that include their featured app right
       None.toJava,
     )
   }
