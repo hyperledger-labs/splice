@@ -30,7 +30,7 @@ class SplitwellMultiDomainIntegrationTest
       })
 
   "splitwell" should {
-    "go through install & payment flow on private domain" in { implicit env =>
+    "go through splitwell payment flow" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
       val bob = onboardWalletUser(bobWallet, bobValidator)
 
@@ -73,7 +73,7 @@ class SplitwellMultiDomainIntegrationTest
       )
       aliceSplitwell.joinGroup(accepted)
       val (_, paymentRequest) = actAndCheck(
-        "alice initiates transfer on private domain",
+        "alice initiates transfer on splitwell domain",
         aliceSplitwell.initiateTransfer(
           groupKey,
           Seq(
@@ -92,7 +92,7 @@ class SplitwellMultiDomainIntegrationTest
         "alice initiates payment accept request on global domain",
         aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
       )(
-        "alice sees accepted app payment on global domain",
+        "alice sees balance update on splitwell domain",
         _ =>
           inside(aliceSplitwell.listBalanceUpdates(groupKey)) { case Seq(update) =>
             update
