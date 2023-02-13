@@ -90,12 +90,12 @@ class WalletApp(
           new JwtCallCredential(validatorAuthToken.getOrElse("")),
         )
       }
-      validatorUserInfo <- retryProvider.retryForAutomationHttp(
+      validatorUserInfo <- retryProvider.retryForAutomation(
         "getValidatorUserInfo",
         validatorConnection.getValidatorUserInfo(),
         this,
       )
-      svcParty <- retryProvider.retryForAutomationHttp(
+      svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

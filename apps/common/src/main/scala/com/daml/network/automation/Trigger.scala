@@ -130,7 +130,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
 
       logger.info(show"Processing\n$task")
       context.retryProvider
-        .retryForAutomationGrpc(
+        .retryForAutomation(
           "processTaskWithRetry",
           processTaskWithStalenessCheck(),
           callingService = this,

@@ -132,7 +132,7 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[Unit] = {
     logger.info("Waiting for CoinRules contract to become visible")
-    retryProvider.retryForAutomationGrpc(
+    retryProvider.retryForAutomation(
       "Wait for CoinRules",
       for {
         coinRulesResult <- store.lookupCoinRulesWithOffset()
@@ -177,7 +177,7 @@ class ValidatorApp(
       store: ValidatorStore,
   ): Future[Unit] = {
     logger.info("Waiting for ValidatorLicense contract to become visible")
-    retryProvider.retryForAutomationGrpc(
+    retryProvider.retryForAutomation(
       "Wait for ValidatorLicense",
       for {
         validatorLicenseResult <- store.lookupValidatorLicenseWithOffset()
@@ -201,7 +201,7 @@ class ValidatorApp(
       secret: String,
   ): Future[Unit] = {
     logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
-    retryProvider.retryForAutomationHttp(
+    retryProvider.retryForAutomation(
       "request onboarding", {
         val svConnection = new SvConnection(
           svConfig,
@@ -227,7 +227,7 @@ class ValidatorApp(
     val coinRulesReq =
       new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
     retryProvider
-      .retryForAutomationGrpc(
+      .retryForAutomation(
         "createCoinRulesRequest",
         for {
           coinRulesResult <- store.lookupCoinRulesWithOffset()
@@ -275,7 +275,7 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection()
-      svcParty <- retryProvider.retryForAutomationHttp(
+      svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

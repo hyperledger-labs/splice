@@ -38,7 +38,7 @@ private[validator] object ValidatorUtil {
     )
     for {
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
-      _ <- retryProvider.retryForAutomationGrpc(
+      _ <- retryProvider.retryForAutomation(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case QueryResult(off, None) =>

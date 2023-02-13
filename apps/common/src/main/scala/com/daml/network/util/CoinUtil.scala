@@ -57,7 +57,7 @@ object CoinUtil {
         QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
       ],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    retryProvider.retryForAutomationGrpc(
+    retryProvider.retryForAutomation(
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(off, None) =>

@@ -255,7 +255,7 @@ class TreasuryService(
 
     withSpan("executeBatchWithRetry") { implicit tc => _ =>
       retryProvider
-        .retryForAutomationGrpc(
+        .retryForAutomation(
           "execute coin operation batch",
           executeBatch(batch),
           this,

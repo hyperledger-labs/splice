@@ -64,7 +64,7 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] =
     for {
-      svcPartyId <- retryProvider.retryForAutomationGrpc("get SVC party ID", getSvcPartyId, this)
+      svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, this)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
       svStore = SvSvStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
       svcStore = SvSvcStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
@@ -86,7 +86,7 @@ class SvApp(
         if (config.foundConsortium) {
           foundConsortium(svcStore, ledgerConnection, retryProvider, this)
         } else {
-          retryProvider.retryForAutomationGrpc(
+          retryProvider.retryForAutomation(
             "join existing SV consortium",
             joinConsortium(svPartyId),
             this,
@@ -166,7 +166,7 @@ class SvApp(
     for {
       domainId <- svcStore.domains.getUniqueDomainId()
       _ <- uploadDars(ledgerConnection)
-      _ <- retryProvider.retryForAutomationGrpc(
+      _ <- retryProvider.retryForAutomation(
         "boostrapping SVC",
         bootstrapSvc(svcStore, ledgerConnection, domainId),
         flagCloseable,

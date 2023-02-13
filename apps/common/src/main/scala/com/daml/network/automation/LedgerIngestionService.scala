@@ -50,7 +50,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
       _ => {
         logger.debug(s"Starting ingestion loop")
         val retryLoopF = retryProvider
-          .retryForAutomationGrpc(
+          .retryForAutomation(
             "ingestion loop", {
               newLedgerSubscription().flatMap(subscription => {
                 // Smuggle the current subscription out of the body here, so that we can use

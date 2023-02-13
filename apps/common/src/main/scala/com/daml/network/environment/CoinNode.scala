@@ -128,7 +128,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       }
     }
 
-    retryProvider.retryForAutomationGrpc("Wait for packages", query(), this)
+    retryProvider.retryForAutomation("Wait for packages", query(), this)
 
   }
 
@@ -139,13 +139,13 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       remoteParticipant.ledgerApi.authConfig,
       loggerFactory,
     )
-    token <- retryProvider.retryForAutomationGrpc(
+    token <- retryProvider.retryForAutomation(
       "Acquiring initial auth token",
       authTokenSource.getToken,
       this,
     )
     _ = logger.debug(s"Using token $token for this ledger client")
-    client <- retryProvider.retryForAutomationGrpc(
+    client <- retryProvider.retryForAutomation(
       "Acquiring coin ledger client",
       CoinLedgerClient.create(
         remoteParticipant.ledgerApi.clientConfig,
@@ -181,7 +181,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     connection = ledgerClient.connection()
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
-      retryProvider.retryForAutomationGrpc(
+      retryProvider.retryForAutomation(
         "Querying primary party of user",
         connection.getPrimaryParty(serviceUser),
         this,

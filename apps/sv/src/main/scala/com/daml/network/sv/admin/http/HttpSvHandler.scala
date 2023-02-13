@@ -91,7 +91,7 @@ class HttpSvHandler(
               for {
                 // We retry here because this mutates the CoinRules and rounds contracts,
                 // which can lead to races.
-                _ <- retryProvider.retryForAutomationGrpc(
+                _ <- retryProvider.retryForAutomation(
                   "onboard validator via SvcRules",
                   onboardValidator(partyId, body.secret, vo),
                   flagCloseable,
