@@ -319,7 +319,12 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
   override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.slice(offset, limit))
+    Future.successful(stateVar.txLog.slice(offset, offset + limit))
+
+  def getTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]] =
+    Future.successful(stateVar.txLog.dropWhile(_.eventId != beginAfterEventId).slice(1, 1 + limit))
 
   override def close(): Unit = ()
 }
@@ -421,21 +426,6 @@ object InMemoryAcsWithTxLogStore {
       )
     }
 
-    def ingestTxLogEntry(entry: Option[TXE]): State[TXI, TXE] = entry match {
-      case Some(e) =>
-        State(
-          offset = offset,
-          nextEventNumber = nextEventNumber,
-          createEvents = createEvents,
-          createEventsById = createEventsById,
-          offsetChanged = offsetChanged,
-          offsetIngestionsToSignal = offsetIngestionsToSignal,
-          txLog = txLog.appended(e.indexRecord),
-        )
-      case None =>
-        this
-    }
-
     def ingestTransferInEvent(
         in: TransferEvent.In,
         p: CreatedEvent => Boolean,
@@ -491,35 +481,32 @@ object InMemoryAcsWithTxLogStore {
       var numFilteredArchivedEvents = 0
       val ingestedCreatedEvents = mutable.ListBuffer[CreatedEvent]()
       val ingestedArchivedEvents = mutable.ListBuffer[ExercisedEvent]()
-      val ingestedTxLogEntries = mutable.ListBuffer[TXE]()
 
       val stNew = Trees.foldTree(tx, this)(
         (st, ev, _) => {
-          val txLogEntry = txLogParser.parseCreate(tx, ev)
-          txLogEntry.foreach(ale => ingestedTxLogEntries.append(ale))
           if (p(ev)) {
             ingestedCreatedEvents.append(ev)
-            st.ingestCreatedEvent(ev).ingestTxLogEntry(txLogEntry)
+            st.ingestCreatedEvent(ev)
           } else {
             numFilteredCreatedEvents += 1
-            st.ingestTxLogEntry(txLogEntry)
+            st
           }
         },
         (st, ev, _) => {
-          val txLogEntry = txLogParser.parseExercise(tx, ev)
-          txLogEntry.foreach(ale => ingestedTxLogEntries.append(ale))
           if (ev.isConsuming) {
             val (newSt, ingested) = st.ingestArchivedEvent(new ContractId(ev.getContractId))
             if (ingested)
               ingestedArchivedEvents.append(ev)
             else
               numFilteredArchivedEvents += 1
-            newSt.ingestTxLogEntry(txLogEntry)
+            newSt
           } else {
-            st.ingestTxLogEntry(txLogEntry)
+            st
           }
         },
       )
+
+      val ingestedTxLogEntries = txLogParser.parse(tx)
 
       val offsetsToRemove = stNew.computeOffsetsToRemove(tx.getOffset)
       val newOffset = Some(tx.getOffset)
@@ -532,7 +519,7 @@ object InMemoryAcsWithTxLogStore {
           offsetChanged = Promise(),
           offsetIngestionsToSignal =
             stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
-          txLog = stNew.txLog,
+          txLog = stNew.txLog.appendedAll(ingestedTxLogEntries.view.map(_.indexRecord)),
         ),
         (
           IngestionSummary(
@@ -547,7 +534,7 @@ object InMemoryAcsWithTxLogStore {
             numFilteredTransferOutEvents = 0,
             offset = newOffset,
             newAcsSize = stNew.createEvents.size,
-            ingestedTxLogEntries = ingestedTxLogEntries,
+            ingestedTxLogEntries = mutable.ListBuffer(ingestedTxLogEntries: _*),
           ),
           offsetChanged,
           offsetsToRemove.values,

@@ -1,12 +1,11 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
+import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -29,6 +28,13 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   def txLogParser: Parser[TXI, TXE]
 
   def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]]
+
+  /** List all events that come after the given event id up to the set limit.
+    * Excludes the event with the given id.
+    */
+  def getTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[Seq[TXI]]
 }
@@ -55,27 +61,13 @@ object TxLogStore {
 
   /** Extracts tx log entries from transaction tree events */
   trait Parser[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
-    def parseCreate(
-        tx: TransactionTree,
-        event: CreatedEvent,
-    )(implicit tc: TraceContext): Option[TXE]
-    def parseExercise(
-        tx: TransactionTree,
-        event: ExercisedEvent,
-    )(implicit tc: TraceContext): Option[TXE]
+    def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE]
   }
 
   object Parser {
     final case class Empty[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]]()
         extends Parser[TXI, TXE] {
-      override def parseCreate(
-          tx: TransactionTree,
-          event: CreatedEvent,
-      )(implicit tc: TraceContext) = None
-      override def parseExercise(
-          tx: TransactionTree,
-          event: ExercisedEvent,
-      )(implicit tc: TraceContext) = None
+      override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
     }
   }
 
@@ -120,6 +112,14 @@ object TxLogStore {
       entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
     } yield entries
 
+    def getTxLogAfterEventId(beginAfterEventId: String, limit: Int)(implicit
+        ec: ExecutionContext,
+        tc: TraceContext,
+    ): Future[Seq[TXE]] = for {
+      indices <- txLogStore.getTxLogIndicesAfterEventId(beginAfterEventId, limit)
+      entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
+    } yield entries
+
     private def loadTxLogEntry(entryIndex: TXI)(implicit
         ec: ExecutionContext,
         tc: TraceContext,
@@ -128,27 +128,20 @@ object TxLogStore {
       // TODO(#2455) handle the case when the transaction has been pruned from the ledger
       tx <- transactionTreeSource.getTransactionTreeByEventId(entryIndex.eventId)
 
-      // Find original tree event
-      event = tx.getEventsById.asScala.getOrElse(
-        entryIndex.eventId,
-        sys.error(
-          s"Event ${entryIndex.eventId} not found in the GetTransactionTreeByEventId response. This should never happen."
-        ),
-      )
+      // Extract application-specific data from the tree
+      entries = txLogStore.txLogParser.parse(tx)
 
-      // Extract application-specific data from the tree event
-      entry = event match {
-        case created: CreatedEvent => txLogStore.txLogParser.parseCreate(tx, created)
-        case exercised: ExercisedEvent => txLogStore.txLogParser.parseExercise(tx, exercised)
-        case _ => sys.error(s"Unknown tree event $event")
-      }
-    } yield entry.getOrElse(
-      sys.error(
-        s"Parser did not return any entry for event ${entryIndex.eventId}. "
-          + "The parser did return an entry for the same event previously. "
-          + "Either the parser doesn't always return the same entry for a given input tree event, "
-          + "or the transaction tree was loaded using different reader parties than those used during ingestion."
-      )
-    )
+      // Find original TxLog entry
+      entry = entries
+        .find(_.indexRecord.eventId == entryIndex.eventId)
+        .getOrElse(
+          sys.error(
+            s"Parser did not return any entry for event ${entryIndex.eventId}. "
+              + "The parser did return an entry for the same event previously. "
+              + "Either the parser doesn't always return the same entry for a given input tree event, "
+              + "or the transaction tree was loaded using different reader parties than those used during ingestion."
+          )
+        )
+    } yield entry
   }
 }

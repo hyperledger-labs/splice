@@ -1,7 +1,7 @@
 package com.daml.network.history
 
 import cats.syntax.traverse.*
-import com.daml.ledger.javaapi.data.Value
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{
@@ -13,9 +13,10 @@ import com.daml.network.codegen.java.cc.coin.{
   LockedCoin,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, Contract}
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 
 /** Parent node of a Canton coin create or archive within the corresponding transaction tree. */
 sealed trait ParentNode {
@@ -218,6 +219,14 @@ object CoinUnlock extends ParentNodeCompanion {
   } yield CoinUnlock(node)
 }
 
+object CoinArchive {
+  // Matches on any consuming exercise on a coin
+  def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
+    if (event.getTemplateId == Coin.COMPANION.TEMPLATE_ID && event.isConsuming) {
+      Some(event)
+    } else None
+}
+
 object ParentNode {
   def fromProtoV0(nodeP: v0.ParentNode): Either[ProtoDeserializationError, ParentNode] = {
     nodeP.`type` match {
@@ -230,6 +239,21 @@ object ParentNode {
       case unlock: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(unlock)
       case ownerLock: v0.ParentNode.Type.OwnerExpireLock => OwnerExpireLock.fromProtoV0(ownerLock)
     }
+  }
+}
+
+object CoinCreate {
+  type TCid = Coin.ContractId
+  type T = Coin
+  type ContractType = Contract[TCid, T]
+  val companion = Coin.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    JavaDecodeUtil
+      .decodeCreated(companion)(event)
+      .map(Contract.fromCodegenContract)
   }
 }
 

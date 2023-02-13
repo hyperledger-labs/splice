@@ -34,8 +34,6 @@ trait CoinAppStore[
 
   // TODO (#2619) remove, and remove futureStore and FutureAcsStore
   final val acs: AcsStore = AcsStore futureStore defaultAcs
-  // TODO (#2620) remove in favor of the multi-domain-compatible overload
-  def txLog: TxLogStore[TXI, TXE]
 
   def acs(domain: DomainId): Future[AcsStore]
 
@@ -123,10 +121,15 @@ trait CoinAppStoreWithHistory[
 ] extends CoinAppStore[TXI, TXE] {
   protected def connection: CoinLedgerConnection
 
-  protected lazy val txLogReader: TxLogStore.Reader[TXI, TXE] =
-    new TxLogStore.Reader[TXI, TXE](
-      txLog,
-      transactionTreeSource = TxLogStore.TransactionTreeSource
-        .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
-    )
+  protected final def txLogReader(domain: DomainId): Future[TxLogStore.Reader[TXI, TXE]] = for {
+    txLog <- txLog(domain)
+  } yield new TxLogStore.Reader[TXI, TXE](
+    txLog,
+    transactionTreeSource = TxLogStore.TransactionTreeSource
+      .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
+  )
+
+  // TODO (#2620) remove if unused
+  protected final lazy val defaultTxLogReader: Future[TxLogStore.Reader[TXI, TXE]] =
+    domains.signalWhenConnected(defaultAcsDomain).flatMap(txLogReader(_))
 }

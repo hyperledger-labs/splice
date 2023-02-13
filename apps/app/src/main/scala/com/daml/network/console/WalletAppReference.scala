@@ -15,6 +15,7 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
   UserStatusData,
 }
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
+import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -320,6 +321,19 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListConnectedDomains)
     }
+
+  @Help.Summary("List transaction history")
+  @Help.Description(
+    "Shows items from the transaction history."
+  )
+  def listTransactions(
+      beginAfterId: Option[String],
+      pageSize: Int,
+  ): Seq[UserWalletTxLogParser.TxLogEntry] = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListTransactions(beginAfterId, pageSize))
+    }
+  }
 }
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet

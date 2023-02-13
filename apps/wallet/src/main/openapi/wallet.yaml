@@ -391,6 +391,24 @@ paths:
         "200":
           description: ok
 
+  /transactions:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listTransactions"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListTransactionsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTransactionsResponse"
 components:
   schemas:
     UserStatusResponse:
@@ -670,3 +688,67 @@ components:
       properties:
         connected_domains:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"
+
+    ListTransactionsRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        begin_after_id:
+          type: string
+        page_size:
+          type: integer
+          format: int64
+
+    PartyAndAmount:
+      type: object
+      required:
+        - party
+        - amount
+      properties:
+        party:
+          type: string
+        amount:
+          type: string
+
+    ListTransactionsResponseItem:
+      type: object
+      required:
+        - transaction_type
+        - event_id
+        - offset
+        - date
+      properties:
+        # Note: our codegen does not support oneOf. The property transaction_type should be a discriminator for a sum type.
+        # Supported transaction types:
+        # - 'transfer', with fields: provider, sender, receivers, holding_fees
+        # - 'balance_change', with fields: receivers
+        transaction_type:
+          type: string
+        event_id:
+          type: string
+        offset:
+          type: string
+        date:
+          type: string
+          format: date-time
+        provider:
+          type: string
+        sender:
+          $ref: "#/components/schemas/PartyAndAmount"
+        receivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndAmount"
+        holding_fees:
+          type: string
+
+    ListTransactionsResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListTransactionsResponseItem"

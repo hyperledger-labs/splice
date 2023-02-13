@@ -15,7 +15,8 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.http.v0.wallet as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.util.{Proto, Contract}
+import com.daml.network.util.{Contract, Proto}
+import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.{DomainAlias, ProtoDeserializationError}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -878,5 +879,29 @@ object HttpWalletAppClient {
     override def handleResponse(
         response: http.CancelFeaturedAppRightsResponse
     )(implicit decoder: TemplateJsonDecoder): Either[String, Unit] = Right(())
+  }
+
+  case class ListTransactions(
+      beginAfterId: Option[String],
+      pageSize: Int,
+  ) extends BaseCommand[http.ListTransactionsResponse, Seq[UserWalletTxLogParser.TxLogEntry]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) =
+      client.listTransactions(
+        body = definitions.ListTransactionsRequest(
+          beginAfterId = beginAfterId,
+          pageSize = pageSize.toLong,
+        ),
+        headers = headers,
+      )
+
+    override def handleResponse(
+        response: http.ListTransactionsResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Seq[UserWalletTxLogParser.TxLogEntry]] =
+      response.fold(ok => ok.items.traverse(UserWalletTxLogParser.TxLogEntry.fromJson))
   }
 }

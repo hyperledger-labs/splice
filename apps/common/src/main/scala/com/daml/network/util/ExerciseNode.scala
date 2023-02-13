@@ -46,6 +46,13 @@ trait ExerciseNodeCompanion {
   def argToValue(a: Arg): CodegenValue
   val resDecoder: ValueDecoder[Res]
   def resToValue(r: Res): CodegenValue
+
+  def unapply(
+      event: ExercisedEvent
+  )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[Arg, Res]] = {
+    ExerciseNode
+      .decodeExerciseEvent(this)(event)(lc)
+  }
 }
 
 object ExerciseNode {
@@ -89,13 +96,15 @@ object ExerciseNode {
   }
 
   private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) = {
-    val idMatches = companion.templateOrInterface match {
+    companion.templateOrInterface match {
       case Left(tplCompanion) =>
-        event.getTemplateId == tplCompanion.TEMPLATE_ID
+        event.getTemplateId == tplCompanion.TEMPLATE_ID && event.getChoice == companion.choice.name
       case Right(ifaceCompanion) =>
-        event.getInterfaceId.toScala == Some(ifaceCompanion.TEMPLATE_ID)
+        // TODO(#2842) This works around a bug in canton-research.
+        event.getInterfaceId.toScala.contains(ifaceCompanion.TEMPLATE_ID) && event.getChoice
+          .split("#")
+          .last == companion.choice.name
     }
-    idMatches && event.getChoice == companion.choice.name
   }
 
   def decodeExerciseEvent(companion: ExerciseNodeCompanion)(

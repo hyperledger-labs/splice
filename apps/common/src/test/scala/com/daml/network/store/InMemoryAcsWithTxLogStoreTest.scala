@@ -5,11 +5,11 @@ import cats.syntax.foldable.*
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree, TreeEvent}
 import com.daml.network.codegen.java.cc.{coin as directoryCodegen}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -89,19 +89,18 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
   ) extends TxLogStore.Entry[TestTxLogIndexRecord]
 
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
-    override def parseCreate(tx: TransactionTree, event: CreatedEvent)(implicit
-        tc: TraceContext
-    ): Option[TestTxLogEntry] =
-      Some(
-        TestTxLogEntry(
-          indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
-          payload = event.getEventId,
-        )
+    override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
+      Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
+        onCreate = (res, event, _) => {
+          res :+
+            TestTxLogEntry(
+              indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
+              payload = event.getEventId,
+            )
+        },
+        onExercise = (res, _, _) => res,
       )
-
-    override def parseExercise(tx: TransactionTree, event: ExercisedEvent)(implicit
-        tc: TraceContext
-    ): Option[TestTxLogEntry] = None
+    }
   }
 
   def mkStore(): Future[InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry]] = {
@@ -285,8 +284,8 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
         indices.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds
         entries.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds
 
-        indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 3)
-        entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 3)
+        indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
+        entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
       }
     }
 

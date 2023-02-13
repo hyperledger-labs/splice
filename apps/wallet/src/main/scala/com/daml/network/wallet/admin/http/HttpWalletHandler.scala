@@ -566,6 +566,23 @@ class HttpWalletHandler(
       )
     }
 
+  override def listTransactions(
+      respond: v0.WalletResource.ListTransactionsResponse.type
+  )(
+      request: definitions.ListTransactionsRequest
+  )(user: String): Future[WalletResource.ListTransactionsResponse] =
+    withNewTrace(workflowId) { implicit traceContext => span =>
+      for {
+        userStore <- getUserStore(user)
+        beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
+        transactions <- userStore.listTransactions(beginAfterId, request.pageSize.toInt)
+      } yield v0.WalletResource.ListTransactionsResponse.OK(
+        definitions.ListTransactionsResponse(
+          items = transactions.map(_.toJson).toVector
+        )
+      )
+    }
+
   private def coinToCoinPosition(
       coin: Contract[Coin.ContractId, Coin],
       round: Long,
