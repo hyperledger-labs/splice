@@ -4,12 +4,14 @@ import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
 import com.daml.network.config.CoinConfigTransforms.updateAllWalletAppBackendConfigs_
 import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.util.FrontendLoginUtil
 import monocle.macros.syntax.lens.*
 
 import java.net.URL
-import scala.util.Using
 
-class WalletAuth0FrontendIntegrationTest extends FrontendIntegrationTest("randomUser") {
+class WalletAuth0FrontendIntegrationTest
+    extends FrontendIntegrationTest("randomUser")
+    with FrontendLoginUtil {
 
   override def environmentDefinition = {
     CoinEnvironmentDefinition
@@ -32,43 +34,25 @@ class WalletAuth0FrontendIntegrationTest extends FrontendIntegrationTest("random
 
     "allow login via auth0 and persist user name on refresh" taggedAs LocalAuth0Test in {
       implicit env =>
-        val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
-        Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
-          logger.debug(
-            s"Created user ${user.email} with password ${user.password} (id: ${user.id})"
+        withAuth0LoginCheck("randomUser", 3000) { (userPartyId, wd) =>
+          implicit val webDriver: WebDriverType = wd
+          actAndCheck(
+            "The user reloads the page", {
+              go to s"http://localhost:3000"
+            },
+          )(
+            "The user is automatically logged in",
+            _ =>
+              find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
           )
-          val userPartyId = aliceValidator.onboardUser(user.id)
-
-          withFrontEnd("randomUser") { implicit webDriver =>
-            actAndCheck(
-              "The user logs in with OAauth2 and completes all Auth0 login prompts", {
-                go to "http://localhost:3000"
-                click on "oidc-login-button"
-                completeAuth0LoginWithAuthorization(user.email, user.password)
-              },
-            )(
-              "The user sees his own party ID in the app",
-              _ =>
-                find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
-            )
-            actAndCheck(
-              "The user reloads the page", {
-                go to s"http://localhost:3000"
-              },
-            )(
-              "The user is automatically logged in",
-              _ =>
-                find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
-            )
-            actAndCheck(
-              "The user logs out", {
-                click on "logout-button"
-              },
-            )(
-              "The user sees the login screen again",
-              _ => find(id("oidc-login-button")) should not be empty,
-            )
-          }
+          actAndCheck(
+            "The user logs out", {
+              click on "logout-button"
+            },
+          )(
+            "The user sees the login screen again",
+            _ => find(id("oidc-login-button")) should not be empty,
+          )
         }
     }
   }

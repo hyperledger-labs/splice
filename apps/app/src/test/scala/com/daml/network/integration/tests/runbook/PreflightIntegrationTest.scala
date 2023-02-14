@@ -11,6 +11,7 @@ import com.daml.network.util.{
   Auth0User,
   CantonProcessTestUtil,
   SplitwellFrontendTestUtil,
+  WalletFrontendTestUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -31,6 +32,7 @@ class PreflightIntegrationTest
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
     with WalletTestUtil
+    with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
@@ -108,12 +110,7 @@ class PreflightIntegrationTest
     }
 
     withFrontEnd("alice-v1") { implicit webDriver =>
-      click on "tap-amount-field"
-      numberField("tap-amount-field").underlying.sendKeys("100")
-      click on "tap-button"
-      eventually() {
-        findAll(className("coins-table-row")) should have size 1
-      }
+      tapAndListCoins(100)
 
       createTransferOffer(bobPartyId, "10", "p2ptransfer")
 
@@ -169,7 +166,7 @@ class PreflightIntegrationTest
     withFrontEnd("bob-v1") { implicit webDriver =>
       bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
-      tapViaUi(710)
+      tapAndListCoins(710)
       // bob needs a directory name because as our no-explicit-disclosure workaround, we send splitwell group invites
       // to all parties who have a directory name
       reserveDirectoryNameFor(bobUser, directoryUiUrl, bobDirectoryNameRaw)
@@ -177,14 +174,11 @@ class PreflightIntegrationTest
 
     withFrontEnd("alice-v1") { implicit webDriver =>
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
-      tapViaUi(50)
+      tapAndListCoins(50)
       reserveDirectoryNameFor(aliceUser, directoryUiUrl, aliceDirectoryNameRaw)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
-      click on "group-id-field"
-      textField("group-id-field").value = groupName
-      click on "create-group-button"
-      click on className("create-invite-link")
+      createGroupAndInviteLink(groupName)
     }
 
     // can assign these now after party id's of alice & bob are known.
@@ -239,38 +233,19 @@ class PreflightIntegrationTest
     withFrontEnd("alice-v1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
 
-      click on "tap-amount-field"
-      numberField("tap-amount-field").underlying.sendKeys("100")
-      click on "tap-button"
-      eventually() {
-        findAll(className("coins-table-row")) should have size 1
-      }
+      tapAndListCoins(100)
 
-      go to directoryUiUrl
-
-      click on "oidc-login-button"
-      completeAuth0Prompts(
-        aliceUser.email,
-        aliceUser.password,
-        () => find(id("entry-name-field")).isDefined,
-      )
-
-      waitForQuery(id("entry-name-field"))
-
-      click on "entry-name-field"
-      textField("entry-name-field").value = "alice.cns"
-
-      click on "request-entry-with-sub-button"
-
-      eventually() {
-        findAll(className("sub-requests-table-row")) should have size 1
-      }
+      allocateDirectoryEntry(aliceUser, directoryUiUrl, "alice.cns")
     }
   }
 
-  def reserveDirectoryNameFor(auth0User: Auth0User, directoryUiUrl: String, entryName: String)(
-      implicit webDrive: WebDriverType
-  ): String = {
+  private def allocateDirectoryEntry(
+      auth0User: Auth0User,
+      directoryUiUrl: String,
+      entryName: String,
+  )(implicit
+      webDrive: WebDriverType
+  ) = {
     go to directoryUiUrl
     click on "oidc-login-button"
     completeAuth0Prompts(
@@ -289,6 +264,13 @@ class PreflightIntegrationTest
     eventually() {
       findAll(className("sub-requests-table-row")) should have size 1
     }
+  }
+
+  def reserveDirectoryNameFor(auth0User: Auth0User, directoryUiUrl: String, entryName: String)(
+      implicit webDrive: WebDriverType
+  ): String = {
+    allocateDirectoryEntry(auth0User, directoryUiUrl, entryName)
+
     // user is redirected to their wallet...
     eventually() {
       findAll(className("sub-request-accept-button")) should have size 1
@@ -381,15 +363,6 @@ class PreflightIntegrationTest
       find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
         elm => elm.text
       )
-    }
-  }
-
-  private def tapViaUi(quantity: Double)(implicit webDriver: WebDriverType) = {
-    click on "tap-amount-field"
-    numberField("tap-amount-field").underlying.sendKeys(quantity.toString)
-    click on "tap-button"
-    eventually() {
-      findAll(className("coins-table-row")) should have size 1
     }
   }
 

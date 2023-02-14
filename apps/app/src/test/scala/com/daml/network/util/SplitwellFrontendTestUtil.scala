@@ -36,4 +36,15 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
     click on className("transfer-link")
   }
 
+  def createGroup(groupName: String)(implicit webDriver: WebDriverType) = {
+    click on "group-id-field"
+    textField("group-id-field").value = groupName
+    click on "create-group-button"
+  }
+  def createGroupAndInviteLink(groupName: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    createGroup(groupName)
+    click on className("create-invite-link")
+  }
 }

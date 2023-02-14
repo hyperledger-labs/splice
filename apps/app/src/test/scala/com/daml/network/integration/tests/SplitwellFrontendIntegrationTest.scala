@@ -5,11 +5,15 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.{DirectoryTestUtil, SplitwellFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  DirectoryTestUtil,
+  FrontendLoginUtil,
+  SplitwellFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration.DurationInt
-import scala.util.Using
 
 class SplitwellFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment(
@@ -19,7 +23,8 @@ class SplitwellFrontendIntegrationTest
     )
     with DirectoryTestUtil
     with WalletTestUtil
-    with SplitwellFrontendTestUtil {
+    with SplitwellFrontendTestUtil
+    with FrontendLoginUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
   private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -62,21 +67,12 @@ class SplitwellFrontendIntegrationTest
       bobWallet.tap(550)
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        go to "http://localhost:3002"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
-        click on "group-id-field"
-        textField("group-id-field").value = groupName
-        click on "create-group-button"
-        click on className("create-invite-link")
+        login(3002, aliceDamlUser)
+        createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        go to "http://localhost:3003"
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        login(3003, bobDamlUser)
         bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
@@ -87,10 +83,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
-        go to "http://localhost:3005"
-        click on "user-id-field"
-        textField("user-id-field").value = charlieDamlUser
-        click on "login-button"
+        login(3005, charlieDamlUser)
         charlieValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(charlieUserParty)
         click on className("request-membership-link")
@@ -139,9 +132,7 @@ class SplitwellFrontendIntegrationTest
         click on className("settle-my-debts-link")
 
         // Bob is redirected to wallet ..
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        loginOnCurrentPage(bobDamlUser)
 
         click on className("accept-button")
 
@@ -191,21 +182,12 @@ class SplitwellFrontendIntegrationTest
       bobWallet.tap(510)
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        go to "http://localhost:3002"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
-        click on "group-id-field"
-        textField("group-id-field").value = groupName
-        click on "create-group-button"
-        click on className("create-invite-link")
+        login(3002, aliceDamlUser)
+        createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        go to "http://localhost:3003"
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        login(3003, bobDamlUser)
         bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
@@ -220,9 +202,7 @@ class SplitwellFrontendIntegrationTest
         enterSplitwellPayment(aliceEntryName, 500)
 
         // Bob is redirected to wallet ..
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        loginOnCurrentPage(bobDamlUser)
 
         click on className("accept-button")
 
@@ -266,22 +246,11 @@ class SplitwellFrontendIntegrationTest
 
       // Alice creates three groups - abc, ab, ac
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        go to "http://localhost:3002"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        login(3002, aliceDamlUser)
 
-        click on "group-id-field"
-        textField("group-id-field").value = "group-abc"
-        click on "create-group-button"
-
-        click on "group-id-field"
-        textField("group-id-field").value = "group-ab"
-        click on "create-group-button"
-
-        click on "group-id-field"
-        textField("group-id-field").value = "group-ac"
-        click on "create-group-button"
+        createGroup("group-abc")
+        createGroup("group-ab")
+        createGroup("group-ac")
 
         eventually() {
           findAll(className("create-invite-link")).toSeq should have length 3
@@ -291,10 +260,7 @@ class SplitwellFrontendIntegrationTest
 
       // Bob requests to join groups abc and ab
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        go to "http://localhost:3003"
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        login(3003, bobDamlUser)
         bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
@@ -312,10 +278,7 @@ class SplitwellFrontendIntegrationTest
 
       // Charlie requests to join groups abc and ac
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
-        go to "http://localhost:3005"
-        click on "user-id-field"
-        textField("user-id-field").value = charlieDamlUser
-        click on "login-button"
+        login(3005, charlieDamlUser)
         bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
@@ -377,25 +340,7 @@ class SplitwellFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
-      Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
-        logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
-        val userPartyId = aliceValidator.onboardUser(user.id)
-
-        withFrontEnd("aliceSplitwell") { implicit webDriver =>
-          actAndCheck(
-            "The user logs in with OAauth2 and completes all Auth0 login prompts", {
-              go to "http://localhost:3005"
-              click on "oidc-login-button"
-              completeAuth0LoginWithAuthorization(user.email, user.password)
-            },
-          )(
-            "The user sees his own party ID in the app",
-            _ =>
-              find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
-          )
-        }
-      }
+      withAuth0LoginCheck("aliceSplitwell", 3005)((_, _) => ())
     }
   }
 }

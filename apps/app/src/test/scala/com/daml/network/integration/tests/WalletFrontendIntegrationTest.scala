@@ -1,13 +1,15 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 
 import java.time.Duration
 import scala.util.Try
 
 class WalletFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletFrontendTestUtil
+    with FrontendLoginUtil {
 
   "A wallet UI" should {
 
@@ -17,12 +19,7 @@ class WalletFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
-        click on "tap-amount-field"
-        numberField("tap-amount-field").underlying.sendKeys("15.0")
-        click on "tap-button"
-        eventually() {
-          findAll(className("coins-table-row")) should have size 1
-        }
+        tapAndListCoins(15)
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val amount = row.childElement(className("coins-table-amount"))
         amount.text should be("15.0CC")
@@ -44,13 +41,7 @@ class WalletFrontendIntegrationTest
           find(id("unlocked-qty")).value.text should matchText("0.0000000000")
         }
 
-        click on "tap-amount-field"
-        numberField("tap-amount-field").underlying.sendKeys(s"$tapQty")
-        click on "tap-button"
-        // This is required to ensure we can lock coins
-        eventually() {
-          findAll(className("coins-table-row")) should have size 1
-        }
+        tapAndListCoins(tapQty)
 
         lockCoins(
           aliceWalletBackend,
@@ -81,10 +72,7 @@ class WalletFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
-        go to s"http://localhost:3000"
-        click on "user-id-field"
-        textField("user-id-field").value = newRandomUser
-        click on "login-button"
+        login(3000, newRandomUser)
 
         // After a short delay, the UI should realize that the user is not onboarded,
         // and switch to the onbaording page.
@@ -97,12 +85,7 @@ class WalletFrontendIntegrationTest
 
         // After a short delay, the UI should realize that the user is now onboarded
         // and switch to the default view.
-        click on "tap-amount-field"
-        numberField("tap-amount-field").underlying.sendKeys("15.0")
-        click on "tap-button"
-        eventually() {
-          findAll(className("coins-table-row")) should have size 1
-        }
+        tapAndListCoins(15)
       }
     }
 
@@ -113,10 +96,7 @@ class WalletFrontendIntegrationTest
 
         withFrontEnd("alice") { implicit webDriver =>
           // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
-          go to s"http://localhost:3000"
-          click on "user-id-field"
-          textField("user-id-field").value = newRandomUser
-          click on "login-button"
+          login(3000, newRandomUser)
 
           // After a short delay, the UI should realize that the user is not onboarded,
           // and switch to the onbaording page.
@@ -129,12 +109,7 @@ class WalletFrontendIntegrationTest
 
           // After a short delay, the UI should realize that the user is now onboarded
           // and switch to the default view.
-          click on "tap-amount-field"
-          numberField("tap-amount-field").underlying.sendKeys("15.0")
-          click on "tap-button"
-          eventually() {
-            findAll(className("coins-table-row")) should have size 1
-          }
+          tapAndListCoins(15)
         }
     }
 

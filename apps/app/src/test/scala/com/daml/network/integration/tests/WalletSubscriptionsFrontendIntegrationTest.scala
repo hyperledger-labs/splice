@@ -1,14 +1,15 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class WalletSubscriptionsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
-    with WalletTestUtil {
+    with WalletTestUtil
+    with FrontendLoginUtil {
 
   "A wallet UI" should {
 

@@ -2,14 +2,14 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
 import scala.concurrent.duration.DurationInt
-import scala.util.Using
 
 class DirectoryFrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
-    with WalletTestUtil {
+    with WalletTestUtil
+    with FrontendLoginUtil {
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -33,10 +33,7 @@ class DirectoryFrontendIntegrationTest
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3004"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        login(3004, aliceDamlUser)
         eventually(scaled(10 seconds)) {
           click on "entry-name-field"
         }
@@ -44,9 +41,7 @@ class DirectoryFrontendIntegrationTest
         click on "request-entry-with-sub-button"
 
         // Alice is redirected to wallet...
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        loginOnCurrentPage(aliceDamlUser)
         click on className("sub-request-accept-button")
 
         // And then back to directory, where she is already logged in
@@ -62,25 +57,7 @@ class DirectoryFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
-      Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
-        logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
-        val userPartyId = aliceValidator.onboardUser(user.id)
-
-        withFrontEnd("alice") { implicit webDriver =>
-          actAndCheck(
-            "The user logs in with OAauth2 and completes all Auth0 login prompts", {
-              go to "http://localhost:3004"
-              click on "oidc-login-button"
-              completeAuth0LoginWithAuthorization(user.email, user.password)
-            },
-          )(
-            "The user sees his own party ID in the app",
-            _ =>
-              find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
-          )
-        }
-      }
+      withAuth0LoginCheck("alice", 3004)((_, _) => ())
     }
   }
 }

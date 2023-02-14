@@ -1,12 +1,14 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import org.openqa.selenium.{Keys, WebDriver}
 
 class WalletPaymentFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletFrontendTestUtil
+    with FrontendLoginUtil {
 
   "A wallet UI" should {
 
@@ -42,15 +44,7 @@ class WalletPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
 
-          // Verify that the total amount of CC is properly displayed
-          eventually() {
-            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-              // Verify that the currency and amount are properly displayed
-              row.childElement(className("app-request-total-amount")).text should matchText(
-                "42.00000000CC"
-              )
-            }
-          }
+          verifyRequestAmountIsDisplayed(42)
 
           // Verify that the receiver table row is properly displayed
           eventually() {
@@ -62,9 +56,7 @@ class WalletPaymentFrontendIntegrationTest
                 .text shouldBe aliceUserParty.toProtoPrimitive
 
               // Verify that the currency and amount are properly displayed
-              row.childElement(className("app-request-payment-amount")).text should matchText(
-                "42.0CC"
-              )
+              verifyReceiverTableAmounts("42.0CC")
             }
           }
         }
@@ -80,15 +72,7 @@ class WalletPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
 
-          // Verify that the total amount of USD is properly displayed
-          eventually() {
-            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-              // Verify that the currency and amount are properly displayed
-              row.childElement(className("app-request-total-amount")).text should matchText(
-                "42.00000000CC"
-              )
-            }
-          }
+          verifyRequestAmountIsDisplayed(42)
 
           // Verify that the receiver table row is properly displayed
           eventually() {
@@ -100,9 +84,7 @@ class WalletPaymentFrontendIntegrationTest
                 .text shouldBe aliceUserParty.toProtoPrimitive
 
               // Verify that the currency and amount are properly displayed
-              row.childElement(className("app-request-payment-amount")).text should matchText(
-                "42.0USD"
-              )
+              verifyReceiverTableAmounts("42.0USD")
             }
           }
         }
@@ -124,28 +106,10 @@ class WalletPaymentFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
 
-        // Verify that the total amount of USD is properly displayed
-        eventually() {
-          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-            // Verify that the currency and amount are properly displayed
-            row.childElement(className("app-request-total-amount")).text should matchText(
-              "42.00000000CC"
-            )
-          }
-        }
+        verifyRequestAmountIsDisplayed(42)
 
         // Verify that the receiver table rows contain both receiver amounts
-        eventually() {
-          val amounts =
-            findAll(className("receiver-amount-row")).toList.map(row =>
-              row.childElement(className("app-request-payment-amount")).text
-            )
-
-          amounts should contain theSameElementsAs Seq(
-            "22.0CC",
-            "20.0CC",
-          )
-        }
+        verifyReceiverTableAmounts("22.0CC", "20.0CC")
       }
     }
 

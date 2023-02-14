@@ -3,8 +3,13 @@ package com.daml.network.integration.tests
 import com.daml.network.config.CoinConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{CoinTestConsoleEnvironment}
-import com.daml.network.util.{DirectoryTestUtil, WalletTestUtil}
+import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.util.{
+  DirectoryTestUtil,
+  FrontendLoginUtil,
+  SplitwellFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.Keys
 
@@ -14,7 +19,9 @@ class SplitwellMultiDomainFrontendIntegrationTest
       "bobSplitwell",
     )
     with DirectoryTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with FrontendLoginUtil
+    with SplitwellFrontendTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
   private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -50,21 +57,12 @@ class SplitwellMultiDomainFrontendIntegrationTest
       val groupId = "alice_group"
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        go to "http://localhost:3002"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
-        click on "group-id-field"
-        textField("group-id-field").value = groupId
-        click on "create-group-button"
-        click on className("create-invite-link")
+        login(3002, aliceDamlUser)
+        createGroupAndInviteLink(groupId)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        go to "http://localhost:3003"
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
+        login(3003, bobDamlUser)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 1
         }
@@ -87,9 +85,7 @@ class SplitwellMultiDomainFrontendIntegrationTest
         click on className("transfer-link")
 
         // Alice is redirected to wallet ..
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        loginOnCurrentPage(aliceDamlUser)
         click on className("accept-button")
 
         // And then back to splitwell, where she is already logged in
