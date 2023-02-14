@@ -323,18 +323,18 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       val (_, _) = onboardAliceAndBob()
       val coinRules = scan.getUnfeaturedAppTransferContext().coinRules
 
-      clue("create issuing round 1") {
+      clue("create issuing rounds 0 and 1") {
         advanceRoundsByOneTick
         advanceRoundsByOneTick
       }
-      // run a tx so alice wallet's cache is hydrated  up to issuing round 1.
+      // run a tx so alice wallet's cache is hydrated up to issuing round 1.
       aliceWallet.tap(5)
 
       clue("create issuing round 2") {
         advanceRoundsByOneTick
       }
 
-      clue("gametime") {
+      clue("check that issuing round 1 is cached") {
 
         loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
           {

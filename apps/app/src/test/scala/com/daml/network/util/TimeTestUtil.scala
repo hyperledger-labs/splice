@@ -65,11 +65,14 @@ trait TimeTestUtil extends CoinTestCommon {
     */
   @nowarn("msg=match may not be exhaustive")
   def advanceRoundsByOneTick(implicit env: CoinTestConsoleEnvironment) = {
+    // TODO(M4-82): remove wallet synchronization.
 
     val Seq(lowestOpen, middleOpen, highestOpen) = getSortedOpenMiningRounds(
       aliceWalletBackend.remoteParticipant,
       aliceValidator.getValidatorPartyId(),
     ).map(_.data.round.number)
+
+    val (latestOpenScan, previousIssuingRoundsScan) = scan.getLatestOpenAndIssuingMiningRounds()
 
     val previousIssuingRounds = getSortedIssuingRounds(
       aliceWalletBackend.remoteParticipant,
@@ -86,10 +89,15 @@ trait TimeTestUtil extends CoinTestCommon {
             aliceValidator.getValidatorPartyId(),
           ).map(_.data.round.number)
 
+          val (newLatestOpenScan, newIssuingRoundsScan) =
+            scan.getLatestOpenAndIssuingMiningRounds()
+
           newLowestOpen shouldBe lowestOpen + 1
           newLowestOpen shouldBe middleOpen
           newMiddleOpen shouldBe highestOpen
           newHighestOpen shouldBe highestOpen + 1
+
+          latestOpenScan.payload.round.number shouldBe newLatestOpenScan.payload.round.number - 1
 
           val newIssuingRounds = getSortedIssuingRounds(
             aliceWalletBackend.remoteParticipant,
@@ -107,6 +115,21 @@ trait TimeTestUtil extends CoinTestCommon {
             newLowestIssuing shouldBe middleIssuing
             newMiddleIssuing shouldBe highestIssuing
             newHighestIssuing shouldBe highestIssuing + 1
+          }
+
+          if (previousIssuingRoundsScan.size < 3)
+            newIssuingRoundsScan.size shouldBe previousIssuingRoundsScan.size + 1
+          else {
+            val Seq(lowestIssuingScan, middleIssuingScan, highestIssuingScan) =
+              previousIssuingRoundsScan.map(_.payload.round.number)
+            newIssuingRoundsScan should have size 3
+            val Seq(newLowestIssuingScan, newMiddleIssuingScan, newHighestIssuingScan) =
+              newIssuingRoundsScan.map(_.payload.round.number)
+
+            newLowestIssuingScan shouldBe lowestIssuingScan + 1
+            newLowestIssuingScan shouldBe middleIssuingScan
+            newMiddleIssuingScan shouldBe highestIssuingScan
+            newHighestIssuingScan shouldBe highestIssuingScan + 1
           }
         },
     )

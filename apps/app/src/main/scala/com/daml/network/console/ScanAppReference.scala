@@ -3,6 +3,7 @@ package com.daml.network.console
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.round as roundCodegen
+import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.Contract
@@ -61,6 +62,19 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetClosedRounds)
     }
+
+  @Help.Summary(
+    "List the latest open mining round and all issuing mining rounds."
+  )
+  def getLatestOpenAndIssuingMiningRounds(): (
+      Contract[OpenMiningRound.ContractId, OpenMiningRound],
+      Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+  ) = {
+    val result = consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(None, Map()))
+    }
+    (result._1, result._2.values.toSeq)
+  }
 
   @Help.Summary("List all issued featured app rights")
   def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
