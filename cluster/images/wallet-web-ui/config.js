@@ -23,11 +23,11 @@ window.canton_network_config = {
     },
     directory: {
       // URL of the directory backend.
-      grpcUrl: `https://${cluster}:6010`,
+      grpcUrl: `https://directory.${cluster}`,
     },
     scan: {
       // URL of the scan app's HTTP API
-      grpcUrl: `https://${cluster}:6012`,
+      grpcUrl: `https://scan.${cluster}`,
     },
   },
 };

@@ -16,7 +16,7 @@ window.canton_network_config = {
   services: {
     directory: {
       // URL of the directory backend.
-      grpcUrl: `https://${cluster}:6010`,
+      grpcUrl: `https://directory.${cluster}`,
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API

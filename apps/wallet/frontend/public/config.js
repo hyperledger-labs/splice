@@ -26,12 +26,12 @@ window.canton_network_config = {
     directory: {
       // URL of the directory backend.
       // Edit this to the cluster you're trying to connect on.
-      grpcUrl: 'https://TARGET_CLUSTER.network.canton.global:6010',
+      grpcUrl: 'https://directory.TARGET_CLUSTER.network.canton.global',
     },
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.
-      grpcUrl: 'https://TARGET_CLUSTER.network.canton.global:6012',
+      grpcUrl: 'https://scan.TARGET_CLUSTER.network.canton.global',
     },
     // END_WALLET_CLUSTER_BACKEND_CONFIG
   },
