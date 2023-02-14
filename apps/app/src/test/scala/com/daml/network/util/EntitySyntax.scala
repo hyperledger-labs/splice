@@ -84,7 +84,7 @@ trait EntitySyntax {
       }
     }
 
-    def toParticipantRef: LocalParticipantReference = p(name)
+    def toParticipantRef: LocalParticipantReference = lp(name)
 
     def toParticipantId: ParticipantId = toParticipantRef.id
   }

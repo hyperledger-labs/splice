@@ -195,7 +195,7 @@ private[mediator] class ConfirmationResponseProcessor(
                 case mediatorReject: MediatorReject =>
                   sendMalformedRejection(
                     requestId,
-                    request,
+                    Some(request),
                     rootHashMessages,
                     mediatorReject,
                     decisionTime,
@@ -245,8 +245,8 @@ private[mediator] class ConfirmationResponseProcessor(
       .leftMap { informeesNoParticipant =>
         val reject = MediatorError.InvalidMessage.Reject.create(
           show"Received a mediator request with id $requestId with some informees not being hosted by an active participant: $informeesNoParticipant. Rejecting request...",
-          v0.MediatorRejection.Code.InformeesNotHostedOnActiveParticipant,
           protocolVersion,
+          v0.MediatorRejection.Code.InformeesNotHostedOnActiveParticipant,
         )
         reject.log()
         Some(reject)
@@ -480,9 +480,9 @@ private[mediator] class ConfirmationResponseProcessor(
       }
   }
 
-  private def sendMalformedRejection(
+  private[mediator] def sendMalformedRejection(
       requestId: RequestId,
-      request: MediatorRequest,
+      requestO: Option[MediatorRequest],
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
       rejectionReason: MediatorReject,
       decisionTime: CantonTimestamp,
@@ -509,14 +509,15 @@ private[mediator] class ConfirmationResponseProcessor(
             //  Afterwards, consider to unify this with the code in DefaultVerdictSender.
             val rejection = viewType match {
               case ViewType.TransactionViewType =>
-                request match {
-                  case InformeeMessage(_) =>
+                requestO match {
+                  case Some(request @ InformeeMessage(_)) =>
                     request.createMediatorResult(
                       requestId,
                       rejectionReason,
                       Set.empty,
                     )
-                  case _: MediatorRequest =>
+                  // For other kinds of request, or if the request is unknown, we send a generic result
+                  case _ =>
                     MalformedMediatorRequestResult(
                       requestId,
                       domainId,
@@ -613,11 +614,11 @@ private[mediator] class ConfirmationResponseProcessor(
           }
 
         responseAggregation <- mediatorState.fetch(response.requestId).orElse {
-          // We assume the informee message has already been persisted in mediatorStorage before any participant responds
+          // This can happen after a fail-over or as part of an attack.
           val cause =
             s"Received a mediator response at $ts by ${response.sender} with an unknown request id ${response.requestId}. Discarding response..."
-          val alarm = MediatorError.MalformedMessage.Reject(cause, protocolVersion)
-          alarm.report()
+          val error = MediatorError.InvalidMessage.Reject.create(cause, protocolVersion)
+          error.log()
 
           OptionT.none
         }

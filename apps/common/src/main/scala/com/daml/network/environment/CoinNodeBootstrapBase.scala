@@ -9,7 +9,7 @@ import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.RequireTypes.InstanceName
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
@@ -28,6 +28,8 @@ import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
+import com.daml.metrics.HealthMetrics
+import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -88,6 +90,8 @@ abstract class CoinNodeBootstrapBase[
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     grpcMetrics: GrpcServerMetrics,
+    configuredOpenTelemetry: ConfiguredOpenTelemetry,
+    healthMetrics: HealthMetrics,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
     implicit val scheduler: ScheduledExecutorService,
@@ -98,7 +102,7 @@ abstract class CoinNodeBootstrapBase[
 
   protected val adminApiConfig = config.adminApi
   protected val initConfig = config.init
-  protected val tracerProvider = TracerProvider.Factory(parameterConfig.tracing.tracer, name.unwrap)
+  protected val tracerProvider = TracerProvider.Factory(configuredOpenTelemetry, name.unwrap)
   implicit val tracer: Tracer = tracerProvider.tracer
 
   private val isRunningVar = new AtomicBoolean(true)
@@ -224,7 +228,6 @@ abstract class CoinNodeBootstrapBase[
         val instances = List(
           adminServerRegistry,
           adminServer,
-          tracerProvider,
         ) ++ getNode.toList ++ stores ++ List(clock)
         Lifecycle.close(instances: _*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")

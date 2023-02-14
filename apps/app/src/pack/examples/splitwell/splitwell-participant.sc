@@ -8,11 +8,11 @@ splitwellParticipant.start()
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 splitwellParticipant.domains.connect("global", domainUrl)
 println(s"Creating validator user")
-val validatorParty = splitwellParticipant.parties.enable("validator_user")
+val validatorParty = splitwellParticipant.ledger_api.parties.allocate("validator_user","validator_user").party
 splitwellParticipant.ledger_api.users.create(
     id = "validator_user",
-    actAs = Set(validatorParty.toLf),
+    actAs = Set(validatorParty),
     readAs = Set.empty,
-    primaryParty = Some(validatorParty.toLf),
+    primaryParty = Some(validatorParty),
     participantAdmin = true,
 )

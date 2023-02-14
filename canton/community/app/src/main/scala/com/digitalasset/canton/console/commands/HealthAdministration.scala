@@ -3,9 +3,10 @@
 
 package com.digitalasset.canton.console.commands
 
+import com.digitalasset.canton.admin.api.client.commands.HttpAdminCommand
 import better.files.File
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.admin.api.client.commands.{HttpAdminCommand, StatusAdminCommands}
+import com.digitalasset.canton.admin.api.client.commands.StatusAdminCommands
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
 import com.digitalasset.canton.console.ConsoleMacros.utils

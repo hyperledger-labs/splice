@@ -31,7 +31,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.RequireTypes.InstanceName
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{
   CantonConfig,
   CantonFeatures,
@@ -90,6 +90,7 @@ case class CoinConfig(
 
   override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
+
   override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
   private lazy val validatorAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
@@ -509,6 +510,7 @@ object CoinConfig {
   @nowarn("cat=unused")
   class ConfigWriters(confidential: Boolean) {
     val writers = new CantonConfig.ConfigWriters(confidential)
+
     import writers.*
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*

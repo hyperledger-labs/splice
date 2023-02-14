@@ -3,19 +3,22 @@
 
 package com.digitalasset.canton.domain.metrics
 
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricDoc.MetricQualification.Debug
 import com.daml.metrics.api.MetricHandle.{Gauge, Meter}
 import com.daml.metrics.api.noop.NoOpGauge
 import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
-import com.daml.metrics.grpc.GrpcServerMetrics
+import com.daml.metrics.grpc.{DamlGrpcServerMetrics, GrpcServerMetrics}
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.metrics.MetricHandle.MetricsFactory
+import com.digitalasset.canton.metrics.MetricHandle.{MetricsFactory, NoOpMetricsFactory}
 import com.digitalasset.canton.metrics.{DbStorageMetrics, SequencerClientMetrics}
+import com.google.common.annotations.VisibleForTesting
 
 class SequencerMetrics(
     parent: MetricName,
     val factory: MetricsFactory,
     val grpcMetrics: GrpcServerMetrics,
+    val healthMetrics: HealthMetrics,
 ) {
   val prefix: MetricName = MetricName(parent :+ "sequencer")
 
@@ -57,7 +60,29 @@ class SequencerMetrics(
   )
   val timeRequests: Meter = factory.meter(prefix :+ "time-requests")
 
+  @MetricDoc.Tag(
+    summary = "Age of oldest unpruned sequencer event.",
+    description =
+      """This gauge exposes the age of the oldest, unpruned sequencer event in hours as a way to quantify the
+        |pruning backlog.""",
+    qualification = Debug,
+  )
+  val maxEventAge: Gauge[Long] =
+    factory.gauge[Long](MetricName(prefix :+ "max-event-age"), 0L)(MetricsContext.Empty)
+
   object dbStorage extends DbStorageMetrics(prefix, factory)
+}
+
+object SequencerMetrics {
+
+  @VisibleForTesting
+  def noop(testName: String) = new SequencerMetrics(
+    MetricName(testName),
+    NoOpMetricsFactory,
+    new DamlGrpcServerMetrics(NoOpMetricsFactory, "sequencer"),
+    new HealthMetrics(NoOpMetricsFactory),
+  )
+
 }
 
 class EnvMetrics(factory: MetricsFactory) {
@@ -92,11 +117,12 @@ class DomainMetrics(
     val prefix: MetricName,
     val metricsFactory: MetricsFactory,
     val grpcMetrics: GrpcServerMetrics,
+    val healthMetrics: HealthMetrics,
 ) {
 
   object dbStorage extends DbStorageMetrics(prefix, metricsFactory)
 
-  object sequencer extends SequencerMetrics(prefix, metricsFactory, grpcMetrics)
+  object sequencer extends SequencerMetrics(prefix, metricsFactory, grpcMetrics, healthMetrics)
 
   object mediator extends MediatorMetrics(prefix, metricsFactory)
 
@@ -107,6 +133,7 @@ class MediatorNodeMetrics(
     val prefix: MetricName,
     val metricsFactory: MetricsFactory,
     val grpcMetrics: GrpcServerMetrics,
+    val healthMetrics: HealthMetrics,
 ) {
 
   object dbStorage extends DbStorageMetrics(prefix, metricsFactory)
@@ -137,6 +164,15 @@ class MediatorMetrics(basePrefix: MetricName, metricsFactory: MetricsFactory) {
   )
   val requests: Meter = metricsFactory.meter(prefix :+ "requests")
 
+  @MetricDoc.Tag(
+    summary = "Age of oldest unpruned mediator response.",
+    description =
+      """This gauge exposes the age of the oldest, unpruned mediator response in hours as a way to quantify the
+        |pruning backlog.""",
+    qualification = Debug,
+  )
+  val maxEventAge: Gauge[Long] =
+    metricsFactory.gauge[Long](MetricName(prefix :+ "max-event-age"), 0L)(MetricsContext.Empty)
 }
 
 class IdentityManagerMetrics(basePrefix: MetricName, metricsFactory: MetricsFactory) {

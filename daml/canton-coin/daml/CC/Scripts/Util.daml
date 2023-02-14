@@ -4,8 +4,9 @@ module CC.Scripts.Util where
 
 import Daml.Script
 
-import DA.Action (void, when)
+import DA.Action (void, when, unless)
 import DA.Date
+import DA.Exception
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import DA.List.Total
@@ -474,3 +475,12 @@ featureApp app provider = do
   (openRound, _) <- getLatestOpenRound app
   submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
     provider = provider.primaryParty
+
+assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
+assertError f = do
+  isThrown <-
+    try do
+      let _ = f ()
+      pure False
+    catch (e : AnyException) -> pure True
+  unless isThrown (abort "expected exception but didn't get one")

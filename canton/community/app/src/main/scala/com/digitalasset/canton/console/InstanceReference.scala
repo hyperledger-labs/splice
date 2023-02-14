@@ -3,11 +3,8 @@
 
 package com.digitalasset.canton.console
 
-import io.grpc.CallCredentials
-
-import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.*
-import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, HttpAdminCommand}
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.CommandErrors.NodeNotStarted
@@ -32,6 +29,9 @@ import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
 
 import scala.util.hashing.MurmurHash3
+import com.daml.ledger.api.auth.client.LedgerCallCredentials
+import io.grpc.CallCredentials
+import com.digitalasset.canton.admin.api.client.commands.HttpAdminCommand
 
 trait InstanceReference
     extends AdminCommandRunner
@@ -102,8 +102,8 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     @Help.Description(
       """In some rare cases, we change already applied database migration files in a new release and the repair
         |command resets the checksums we use to ensure that in general already applied migration files have not been changed.
-        |You should only use `db.repair_migration` when advised and otherwise use it at your own risk - in the worst case running 
-        |it may lead to data corruption when an incompatible database migration (one that should be rejected because 
+        |You should only use `db.repair_migration` when advised and otherwise use it at your own risk - in the worst case running
+        |it may lead to data corruption when an incompatible database migration (one that should be rejected because
         |the already applied database migration files have changed) is subsequently falsely applied.
         |"""
     )
@@ -111,6 +111,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
       consoleEnvironment.run(repairMigrationCommand(force))
 
   }
+
   @Help.Summary("Start the instance")
   def start(): Unit = consoleEnvironment.run(startCommand())
 
@@ -155,6 +156,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     }
 
   protected def migrateInstanceDb(): Either[StartupError, _] = nodes.migrateDatabase(name)
+
   protected def repairMigrationOfInstance(force: Boolean): Either[StartupError, Unit] = {
     Either
       .cond(force, (), DidntUseForceOnRepairMigration(name))
@@ -162,7 +164,9 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
   }
 
   protected def startInstance(): Either[StartupError, Unit] = nodes.start(name).map(_ => ())
+
   protected def stopInstance(): Either[ShutdownError, Unit] = nodes.stop(name)
+
   protected[canton] def crypto: Crypto
 
   protected def runCommandIfRunning[Result](
@@ -241,6 +245,7 @@ trait DomainReference
       consoleEnvironment,
       loggerFactory,
     )
+
   @Help.Summary("Topology management related commands")
   @Help.Group("Topology")
   @Help.Description("This group contains access to the full set of topology management commands.")
@@ -264,12 +269,14 @@ trait DomainReference
 
   private lazy val sequencer_ =
     new SequencerAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Manage the sequencer")
   @Help.Group("Sequencer")
   override def sequencer: SequencerAdministrationGroup = sequencer_
 
   private lazy val mediator_ =
     new MediatorAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Manage the mediator")
   @Help.Group("Mediator")
   def mediator: MediatorAdministrationGroup = mediator_
@@ -349,9 +356,9 @@ class CommunityLocalDomainReference(
   * is not supported
   *
   * @param hostname the hostname of the ledger api server
-  * @param port the port of the ledger api server
-  * @param tls the tls config to use on the client
-  * @param token the jwt token to use on the client
+  * @param port     the port of the ledger api server
+  * @param tls      the tls config to use on the client
+  * @param token    the jwt token to use on the client
   */
 class ExternalLedgerApiClient(
     hostname: String,
@@ -440,6 +447,7 @@ abstract class ParticipantReference(
       consoleEnvironment,
       loggerFactory,
     )
+
   @Help.Summary("Topology management related commands")
   @Help.Group("Topology")
   @Help.Description("This group contains access to the full set of topology management commands.")
@@ -462,6 +470,7 @@ abstract class ParticipantReference(
   @Help.Summary("Manage participant replication")
   @Help.Group("Replication")
   def replication: ParticipantReplicationAdministrationGroup = replicationGroup
+
   lazy private val replicationGroup =
     new ParticipantReplicationAdministrationGroup(this, consoleEnvironment)
 
@@ -498,17 +507,20 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
   @Help.Summary("Inspect and manage parties")
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
+
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
     new ParticipantPartiesAdministrationGroup(id, this, consoleEnvironment)
 
   private lazy val testing_ = new ParticipantTestingGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Commands used for development and testing", FeatureFlag.Testing)
   @Help.Group("Testing")
   override def testing: ParticipantTestingGroup = testing_
 
   private lazy val pruning_ =
     new ParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Commands to prune the archive of the participant ledger")
   @Help.Group("Participant Pruning")
   def pruning: ParticipantPruningAdministrationGroup = pruning_
@@ -528,17 +540,20 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
 
   private lazy val testing_ =
     new LocalParticipantTestingGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Commands used for development and testing", FeatureFlag.Testing)
   override def testing: LocalParticipantTestingGroup = testing_
 
   private lazy val pruning_ =
     new LocalParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Commands to truncate the archive of the ledger", FeatureFlag.Preview)
   @Help.Group("Ledger Pruning")
   def pruning: LocalParticipantPruningAdministrationGroup = pruning_
 
   private lazy val commitments_ =
     new LocalCommitmentsAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
   @Help.Summary("Commands to inspect and extract bilateral commitments", FeatureFlag.Preview)
   @Help.Group("Commitments")
   def commitments: LocalCommitmentsAdministrationGroup = commitments_
@@ -548,6 +563,7 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
       override protected def access[T](handler: ParticipantNode => T): T =
         LocalParticipantReference.this.access(handler)
     }
+
   @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
   @Help.Group("Repair")
   def repair: ParticipantRepairAdministration = repair_
@@ -555,6 +571,7 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   @Help.Summary("Inspect and manage parties")
   @Help.Group("Parties")
   override def parties: LocalParticipantPartiesAdministrationGroup = partiesGroup
+
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
     new LocalParticipantPartiesAdministrationGroup(this, this, consoleEnvironment, loggerFactory)

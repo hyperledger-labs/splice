@@ -12,7 +12,8 @@ import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.{

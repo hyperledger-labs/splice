@@ -13,13 +13,13 @@ println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("global", domainUrl)
 
 println(s"Creating validator user: " + validatorUserName)
-val validatorParty = validatorParticipant.parties.enable("validator_service_user")
+val validatorParty = validatorParticipant.ledger_api.parties.allocate("validator_service_user", "validator_service_user").party
 
 validatorParticipant.ledger_api.users.create(
     id = validatorUserName,
-    actAs = Set(validatorParty.toLf),
+    actAs = Set(validatorParty),
     readAs = Set.empty,
-    primaryParty = Some(validatorParty.toLf),
+    primaryParty = Some(validatorParty),
     participantAdmin = true,
 )
 println("Validator participant bootstrap finished")

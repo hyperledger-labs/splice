@@ -14,12 +14,13 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.daml.platform.akkastreams.dispatcher.Dispatcher
 import com.daml.platform.akkastreams.dispatcher.SubSource.RangeSource
+import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{PositiveNumeric, String300}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.metrics.TimedLoadGauge
+import com.digitalasset.canton.metrics.{MetricsHelper, TimedLoadGauge}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher.{
   PendingEventPublish,
   PendingPublish,
@@ -588,6 +589,20 @@ class DbMultiDomainEventLog private[db] (
       )
     }
 
+  override def locatePruningTimestamp(
+      skip: NonNegativeInt
+  )(implicit traceContext: TraceContext): OptionT[Future, CantonTimestamp] =
+    processingTime
+      .optionTEvent {
+        storage.querySingle(
+          sql"select publication_time from linearized_event_log order by global_offset #${storage
+              .limit(1, skip.value.toLong)}"
+            .as[CantonTimestamp]
+            .headOption,
+          functionFullName,
+        )
+      }
+
   override def lookupOffset(globalOffset: GlobalOffset)(implicit
       traceContext: TraceContext
   ): OptionT[Future, (EventLogId, LocalOffset, CantonTimestamp)] =
@@ -708,6 +723,13 @@ class DbMultiDomainEventLog private[db] (
   override def publicationTimeLowerBound: CantonTimestamp = publicationTimeLowerBoundRef.get()
 
   override def flush(): Future[Unit] = doFlush()
+
+  override def reportMaxEventAgeMetric(oldestEventTimestamp: Option[CantonTimestamp]): Unit =
+    MetricsHelper.updateAgeInHoursGauge(
+      clock,
+      metrics.pruning.prune.maxEventAge,
+      oldestEventTimestamp,
+    )
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*

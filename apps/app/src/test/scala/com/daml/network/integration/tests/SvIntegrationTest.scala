@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
 import scala.concurrent.duration.*
@@ -111,9 +112,16 @@ class SvIntegrationTest extends CoinIntegrationTest {
       },
     )._1
     val candidate = clue("create a dummy party") {
-      bobValidator.remoteParticipantWithAdminToken.parties.enable(
-        "dummy" + env.environment.config.name.getOrElse("")
+      val name = "dummy" + env.environment.config.name.getOrElse("")
+      PartyId.tryFromLfParty(
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.parties
+          .allocate(
+            name,
+            name,
+          )
+          .party
       )
+
     }
     clue("try to onboard with a wrong secret, which should fail") {
       assertThrows[CommandFailure](

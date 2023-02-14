@@ -30,7 +30,7 @@ import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
-import com.digitalasset.canton.config.RequireTypes.InstanceName
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
@@ -80,6 +80,7 @@ class CoinConsoleEnvironment(
 
   def mergeLocalCoinInstances(locals: Seq[LocalCoinAppReference]*): Seq[LocalCoinAppReference] =
     locals.flatten
+
   def mergeRemoteCoinInstances(remotes: Seq[CoinAppReference]*): Seq[CoinAppReference] =
     remotes.flatten
 

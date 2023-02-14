@@ -13,7 +13,8 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.RequireTypes.InstanceName
+import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.*
@@ -38,6 +39,7 @@ class ScanAppBootstrap(
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
+    configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -57,6 +59,8 @@ class ScanAppBootstrap(
       loggerFactory,
       writeHealthDumpToFile,
       metrics.grpcMetrics,
+      configuredOpenTelemetry,
+      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -96,6 +100,7 @@ object ScanAppBootstrap {
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
       retryProvider: CoinRetries,
+      configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -117,6 +122,7 @@ object ScanAppBootstrap {
           writeHealthDumpToFile,
           retryProvider,
           futureSupervisor,
+          configuredOpenTelemetry,
         )
       )
       .leftMap(_.toString)

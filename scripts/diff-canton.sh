@@ -6,4 +6,5 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-diff -ur -x VERSION -x version.sbt -x community-build.sbt -x deployment -x project -x scripts $1 canton
+diff -urN -x VERSION -x version.sbt -x daml -x .git -x community-build.sbt -x deployment \
+ -x project -x scripts -x .github -x .idea -x demo "$1" canton

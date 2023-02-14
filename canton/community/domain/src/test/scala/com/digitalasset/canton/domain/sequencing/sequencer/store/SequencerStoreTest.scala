@@ -7,7 +7,8 @@ import cats.data.EitherT
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, String256M}
+import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.DomainSequencingTestUtils.mockDeliverStoreEvent
 import com.digitalasset.canton.domain.sequencing.sequencer.store.SaveLowerBoundError.BoundLowerThanExisting
@@ -677,7 +678,7 @@ trait SequencerStoreTest
           statusBefore <- store.status(ts(10))
           recordCountsBefore <- store.countRecords
           pruningTimestamp = statusBefore.safePruningTimestamp
-          _message <- {
+          _tsAndReport <- {
             logger.debug(s"Pruning sequencer store from $pruningTimestamp")
             store
               .prune(pruningTimestamp, statusBefore, NonNegativeFiniteDuration.ofSeconds(1))
@@ -748,7 +749,7 @@ trait SequencerStoreTest
           statusBefore <- store.status(ts(10))
           recordCountsBefore <- store.countRecords
           pruningTimestamp = ts(5)
-          _message <- {
+          _tsAndReport <- {
             logger.debug(s"Pruning sequencer store from $pruningTimestamp")
             store
               .prune(pruningTimestamp, statusBefore, NonNegativeFiniteDuration.ofSeconds(1))

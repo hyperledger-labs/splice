@@ -8,6 +8,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import cats.syntax.parallel.*
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
+import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.sequencer.store.InMemorySequencerStore
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -76,17 +77,19 @@ class SequencerTest extends FixtureAsyncWordSpec with BaseTest with HasExecution
         .forDomain(domainId)
         .toRight("crypto error")
     )("building crypto")
+    val metrics = SequencerMetrics.noop("sequencer-test")
 
     val sequencer =
       DatabaseSequencer.single(
         CommunitySequencerConfig.Database(),
         DefaultProcessingTimeouts.testing,
-        new MemoryStorage(),
+        new MemoryStorage(loggerFactory),
         clock,
         domainId,
         topologyClientMember,
         testedProtocolVersion,
         crypto,
+        metrics,
         loggerFactory,
       )(parallelExecutionContext, tracer, materializer)
 

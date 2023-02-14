@@ -9,7 +9,7 @@ import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
-import com.digitalasset.canton.config.RequireTypes.NonEmptyString
+import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.{
   CommunityDomainConfig,
@@ -54,7 +54,7 @@ object CoinConfigTransforms {
     *
     * val validatorUserName = validatorApp.config.ledgerApiUser
     * // validatorUserName will have the name with the suffix applied
-    * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
+    * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
   def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
     val suffix = context.toLowerCase
@@ -127,7 +127,7 @@ object CoinConfigTransforms {
     *
     * val validatorUserName = validatorApp.config.ledgerApiUser
     * // validatorUserName will have the name with the suffix applied
-    * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
+    * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
   def ensureNovelDamlNames(): CoinConfigTransform = { config =>
     val id = (new scala.util.Random).nextInt().toHexString

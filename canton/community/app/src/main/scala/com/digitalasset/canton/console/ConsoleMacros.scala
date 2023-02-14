@@ -4,6 +4,7 @@
 package com.digitalasset.canton.console
 
 import better.files.File
+import com.digitalasset.canton.DomainAlias
 import cats.syntax.functor.*
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
@@ -22,10 +23,9 @@ import com.daml.ledger.api.v1.value.{
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data.ListPartiesResult
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
-import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
-import com.digitalasset.canton.external.{BackgroundRunnerHandler, BackgroundRunnerHelpers}
 import com.digitalasset.canton.logging.{LastErrorsAppender, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.{RepairService, SyncStateInspection}
 import com.digitalasset.canton.participant.config.{AuthServiceConfig, BaseParticipantConfig}
@@ -33,8 +33,7 @@ import com.digitalasset.canton.participant.ledger.api.JwtTokenUtilities
 import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
-import com.digitalasset.canton.util.{BinaryFileUtil, ErrorUtil}
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
+import com.digitalasset.canton.util.BinaryFileUtil
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
@@ -43,12 +42,12 @@ import io.circe.syntax.*
 
 import java.io.{File as JFile}
 import java.time.Instant
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait ConsoleMacros extends NamedLogging with NoTracing {
+
   import scala.reflect.runtime.universe.*
 
   @Help.Summary("Console utilities")
@@ -72,8 +71,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Wait for a value computation to not fail, using default timeouts")
     @Help.Description("""
-      |Wait until the value computes successfully, with a timeout taken from the parameters.timeouts.console.bounded 
-      |configuration parameter.""")
+        |Wait until the value computes successfully, with a timeout taken from the parameters.timeouts.console.bounded
+        |configuration parameter.""")
     final def retry[A](computeValue: => A)(isFailure: A => Boolean)(implicit
         env: ConsoleEnvironment
     ): A = retry(env.commandTimeouts.bounded, 10.seconds)(computeValue)(
@@ -82,9 +81,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
 
     @Help.Summary("Wait for a value computation to not fail")
-    @Help.Description("""Wait `timeout` duration until `computeValue` does not fail (as indicated by `isFailure`). 
-      | Retry evaluating `computeValue` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries. 
-      |""")
+    @Help.Description("""Wait `timeout` duration until `computeValue` does not fail (as indicated by `isFailure`).
+        | Retry evaluating `computeValue` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries.
+        |""")
     @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
     final def retry[A](
         timeout: NonNegativeDuration,
@@ -113,8 +112,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @Help.Summary("Wait for a condition to become true, using default timeouts")
     @Help.Description("""
-       |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded 
-       |configuration parameter.""")
+        |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded
+        |configuration parameter.""")
     final def retry_until_true(
         condition: => Boolean
     )(implicit
@@ -125,8 +124,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
 
     @Help.Summary("Wait for a condition to become true")
-    @Help.Description("""Wait `timeout` duration until `condition` becomes true. 
-        | Retry evaluating `condition` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries. 
+    @Help.Description("""Wait `timeout` duration until `condition` becomes true.
+        | Retry evaluating `condition` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries.
         |""")
     @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
     final def retry_until_true(
@@ -136,7 +135,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         condition: => Boolean,
         failure: => String = s"Condition never became true within $timeout",
     ): Unit = {
-      retry(timeout, maxWaitPeriod)(condition)(x => !x, failure).discard
+      retry(timeout, maxWaitPeriod)(condition)(x => !x, failure): Unit
     }
 
     @Help.Summary("Wait until all topology changes have been effected on all accessible nodes")
@@ -180,11 +179,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object GenerateDamlScriptParticipantsConf {
+
       import ConsoleEnvironment.Implicits.*
 
       private val filename = "participant-config.json"
 
       case class LedgerApi(host: String, port: Int)
+
       // Keys in the exported JSON should have snake_case
       case class Participants(
           default_participant: Option[LedgerApi],
@@ -202,6 +203,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         def participantReference(p: ParticipantId) = if (useParticipantAlias)
           uidToAlias.getOrElse(p, p.uid.toProtoPrimitive)
         else p.uid.toProtoPrimitive
+
         def partyIdToParticipant(p: ListPartiesResult) = p.participants.headOption.map {
           participantDomains =>
             (p.party.filterString, participantReference(participantDomains.participant))
@@ -400,114 +402,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
   }
 
-  // intentionally not publicly documented
-  // TODO(#8353): Identify non-daml-sdk way to run the daml-json service, perhaps renaming `sdk` to something else.
-  //  Alternatively even though the daml-sdk may not be available in all environments (such as integration tests)
-  //  keep this around and count on users installing the daml-sdk on top of canton.
-  object sdk extends Helpful {
-
-    private val backgroundRunner =
-      new BackgroundRunnerHandler[String](ProcessingTimeout(), loggerFactory)
-    private val jsonApiPort = new AtomicInteger(7575)
-    private val registeredClose = new AtomicBoolean(false)
-
-    private def ensureWeClose()(implicit env: ConsoleEnvironment): Unit = {
-      // ensure we close when this env goes down
-      if (!registeredClose.getAndSet(true)) {
-        env.environment.addUserCloseable(() => {
-          backgroundRunner.close()
-        })
-      }
-    }
-
-    object http_json {
-      def launch_for(ref: ParticipantReference, port: Option[Int] = None)(implicit
-          env: ConsoleEnvironment
-      ): Port = {
-        val config = ref.config.clientLedgerApi
-        ErrorUtil.requireArgument(
-          config.tls.isEmpty,
-          "Implementing starting json-apis with TLS connection support is left to the reader as an exercise",
-        )
-        val name = s"json-api-${ref.name}"
-        val httpPort = port.getOrElse(jsonApiPort.getAndIncrement())
-        val cmd =
-          Seq(
-            "daml",
-            "json-api",
-            "--ledger-host",
-            s"${config.address}",
-            "--ledger-port",
-            s"${config.port.unwrap}",
-            "--http-port",
-            s"${httpPort}",
-            "--allow-insecure-tokens",
-          )
-        logger.info(s"Starting ${name} as external process with $cmd")
-        if (!backgroundRunner.exists(name)) {
-          logger.warn(
-            "Starting `daml json-api` which must have been installed separately from canton."
-          )
-          backgroundRunner.tryAdd(name, cmd, name, manualStart = false)
-          ensureWeClose()
-        }
-        BackgroundRunnerHelpers.waitUntilUp(Port.tryCreate(httpPort), 30)
-        Port.tryCreate(httpPort)
-      }
-    }
-
-    object jwt {
-
-      def generate_unsafe_token_for_participant(
-          participant: LocalParticipantReference,
-          admin: Boolean,
-          applicationId: String,
-      ): Map[PartyId, String] = {
-        val secret = participant.config.ledgerApi.authServices
-          .collectFirst { case AuthServiceConfig.UnsafeJwtHmac256(secret) =>
-            secret.unwrap
-          }
-          .getOrElse("notasecret")
-
-        participant.parties
-          .hosted()
-          .map(_.party)
-          .map(x =>
-            (
-              x,
-              generate_unsafe_jwt256_token(
-                secret = secret,
-                admin = admin,
-                readAs = List(x.toLf),
-                actAs = List(x.toLf),
-                ledgerId = Some(participant.id.uid.id.unwrap),
-                applicationId = Some(applicationId),
-              ),
-            )
-          )
-          .toMap
-
-      }
-
-      def generate_unsafe_jwt256_token(
-          secret: String,
-          admin: Boolean,
-          readAs: List[String],
-          actAs: List[String],
-          ledgerId: Option[String],
-          applicationId: Option[String],
-      ): String = JwtTokenUtilities.buildUnsafeToken(
-        secret = secret,
-        admin = admin,
-        readAs = readAs,
-        actAs = actAs,
-        ledgerId = ledgerId,
-        applicationId = applicationId,
-      )
-
-    }
-  }
-
   @Help.Summary("Canton development and testing utilities", FeatureFlag.Testing)
   @Help.Group("Ledger Api Testing")
   object ledger_api_utils extends Helpful {
@@ -597,6 +491,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         opt.getOrElse(
           throw new IllegalArgumentException(s"Corrupt created event ${event} without ${desc}")
         )
+
       exercise(
         getOrThrow(
           "packageId",
@@ -611,6 +506,54 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       )
     }
 
+    // intentionally not publicly documented
+    object jwt {
+      def generate_unsafe_token_for_participant(
+          participant: LocalParticipantReference,
+          admin: Boolean,
+          applicationId: String,
+      ): Map[PartyId, String] = {
+        val secret = participant.config.ledgerApi.authServices
+          .collectFirst { case AuthServiceConfig.UnsafeJwtHmac256(secret) =>
+            secret.unwrap
+          }
+          .getOrElse("notasecret")
+
+        participant.parties
+          .hosted()
+          .map(_.party)
+          .map(x =>
+            (
+              x,
+              generate_unsafe_jwt256_token(
+                secret = secret,
+                admin = admin,
+                readAs = List(x.toLf),
+                actAs = List(x.toLf),
+                ledgerId = Some(participant.id.uid.id.unwrap),
+                applicationId = Some(applicationId),
+              ),
+            )
+          )
+          .toMap
+      }
+
+      def generate_unsafe_jwt256_token(
+          secret: String,
+          admin: Boolean,
+          readAs: List[String],
+          actAs: List[String],
+          ledgerId: Option[String],
+          applicationId: Option[String],
+      ): String = JwtTokenUtilities.buildUnsafeToken(
+        secret = secret,
+        admin = admin,
+        readAs = readAs,
+        actAs = actAs,
+        ledgerId = ledgerId,
+        applicationId = applicationId,
+      )
+    }
   }
 
   @Help.Summary("Logging related commands")

@@ -3,6 +3,7 @@ import scala.collection.mutable.ListBuffer
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
 import com.digitalasset.canton.console.ParticipantReference
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.topology.PartyId
 
 println("Running canton bootstrap script...")
@@ -12,12 +13,12 @@ participants.all.domains.connect_local(global)
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
 Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(_.domains.connect_local(splitwell))
 
-def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[PartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
-  val party = participant.parties.enable(user)
+def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[LfPartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
+  val party = participant.ledger_api.parties.allocate(user, user).party
   participant.ledger_api.users.create(
     id = user,
-    actAs = Set(party.toLf) ++ additionalActAsParties.map(_.toLf),
-    primaryParty = Some(party.toLf),
+    actAs = Set(party) ++ additionalActAsParties,
+    primaryParty = Some(party),
     readAs = Set(),
     participantAdmin = true,
   )

@@ -11,16 +11,18 @@ import com.daml.ledger.participant.state.v2.{
   TransactionMeta,
   Update,
 }
-import com.daml.lf.CantonOnly
 import com.daml.lf.data.{Bytes, ImmArray}
 import com.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.participant.protocol.ProcessingSteps
+import com.digitalasset.canton.participant.protocol.ProcessingSteps.RequestType
 import com.digitalasset.canton.protocol.{
   LfCommittedTransaction,
   LfContractId,
   LfHash,
   LfNodeCreate,
   LfNodeId,
+  LfVersionedTransaction,
   TransferId,
 }
 import com.digitalasset.canton.topology.DomainId
@@ -31,6 +33,7 @@ import com.digitalasset.canton.{
   LedgerTransactionId,
   LfPartyId,
   LfTimestamp,
+  LfWorkflowId,
 }
 import com.google.rpc.status.Status as RpcStatus
 import io.scalaland.chimney.Transformer
@@ -229,6 +232,7 @@ object LedgerSyncEvent {
       recordTime: LfTimestamp,
       completionInfo: CompletionInfo,
       reasonTemplate: CommandRejected.FinalReason,
+      kind: ProcessingSteps.RequestType.Values,
   ) extends LedgerSyncEvent
       with PrettyPrinting {
     override def description: String =
@@ -242,13 +246,20 @@ object LedgerSyncEvent {
         param("recordTime", _.recordTime),
         param("completionInfo", _.completionInfo),
         param("reason", _.reasonTemplate),
+        param("kind", _.kind),
       )
 
-    def toDamlUpdate: Option[Update] = Some(this.transformInto[Update.CommandRejected])
+    def toDamlUpdate: Option[Update] = {
+      val selector = kind match {
+        case RequestType.Transaction => Some(())
+        case _: RequestType.Transfer => None
+      }
+
+      selector.map(_ => this.transformInto[Update.CommandRejected])
+    }
   }
 
   object CommandRejected {
-
     final case class FinalReason(status: RpcStatus) extends PrettyPrinting {
       def message: String = status.message
       def code: Int = status.code
@@ -275,6 +286,7 @@ object LedgerSyncEvent {
     * @param targetDomainId        The target domain of the transfer.
     * @param transferInExclusivity The timestamp of the timeout before which only the submitter can initiate the
     *                              corresponding transfer-in. Must be provided for the participant that submitted the transfer-out.
+    * @param workflowId            The workflowId specified by the submitter in the transfer command.
     */
   final case class TransferredOut(
       updateId: LedgerTransactionId,
@@ -286,6 +298,7 @@ object LedgerSyncEvent {
       sourceDomainId: DomainId,
       targetDomainId: DomainId,
       transferInExclusivity: Option[LfTimestamp],
+      workflowId: Option[LfWorkflowId],
   ) extends LedgerSyncEvent
       with PrettyPrinting {
 
@@ -301,6 +314,7 @@ object LedgerSyncEvent {
       param("source", _.sourceDomainId),
       param("target", _.targetDomainId),
       paramIfDefined("transferInExclusivity", _.transferInExclusivity),
+      paramIfDefined("workflowId", _.workflowId),
     )
 
     def toDamlUpdate: Option[Update] = None
@@ -319,6 +333,7 @@ object LedgerSyncEvent {
     * @param targetDomain              The target domain of the transfer.
     * @param createTransactionAccepted We used to create a TransactionAccepted for the transferIn.
     *                                  This param is used to keep the same behavior.
+    * @param workflowId                The workflowId specified by the submitter in the transfer command.
     */
 
   final case class TransferredIn(
@@ -333,6 +348,7 @@ object LedgerSyncEvent {
       transferOutId: TransferId,
       targetDomain: DomainId,
       createTransactionAccepted: Boolean,
+      workflowId: Option[LfWorkflowId],
   ) extends LedgerSyncEvent
       with PrettyPrinting {
     def sourceDomain: DomainId = transferOutId.sourceDomain
@@ -346,16 +362,16 @@ object LedgerSyncEvent {
       param("submitter", _.submitter),
       param("recordTime", _.recordTime),
       param("transferOutId", _.transferOutId),
-      param("transferOutId", _.transferOutId),
       param("target", _.targetDomain),
       paramWithoutValue("createNode"),
       paramWithoutValue("contractMetadata"),
       paramWithoutValue("createdEvent"),
+      paramIfDefined("workflowId", _.workflowId),
     )
 
     lazy val transactionMeta = TransactionMeta(
       ledgerEffectiveTime = ledgerCreateTime,
-      workflowId = None,
+      workflowId = workflowId,
       submissionTime = recordTime, // TODO(M41): Upstream mismatch, replace with enter/leave view
       submissionSeed = LedgerSyncEvent.noOpSeed,
       optUsedPackages = None,
@@ -372,7 +388,7 @@ object LedgerSyncEvent {
       Option.when(createTransactionAccepted) {
         val nodeId = LfNodeId(0)
         val committedTransaction = LfCommittedTransaction(
-          CantonOnly.lfVersionedTransaction(
+          LfVersionedTransaction(
             version = createNode.version,
             nodes = HashMap((nodeId, createNode)),
             roots = ImmArray(nodeId),

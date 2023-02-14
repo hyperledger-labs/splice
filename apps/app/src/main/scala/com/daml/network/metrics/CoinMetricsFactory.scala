@@ -1,6 +1,7 @@
 package com.daml.network.metrics
 
 import com.codahale.metrics
+import com.daml.metrics.grpc.DamlGrpcServerMetrics
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
@@ -8,6 +9,7 @@ import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
+import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory}
 import io.opentelemetry.api.metrics.Meter
@@ -40,11 +42,12 @@ case class CoinMetricsFactory(
   def forValidator(name: String): ValidatorAppMetrics = {
     validators.getOrElseUpdate(
       name, {
-        val metricName = deduplicateName(name, "validator", validators)
+        val metricName = deduplicateName(name, "Validator", validators)
         new ValidatorAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("validator"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "Validator"),
+          healthMetrics,
         )
       },
     )
@@ -56,8 +59,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "SVC", svcs)
         new SvcAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("SVC"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "SVC"),
+          healthMetrics,
         )
       },
     )
@@ -69,8 +73,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "SV", svcs)
         new SvAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("SV"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "SV"),
+          healthMetrics,
         )
       },
     )
@@ -82,8 +87,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "Scan", scans)
         new ScanAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("Scan"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "Scan"),
+          healthMetrics,
         )
       },
     )
@@ -95,8 +101,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "Wallet", wallets)
         new WalletAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("Wallet"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "Wallet"),
+          healthMetrics,
         )
       },
     )
@@ -108,8 +115,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "Directory", directories)
         new DirectoryAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("Directory"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "Directory"),
+          healthMetrics,
         )
       },
     )
@@ -121,8 +129,9 @@ case class CoinMetricsFactory(
         val metricName = deduplicateName(name, "Splitwell", splitwells)
         new SplitwellAppMetrics(
           MetricsFactory.prefix,
-          newRegistry(metricName),
-          grpcMetricsForComponent("Splitwell"),
+          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
+          new DamlGrpcServerMetrics(openTelemetryFactory, "Splitwell"),
+          healthMetrics,
         )
       },
     )
@@ -133,7 +142,7 @@ object CoinMetricsFactory {
   def forConfig(config: MetricsConfig): CoinMetricsFactory = {
     val registry = new metrics.MetricRegistry()
     val meterProviderBuilder = SdkMeterProvider.builder()
-    val reporter = registerReporter(config, registry, meterProviderBuilder)
+    val reporter = registerReporter(config, registry)
     val meterProvider = meterProviderBuilder.build()
     new CoinMetricsFactory(
       reporter,

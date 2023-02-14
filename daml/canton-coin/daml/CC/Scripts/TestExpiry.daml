@@ -9,12 +9,9 @@ import CC.Round
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
-import DA.Action
 import DA.Assert
 import DA.Date
 import DA.Time
-
-import DA.Exception
 
 import qualified CC.API.V1.Round as API
 
@@ -80,10 +77,10 @@ testEstimateOpenRoundCreatedAt = script do
   estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 3)) === (Singleton t05_00) -- T00:05:00
 
   -- estimate the creation time of round relative to round 3
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round (3))))
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 4)) === (Singleton t07_30) -- T00:07:30
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 5)) === (Singleton t10_00) -- T00:10:00
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 6)) === (Singleton t12_30) -- T00:12:30
+  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round (3))))
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 4)) === (Singleton t07_30) -- T00:07:30
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 5)) === (Singleton t10_00) -- T00:10:00
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 6)) === (Singleton t12_30) -- T00:12:30
 
 testAmountExpiresAt : Script ()
 testAmountExpiresAt = do
@@ -113,12 +110,3 @@ addRelRoundN : Int -> Time -> RelTime -> Time
 addRelRoundN n t relTime
   | n <= 0 = t
   | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
-
-assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
-assertError f = do
-  isThrown <-
-    try do
-      let _ = f ()
-      pure False
-    catch (e : AnyException) -> pure True
-  unless isThrown (abort "expected exception but didn't get one")

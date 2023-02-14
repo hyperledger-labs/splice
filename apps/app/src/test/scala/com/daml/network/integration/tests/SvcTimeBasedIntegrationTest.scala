@@ -683,12 +683,12 @@ class SvcTimeBasedIntegrationTest
       initialMaxNumInputs: Int = 100,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
     defaultCoinConfig(
-      NonNegativeFiniteDuration.ofMicros(tickDuration.getMicros),
+      tickDuration,
       initialMaxNumInputs,
     )
 
   private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
-    duration.getMicros
+    duration.toScala.toMicros
   )
 
   private def fromRelTime(duration: RelTime): Duration =

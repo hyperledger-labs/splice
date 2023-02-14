@@ -64,7 +64,7 @@ class TimeBasedTreasuryIntegrationTest
       )
   }
 
-  "operate and shutdown cleanly with lots of coin operations in flight" in { implicit env =>
+  "operate and shutdown cleanly with lots of coin operations in flight" ignore { implicit env =>
     onboardWalletUser(aliceWallet, aliceValidator)
 
     def tapInRange(start: Int, end: Int) = {

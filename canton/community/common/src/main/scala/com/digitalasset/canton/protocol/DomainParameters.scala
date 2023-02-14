@@ -6,6 +6,7 @@ package com.digitalasset.canton.protocol
 import cats.Order
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -25,7 +26,6 @@ import com.digitalasset.canton.time.{
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{ProtoDeserializationError, checked}
 
-import scala.Ordering.Implicits.*
 import scala.annotation.nowarn
 
 object DomainParameters {
@@ -121,11 +121,6 @@ object StaticDomainParameters
 
   override protected def name: String = "static domain parameters"
 
-  /*
-   Set of default values used for configuration and tests
-   Values should be synced with the CCF ones:
-    enterprise/domain/src/main/cpp/canton/domain/canton_domain_parameters.hpp
-   */
   val defaultMaxRatePerParticipant: NonNegativeInt =
     NonNegativeInt.tryCreate(1000000) // yeah, sure.
   val defaultMaxRequestSize: MaxRequestSize = MaxRequestSize(
@@ -168,7 +163,6 @@ object StaticDomainParameters
   def fromProtoV0(
       domainParametersP: protoV0.StaticDomainParameters
   ): ParsingResult[StaticDomainParameters] = {
-
     val protoV0.StaticDomainParameters(
       reconciliationIntervalP,
       maxRatePerParticipantP,
@@ -186,8 +180,14 @@ object StaticDomainParameters
       reconciliationInterval <- PositiveSeconds.fromProtoPrimitiveO("reconciliationInterval")(
         reconciliationIntervalP
       )
-      maxRatePerParticipant <- NonNegativeInt.create(maxRatePerParticipantP)
-      maxRequestSize <- NonNegativeInt.create(maxInboundMessageSizeP).map(MaxRequestSize)
+      maxRatePerParticipant <- NonNegativeInt
+        .create(maxRatePerParticipantP)
+        .leftMap(InvariantViolation.toProtoDeserializationError)
+
+      maxRequestSize <- NonNegativeInt
+        .create(maxInboundMessageSizeP)
+        .map(MaxRequestSize)
+        .leftMap(InvariantViolation.toProtoDeserializationError)
 
       requiredSigningKeySchemes <- requiredKeySchemes(
         "requiredSigningKeySchemes",
@@ -539,11 +539,6 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
 
   override protected def name: String = "dynamic domain parameters"
 
-  /*
-   Set of default values used for configuration and tests
-   Values should be synced with the CCF ones:
-    enterprise/domain/src/main/cpp/canton/domain/canton_domain_parameters.hpp
-   */
   private val defaultParticipantResponseTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofSeconds(30)
   private val defaultMediatorReactionTimeout: NonNegativeFiniteDuration =
@@ -663,7 +658,6 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       maxRatePerParticipantP,
       maxRequestSizeP,
     ) = domainParametersP
-
     for {
       reconciliationInterval <- PositiveSeconds.fromProtoPrimitiveO(
         "reconciliationInterval"
@@ -698,8 +692,15 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       )(
         mediatorDeduplicationTimeoutP
       )
-      maxRatePerParticipant <- NonNegativeInt.create(maxRatePerParticipantP)
-      maxRequestSize <- NonNegativeInt.create(maxRequestSizeP).map(MaxRequestSize)
+      maxRatePerParticipant <- NonNegativeInt
+        .create(maxRatePerParticipantP)
+        .leftMap(InvariantViolation.toProtoDeserializationError)
+
+      maxRequestSize <- NonNegativeInt
+        .create(maxRequestSizeP)
+        .map(MaxRequestSize)
+        .leftMap(InvariantViolation.toProtoDeserializationError)
+
       domainParameters <-
         create(
           participantResponseTimeout = participantResponseTimeout,

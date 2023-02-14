@@ -3,8 +3,8 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.6.0-snapshot.20230116.11260.0.94327f5d"
-  val daml_language_versions = Seq("1.14", "1.dev")
+  val version: String = "2.6.0-snapshot.20230206.11376.0.2713e2b4"
+  val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
@@ -100,6 +100,8 @@ object CantonDependencies {
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
+  lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
+  lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version

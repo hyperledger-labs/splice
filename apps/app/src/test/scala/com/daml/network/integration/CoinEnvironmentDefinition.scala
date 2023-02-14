@@ -38,6 +38,7 @@ case class CoinEnvironmentDefinition(
       configTransformsWithContext(context),
     ) {
   override val configTransforms = configTransformsWithContext(context)
+
   def withManualStart: CoinEnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
 
@@ -48,25 +49,30 @@ case class CoinEnvironmentDefinition(
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
         val svcParty =
-          svc.remoteParticipantWithAdminToken.parties.enable(svc.config.ledgerApiUser)
+          svc.remoteParticipantWithAdminToken.ledger_api.parties
+            .allocate(svc.config.ledgerApiUser, svc.config.ledgerApiUser)
+            .party
         svc.remoteParticipantWithAdminToken.ledger_api.users.create(
           id = svc.config.ledgerApiUser,
-          actAs = Set(svcParty.toLf),
-          primaryParty = Some(svcParty.toLf),
+          actAs = Set(svcParty),
+          primaryParty = Some(svcParty),
           readAs = Set.empty,
           participantAdmin = true,
         )
         svs.local.foreach(sv => {
-          val svParty =
-            sv.remoteParticipantWithAdminToken.parties.enable(sv.config.ledgerApiUser)
+          val svParty = {
+            sv.remoteParticipantWithAdminToken.ledger_api.parties
+              .allocate(sv.config.ledgerApiUser, sv.config.ledgerApiUser)
+              .party
+          }
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs =
               // the SV app will revoke the "act as svcParty" right at the end of its init
-              if (sv.config.foundConsortium) Set(svParty.toLf, svcParty.toLf)
-              else Set(svParty.toLf),
-            primaryParty = Some(svParty.toLf),
-            readAs = Set(svcParty.toLf),
+              if (sv.config.foundConsortium) Set(svParty, svcParty)
+              else Set(svParty),
+            primaryParty = Some(svParty),
+            readAs = Set(svcParty),
             participantAdmin = true,
           )
         })
@@ -79,11 +85,13 @@ case class CoinEnvironmentDefinition(
       this.preSetup(env)
       validators.local.foreach(validator => {
         val validatorParty =
-          validator.remoteParticipantWithAdminToken.parties.enable(validator.config.ledgerApiUser)
+          validator.remoteParticipantWithAdminToken.ledger_api.parties
+            .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
+            .party
         validator.remoteParticipantWithAdminToken.ledger_api.users.create(
           id = validator.config.ledgerApiUser,
-          actAs = Set(validatorParty.toLf),
-          primaryParty = Some(validatorParty.toLf),
+          actAs = Set(validatorParty),
+          primaryParty = Some(validatorParty),
           readAs = Set.empty,
           participantAdmin = true,
         )

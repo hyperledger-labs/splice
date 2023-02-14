@@ -3,14 +3,14 @@
 
 package com.digitalasset.canton
 
-import pureconfig.{ConfigReader, ConfigWriter}
-import pureconfig.error.CannotConvert
 import cats.syntax.either.*
-import com.digitalasset.canton.config.RequireTypes.{
+import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedStringWrapper,
   LengthLimitedStringWrapperCompanion,
   String255,
 }
+import pureconfig.{ConfigReader, ConfigWriter}
+import pureconfig.error.CannotConvert
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.store.db.DbDeserializationException
 import slick.jdbc.{GetResult, SetParameter}

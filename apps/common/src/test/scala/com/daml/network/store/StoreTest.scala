@@ -4,10 +4,10 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfe
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
-  LedgerOffset,
   ExercisedEvent,
-  TreeEvent,
+  LedgerOffset,
   TransactionTree,
+  TreeEvent,
   Unit as damlUnit,
 }
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
@@ -18,14 +18,18 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
+
   protected val svcParty: PartyId = mkPartyId("svc")
+
   protected def userParty(i: Int) = mkPartyId(s"user-$i")
+
   protected def providerParty(i: Int) = mkPartyId(s"provider-$i")
 
   protected def appRewardCoupon(
@@ -62,6 +66,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ),
     )
 
+  @nowarn // TODO(#2577): switch to new constructor.
   protected def toCreatedEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T]
   ): CreatedEvent = {
@@ -99,6 +104,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  @nowarn // TODO(#2577): switch to new constructor.
   protected def withEventId(
       event: TreeEvent,
       eventId: String,

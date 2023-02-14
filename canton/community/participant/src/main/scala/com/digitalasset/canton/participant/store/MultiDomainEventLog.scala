@@ -11,12 +11,14 @@ import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.ledger.participant.state.v2.ChangeId
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher.PendingPublish
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
+import com.digitalasset.canton.participant.protocol.ProcessingSteps
 import com.digitalasset.canton.participant.store.EventLogId.{
   DomainEventLogId,
   ParticipantEventLogId,
@@ -194,6 +196,13 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
       traceContext: TraceContext
   ): OptionT[Future, GlobalOffset]
 
+  /** Yields the `skip`-lowest publication timestamp (if it exists).
+    * I.e., `locatePruningTimestamp(0)` yields the smallest timestamp, `locatePruningTimestamp(1)` the second smallest timestamp, and so on.
+    */
+  def locatePruningTimestamp(skip: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): OptionT[Future, CantonTimestamp]
+
   /** Returns the data associated with the given offset, if any */
   def lookupOffset(globalOffset: GlobalOffset)(implicit
       traceContext: TraceContext
@@ -260,6 +269,11 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
     * before the call to [[flush]].
     */
   def flush(): Future[Unit]
+
+  /** Report the max-event-age metric based on the oldest event timestamp and the current clock time or
+    * zero if no oldest timestamp exists (e.g. events fully pruned).
+    */
+  def reportMaxEventAgeMetric(oldestEventTimestamp: Option[CantonTimestamp]): Unit
 }
 
 object MultiDomainEventLog {
@@ -393,7 +407,13 @@ object MultiDomainEventLog {
               eventTraceContext,
             )
           }
-        case LedgerSyncEvent.CommandRejected(_recordTime, completionInfo, _reason) =>
+
+        case LedgerSyncEvent.CommandRejected(
+              _recordTime,
+              completionInfo,
+              _reason,
+              ProcessingSteps.RequestType.Transaction,
+            ) =>
           val changeId = completionInfo.changeId
           DeduplicationInfo(
             changeId,
@@ -401,6 +421,7 @@ object MultiDomainEventLog {
             acceptance = false,
             eventTraceContext,
           ).some
+
         case _ => None
       }
 

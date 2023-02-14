@@ -8,6 +8,7 @@ import com.digitalasset.canton.config.{
   LocalNodeConfig,
   LoggingConfig,
   NodeConfig,
+  NodeMonitoringConfig,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
 }
@@ -25,6 +26,8 @@ abstract class LocalCoinConfig extends LocalNodeConfig {
   override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
+
+  override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
   def remoteParticipant: CoinRemoteParticipantConfig
 }
 

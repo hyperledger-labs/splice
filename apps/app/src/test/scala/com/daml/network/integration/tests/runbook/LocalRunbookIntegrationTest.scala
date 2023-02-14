@@ -45,35 +45,35 @@ class LocalRunbookIntegrationTest
     val validatorBootstrapContent: String =
       (validatorPath / "validator-participant.sc").contentAsString
     bootstrapFile.overwrite("""
+      |println("Connecting svc participant to domain")
+      |svc_participant.domains.connect("global", "http://localhost:9008")
       |val svcUserName = "svc"
       |println("Allocating svc party")
-      |val svcParty = svc_participant.parties.enable(svcUserName)
+      |val svcParty = svc_participant.ledger_api.parties.allocate(svcUserName, svcUserName).party
       |println("Creating svc user")
       |svc_participant.ledger_api.users.create(
       |  id = svcUserName,
-      |  actAs = Set(svcParty.toLf),
-      |  primaryParty = Some(svcParty.toLf),
+      |  actAs = Set(svcParty),
+      |  primaryParty = Some(svcParty),
       |  readAs = Set.empty,
       |  participantAdmin = true,
       |)
       |Seq("sv1", "sv2", "sv3", "sv4").foreach(svUserName => {
       |  println("Allocating " + svUserName + " party")
-      |  val svParty = svc_participant.parties.enable(svUserName)
+      |  val svParty = svc_participant.ledger_api.parties.allocate(svUserName, svUserName).party
       |  println("Creating " + svUserName + " user")
       |  val foundConsortium = svUserName == "sv1" // we configure sv1 to `found-consortium`
       |  svc_participant.ledger_api.users.create(
       |    id = svUserName,
       |    actAs =
       |      // the SV app will revoke the "act as svcParty" right at the end of its init
-      |      if (foundConsortium) Set(svParty.toLf, svcParty.toLf)
-      |      else Set(svParty.toLf),
-      |    readAs = Set(svcParty.toLf),
-      |    primaryParty = Some(svParty.toLf),
+      |      if (foundConsortium) Set(svParty, svcParty)
+      |      else Set(svParty),
+      |    readAs = Set(svcParty),
+      |    primaryParty = Some(svParty),
       |    participantAdmin = true,
       |  )
       |})
-      |println("Connecting svc participant to domain")
-      |svc_participant.domains.connect("global", "http://localhost:9008")
       |""".stripMargin)
     bootstrapFile.append(validatorBootstrapContent)
 

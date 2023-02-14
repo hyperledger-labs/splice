@@ -6,13 +6,16 @@ package com.digitalasset.canton.domain.mediator.store
 import cats.data.OptionT
 import cats.instances.future.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.mediator.ResponseAggregation
 import com.digitalasset.canton.domain.metrics.MediatorMetrics
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.MetricsHelper
 import com.digitalasset.canton.protocol.RequestId
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 
@@ -32,6 +35,7 @@ import scala.jdk.CollectionConverters.*
 private[mediator] class MediatorState(
     val finalizedResponseStore: FinalizedResponseStore,
     val deduplicationStore: MediatorDeduplicationStore,
+    val clock: Clock,
     metrics: MediatorMetrics,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -167,11 +171,29 @@ private[mediator] class MediatorState(
   /** Prune unnecessary data from before and including the given timestamp which should be calculated by the [[Mediator]]
     * based on the participant response timeout domain parameters. In practice a much larger retention period
     * may be kept.
+    *
+    * Also updates the current age of the oldest finalized response after pruning.
     */
   def prune(pruneRequestsBeforeAndIncludingTs: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[Unit] =
-    finalizedResponseStore.prune(pruneRequestsBeforeAndIncludingTs)
+  ): Future[Unit] = finalizedResponseStore.prune(pruneRequestsBeforeAndIncludingTs)
+
+  /** Locate the timestamp of the finalized response at or, if skip > 0, near the beginning of the sequence of finalized responses.
+    *
+    * If skip == 0, returns the timestamp of the oldest, unpruned finalized response.
+    */
+  def locatePruningTimestamp(skip: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): Future[Option[CantonTimestamp]] = for {
+    ts <- finalizedResponseStore.locatePruningTimestamp(skip.value)
+    _ = if (skip.value == 0) MetricsHelper.updateAgeInHoursGauge(clock, metrics.maxEventAge, ts)
+  } yield ts
+
+  /** Report the max-event-age metric based on the oldest response timestamp and the current clock time or
+    * zero if no oldest timestamp exists (e.g. mediator fully pruned).
+    */
+  def reportMaxResponseAgeMetric(oldestResponseTimestamp: Option[CantonTimestamp]): Unit =
+    MetricsHelper.updateAgeInHoursGauge(clock, metrics.maxEventAge, oldestResponseTimestamp)
 
   override def onClosed(): Unit = Lifecycle.close(finalizedResponseStore)(logger)
 }

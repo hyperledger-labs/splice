@@ -8,7 +8,8 @@ import akka.stream.KillSwitch
 import akka.stream.scaladsl.Source
 import cats.data.EitherT
 import com.digitalasset.canton.SequencerCounter
-import com.digitalasset.canton.config.RequireTypes.{PositiveInt, String256M}
+import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
@@ -167,17 +168,29 @@ trait SequencerPruning {
     * Sequencers are permitted to prune to an earlier timestamp if required to for their own consistency.
     * For example, the Database Sequencer will adjust this time to a potentially earlier point in time where
     * counter checkpoints are available for all members (who aren't being ignored).
+    *
+    * Implementations that support pruning also update the "oldest-response-age" metric if pruning succeeds.
     */
   def prune(requestedTimestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): EitherT[Future, PruningError, String]
 
   /** Locate a timestamp relative to the earliest available sequencer event based on an index starting at one.
-    * Useful to monitor the progress of pruning (when index == 1) and for pruning in batches (with index == batchSize).
+    *
+    * When index == 1, indicates the progress of pruning as the timestamp of the oldest unpruned response
+    * When index > 1, returns the timestamp of the index'th oldest response which is useful for pruning in batches
+    *                  when index == batchSize.
     */
   def locatePruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[Future, PruningSupportError, Option[CantonTimestamp]]
+
+  /** Report the max-event-age metric based on the oldest event timestamp and the current clock time or
+    * zero if no oldest timestamp exists (e.g. events fully pruned).
+    */
+  def reportMaxEventAgeMetric(
+      oldestEventTimestamp: Option[CantonTimestamp]
+  ): Either[PruningSupportError, Unit]
 
   /** Acknowledge that a member has successfully handled all events up to and including the timestamp provided.
     * Makes earlier events for this member available for pruning.

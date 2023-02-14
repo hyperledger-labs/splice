@@ -14,6 +14,7 @@ import com.daml.platform.akkastreams.dispatcher.SubSource.RangeSource
 import com.digitalasset.canton.LedgerTransactionId
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{
@@ -22,6 +23,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
   NamedLoggingContext,
 }
+import com.digitalasset.canton.metrics.MetricsHelper
 import com.digitalasset.canton.participant.event.RecordOrderPublisher.{
   PendingEventPublish,
   PendingPublish,
@@ -375,6 +377,20 @@ class InMemoryMultiDomainEventLog(
       }
     )
 
+  override def locatePruningTimestamp(skip: NonNegativeInt)(implicit
+      traceContext: TraceContext
+  ): OptionT[Future, CantonTimestamp] =
+    OptionT.fromOption(
+      entriesRef
+        .get()
+        .referencesByOffset
+        .drop(skip.value)
+        .headOption
+        .map { case (_offset, (_eventLogId, _localOffset, publicationTime)) =>
+          publicationTime
+        }
+    )
+
   override def lookupOffset(globalOffset: GlobalOffset)(implicit
       traceContext: TraceContext
   ): OptionT[Future, (EventLogId, LocalOffset, CantonTimestamp)] =
@@ -454,6 +470,13 @@ class InMemoryMultiDomainEventLog(
   }
 
   override def flush(): Future[Unit] = executionQueue.flush()
+
+  override def reportMaxEventAgeMetric(oldestEventTimestamp: Option[CantonTimestamp]): Unit =
+    MetricsHelper.updateAgeInHoursGauge(
+      clock,
+      metrics.pruning.prune.maxEventAge,
+      oldestEventTimestamp,
+    )
 }
 
 object InMemoryMultiDomainEventLog extends HasLoggerName {

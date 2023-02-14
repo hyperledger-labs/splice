@@ -323,6 +323,8 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           daml_error,
           daml_telemetry,
+          daml_tracing,
+          daml_executors,
           daml_lf_data,
           daml_lf_nonempty_cats,
           logback_classic,

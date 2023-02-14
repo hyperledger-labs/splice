@@ -6,9 +6,8 @@ package com.digitalasset.canton.config
 import cats.data.Validated
 import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.domain.config.{
   CommunityDomainConfig,
   DomainBaseConfig,
@@ -145,6 +144,6 @@ object CantonCommunityConfig {
     val content = "canton { " + ConfigWriter[CantonCommunityConfig]
       .to(config)
       .render(renderer) + "}"
-    Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
+    Files.write(path, content.getBytes(StandardCharsets.UTF_8)): Unit
   }
 }
