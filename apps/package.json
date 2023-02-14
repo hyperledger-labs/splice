@@ -8,6 +8,7 @@
     "splitwell/frontend",
     "validator/openapi-ts-client",
     "wallet/frontend",
+    "wallet/frontend-new",
     "wallet/openapi-ts-client"
   ]
 }

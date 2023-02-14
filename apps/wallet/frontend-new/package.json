@@ -1,0 +1,43 @@
+{
+  "name": "wallet-frontend-new",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build --outDir build",
+    "preview": "vite preview",
+    "fix": "npm run format:fix && npm run lint:fix",
+    "check": "npm run format:check && npm run lint:check",
+    "lint:check": "eslint src --max-warnings=0",
+    "lint:fix": "eslint src --fix",
+    "format:fix": "prettier --write src",
+    "format:check": "prettier --check src"
+  },
+  "dependencies": {
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "@mui/icons-material": "latest",
+    "@mui/material": "latest",
+    "bignumber.js": "^9.1.1",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "^6.8.1"
+  },
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^4.0.0",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "@vitejs/plugin-react": "latest",
+    "eslint": "^8.34.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "prettier": "^2.8.4",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}

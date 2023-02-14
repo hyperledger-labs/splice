@@ -433,6 +433,17 @@ lazy val `apps-wallet-frontend` = {
     )
 }
 
+lazy val `apps-wallet-frontend-new` = {
+  project
+    .in(file("apps/wallet/frontend-new"))
+    .dependsOn(`apps-common-frontend`)
+    .settings(
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
+      frontendWorkspace := "wallet-frontend-new",
+      sharedFrontendSettings,
+    )
+}
+
 lazy val `apps-splitwell-frontend` = {
   project
     .in(file("apps/splitwell/frontend"))
@@ -481,6 +492,7 @@ lazy val `apps-frontends` = {
     `apps-common-frontend-protobuf`,
     `apps-common-frontend`,
     `apps-wallet-frontend`,
+    `apps-wallet-frontend-new`,
     `apps-directory-frontend`,
     `apps-splitwell-frontend`,
   )
@@ -607,6 +619,7 @@ lazy val bundleTask = {
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
+        ((`apps-wallet-frontend-new` / bundle).value, "wallet-new"),
         ((`apps-directory-frontend` / bundle).value, "directory"),
         ((`apps-splitwell-frontend` / bundle).value, "splitwell"),
       )

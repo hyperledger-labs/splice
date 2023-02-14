@@ -4,6 +4,7 @@
 .DS_Store
 node_modules/
 build
+lib
 daml.js
 log/
 logfile
