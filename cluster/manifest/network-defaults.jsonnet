@@ -11,6 +11,7 @@
   postgresCpu: 2,
   postgresMemoryMib: 4096,
   ledgerDatabaseGib: 20,
+  numberOfSvNodes: 4,
   externalIPRanges: [
     "35.194.81.56/32",
     "35.198.147.95/32",

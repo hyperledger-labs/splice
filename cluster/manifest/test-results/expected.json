@@ -180,6 +180,16 @@
       },
       {
          "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "svc"
+         }
+      },
+      {
+         "apiVersion": "v1",
          "data": {
             "PGDATA": "/var/lib/postgresql/data/pgdata",
             "POSTGRES_DB": "cantonnet",
@@ -192,7 +202,8 @@
                "app": "postgres",
                "clusterName": "cluster"
             },
-            "name": "postgres-configuration"
+            "name": "postgres-configuration",
+            "namespace": "svc"
          }
       },
       {
@@ -203,7 +214,8 @@
                "app": "postgres",
                "clusterName": "cluster"
             },
-            "name": "postgres"
+            "name": "postgres",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -218,7 +230,8 @@
                   "labels": {
                      "app": "postgres",
                      "clusterName": "cluster"
-                  }
+                  },
+                  "namespace": "svc"
                },
                "spec": {
                   "containers": [
@@ -299,7 +312,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "postgres"
+            "name": "postgres",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -323,7 +337,8 @@
                "clusterName": "cluster",
                "moduleName": "canton-domain"
             },
-            "name": "global-domain"
+            "name": "global-domain",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -414,7 +429,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "global-domain"
+            "name": "global-domain",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -448,7 +464,8 @@
                "clusterName": "cluster",
                "moduleName": "canton-domain"
             },
-            "name": "splitwell-domain"
+            "name": "splitwell-domain",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -478,7 +495,7 @@
                            },
                            {
                               "name": "CANTON_DOMAIN_POSTGRES_SERVER",
-                              "value": "sw-postgres"
+                              "value": "sw-postgres.splitwell"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -539,7 +556,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-domain"
+            "name": "splitwell-domain",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -573,7 +591,8 @@
                "clusterName": "cluster",
                "moduleName": "canton-participant"
             },
-            "name": "svc-participant"
+            "name": "svc-participant",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -723,7 +742,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "svc-participant"
+            "name": "svc-participant",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -757,7 +777,8 @@
                "clusterName": "cluster",
                "moduleName": "directory-app"
             },
-            "name": "directory-app"
+            "name": "directory-app",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -861,7 +882,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "directory-app"
+            "name": "directory-app",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -890,7 +912,8 @@
                "clusterName": "cluster",
                "moduleName": "svc-app"
             },
-            "name": "svc-app"
+            "name": "svc-app",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -990,7 +1013,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "svc-app"
+            "name": "svc-app",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -1006,6 +1030,16 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-1"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -1014,7 +1048,8 @@
                "clusterName": "cluster",
                "moduleName": "sv-app"
             },
-            "name": "sv-app-1"
+            "name": "sv-app-1",
+            "namespace": "sv-app-1"
          },
          "spec": {
             "replicas": 1,
@@ -1047,7 +1082,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1057,7 +1092,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1067,7 +1102,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1077,7 +1112,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-sv1-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1087,11 +1122,11 @@
                               "value": "5014"
                            },
                            {
-                              "name": "CN_APP_SV_FOUND_CONSORTIUM",
+                              "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
                            },
                            {
-                              "name": "CN_APP_SV_IS_DEV_NET",
+                              "name": "CN_APP_SV_FOUND_CONSORTIUM",
                               "value": "true"
                            }
                         ],
@@ -1130,7 +1165,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sv-app-1"
+            "name": "sv-app-1",
+            "namespace": "sv-app-1"
          },
          "spec": {
             "ports": [
@@ -1151,6 +1187,16 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-2"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -1159,7 +1205,8 @@
                "clusterName": "cluster",
                "moduleName": "sv-app"
             },
-            "name": "sv-app-2"
+            "name": "sv-app-2",
+            "namespace": "sv-app-2"
          },
          "spec": {
             "replicas": 1,
@@ -1192,7 +1239,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1202,7 +1249,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1212,7 +1259,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1222,7 +1269,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-sv2-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1271,7 +1318,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sv-app-2"
+            "name": "sv-app-2",
+            "namespace": "sv-app-2"
          },
          "spec": {
             "ports": [
@@ -1292,6 +1340,16 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-3"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -1300,7 +1358,8 @@
                "clusterName": "cluster",
                "moduleName": "sv-app"
             },
-            "name": "sv-app-3"
+            "name": "sv-app-3",
+            "namespace": "sv-app-3"
          },
          "spec": {
             "replicas": 1,
@@ -1333,7 +1392,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1343,7 +1402,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1353,7 +1412,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1363,7 +1422,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-sv3-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1412,7 +1471,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sv-app-3"
+            "name": "sv-app-3",
+            "namespace": "sv-app-3"
          },
          "spec": {
             "ports": [
@@ -1433,6 +1493,16 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-app-4"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -1441,7 +1511,8 @@
                "clusterName": "cluster",
                "moduleName": "sv-app"
             },
-            "name": "sv-app-4"
+            "name": "sv-app-4",
+            "namespace": "sv-app-4"
          },
          "spec": {
             "replicas": 1,
@@ -1474,7 +1545,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1484,7 +1555,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1494,7 +1565,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1504,7 +1575,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1553,7 +1624,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sv-app-4"
+            "name": "sv-app-4",
+            "namespace": "sv-app-4"
          },
          "spec": {
             "ports": [
@@ -1582,7 +1654,8 @@
                "clusterName": "cluster",
                "moduleName": "scan-app"
             },
-            "name": "scan-app"
+            "name": "scan-app",
+            "namespace": "svc"
          },
          "spec": {
             "replicas": 1,
@@ -1686,7 +1759,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "scan-app"
+            "name": "scan-app",
+            "namespace": "svc"
          },
          "spec": {
             "ports": [
@@ -1708,6 +1782,16 @@
       },
       {
          "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "validator1"
+         }
+      },
+      {
+         "apiVersion": "v1",
          "data": {
             "PGDATA": "/var/lib/postgresql/data/pgdata",
             "POSTGRES_DB": "cantonnet",
@@ -1720,7 +1804,8 @@
                "app": "val1-postgres",
                "clusterName": "cluster"
             },
-            "name": "val1-postgres-configuration"
+            "name": "val1-postgres-configuration",
+            "namespace": "validator1"
          }
       },
       {
@@ -1731,7 +1816,8 @@
                "app": "val1-postgres",
                "clusterName": "cluster"
             },
-            "name": "val1-postgres"
+            "name": "val1-postgres",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
@@ -1746,7 +1832,8 @@
                   "labels": {
                      "app": "val1-postgres",
                      "clusterName": "cluster"
-                  }
+                  },
+                  "namespace": "validator1"
                },
                "spec": {
                   "containers": [
@@ -1827,7 +1914,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "val1-postgres"
+            "name": "val1-postgres",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -1847,17 +1935,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-participant",
+               "app": "canton-participant",
                "clusterName": "cluster",
                "moduleName": "canton-participant"
             },
-            "name": "validator1-participant"
+            "name": "canton-participant",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-participant"
+                  "app": "canton-participant"
                }
             },
             "strategy": {
@@ -1866,7 +1955,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-participant",
+                     "app": "canton-participant",
                      "clusterName": "cluster",
                      "moduleName": "canton-participant"
                   }
@@ -1903,12 +1992,12 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain.svc:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-participant",
+                        "name": "canton-participant",
                         "ports": [
                            {
                               "containerPort": 5002,
@@ -1978,7 +2067,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-participant"
+            "name": "canton-participant",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2004,7 +2094,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-participant"
+               "app": "canton-participant"
             }
          }
       },
@@ -2013,17 +2103,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-validator-app",
+               "app": "validator-app",
                "clusterName": "cluster",
                "moduleName": "validator1-validator-app"
             },
-            "name": "validator1-validator-app"
+            "name": "validator-app",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-validator-app"
+                  "app": "validator-app"
                }
             },
             "strategy": {
@@ -2032,7 +2123,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-validator-app",
+                     "app": "validator-app",
                      "clusterName": "cluster",
                      "moduleName": "validator1-validator-app"
                   }
@@ -2102,7 +2193,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-validator-app",
+                        "name": "validator-app",
                         "ports": [
                            {
                               "containerPort": 6103,
@@ -2131,7 +2222,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-validator-app"
+            "name": "validator-app",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2142,7 +2234,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-validator-app"
+               "app": "validator-app"
             }
          }
       },
@@ -2151,17 +2243,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-wallet-app",
+               "app": "wallet-app",
                "clusterName": "cluster",
                "moduleName": "wallet-app"
             },
-            "name": "validator1-wallet-app"
+            "name": "wallet-app",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-wallet-app"
+                  "app": "wallet-app"
                }
             },
             "strategy": {
@@ -2170,7 +2263,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-wallet-app",
+                     "app": "wallet-app",
                      "clusterName": "cluster",
                      "moduleName": "wallet-app"
                   }
@@ -2225,11 +2318,11 @@
                            },
                            {
                               "name": "CN_APP_WALLET_PARTICIPANT_ADDRESS",
-                              "value": "validator1-participant"
+                              "value": "canton-participant"
                            },
                            {
                               "name": "CN_APP_WALLET_VALIDATOR_ADDRESS",
-                              "value": "validator1-validator-app"
+                              "value": "validator-app"
                            },
                            {
                               "name": "CN_APP_WALLET_VALIDATOR_GRPC_PORT",
@@ -2242,7 +2335,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-app:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-wallet-app",
+                        "name": "wallet-app",
                         "ports": [
                            {
                               "containerPort": 6004,
@@ -2271,7 +2364,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-wallet-app"
+            "name": "wallet-app",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2282,7 +2376,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-wallet-app"
+               "app": "wallet-app"
             }
          }
       },
@@ -2291,17 +2385,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-wallet-web-ui",
+               "app": "wallet-web-ui",
                "clusterName": "cluster",
                "moduleName": "wallet-web-ui"
             },
-            "name": "validator1-wallet-web-ui"
+            "name": "wallet-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-wallet-web-ui"
+                  "app": "wallet-web-ui"
                }
             },
             "strategy": {
@@ -2310,7 +2405,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-wallet-web-ui",
+                     "app": "wallet-web-ui",
                      "clusterName": "cluster",
                      "moduleName": "wallet-web-ui"
                   }
@@ -2330,7 +2425,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-wallet-web-ui",
+                        "name": "wallet-web-ui",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -2359,7 +2454,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-wallet-web-ui"
+            "name": "wallet-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2370,7 +2466,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-wallet-web-ui"
+               "app": "wallet-web-ui"
             }
          }
       },
@@ -2379,17 +2475,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-directory-web-ui",
+               "app": "directory-web-ui",
                "clusterName": "cluster",
                "moduleName": "validator1-directory-web-ui"
             },
-            "name": "validator1-directory-web-ui"
+            "name": "directory-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-directory-web-ui"
+                  "app": "directory-web-ui"
                }
             },
             "strategy": {
@@ -2398,7 +2495,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-directory-web-ui",
+                     "app": "directory-web-ui",
                      "clusterName": "cluster",
                      "moduleName": "validator1-directory-web-ui"
                   }
@@ -2414,7 +2511,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-directory-web-ui",
+                        "name": "directory-web-ui",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -2443,7 +2540,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-directory-web-ui"
+            "name": "directory-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2454,7 +2552,7 @@
                }
             ],
             "selector": {
-               "app": "validator1-directory-web-ui"
+               "app": "directory-web-ui"
             }
          }
       },
@@ -2463,17 +2561,18 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "validator1-splitwell-web-ui",
+               "app": "splitwell-web-ui",
                "clusterName": "cluster",
                "moduleName": "validator1-splitwell-web-ui"
             },
-            "name": "validator1-splitwell-web-ui"
+            "name": "splitwell-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "validator1-splitwell-web-ui"
+                  "app": "splitwell-web-ui"
                }
             },
             "strategy": {
@@ -2482,7 +2581,7 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "validator1-splitwell-web-ui",
+                     "app": "splitwell-web-ui",
                      "clusterName": "cluster",
                      "moduleName": "validator1-splitwell-web-ui"
                   }
@@ -2498,7 +2597,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-splitwell-web-ui:tag",
                         "imagePullPolicy": "Always",
-                        "name": "validator1-splitwell-web-ui",
+                        "name": "splitwell-web-ui",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -2527,7 +2626,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "validator1-splitwell-web-ui"
+            "name": "splitwell-web-ui",
+            "namespace": "validator1"
          },
          "spec": {
             "ports": [
@@ -2538,8 +2638,18 @@
                }
             ],
             "selector": {
-               "app": "validator1-splitwell-web-ui"
+               "app": "splitwell-web-ui"
             }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "splitwell"
          }
       },
       {
@@ -2556,7 +2666,8 @@
                "app": "sw-postgres",
                "clusterName": "cluster"
             },
-            "name": "sw-postgres-configuration"
+            "name": "sw-postgres-configuration",
+            "namespace": "splitwell"
          }
       },
       {
@@ -2567,7 +2678,8 @@
                "app": "sw-postgres",
                "clusterName": "cluster"
             },
-            "name": "sw-postgres"
+            "name": "sw-postgres",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -2582,7 +2694,8 @@
                   "labels": {
                      "app": "sw-postgres",
                      "clusterName": "cluster"
-                  }
+                  },
+                  "namespace": "splitwell"
                },
                "spec": {
                   "containers": [
@@ -2663,7 +2776,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sw-postgres"
+            "name": "sw-postgres",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -2687,7 +2801,8 @@
                "clusterName": "cluster",
                "moduleName": "canton-participant"
             },
-            "name": "splitwell-participant"
+            "name": "splitwell-participant",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -2720,7 +2835,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2739,7 +2854,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain.svc:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2814,7 +2929,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-participant"
+            "name": "splitwell-participant",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -2853,7 +2969,8 @@
                "clusterName": "cluster",
                "moduleName": "splitwell-validator-app"
             },
-            "name": "splitwell-validator-app"
+            "name": "splitwell-validator-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -2886,7 +3003,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2896,7 +3013,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2906,7 +3023,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2916,7 +3033,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwell-validator-ledger-api-auth",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2936,7 +3053,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
+                                    "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2977,7 +3094,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-validator-app"
+            "name": "splitwell-validator-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -3001,7 +3119,8 @@
                "clusterName": "cluster",
                "moduleName": "wallet-app"
             },
-            "name": "splitwell-wallet-app"
+            "name": "splitwell-wallet-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -3034,7 +3153,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
+                                    "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3044,7 +3163,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
+                                    "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3054,7 +3173,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
+                                    "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3064,7 +3183,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-splitwell-wallet-ledger-api-auth",
+                                    "name": "cn-app-wallet-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3117,7 +3236,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-wallet-app"
+            "name": "splitwell-wallet-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -3141,7 +3261,8 @@
                "clusterName": "cluster",
                "moduleName": "wallet-web-ui"
             },
-            "name": "splitwell-wallet-web-ui"
+            "name": "splitwell-wallet-web-ui",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -3205,7 +3326,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-wallet-web-ui"
+            "name": "splitwell-wallet-web-ui",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -3229,7 +3351,8 @@
                "clusterName": "cluster",
                "moduleName": "splitwell-app"
             },
-            "name": "splitwell-app"
+            "name": "splitwell-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -3362,7 +3485,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "splitwell-app"
+            "name": "splitwell-app",
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -3385,7 +3509,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv1-api-http\",\n      \"port\": 6014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-api\",\n      \"port\": 5114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv2-api-http\",\n      \"port\": 6114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-api\",\n      \"port\": 5214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv3-api-http\",\n      \"port\": 6214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-api\",\n      \"port\": 5314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"sv4-api-http\",\n      \"port\": 6314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 6012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-http\",\n      \"port\": 6004,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"validator1-splitwell-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwell-validator-app\"\n    },\n    {\n      \"name\": \"sw-wal-http\",\n      \"port\": 6004,\n      \"service\": \"splitwell-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwell-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwell-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv1-api-http\",\n      \"port\": 6014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-api\",\n      \"port\": 5114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv2-api-http\",\n      \"port\": 6114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-api\",\n      \"port\": 5214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv3-api-http\",\n      \"port\": 6214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-api\",\n      \"port\": 5314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"sv4-api-http\",\n      \"port\": 6314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 6012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-http\",\n      \"port\": 6004,\n      \"service\": \"wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwell-validator-app\"\n    },\n    {\n      \"name\": \"sw-wal-http\",\n      \"port\": 6004,\n      \"service\": \"splitwell-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwell-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwell-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",

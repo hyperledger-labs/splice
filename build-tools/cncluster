@@ -598,23 +598,43 @@ function _set_auth0_secret() {
   SECRET_NAME=$1
   CLIENT_ID=$2
   CLIENT_SECRET=$3
+  NAMESPACE=${4-default}
 
-  _log "Setting secret $SECRET_NAME"
+  _log "Setting secret $SECRET_NAME ($NAMESPACE)"
 
   USER_NAME="${CLIENT_ID}@clients"
 
   WELL_KNOWN_URL='https://canton-network-dev.us.auth0.com/.well-known/openid-configuration'
 
   # Delete secret if it exists, easier than editing existing secrets
-  if kubectl get secret ${SECRET_NAME} > /dev/null 2>&1; then
-      kubectl delete secret ${SECRET_NAME}
+  if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} > /dev/null 2>&1; then
+      kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
   fi
 
-  kubectl create secret generic ${SECRET_NAME} \
+  kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
     --from-literal=url="${WELL_KNOWN_URL}" \
     --from-literal=client-id="${CLIENT_ID}" \
     --from-literal=client-secret="${CLIENT_SECRET}" \
     --from-literal=ledger-api-user="${USER_NAME}"
+}
+
+function _set_auth0_api_user() {
+    # Add/update secret only containing the `ledger-api-user` field
+    local -r APP_NAME="$1"
+    local -r NAMESPACE="$2"
+    local -r CLIENT_ID="$3"
+    local SECRET_NAME="cn-app-${APP_NAME,,}-ledger-api-auth"
+    SECRET_NAME="${SECRET_NAME//_/-}"
+
+    _log "Setting user-only secret $SECRET_NAME ($NAMESPACE)"
+
+    # Delete secret if it exists, easier than editing existing secrets
+    if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} &> /dev/null; then
+       kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
+    fi
+
+    kubectl create --namespace "$NAMESPACE" secret generic "${SECRET_NAME}" \
+            "--from-literal=ledger-api-user=${CLIENT_ID}@clients"
 }
 
 function cluster_update_secrets() {
@@ -628,23 +648,48 @@ function cluster_update_secrets() {
   AUTH0_MANAGEMENT_API_URL="https://canton-network-dev.us.auth0.com/api/v2"
   all=$(curl -s --show-error --fail -H "Authorization: Bearer ${AUTH0_MANAGEMENT_API_TOKEN}" ${AUTH0_MANAGEMENT_API_URL}/clients)
 
+  local -Ar appToClientId=(
+      [wallet]='KChYVPmxvHHUebLDXnNo3Z125WrxJiLb'
+      [validator]='cf0cZaTagQUN59C1HBL2udiIBdFh2CWq'
+      [svc]='XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC'
+      [scan]='nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6'
+      [directory]='PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs'
+      [splitwell]='ekPlYxilradhEnpWdS80WfW63z1nHvKy'
+      [splitwell_validator]='hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW'
+      [splitwell_wallet]='BMSnkJmJMGQqTQY8sabXNHVEzvNW5MMo'
+      [sv1]='OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn'
+      [sv2]='rv4bllgKWAiW9tBtdvURMdHW42MAXghz'
+      [sv3]='SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk'
+      [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
+  )
+
   for i in \
-    "cn-app-wallet-ledger-api-auth KChYVPmxvHHUebLDXnNo3Z125WrxJiLb" \
-    "cn-app-validator-ledger-api-auth cf0cZaTagQUN59C1HBL2udiIBdFh2CWq" \
-    "cn-app-svc-ledger-api-auth XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC" \
-    "cn-app-sv1-ledger-api-auth OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn" \
-    "cn-app-sv2-ledger-api-auth rv4bllgKWAiW9tBtdvURMdHW42MAXghz" \
-    "cn-app-sv3-ledger-api-auth SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk" \
-    "cn-app-sv4-ledger-api-auth CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN" \
-    "cn-app-scan-ledger-api-auth nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6" \
-    "cn-app-directory-ledger-api-auth PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs" \
-    "cn-app-splitwell-ledger-api-auth ekPlYxilradhEnpWdS80WfW63z1nHvKy" \
-    "cn-app-splitwell-validator-ledger-api-auth hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW" \
-    "cn-app-splitwell-wallet-ledger-api-auth BMSnkJmJMGQqTQY8sabXNHVEzvNW5MMo"
+    "cn-app-wallet-ledger-api-auth wallet validator1" \
+    "cn-app-validator-ledger-api-auth validator validator1" \
+    "cn-app-svc-ledger-api-auth svc svc" \
+    "cn-app-sv-ledger-api-auth sv1 sv-app-1" \
+    "cn-app-sv-ledger-api-auth sv2 sv-app-2" \
+    "cn-app-sv-ledger-api-auth sv3 sv-app-3" \
+    "cn-app-sv-ledger-api-auth sv4 sv-app-4" \
+    "cn-app-scan-ledger-api-auth scan svc" \
+    "cn-app-directory-ledger-api-auth directory svc" \
+    "cn-app-splitwell-ledger-api-auth splitwell splitwell" \
+    "cn-app-validator-ledger-api-auth splitwell_validator splitwell" \
+    "cn-app-wallet-ledger-api-auth splitwell_wallet splitwell"
   do
     set -- $i
-    secret=$(echo $all | jq -r ".[] | select(.client_id==\"$2\") | .client_secret")
-    _set_auth0_secret $1 $2 $secret
+    client_id="${appToClientId[$2]}"
+    secret=$(echo $all | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
+    _set_auth0_secret $1 "$client_id" $secret "$3"
+
+    # TODO (#2869) remove once secrets in the "default" namespace are no longer needed
+    _set_auth0_secret $1 "$client_id" $secret
+  done
+
+  for i in sv1 sv2 sv3 sv4
+  do
+      client_id="${appToClientId[$i]}"
+      _set_auth0_api_user "$i" svc "$client_id"
   done
 }
 

@@ -112,7 +112,7 @@ local expandEnvironment(env) =
   ), env);
 
 // `image` defaults to `name`
-local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null) =
+local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =
 
   local proxyPort =
     if proxyToGrpcWeb == null then null
@@ -137,6 +137,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
             moduleName: if image == null then name else image,
             clusterName: config.clusterName,
           },
+          [if namespace != null then "namespace"]: namespace,
         },
         spec: {
           replicas: 1,
@@ -249,6 +250,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
         metadata: {
           name: name,
           clusterName: config.clusterName,
+          [if namespace != null then "namespace"]: namespace,
         },
         spec: {
           selector: {
@@ -344,10 +346,27 @@ local cluster(config, clusterDeployments) =
     tls.certificate(issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
   ]);
 
+local namespace(name, config) = {
+  ports: [],
+  deploymentObjects: [
+    {
+      apiVersion: "v1",
+      kind: "Namespace",
+      metadata: {
+        name: name,
+        labels: {
+          clusterName: config.clusterName,
+        },
+      },
+    },
+  ],
+};
+
 {
   deployment:: deployment,
   cluster:: cluster,
   appAuthEnvBinding:: appAuthEnvBinding,
   appUserNameEnvBinding:: appUserNameEnvBinding,
   appUserNameEnvBindings:: appUserNameEnvBindings,
+  namespace:: namespace,
 }

@@ -29,7 +29,7 @@ def connectDomain(p: ParticipantReference, domain: DomainDef) {
 }
 
 def connectGlobalDomain(p: ParticipantReference) {
-    connectDomain(p, DomainDef("global", "http://global-domain:5008"))
+    connectDomain(p, DomainDef("global", "http://global-domain.svc:5008"))
 }
 
 def ensureParticipantUser(p: ParticipantReference, userName: String, createUser: => User): User = {

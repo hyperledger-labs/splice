@@ -1,4 +1,4 @@
-local database(name, config) = {
+local database(name, config, namespace=null) = {
   ports: [],
   deploymentObjects: [
     {
@@ -10,6 +10,7 @@ local database(name, config) = {
           app: name,
           clusterName: config.clusterName,
         },
+        [if namespace != null then "namespace"]: namespace,
       },
       data: {
         PGDATA: "/var/lib/postgresql/data/pgdata",
@@ -27,6 +28,7 @@ local database(name, config) = {
           app: name,
           clusterName: config.clusterName,
         },
+        [if namespace != null then "namespace"]: namespace,
       },
       spec: {
         serviceName: name,
@@ -42,6 +44,7 @@ local database(name, config) = {
               app: name,
               clusterName: config.clusterName,
             },
+            [if namespace != null then "namespace"]: namespace,
           },
           spec: {
             containers: [
@@ -113,6 +116,7 @@ local database(name, config) = {
       metadata: {
         name: name,
         clusterName: config.clusterName,
+        [if namespace != null then "namespace"]: namespace,
       },
       spec: {
         selector: {

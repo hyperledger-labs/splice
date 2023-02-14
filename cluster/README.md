@@ -278,9 +278,9 @@ Available operations include:
 
 * `cncluster apply` - Apply the current working copy's manifest to a
   cluster. The presence of all images referenced by that manifest is
-  confirmed prior to application of the manifst.
-      * The tag for the images to be deployed can be overriden with an
-        optional paramater. If this is specified, then the docker image
+  confirmed prior to application of the manifest.
+      * The tag for the images to be deployed can be overridden with an
+        optional parameter. If this is specified, then the docker image
         presence check is also bypassed.
       * To docker image check can also be bypassed by setting the
         `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
@@ -367,20 +367,17 @@ This should produce a list of pods, all in running status:
 
 ```
  $ kubectl get pods
-NAME                                        READY   STATUS             RESTARTS      AGE
-canton-domain-c476c45c4-mqnf8               1/1     Running            0             81s
-canton-participant-84c9d9f56c-9mphh         1/1     Running            0             77s
-directory-app-5f65cf4d6c-kzm74              1/2     Running            1 (31s ago)   56s
-docs-856579dc5-rr6c6                        1/1     Running            0             96s
-external-proxy-856cf65d66-48nlr             1/1     Running            0             52s
-gcs-proxy-79646cf548-zrmfh                  1/1     Running            0             57s
-scan-app-765877dfcb-ttskv                   1/1     Running            1 (64s ago)   88s
-svc-app-589c858dc8-wcv84                    1/1     Running            3 (42s ago)   93s
-validator1-participant-6659977887-xkz6z     1/1     Running            0             72s
-validator1-validator-app-67bd778d4b-z4b4l   1/1     Running            2 (25s ago)   70s
-validator1-wallet-app-7f7cfc6dbf-2tkzh      2/2     Running            1 (13s ago)   32s
-validator1-wallet-web-ui-7777944f47-qz4vv   1/1     Running            0             62s
+NAME                                       READY   STATUS    RESTARTS   AGE
+docs-856fddb7c8-74k5g                      1/1     Running   0          32m
+external-proxy-786cd9c644-59fbz            1/1     Running   0          31m
+gcs-proxy-794d475b46-47r5w                 1/1     Running   0          32m
 ```
+
+_Note_: This only shows the pods running in the `default` namespace, but some pods are running in a
+        different [namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+        and are not shown in this listing. Use `kubectl get pods --all-namespaces` to see all of the
+        pods at once, or `kubectl get pods --namespace <NAMESPACE>` to zoom in on a specific namespace
+        (you can list available namespaces with `kubectl get namespaces`).
 
 If Kubernetes is unable to pull the image for a pod, the status might
 look something like this:

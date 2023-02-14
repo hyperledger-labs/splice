@@ -4,8 +4,44 @@ local postgres = import "./postgres.jsonnet";
 
 local c = import "./cluster.jsonnet";
 
+local defineSvApp(num, config) =
+  local name = std.format("sv-app-%d", num);
+  local adminApi = std.format("sv%d-api", num);
+  local adminApiHttp = adminApi + "-http";
+  local authBinding = std.format("sv%d", num);
+  local port = 5014 + 100 * (num - 1);
+  local httpPort = port + 1000;
+
+  [
+    c.namespace(std.format("sv-app-%d", num), config),
+    c.deployment(
+      config,
+      name,
+      [
+        {
+          name: adminApi,
+          port: port,
+        },
+        {
+          name: adminApiHttp,
+          port: httpPort,
+        },
+      ],
+      image="sv-app",
+      extraEnvVars=c.appAuthEnvBinding("sv") + [
+        { name: "CN_APP_SV_ADMIN_API_PORT", value: std.toString(port) },
+        { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
+      ] + (
+        // the first one is the founding SV app
+        if num == 1 then [{ name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" }] else []
+      ),
+      namespace=name
+    ),
+  ];
+
 local svcDeployments(config) = [
-  postgres.database("postgres", config),
+  c.namespace("svc", config),
+  postgres.database("postgres", config, namespace="svc"),
   c.deployment(
     config,
     "global-domain",
@@ -25,6 +61,7 @@ local svcDeployments(config) = [
       },
     ],
     image="canton-domain",
+    namespace="svc",
     ext={
       readinessProbe: {
         tcpSocket: {
@@ -73,6 +110,7 @@ local svcDeployments(config) = [
       },
     ],
     image="canton-domain",
+    namespace="svc",
     ext={
       readinessProbe: {
         tcpSocket: {
@@ -97,7 +135,7 @@ local svcDeployments(config) = [
     cpuRequest=config.domainCpu,
     memoryLimitMiB=config.domainMemoryMib,
     extraEnvVars=[
-      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres" },
+      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres.splitwell" },
     ]
   ),
 
@@ -115,7 +153,7 @@ local svcDeployments(config) = [
       port: 10013,
       externalPort: 10013,
     },
-  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
+  ], image="canton-participant", namespace="svc", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
                c.appUserNameEnvBindings(["svc", "sv1", "sv2", "sv3", "sv4", "scan", "directory"]) + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
@@ -182,71 +220,16 @@ local svcDeployments(config) = [
       name: "dir-http-api",
       port: 6010,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("directory")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding("directory")),
 
   c.deployment(config, "svc-app", [
     {
       name: "svc-app-adm-api",
       port: 5005,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("svc")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding("svc")),
 
-  c.deployment(config, "sv-app-1", [
-    {
-      name: "sv1-api",
-      port: 5014,
-    },
-    {
-      name: "sv1-api-http",
-      port: 6014,
-    },
-  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv1", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5014" },
-    { name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" },
-    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
-  ]),
-
-  c.deployment(config, "sv-app-2", [
-    {
-      name: "sv2-api",
-      port: 5114,
-    },
-    {
-      name: "sv2-api-http",
-      port: 6114,
-    },
-  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv2", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5114" },
-    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
-  ]),
-
-  c.deployment(config, "sv-app-3", [
-    {
-      name: "sv3-api",
-      port: 5214,
-    },
-    {
-      name: "sv3-api-http",
-      port: 6214,
-    },
-  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv3", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5214" },
-    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
-  ]),
-
-  c.deployment(config, "sv-app-4", [
-    {
-      name: "sv4-api",
-      port: 5314,
-    },
-    {
-      name: "sv4-api-http",
-      port: 6314,
-    },
-  ], image="sv-app", extraEnvVars=c.appAuthEnvBinding("sv4", "sv") + [
-    { name: "CN_APP_SV_ADMIN_API_PORT", value: "5314" },
-    { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
-  ]),
+  [defineSvApp(num, config) for num in std.range(1, networkDefaults.numberOfSvNodes)],
 
   c.deployment(config, "scan-app", [
     {
@@ -257,12 +240,13 @@ local svcDeployments(config) = [
       name: "scan-api-http",
       port: 6012,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("scan")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding("scan")),
 ];
 
 local validator1Deployments(config) = [
-  postgres.database("val1-postgres", config),
-  c.deployment(config, "validator1-participant", [
+  c.namespace("validator1", config),
+  postgres.database("val1-postgres", config, namespace="validator1"),
+  c.deployment(config, "canton-participant", [
     {
       name: "val1-adm-api",
       port: 5002,
@@ -278,7 +262,7 @@ local validator1Deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
+  ], image="canton-participant", namespace="validator1", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "val1-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -293,59 +277,65 @@ local validator1Deployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain:5008",
+        url: "http://splitwell-domain.svc:5008",
       },
     ] },
   ]),
 
-  c.deployment(config, "validator1-validator-app", [
-    {
-      name: "val1-val-http",
-      port: 6103,
-    },
-  ], extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet") + [{ name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" }]),
+  c.deployment(config,
+               "validator-app",
+               [
+                 {
+                   name: "val1-val-http",
+                   port: 6103,
+                 },
+               ],
+               image="validator1-validator-app",
+               namespace="validator1",
+               extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet") + [{ name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" }]),
 
-  c.deployment(config, "validator1-wallet-app", [
+  c.deployment(config, "wallet-app", [
     {
       name: "val1-wal-http",
       port: 6004,
     },
-  ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("wallet") + [
-    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "validator1-participant" },
-    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator1-validator-app" },
+  ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding("wallet") + [
+    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "canton-participant" },
+    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
     { name: "CN_APP_WALLET_VALIDATOR_HTTP_PORT", value: "6103" },
   ]),
 
-  c.deployment(config, "validator1-wallet-web-ui", [
+  c.deployment(config, "wallet-web-ui", [
     {
       name: "val1-wal-ui",
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", cpuRequest=0.5, extraEnvVars=[
+  ], image="wallet-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=[
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
   ]),
 
-  c.deployment(config, "validator1-directory-web-ui", [
+  c.deployment(config, "directory-web-ui", [
     {
       name: "val1-dir-ui",
       port: 80,
       internalOnly: true,
     },
-  ], cpuRequest=0.5),
+  ], image="validator1-directory-web-ui", namespace="validator1", cpuRequest=0.5),
 
-  c.deployment(config, "validator1-splitwell-web-ui", [
+  c.deployment(config, "splitwell-web-ui", [
     {
       name: "val1-sw-ui",
       port: 80,
       internalOnly: true,
     },
-  ], cpuRequest=0.5),
+  ], image="validator1-splitwell-web-ui", namespace="validator1", cpuRequest=0.5),
 ];
 
 local splitwellDeployments(config) = [
-  postgres.database("sw-postgres", config),
+  c.namespace("splitwell", config),
+  postgres.database("sw-postgres", config, namespace="splitwell"),
   c.deployment(config, "splitwell-participant", [
     {
       name: "sw-adm-api",
@@ -362,8 +352,8 @@ local splitwellDeployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], image="canton-participant", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
-               c.appUserNameEnvBinding("splitwell_validator") + [
+  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
+               c.appUserNameEnvBinding("validator", "splitwell_validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -378,7 +368,7 @@ local splitwellDeployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain:5008",
+        url: "http://splitwell-domain.svc:5008",
       },
     ] },
   ]),
@@ -388,15 +378,17 @@ local splitwellDeployments(config) = [
       name: "sw-val-http",
       port: 6203,
     },
-  ], extraEnvVars=c.appAuthEnvBinding("splitwell_validator") + c.appUserNameEnvBindings(["splitwell", "splitwell_wallet"]) + [{ name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }]),
-
+  ], namespace="splitwell", extraEnvVars=c.appAuthEnvBinding("validator", "splitwell_validator") +
+                                       c.appUserNameEnvBinding("splitwell") +
+                                       c.appUserNameEnvBinding("wallet", "splitwell_wallet") +
+                                       [{ name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }]),
 
   c.deployment(config, "splitwell-wallet-app", [
     {
       name: "sw-wal-http",
       port: 6004,
     },
-  ], image="wallet-app", extraEnvVars=c.appAuthEnvBinding("splitwell_wallet", "wallet") + [
+  ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwell-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
@@ -409,7 +401,7 @@ local splitwellDeployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", cpuRequest=0.5, extraEnvVars=[
+  ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
   ]),
 
@@ -418,7 +410,7 @@ local splitwellDeployments(config) = [
       name: "sw-api",
       port: 5213,
     },
-  ], proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding("splitwell")),
+  ], namespace="splitwell", proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding("splitwell")),
 ];
 
 local cantonNetwork(config) =
