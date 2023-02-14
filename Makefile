@@ -9,10 +9,13 @@ current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 auth-service := ${REPO_ROOT}/canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class
 
+directory-service-dar := ${REPO_ROOT}/daml/directory-service/.daml/dist/directory-service-0.1.0.dar
+splitwell-dar := ${REPO_ROOT}/daml/splitwell/.daml/dist/splitwell-0.1.0.dar
+
 .PHONY: build
 build: $(app-bundle)	## Build the Canton Coin app bundle
 
-$(app-bundle):
+$(app-bundle) $(directory-service-dar) $(splitwell-service-dar) &:
 	sbt --batch bundle
 
 $(auth-service):
