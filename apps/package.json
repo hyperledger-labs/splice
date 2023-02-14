@@ -1,13 +1,13 @@
 {
   "workspaces": [
     "common/frontend-protobuf",
-    "directory/openapi-ts-client",
-    "scan/openapi-ts-client",
-    "validator/openapi-ts-client",
-    "wallet/openapi-ts-client",
     "common/frontend",
     "directory/frontend",
+    "directory/openapi-ts-client",
+    "scan/openapi-ts-client",
+    "splitwell/frontend",
+    "validator/openapi-ts-client",
     "wallet/frontend",
-    "splitwell/frontend"
+    "wallet/openapi-ts-client"
   ]
 }
