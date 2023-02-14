@@ -31,30 +31,31 @@ trait WalletStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRou
       endUserParty: PartyId
   ): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ]] =
-    acs
-      .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
-        co.payload.endUserParty == endUserParty.toProtoPrimitive
-      )
-      .map(_.value)
+  ]] = for {
+    acs <- defaultAcs
+    install <- acs.findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
+      co.payload.endUserParty == endUserParty.toProtoPrimitive
+    )
+  } yield install.value
 
   def lookupInstallByName(
       endUserName: String
   ): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ]] =
-    acs
-      .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
-        co.payload.endUserName == endUserName
-      )
-      .map(_.value)
+  ]] = for {
+    acs <- defaultAcs
+    install <- acs.findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
+      co.payload.endUserName == endUserName
+    )
+  } yield install.value
 
   def lookupValidatorFeaturedAppRight()
-      : Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] = {
-    acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
-      co.payload.provider == key.validatorParty.toProtoPrimitive
+      : Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] =
+    defaultAcs.flatMap(
+      _.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+        co.payload.provider == key.validatorParty.toProtoPrimitive
+      )
     )
-  }
 }
 
 object WalletStore {

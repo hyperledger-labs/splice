@@ -27,8 +27,10 @@ trait SplitwellStore extends CoinAppStoreWithoutHistory {
   ): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]]] =
-    acs.findContractWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
-      co.payload.user == user.toProtoPrimitive
+    defaultAcs.flatMap(
+      _.findContractWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
+        co.payload.user == user.toProtoPrimitive
+      )
     )
 
   def lookupInstall(user: PartyId): Future[Option[
@@ -42,8 +44,10 @@ trait SplitwellStore extends CoinAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]]
   ] =
-    acs.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
-      co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
+    defaultAcs.flatMap(
+      _.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
+        co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
+      )
     )
 
   def lookupGroup(

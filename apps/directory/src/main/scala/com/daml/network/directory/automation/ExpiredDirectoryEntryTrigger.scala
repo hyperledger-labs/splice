@@ -29,7 +29,7 @@ class ExpiredDirectoryEntryTrigger(
       directoryCodegen.DirectoryEntry.ContractId,
       directoryCodegen.DirectoryEntry,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listExpiredDirectoryEntries,
       directoryCodegen.DirectoryEntry.COMPANION,
     ) {

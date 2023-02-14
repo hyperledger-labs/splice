@@ -154,8 +154,9 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       domainId <- svcStore.domains.getUniqueDomainId()
-      openMiningRounds <- svcStore.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
-      issuingMiningRounds <- svcStore.acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
+      acs <- svcStore.acs(domainId)
+      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
+      issuingMiningRounds <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
       coinRules <- svcStore.getCoinRules()
       svcRules <- svcStore.getSvcRules()
       cmds = (

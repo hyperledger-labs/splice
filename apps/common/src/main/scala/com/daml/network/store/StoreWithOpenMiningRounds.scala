@@ -10,22 +10,20 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Mix-in for an ACS-based store that tracks the OpenMiningRound contracts. */
 trait StoreWithOpenMiningRounds {
 
-  def acs: AcsStore
+  protected[this] def defaultAcs: Future[AcsStore]
 
   /** Returns the active open mining rounds who are open according to 'opensAt'. */
   def lookupSubmittableOpenMiningRounds(
       now: CantonTimestamp
   )(implicit
       ec: ExecutionContext
-  ): Future[Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
-    acs
-      .listContracts(OpenMiningRound.COMPANION)
-      // only return open open rounds.
-      .map(
-        _.filter(r => r.payload.opensAt.compareTo(now.toInstant) <= 0)
-          .sortBy(r => r.payload.opensAt)
-      )
-  }
+  ): Future[Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] = for {
+    acs <- defaultAcs
+    rounds <- acs.listContracts(OpenMiningRound.COMPANION)
+  } yield rounds
+    // only return open open rounds.
+    .filter(r => r.payload.opensAt.compareTo(now.toInstant) <= 0)
+    .sortBy(r => r.payload.opensAt)
 
   /** Get latest mining round which can be submitted against.
     */

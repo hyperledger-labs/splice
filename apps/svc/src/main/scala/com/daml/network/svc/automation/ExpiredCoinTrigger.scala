@@ -24,7 +24,7 @@ class ExpiredCoinTrigger(
       cc.coin.Coin.ContractId,
       cc.coin.Coin,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listExpiredCoins,
       cc.coin.Coin.COMPANION,
     ) {

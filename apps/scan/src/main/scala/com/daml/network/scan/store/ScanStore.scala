@@ -23,7 +23,7 @@ trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRound
   override final def defaultAcsDomain = domainConfig.global
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
-    acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContract(cc.coin.CoinRules.COMPANION)(_ => true))
 }
 
 object ScanStore {

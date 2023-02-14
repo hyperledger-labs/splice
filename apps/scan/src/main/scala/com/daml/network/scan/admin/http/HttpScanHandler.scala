@@ -44,8 +44,8 @@ class HttpScanHandler(
       val now = clock.now
       for {
         latestOpen <- store.getLatestOpenMiningRound(now)
-        issuingRounds <- store.acs
-          .listContracts(IssuingMiningRound.COMPANION)
+        acs <- store.defaultAcs
+        issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         issuingRoundsResponseMap = issuingRounds
           .map(round => {
@@ -110,7 +110,8 @@ class HttpScanHandler(
   )(): Future[v0.ScanResource.GetClosedRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
-        rounds <- store.acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
+        acs <- store.defaultAcs
+        rounds <- acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
         val filteredRounds = rounds.sortWith(_.payload.round.number > _.payload.round.number)
         definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toJson))
@@ -141,7 +142,8 @@ class HttpScanHandler(
   )(): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
-        apps <- store.acs.listContracts(FeaturedAppRight.COMPANION)
+        acs <- store.defaultAcs
+        apps <- acs.listContracts(FeaturedAppRight.COMPANION)
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toJson))
       }
@@ -154,7 +156,8 @@ class HttpScanHandler(
   ] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
-        right <- store.acs.findContract(FeaturedAppRight.COMPANION)(co =>
+        acs <- store.defaultAcs
+        right <- acs.findContract(FeaturedAppRight.COMPANION)(co =>
           co.payload.provider == providerPartyId
         )
       } yield {

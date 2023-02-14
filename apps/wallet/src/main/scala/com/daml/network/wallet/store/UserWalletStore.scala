@@ -1,5 +1,8 @@
 package com.daml.network.wallet.store
 
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen as jcg
+import com.daml.network.automation.ExpiredContractTrigger
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
@@ -36,6 +39,7 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import java.time.Instant
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
@@ -50,59 +54,42 @@ trait UserWalletStore
 
   def getInstall()(implicit ec: ExecutionContext): Future[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ] =
-    acs
+  ] = for {
+    acs <- defaultAcs
+    ct <- acs
       .findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
-      .map(
-        _.getOrElse(
-          throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
-        )
-      )
+  } yield ct.getOrElse(
+    throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
+  )
 
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    acs.signalWhenIngested(offset)
+    defaultAcs.flatMap(_.signalWhenIngested(offset))
 
-  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int): Future[Seq[Contract[
+  def listExpiredTransferOffers: ExpiredContractTrigger.ListExpiredContracts[
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
-  ]]] =
-    acs
-      .listContracts(transferOffersCodegen.TransferOffer.COMPANION)
-      .map(
-        _.iterator
-          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-          .take(limit)
-          .toSeq
-      )
+  ] = listExpiredContracts(transferOffersCodegen.TransferOffer.COMPANION)(_.expiresAt)
 
-  def listExpiredAcceptedTransferOffers(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[Contract[
+  def listExpiredAcceptedTransferOffers: ExpiredContractTrigger.ListExpiredContracts[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
-  ]]] =
-    acs
-      .listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
-      .map(
-        _.iterator
-          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-          .take(limit)
-          .toSeq
-      )
+  ] = listExpiredContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(_.expiresAt)
 
-  def listExpiredAppPaymentRequests(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[
-    Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
-  ] =
-    acs
-      .listContracts(walletCodegen.AppPaymentRequest.COMPANION)
-      .map(
-        _.iterator
-          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-          .take(limit)
-          .toSeq
-      )
+  def listExpiredAppPaymentRequests: ExpiredContractTrigger.ListExpiredContracts[
+    walletCodegen.AppPaymentRequest.ContractId,
+    walletCodegen.AppPaymentRequest,
+  ] = listExpiredContracts(walletCodegen.AppPaymentRequest.COMPANION)(_.expiresAt)
+
+  private[this] def listExpiredContracts[TCid <: jcg.ContractId[T], T <: Template](
+      companion: jcg.ContractCompanion[_ <: jcg.Contract[TCid, T], TCid, T]
+  )(expiresAt: T => Instant): ExpiredContractTrigger.ListExpiredContracts[TCid, T] = (now, limit) =>
+    for {
+      acs <- defaultAcs
+      contracts <- acs.listContracts(companion)
+    } yield contracts.iterator
+      .filter(co => now.toInstant isAfter expiresAt(co.payload))
+      .take(limit)
+      .toSeq
 
   def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
@@ -113,43 +100,41 @@ trait UserWalletStore
       state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
     )
 
-    acs
-      .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-      .map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq)
+    for {
+      acs <- defaultAcs
+      cos <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
+    } yield cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq
   }
 
   /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
   def listSortedCoinsAndQuantity(
       maxNumInputs: Int,
       submittingRound: Long,
-  ): Future[Seq[(BigDecimal, InputCoin)]] = {
-    acs
-      .listContracts(coinCodegen.Coin.COMPANION)
-      .map(coins =>
-        coins
-          .map(c =>
-            (
-              CoinUtil
-                .currentAmount(c.payload, submittingRound),
-              c,
-            )
-          )
-          .filter { quantityAndCoin => quantityAndCoin._1.compareTo(BigDecimal.valueOf(0)) > 0 }
-          .sortBy(quantityAndCoin =>
-            // negating because largest values should come first.
-            quantityAndCoin._1.negate()
-          )
-          .take(maxNumInputs)
-          .map(quantityAndCoin =>
-            (
-              quantityAndCoin._1,
-              new v1.coin.transferinput.InputCoin(
-                quantityAndCoin._2.contractId.toInterface(v1.coin.Coin.INTERFACE)
-              ),
-            )
-          )
+  ): Future[Seq[(BigDecimal, InputCoin)]] = for {
+    acs <- defaultAcs
+    coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+  } yield coins
+    .map(c =>
+      (
+        CoinUtil
+          .currentAmount(c.payload, submittingRound),
+        c,
       )
-  }
+    )
+    .filter { quantityAndCoin => quantityAndCoin._1.compareTo(BigDecimal.valueOf(0)) > 0 }
+    .sortBy(quantityAndCoin =>
+      // negating because largest values should come first.
+      quantityAndCoin._1.negate()
+    )
+    .take(maxNumInputs)
+    .map(quantityAndCoin =>
+      (
+        quantityAndCoin._1,
+        new v1.coin.transferinput.InputCoin(
+          quantityAndCoin._2.contractId.toInterface(v1.coin.Coin.INTERFACE)
+        ),
+      )
+    )
 
   /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
     * and optionally filtered by a set of issuing rounds.
@@ -165,14 +150,13 @@ trait UserWalletStore
       case None => true
     }
     // TODO(M3-83): use an index to access sorted rounds in the DB schema.
-    acs
-      .listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
-      .map(rewards => {
-        rewards
-          .filter(rw => filterActiveRounds(rw.payload.round.number))
-          .sortBy(_.payload.round.number)
-          .take(maxNumInputs.getOrElse(Int.MaxValue))
-      })
+    for {
+      acs <- defaultAcs
+      rewards <- acs.listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
+    } yield rewards
+      .filter(rw => filterActiveRounds(rw.payload.round.number))
+      .sortBy(_.payload.round.number)
+      .take(maxNumInputs.getOrElse(Int.MaxValue))
   }
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
@@ -183,48 +167,42 @@ trait UserWalletStore
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   ): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
-  ]] = {
+  ]] = for {
+    acs <- defaultAcs
     // TODO(M3-83): use an index to access sorted rounds in the DB schema.
-    acs
-      .listContracts(
-        coinCodegen.AppRewardCoupon.COMPANION
+    rewards <- acs.listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+  } yield rewards
+    .flatMap { rw =>
+      val issuingO = issuingRoundsMap.get(rw.payload.round)
+      issuingO
+        .map(i => {
+          val quantity =
+            if (rw.payload.featured)
+              rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
+            else
+              rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
+          (rw, BigDecimal(quantity))
+        })
+    }
+    .sorted(
+      Ordering[(Long, BigDecimal)].on(
+        (x: (
+            Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+            BigDecimal,
+        )) => (x._1.payload.round.number, -x._2)
       )
-      .map(rewards =>
-        rewards
-          .flatMap(rw => {
-            val issuingO = issuingRoundsMap.get(rw.payload.round)
-            issuingO
-              .map(i => {
-                val quantity =
-                  if (rw.payload.featured)
-                    rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
-                  else
-                    rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
-                (rw, BigDecimal(quantity))
-              })
-          })
-          .sorted(
-            Ordering[(Long, BigDecimal)].on(
-              (x: (
-                  Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
-                  BigDecimal,
-              )) => (x._1.payload.round.number, -x._2)
-            )
-          )
-          .take(maxNumInputs)
-      )
-  }
+    )
+    .take(maxNumInputs)
 
   def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
-  ] = {
-    acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true)
-  }
+  ] =
+    defaultAcs.flatMap(_.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true))
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   def getValidatorRightsWhereUserIsValidator()
       : Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
-    acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
+    defaultAcs.flatMap(_.listContracts(coinCodegen.ValidatorRight.COMPANION))
 
   def listTransactions(
       beginAfterEventId: Option[String],

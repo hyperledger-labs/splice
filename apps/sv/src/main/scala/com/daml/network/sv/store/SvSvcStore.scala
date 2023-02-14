@@ -27,7 +27,7 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
-    acs.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true))
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
@@ -45,7 +45,7 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
   ] =
-    acs.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true))
 
   def lookupSvcRules()
       : Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =

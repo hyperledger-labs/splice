@@ -195,12 +195,6 @@ trait AcsStore extends AutoCloseable {
 
 object AcsStore {
 
-  // TODO (#2619) remove along with FutureAcsStore
-  private[network] def futureStore(store: Future[AcsStore])(implicit
-      ec: ExecutionContext
-  ): AcsStore =
-    new FutureAcsStore(store)
-
   // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
   abstract class InterfaceDecoder {
     def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[_]](

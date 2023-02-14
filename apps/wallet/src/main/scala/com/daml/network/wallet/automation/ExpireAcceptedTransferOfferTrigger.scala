@@ -31,7 +31,7 @@ class ExpireAcceptedTransferOfferTrigger(
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listExpiredAcceptedTransferOffers,
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
     ) {

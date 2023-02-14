@@ -63,15 +63,16 @@ class ExpireRewardCouponsTrigger(
     for {
       domainId <- store.domains.getUniqueDomainId()
       cmds <- getCmdsForRound(closedRound, coinRules)
+      acs <- store.defaultAcs
       _ <- Future.sequence(
         cmds.map(cmd =>
           connection
             .submitWithResultAndOffsetNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
-            .flatMap({
+            .flatMap {
               // make sure the store ingested our update so we don't
               // attempt to collect the same coupon twice
-              case (offset, outcome) => store.acs.signalWhenIngested(offset).map(_ => Some(outcome))
-            })
+              case (offset, outcome) => acs.signalWhenIngested(offset).map(_ => Some(outcome))
+            }
         )
       )
     } yield !cmds.isEmpty

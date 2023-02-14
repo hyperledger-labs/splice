@@ -29,7 +29,7 @@ class ExpireIssuingMiningRoundTrigger(
       cc.round.IssuingMiningRound.ContractId,
       cc.round.IssuingMiningRound,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listExpiredIssuingMiningRounds,
       cc.round.IssuingMiningRound.COMPANION,
     ) {

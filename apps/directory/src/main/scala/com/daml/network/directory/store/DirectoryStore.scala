@@ -44,8 +44,10 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
   ): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
   ]]] =
-    acs.findContractWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(co =>
-      co.payload.user == user.toProtoPrimitive
+    defaultAcs.flatMap(
+      _.findContractWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(co =>
+        co.payload.user == user.toProtoPrimitive
+      )
     )
 
   /** Lookup a directory entry by name. */
@@ -54,8 +56,10 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
   ): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    acs.findContractWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(co =>
-      co.payload.name == name
+    defaultAcs.flatMap(
+      _.findContractWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(co =>
+        co.payload.name == name
+      )
     )
 
   def lookupEntryByName(name: String): Future[
@@ -71,8 +75,10 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
   ): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
-    acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
-      co.payload.user == partyId.toProtoPrimitive
+    defaultAcs.flatMap(
+      _.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
+        co.payload.user == partyId.toProtoPrimitive
+      )
     )
 
   /** List all directory entries that are active as of a specific revision, up to a certain number. */
@@ -82,6 +88,7 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
     for {
+      acs <- defaultAcs
       list <- acs.listContracts(
         directoryCodegen.DirectoryEntry.COMPANION,
         (entry: Contract[
@@ -91,23 +98,23 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
       )
     } yield list.take(pageSize)
 
+  // TODO (#2828) factor with UserWalletStore#listExpiredContracts
   def listExpiredDirectoryEntries(now: CantonTimestamp, limit: Int): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ] =
-    acs
-      .listContracts(directoryCodegen.DirectoryEntry.COMPANION)
-      .map(
-        _.iterator
-          .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
-          .take(limit)
-          .toSeq
-      )
+  ] = for {
+    acs <- defaultAcs
+    entries <- acs.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
+  } yield entries.iterator
+    .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
+    .take(limit)
+    .toSeq
 
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
       limit: Int,
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     for {
+      acs <- defaultAcs
       allSubscriptions <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
       dueSubscriptions = allSubscriptions.filter(e =>
         now.toInstant.isAfter(e.payload.nextPaymentDueAt)

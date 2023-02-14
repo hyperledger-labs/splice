@@ -40,14 +40,14 @@ class MergeUnclaimedRewardsTrigger(
                   unclaimedRewards.map(co => co.contractId).asJava
                 )
                 val cmd = rules.contractId.exerciseCoinRules_MergeUnclaimedRewards(arg)
-                connection
-                  .submitWithResultAndOffsetNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
-                  .flatMap {
-                    // make sure the store ingested our update so we don't
-                    // attempt to merge the same reward twice
-                    case (offset, outcome) =>
-                      store.acs.signalWhenIngested(offset).map(_ => Some(outcome))
-                  }
+                for {
+                  (offset, outcome) <- connection
+                    .submitWithResultAndOffsetNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
+                  acs <- store.defaultAcs
+                  // make sure the store ingested our update so we don't
+                  // attempt to merge the same reward twice
+                  _ <- acs.signalWhenIngested(offset)
+                } yield Some(outcome)
             }
           } yield {
             res

@@ -80,12 +80,13 @@ class SummarizingMiningRoundTrigger(
     */
   private def queryRewards(round: Long)(implicit ec: ExecutionContext): Future[RoundRewards] =
     for {
-      appRewardCoupons <- store.acs.listContracts(
+      acs <- store.defaultAcs
+      appRewardCoupons <- acs.listContracts(
         cc.coin.AppRewardCoupon.COMPANION,
         (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
       )
-      validatorRewardCoupons <- store.acs.listContracts(
+      validatorRewardCoupons <- acs.listContracts(
         cc.coin.ValidatorRewardCoupon.COMPANION,
         (c: Contract[
           cc.coin.ValidatorRewardCoupon.ContractId,

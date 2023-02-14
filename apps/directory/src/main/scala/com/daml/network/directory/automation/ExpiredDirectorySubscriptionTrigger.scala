@@ -50,13 +50,14 @@ class ExpiredDirectorySubscriptionTrigger(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
   )(implicit tc: TraceContext): Future[Boolean] =
     (for {
+      acs <- OptionT liftF store.defaultAcs
       _ <- OptionT(
-        store.acs.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(
+        acs.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(
           task.work.state.contractId
         )
       )
       _ <- OptionT(
-        store.acs.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
+        acs.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
           task.work.context.contractId
         )
       )

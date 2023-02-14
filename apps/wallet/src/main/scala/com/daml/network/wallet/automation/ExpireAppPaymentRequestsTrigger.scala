@@ -30,7 +30,7 @@ class ExpireAppPaymentRequestsTrigger(
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listExpiredAppPaymentRequests,
       paymentCodegen.AppPaymentRequest.COMPANION,
     ) {

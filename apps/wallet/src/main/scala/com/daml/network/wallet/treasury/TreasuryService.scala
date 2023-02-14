@@ -194,37 +194,41 @@ class TreasuryService(
   private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
     case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
       for {
-        subscriptionRequest <- userStore.acs.getContractById(
+        acs <- userStore.defaultAcs
+        subscriptionRequest <- acs.getContractById(
           subsCodegen.SubscriptionRequest.COMPANION
         )(op.contractIdValue)
-        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+        _ <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
           subscriptionRequest.payload.subscriptionData.context
         )
       } yield ()
 
     case op: coinoperation.CO_SubscriptionMakePayment =>
       for {
-        subscriptionState <- userStore.acs.getContractById(
+        acs <- userStore.defaultAcs
+        subscriptionState <- acs.getContractById(
           subsCodegen.SubscriptionIdleState.COMPANION
         )(op.contractIdValue)
-        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+        _ <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
           subscriptionState.payload.subscriptionData.context
         )
       } yield ()
 
     case op: coinoperation.CO_AppPayment =>
       for {
-        paymentRequest <- userStore.acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(
+        acs <- userStore.defaultAcs
+        paymentRequest <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(
           op.contractIdValue
         )
-        _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
+        _ <- acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
           paymentRequest.payload.deliveryOffer
         )
       } yield ()
 
     case op: coinoperation.CO_CompleteAcceptedTransfer =>
       for {
-        _ <- userStore.acs.getContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
+        acs <- userStore.defaultAcs
+        _ <- acs.getContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
           op.contractIdValue
         )
       } yield ()
@@ -431,10 +435,8 @@ class TreasuryService(
       issuingRoundsMap = openIssuingRounds
         .map(r => (r.payload.round, r.payload))
         .toMap
-      validatorRights <- walletManager.store.acs
-        .listContracts(
-          coinCodegen.ValidatorRight.COMPANION
-        )
+      walletAcs <- walletManager.store.defaultAcs
+      validatorRights <- walletAcs.listContracts(coinCodegen.ValidatorRight.COMPANION)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
         openRound.payload.round.number,

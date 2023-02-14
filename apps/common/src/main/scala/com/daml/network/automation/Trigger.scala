@@ -540,8 +540,8 @@ abstract class ExpiredContractTrigger[
     TCid <: ContractId[T],
     T <: CodegenTemplate,
 ](
-    acs: AcsStore,
-    listExpiredContracts: (CantonTimestamp, Int) => Future[Seq[Contract[TCid, T]]],
+    acs: Future[AcsStore],
+    listExpiredContracts: ExpiredContractTrigger.ListExpiredContracts[TCid, T],
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
@@ -555,8 +555,13 @@ abstract class ExpiredContractTrigger[
 
   override final protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[Contract[TCid, T]]
-  )(implicit tc: TraceContext): Future[Boolean] =
-    acs
-      .lookupContractById(templateCompanion)(task.work.contractId)
-      .map(_.isEmpty)
+  )(implicit tc: TraceContext): Future[Boolean] = for {
+    acs <- acs
+    ct <- acs.lookupContractById(templateCompanion)(task.work.contractId)
+  } yield ct.isEmpty
+}
+
+object ExpiredContractTrigger {
+  type ListExpiredContracts[TCid <: ContractId[_], T] =
+    (CantonTimestamp, Int) => Future[Seq[Contract[TCid, T]]]
 }

@@ -1,5 +1,6 @@
 package com.daml.network.svc.store
 
+import com.daml.ledger.javaapi.data as javab
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
@@ -32,7 +33,7 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
-    acs.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true))
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
@@ -52,7 +53,7 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
   ] =
-    acs.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true)
+    defaultAcs.flatMap(_.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true))
 
   // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
   def lookupSvcRules()(implicit
@@ -78,8 +79,10 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
   ] =
-    acs.findContractWithOffset(cc.coin.ValidatorRight.COMPANION)(co =>
-      co.payload.user == party.toProtoPrimitive
+    defaultAcs.flatMap(
+      _.findContractWithOffset(cc.coin.ValidatorRight.COMPANION)(co =>
+        co.payload.user == party.toProtoPrimitive
+      )
     )
 
   /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
@@ -87,6 +90,7 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       ec: ExecutionContext
   ): Future[Option[SvcStore.OpenMiningRoundTriple]] =
     for {
+      acs <- defaultAcs
       openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
         case Seq(oldest, middle, newest) =>
@@ -111,77 +115,75 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
     )
   )
 
+  // TODO (#2828) factor with UserWalletStore#listExpiredContracts
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[Seq[Contract[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound]]] =
-    acs
-      .listContracts(cc.round.IssuingMiningRound.COMPANION)
-      .map(
-        _.iterator
-          .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
-          .take(limit)
-          .toSeq
-      )
+    for {
+      acs <- defaultAcs
+      imrContracts <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
+    } yield imrContracts.iterator
+      .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
+      .take(limit)
+      .toSeq
 
   /** List coins that are expired and can never be used as transfer input. */
   def listExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[Seq[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]]] = for {
-    maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
-    result <- maybeLatestOpenMiningRound.fold(
-      Future.successful(Seq.empty[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]])
-    ) { latest =>
-      acs
-        .listContracts(
-          cc.coin.Coin.COMPANION,
-          (e: Contract[
-            cc.coin.Coin.ContractId,
-            cc.coin.Coin,
-          ]) => CoinUtil.coinExpiresAt(e.payload).number <= latest.payload.round.number - 2,
-        )
-        .map(_.iterator.take(limit).toSeq)
-    }
-  } yield result
+  ): Future[Seq[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]]] =
+    listExpired(limit, cc.coin.Coin.COMPANION)(identity)
 
   /** List locked coins that are expired and can never be used as transfer input. */
   def listLockedExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[Seq[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]] = for {
-    maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
-    result <- maybeLatestOpenMiningRound.fold(
-      Future.successful(Seq.empty[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]])
-    ) { latest =>
-      acs
-        .listContracts(
-          cc.coin.LockedCoin.COMPANION,
-          (e: Contract[
-            cc.coin.LockedCoin.ContractId,
-            cc.coin.LockedCoin,
-          ]) => CoinUtil.coinExpiresAt(e.payload.coin).number <= latest.payload.round.number - 2,
-        )
-        .map(_.iterator.take(limit).toSeq)
-    }
-  } yield result
+  ): Future[Seq[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]] =
+    listExpired(limit, cc.coin.LockedCoin.COMPANION)(_.coin)
+
+  private[this] def listExpired[Id <: javab.codegen.ContractId[T], T <: javab.Template](
+      limit: Int,
+      companion: javab.codegen.ContractCompanion[_ <: javab.codegen.Contract[Id, T], Id, T],
+  )(coin: T => cc.coin.Coin)(implicit ec: ExecutionContext): Future[Seq[Contract[Id, T]]] =
+    for {
+      maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
+      result <- maybeLatestOpenMiningRound.fold(
+        Future.successful(Seq.empty[Contract[Id, T]])
+      ) { latest =>
+        for {
+          acs <- defaultAcs
+          allExpired <- acs
+            .listContracts(
+              companion,
+              (e: Contract[Id, T]) =>
+                CoinUtil.coinExpiresAt(coin(e.payload)).number <= latest.payload.round.number - 2,
+            )
+        } yield allExpired.iterator.take(limit).toSeq
+      }
+    } yield result
 
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
-    acs.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
+    defaultAcs.flatMap(
+      _.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
+    )
 
   def listUnclaimedRewards(
       limit: Long
   ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
-    acs.listContracts(
-      cc.coin.UnclaimedReward.COMPANION,
-      (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
-      Some(limit),
+    defaultAcs.flatMap(
+      _.listContracts(
+        cc.coin.UnclaimedReward.COMPANION,
+        (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
+        Some(limit),
+      )
     )
 
   def lookupOldestClosedMiningRound(): Future[
     Option[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
   ] =
     for {
+      acs <- defaultAcs
       rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
     } yield rounds.sortBy(_.payload.round.number).headOption
 
@@ -189,11 +191,13 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       round: Long,
       limit: Option[Long] = None,
   ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]] =
-    acs.listContracts(
-      cc.coin.AppRewardCoupon.COMPANION,
-      (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
-        co.payload.round.number == round,
-      limit,
+    defaultAcs.flatMap(
+      _.listContracts(
+        cc.coin.AppRewardCoupon.COMPANION,
+        (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
+          co.payload.round.number == round,
+        limit,
+      )
     )
 
   def listAppRewardCouponsGroupedByCounterparty(
@@ -221,11 +225,13 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
   ): Future[
     Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
   ] =
-    acs.listContracts(
-      cc.coin.ValidatorRewardCoupon.COMPANION,
-      (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
-        co.payload.round.number == round,
-      limit,
+    defaultAcs.flatMap(
+      _.listContracts(
+        cc.coin.ValidatorRewardCoupon.COMPANION,
+        (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
+          co.payload.round.number == round,
+        limit,
+      )
     )
 
   def listValidatorRewardCouponsGroupedByCounterparty(

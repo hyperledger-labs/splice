@@ -33,7 +33,7 @@ class SubscriptionReadyForPaymentTrigger(
       subsCodegen.SubscriptionIdleState.ContractId,
       subsCodegen.SubscriptionIdleState,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listSubscriptionStatesReadyForPayment,
       subsCodegen.SubscriptionIdleState.COMPANION,
     ) {

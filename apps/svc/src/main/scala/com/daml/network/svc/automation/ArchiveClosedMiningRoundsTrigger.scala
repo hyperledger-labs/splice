@@ -39,32 +39,31 @@ class ArchiveClosedMiningRoundsTrigger(
               s"Round ${closedRound.payload.round.number} still has unclaimed reward coupons, not archiving yet"
             )
             Future(false)
-          case false => {
-            connection
-              .submitCommandsNoDedupTransaction(
-                Seq(store.svcParty),
-                Seq.empty,
-                coinRules.contractId
-                  .exerciseCoinRules_MiningRound_Archive(
-                    closedRound.contractId
-                  )
-                  .commands
-                  .asScala
-                  .toSeq,
-                domainId,
-              )
-              .flatMap(tx =>
-                // make sure the store ingested our update so we don't
-                // attempt to archive the same round twice
-                store.acs.signalWhenIngested(tx.getOffset())
-              )
-              .map(_ => {
-                logger.info(
-                  s"successfully archived closed mining round ${closedRound.payload.round.number}"
+          case false =>
+            for {
+              tx <- connection
+                .submitCommandsNoDedupTransaction(
+                  Seq(store.svcParty),
+                  Seq.empty,
+                  coinRules.contractId
+                    .exerciseCoinRules_MiningRound_Archive(
+                      closedRound.contractId
+                    )
+                    .commands
+                    .asScala
+                    .toSeq,
+                  domainId,
                 )
-                true
-              })
-          }
+              // make sure the store ingested our update so we don't
+              // attempt to archive the same round twice
+              acs <- store.defaultAcs
+              _ <- acs.signalWhenIngested(tx.getOffset())
+            } yield {
+              logger.info(
+                s"successfully archived closed mining round ${closedRound.payload.round.number}"
+              )
+              true
+            }
         }
     } yield res
   }

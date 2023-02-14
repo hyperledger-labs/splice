@@ -23,7 +23,7 @@ class ExpiredLockedCoinTrigger(
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ](
-      store.acs,
+      store.defaultAcs,
       store.listLockedExpiredCoins,
       cc.coin.LockedCoin.COMPANION,
     ) {

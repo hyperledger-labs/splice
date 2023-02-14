@@ -52,20 +52,17 @@ class AdvanceOpenMiningRoundTrigger(
       .commands
       .asScala
       .toSeq
-    store.domains.getUniqueDomainId().flatMap { domainId =>
-      connection
+    for {
+      domainId <- store.domains.getUniqueDomainId()
+      tx <- connection
         .submitCommandsNoDedupTransaction(Seq(store.svcParty), Seq(), cmds, domainId)
-        .flatMap(tx =>
-          // make sure the store ingested our update so we don't
-          // attempt to advance the same round twice
-          store.acs.signalWhenIngested(tx.getOffset())
-        )
-        .map(_ =>
-          TaskSuccess(
-            s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
-          )
-        )
-    }
+      acs <- store.acs(domainId)
+      // make sure the store ingested our update so we don't
+      // attempt to advance the same round twice
+      _ <- acs.signalWhenIngested(tx.getOffset())
+    } yield TaskSuccess(
+      s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+    )
   }
 
   override protected def isStaleTask(
@@ -76,9 +73,10 @@ class AdvanceOpenMiningRoundTrigger(
     import cats.syntax.traverse.*
 
     (for {
-      _ <- OptionT(store.acs.lookupContractById(cc.coin.CoinRules.COMPANION)(task.work.coinRulesId))
+      acs <- OptionT liftF store.defaultAcs
+      _ <- OptionT(acs.lookupContractById(cc.coin.CoinRules.COMPANION)(task.work.coinRulesId))
       _ <- task.work.openRounds.toSeq.traverse(co =>
-        OptionT(store.acs.lookupContractById(cc.round.OpenMiningRound.COMPANION)(co.contractId))
+        OptionT(acs.lookupContractById(cc.round.OpenMiningRound.COMPANION)(co.contractId))
       )
     } yield ()).isEmpty
   }

@@ -25,15 +25,10 @@ trait CoinAppStore[
     */
   private[network] type PerDomainStore
 
-  // TODO (#2619) remove if not used anymore
   def defaultAcsDomain: DomainAlias
 
-  // TODO (#2619) remove if unused after fixing `acs` users
-  final lazy val defaultAcs: Future[AcsStore] =
+  lazy val defaultAcs: Future[AcsStore] =
     domains.signalWhenConnected(defaultAcsDomain).flatMap(acs(_))
-
-  // TODO (#2619) remove, and remove futureStore and FutureAcsStore
-  final val acs: AcsStore = AcsStore futureStore defaultAcs
 
   def acs(domain: DomainId): Future[AcsStore]
 

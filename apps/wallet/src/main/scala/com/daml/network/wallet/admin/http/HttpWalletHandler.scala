@@ -322,8 +322,9 @@ class HttpWalletHandler(
   ): Future[v0.WalletResource.GetBalanceResponse] = withNewTrace(workflowId) { _ => _ =>
     for {
       userStore <- getUserStore(user)
-      coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
-      lockedCoins <- userStore.acs.listContracts(coinCodegen.LockedCoin.COMPANION)
+      acs <- userStore.defaultAcs
+      coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+      lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
       now = clock.now
       currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
     } yield {
@@ -353,8 +354,9 @@ class HttpWalletHandler(
         userStore <- getUserStore(user)
         now = clock.now
         currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
-        coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
-        lockedCoins <- userStore.acs.listContracts(
+        acs <- userStore.defaultAcs
+        coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+        lockedCoins <- acs.listContracts(
           coinCodegen.LockedCoin.COMPANION
         )
       } yield definitions.ListResponse(
@@ -433,11 +435,12 @@ class HttpWalletHandler(
     implicit traceContext => span =>
       for {
         userStore <- getUserStore(user)
-        subscriptions <- userStore.acs.listContracts(subsCodegen.Subscription.COMPANION)
-        subscriptionIdleStates <- userStore.acs.listContracts(
+        acs <- userStore.defaultAcs
+        subscriptions <- acs.listContracts(subsCodegen.Subscription.COMPANION)
+        subscriptionIdleStates <- acs.listContracts(
           subsCodegen.SubscriptionIdleState.COMPANION
         )
-        subscriptionPayments <- userStore.acs.listContracts(
+        subscriptionPayments <- acs.listContracts(
           subsCodegen.SubscriptionPayment.COMPANION
         )
       } yield {
@@ -631,7 +634,8 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
         userStore <- getUserStore(user)
-        contracts <- userStore.acs.listContracts(templateCompanion)
+        acs <- userStore.defaultAcs
+        contracts <- acs.listContracts(templateCompanion)
       } yield mkResponse(contracts.map(_.toJson).toVector)
     }
 

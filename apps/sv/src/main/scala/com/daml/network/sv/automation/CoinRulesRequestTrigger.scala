@@ -57,8 +57,9 @@ class CoinRulesRequestTrigger(
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
       domainId <- store.domains.getUniqueDomainId()
-      openMiningRounds <- store.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
-      issuingMiningRounds <- store.acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
+      acs <- store.acs(domainId)
+      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
+      issuingMiningRounds <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
       coinRules <- store.getCoinRules()
       svcRules <- store.getSvcRules()
       cmds = svcRules.contractId

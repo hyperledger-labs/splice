@@ -84,7 +84,8 @@ class SubscriptionInitialPaymentTrigger(
     }
     for {
       domainId <- store.domains.getUniqueDomainId()
-      context <- store.acs
+      acs <- store.acs(domainId)
+      context <- acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
           _.getOrElse(

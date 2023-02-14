@@ -47,11 +47,16 @@ class AcceptedTransferOfferTrigger(
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ], NotUsed] =
-    store.acs
-      .streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
-      .filter(acceptedOffer =>
-        acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
+    Source
+      .futureSource(
+        store.defaultAcs.map(
+          _.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
+            .filter(acceptedOffer =>
+              acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
+            )
+        )
       )
+      .mapMaterializedValue { _: Future[NotUsed] => NotUsed }
 
   override def completeTask(
       acceptedOffer: Contract[
