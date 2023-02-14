@@ -88,7 +88,6 @@ testUSDSubscription = script do
   pizzeria <- setupUser app "pizzeria" validator
   provider <- setupUser app "la_famiglia" validator
 
-  -- TODO(M3-06): more thoroughly test rewards
   featureApp app provider
   validatorUserId <- validateUserId "validator1"
   featuredValidator <- featureApp app (CCUser validatorUserId validator)
@@ -110,10 +109,38 @@ testUSDSubscription = script do
   advanceToIssuanceWithPrice app 2.0
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
-  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator (Some featuredValidator) subscriptionRequestCid
+
+  (_, round) <- getLatestActiveOpenRound app
+
+  let expectedFeeInLockLeg =
+        (
+          (round.coinConfig.lockHolderFee.fee * 2.0) +
+          (round.coinConfig.createFee.fee)
+        )
+
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon validator
+  reward.amount === expectedFeeInLockLeg
+  reward.featured === True
 
   coins0 <- query @Coin pizzeria.primaryParty
   (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  let expectedFeeInUnlockLeg =
+        (
+          round.coinConfig.createFee.fee +
+          round.coinConfig.transferFee.initialRate * payData.paymentAmount.amount
+        )
+
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty
+  -- reward.amount === expectedFeeInUnlockLeg
+  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
+  reward.featured === True
+
+  rewards <- query @CC.Coin.ValidatorRewardCoupon alice.primaryParty
+  let amounts = map (._2.amount) rewards
+  -- sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInUnlockLeg])
+  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
 
   coins1 <- query @Coin pizzeria.primaryParty
 
@@ -123,24 +150,30 @@ testUSDSubscription = script do
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
+  rewards <- query @CC.Coin.AppRewardCoupon validator
+  let amounts = map (._2.amount) rewards
+  sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInLockLeg])
+
+  rewards <- query @CC.Coin.AppRewardCoupon provider.primaryParty
+  let amounts = map (._2.amount) rewards
+  -- sort amounts === sort ([expectedFeeInUnlockLeg, expectedFeeInUnlockLeg])
+  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
+
   coins2 <- query @Coin pizzeria.primaryParty
   map (\(_, c) -> c.amount.initialAmount) (coins2 `diffContracts` coins1) === [0.5]
 
   advanceToIssuanceWithPrice app 0.5
 
   passTime (days 28)
+
+  coins3 <- query @Coin pizzeria.primaryParty
+
   payment3Cid <- makeSubscriptionPayment app alice validator None subscriptionState2Cid
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
 
-  coins3 <- query @Coin pizzeria.primaryParty
-  let amounts = map (\(_, c) -> c.amount.initialAmount) (coins3 `diffContracts` coins2)
-  sort amounts === [1.9849825, 2.0] -- TODO(M3-06): double-check these values
-
-  -- TODO(M3-06): more thoroughly test rewards
-  [(_, coupon1), (_, coupon2), (_, coupon3)] <- query @AppRewardCoupon provider.primaryParty
-  coupon1.featured === True
-  coupon2.featured === True
-  coupon3.featured === True
+  coins4 <- query @Coin pizzeria.primaryParty
+  let amounts = map (\(_, c) -> c.amount.initialAmount) (coins4 `diffContracts` coins3)
+  amounts === [2.0]
 
   -- alice has no coins left, as all her coins have been used up
   aliceCoins <- query @Coin alice.primaryParty

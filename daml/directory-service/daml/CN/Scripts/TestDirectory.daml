@@ -10,6 +10,8 @@ import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
 
+import CC.Coin
+
 testWithSubscription : Script ()
 testWithSubscription = script do
   app <- setupApp
@@ -20,7 +22,6 @@ testWithSubscription = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
-  -- TODO(M3-06): test that provider gets the expected rewards
   featureApp app provider
 
   -- provider creates directory rules
@@ -29,9 +30,11 @@ testWithSubscription = script do
     provider = provider.primaryParty
     user = user.primaryParty
 
+  let entryFee = 1.0
+
   directoryInstall <- submit provider.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
     svc = app.svc
-    entryFee = 1.0
+    entryFee = entryFee
     collectionDuration = minutes 5
     renewalDuration = days 30
     entryLifetime = days 90
@@ -56,11 +59,25 @@ testWithSubscription = script do
     context = paymentContext
     walletProvider = app.svc
 
+  (_, round) <- getLatestActiveOpenRound app
+
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
+  reward.amount ===
+    round.coinConfig.createFee.fee +
+    round.coinConfig.lockHolderFee.fee
+  reward.featured === False
+
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
   -- how: provider on their own participant
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectInitialEntryPayment with
     paymentCid = initialPaymentCid
     transferContext = appContext
+
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty
+  reward.amount ===
+    round.coinConfig.createFee.fee +
+    round.coinConfig.transferFee.initialRate * entryFee
+  reward.featured === True
 
   Some entry <- queryContractId user.primaryParty entryCid
   Some subscriptionState <- queryContractId user.primaryParty subscriptionStateCid

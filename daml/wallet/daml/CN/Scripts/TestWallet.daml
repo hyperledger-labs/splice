@@ -238,12 +238,18 @@ testCCPaymentRequest = script do
   checkCoinPositions bob [1.0, 15.0]
   checkCoinPositions charlie [1.0, 10.0]
 
+  (_, round) <- getLatestActiveOpenRound app
+
   [(_, coupon)] <- query @AppRewardCoupon provider.primaryParty
-  coupon.amount === 0.31 -- TODO(M3-06) check these values
+  coupon.amount ===
+    round.coinConfig.transferFee.initialRate * (15.0 + 10.0) +
+    round.coinConfig.createFee.fee * 2.0
   coupon.featured === False
 
   [(_, coupon)] <- query @AppRewardCoupon validator
-  coupon.amount === 0.045 -- TODO(M3-06) check these values
+  coupon.amount ===
+    round.coinConfig.createFee.fee + -- for one locked coin
+    round.coinConfig.lockHolderFee.fee * 3.0
   coupon.provider === validator
   coupon.featured === True
 
