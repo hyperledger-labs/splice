@@ -110,7 +110,7 @@ def resolveEnv(env: EnvSubst): String =
 
 def resolvePrimaryParty(p: ParticipantReference, primaryParty: PrimaryParty) =
   primaryParty match {
-    case AllocateParty(allocate) => p.parties.enable(allocate).toLf
+    case AllocateParty(allocate) => p.ledger_api.parties.allocate(allocate, allocate).party
     case PartyFromUser(env) =>
       p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
   }
