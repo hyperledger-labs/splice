@@ -5,6 +5,7 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.{
@@ -36,7 +37,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{HasHealth, Contract}
+import com.daml.network.util.{Contract, HasHealth}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -319,8 +320,15 @@ class TreasuryService(
                 _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
               )
               Future.successful(Done)
-            case Some((inputs, readAs, transferContext)) =>
-              executeFilteredBatch(install, transferContext, inputs, filteredBatch, readAs)
+            case Some((inputs, readAs, transferContext, disclosedContracts)) =>
+              executeFilteredBatch(
+                install,
+                transferContext,
+                inputs,
+                filteredBatch,
+                readAs,
+                disclosedContracts,
+              )
           }
       } yield res
       batchExecutionF.recoverWith(ex => {
@@ -347,6 +355,7 @@ class TreasuryService(
       inputs: Seq[TransferInput],
       batch: CoinOperationBatch,
       readAs: Set[PartyId],
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   )(implicit tc: TraceContext) = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing filtered batch $batch with inputs $inputs")
@@ -361,6 +370,7 @@ class TreasuryService(
           walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
           domainId,
+          disclosedContracts,
         )
       // return all outcomes to the callers
       _ = batch.completeBatchOperations(outcomes)(logger, tc)
@@ -424,6 +434,7 @@ class TreasuryService(
         Seq[v1.coin.TransferInput],
         Set[PartyId],
         v1.coin.PaymentTransferContext,
+        Seq[CommandsOuterClass.DisclosedContract],
     )
   ]] =
     for {
@@ -496,6 +507,11 @@ class TreasuryService(
             .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
             .toJava,
         )
+        val contractsToDisclose =
+          Seq(
+            coinRules.tryToDisclosedContract,
+            openRound.tryToDisclosedContract,
+          ) ++ openIssuingRounds.map(_.tryToDisclosedContract)
         Some(
           (
             inputs,
@@ -504,6 +520,7 @@ class TreasuryService(
               coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
               transferContext,
             ),
+            contractsToDisclose,
           )
         )
       }

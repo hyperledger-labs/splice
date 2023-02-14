@@ -5,6 +5,7 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.{
   Contract,
   ContractCompanion,
@@ -59,6 +60,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commandId: CoinLedgerConnection.CommandId,
       deduplicationOffset: String,
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[Unit]
 
   // TODO(M3-60): review all uses of command submission w/o deduplication
@@ -67,6 +69,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[Unit]
 
   def submitCommandsNoDedupTransaction(
@@ -74,6 +77,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[Transaction]
 
   def submitWithResultNoDedup[T](
@@ -81,6 +85,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       update: Update[T],
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[T]
 
   def submitWithResultAndOffsetNoDedup[T](
@@ -88,6 +93,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       update: Update[T],
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[(String, T)]
 
   def submitWithResult[T](
@@ -97,6 +103,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commandId: CoinLedgerConnection.CommandId,
       deduplicationConfig: DedupConfig,
       domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit traceContext: TraceContext): Future[T]
 }
 
@@ -194,6 +201,7 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 object CoinLedgerConnection {
 
   // TODO(#2699) Remove this once we have a proper ACS endpoint
+
   /** This represents an update to the ACS that we got through the update stream.
     * We also represent transfer in/out as AcsTransactions here not just
     * regular Daml transactions.
@@ -206,6 +214,7 @@ object CoinLedgerConnection {
 
   object AcsEvent {
     final case class Created(event: CreatedEvent) extends AcsEvent
+
     final case class Archived(contractId: String) extends AcsEvent
   }
 
@@ -262,6 +271,7 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           commands: Seq[Command],
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Unit] = {
         client.submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
@@ -271,6 +281,7 @@ object CoinLedgerConnection {
           commands = commands,
           commandId = uniqueId,
           deduplicationConfig = NoDedup,
+          disclosedContracts = disclosedContracts,
         )
       }
 
@@ -279,6 +290,7 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           commands: Seq[Command],
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
@@ -288,6 +300,7 @@ object CoinLedgerConnection {
           commands = commands,
           commandId = uniqueId,
           deduplicationConfig = NoDedup,
+          disclosedContracts = disclosedContracts,
         )
       }
 
@@ -298,6 +311,7 @@ object CoinLedgerConnection {
           commandId: CommandId,
           deduplicationOffset: String,
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Unit] = {
         client.submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
@@ -309,6 +323,7 @@ object CoinLedgerConnection {
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,
+          disclosedContracts = disclosedContracts,
         )
       }
 
@@ -317,6 +332,7 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           update: Update[T],
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[T] =
         submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId).map(_._2)
 
@@ -325,8 +341,17 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           update: Update[T],
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[(String, T)] =
-        doSubmitWithResultAndOffset(actAs, readAs, update, uniqueId, NoDedup, domainId)
+        doSubmitWithResultAndOffset(
+          actAs,
+          readAs,
+          update,
+          uniqueId,
+          NoDedup,
+          domainId,
+          disclosedContracts,
+        )
 
       def submitWithResult[T](
           actAs: Seq[PartyId],
@@ -335,6 +360,7 @@ object CoinLedgerConnection {
           commandId: CommandId,
           dedupConfig: DedupConfig,
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[T] =
         doSubmitWithResultAndOffset(
           actAs,
@@ -343,6 +369,7 @@ object CoinLedgerConnection {
           commandId.commandIdForSubmission,
           dedupConfig,
           domainId,
+          disclosedContracts,
         )
           .map(_._2)
 
@@ -353,6 +380,7 @@ object CoinLedgerConnection {
           commandIdForSubmission: String,
           dedup: DedupConfig,
           domainId: DomainId,
+          disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
       ): Future[(String, T)] = {
         for {
           tree <- client.submitAndWaitForTransactionTree(
@@ -363,6 +391,7 @@ object CoinLedgerConnection {
             readAs = readAs.map(_.toProtoPrimitive),
             commands = update.commands.asScala.toSeq,
             deduplicationConfig = dedup,
+            disclosedContracts = disclosedContracts,
           )
         } yield (
           tree.getOffset,

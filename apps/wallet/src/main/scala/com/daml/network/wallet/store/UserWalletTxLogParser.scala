@@ -3,26 +3,19 @@ package com.daml.network.wallet.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  ExercisedEvent,
-  Template,
-  TransactionTree,
-  TreeEvent,
-}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
   DamlRecord,
   Contract as CodegenContract,
 }
+import com.daml.ledger.javaapi.data.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.history.{CoinArchive, CoinCreate, Tap, Transfer}
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Proto}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.{Instant, ZoneOffset}
@@ -341,9 +334,8 @@ object UserWalletTxLogParser {
       path: Seq[TreeEvent],
       tc: TraceContext,
   ): State = {
-    JavaDecodeUtil
-      .decodeCreated(companion)(event)
-      .map(Contract.fromCodegenContract)
+    Contract
+      .fromCreatedEvent(companion)(event)
       .fold(parseState)(contract => parse(tree, event, contract.payload, parseState, path, tc))
   }
 

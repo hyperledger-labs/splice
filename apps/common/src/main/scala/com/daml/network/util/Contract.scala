@@ -4,7 +4,8 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.value as scalaValue
+import com.daml.ledger.api.v1.contract_metadata.ContractMetadata.toJavaProto
+import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
 import com.daml.ledger.api.validation.NoLoggingValueValidator
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
@@ -14,7 +15,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ValueDecoder,
   Contract as CodegenContract,
 }
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
+import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Template, Value}
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.lf.value as lf
@@ -38,20 +39,25 @@ import scala.util.Try
   * so if you are unsure which type to use, this is probably the right
   * one.
   *
-  * @param contractId     Contract ID.
-  * @param payload          Contract instance as defined in Daml template (without `contractId` and `agreementText`).
-  * @tparam T             Contract template type parameter.
+  * @param contractId Contract ID.
+  * @param payload    Contract instance as defined in Daml template (without `contractId` and `agreementText`).
+  * @tparam T Contract template type parameter.
   */
 final case class Contract[TCid <: ContractId[_], T](
     identifier: Identifier,
     contractId: TCid,
     payload: T with DamlRecord[_],
+    metadata: Option[ContractMetadata],
+    // TODO(M4-82): also add a createArgumentsBlob attribute to be able to disclose interface views.
 ) extends PrettyPrinting {
 
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
     contractId = contractId.contractId,
     payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
+    metadata = metadata.map(m =>
+      com.daml.ledger.api.v1.contract_metadata.ContractMetadata.fromJavaProto(m.toProto)
+    ),
   )
 
   def toJson(implicit elc: ErrorLoggingContext): http.Contract = {
@@ -68,7 +74,19 @@ final case class Contract[TCid <: ContractId[_], T](
             .compactPrint
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
+      metadata = metadata.map(m => ContractMetadataUtil.tryToJson(m)),
     )
+  }
+
+  def tryToDisclosedContract: CommandsOuterClass.DisclosedContract = {
+    com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract
+      .newBuilder()
+      // TODO(M4-82): use setCreateArgumentsBlob instead for interface views.
+      .setCreateArguments(payload.toValue.toProtoRecord)
+      .setContractId(contractId.contractId)
+      .setTemplateId(identifier.toProto)
+      .setMetadata(metadata.getOrElse(sys.error(s"found no metadata for contract $this")).toProto)
+      .build()
   }
 
   override def pretty: Pretty[Contract[TCid, T]] = {
@@ -79,6 +97,7 @@ final case class Contract[TCid <: ContractId[_], T](
       param("contractId", _.contractId),
       param("templateId", _.identifier),
       param("payload", _.payload),
+      param("contractMetadata", _.metadata),
     )
   }
 }
@@ -107,7 +126,8 @@ object Contract {
         ),
       )
       contractId = companion.toContractId(new ContractId[T](contract.contractId))
-      payloadP <- ProtoConverter.required("opayload", contract.payload)
+      metadataO = contract.metadata.map(m => ContractMetadata.fromProto(toJavaProto(m)))
+      payloadP <- ProtoConverter.required("payload", contract.payload)
       payload <- Try(
         decoder.decode(
           Value.fromProto(scalaValue.Value.toJavaProto(scalaValue.Value().withRecord(payloadP)))
@@ -119,6 +139,7 @@ object Contract {
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
+      metadata = metadataO,
     )
   }
 
@@ -146,6 +167,7 @@ object Contract {
         ),
       )
       contractId = companion.toContractId(new ContractId[T](contract.contractId))
+      metadataO = contract.metadata.map(m => ContractMetadataUtil.tryFromJson(m))
       payload <- Try(
         decoder.decodeTemplate(companion)(contract.payload)
       ).toEither.left.map(ex =>
@@ -155,6 +177,7 @@ object Contract {
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
+      metadata = metadataO,
     )
   }
 
@@ -177,21 +200,30 @@ object Contract {
   }
 
   def fromCodegenContract[TCid <: ContractId[_], T <: DamlRecord[_]](
-      contract: CodegenContract[TCid, T]
-  ): Contract[TCid, T] =
+      contract: CodegenContract[TCid, T],
+      metadata: Option[ContractMetadata],
+  ): Contract[TCid, T] = {
     Contract(
       identifier = contract.getContractTypeId,
       contractId = contract.id,
       payload = contract.data,
+      // TODO(#2577): this is why contractmetadata is optional.
+      metadata = metadata,
     )
+  }
 
   def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
-  )(ev: CreatedEvent): Option[Contract[TCid, T]] =
-    JavaDecodeUtil.decodeCreated(companion)(ev).map(Contract.fromCodegenContract)
+  )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
+    JavaDecodeUtil
+      .decodeCreated(companion)(ev)
+      .map(Contract.fromCodegenContract(_, Some(ev.getContractMetadata)))
+  }
 
   def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[View]](
       companion: InterfaceCompanion[I, Id, View]
   )(ev: CreatedEvent): Option[Contract[Id, View]] =
-    JavaDecodeUtil.decodeCreated(companion)(ev).map(Contract.fromCodegenContract)
+    JavaDecodeUtil
+      .decodeCreated(companion)(ev)
+      .map(Contract.fromCodegenContract(_, Some(ev.getContractMetadata)))
 }

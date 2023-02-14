@@ -1,36 +1,18 @@
 package com.daml.network.environment
 
-import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyInstances}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
 import com.daml.ledger.api.auth.client.LedgerCallCredentials
-import com.daml.ledger.api.v1.admin.{
-  PackageManagementServiceGrpc,
-  PackageManagementServiceOuterClass,
-  PartyManagementServiceGrpc,
-  PartyManagementServiceOuterClass,
-  UserManagementServiceGrpc,
-}
-import com.daml.ledger.api.v1.{
-  ActiveContractsServiceGrpc,
-  CommandServiceGrpc,
-  CommandServiceOuterClass,
-  CommandsOuterClass,
-  PackageServiceGrpc,
-  PackageServiceOuterClass,
-  TransactionServiceGrpc,
-  TransactionServiceOuterClass,
-}
+import com.daml.ledger.api.v1.admin.*
+import com.daml.ledger.api.v1.*
 import com.daml.ledger.client.GrpcChannel
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserRequest,
   CreateUserResponse,
+  CreatedEvent,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
   GetUserRequest,
@@ -43,7 +25,10 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.digitalasset.canton.research.participant.multidomain.{
   transfer as xfr,
   transfer_command as xfrcmd,
@@ -54,13 +39,12 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, Duration}
-import io.grpc.Channel
+import io.grpc.{Channel, StatusRuntimeException}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
-import io.grpc.StatusRuntimeException
 
 sealed abstract class DedupConfig
 
@@ -83,7 +67,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     ec: ExecutionContext,
     elc: ErrorLoggingContext,
 ) extends Closeable {
-  import LedgerClient.{GetUpdatesRequest, GetTreeUpdatesResponse, scalapbToJava}
+
+  import LedgerClient.{GetTreeUpdatesResponse, GetUpdatesRequest, scalapbToJava}
 
   val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
     withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
@@ -183,6 +168,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   ): CommandServiceOuterClass.SubmitAndWaitRequest = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
     commandsBuilder
@@ -192,6 +178,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
       .addAllCommands(commands.map(_.toProtoCommand).asJava)
+      .addAllDisclosedContracts(disclosedContracts.asJava)
     deduplicationOffsetOrDuration match {
       case DedupOffset(offset) =>
         commandsBuilder.setDeduplicationOffset(offset)
@@ -214,6 +201,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   )(implicit ec: ExecutionContext): Future[Unit] = {
     val request = submitAndWaitRequest(
       workflowId,
@@ -223,6 +211,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs,
       readAs,
       commands,
+      disclosedContracts,
     )
     wrapFuture(commandServiceStub.submitAndWait(request, _)).map(_ => ())
   }
@@ -235,6 +224,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   )(implicit ec: ExecutionContext): Future[Transaction] = {
     val request = submitAndWaitRequest(
       workflowId,
@@ -244,6 +234,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs,
       readAs,
       commands,
+      disclosedContracts,
     )
     wrapFuture(commandServiceStub.submitAndWaitForTransaction(request, _)).map(response =>
       Transaction.fromProto(response.getTransaction)
@@ -258,6 +249,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   )(implicit ec: ExecutionContext): Future[TransactionTree] = {
     val request = submitAndWaitRequest(
       workflowId,
@@ -267,6 +259,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs,
       readAs,
       commands,
+      disclosedContracts,
     )
     wrapFuture(commandServiceStub.submitAndWaitForTransactionTree(request, _)).map(response =>
       TransactionTree.fromProto(response.getTransaction)
@@ -405,6 +398,7 @@ object LedgerClient {
       party: PartyId,
       domainId: DomainId,
   ) {
+
     import com.daml.ledger.api.v1.ledger_offset as sclo
 
     private[LedgerClient] def toProto: upsvc.GetUpdatesRequest =
@@ -425,6 +419,7 @@ object LedgerClient {
     sealed abstract class TreeUpdate extends Product with Serializable
 
     final case class TransactionTreeUpdate(tree: TransactionTree) extends TreeUpdate
+
     final case class TransferUpdate(transfer: Transfer[TransferEvent]) extends TreeUpdate
 
     final case class Transfer[+E](
@@ -441,6 +436,7 @@ object LedgerClient {
           param("event", _.event),
         )
     }
+
     object Transfer {
       private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer[TransferEvent] = {
         val offset = new LedgerOffset.Absolute(proto.offset)
@@ -461,10 +457,12 @@ object LedgerClient {
     }
 
     sealed trait TransferEvent extends Product with Serializable with PrettyPrinting
+
     object TransferEvent {
       private case class TransferOutId(s: String) extends PrettyPrinting {
         override def pretty: Pretty[this.type] = prettyOfString(_.s)
       }
+
       final case class Out(
           transferOutId: String,
           contractId: ContractId[_],
@@ -479,6 +477,7 @@ object LedgerClient {
             param("target", _.target),
           )
       }
+
       object Out {
         private[LedgerClient] def fromProto(proto: xfr.TransferredOutEvent): Out = {
           Out(
@@ -489,6 +488,7 @@ object LedgerClient {
           )
         }
       }
+
       final case class In(
           source: DomainId,
           target: DomainId,
@@ -503,9 +503,10 @@ object LedgerClient {
             param("createdEvent", _.createdEvent),
           )
       }
+
       object In {
         private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In = {
-          import com.daml.ledger.api.v1.{event as scalaEvent}
+          import com.daml.ledger.api.v1.event as scalaEvent
           In(
             source = DomainId.tryFromString(proto.source),
             target = DomainId.tryFromString(proto.target),
@@ -516,6 +517,7 @@ object LedgerClient {
         }
       }
     }
+
     import upsvc.TreeUpdate.TreeUpdate as TU
 
     private[LedgerClient] def fromProto(
@@ -546,6 +548,7 @@ object LedgerClient {
           target = target.toProtoPrimitive,
         )
     }
+
     final case class In(
         transferOutId: String,
         source: DomainId,

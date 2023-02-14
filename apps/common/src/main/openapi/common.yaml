@@ -5,6 +5,19 @@ info:
 paths: {}
 components:
   schemas:
+    ContractMetadata:
+      type: object
+      required: ["createdAt", "driverMetadata", "contractKeyHash"]
+      properties:
+        createdAt:
+          type: string # java.time.Instant in ISO_INSTANT format.
+        contractKeyHash:
+          type: string
+          format: binary # base-16 encoded.
+        driverMetadata:
+          type: string
+          format: binary # base-16 encoded.
+
     Contract:
       type: object
       properties:
@@ -14,6 +27,8 @@ components:
           type: string
         payload:
           type: object
+        metadata:
+          $ref: '#/components/schemas/ContractMetadata'
       required: ["template_id", "contract_id", "payload"]
     ContractId:
       type: string

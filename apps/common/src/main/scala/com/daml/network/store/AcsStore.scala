@@ -212,11 +212,15 @@ object AcsStore {
         interfaceCompanion: InterfaceCompanion[I, Id, View]
     )(ev: CreatedEvent): Contract[Id, View] = {
       val templateContract: Contract[TCid, Tmpl] =
-        Contract.fromCodegenContract[TCid, Tmpl](companion.fromCreatedEvent(ev))
+        Contract.fromCodegenContract[TCid, Tmpl](
+          companion.fromCreatedEvent(ev),
+          Some(ev.getContractMetadata),
+        )
       Contract[Id, View](
         interfaceCompanion.TEMPLATE_ID,
         interfaceCompanion.toContractId(new ContractId(templateContract.contractId.contractId)),
         view(templateContract.payload),
+        Some(ev.getContractMetadata),
       )
     }
   }
@@ -345,7 +349,13 @@ object AcsStore {
   ): (Identifier, CreatedEvent => Boolean) =
     (
       templateCompanion.TEMPLATE_ID,
-      ev => p(Contract.fromCodegenContract[TCid, T](templateCompanion.fromCreatedEvent(ev))),
+      ev =>
+        p(
+          Contract.fromCodegenContract[TCid, T](
+            templateCompanion.fromCreatedEvent(ev),
+            Some(ev.getContractMetadata),
+          )
+        ),
     )
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */

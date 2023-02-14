@@ -277,7 +277,11 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
         // The test transactions only contain root nodes, the tx log should preserve their order.
         val expectedEventsInTxLog = Seq(tx1, tx2).flatMap(tx =>
           tx.getRootEventIds.asScala.toList
-            .collect(i => tx.getEventsById.get(i) match { case c: CreatedEvent => c })
+            .collect(i =>
+              tx.getEventsById.get(i) match {
+                case c: CreatedEvent => c
+              }
+            )
         )
         val expectedEventIds = expectedEventsInTxLog.map(_.getEventId)
 

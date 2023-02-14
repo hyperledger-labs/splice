@@ -1,11 +1,10 @@
 package com.daml.network.history
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, CoinRules, CoinRules_DevNet_Tap}
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 
 case class Transfer(
     node: ExerciseNode[
@@ -66,8 +65,6 @@ object CoinCreate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    JavaDecodeUtil
-      .decodeCreated(companion)(event)
-      .map(Contract.fromCodegenContract)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }

@@ -51,7 +51,7 @@ class GrpcSplitwellService(
         )
       } yield {
         val filtered = groups.filter(c => c.hasStakeholder(userParty))
-        v0.ListGroupsResponse(filtered.map(c => Contract.fromCodegenContract(c).toProtoV0))
+        v0.ListGroupsResponse(filtered.map(c => Contract.fromCodegenContract(c, None).toProtoV0))
       }
     }
 
@@ -69,7 +69,7 @@ class GrpcSplitwellService(
       } yield {
         val filtered = groupInvites.filter(c => c.hasStakeholder(userParty))
         v0.ListGroupInvitesResponse(
-          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+          filtered.map(c => Contract.fromCodegenContract(c, None).toProtoV0)
         )
       }
     }
@@ -92,7 +92,7 @@ class GrpcSplitwellService(
               c.data.groupKey == groupKey(userParty, providerParty, request.groupId)
           )
         v0.ListAcceptedGroupInvitesResponse(
-          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+          filtered.map(c => Contract.fromCodegenContract(c, None).toProtoV0)
         )
       }
     }
@@ -119,7 +119,9 @@ class GrpcSplitwellService(
               request.getGroupKey
             )
         )
-        v0.ListBalanceUpdatesResponse(filtered.map(c => Contract.fromCodegenContract(c).toProtoV0))
+        v0.ListBalanceUpdatesResponse(
+          filtered.map(c => Contract.fromCodegenContract(c, None).toProtoV0)
+        )
       }
     }
 

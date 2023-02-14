@@ -153,6 +153,12 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     param("contractId", ev => prettyContractIdString.treeOf(ev.getContractId)),
     param("templateId", _.getTemplateId),
   )
+
+  implicit def prettyContractMetadata: Pretty[javaapi.data.ContractMetadata] = prettyOfClass(
+    param("createdAt", _.createdAt),
+    param("driverMetadata", _.driverMetadata),
+    param("contractKeyHash", _.contractKeyHash),
+  )
 }
 
 object PrettyInstances extends PrettyInstances {

@@ -1,8 +1,8 @@
 package com.daml.network.store
 
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{
+  ContractMetadata,
   CreatedEvent,
   ExercisedEvent,
   LedgerOffset,
@@ -11,14 +11,15 @@ import com.daml.ledger.javaapi.data.{
   Unit as damlUnit,
 }
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.google.protobuf.Any
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -46,6 +47,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),
+      metadata = Some(ContractMetadata.Empty()),
     )
 
   protected def validatorRewardCoupon(
@@ -64,9 +66,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),
+      metadata = Some(ContractMetadata.Empty()),
     )
 
-  @nowarn // TODO(#2577): switch to new constructor.
   protected def toCreatedEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T]
   ): CreatedEvent = {
@@ -78,6 +80,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
+      createArgumentsBlob = Any.getDefaultInstance, // TODO(#2577): pass through blob.
+      contractMetadata = contract.metadata.value,
       witnessParties = Seq.empty.asJava,
       signatories = Seq.empty.asJava,
       observers = Seq.empty.asJava,
@@ -104,7 +108,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  @nowarn // TODO(#2577): switch to new constructor.
   protected def withEventId(
       event: TreeEvent,
       eventId: String,
@@ -117,6 +120,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         failedInterfaceViews = created.getFailedInterfaceViews,
         templateId = created.getTemplateId,
         arguments = created.getArguments,
+        createArgumentsBlob = created.getCreateArgumentsBlob,
+        contractMetadata = created.getContractMetadata,
         witnessParties = created.getWitnessParties,
         signatories = created.getSignatories,
         observers = created.getObservers,
