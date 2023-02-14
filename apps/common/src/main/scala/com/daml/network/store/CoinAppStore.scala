@@ -129,7 +129,6 @@ trait CoinAppStoreWithHistory[
       .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
   )
 
-  // TODO (#2620) remove if unused
   protected final lazy val defaultTxLogReader: Future[TxLogStore.Reader[TXI, TXE]] =
     domains.signalWhenConnected(defaultAcsDomain).flatMap(txLogReader(_))
 }
