@@ -2,50 +2,62 @@
 
 1. [Available Clusters](#available-clusters)
 1. [Connecting to a Cluster](#connecting-to-a-cluster)
-    1. [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
-    1. [Connecting Locally Hosted Canton Components to a Cluster](#connecting-locally-hosted-canton-components-to-a-cluster)
-    1. [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
-1. [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
+   1. [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
+   1. [Available Cluster Services](#available-cluster-services)
+   1. [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
+   1. [Connecting Locally Hosted Canton Components to a Cluster](#connecting-locally-hosted-canton-components-to-a-cluster)
+   1. [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
 1. [Cluster Tooling](#cluster-tooling)
-    1. [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
-    1. [Docker image hosting](#docker-image-hosting)
-    1. [Cluster Management Operations](#cluster management-operations)
-    1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci/cd-deployment)
-    1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
+   1. [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
+   1. [Docker Image Hosting](#docker-image-hosting)
+   1. [Cluster Management Operations](#cluster-management-operations)
+   1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci/cd-deployment)
+   1. [Observing Cluster Operation](#observing-cluster-operation)
+      1. [GCE Dashboards](#gce-dashboards)
+      1. [GCE Log Explorer](#gce-log-explorer)
+         1. [Exclude noisy/non-JSON containers](#exclude-noisy/non-json-containers)
+         1. [Manual configuration actions taken by DA employees](#manual-configuration-actions-taken-by-da-employees)
+         1. [Configuration actions initiated by CircleCI](#configuration-actions-initiated-by-circleci)
+         1. [Pod error states](#pod-error-states)
+      1. [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
+   1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
 1. [Updating the Canton Network Deployment](#updating-the-canton-network-deployment)
 1. [Fixing connection issues in kubectl](#fixing-connection-issues-in-kubectl)
 1. [TLS Certificate Provisioning](#tls-certificate-provisioning)
    1. [First-time Infra Setup](#first-time-infra-setup)
    1. [Cluster Configuration](#cluster-configuration)
-   1. [Adding TLS to {insert-service-here}](#adding-tls-to-insert-service-here)
+   1. [Adding TLS to {insert-service-here}](#adding-tls-to-{insert-service-here})
+   1. [Force-updating the certificate](#force-updating-the-certificate)
+1. [Auth0 secrets](#auth0-secrets)
+1. [Participant User Configuration](#participant-user-configuration)
 
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
 you will be asked to authenticate when you change into this directory
-for the first time.
+for the first ##qtime.
 
 ## Available Clusters
 
 The public Canton Network clusters are currently hosted in Google
-Cloud. They are expected to be moved to Azure sometime in 1Q23.
+Cloud. There are multiple clusters, each with a different purpose, all
+of which are accessible only through VPN:
 
-There are multiple clusters, each with a different purpose, all of
-which are accessible only through VPN:
-
-| Cluster     | URL                                   | Deployment Policy                | Purpose                            |
-|-------------|---------------------------------------|----------------------------------|------------------------------------|
-| TestNet     | http://test.network.canton.global     | Weekly, Midnight UTC Sunday      | Longer Running Tests               |
-| DevNet      | http://dev.network.canton.global      | Nightly, 6AM UTC                 | Current, Tested `main`             |
-| Staging     | http://staging.network.canton.global  | After every push to `main`       | Latest `main`                      |
-| ScratchNet  | http://scratch.network.canton.global  | Ad hoc, manual                   | Cluster Configuration Development  |
+| Cluster        | URL                                      | Deployment Policy                | Purpose                            |
+|----------------|------------------------------------------|----------------------------------|------------------------------------|
+| TestNet        | http://test.network.canton.global        | Weekly, Midnight UTC Sunday      | Longer Running Tests               |
+| DevNet         | http://dev.network.canton.global         | Nightly, 6AM UTC                 | Current, Tested `main`             |
+| Staging        | http://staging.network.canton.global     | After every push to `main`       | Latest `main`                      |
+| ScratchNet     | http://scratch.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development  |
+| SqlScratchNet  | http://sqlscratch.network.canton.global  | Ad hoc, manual                   | CloudSQL Configuration Prototype   |
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/the-real-canton-coin/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fthe-real-canton-coin)
 [CI/CD](/.circleci/config.yml) in CircleCI.
 
-The ScratchNet cluster is manually managed and intended to be a test
-bed for new code and deployment process updates. It is a shared
-resource, so please coordinate with the team prior to making changes.
+The ScratchNet and SqlScratchNet clusters are manually managed and
+intended to be test beds for new code, deployment process updates, and
+CloudSQL integration. These are a shared resource, so please
+coordinate with the team prior to making changes.
 
 Additional clusters can be created without difficulty, although with
 additional running costs.
@@ -101,7 +113,7 @@ The process by which access is granted is this:
 
 Provided you are connecting through one of the listed VPNs, a full
 list of services provided through the cluster is available via
-`cncluster services` (or `cncluster stats`).
+`cncluster ports`.
 
 ### Connecting Locally Hosted Canton Network Apps to a Cluster
 
@@ -116,83 +128,16 @@ links. The source for this documentation is available
 
 It is also possible to connect locally hosted Canton components into
 this environment. This includes the REPL, participant nodes, and
-domain nodes.  If you don't have Canton, you may install it following
+domain nodes.  If you don't have Canton, you may install it following the
 instructions [here](https://docs.daml.com/canton/usermanual/installation.html).
 
-This is an example of a configuration file that might be used with a
-Canton Network cluster. It connects a local REPL to a (`DevNet`)
-cluster participant and creates a locally hosted participant.
-
-```
-canton {
-  remote-participants {
-   remoteParticipant1 {
-      admin-api {
-        port = 5002
-        address = dev.network.canton.global
-      }
-      ledger-api {
-        port = 5001
-        address = dev.network.canton.global
-      }
-    }
-  }
-  participants {
-    localParticipant1 {
-      storage.type = memory
-      admin-api.port = 5002
-      ledger-api.port = 5001
-    }
- }
-}
-```
-
-This can be used to start a REPL as follows:
-
-```
-$ bin/canton -c cn.conf
-```
-
-Once the REPL is running, it is then possible to interact with the
-cluster via the REPL.
-
-This is an example of a locally requested ping from the remote
-participant to the remote participant. This command confirms the ledger API
-connection to the remote participant node:
-
-```
-@ remoteParticipant1.health.ping(remoteParticipant1, timeout = 10.seconds)
-res0: concurrent.duration.Duration = 2246 milliseconds
-```
-
-The local participant node may connect to the CN domain as follows:
-
-
-```
-@ localParticipant1.domains.connect("test", "http://dev.network.canton.global:5008")
-res1: DomainConnectionConfig = DomainConnectionConfig(
-  domain = Domain 'test',
-  sequencerConnection = GrpcSequencerConnection(
-    endpoints = http://34.173.2.69:5008,
-    transportSecurity = false,
-    customTrustCertificates = None()
-  ),
-  manualConnect = false,
-  domainId = None(),
-  priority = 0,
-  initialRetryDelay = None(),
-  maxRetryDelay = None()
-)
-```
-
-Once that connection is established, it is possible to conduct ledger
-interactions that span both the CN cluster participant and the locally
-hosted participant:
-
-```
-@ remoteParticipant1.health.ping(localParticipant1, timeout = 10.seconds)
-res2: concurrent.duration.Duration = 1762 milliseconds
-```
+Canton configuration files
+([`cluster-test.conf`](build-tools/cluster-test.conf) and
+[`cluster-test.sc`](build-tools/cluster-test.sc)) are available in the
+source code repository under [`build-tools`](build-tools). These are
+used by `cncluster check` as part of its ledger API test, and
+establish both a local participant connected to the Canton Network
+global domain and a connection to a remote participant.
 
 As part of the runbook a participant node is also spun up and connects
 to the DevNet domain. Therefore, the runbook contains alternative
@@ -246,7 +191,7 @@ compute service account within the new cluster.
 * The service account must have access to the Artifact Registry within `da-cn-images`.
 * The service account must have Read-Only access to the `release-bundles` Google Storage bucket.
 
-### Docker image hosting
+### Docker Image Hosting
 
 Docker images for both local and GCE clusters are stored in the Google
 Cloud [Artifact Registry](https://cloud.google.com/artifact-registry).
@@ -274,7 +219,8 @@ reduces the possibility of operating on the wrong cluster, and allows
 the use of the `.envrc` mechanism to provide whatever configuration
 is necessary to identify a given cluster.
 
-Available operations include:
+`cncluster help` will provide a full list of supported cluster
+subcommands. A few highlights include the following:
 
 * `cncluster apply` - Apply the current working copy's manifest to a
   cluster. The presence of all images referenced by that manifest is
@@ -297,9 +243,9 @@ Available operations include:
 * `cncluster info` - Display a table showing all deployed images and resource
   allocation settinos.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
-* `cncluster log` or `cncluster logs` - Stream the logs for the
-  specified module running in the cluster. This will attempt to apply
-  JSON log formatting, unless you specify `--raw`.n
+* `cncluster logs` - Stream the logs for the specified module running
+  in the cluster. This will attempt to apply JSON log formatting,
+  unless you specify `--raw`.
 * `cncluster ports` - Show a table of all ports exposed from the
   cluster, along with what is on each port.
 * `cncluster preflight` - Run the preflight check against the cluster.
@@ -308,10 +254,11 @@ Available operations include:
   within the cluster are updated to match your local working copy. (It
   also works for base images like `canton` and `cn-app` that do not have
   corresponding cluster modules.)
-* `cncluster reset` - Delete all `Pod`s, forcing all memory state to
-  be reset.
+* `cncluster reset` - Delete all `Pod`s and persistent storage, resetting
+  all state and preparing the cluster for a fresh environment startup.
 * `cncluster top` - Show memory and CPU usage across the cluster.
-* `cncluster wait` - Wait for the clusters' pods to all be noted as in a ready state.
+* `cncluster wait` - Wait for the clusters' pods to all be noted as in
+  a ready state.
 
 Internally, these operations rely on the following environment
 variables. As stated above, these are usually populated via `.envrc`.
@@ -361,7 +308,7 @@ need to be connected to the VPN.)
 
 Successful pod deplomyment can then be checked:
 
-`(cd cluster/deployment/devnet && kubectl get pods)`
+`(cd cluster/deployment/devnet && kubectl get pods --all-namespaces)`
 
 This should produce a list of pods, all in running status:
 
@@ -415,7 +362,9 @@ for the moment, given that we rebuild the cluster nightly anyway.
 cncluster reset
 ```
 
-### Cluster Operational Dashboards
+### Observing Cluster Operation
+
+#### GCE Dashboards
 
 Each of our two GCE projects has a corresponding dashboard that shows
 high level stats for the clusters hosted in that project. This
@@ -425,54 +374,93 @@ time:
 * [`TestNet`/`DevNet`](https://console.cloud.google.com/monitoring/dashboards/builder/f4d4f86d-7c59-4b27-9a73-fb6e0418e45b?project=da-cn-devnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
 * [`Staging`/`ScratchNet`](https://console.cloud.google.com/monitoring/dashboards/builder/ef100871-4e71-409e-a3c2-706b2dbd5465?project=da-cn-scratchnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
 
+#### GCE Log Explorer
+
+Google Cloud offers central log aggregation through its Log Explorer
+feature, available here:
+
+* [`TestNet`/`DevNet`](https://console.cloud.google.com/logs/query?project=da-cn-devnet)
+* [`Staging`/`ScratchNet`](https://console.cloud.google.com/logs/query?project=da-cn-scratchnet)
+
+Log volumes can be very high, and not all of our current processes
+generate logs in the GCE JSON format. This makes it important to use
+the log explorer query language to restrict the subset of log messages
+to those of interest. Here are a few queries to get you
+started. Please feel free to add others you find useful.
+
+The query language itself is documented [here](https://cloud.google.com/logging/docs/view/logging-query-language).
+
+##### Exclude noisy/non-JSON containers
+
+```
+-resource.labels.container_name="envoy-proxy"
+-resource.labels.container_name="gke-metrics-agent"
+-resource.labels.container_name="splitwell-wallet-web-ui"
+-resource.labels.container_name="docs"
+```
+
+##### Manual configuration actions taken by DA employees
+
+```
+protoPayload.authenticationInfo.principalEmail=~"^.*@digitalasset.com$"
+protoPayload.serviceName="k8s.io"
+```
+
+##### Configuration actions initiated by CircleCI
+
+```
+protoPayload.authenticationInfo.principalEmail="circleci@da-cn-devnet.iam.gserviceaccount.com"
+```
+
+##### Pod error states
+
+```
+resource.type="k8s_pod"
+resource.labels.location="us-central1"
+severity=WARNING
+```
+
+#### Canton Ledger Prometheus Metrics
+
+We expose prometheus metrics for our three participants and the domain on the following urls:
+
+- Global Domain: `http://${cluster}.network.canton.global:10313/metrics`
+- SVC Participant: `http://${cluster}.network.canton.global:10013/metrics`
+- Validator1 Participant: `http://${cluster}.network.canton.global:10113/metrics`
+- Splitwell Participant: `http://${cluster}.network.canton.global:10213/metrics`
+
 ### Checking Pod Node Assignments and Memory Usage
 
-Kubernetes runs Docker images in `Pods` that are scheduled to run on
-`Node`s based on the requirements of the pod and the available
-capacity within the nodes available to the cluster. We currently run
-without cluster autoscaling enabled, which means we have a fixed pool
-of nodes. In this environment, it is possible for nodes to be in an
-`Evicted`, `OOMKilled`, or `Pending` state due to memory
-limitations. None of these states are normal and any of them indicate
-a problem that likely needs to be corrected.
+Kubernetes runs Docker images in `Pod`s of containers that it
+schedules to run on `Node`s representing physical hardware (or virtual
+machines). The scheduler assigns `Pod`s to `Node`s based on the
+resources requested by the `Pod`s containers and the capacity
+available on each `Node`. A `Pod` will always be scheduled such that
+all of the containers running within that `Pod` are on the same
+`Node`. A `Pod` will never be split across more than one `Node`.
 
-A list of nodes available to the cluster can be requested from
-`kubectl` as follows:
+Starting in early 2023, we've enabled cluster autoscaling. As a
+cluster needs additonal capacity to schedule `Pod`s, the autoscaler
+will enlarge the cluster to accomodate the demand. If you see a `Pod`
+in a `Pending` state, it means the `Pod` has not been scheduled and
+the autoscaler is likely adding a `Node` to accomodate. If a `Pending`
+state does not clear up in a few minutes, check the number of `Node`s
+against the cluster sizing limits, which currently default to a limit
+of eight nodes. If the autoscaler can't add a node, the `Pod` will
+never be scheduled and stay in `Pending` state indefinately.
 
-```
-$ kubectl get nodes
-NAME                                           STATUS   ROLES    AGE     VERSION
-gke-cn-stagingnet-default-pool-285c4578-34nx   Ready    <none>   7h8m    v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-5qkw   Ready    <none>   7d23h   v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-929v   Ready    <none>   7h8m    v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-gwen   Ready    <none>   7d23h   v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-kfvr   Ready    <none>   30m     v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-mzs1   Ready    <none>   7d23h   v1.22.12-gke.300
-gke-cn-stagingnet-default-pool-285c4578-scv2   Ready    <none>   30m     v1.22.12-gke.300
-```
+The autoscaler also has the ability to scale the `Node` pool down, if
+there is insufficient demand for the capacity. When this happens, the
+`Node` will be drained of running `Pod`s, that will then be
+rescheduled on the remaining `Node`s. This necessarily means
+interruption of the service provided by those `Pod`s, although there
+are steps that can be taken to either prevent this from happening to
+specific `Pod`s or reduce the likelihood.
 
-The corresponding command to list pods may also be run in a wide
-format, which shows the `Node`s on which a given `Pod` is scheduled:
-
-```
-$ kubectl get pods -o wide
-NAME                                        READY   STATUS    RESTARTS      AGE   IP            NODE                                           NOMINATED NODE   READINESS GATES
-canton-domain-69c9dcfbf6-pr8w2              1/1     Running   0             42m   10.92.1.211   gke-cn-stagingnet-default-pool-285c4578-5qkw   <none>           <none>
-canton-participant-7f4dd65887-x5l2z         1/1     Running   0             42m   10.92.2.75    gke-cn-stagingnet-default-pool-285c4578-mzs1   <none>           <none>
-directory-app-6c4d49868c-4pp8b              2/2     Running   0             42m   10.92.6.2     gke-cn-stagingnet-default-pool-285c4578-scv2   <none>           <none>
-docs-845c84dc5-t6zdj                        1/1     Running   0             42m   10.92.6.3     gke-cn-stagingnet-default-pool-285c4578-scv2   <none>           <none>
-external-proxy-55d954c97b-k7gln             1/1     Running   0             42m   10.92.2.76    gke-cn-stagingnet-default-pool-285c4578-mzs1   <none>           <none>
-gcs-proxy-84bd947f54-tpc24                  1/1     Running   0             42m   10.92.4.37    gke-cn-stagingnet-default-pool-285c4578-34nx   <none>           <none>
-scan-app-6bb5f9668f-q4b6b                   1/1     Running   1 (42m ago)   42m   10.92.4.36    gke-cn-stagingnet-default-pool-285c4578-34nx   <none>           <none>
-svc-app-78b84cf7-jhpg9                      1/1     Running   3 (42m ago)   42m   10.92.0.43    gke-cn-stagingnet-default-pool-285c4578-929v   <none>           <none>
-validator1-participant-7d6ff497ff-2hk4f     1/1     Running   0             42m   10.92.3.152   gke-cn-stagingnet-default-pool-285c4578-gwen   <none>           <none>
-validator1-validator-app-58667ffcc7-mn98t   1/1     Running   3 (41m ago)   42m   10.92.1.212   gke-cn-stagingnet-default-pool-285c4578-5qkw   <none>           <none>
-validator1-wallet-app-d7ffcf8fc-qvnxc       2/2     Running   3 (41m ago)   42m   10.92.0.44    gke-cn-stagingnet-default-pool-285c4578-929v   <none>           <none>
-```
-
-To get a summary view of cluster status, you can use `cncluster
-stats`, which will show a display of cluster status at both a pod and
-a node level.
+To get a summary view of cluster status, you can use `cncluster top`,
+which will show a display of cluster usages at both a pod and a node
+level. `cncluster info` will show deployed tags and resource requests
+made by `Pod`s.
 
 To further investigate `Pod`s in an invalid state, additional details
 may be requested through `kubectl describe pod ${POD_NAME}`. This will
@@ -480,23 +468,111 @@ show, among many other details, a log of recent events related to the
 `Pod`'s deployment within Kubernetes. You can also describe `Node`s to
 get details on capacities with `kubectl describe node ${NODE_NAME}`.
 
-
 ## Updating the Canton Network Deployment
 
-This section provides simple step-by-step instructions for how to change a CN cluster.
-For details on the individual steps, read the above sections.
+This section provides step-by-step instructions how to update a
+cluster in several different development scenarios. To accurately
+follow these instructions, it's a good idea to understand the
+[fundamentals of Kubernetes]((https://kubernetes.io/docs/concepts/overview/)).
 
-1. Acquire at least a minimal knowledge about [kubernetes](https://kubernetes.io/docs/concepts/overview/). TLDR:
-   1. A _container_ is a portable executable image that contains software and all of its dependencies.
-   2. A _pod_ is a group of containers with shared storage/network resources, running in a shared environment.
-   It's analogous to a set of applications running on the same machine.
-   Containers within a pod can reach each other's ports on `localhost`.
-   A pod also defines what ports it exposes to the outside world.
-   3. A _service_ is a logical set of pods and a policy by which to access them.
-   A service defines what ports it exposes, and where requests sent to those ports are routed to (e.g., to pods).
-   4. Each service gets a DNS name equal to `<service-name>.<namespace-name>`,
-   pods in the same namespace can use simply `<service-name>`.
-   Use service DNS names for communication between pods.
+At it's core, Kubernetes has an [object model](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22)
+used to represent the desired target state for a given cluster.
+Configuring a Kubernetes cluster is done by defining the desired
+target state in terms of the object classes defined within this
+module.  Kubernetes then works over time to align the actual state of
+the cluster with the target state as specified via the object model.
+Interaction with a Kubernetes cluster is therefore done in terms of
+manipulating a specification of the desired target state and inspecting
+the actual state of the cluster at runtime.  All of these operations are
+done using the `kubectl` commamnd, with subcommands for listing,
+retrieving, editing, and creating instances of these objects.
+
+The general form of an inspection command is this:
+
+`kubectl get ${OBJECT_TYPE}`
+
+To see a list of pods, you can say this
+
+`kubectl get pods`
+
+Note that there are alternate names for the object type `pods`.
+`kubectl` usually accepts both singular and plural forms of the class
+name, as well as short forms. As a consequence, the following three
+commands are equivalent:
+
+* `kubectl get pods`
+* `kubectl get pod`
+* `kubectl get pod`
+
+A specific object instance can be queried using
+
+`kubectl get pods docs-fc7797f46-bfwxz`
+
+Querying for all objects with a given label can be done as follows:
+
+`kubectl get pods -l clusterName=cn-devnet`
+
+A full list of the object types (with short names) can be requested with:
+
+`kubectl api-resources`
+
+By default, `kubectl` presents a short tabular summary of the objects
+of the given type that are present within the default namespace. The
+formatting may be configured with the `-o` option.
+
+* `kubectl get pod -o json` - Format the objects in JSON format. This
+  gives full details.
+* `kubectl get pod -o yaml` - Format the objects in YAML. (Also with
+  full details.)
+* `kubectl get pod -o wide` - Present a wider form table with a few
+  extra columns.
+
+There are also additional format types that allow specific columns to
+be specified using JsonPath. Examples of this can be found within the
+source of `cncluster`.
+
+`kubectl` also has support for editing, patching, and applying sets of
+object definitions to a running cluster.
+
+### Key Kubernetes Object Classes
+
+There are dozens of classes, but a few of the key classes are
+as follows:
+
+1. A [`Container`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#container-v1-core)
+   is a portable Docker image that contains deployable software and all of
+   its dependencies. 
+
+2. A [`Pod`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#pod-v1-core)
+   is a group of containers with shared storage/network
+   resources, running in a shared environment. Kubernetes makes the
+   guarantee that all of the containers specified within a pod are
+   run on the same `Node`.  Containers within a pod can reach each
+   other's ports on `localhost`.  A pod also defines what ports it
+   exposes to the outside world.
+
+3. A [`Node`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#node-v1-core)
+   represents a virtual or physical machine on which a `Pod` might be scheduled
+   to run. All of the containers within a given `Pod` will be scheduled
+   on a single `Node`.
+
+4. A [`Service`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#service-v1-core)
+   is a logical set of pods and a policy by which to access them.  A
+   service defines what ports it exposes, and where requests sent to
+   those ports are routed to (e.g., to pods).  Each service gets a DNS
+   name within the cluster equal to `<service-name>.<namespace-name>`,
+   pods in the same [`Namespace`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#namespace-v1-core)
+   can use simply `<service-name>`.  Use service DNS names for
+   communication between pods.
+
+### Editing the Cluster Definition
+
+Canton network clusters are defined through the use of a manifest.  A
+manifest is a JSON document that contains a full list of all of the
+Kubernetes objects needed to run the cluster. We generate the manifest
+using [Jsonnet](https://jsonnet.org) scripts in [`/cluster/manifest`](/cluster/manifest).
+
+
 2. Edit the canton network cluster definition
     1. If you need to add a new asset (e.g., a new frontend bundle):
        make sure that asset is included in the bundle produced by `sbt bundle`.
@@ -527,7 +603,7 @@ For details on the individual steps, read the above sections.
    whenever you run a command interacting with the cloud.
 5. Build and upload all docker images
     1. The dependency tracking of the build system is currently not reliable. Do the following workarounds:
-       1. Run `make clean`. This deletes all `./cluster/images/**/target` folders and forces the next
+        1. Run `make clean`. This deletes all `./cluster/images/**/target` folders and forces the next
           `make` invocation to rerun `sbt bundle`. It does not do a full `sbt clean` though..
        2. If you still run into any issues, run `make clean && sbt clean` to trigger a full rebuild.
     2. Run `make`
@@ -573,8 +649,7 @@ if someone else has fully rebuilt the cluster. (`cncluster delete`/`cncluster cr
 To do so run the following commands from the cluster directory, e.g. `cluster/deployment/staging`:
 
 ```
-rm .kubecfg
-direnv reload
+cncluster activate
 ```
 
 ## TLS Certificate Provisioning
@@ -640,15 +715,6 @@ the token obtained from [Auth0 Management API Explorer](https://manage.auth0.com
 In order to update secrets on a deployed cluster, run `cncluster update_secrets`. It will fetch all
 relevant secrets from Auth0 using the management API token obtained above, and store them in
 kubernetes secrets.
-
-## Canton Metrics
-
-We expose prometheus metrics for our three participants and the domain on the following urls:
-
-- svc participant: http://$cluster.network.canton.global:10013/metrics
-- validator1 participant: http://$cluster.network.canton.global:10113/metrics
-- splitwell participant: http://$cluster.network.canton.global:10213/metrics
-- domain: http://$cluster.network.canton.global:10313/metrics
 
 ## Participant User Configuration
 

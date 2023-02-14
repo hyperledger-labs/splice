@@ -83,16 +83,17 @@ function _ok(){
   echo -e "\e[32;1m✔\e[0m ${@}"
 }
 
+# prints a little red x mark before $@ and sets check to 1 if you are using it
+function _nope(){
+  echo -e "\e[31;1m✘\e[0m ${@}"
+}
+
+
 # Displays a macOS notification with $@ as the message text
 function _notify(){
   osascript <<EOF
     display notification "$@" with title "Daml Hub"
 EOF
-}
-
-# prints a little red x mark before $@ and sets check to 1 if you are using it
-function _nope(){
-  echo -e "\e[31;1m✘\e[0m ${@}"
 }
 
 

@@ -12,7 +12,7 @@ localParticipant1.domains.connect("global", s"http://$clusterAddr:5008")
 
 println("....waiting for active domain connection.")
 
-utils.retry_until_true(localParticipant1.domains.active("svc_domain"))
+utils.retry_until_true(localParticipant1.domains.active("global"))
 
 println("Checking local to remote access via ping test...")
 

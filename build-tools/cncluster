@@ -13,9 +13,7 @@ SCRIPTNAME=${0##*/}
 
 if [ -z "${GCP_CLUSTER_BASENAME-}" ]; then
     _error "GCP_CLUSTER_BASENAME is undefined, this script must be run in a deployment/ directory."
-    exit 1
 fi
-
 
 ##
 
@@ -23,7 +21,11 @@ SOURCE_IMAGE_TAG=$(version-gen)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
-function cluster_exists() {
+################################
+### Utilities
+################################
+
+function _cluster_exists() {
   CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
 
   if [ -z "${CLUSTER}" ]; then
@@ -33,26 +35,34 @@ function cluster_exists() {
   fi
 }
 
-function cluster_must_exist() {
-    if ! cluster_exists; then
+function _cluster_must_exist() {
+    if ! _cluster_exists; then
         _error "Cluster does not exist, cannot continue."
     fi
 }
 
-function cluster_ip() {
+function _docker_must_be_running() {
+    if ! docker ps  > /dev/null 2>&1; then
+        _error "Docker Daemon not found to be running."
+    fi
+}
+
+function _cluster_ip() {
     gcloud compute addresses list \
            --regions=${CLOUDSDK_COMPUTE_REGION} \
            --filter "name:${GCP_CLUSTER_NAME}-ip" \
            --format 'value(address)'
 }
 
-function nat_router() {
+function _nat_router() {
+    # Check to see if the NAT router exists
     gcloud compute routers list \
             --filter "name:${GCP_NAT_ROUTER_NAME}" \
             --format 'value(name)'
 }
 
-function nat_config() {
+function _nat_config() {
+    # Check to see if the NAT is configured
     gcloud compute routers nats list \
             --router=${GCP_NAT_ROUTER_NAME} \
             --format 'value(name)'
@@ -70,14 +80,47 @@ function _cluster_apply() {
             --tla-str gcpDnsProject=${GCP_DNS_PROJECT} \
             --tla-str gcpDnsSASecret=${GCP_DNS_SA_SECRET} \
             --tla-str imageTag=${IMAGE_TAG} \
-            --tla-str ipAddr=$(cluster_ip) \
+            --tla-str ipAddr=$(_cluster_ip) \
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
             --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
             $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
         | kubectl apply -f -
 }
 
-function cluster_show() {
+function _cluster_update_module() {
+    module=$1
+
+    _log "Pushing module: ${module}"
+
+    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
+
+    if [ ! -f ${pushStateFile} ]; then
+        _error "Module not available for deployment (failure during either push or build): $1"
+        exit 1
+    fi
+
+    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
+
+    dnames=$(kubectl get deployment -l moduleName=${module} -o jsonpath='{.items[*].metadata.name}')
+
+    if [ -z "$dnames" ]; then
+        _warning "No deployment found for module: ${module}"
+    else
+        for dname in $dnames; do
+            _log "Setting module for deployment: ${dname}"
+            kubectl set image "deployment/${dname}" "${dname}=${imageTag}"
+        done
+
+        _log "Deleting module pods to force restart: ${module}"
+
+        # Delete the pods to force recreation. This forces a reload of
+        # the docker image, even if the tag has not changed, due to
+        # the imagePullPolicy setting of "Always".
+        kubectl delete pods -l "moduleName=${module}"
+    fi
+}
+
+function _cluster_show() {
     _log "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
     _log "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
     _log "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
@@ -85,32 +128,47 @@ function cluster_show() {
     _log "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
     _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
     _log "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
-
-    _log "GCP_CLUSTER_NODE_TYPE   : ${GCP_CLUSTER_NODE_TYPE}"
-    _log "GCP_CLUSTER_MAX_NODES   : ${GCP_CLUSTER_MAX_NODES}"
-
     _log "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
-    _log "SOURCE_IMAGE_TAG        : ${SOURCE_IMAGE_TAG}"
 
     _log ""
 }
 
-function cluster_confirm() {
-    cluster_show
+function _cluster_confirm() {
+    _cluster_show
 
     _confirm "GKE Cluster Operation: $@"
 }
 
+################################
 ### Commands
+################################
 
-function cluster_activate() {
-    cluster_must_exist
+## Subcommand dictionary
+##
+##    This is a map from subcommand name to help text. The definition of the
+##    sumcommand's functionality itself is in a shell function named
+##    cluster_${subcommand_name}. The subcommand must be defined in the
+##    whitelist dictionary to be invoked.
+
+declare -A subcommand_whitelist
+
+###
+
+subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to administer the cluster.'
+
+function subcmd_activate() {
+    _cluster_must_exist
 
     gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
 }
 
-function cluster_apply() {
-    cluster_confirm "Apply configuration"
+###
+
+subcommand_whitelist[apply]='Apply the current manifest to the cluster. Accepts an optional tag for images.'
+
+function subcmd_apply() {
+    _cluster_confirm "Apply configuration"
+    _docker_must_be_running
 
     IMAGE_TAG=${SOURCE_IMAGE_TAG}
 
@@ -131,8 +189,13 @@ function cluster_apply() {
     _cluster_apply ${IMAGE_TAG}
 }
 
-function cluster_deploy() {
-    cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
+###
+
+subcommand_whitelist[deploy]='Rebuild local working copy and deploy to cluster.'
+
+function subcmd_deploy() {
+    _cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
+    _docker_must_be_running
 
     make -C ${REPO_ROOT} clean -j
 
@@ -147,44 +210,15 @@ function cluster_deploy() {
     _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
-function _cluster_update_module() {
-    module=$1
+###
 
-    _log "Pushing module: ${module}"
+subcommand_whitelist[push]='Update one or more modules running on a cluster'
 
-    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
+function subcmd_push() {
 
-    if [ ! -f ${pushStateFile} ]; then
-        _error "Module not built: $1"
-        exit 1
-    fi
-
-    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
-
-    dnames=$(kubectl get deployment -l moduleName=${module} -o jsonpath='{.items[*].metadata.name}')
-
-    if [ -z "$dnames" ]; then
-        _warning "No deployment found for module: ${module}"
-    else
-        for dname in $dnames; do
-            _log "Setting module for deployment: ${dname}"
-            kubectl set image "deployment/${dname}" "${dname}=${imageTag}"
-        done
-
-        _log "Deleting module pods to force restart: ${module}"
-
-        # Delete the pods to force recreation. This forces a reload of
-        # the docker image, due to the imagePullPolicy setting of
-        # "Always".
-        kubectl delete pods -l "moduleName=${module}"
-    fi
-}
-
-function cluster_push() {
-
-    cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
-
-    cluster_must_exist
+    _cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
+    _cluster_must_exist
+    _docker_must_be_running
 
     # Assemble target lists for parallel clean and then build.
     clean_targets=""
@@ -220,11 +254,15 @@ function cluster_push() {
     done
 }
 
+###
+
+subcommand_whitelist[logs]='Stream logs from an application container running in cluster'
+
 function _json_log_format() {
     jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
 }
 
-function cluster_logs() {
+function subcmd_logs() {
     if [ "${1-}" = "--raw" ]; then
         raw=yes
         shift
@@ -236,7 +274,7 @@ function cluster_logs() {
         _error "No module specified"
     fi
 
-    cluster_must_exist
+    _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
                           --all-namespaces \
@@ -254,11 +292,14 @@ function cluster_logs() {
     fi
 }
 
-function cluster_set_machine_type() {
-    cluster_confirm "Set cluster machine type to current default. (This will interrupt all workloads.)"
+###
 
-    cluster_must_exist
+subcommand_whitelist[set_machine_type]='Rebuilds the default node pool with current cluster machine type and count'
 
+function subcmd_set_machine_type() {
+    _cluster_confirm "Rebuild default node pool to up to ${GCP_CLUSTER_MAX_NODES} ${GCP_CLUSTER_NODE_TYPE} nodes (This will interrupt all workloads.)"
+
+    _cluster_must_exist
 
     _info "Creating temporary node pool..."
     gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
@@ -283,10 +324,14 @@ function cluster_set_machine_type() {
            || _error "Could not delete temporary node pool."
 }
 
-function cluster_create() {
-    cluster_confirm "Create cluster"
+###
 
-    if cluster_exists; then
+subcommand_whitelist[create]='Create a cluster from scratch.'
+
+function subcmd_create() {
+    _cluster_confirm "Create cluster"
+
+    if _cluster_exists; then
         _error "Cluster already exists."
     else
         #### Cluster can be resized from deployment directories with the following command:
@@ -341,12 +386,12 @@ function cluster_create() {
 
     #### Check for IP
 
-    if [ -z $(cluster_ip) ]; then
+    if [ -z $(_cluster_ip) ]; then
         _log "Allocating IP address."
         gcloud compute addresses create "${GCP_CLUSTER_NAME}-ip" --region=${CLOUDSDK_COMPUTE_REGION}
     fi
 
-    IPADDR=$(cluster_ip)
+    IPADDR=$(_cluster_ip)
 
     if [ -z ${IPADDR} ]; then
         _error "Could not determine cluster IP address."
@@ -369,7 +414,7 @@ function cluster_create() {
     echo "Cluster at IP ${IPADDR}, applying configuration."
 
     #### Check for Cloud NAT rules
-    if [ -z $(nat_router) ]; then
+    if [ -z $(_nat_router) ]; then
         _log "NAT router ${GCP_NAT_ROUTER_NAME} not found, creating..."
         gcloud compute routers create "${GCP_NAT_ROUTER_NAME}" \
             --network default \
@@ -378,7 +423,7 @@ function cluster_create() {
         _log "NAT router ${GCP_NAT_ROUTER_NAME} exists, skipping..."
     fi
 
-    if [ -z $(nat_config) ]; then
+    if [ -z $(_nat_config) ]; then
         _log "NAT config ${GCP_NAT_CONFIG_NAME} not found, creating..."
         gcloud compute routers nats create "${GCP_NAT_CONFIG_NAME}" \
                 --router-region "${CLOUDSDK_COMPUTE_REGION}" \
@@ -390,10 +435,10 @@ function cluster_create() {
     fi
 
     _log "Authenticating to newly created cluster."
-    cluster_activate
+    subcmd_activate
 
     _log "Updating cluster secrets"
-    cluster_update_secrets
+    subcmd_update_secrets
 
     _log "Applying current manifest to cluster."
     _cluster_apply ${SOURCE_IMAGE_TAG}
@@ -401,13 +446,17 @@ function cluster_create() {
     _log "Cluster ready."
 }
 
+###
+
+subcommand_whitelist[check]='Runs a simple baseline check of cluster operation'
+
 function _check_cluster_grpc_port() {
     PORT=$1
 
-    _log "Checking gRPC API: $2"
-
-    if ! grpcurl -plaintext ${CLUSTER_DNS_NAME}:${PORT} list > /dev/null; then
-        _error "API not reachable"
+    if  grpcurl -plaintext ${CLUSTER_DNS_NAME}:${PORT} list > /dev/null; then
+        _ok "gRPC API Reachable: $2"
+    else
+        _nope "gRPC API NOT Reachable: $2"
     fi
 }
 
@@ -419,8 +468,8 @@ function _check_cluster_ledger() {
     fi
 }
 
-function cluster_check() {
-    cluster_show
+function subcmd_check() {
+    _cluster_show
 
     _check_cluster_grpc_port 5008 "Canton Domain Connection"
     _check_cluster_grpc_port 5009 "Canton Domain Admin"
@@ -437,17 +486,18 @@ function cluster_check() {
 
     _check_cluster_grpc_port 5101 "Validator1: Ledger Participant API"
     _check_cluster_grpc_port 5102 "Validator1: Ledger Participant Admin API"
-    _check_cluster_grpc_port 5103 "Validator1: Validator App API"
-    _check_cluster_grpc_port 5104 "Validator1: Wallet App API"
 
     _check_cluster_grpc_port 5201 "Splitwell: Ledger Participant API"
     _check_cluster_grpc_port 5202 "Splitwell: Ledger Participant Admin API"
-    _check_cluster_grpc_port 5203 "Splitwell: Validator App API"
     _check_cluster_grpc_port 5213 "Splitwell: Splitwell App API"
 
     _log "Checking cluster via ping test..."
     _check_cluster_ledger
 }
+
+###
+
+subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'
 
 function _cluster_reset() {
     _info "Deleting all stateful sets..."
@@ -465,6 +515,10 @@ function _cluster_reset() {
     _info "Cluster in reset/idle state."
 }
 
+###
+
+subcommand_whitelist[ciapply]='Run only by CircleCI'
+
 function cluster_ciapply() {
     # A CI specific variant of 'cncluster apply' that removes the need
     # for manual confirmation and ensures that all pods are deleted
@@ -477,15 +531,18 @@ function cluster_ciapply() {
         exit 1
     fi
 
-    cluster_show
-
+    _cluster_show
     _cluster_reset
     _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
-function cluster_delete() {
-    cluster_confirm "Delete cluster"
-    cluster_must_exist
+###
+
+subcommand_whitelist[delete]='Delete all cluster resources.'
+
+function subcmd_delete() {
+    _cluster_confirm "Delete cluster"
+    _cluster_must_exist
 
     if gcloud dns record-sets delete \
               --project="${GCP_DNS_PROJECT}" \
@@ -512,20 +569,30 @@ function cluster_delete() {
     echo "Cluster deleted."
 }
 
-function cluster_ipaddr() {
-    cluster_must_exist
+###
 
-    cluster_ip
+subcommand_whitelist[ipaddr]='Display the cluster\s main IP address.'
+
+function subcmd_ipaddr() {
+    _cluster_must_exist
+    _cluster_ip
 }
 
+###
 
-function cluster_preflight() {
+subcommand_whitelist[preflight]='Run the runbook preflight test against the cluster'
+
+function subcmd_preflight() {
     _log "Starting preflight"
 
-    run_sbt_for_preflight "testOnly *PreflightIntegrationTest"
+    subcmd_sbt_for_preflight "testOnly *PreflightIntegrationTest"
 }
 
-function run_sbt_for_preflight() {
+###
+
+subcommand_whitelist[sbt_for_preflight]='Runs Sbt, as if for the runbook preflight test.'
+
+function subcmd_sbt_for_preflight() {
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
         _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
       exit 1
@@ -543,41 +610,49 @@ function run_sbt_for_preflight() {
              sbt -DAUTH0_TENANT=dev "$@")
 }
 
-function cluster_reset() {
-    cluster_confirm "Reset cluster state by deleting ALL pods."
+function subcmd_reset() {
+    _cluster_confirm "Reset cluster state by deleting ALL pods."
 
     _cluster_reset
 }
 
-function cluster_ports() {
-    cluster_show
-    cluster_must_exist
+###
 
-    curl -L http://scratch.network.canton.global/manifest.json 2> /dev/null \
+subcommand_whitelist[ports]='Display a table of all ports exposed from the cluster.'
+
+function subcmd_ports() {
+    _cluster_show
+    _cluster_must_exist
+
+    curl -L http://${CLUSTER_DNS_NAME}/manifest.json 2> /dev/null \
         | jq -r '(["SERVICE","PORT-NAME","PORT","AS-GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@tsv' \
         | column -t
 }
 
-function cluster_services() {
-    cluster_show
+###
 
-    _show_ports
-}
+subcommand_whitelist[info]='Display information on current cluster configuration, including image tags'
 
-function cluster_info() {
-    cluster_show
-    cluster_must_exist
+function subcmd_info() {
+    _cluster_show
+    _cluster_must_exist
 
     kubectl get po -o json \
+            --all-namespaces \
+            -l clusterName=${GCP_CLUSTER_NAME} \
         | jq -r '(["NAMESPACE", "POD-NAME", "CONTAINER", "IMAGE", "MEM-LIMIT", "CPU-REQ", "CPU-LIMIT"],(.items[] | .metadata as $pod | .spec.containers[] as $c | $c.resources as $r | [$pod.namespace, $pod.name, $c.name, ($c.image | split(":")[1]), $r.limits.memory, $r.requests.cpu, $r.limits.cpu]))|@tsv' \
         | sort \
         | column -t
 
 }
 
-function cluster_top() {
-    cluster_show
-    cluster_must_exist
+###
+
+subcommand_whitelist[top]='Display current CPU and memory usage by both node and pod'
+
+function subcmd_top() {
+    _cluster_show
+    _cluster_must_exist
 
 	_log "Node Usage:"
     kubectl top node
@@ -587,12 +662,20 @@ function cluster_top() {
     kubectl top pod --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 }
 
-function cluster_wait() {
-    cluster_show
+###
+
+subcommand_whitelist[wait]='Wait for the cluster to reach a fully ready state'
+
+function subcmd_wait() {
+    _cluster_show
 
     _log "Waiting for all pods to become ready"
     kubectl wait --for=condition=Ready --all pod --timeout=5m
 }
+
+###
+
+subcommand_whitelist[update_secrets]='Update Auth0 Kubernetes Secrets'
 
 function _set_auth0_secret() {
   SECRET_NAME=$1
@@ -637,7 +720,8 @@ function _set_auth0_api_user() {
             "--from-literal=ledger-api-user=${CLIENT_ID}@clients"
 }
 
-function cluster_update_secrets() {
+function subcmd_update_secrets() {
+
 
   if [ -z "${AUTH0_MANAGEMENT_API_TOKEN-}" ]; then
       _error "Environment variable AUTH0_MANAGEMENT_API_TOKEN is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets"
@@ -693,89 +777,30 @@ function cluster_update_secrets() {
   done
 }
 
-case "${SUBCOMMAND_NAME}" in
-    activate)
-        cluster_activate $@
-        ;;
+###
 
-    apply)
-        cluster_apply $@
-        ;;
+subcommand_whitelist[help]='Display this help message.'
 
-    create)
-        cluster_create $@
-        ;;
+function subcmd_help() {
+    _info "Usage: $SCRIPTNAME {subcommand} [options...]"
 
-    check)
-        cluster_check $@
-        ;;
+    _info "Valid subcommands: "
+    readarray -t sorted < <(printf '%s\n' "${!subcommand_whitelist[@]}" | sort)
 
-    ciapply)
-        cluster_ciapply $@
-        ;;
+    for ii in ${sorted[@]};
+    do
+        printf '%s\t%s\n' "${ii}" "${subcommand_whitelist[${ii}]}"
+    done | column -ts $'\t'
+}
 
-    delete)
-        cluster_delete $@
-        ;;
+################################
+### Main
+################################
 
-    deploy)
-        cluster_deploy $@
-        ;;
+if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
+    subcmd_help
 
-    ipaddr)
-        cluster_ipaddr $@
-        ;;
+    _error  "Unknown subcommand: ${SUBCOMMAND_NAME}"
+fi
 
-    info)
-        cluster_info $@
-        ;;
-
-    log | logs)
-        cluster_logs $@
-        ;;
-
-    ports)
-        cluster_ports $@
-        ;;
-
-    preflight)
-        cluster_preflight $@
-        ;;
-
-    push)
-        cluster_push $@
-        ;;
-
-    sbt_for_preflight)
-        run_sbt_for_preflight $@
-        ;;
-
-    reset)
-        cluster_reset $@
-        ;;
-
-    set_machine_type)
-        cluster_set_machine_type $@
-        ;;
-
-    services)
-        cluster_services $@
-        ;;
-
-    top)
-        cluster_top $@
-        ;;
-
-    wait)
-        cluster_wait $@
-        ;;
-
-    update_secrets)
-        cluster_update_secrets
-        ;;
-
-    *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|image_tags|ipaddr|ports|push|reset|top|wait|update_secrets}" >&2
-	    exit 3
-	    ;;
-esac
+subcmd_${SUBCOMMAND_NAME} $@
