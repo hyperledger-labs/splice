@@ -11,25 +11,32 @@
    1. [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
    1. [Docker Image Hosting](#docker-image-hosting)
    1. [Cluster Management Operations](#cluster-management-operations)
-   1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci/cd-deployment)
+   1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci-cd-deployment)
    1. [Observing Cluster Operation](#observing-cluster-operation)
+      1. [Kubectl and `cncluster` operations.](#kubectl-and-cncluster-operations.)
       1. [GCE Dashboards](#gce-dashboards)
       1. [GCE Log Explorer](#gce-log-explorer)
-         1. [Exclude noisy/non-JSON containers](#exclude-noisy/non-json-containers)
+         1. [Exclude noisy/non-JSON containers](#exclude-noisy-non-json-containers)
          1. [Manual configuration actions taken by DA employees](#manual-configuration-actions-taken-by-da-employees)
          1. [Configuration actions initiated by CircleCI](#configuration-actions-initiated-by-circleci)
          1. [Pod error states](#pod-error-states)
       1. [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
    1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
-1. [Updating the Canton Network Deployment](#updating-the-canton-network-deployment)
-1. [Fixing connection issues in kubectl](#fixing-connection-issues-in-kubectl)
+1. [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
+   1. [Gaining Access to a Cluster](#gaining-access-to-a-cluster)
+      1. [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
+   1. [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
+   1. [Update a Single Component in a Cluster](#update-a-single-component-in-a-cluster)
+   1. [Add a Component to the Build](#add-a-component-to-the-build)
 1. [TLS Certificate Provisioning](#tls-certificate-provisioning)
    1. [First-time Infra Setup](#first-time-infra-setup)
    1. [Cluster Configuration](#cluster-configuration)
-   1. [Adding TLS to {insert-service-here}](#adding-tls-to-{insert-service-here})
+   1. [Adding TLS to `{insert-service-here}`](#adding-tls-to-insert-service-here)
    1. [Force-updating the certificate](#force-updating-the-certificate)
 1. [Auth0 secrets](#auth0-secrets)
 1. [Participant User Configuration](#participant-user-configuration)
+1. [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
+   1. [Manifests](#manifests)
 
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
@@ -188,7 +195,7 @@ created within GCE that will host a Canton Network cluster, the
 following grants must be made within `da-cn-images` to the default
 compute service account within the new cluster.
 
-* The service account must have access to the Artifact Registry within `da-cn-images`.
+* The service account must have access to the [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images) within `da-cn-images`.
 * The service account must have Read-Only access to the `release-bundles` Google Storage bucket.
 
 ### Docker Image Hosting
@@ -292,7 +299,8 @@ docker images from scratch:
 `make clean docker-build -j`
 
 Secondly, from the same directory, push the docker images to the
-artifact registry with the appropriate tags.
+[Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images)
+with the appropriate tags.
 
 `CI=true make docker-push -j`
 
@@ -370,7 +378,11 @@ Run the following commands in the deployment directory of the cluster
 you with to observe. For ScratchNet, this is
 `cluster/deployment/scratchnet`, and similar for other clsuters.
 
-1. Run `kubectl get pods` to get the status of all pods.
+1. Run `kubectl get pods` to get the status of all pods in the default namespace
+   1. `kubectl get pods --all-namespaces` to get the status of all pods, regardless of namespace
+   1. `kubectl get pod -n splitwell` to get the status of all pods, in the `splitwell namespace`
+1. Run `kubectl get namespace` to get a list of all namespaces
+1. Run `kubectl api-resources` to get a list of Kubernetes object types
 1. Run `kubectl describe pod <pod-name>` to get a detailed status of
    the given pod, including state transitions that might indicate
    memory or configuratoin failures.
@@ -517,6 +529,7 @@ work. However, it can be useful to understand this distinction when
 encounting certain errors that might occur if the VPN fails during a
 long operation.
 
+
 #### Fixing Connection Issues in kubectl
 
 Occasionally, you might encounter difficulty accessing `kubectl`, even
@@ -526,7 +539,8 @@ to force `.kubecfg` to be regenerated. This can be required if someone
 else has fully rebuilt the cluster. (`cncluster delete`/`cncluster
 create`)
 
-To do so run the following commands from the cluster directory, e.g. `cluster/deployment/staging`:
+To do so run the following commands from the cluster directory,
+e.g. `cluster/deployment/staging`:
 
 ```
 cncluster activate
@@ -565,7 +579,8 @@ cncluster activate
 1. From a deployment directory, invoke `cncluster push`, passing in
    the module names for the modules you wish to update. This will
    start a build for those modules, push the resulting images to the
-   artifact registry and patch all necessary `Deployment` objects with
+   [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images).
+   and patch all necessary `Deployment` objects with
    the image tag to force an update.
 1. Debug your deployment. Tools mentioned in [Observing Cluster Operation](#observing-cluster-operation)
    can be useful.
@@ -713,187 +728,16 @@ how the Scan and Directory users share their primary party and
 
 The exact JSON format is defined in `tools.sc`.
 
-## Appendix: Intro to Kubernetes
+## Appendix: Kubernetes Resources
 
-To work with Kubernetes, it's a good idea to understand the
-[fundamentals of Kubernetes](https://kubernetes.io/docs/concepts/overview/).
-Kubernetes is what's known as a Container Orchestration system.
-It provides tools for managing applications composed of multiple
-Docker containers across clusters of computing resources. In
-addition to deploying and running containers, it supports automatic
-scaling, mangement of network routing, health checks, and many of the
-other capabilities required to run a large distributed application
-reliably at scale. To accomplish this, Kubernetes introduces a number
-of additional concepts and tools that are necessary to understand
-to use it effectively.
-
-Before continuing, a word on naming and the origins of Kubernetes.
-Kubernetes is a Google Open Source project. Kubernetes is an updated
-successor to Google's internal [Borg](https://research.google/pubs/pub43438/)
-cluster management tool. On Canton network, we use an extension of Kubernetes
-called [GKE](https://cloud.google.com/kubernetes-engine), the Google
-Kubernetes Engine. This is a product based on open source Kubernetes that
-Google has extended and offers through Google Cloud. We run our GKE clusters
-on Google Compute Engine Nodes - [GCE](https://cloud.google.com/compute).
-
-In summary:
-
-* **Kubernetes** - Open Source Container Orchestration System
-* **Google Kubernetes Engine (GKE)** - Google Cloud's Kubernetes Offering
-* **Gooble Compute Engine (GCE)** - Google Cloud's Compute Offering
-
-### Kubernetes Configuration
-
-At it's core, Kubernetes has an
-[object model](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22)
-used to represent the desired target state for a given cluster. We
-control Kubernetes in terms of operations against this object model - by
-creating, editing, and deleting objects that represent portions of
-our cluster configuration. Kubernetes runs background reconciliation
-processes that work to ensure the actual state of a cluster matches
-the target state expressed in the objects. Reconciliation is done
-over a period of time, and with the goal of eventually achieving
-consistancy with the target configuration. The path taken to the
-target configuration is not necessarily the shortest. Configuration
-changes can be done in ways that preserve operation of the cluster
-during faults and upgrades.
-
-An example of what this looks like in concrete terms is the mechanism
-we use for deploying software into a cluster. These steps assume that
-our build process has successfully deployed a Docker image with a known
-tag into [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images).
-
-1. We create a [`Deployment`](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) object that specifies how a image will be
-   deployed in cluster as a collection of one or more `Pod`s. These
-   `Pod`s refer back to images uploaded into the artifact registry by
-   tag.
-2. The Kubernetes `Deployment` synchronization loop creates or updates
-   `Pod` objects according to the policies set for the deployment.
-3. The Kubernetes `Pod` synchronization loop schedules the `Pod`s on
-   `Node`s, which then pull the image and run it.
-
-We request deployment of the software in this case via a `Deployment`,
-and rely on Kubernetes to apply that policy in a controlled way to the
-cluster itself. The amount of indirection might seem overkill, but it
-lies at the key of some of the more powerful features Kubernetes
-offers for managing a cluster. In this case, the `Deployment` object
-is intelligent enough to seamlessly roll over from one version of a
-`Pod` to another. When rolling from version 1 to version 2, the
-`Deployment` will start the version 2 pod and wait for it to become
-[ready](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) 
-before it shuts down the version 1 pod.  In the event the `Pod`
-exposes network services via a
-[`Service`](https://kubernetes.io/docs/concepts/services-networking/service/)
-object, inbound requests will not be routed to the new `Pod` until
-it's ready. `Deployment` configuration options also allow for multiple
-instances of `Pod`s and various other more sophisticated cutover
-strategies. Regardless, the UX for managing the deployed version is
-provided through the toplevel `Deployment` object.
-
-It is important to point out that this sort of automation is not
-totally free. Both Kubernetes and the Cloud present different sets of
-opportunities and architectural constraints when compared to
-traditional software architectures. Processes tend to be more
-transient, requiring more care when handling state and more detail
-when presenting status information to the orchestration framework.
-Just as an example, the `Deployment` rollover strategy mentioned above
-depends on a process presenting an accurate and complete readiness
-status to Kubernetes. If the readiness check is inaccurate, requests
-can go to a `Pod` that's not ready to process then and the one working
-`Pod` can be terminated before anything is ready to take on the
-workload. This is a large topic in general, but Google has some
-guidelines mentioned [here](https://cloud.google.com/blog/products/devops-sre/want-repeatable-scale-adopt-infrastructure-as-code-on-gcp)
-that are worth reading.
-
-#### `kubectl`
-
-Configuring a Kubernetes cluster is done by defining the desired
-target state in terms of the object classes defined within this
-module.  Kubernetes then works over time to align the actual state of
-the cluster with the target state as specified via the object model.
-Interaction with a Kubernetes cluster is therefore done in terms of
-manipulating a specification of the desired target state and inspecting
-the actual state of the cluster at runtime.  All of these operations are
-done using the `kubectl` commamnd, with subcommands for listing,
-retrieving, editing, and creating instances of these objects.
-
-The general form of an inspection command is this:
-
-`kubectl get ${OBJECT_TYPE}`
-
-To see a list of pods, you can say this
-
-`kubectl get pods`
-
-Note that there are alternate names for the object type `pods`.
-`kubectl` usually accepts both singular and plural forms of the class
-name, as well as short forms. As a consequence, the following three
-commands are equivalent:
-
-* `kubectl get pods`
-* `kubectl get pod`
-* `kubectl get pod`
-
-A specific object instance can be queried using
-
-`kubectl get pods docs-fc7797f46-bfwxz`
-
-Querying for all objects with a given label can be done as follows:
-
-`kubectl get pods -l clusterName=cn-devnet`
-
-A full list of the object types (with short names) can be requested with:
-
-`kubectl api-resources`
-
-By default, `kubectl` presents a short tabular summary of the objects
-of the given type that are present within the default namespace. The
-formatting may be configured with the `-o` option.
-
-* `kubectl get pod -o json` - Format the objects in JSON format. This
-  gives full details.
-* `kubectl get pod -o yaml` - Format the objects in YAML. (Also with
-  full details.)
-* `kubectl get pod -o wide` - Present a wider form table with a few
-  extra columns.
-
-There are also additional format types that allow specific columns to
-be specified using JsonPath. Examples of this can be found within the
-source of `cncluster`.
-
-`kubectl` also has support for editing, patching, and applying sets of
-object definitions to a running cluster.
-
-### Key Kubernetes Object Classes
-
-There are dozens of classes, but a few of the key classes are
-as follows:
-
-1. A [`Container`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#container-v1-core)
-   is a portable Docker image that contains deployable software and all of
-   its dependencies. 
-
-2. A [`Pod`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#pod-v1-core)
-   is a group of containers with shared storage/network
-   resources, running in a shared environment. Kubernetes makes the
-   guarantee that all of the containers specified within a pod are
-   run on the same `Node`.  Containers within a pod can reach each
-   other's ports on `localhost`.  A pod also defines what ports it
-   exposes to the outside world.
-
-3. A [`Node`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#node-v1-core)
-   represents a virtual or physical machine on which a `Pod` might be scheduled
-   to run. All of the containers within a given `Pod` will be scheduled
-   on a single `Node`.
-
-4. A [`Service`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#service-v1-core)
-   is a logical set of pods and a policy by which to access them.  A
-   service defines what ports it exposes, and where requests sent to
-   those ports are routed to (e.g., to pods).  Each service gets a DNS
-   name within the cluster equal to `<service-name>.<namespace-name>`,
-   pods in the same [`Namespace`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#namespace-v1-core)
-   can use simply `<service-name>`.  Use service DNS names for
-   communication between pods.
+* Kubernetes Documentation
+   * [Fundamentals of Kubernetes](https://kubernetes.io/docs/concepts/overview/).
+   * [`kubectl` Documentation](https://kubernetes.io/docs/reference/kubectl/)   
+   * [Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) 
+   * [`Deployment`](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+   * [`Service`](https://kubernetes.io/docs/concepts/services-networking/service/)
+* [Object model API reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22)
+* [Google on Cloud Readiness](https://cloud.google.com/blog/products/devops-sre/want-repeatable-scale-adopt-infrastructure-as-code-on-gcp)
 
 ### Manifests
 
