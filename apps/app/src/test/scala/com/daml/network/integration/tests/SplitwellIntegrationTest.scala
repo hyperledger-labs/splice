@@ -1,19 +1,21 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 
 class SplitwellIntegrationTest
     extends CoinIntegrationTestWithSharedEnvironment
+    with SplitwellTestUtil
     with WalletTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
@@ -74,6 +76,50 @@ class SplitwellIntegrationTest
           aliceSplitwell.ledgerApi.ledger_api.acs
             .filterJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
         groups should have size 1
+    }
+
+    "use its own app domain" in { implicit env =>
+      val (aliceUserParty, bobUserParty, _, _, key) = initSplitwellTest()
+
+      aliceWallet.tap(50)
+
+      val install = aliceSplitwell.ledgerApi.ledger_api.acs
+        .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
+      aliceValidator.remoteParticipant.transfer
+        .lookup_contract_domain(install.id) shouldBe Map(
+        javaToScalaContractId(install.id) -> "splitwell"
+      )
+
+      val (_, paymentRequest) = actAndCheck(
+        "alice initiates transfer on splitwell domain",
+        aliceSplitwell.initiateTransfer(
+          key,
+          Seq(
+            new walletCodegen.ReceiverCCAmount(
+              bobUserParty.toProtoPrimitive,
+              BigDecimal(42.0).bigDecimal,
+            )
+          ),
+        ),
+      )(
+        "alice sees payment request on global domain",
+        _ => aliceWallet.listAppPaymentRequests().headOption.value,
+      )
+
+      val (_, balanceUpdate) = actAndCheck(
+        "alice initiates payment accept request on global domain",
+        aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
+      )(
+        "alice sees balance update on splitwell domain",
+        _ =>
+          inside(aliceSplitwell.listBalanceUpdates(key)) { case Seq(update) =>
+            update
+          },
+      )
+      aliceValidator.remoteParticipant.transfer
+        .lookup_contract_domain(balanceUpdate.contractId) shouldBe Map(
+        javaToScalaContractId(balanceUpdate.contractId) -> "splitwell"
+      )
     }
 
     "return the primary party of the user" in { implicit env =>

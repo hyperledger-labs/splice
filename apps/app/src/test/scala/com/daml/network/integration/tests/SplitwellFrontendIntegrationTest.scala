@@ -148,13 +148,21 @@ class SplitwellFrontendIntegrationTest
             )
             row2.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
           }
-          inside(findAll(className("balance-updates-list-item")).toSeq) {
-            case Seq(row1, row2, row3, row4) =>
-              row1.text should matchText(s"${bobCns} sent 111.0000000000 CC to ${charlieCns}")
-              row2.text should matchText(s"${bobCns} sent 400.0000000000 CC to ${aliceCns}")
-              row3.text should matchText(s"${charlieCns} paid 333.0000000000 CC for Digestivs")
-              row4.text should matchText(s"${aliceCns} paid 1200.0000000000 CC for Team lunch")
-          }
+          val rows = findAll(className("balance-updates-list-item")).toSeq
+          rows should have size 4
+          // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
+          forExactly(1, rows)(
+            _.text should matchText(s"${bobCns} sent 111.0000000000 CC to ${charlieCns}")
+          )
+          forExactly(1, rows)(
+            _.text should matchText(s"${bobCns} sent 400.0000000000 CC to ${aliceCns}")
+          )
+          forExactly(1, rows)(
+            _.text should matchText(s"${charlieCns} paid 333.0000000000 CC for Digestivs")
+          )
+          forExactly(1, rows)(
+            _.text should matchText(s"${aliceCns} paid 1200.0000000000 CC for Team lunch")
+          )
         }
       }
 

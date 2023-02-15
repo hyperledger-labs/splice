@@ -6,9 +6,14 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.console.SplitwellAppClientReference
 import com.daml.network.console.WalletAppClientReference
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.time.RemoteClock
 
-trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil {
+import java.time.Duration
+import org.slf4j.event.Level
+
+trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTestUtil {
   def initSplitwellTest()(implicit
       env: CoinTestConsoleEnvironment
   ) = {
@@ -77,25 +82,43 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil {
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key)
   }
 
+  private def syncOnTransfers[A](numTransfers: Int, act: => A)(implicit
+      env: CoinTestConsoleEnvironment
+  ) =
+    env.environment.clock match {
+      case _: RemoteClock =>
+        // TODO(#2864) Remove workarounds for buggy transfers in simtime. For now, we need to
+        // advance time manually after the transfer out has been submitted.
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+          act,
+          forExactly(numTransfers, _)(_.message should include("Submitting transfer out")),
+        )
+        advanceTime(Duration.ofSeconds(5))
+      case _ => act
+    }
+
   def splitwellTransfer(
       senderSplitwell: SplitwellAppClientReference,
       senderWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
       key: GrpcSplitwellAppClient.GroupKey,
-  ) = {
-    senderSplitwell.initiateTransfer(
-      key,
-      Seq(
-        new walletCodegen.ReceiverCCAmount(
-          receiver.toProtoPrimitive,
-          amount.bigDecimal,
-        )
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    syncOnTransfers(
+      2,
+      senderSplitwell.initiateTransfer(
+        key,
+        Seq(
+          new walletCodegen.ReceiverCCAmount(
+            receiver.toProtoPrimitive,
+            amount.bigDecimal,
+          )
+        ),
       ),
     )
     eventually()(senderWallet.listAppPaymentRequests() should not be empty)
     inside(senderWallet.listAppPaymentRequests()) { case Seq(request) =>
-      senderWallet.acceptAppPaymentRequest(request.contractId)
+      syncOnTransfers(1, senderWallet.acceptAppPaymentRequest(request.contractId))
     }
 
   }
