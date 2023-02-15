@@ -9,10 +9,6 @@ object TransformConfig extends App {
   val outputFileName = Paths.get(args(2))
 
   mode match {
-    case "remoteCantonConfigWithAdminTokens" =>
-      val inputConfig = CantonCommunityConfig.parseAndLoadOrExit(Seq(inputFileName.toFile))
-      val outputConfig = CNNodeConfigTransforms.remoteCantonConfigWithAdminTokens(inputConfig)
-      CantonCommunityConfig.writeToFile(outputConfig, outputFileName)
     case "useSelfSignedTokensForLedgerApiAuth" =>
       val inputConfig = CNNodeConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
       val outputConfig = CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)

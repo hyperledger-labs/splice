@@ -3,31 +3,8 @@ set -eou pipefail
 
 POSTGRES_MODE=${1:-docker}
 
-if [ -f "toxi.pid" ]; then
-  PID=$(cat toxi.pid)
-  kill "$PID" || true
-  rm toxi.pid
-fi
+tmux kill-session -t canton || true
 
-if [ -f "canton.pid" ]; then
-    PID=$(cat canton.pid)
-    kill "$PID" || true
-    rm canton.pid
-else
-    echo "The file canton.pid does not exist, not stopping Canton"
-fi
-
-if [ -f "canton-simtime.pid" ]; then
-    PID=$(cat canton-simtime.pid)
-    kill "$PID" || true
-    rm canton-simtime.pid
-else
-    echo "The file canton-simtime.pid does not exist, not stopping simtime Canton"
-fi
-
-rm -f canton.tokens
-rm -f canton.ports canton-simtime.ports
-
-rm canton.ports canton-simtime.ports || true
+rm -f canton.tokens canton-simtime.tokens
 
 ./scripts/postgres.sh "$POSTGRES_MODE" stop

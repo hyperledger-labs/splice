@@ -10,11 +10,7 @@ import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.domain.config.{
-  CommunityDomainConfig,
-  CommunityPublicServerConfig,
-  RemoteDomainConfig,
-}
+import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
 import com.digitalasset.canton.participant.config.{
   AuthServiceConfig,
   CommunityParticipantConfig,
@@ -495,39 +491,5 @@ object CNNodeConfigTransforms {
       )
     }
     token
-  }
-
-  /** This transforms canton configs, not cn node configs, but we need it for the Canton coin project:
-    * We use a long running canton process that is running in the background.
-    * Sometimes you want to attach a Canton console to that process for debugging.
-    * Since the canton process uses an authenticated ledger API, we need a way of automatically
-    * generating a config that contains the right access tokens.
-    */
-  def remoteCantonConfigWithAdminTokens: CantonCommunityConfig => CantonCommunityConfig = {
-    config: CantonCommunityConfig =>
-      {
-        config.copy(
-          domains = Map.empty,
-          participants = Map.empty,
-          remoteDomains = config.domains.view
-            .mapValues(d =>
-              RemoteDomainConfig(
-                adminApi = d.adminApi.clientConfig,
-                publicApi = SequencerConnectionConfig.Grpc(d.publicApi.address, d.publicApi.port),
-              )
-            )
-            .toMap,
-          remoteParticipants = config.participants.view
-            .mapValues(p =>
-              RemoteParticipantConfig(
-                adminApi = p.adminApi.clientConfig,
-                ledgerApi = p.ledgerApi.clientConfig,
-                token = Some(getAdminToken(config.parameters.clock, p.ledgerApi.clientConfig)),
-              )
-            )
-            .toMap,
-          features = config.features.copy(enableTestingCommands = true),
-        )
-      }
   }
 }

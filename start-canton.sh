@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-if [ -f "canton.pid" ]; then
+tmux_session="canton"
+tmux_window=0
+
+if tmux has-session -t $tmux_session 2>/dev/null; then
   >&2 echo "Canton seems to already be running. Did you mean to run stop-canton.sh first?"
   exit 1
 fi
 
 rm -f canton.tokens canton-simtime.tokens
-rm -f canton.ports canton-simtime.ports
 
 POSTGRES_MODE=${1:-docker}
 
@@ -42,29 +44,37 @@ cp ./canton/community/participant/target/scala-2.13/classes/com/digitalasset/can
    ./canton-classpath/com/digitalasset/canton/participant/ledger/api
 export CLASSPATH=$PWD/canton-classpath
 
-# Start Canton
-CANTON_TOKEN_FILENAME=canton.tokens canton \
-    daemon --no-tty \
+function tmux_cmd() {
+  local title=$1
+  local cmd=$2
+  local t=${tmux_session}:${tmux_window}
+
+  if [[ ${tmux_window} -eq 0 ]]; then
+    tmux rename-window -t "$t" "$title"
+  else
+    tmux new-window -t "$t" -n "$title"
+  fi
+  tmux send-keys -t "$t" "$cmd" C-m
+  tmux_window=$((tmux_window+1))
+}
+
+tmux new-session -d -s "${tmux_session}"
+
+tmux_cmd canton-wallclocktime \
+  "CANTON_TOKEN_FILENAME=canton.tokens canton \
     -c ./apps/app/src/test/resources/simple-topology-canton.conf \
-    -C canton.parameters.ports-file=canton.ports \
     --log-level-canton=DEBUG \
     --log-encoder json \
     --log-file-name log/canton.clog \
-    --bootstrap bootstrap-canton.sc &
-PID=$!
-echo "$PID" > canton.pid
+    --bootstrap bootstrap-canton.sc"
 
-# Start second Canton with simulated time, for time-based tests
-CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
-    daemon --no-tty \
+tmux_cmd canton-simtime \
+  "CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
     -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
-    -C canton.parameters.ports-file=canton-simtime.ports \
     --log-level-canton=DEBUG \
     --log-encoder json \
     --log-file-name log/canton-simtime.clog \
-    --bootstrap bootstrap-canton.sc &
-PID=$!
-echo "$PID" > canton-simtime.pid
+    --bootstrap bootstrap-canton.sc"
 
 # Wait for both Cantons to start
 while [ ! -f canton.tokens ] || [ ! -f canton-simtime.tokens ]; do
@@ -73,7 +83,4 @@ while [ ! -f canton.tokens ] || [ ! -f canton-simtime.tokens ]; do
 done
 echo "Canton instances started"
 
-# Start toxiproxy server
-toxiproxy-server > log/toxi.log 2>&1 &
-PID=$!
-echo "$PID" > toxi.pid
+tmux_cmd toxiproxy toxiproxy-server > log/toxi.log 2>&1

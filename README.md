@@ -490,6 +490,15 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 
 To speed up our tests run against a long-running Canton instance.
 To start the instance run `./start-canton.sh`. It can be stopped via `./stop-canton.sh`.
+The Canton instance is run in a tmux instance in the background instance. You can attach to it using
+
+```
+tmux attach -t canton
+```
+
+That way you can also use the console. There are 3 tmux windows open
+in that session for Canton in wallclock time, Canton in simtime and
+toxyproxy. You can switch between those with `Ctrl-b w`.
 
 You should only need to restart it if you change
 `apps/app/src/test/resources/simple-topology-canton.conf`. If you
