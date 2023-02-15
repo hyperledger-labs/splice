@@ -2475,6 +2475,96 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "wallet-new-web-ui",
+               "clusterName": "cluster",
+               "moduleName": "wallet-new-web-ui"
+            },
+            "name": "wallet-new-web-ui",
+            "namespace": "validator1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "wallet-new-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "wallet-new-web-ui",
+                     "clusterName": "cluster",
+                     "moduleName": "wallet-new-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "value": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-new-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "wallet-new-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-new-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "wallet-new-web-ui",
+            "namespace": "validator1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-new-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "wallet-new-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "directory-web-ui",
                "clusterName": "cluster",
                "moduleName": "validator1-directory-web-ui"
@@ -3347,6 +3437,96 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "splitwell-wallet-new-web-ui",
+               "clusterName": "cluster",
+               "moduleName": "wallet-new-web-ui"
+            },
+            "name": "splitwell-wallet-new-web-ui",
+            "namespace": "splitwell"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "splitwell-wallet-new-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "splitwell-wallet-new-web-ui",
+                     "clusterName": "cluster",
+                     "moduleName": "wallet-new-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "value": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-new-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "splitwell-wallet-new-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "sw-wal-new-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "splitwell-wallet-new-web-ui",
+            "namespace": "splitwell"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sw-wal-new-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "splitwell-wallet-new-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "splitwell-app",
                "clusterName": "cluster",
                "moduleName": "splitwell-app"
@@ -3509,7 +3689,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv1-api-http\",\n      \"port\": 6014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-api\",\n      \"port\": 5114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv2-api-http\",\n      \"port\": 6114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-api\",\n      \"port\": 5214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv3-api-http\",\n      \"port\": 6214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-api\",\n      \"port\": 5314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"sv4-api-http\",\n      \"port\": 6314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 6012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-http\",\n      \"port\": 6004,\n      \"service\": \"wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwell-validator-app\"\n    },\n    {\n      \"name\": \"sw-wal-http\",\n      \"port\": 6004,\n      \"service\": \"splitwell-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwell-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwell-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"http\",\n      \"port\": 8080,\n      \"service\": \"gcs-proxy\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 10313,\n      \"name\": \"cd-metrics\",\n      \"port\": 10013,\n      \"service\": \"global-domain\"\n    },\n    {\n      \"externalPort\": 5108,\n      \"name\": \"swd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 5109,\n      \"name\": \"swd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"externalPort\": 10413,\n      \"name\": \"swd-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-domain\"\n    },\n    {\n      \"name\": \"svcp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"svcp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"externalPort\": 10013,\n      \"name\": \"svcp-metrics\",\n      \"port\": 10013,\n      \"service\": \"svc-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"sv1-api\",\n      \"port\": 5014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv1-api-http\",\n      \"port\": 6014,\n      \"service\": \"sv-app-1\"\n    },\n    {\n      \"name\": \"sv2-api\",\n      \"port\": 5114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv2-api-http\",\n      \"port\": 6114,\n      \"service\": \"sv-app-2\"\n    },\n    {\n      \"name\": \"sv3-api\",\n      \"port\": 5214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv3-api-http\",\n      \"port\": 6214,\n      \"service\": \"sv-app-3\"\n    },\n    {\n      \"name\": \"sv4-api\",\n      \"port\": 5314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"sv4-api-http\",\n      \"port\": 6314,\n      \"service\": \"sv-app-4\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-http\",\n      \"port\": 6012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"externalPort\": 5102,\n      \"name\": \"val1-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 5101,\n      \"name\": \"val1-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 10113,\n      \"name\": \"val1-metrics\",\n      \"port\": 10013,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"externalPort\": 6101,\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"val1-val-http\",\n      \"port\": 6103,\n      \"service\": \"validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-http\",\n      \"port\": 6004,\n      \"service\": \"wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-ui\",\n      \"port\": 80,\n      \"service\": \"wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-wal-new-ui\",\n      \"port\": 80,\n      \"service\": \"wallet-new-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-dir-ui\",\n      \"port\": 80,\n      \"service\": \"directory-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"val1-sw-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-web-ui\"\n    },\n    {\n      \"externalPort\": 5202,\n      \"name\": \"sw-adm-api\",\n      \"port\": 5002,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 5201,\n      \"name\": \"sw-lg-api\",\n      \"port\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 10213,\n      \"name\": \"sw-metrics\",\n      \"port\": 10013,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"externalPort\": 6201,\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6001,\n      \"proxyToGrpc\": 5001,\n      \"service\": \"splitwell-participant\"\n    },\n    {\n      \"name\": \"sw-val-http\",\n      \"port\": 6203,\n      \"service\": \"splitwell-validator-app\"\n    },\n    {\n      \"name\": \"sw-wal-http\",\n      \"port\": 6004,\n      \"service\": \"splitwell-wallet-app\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-web-ui\"\n    },\n    {\n      \"internalOnly\": true,\n      \"name\": \"sw-wal-new-ui\",\n      \"port\": 80,\n      \"service\": \"splitwell-wallet-new-web-ui\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwell-app\"\n    },\n    {\n      \"externalPort\": 6213,\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwell-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",

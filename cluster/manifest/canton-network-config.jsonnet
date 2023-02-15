@@ -316,6 +316,16 @@ local validator1Deployments(config) = [
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
   ]),
 
+  c.deployment(config, "wallet-new-web-ui", [
+    {
+      name: "val1-wal-new-ui",
+      port: 80,
+      internalOnly: true,
+    },
+  ], image="wallet-new-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=[
+    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
+  ]),
+
   c.deployment(config, "directory-web-ui", [
     {
       name: "val1-dir-ui",
@@ -402,6 +412,16 @@ local splitwellDeployments(config) = [
       internalOnly: true,
     },
   ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[
+    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
+  ]),
+
+  c.deployment(config, "splitwell-wallet-new-web-ui", [
+    {
+      name: "sw-wal-new-ui",
+      port: 80,
+      internalOnly: true,
+    },
+  ], image="wallet-new-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
   ]),
 
