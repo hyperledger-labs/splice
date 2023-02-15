@@ -5,8 +5,8 @@ import com.daml.network.config.{
   AutomationConfig,
   CoinLedgerApiClientConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
@@ -24,7 +24,7 @@ case class SplitwellAppBackendConfig(
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
     domains: SplitwellDomainConfig,
-) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
+) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
 
@@ -39,6 +39,6 @@ case class SplitwellAppClientConfig(
     ledgerApi: CoinLedgerApiClientConfig,
     remoteScan: ScanAppClientConfig,
     ledgerApiUser: String,
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

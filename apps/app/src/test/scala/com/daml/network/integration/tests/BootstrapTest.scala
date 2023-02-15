@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import better.files.File
-import com.daml.network.config.CoinConfigTransforms.useSelfSignedTokensForLedgerApiAuth
+import com.daml.network.config.CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{

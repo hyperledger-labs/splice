@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
@@ -22,7 +22,7 @@ class WalletTxLogIntegrationTest
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
-        CoinConfigTransforms.updateAllAutomationConfigs(
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
       )

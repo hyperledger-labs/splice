@@ -5,8 +5,8 @@ import com.daml.network.config.{
   CoinHttpClientConfig,
   CoinLedgerApiClientConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
@@ -19,7 +19,7 @@ case class LocalDirectoryAppConfig(
     remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
     domains: DirectoryDomainConfig,
-) extends LocalCoinConfig {
+) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "directory"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -29,6 +29,6 @@ case class RemoteDirectoryAppConfig(
     ledgerApiUser: String,
     adminApi: CoinHttpClientConfig,
     ledgerApi: CoinLedgerApiClientConfig,
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

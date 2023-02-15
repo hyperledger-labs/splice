@@ -22,7 +22,7 @@ import monocle.macros.syntax.lens.*
 
 import scala.jdk.CollectionConverters.*
 import java.time.{Duration, Instant}
-import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.Contract
 import com.daml.network.util.CoinUtil.defaultCoinConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -40,12 +40,12 @@ class SvcTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => {
         // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-        CoinConfigTransforms.updateAllAutomationConfigs(
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
         // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
         // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
-        CoinConfigTransforms.updateAllAutomationConfigs(
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableUnclaimedRewardExpiration).replace(true)
         )(config)
       })

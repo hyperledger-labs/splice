@@ -1,6 +1,6 @@
 package com.daml.network.integration.plugins.toxiproxy
 
-import com.daml.network.config.{CoinConfig, CoinRemoteParticipantConfig}
+import com.daml.network.config.{CNNodeConfig, CoinRemoteParticipantConfig}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.BaseTest
@@ -20,7 +20,7 @@ case class UseToxiproxy()
   val client = new ToxiproxyClient()
   val proxies = Map[String, Proxy]()
 
-  override def beforeEnvironmentCreated(config: CoinConfig): CoinConfig = {
+  override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     def addLedgerApiProxy(
         instanceName: String,
         remoteParticipant: CoinRemoteParticipantConfig,
@@ -51,7 +51,7 @@ case class UseToxiproxy()
       )
   }
 
-  override def afterEnvironmentDestroyed(config: CoinConfig): Unit = {
+  override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
     proxies.foreach { case (_, p) => p.delete() }
   }
 

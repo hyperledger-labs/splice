@@ -1,6 +1,6 @@
 package com.daml.network
 
 package object config {
-  type CoinConfigTransform = CoinConfig => CoinConfig
+  type CNNodeConfigTransform = CNNodeConfig => CNNodeConfig
 
 }

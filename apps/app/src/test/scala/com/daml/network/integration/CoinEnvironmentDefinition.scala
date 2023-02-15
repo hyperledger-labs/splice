@@ -1,7 +1,7 @@
 package com.daml.network.integration
 
 import better.files.{File, Resource}
-import com.daml.network.config.{CoinConfig, CoinConfigTransforms}
+import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
   CoinEnvironmentFactory,
@@ -22,14 +22,14 @@ import monocle.macros.syntax.lens.*
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CoinEnvironmentDefinition(
-    override val baseConfig: CoinConfig,
+    override val baseConfig: CNNodeConfig,
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
     val preSetup: CoinTestConsoleEnvironment => Unit = _ => (),
     val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
-    val configTransformsWithContext: (String => Seq[CoinConfig => CoinConfig]) =
-      CoinConfigTransforms.defaults(_),
+    val configTransformsWithContext: (String => Seq[CNNodeConfig => CNNodeConfig]) =
+      CNNodeConfigTransforms.defaults(_),
 ) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
       baseConfig,
       testingConfig,
@@ -126,12 +126,12 @@ case class CoinEnvironmentDefinition(
     copy(configTransformsWithContext = _ => Seq())
 
   def addConfigTransforms(
-      transforms: (String, CoinConfig) => CoinConfig*
+      transforms: (String, CNNodeConfig) => CNNodeConfig*
   ): CoinEnvironmentDefinition =
     transforms.foldLeft(this)((ed, ct) => ed.addConfigTransform(ct))
 
   def addConfigTransform(
-      transform: (String, CoinConfig) => CoinConfig
+      transform: (String, CNNodeConfig) => CNNodeConfig
   ): CoinEnvironmentDefinition =
     copy(configTransformsWithContext =
       ctx => this.configTransformsWithContext(ctx) :+ (conf => transform(ctx, conf))
@@ -139,12 +139,12 @@ case class CoinEnvironmentDefinition(
 
   /** Apply these config transforms before all others configured so far. */
   def addConfigTransformsToFront(
-      transforms: (String, CoinConfig) => CoinConfig*
+      transforms: (String, CNNodeConfig) => CNNodeConfig*
   ): CoinEnvironmentDefinition =
     transforms.foldRight(this)((ct, ed) => ed.addConfigTransformToFront(ct))
 
   def addConfigTransformToFront(
-      transform: (String, CoinConfig) => CoinConfig
+      transform: (String, CNNodeConfig) => CNNodeConfig
   ): CoinEnvironmentDefinition =
     copy(configTransformsWithContext =
       ctx => (conf => transform(ctx, conf)) +: this.configTransformsWithContext(ctx)
@@ -161,7 +161,7 @@ case class CoinEnvironmentDefinition(
       environment,
       new TestConsoleOutput(loggerFactory),
     ) with TestEnvironment[CoinEnvironmentImpl] {
-      override val actualConfig: CoinConfig = environment.config
+      override val actualConfig: CNNodeConfig = environment.config
     }
 }
 
@@ -190,14 +190,16 @@ object CoinEnvironmentDefinition {
             )
           )
       )
-      .addConfigTransformsToFront((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.bumpCantonPortsBy(10_000)(conf)
+      )
       // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy
       .addConfigTransformsToFront((_, conf) =>
-        CoinConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
+        CNNodeConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
       )
       .addConfigTransformsToFront((_, conf) =>
-        CoinConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
+        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
@@ -206,13 +208,13 @@ object CoinEnvironmentDefinition {
       context = testName,
     )
 
-  private def loadConfigFromResource(path: String): CoinConfig = {
+  private def loadConfigFromResource(path: String): CNNodeConfig = {
     val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
-    CoinConfig.loadOrThrow(rawConfig)
+    CNNodeConfig.loadOrThrow(rawConfig)
   }
 
   def fromFiles(testName: String, files: File*): CoinEnvironmentDefinition = {
-    val config = CoinConfig.parseAndLoadOrThrow(files.map(_.toJava))
+    val config = CNNodeConfig.parseAndLoadOrThrow(files.map(_.toJava))
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
 

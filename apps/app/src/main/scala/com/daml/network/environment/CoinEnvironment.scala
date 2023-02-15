@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import cats.syntax.either.*
-import com.daml.network.config.CoinConfig
+import com.daml.network.config.CNNodeConfig
 import com.daml.network.directory.DirectoryAppBootstrap
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
@@ -33,7 +33,7 @@ import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrati
 
 trait CoinEnvironment extends Environment {
 
-  override type Config = CoinConfig
+  override type Config = CNNodeConfig
   override type Console = CoinConsoleEnvironment
 
   // TODO(tech-debt): check that the CoinMetrics factory is used in all of this trait's methods.
@@ -307,7 +307,7 @@ trait CoinEnvironment extends Environment {
 
 object CoinEnvironmentFactory extends EnvironmentFactory[CoinEnvironmentImpl] {
   override def create(
-      config: CoinConfig,
+      config: CNNodeConfig,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal,
   ): CoinEnvironmentImpl = {
@@ -317,11 +317,11 @@ object CoinEnvironmentFactory extends EnvironmentFactory[CoinEnvironmentImpl] {
 }
 
 class CoinEnvironmentImpl(
-    override val config: CoinConfig,
+    override val config: CNNodeConfig,
     override val testingConfig: TestingConfigInternal,
     override val loggerFactory: NamedLoggerFactory,
 ) extends CoinEnvironment {
-  override type Config = CoinConfig
+  override type Config = CNNodeConfig
 
   // dump config (without sensitive data) to ease debugging
   logger.info(s"CoinEnvironment with config = {\n${config.dumpString}\n}")

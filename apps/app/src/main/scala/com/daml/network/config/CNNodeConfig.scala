@@ -60,7 +60,7 @@ import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
 import scala.util.control.NoStackTrace
 
-case class CoinConfig(
+case class CNNodeConfig(
     override val name: Option[String] = None,
     validatorApps: Map[InstanceName, ValidatorAppBackendConfig] = Map.empty,
     validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
@@ -86,7 +86,7 @@ case class CoinConfig(
     features: CantonFeatures = CantonFeatures(),
     override val akkaConfig: Option[Config] = None,
 ) extends CantonConfig // TODO(#736): generalize or fork this trait.
-    with ConfigDefaults[DefaultPorts, CoinConfig] {
+    with ConfigDefaults[DefaultPorts, CNNodeConfig] {
 
   override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
@@ -387,12 +387,12 @@ case class CoinConfig(
     }
 
   override def dumpString: String = {
-    val writers = new CoinConfig.ConfigWriters(confidential = true)
+    val writers = new CNNodeConfig.ConfigWriters(confidential = true)
     import writers.*
-    ConfigWriter[CoinConfig].to(this).render(CoinConfig.defaultConfigRenderer)
+    ConfigWriter[CNNodeConfig].to(this).render(CNNodeConfig.defaultConfigRenderer)
   }
 
-  override def withDefaults(ports: DefaultPorts): CoinConfig =
+  override def withDefaults(ports: DefaultPorts): CNNodeConfig =
     this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
   // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
 }
@@ -400,9 +400,9 @@ case class CoinConfig(
 // NOTE: the below is patterned after CantonCommunityConfig.
 // In case of changes, recopy from there.
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
-object CoinConfig {
+object CNNodeConfig {
 
-  private val logger: Logger = LoggerFactory.getLogger(classOf[CoinConfig])
+  private val logger: Logger = LoggerFactory.getLogger(classOf[CNNodeConfig])
   private val elc = ErrorLoggingContext(
     TracedLogger(logger),
     NamedLoggerFactory.root.properties,
@@ -413,9 +413,9 @@ object CoinConfig {
   import CantonConfig.*
 
   @nowarn("cat=unused")
-  private implicit def coinConfigReader(implicit
+  private implicit def cnNodeConfigReader(implicit
       elc: ErrorLoggingContext
-  ): ConfigReader[CoinConfig] = {
+  ): ConfigReader[CNNodeConfig] = {
     val configReaders: ConfigReaders = new ConfigReaders()
     import configReaders.*
     import DeprecatedConfigUtils.*
@@ -504,7 +504,7 @@ object CoinConfig {
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig].applyDeprecations
 
-    deriveReader[CoinConfig]
+    deriveReader[CNNodeConfig]
   }
 
   @nowarn("cat=unused")
@@ -602,34 +602,37 @@ object CoinConfig {
     implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
       deriveWriter[CommunityParticipantConfig]
 
-    implicit val coinConfigWriter: ConfigWriter[CoinConfig] = deriveWriter[CoinConfig]
+    implicit val cnNodeConfigWriter: ConfigWriter[CNNodeConfig] =
+      deriveWriter[CNNodeConfig]
   }
 
   def load(config: Config)(implicit
       elc: ErrorLoggingContext = elc
-  ): Either[CantonConfigError, CoinConfig] =
-    CantonConfig.loadAndValidate[CoinConfig](config)
+  ): Either[CantonConfigError, CNNodeConfig] =
+    CantonConfig.loadAndValidate[CNNodeConfig](config)
 
   def parseAndLoadOrThrow(files: Seq[File])(implicit
       elc: ErrorLoggingContext = elc
-  ): CoinConfig =
-    CantonConfig.parseAndLoad[CoinConfig](files).valueOr(error => throw CoinConfigException(error))
-
-  def loadOrThrow(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig = {
+  ): CNNodeConfig =
     CantonConfig
-      .loadAndValidate[CoinConfig](config)
-      .valueOr(error => throw CoinConfigException(error))
+      .parseAndLoad[CNNodeConfig](files)
+      .valueOr(error => throw CNNodeConfigException(error))
+
+  def loadOrThrow(config: Config)(implicit elc: ErrorLoggingContext = elc): CNNodeConfig = {
+    CantonConfig
+      .loadAndValidate[CNNodeConfig](config)
+      .valueOr(error => throw CNNodeConfigException(error))
   }
 
-  def writeToFile(config: CoinConfig, path: Path, confidential: Boolean = true): Unit = {
-    val writers = new CoinConfig.ConfigWriters(confidential)
+  def writeToFile(config: CNNodeConfig, path: Path, confidential: Boolean = true): Unit = {
+    val writers = new CNNodeConfig.ConfigWriters(confidential)
     import writers.*
     val renderer = ConfigRenderOptions
       .defaults()
       .setOriginComments(false)
       .setComments(false)
       .setJson(false)
-    val content = "canton { " + ConfigWriter[CoinConfig]
+    val content = "canton { " + ConfigWriter[CNNodeConfig]
       .to(config)
       .render(renderer) + "}"
     Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
@@ -639,14 +642,14 @@ object CoinConfig {
     ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
 }
 
-object CoinConfigException {
-  def apply(error: CantonConfigError): CoinConfigException =
-    error.throwableO.fold(new CoinConfigException(error.cause))(t =>
-      new CoinConfigException(error.cause, t)
+object CNNodeConfigException {
+  def apply(error: CantonConfigError): CNNodeConfigException =
+    error.throwableO.fold(new CNNodeConfigException(error.cause))(t =>
+      new CNNodeConfigException(error.cause, t)
     )
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.Null"))
-final case class CoinConfigException(message: String, cause: Throwable = null)
+final case class CNNodeConfigException(message: String, cause: Throwable = null)
     extends RuntimeException(message, cause)
     with NoStackTrace

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.traverse.*
-import com.daml.network.config.CoinConfigTransforms.{
+import com.daml.network.config.CNNodeConfigTransforms.{
   setPollingInterval,
   updateAllWalletAppBackendConfigs_,
 }
@@ -36,10 +36,10 @@ class TimeBasedTreasuryIntegrationTest
   override def environmentDefinition: CoinEnvironmentDefinition = {
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransform((_, coinConfig) =>
+      .addConfigTransform((_, cnNodeConfig) =>
         updateAllWalletAppBackendConfigs_(walletConfig =>
           walletConfig.focus(_.treasury).replace(TreasuryConfig(batchSize, queueSize))
-        )(coinConfig)
+        )(cnNodeConfig)
       )
       .addConfigTransform((_, config) =>
         // for testing non-automation-based coin merging.

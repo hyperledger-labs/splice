@@ -4,8 +4,8 @@ import com.daml.network.config.{
   AutomationConfig,
   CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
@@ -40,7 +40,7 @@ case class LocalSvAppConfig(
     // TODO(M3-07): use price from SvcRules
     // TODO(M3-46): use this also for mining rounds automation, not just init
     coinPrice: BigDecimal = 1.0,
-) extends LocalCoinConfig {
+) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -48,6 +48,6 @@ case class LocalSvAppConfig(
 
 case class RemoteSvAppConfig(
     adminApi: CoinHttpClientConfig
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

@@ -28,9 +28,9 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
 
-object CoinConfigTransforms {
+object CNNodeConfigTransforms {
 
-  def makeAllTimeoutsBounded: CoinConfigTransform = {
+  def makeAllTimeoutsBounded: CNNodeConfigTransform = {
     // make unbounded duration bounded for our test
     _.focus(_.parameters.timeouts.console.unbounded)
       .replace(NonNegativeDuration.tryFromDuration(2.minutes))
@@ -40,7 +40,7 @@ object CoinConfigTransforms {
       .replace(NonNegativeDuration.tryFromDuration(10.seconds))
   }
 
-  def addConfigName(context: String): CoinConfigTransform = { config =>
+  def addConfigName(context: String): CNNodeConfigTransform = { config =>
     config.copy(name = Some(context))
   }
 
@@ -55,7 +55,7 @@ object CoinConfigTransforms {
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
-  def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
+  def addDamlNameSuffix(context: String): CNNodeConfigTransform = { config =>
     val suffix = context.toLowerCase
 
     val transforms = Seq(
@@ -93,7 +93,7 @@ object CoinConfigTransforms {
 
   def reducePollingInterval = setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(1))
 
-  def updateAllAutomationConfigs(transform: AutomationConfigTransform): CoinConfigTransform = {
+  def updateAllAutomationConfigs(transform: AutomationConfigTransform): CNNodeConfigTransform = {
     config =>
       val transforms = Seq(
         updateSvcAppConfig(c => c.focus(_.automation).modify(transform)),
@@ -107,7 +107,7 @@ object CoinConfigTransforms {
       transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CoinConfigTransform = {
+  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CNNodeConfigTransform = {
     config =>
       def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig = {
         config.focus(_.pollingInterval).replace(newInterval)
@@ -128,7 +128,7 @@ object CoinConfigTransforms {
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
-  def ensureNovelDamlNames(): CoinConfigTransform = { config =>
+  def ensureNovelDamlNames(): CNNodeConfigTransform = { config =>
     val id = (new scala.util.Random).nextInt().toHexString
     addConfigName(id)(addDamlNameSuffix(id)(config))
   }
@@ -138,7 +138,7 @@ object CoinConfigTransforms {
     * collide, and adds a suffix to Daml user names that is specific to a given test
     * context.
     */
-  def defaults(testContextNameSuffix: String): Seq[CoinConfigTransform] = {
+  def defaults(testContextNameSuffix: String): Seq[CNNodeConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
       ensureNovelDamlNames(),
@@ -161,14 +161,14 @@ object CoinConfigTransforms {
   type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
-  def setCoinPrice(price: BigDecimal): CoinConfigTransform =
+  def setCoinPrice(price: BigDecimal): CNNodeConfigTransform =
     config =>
       Seq(
         updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
         updateAllSvAppConfigs_(c => c.focus(_.coinPrice).replace(price)),
       ).foldLeft(config)((c, tf) => tf(c))
 
-  def updateDirectoryAppConfig(update: DirectoryAppTransform): CoinConfigTransform =
+  def updateDirectoryAppConfig(update: DirectoryAppTransform): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.directoryApp)
@@ -179,26 +179,26 @@ object CoinConfigTransforms {
 
   def updateAllRemoteDirectoryAppConfigs_(
       update: RemoteDirectoryAppTransform
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     _.focus(_.remoteDirectoryApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
   def updateAllWalletAppBackendConfigs_(
       update: WalletAppBackendTransform
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     _.focus(_.walletAppBackends).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
   def updateAllWalletAppClientConfigs_(
       update: WalletAppClientTransform
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
-  def updateScanAppConfig(update: ScanAppTransform): CoinConfigTransform =
+  def updateScanAppConfig(update: ScanAppTransform): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.scanApp)
@@ -207,7 +207,7 @@ object CoinConfigTransforms {
           case Some(scan) => Some(update(scan))
         })
 
-  def updateSvcAppConfig(update: SvcAppTransform): CoinConfigTransform =
+  def updateSvcAppConfig(update: SvcAppTransform): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.svcApp)
@@ -218,7 +218,7 @@ object CoinConfigTransforms {
 
   def updateAllSvAppConfigs(
       update: (String, LocalSvAppConfig) => LocalSvAppConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.svApps)
@@ -226,12 +226,12 @@ object CoinConfigTransforms {
 
   def updateAllSvAppConfigs_(
       update: LocalSvAppConfig => LocalSvAppConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     updateAllSvAppConfigs((_, config) => update(config))
 
   def updateAllValidatorConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.validatorApps)
@@ -239,26 +239,26 @@ object CoinConfigTransforms {
 
   def updateAllValidatorConfigs_(
       update: ValidatorAppBackendConfig => ValidatorAppBackendConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
   def updateAllRemoteSplitwellAppConfigs_(
       update: RemoteSplitwellAppTransform
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
   def updateAllDomainConfigs(
       update: (String, CommunityDomainConfig) => CommunityDomainConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.domains)
@@ -266,12 +266,12 @@ object CoinConfigTransforms {
 
   def updateAllDomainConfigs_(
       update: CommunityDomainConfig => CommunityDomainConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     updateAllDomainConfigs((_, config) => update(config))
 
   def updateAllParticipantConfigs(
       update: (String, CommunityParticipantConfig) => CommunityParticipantConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.participants)
@@ -279,12 +279,12 @@ object CoinConfigTransforms {
 
   def updateRemoteParticipantConfigs_(
       update: RemoteParticipantConfig => RemoteParticipantConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     updateRemoteParticipantConfigs((_, config) => update(config))
 
   def updateRemoteParticipantConfigs(
       update: (String, RemoteParticipantConfig) => RemoteParticipantConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.remoteParticipants)
@@ -292,10 +292,10 @@ object CoinConfigTransforms {
 
   def updateAllParticipantConfigs_(
       update: CommunityParticipantConfig => CommunityParticipantConfig
-  ): CoinConfigTransform =
+  ): CNNodeConfigTransform =
     updateAllParticipantConfigs((_, config) => update(config))
 
-  def bumpCantonPortsBy(bump: Int): CoinConfigTransform = {
+  def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
 
     val transforms = Seq(
       updateAllDomainConfigs_(
@@ -327,23 +327,23 @@ object CoinConfigTransforms {
       ),
     )
 
-    transforms.foldLeft((c: CoinConfig) => c)((f, tf) => f compose tf)
+    transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
 
   }
 
-  def bumpRemoteDirectoryPortsBy(bump: Int): CoinConfigTransform = {
+  def bumpRemoteDirectoryPortsBy(bump: Int): CNNodeConfigTransform = {
     updateAllRemoteDirectoryAppConfigs_(
       _.focus(_.ledgerApi).modify(portTransform(bump, _))
     )
   }
 
-  def bumpRemoteSplitwellPortsBy(bump: Int): CoinConfigTransform = {
+  def bumpRemoteSplitwellPortsBy(bump: Int): CNNodeConfigTransform = {
     updateAllRemoteSplitwellAppConfigs_(
       _.focus(_.ledgerApi).modify(portTransform(bump, _))
     )
   }
 
-  def bumpSelfHostedParticipantPortsBy(bump: Int): CoinConfigTransform = {
+  def bumpSelfHostedParticipantPortsBy(bump: Int): CNNodeConfigTransform = {
     val transforms = Seq(
       updateAllWalletAppBackendConfigs_(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
@@ -352,7 +352,7 @@ object CoinConfigTransforms {
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
       ),
     )
-    transforms.foldLeft((c: CoinConfig) => c)((f, tf) => f compose tf)
+    transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
   }
 
   private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
@@ -385,7 +385,7 @@ object CoinConfigTransforms {
   /** All local participants require auth tokens for their ledger API.
     * The tokens are expected to by signed by hmac256 with the given secret.
     */
-  def enableLedgerApiAuthForLocalParticipants(secret: String): CoinConfigTransform =
+  def enableLedgerApiAuthForLocalParticipants(secret: String): CNNodeConfigTransform =
     updateAllParticipantConfigs { case (_, c) =>
       c.focus(_.ledgerApi.authServices)
         .replace(Seq(AuthServiceConfig.UnsafeJwtHmac256(NonEmptyString.tryCreate(secret))))
@@ -394,7 +394,7 @@ object CoinConfigTransforms {
   /** Auth-enabled CN apps use self-signed tokens with the given secret for their ledger API connections.
     * Other CN apps use canton admin tokens for their ledger API connections.
     */
-  def useSelfSignedTokensForLedgerApiAuth(secret: String): CoinConfigTransform = { config =>
+  def useSelfSignedTokensForLedgerApiAuth(secret: String): CNNodeConfigTransform = { config =>
     updateAllLedgerApiClientConfigs(
       enableAuth = selfSignedTokenAuthSourceTransform(config.parameters.clock, secret)
     )(config)
@@ -402,8 +402,8 @@ object CoinConfigTransforms {
 
   private def updateAllLedgerApiClientConfigs(
       enableAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig
-  ): CoinConfigTransform = { config =>
-    val transforms: Seq[CoinConfigTransform] = Seq(
+  ): CNNodeConfigTransform = { config =>
+    val transforms: Seq[CNNodeConfigTransform] = Seq(
       updateAllValidatorConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
@@ -448,7 +448,7 @@ object CoinConfigTransforms {
 
   def useSelfSignedTokensForWalletValidatorApiAuth(
       secret: String
-  ): CoinConfigTransform = {
+  ): CNNodeConfigTransform = {
     updateAllWalletAppBackendConfigs_(c => {
       val userToken = AuthUtil.testToken(AuthUtil.testAudience, c.serviceUser)
       c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
@@ -497,7 +497,7 @@ object CoinConfigTransforms {
     token
   }
 
-  /** This transforms canton configs, not coin configs, but we need it for the Canton coin project:
+  /** This transforms canton configs, not cn node configs, but we need it for the Canton coin project:
     * We use a long running canton process that is running in the background.
     * Sometimes you want to attach a Canton console to that process for debugging.
     * Since the canton process uses an authenticated ledger API, we need a way of automatically

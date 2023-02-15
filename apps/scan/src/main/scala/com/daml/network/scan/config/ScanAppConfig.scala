@@ -3,8 +3,8 @@ package com.daml.network.scan.config
 import com.daml.network.config.{
   AutomationConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.digitalasset.canton.config.*
 import com.daml.network.config.CoinHttpClientConfig
@@ -18,7 +18,7 @@ case class ScanAppBackendConfig(
     override val remoteParticipant: CoinRemoteParticipantConfig,
     domains: ScanDomainConfig,
     automation: AutomationConfig = AutomationConfig(),
-) extends LocalCoinConfig
+) extends LocalCNNodeConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
@@ -29,7 +29,7 @@ case class ScanAppBackendConfig(
 
 case class ScanAppClientConfig(
     adminApi: CoinHttpClientConfig
-) extends RemoteCoinConfig
+) extends RemoteCNNodeConfig
     with BaseScanAppConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

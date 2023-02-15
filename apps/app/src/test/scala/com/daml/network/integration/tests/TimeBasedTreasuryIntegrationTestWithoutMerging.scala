@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
@@ -23,13 +23,13 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
-        CoinConfigTransforms.updateAllAutomationConfigs(
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
       )
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
-        CoinConfigTransforms
+        CNNodeConfigTransforms
           .updateAllSvAppConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
       )
   }

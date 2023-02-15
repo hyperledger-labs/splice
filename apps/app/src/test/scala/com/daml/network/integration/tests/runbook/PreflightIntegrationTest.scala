@@ -2,7 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import better.files.*
 import com.daml.network.LiveDevNetTest
-import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
@@ -76,9 +76,9 @@ class PreflightIntegrationTest
       // clearing default config transforms because they have settings
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
+      .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
       .addConfigTransforms((_, conf) =>
-        CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
+        CNNodeConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
       )
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.sc` below.

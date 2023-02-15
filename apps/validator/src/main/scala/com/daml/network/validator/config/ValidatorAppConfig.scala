@@ -5,8 +5,8 @@ import com.daml.network.config.{
   AutomationConfig,
   CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.RemoteSvAppConfig
@@ -54,7 +54,7 @@ case class ValidatorAppBackendConfig(
     automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],
-) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
+) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
 
@@ -64,6 +64,6 @@ case class ValidatorAppBackendConfig(
 
 case class ValidatorAppClientConfig(
     adminApi: CoinHttpClientConfig
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

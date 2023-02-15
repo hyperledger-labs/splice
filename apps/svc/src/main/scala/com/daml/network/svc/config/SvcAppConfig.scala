@@ -3,8 +3,8 @@ package com.daml.network.svc.config
 import com.daml.network.config.{
   AutomationConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.digitalasset.canton.config.*
 
@@ -18,7 +18,7 @@ case class SvcAppBackendConfig(
     // TODO(M3-07): use price from SvcRules
     // TODO(M3-46): remove entirely once mining rounds automations moves into SvApp
     coinPrice: BigDecimal = 1.0,
-) extends LocalCoinConfig {
+) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "SVC"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -27,6 +27,6 @@ case class SvcAppBackendConfig(
 
 case class SvcAppClientConfig(
     adminApi: ClientConfig
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

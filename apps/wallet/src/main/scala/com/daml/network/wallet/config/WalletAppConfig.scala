@@ -7,8 +7,8 @@ import com.daml.network.config.{
   AutomationConfig,
   CoinHttpClientConfig,
   CoinRemoteParticipantConfig,
-  LocalCoinConfig,
-  RemoteCoinConfig,
+  LocalCNNodeConfig,
+  RemoteCNNodeConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
@@ -29,7 +29,7 @@ case class WalletAppBackendConfig(
     automation: AutomationConfig = AutomationConfig(),
     treasury: TreasuryConfig = TreasuryConfig(),
     domains: WalletDomainConfig,
-) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
+) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"
 
@@ -40,13 +40,13 @@ case class WalletAppBackendConfig(
 // Inlined to avoid a dependency
 case class WalletRemoteValidatorAppConfig(
     adminApi: CoinHttpClientConfig
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
 case class WalletAppClientConfig(
     adminApi: CoinHttpClientConfig,
     ledgerApiUser: String,
-) extends RemoteCoinConfig {
+) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

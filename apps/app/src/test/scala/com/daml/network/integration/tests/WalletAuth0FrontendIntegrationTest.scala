@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
-import com.daml.network.config.CoinConfigTransforms.updateAllWalletAppBackendConfigs_
+import com.daml.network.config.CNNodeConfigTransforms.updateAllWalletAppBackendConfigs_
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.FrontendLoginUtil
 import monocle.macros.syntax.lens.*
@@ -16,7 +16,7 @@ class WalletAuth0FrontendIntegrationTest
   override def environmentDefinition = {
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransform((_, coinConfig) =>
+      .addConfigTransform((_, cnNodeConfig) =>
         updateAllWalletAppBackendConfigs_(walletConfig =>
           walletConfig
             .focus(_.auth)
@@ -26,7 +26,7 @@ class WalletAuth0FrontendIntegrationTest
                 new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"),
               )
             )
-        )(coinConfig)
+        )(cnNodeConfig)
       )
   }
 

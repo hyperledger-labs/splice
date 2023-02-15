@@ -2,7 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import java.nio.file.Files
 import better.files.{File, *}
-import com.daml.network.config.CoinConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -130,7 +130,7 @@ class LocalRunbookIntegrationTest
       // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
       // configs of apps started on the self-hosted validator node.
       .addConfigTransforms((_, conf) =>
-        CoinConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
+        CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
       .withThisSetup(env => {
         env.appsHostedBySvc.local.foreach(_.start())
