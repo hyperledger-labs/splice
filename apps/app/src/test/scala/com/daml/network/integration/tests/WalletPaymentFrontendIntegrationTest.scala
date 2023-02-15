@@ -318,7 +318,7 @@ class WalletPaymentFrontendIntegrationTest
     // Testing a short-lived offer here might be racy, so for now we're not doing that. The different units of time
     // have been manually tested instead, and general expiration times is tested in the non-frontend integration test.
 
-    // TODO(#1799): Currently it is hard to test the scenario of insufficient funds,
+    // TODO(#2880): Currently it is hard to test the scenario of insufficient funds,
     //  until we have some form of notification that the offer has been aborted
     }
   }
