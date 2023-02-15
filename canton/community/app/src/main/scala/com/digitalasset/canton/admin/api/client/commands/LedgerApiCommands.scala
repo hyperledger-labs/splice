@@ -4,7 +4,6 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.api.v1.active_contracts_service.ActiveContractsServiceGrpc.ActiveContractsServiceStub
 import com.daml.ledger.api.v1.active_contracts_service.{
@@ -1008,39 +1007,6 @@ object LedgerApiCommands {
         ProtoConverter
           .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
           .leftMap(_.toString)
-
-    }
-
-    // We cannot easily implement Lookup on top of Get or the other way around because in between the exceptions get turned
-    // into strings.
-    final case class Lookup(
-        id: String
-    )(implicit ec: ExecutionContext)
-        extends BaseCommand[GetUserRequest, Option[GetUserResponse], Option[LedgerApiUser]] {
-
-      override def submitRequest(
-          service: UserManagementServiceStub,
-          request: GetUserRequest,
-      ): Future[Option[GetUserResponse]] =
-        service.getUser(request).map(Some(_)) recover {
-          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
-            None
-        }
-
-      override def createRequest(): Either[String, GetUserRequest] = Right(
-        GetUserRequest(
-          userId = id
-        )
-      )
-
-      override def handleResponse(
-          responseO: Option[GetUserResponse]
-      ): Either[String, Option[LedgerApiUser]] =
-        responseO.traverse { response =>
-          ProtoConverter
-            .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
-            .leftMap(_.toString)
-        }
 
     }
 

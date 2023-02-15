@@ -106,10 +106,10 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Get transaction trees", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the transaction tree stream for the given parties and collects transaction trees 
+        """This function connects to the transaction tree stream for the given parties and collects transaction trees
           |until either `completeAfter` transaction trees have been received or `timeout` has elapsed.
           |The returned transaction trees can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset, 
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error."""
       )
       def trees(
@@ -173,12 +173,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Subscribe to the transaction tree stream", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the transaction tree stream and passes transaction trees to `observer` until 
+        """This function connects to the transaction tree stream and passes transaction trees to `observer` until
           |the stream is completed.
           |Only transaction trees for parties in `filter.filterByParty.keys` will be returned.
-          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all trees for `myParty: PartyId`. 
+          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all trees for `myParty: PartyId`.
           |The returned transactions can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset, 
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error."""
       )
       def subscribe_trees(
@@ -206,10 +206,10 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Get flat transactions", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the flat transaction stream for the given parties and collects transactions 
+        """This function connects to the flat transaction stream for the given parties and collects transactions
           |until either `completeAfter` transaction trees have been received or `timeout` has elapsed.
           |The returned transactions can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset, 
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error."""
       )
       def flat(
@@ -232,12 +232,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
       })
 
       @Help.Summary("Subscribe to the flat transaction stream", FeatureFlag.Testing)
-      @Help.Description("""This function connects to the flat transaction stream and passes transactions to `observer` until 
+      @Help.Description("""This function connects to the flat transaction stream and passes transactions to `observer` until
           |the stream is completed.
           |Only transactions for parties in `filter.filterByParty.keys` will be returned.
-          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all transactions for `myParty: PartyId`. 
+          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all transactions for `myParty: PartyId`.
           |The returned transactions can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset, 
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error.""")
       def subscribe_flat(
           observer: StreamObserver[Transaction],
@@ -264,7 +264,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Starts measuring throughput at the transaction service", FeatureFlag.Testing)
       @Help.Description(
-        """This function will subscribe on behalf of `parties` to the transaction tree stream and 
+        """This function will subscribe on behalf of `parties` to the transaction tree stream and
           |notify various metrics:
           |The metric `<name>.<metricSuffix>` counts the number of transaction trees emitted.
           |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of root events emitted as part of transaction trees.
@@ -365,10 +365,10 @@ trait BaseLedgerApiAdministration extends NoTracing {
           | If the timeout is set, it also waits for the transaction to appear at all other configured
           | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
           | the timeout only specifies how long to wait at the other participants.
-          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in 
+          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
           | the allotted time.
-          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their 
-          | participants are connected/disconnected, the command may currently result in spurious timeouts or may 
+          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
+          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
           | return before the transaction appears at all the involved participants."""
       )
       def submit(
@@ -459,10 +459,10 @@ trait BaseLedgerApiAdministration extends NoTracing {
           | If the timeout is set, it also waits for the transaction to appear at all other configured
           | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
           | the timeout only specifies how long to wait at the other participants.
-          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in 
+          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
           | the allotted time.
-          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their 
-          | participants are connected/disconnected, the command may currently result in spurious timeouts or may 
+          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
+          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
           | return before the transaction appears at all the involved participants."""
       )
       def submit_flat(
@@ -758,7 +758,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Allocate a new party", FeatureFlag.Testing)
       @Help.Description(
-        """Allocates a new party on the ledger. 
+        """Allocates a new party on the ledger.
           party: a hint for generating the party identifier
           displayName: a human-readable name of this party
           annotations: key-value pairs associated with this party and stored locally on this Ledger API server"""
@@ -930,11 +930,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Subscribe to the command completion stream", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the command completion stream and passes command completions to `observer` until 
+        """This function connects to the command completion stream and passes command completions to `observer` until
           |the stream is completed.
           |Only completions for parties in `parties` will be returned.
           |The returned completions start at `beginOffset` (default: `LEDGER_BEGIN`).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset, 
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error."""
       )
       def subscribe(
@@ -964,7 +964,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
     object configuration extends Helpful {
 
       @Help.Summary("Obtain the ledger configuration", FeatureFlag.Testing)
-      @Help.Description("""Returns the current ledger configuration and subsequent updates until 
+      @Help.Description("""Returns the current ledger configuration and subsequent updates until
            the expected number of configs was retrieved or the timeout is over.""")
       def list(
           expectedConfigs: Int = 1,
@@ -986,9 +986,9 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
       @Help.Summary("Create a user with the given id", FeatureFlag.Testing)
       @Help.Description(
-        """Users are used to dynamically managing the rights given to Daml applications. 
+        """Users are used to dynamically managing the rights given to Daml applications.
           |They allow us to link a stable local identifier (of an application) with a set of parties.
-          id: the id used to identify the given user 
+          id: the id used to identify the given user
           actAs: the set of parties this user is allowed to act as
           primaryParty: the optional party that should be linked to this user by default
           readAs: the set of parties this user is allowed to read as
@@ -1027,7 +1027,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
         """Currently you can update the annotations, active status and primary party.
           |You cannot update other user attributes.
           id: id of the user to be updated
-          modifier: a function for modifying the user; e.g: `user => { user.copy(isActive = false, primaryParty = None, annotations = user.annotations.updated("a", "b").removed("c")) }` 
+          modifier: a function for modifying the user; e.g: `user => { user.copy(isActive = false, primaryParty = None, annotations = user.annotations.updated("a", "b").removed("c")) }`
           """
       )
       def update(
@@ -1061,30 +1061,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
           |If you need the user rights, use rights.list instead."""
       )
       def get(id: String): User = User.fromLapiUser(doGet(id))
-
-      @Help.Summary("Lookup the user data of the user with the given id", FeatureFlag.Testing)
-      @Help.Description(
-        """Lookup the data associated with the given user id returning None if there is no such user.
-          |This can be used to get the primary party associated with a given user.
-          |If you need the full user rights, use rights.list instead."""
-      )
-      def lookup(
-          id: String
-      ): Option[LedgerApiUser] =
-        check(FeatureFlag.Testing)(consoleEnvironment.run {
-          ledgerApiCommand(LedgerApiCommands.Users.Lookup(id))
-        })
-
-      @Help.Summary("Delete a user", FeatureFlag.Testing)
-      @Help.Description("""Delete a user by id.""")
-      def delete(id: String): Unit =
-        check(FeatureFlag.Testing)(consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.Users.Delete(
-              id
-            )
-          )
-        })
 
       @Help.Summary("List users", FeatureFlag.Testing)
       @Help.Description("""List users of this participant node
@@ -1133,12 +1109,12 @@ trait BaseLedgerApiAdministration extends NoTracing {
       object rights extends Helpful {
 
         @Help.Summary("Grant new rights to a user", FeatureFlag.Testing)
-        @Help.Description("""Users are used to dynamically managing the rights given to Daml applications. 
+        @Help.Description("""Users are used to dynamically managing the rights given to Daml applications.
           |This function is used to grant new rights to an existing user.
-          id: the id used to identify the given user 
+          id: the id used to identify the given user
           actAs: the set of parties this user is allowed to act as
           readAs: the set of parties this user is allowed to read as
-          participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api 
+          participantAdmin: flag (default false) indicating if the user is allowed to use the admin commands of the Ledger Api
           """)
         def grant(
             id: String,
@@ -1158,11 +1134,11 @@ trait BaseLedgerApiAdministration extends NoTracing {
           })
 
         @Help.Summary("Revoke user rights", FeatureFlag.Testing)
-        @Help.Description("""Use to revoke specific rights from a user.           
-          id: the id used to identify the given user 
+        @Help.Description("""Use to revoke specific rights from a user.
+          id: the id used to identify the given user
           actAs: the set of parties this user should not be allowed to act as
           readAs: the set of parties this user should not be allowed to read as
-          participantAdmin: if set to true, the participant admin rights will be removed 
+          participantAdmin: if set to true, the participant admin rights will be removed
           """)
         def revoke(
             id: String,
