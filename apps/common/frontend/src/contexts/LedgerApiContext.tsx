@@ -29,6 +29,17 @@ import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract } from '..';
 
+// Description of a command that we can log
+type CommandDescription =
+  | { type: 'create'; templateId: string; payload: unknown }
+  | {
+      type: 'exercise';
+      templateId: string;
+      choice: string;
+      contractId: ContractId<unknown>;
+      argument: unknown;
+    };
+
 // exported so it can be extended by apps
 export class LedgerApiClient {
   activeContractsServiceClient: ActiveContractsServicePromiseClient;
@@ -78,7 +89,12 @@ export class LedgerApiClient {
         .setTemplateId(templateId)
         .setCreateArguments(template.encodeProto(payload).getRecord())
     );
-    const transaction = await this.submitCommand(actAs, [], cmd, domainId);
+    const jsonCmd: CommandDescription = {
+      type: 'create',
+      templateId: template.templateId,
+      payload: template.encode(payload),
+    };
+    const transaction = await this.submitCommand(actAs, [], cmd, jsonCmd, domainId);
     const createdEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -103,7 +119,14 @@ export class LedgerApiClient {
         .setContractId(contractId)
         .setChoiceArgument(encodedArg)
     );
-    const transaction = await this.submitCommand(actAs, readAs, cmd, domainId);
+    const jsonCmd: CommandDescription = {
+      type: 'exercise',
+      templateId: choice.template().templateId,
+      choice: choice.choiceName,
+      contractId: contractId,
+      argument: choice.argumentEncode(argument),
+    };
+    const transaction = await this.submitCommand(actAs, readAs, cmd, jsonCmd, domainId);
     const exerciseEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -116,22 +139,35 @@ export class LedgerApiClient {
     actAs: string[],
     readAs: string[],
     command: Command,
+    jsonCommand: CommandDescription,
     domainId: string | undefined
   ): Promise<TransactionTree> {
+    const commandId = uuidv4();
     const cmds = new Commands()
       .setCommandsList([command])
       .setActAsList(actAs)
       .setReadAsList(readAs)
       .setApplicationId(this.userId)
-      .setCommandId(uuidv4());
+      .setCommandId(commandId);
     if (domainId) {
       cmds.setWorkflowId(`domain-id:${domainId}`);
     }
     const request = new SubmitAndWaitRequest().setCommands(cmds);
-    const response = await this.commandServiceClient.submitAndWaitForTransactionTree(
-      request,
-      this.metaData
+    console.debug(
+      `Submitting command: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
+        readAs
+      )}, commandId=${commandId}, domainId=${domainId}, cmd=${JSON.stringify(jsonCommand)}`
     );
+    const response = await this.commandServiceClient
+      .submitAndWaitForTransactionTree(request, this.metaData)
+      .then(r => {
+        console.debug(`Command with commandId=${commandId} succeeded`);
+        return r;
+      })
+      .catch(e => {
+        console.debug(`Command with commandId=${commandId} failed: ${JSON.stringify(e)}`);
+        throw e;
+      });
     return response.getTransaction()!;
   }
   async queryAcs<T extends object, K, I extends string>(
