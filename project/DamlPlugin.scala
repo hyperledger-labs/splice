@@ -94,10 +94,10 @@ object DamlPlugin extends AutoPlugin {
           val codegens =
             (if (enableScalaCodegen) Seq((Codegen.Scala, scalaOutputDirectory)) else Seq.empty) ++
               (if (enableJavaCodegen) Seq((Codegen.Java, javaOutputDirectory)) else Seq.empty)
+          codegens.foreach { case (_, outputDirectory) => IO.delete(outputDirectory) }
           settings.flatMap { case (darFile, packageName) =>
             codegens
               .flatMap { case (codegen, outputDirectory) =>
-                IO.delete(outputDirectory)
                 generateCode(
                   log,
                   darFile,
