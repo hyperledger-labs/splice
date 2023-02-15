@@ -92,11 +92,7 @@ class SvApp(
             this,
           )
         }
-      _ <- Future.sequence(
-        config.expectedOnboardings.map(c =>
-          expectValidatorOnboarding(c.secret, c.expiresIn, svStore, ledgerConnection, clock)
-        )
-      )
+      _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, clock)
       // TODO(M3-46) split the SV API into a client API and an admin API with auth
       routes = cors() {
         SvResource.routes(
@@ -278,6 +274,21 @@ class SvApp(
       .andThen(_ => svcConnection.close())
   }
 
+  private def expectConfiguredValidatorOnboardings(
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      clock: Clock,
+  ): Future[List[Unit]] = {
+    if (config.expectedOnboardings.map(_.secret).toSet.size != config.expectedOnboardings.size) {
+      sys.error("Expected onboarding secrets must be unique! Check your SV app config.")
+    }
+    Future.sequence(
+      config.expectedOnboardings.map(c =>
+        expectValidatorOnboarding(c.secret, c.expiresIn, svStore, ledgerConnection, clock)
+      )
+    )
+  }
+
   private def expectValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
@@ -364,6 +375,7 @@ object SvApp {
                     .CommandId(
                       "com.daml.network.sv.expectValidatorOnboarding",
                       Seq(svParty),
+                      secret, // not a leak as this gets hashed before it's used
                     ),
                   deduplicationOffset = off,
                   domainId = domainId,

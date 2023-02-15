@@ -159,20 +159,20 @@ class SvIntegrationTest extends CoinIntegrationTest {
 
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
-    clue("SV2 has created many ValidatorOnboarding contracts as it's configured to.") {
-      sv2.listOngoingValidatorOnboardings() should have length 1
+    clue("SV2 has created as many ValidatorOnboarding contracts as it's configured to.") {
+      sv2.listOngoingValidatorOnboardings() should have length 3
     }
     clue("SV2 doesn't recreate ValidatorOnboarding contracts on restart...") {
       sv2.stop()
       sv2.startSync()
-      sv2.listOngoingValidatorOnboardings() should have length 1
+      sv2.listOngoingValidatorOnboardings() should have length 3
     }
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
-      sv2.listOngoingValidatorOnboardings() shouldBe empty
+      sv2.listOngoingValidatorOnboardings() should have length 2
       sv2.stop()
       sv2.startSync()
-      sv2.listOngoingValidatorOnboardings() shouldBe empty
+      sv2.listOngoingValidatorOnboardings() should have length 2
     }
   }
 
