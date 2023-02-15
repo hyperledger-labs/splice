@@ -22,6 +22,13 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
     val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
     // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready
     waitForWalletUser(splitwellProviderWallet)
+
+    // TODO(#2871) Remove this again once the transfer no longer ends up picking the wrong
+    // topology time.
+    if (isSimTime()) {
+      advanceTime(Duration.ofSeconds(30))
+    }
+
     val splitwellProviderParty = providerSplitwellBackend.getProviderPartyId()
 
     // Setup install contracts
@@ -82,19 +89,26 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key)
   }
 
+  private def isSimTime()(implicit env: CoinTestConsoleEnvironment): Boolean =
+    env.environment.clock match {
+      case _: RemoteClock =>
+        true
+      case _ => false
+    }
+
   private def syncOnTransfers[A](numTransfers: Int, act: => A)(implicit
       env: CoinTestConsoleEnvironment
   ) =
-    env.environment.clock match {
-      case _: RemoteClock =>
-        // TODO(#2864) Remove workarounds for buggy transfers in simtime. For now, we need to
-        // advance time manually after the transfer out has been submitted.
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
-          act,
-          forExactly(numTransfers, _)(_.message should include("Submitting transfer out")),
-        )
-        advanceTime(Duration.ofSeconds(5))
-      case _ => act
+    if (isSimTime()) {
+      // TODO(#2864) Remove workarounds for buggy transfers in simtime. For now, we need to
+      // advance time manually after the transfer out has been submitted.
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+        act,
+        forExactly(numTransfers, _)(_.message should include("Submitting transfer out")),
+      )
+      advanceTime(Duration.ofSeconds(5))
+    } else {
+      act
     }
 
   def splitwellTransfer(
