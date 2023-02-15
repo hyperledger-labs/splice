@@ -19,15 +19,24 @@ const ConfirmPayment: React.FC<ConfirmPaymentProps> = ({ coinPrice }) => {
   const { cid } = useParams();
   const [appPayment, setAppPayment] = useState<Contract<AppPaymentRequest>>();
   useEffect(() => {
-    const fetchAppPayment = async () => {
+    let timer: NodeJS.Timeout | undefined;
+    const fetchAppPayment = async (n: number) => {
       const { paymentRequestsList } = await listAppPaymentRequests();
       const req = paymentRequestsList.find(c => c.contractId === cid);
-      if (!req) {
-        throw new Error('Payment request contract not found');
+      if (req) {
+        console.debug('Payment request found');
+        setAppPayment(req);
+      } else if (n < 0) {
+        throw new Error('Payment request not found, retries exceeded giving up...');
+      } else {
+        console.debug('Payment request not found, trying again...');
+        timer = setTimeout(fetchAppPayment, 500, n - 1);
       }
-      setAppPayment(req);
     };
-    fetchAppPayment();
+    fetchAppPayment(30);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [cid, listAppPaymentRequests]);
 
   if (appPayment === undefined || cid === undefined) {
