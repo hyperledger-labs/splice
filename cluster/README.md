@@ -220,11 +220,13 @@ Operations against GCE clusters are complicated by the fact that there
 is more than one cluster, and the clusters have different connection
 paramaters. To accommodate this, there is a directory under
 [`cluster/deployment`](/cluster/deployment) for each cluster that
-contains the connection configuration specific to that cluster. Operations
-against that cluster must be invoked from within that directory. This
-reduces the possibility of operating on the wrong cluster, and allows
-the use of the `.envrc` mechanism to provide whatever configuration
-is necessary to identify a given cluster.
+contains the connection configuration specific to that
+cluster. Operations against that cluster must be invoked from within
+that directory. This reduces the possibility of operating on the wrong
+cluster, and allows the use of the [direnv](https://direnv.net)
+mechanism to provide whatever configuration is necessary to identify a
+given cluster. The `.envrc` files with cluster identify information
+are stored in the deployment directory for the given cluster.
 
 `cncluster help` will provide a full list of supported cluster
 subcommands. A few highlights include the following:

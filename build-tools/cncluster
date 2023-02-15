@@ -439,11 +439,11 @@ function subcmd_create() {
     _log "Authenticating to newly created cluster."
     subcmd_activate
 
-    _log "Updating cluster secrets"
-    subcmd_update_secrets
-
     _log "Applying current manifest to cluster."
     _cluster_apply ${SOURCE_IMAGE_TAG}
+
+    _log "Updating cluster secrets"
+    subcmd_update_secrets
 
     _log "Cluster ready."
 }
