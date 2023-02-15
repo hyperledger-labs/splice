@@ -42,12 +42,14 @@ root directory. The commands will look similar to these:
   tar xzvf |version|\_coin-0.1.0-SNAPSHOT.tar.gz
   cd coin-0.1.0-SNAPSHOT
 
+.. _validator_onboarding:
+
 Onboarding Validator
 --------------------
 
 To operate a validator node you will need to:
 
-1) Run a participant node that connects to the supervalidator consortium
+1) Run a participant node that connects to the global domain operated by the supervalidator consortium.
 2) Run the validator app to register yourself with the supervalidator consortium.
 
 The Canton participant is responsible for hosting your Daml apps; i.e. interpreting Daml code, securing your data, and talking to the public canton network. It connects to the global canton domain `canton.global`. We provide a bootstrap script to handle these steps for you. You can refer to the `canton tutorial <https://docs.daml.com/canton/tutorials/getting_started.html>`_ for greater detail on what each step does.
@@ -62,18 +64,28 @@ you extracted Canton research next to the Canton network tarball. If you placed 
 
 .. parsed-literal::
 
-  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf \
-      --bootstrap examples/validator/validator-participant.sc
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf --bootstrap examples/validator/validator-participant.sc
 
-Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps:
+Next, open a second terminal and navigate to the extracted bundle's root directory.
+In order to become a validator, you need the sponsorship of a current supervalidator.
+In this feature preview, you can obtain such a sponsorship without interacting with a supervalidator operator.
+Use the following shell command to get sponsored by supervalidator 1 and obtain an onboarding secret from it (saved to `validator-onboarding.conf`):
+
+..
+   TODO(#2903) revisit the API so that we can use a nicer command here (without "admin", "POST" and a JSON request...)
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf \
-      --bootstrap examples/validator/validator.sc
+   curl -X POST -H 'Content-Type: application/json' -d '{"expires_in": 3600}' https://|cn_cluster|.network.canton.global:6014/admin/validator/onboarding/prepare | jq '.secret' | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
-This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
-In this feature preview, the SVC automatically accepts any validator onboard requests.
+You can now start a console with the CN apps. Use the following command, making sure that the `validator-onboarding.conf` matches the file you created in the previous step.
+
+.. parsed-literal::
+
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
+
+The `validator-onboarding.conf` enables the validator to request its onboarding from the sponsoring supervalidator.
+Upon verification of the onboarding secret, the sponsoring supervalidator issues a `ValidatorLicense` to the validator party and exposes a `CoinRules` contract to it.
 
 Now, onboard a new user called "alice" via the validator app: ::
 
@@ -235,8 +247,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf \
-      --bootstrap examples/validator/validator-participant-secure.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
 
 4. Get participant id from the Canton console. We'll need to configure Auth0 to issue tokens for this participant. The actual participant id you see will vary slightly::
 
@@ -313,8 +324,9 @@ NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
-      --bootstrap examples/validator/validator.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
+
+Note that if your validator is not onboarded yet, you will need to extend this command with a `--config validator-onboarding.conf` as described in :ref:`validator_onboarding`.
 
 14. Upload the directory DAR.
 
@@ -390,8 +402,7 @@ NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to a
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf \
-      --bootstrap examples/validator/validator.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
 
 7. Refresh your browser with the wallet UI, log out of any user you may be logged in as, and login again using the validator admin user defined above.
 

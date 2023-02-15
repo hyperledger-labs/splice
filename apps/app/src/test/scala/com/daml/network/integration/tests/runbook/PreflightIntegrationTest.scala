@@ -2,7 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import better.files.*
 import com.daml.network.LiveDevNetTest
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
@@ -19,6 +19,8 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -41,6 +43,10 @@ class PreflightIntegrationTest
   val resourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
 
   val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
+
+  // We cache this because we only need it for one test case
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  var validatorOnboardingSecret: Option[String] = None
 
   override def beforeEach() = {
     super.beforeEach();
@@ -72,6 +78,7 @@ class PreflightIntegrationTest
       .fromFiles(
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
+        validatorPath / "validator-onboarding-nosecret.conf",
       )
       // clearing default config transforms because they have settings
       // we don't want such as adjusting daml names or triggering automation every second
@@ -83,6 +90,8 @@ class PreflightIntegrationTest
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.sc` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
+      .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
@@ -309,6 +318,46 @@ class PreflightIntegrationTest
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
     }
+  }
+
+  private def insertValidatorOnboardingSecret(conf: CNNodeConfig): CNNodeConfig = {
+
+    conf.validatorApps.size shouldBe 1
+
+    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
+      val oc = vc.onboarding.value
+
+      // obtain an onboarding secret
+      val secret = validatorOnboardingSecret match {
+        case Some(s) => s
+        case None => {
+          val s = prepareValidatorOnboarding(oc.remoteSv.adminApi.url)
+          validatorOnboardingSecret = Some(s)
+          s
+        }
+      }
+      // insert it
+      vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
+    })(conf)
+  }
+
+  // We invoke the API via a basic HTTP request, just like we expect runbook users to do for now.
+  private def prepareValidatorOnboarding(url: String): String = {
+    val client = HttpClient
+      .newBuilder()
+      .connectTimeout(java.time.Duration.ofSeconds(20))
+      .build()
+
+    val request = HttpRequest
+      .newBuilder()
+      .uri(URI.create(url + "/admin/validator/onboarding/prepare"))
+      .header("content-type", "application/json")
+      .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
+      .build();
+
+    val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+    val secret = (io.circe.parser.parse(response.body).value \\ "secret" head).asString.value
+    secret
   }
 
   private def loginAndOnboardToWalletUi(

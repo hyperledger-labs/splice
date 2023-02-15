@@ -2,13 +2,14 @@ package com.daml.network.integration.tests.runbook
 
 import java.nio.file.Files
 import better.files.{File, *}
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.sv.config.ExpectedOnboardingConfig
 import com.daml.network.util.CantonProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
@@ -119,6 +120,8 @@ class LocalRunbookIntegrationTest
         this.getClass.getSimpleName,
         // Config file for the self-hosted validator (original version from the runbook)
         validatorPath / "validator.conf",
+        // Config file template for onboarding self-hosted validator (original version from the runbook)
+        validatorPath / "validator-onboarding-nosecret.conf",
         // Config files for SVC-hosted apps (modified copies of deployed configs)
         svcAppPath / "app.conf",
         svAppsPath / "app.conf",
@@ -132,6 +135,7 @@ class LocalRunbookIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
+      .addConfigTransforms((_, conf) => expectValidatorOnboarding(conf, "validatorsecret"))
       .withThisSetup(env => {
         env.appsHostedBySvc.local.foreach(_.start())
         env.appsHostedBySvc.local.foreach(_.waitForInitialization())
@@ -141,5 +145,28 @@ class LocalRunbookIntegrationTest
   "run through runbook against local SVC" in { implicit env =>
     runScript(validatorPath / "validator.sc")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
+  }
+
+  private def expectValidatorOnboarding(conf: CNNodeConfig, secret: String): CNNodeConfig = {
+
+    // make sure that sv1 expects the secret
+    val conf_ = conf
+      .focus(_.svApps)
+      .modify(_.map { case (svName, svConfig) =>
+        if (svName.unwrap == "sv1") {
+          (
+            svName,
+            svConfig.focus(_.expectedOnboardings).replace(List(ExpectedOnboardingConfig(secret))),
+          )
+        } else {
+          (svName, svConfig)
+        }
+      })
+    // insert the secret into the validator onboarding config
+    conf.validatorApps.size shouldBe 1
+    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
+      val oc = vc.onboarding.value
+      vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
+    })(conf_)
   }
 }

@@ -76,6 +76,7 @@ class HttpSvHandler(
       respond: v0.SvResource.OnboardValidatorResponse.type
   )(body: definitions.OnboardValidatorRequest): Future[v0.SvResource.OnboardValidatorResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
+      // TODO(M3-46) Add check to avoid that a validator can get onboarded twice
       PartyId.fromProtoPrimitive(body.partyId) match {
         case Right(partyId) =>
           svStore.lookupValidatorOnboardingBySecretWithOffset(body.secret).flatMap {

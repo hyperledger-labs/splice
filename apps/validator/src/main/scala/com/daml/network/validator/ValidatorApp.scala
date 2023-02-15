@@ -322,7 +322,7 @@ class ValidatorApp(
         flagCloseable = this,
         logger,
       )
-      _ <- // TODO(#2241) activate this for all nodes
+      _ <- // TODO(#2862) activate this for all nodes
         if (config.onboarding.isDefined) {
           ensureOnboarded(connection, store, validatorParty, config.onboarding)
         } else {
