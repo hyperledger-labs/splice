@@ -145,14 +145,17 @@ class TreasuryService(
       case QueueOfferResult.Failure(cause) => Future.failed(cause)
       case QueueClosed =>
         Future.failed(
-          new StatusRuntimeException(
-            Status.UNAVAILABLE.withDescription(
-              show"Rejected operation because the coin operation batch executor is shutting down: $operation"
-            )
-          )
+          closingException(operation)
         )
     }
   }
+
+  private def closingException(operation: installCodegen.CoinOperation) =
+    Status.UNAVAILABLE
+      .withDescription(
+        show"Rejected operation because the coin operation batch executor is shutting down: $operation"
+      )
+      .asRuntimeException
 
   /** Find all operations that have become stale and complete them with their failure.
     * This effectively removes these operations from the next retry of executing the batch.
@@ -248,15 +251,21 @@ class TreasuryService(
   private def executeBatchWithRetry(
       batch: CoinOperationBatch
   )(implicit tc: TraceContext): Future[Done] = {
-    def completeWithUnexpectedFailure(op: EnqueuedCoinOperation) =
+    def completeWithFailure(
+        op: EnqueuedCoinOperation,
+        exception: installCodegen.CoinOperation => StatusRuntimeException,
+    ) =
       // Need to use tryComplete as some of them might have been completed already due to being stale
       op.outcomePromise.tryComplete(
         Failure(
-          Status.INTERNAL
-            .withDescription("Unexpected coin operation execution failure.")
-            .asRuntimeException()
+          exception(op.operation)
         )
       )
+
+    def internal(op: installCodegen.CoinOperation) =
+      Status.INTERNAL
+        .withDescription("Unexpected coin operation execution failure.")
+        .asRuntimeException()
 
     withSpan("executeBatchWithRetry") { implicit tc => _ =>
       retryProvider
@@ -266,14 +275,17 @@ class TreasuryService(
           this,
         )
         .recover(ex => {
-          if (this.isClosing) {
+          val failure = if (this.isClosing) {
             // TODO(tech-debt): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
             logger.info("Ignoring batch execution failure, as we are shutting down", ex)
-          } else
+            closingException(_)
+          } else {
             logger.error("Skipping batch due to unexpected execution failure", ex)
+            internal(_)
+          }
           // Complete all operations of this batch
-          batch.nonMergeOperations.foreach(completeWithUnexpectedFailure)
-          batch.mergeOperationOpt.foreach(completeWithUnexpectedFailure)
+          batch.nonMergeOperations.foreach(completeWithFailure(_, failure))
+          batch.mergeOperationOpt.foreach(completeWithFailure(_, failure))
           Done
         })
     }
