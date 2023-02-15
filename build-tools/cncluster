@@ -259,7 +259,8 @@ function subcmd_push() {
 subcommand_whitelist[logs]='Stream logs from an application container running in cluster'
 
 function _json_log_format() {
-    jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
+    jq -R 'fromjson? | select(type == "object")' \
+        | jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
 }
 
 function subcmd_logs() {
@@ -268,27 +269,28 @@ function subcmd_logs() {
         shift
     fi
 
-    module=$1
+    app=$1
 
-    if [ -z "${module}" ]; then
-        _error "No module specified"
+    if [ -z "${app}" ]; then
+        _error "No app specified"
     fi
 
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
                           --all-namespaces \
-                          -l app=${module} \
+                          -l app=${app} \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
+
         if [ -n "${raw-}" ] ; then
-            kubectl logs ${POD_SPEC} ${module} -f
+            kubectl logs ${POD_SPEC} ${app} -f
         else
-            kubectl logs ${POD_SPEC} ${module} -f | _json_log_format
+            kubectl logs ${POD_SPEC} ${app} -f | _json_log_format
         fi
     else
-        _error "No pod for module found: ${module}"
+        _error "No pod for app found: ${app}"
     fi
 }
 
@@ -796,6 +798,13 @@ function subcmd_help() {
 ################################
 ### Main
 ################################
+
+if [ -z "${SUBCOMMAND_NAME-}" ]; then
+    subcmd_help
+
+    _error  "Missing subcommand"
+fi
+
 
 if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
     subcmd_help

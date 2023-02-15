@@ -386,20 +386,25 @@ you with to observe. For ScratchNet, this is
 1. Run `kubectl describe pod <pod-name>` to get a detailed status of
    the given pod, including state transitions that might indicate
    memory or configuratoin failures.
-1. Run `kubectl logs` to download application logs
-   1. Run `kubectl logs -l app=<app-name>` to get the log for the given application.
-   1. Run `kubectl logs -l 'app in (<app-name>, <app-name>)'` to get a combined log for all the given applications.
-   1. Run `kubectl logs <pod-name>` to get the application log for the given pod.
-   1. Add `--tail=-1` to get the complete log snapshot (no limit on the number of lines returned)
-   1. Add `-f` to get the live log (new entries streaming to your console)
-   1. Add `--since=30m` to only return entries from the past 30min
-   1. Add `-p` to get the log from the previous instance. Use this to access the log of a crashed container after it restarted.
+1. Run `cncluster logs` to download application logs
+   1. Run `cncluster logs <app-name>` to get the formatted version of
+      the JSON log for the given application, regardless of namespace.
+      1. Run `cncluster logs --raw <app-name>` to get the raw log for the
+         given application, regardless of namespace.
+   1. Run `kubectl logs <pod-name> -n <namespace-name>` `kubectl logs
+      -l app=<app-name> -n <namespace-name>` to get logs for a given
+      pod in a given namespace. (This requires more knowledge than
+      `cncluster logs`, but can be useful to query based on time or
+      number of lines.)
+      1. Add `--tail=-1` to get the complete log snapshot (no limit on the number of lines returned)
+      1. Add `-f` to get the live log (new entries streaming to your console)
+      1. Add `--since=30m` to only return entries from the past 30min
+      1. Add `-p` to get the log from the previous instance. Use this to access the log of a crashed container after it restarted.
 1. Run `kubectl get svc` or `cncluster ports` to get an overview of
    ports used within the cluster.
-1. Use `lnav` to quickly analyze log files downloaded using
-   `kubectl logs`.  Before opening the log file in `lnav`, manually
-   remove the first ~100 lines that use a different log line
-   format, otherwise `lnav` will not work correctly.
+1. Use `lnav` to quickly analyze log files downloaded using `kubectl
+   logs` or `cncluster logs`. For JSON format logs, `lnav`
+   autodetection requires the log files to have a `.clog` format.
 1. If you prefer a web UI to read logs, open the [GCE Log Explorer](#gce-log-explorer).
 
 
