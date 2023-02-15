@@ -9,14 +9,13 @@ import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import com.daml.network.util.Contract
+import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractTypeCompanion,
   DamlRecord,
-  ContractCompanion,
   ContractId,
   InterfaceCompanion,
 }
@@ -72,8 +71,8 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
 }
 
 object TransferOutTrigger {
-  type Template[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: CodegenTemplate] =
-    TransferOutTrigger[ContractCompanion[TC, TCid, T], TCid, T]
+  type Template[TCid <: ContractId[T], T <: CodegenTemplate] =
+    TransferOutTrigger[TemplateCompanion[TCid, T], TCid, T]
   type Interface[I, Id <: ContractId[I], View <: DamlRecord[View]] =
     TransferOutTrigger[InterfaceCompanion[I, Id, View], Id, View]
 }

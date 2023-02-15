@@ -25,7 +25,6 @@ class ExpireIssuingMiningRoundTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      cc.round.IssuingMiningRound.Contract,
       cc.round.IssuingMiningRound.ContractId,
       cc.round.IssuingMiningRound,
     ](

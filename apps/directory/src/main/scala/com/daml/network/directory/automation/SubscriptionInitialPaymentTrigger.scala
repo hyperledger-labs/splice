@@ -28,7 +28,6 @@ class SubscriptionInitialPaymentTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      subsCodegen.SubscriptionInitialPayment.Contract,
       subsCodegen.SubscriptionInitialPayment.ContractId,
       subsCodegen.SubscriptionInitialPayment,
     ](

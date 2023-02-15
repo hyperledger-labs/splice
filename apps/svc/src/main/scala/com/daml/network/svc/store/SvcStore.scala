@@ -8,6 +8,7 @@ import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{CoinUtil, Contract}
+import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -142,7 +143,7 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
 
   private[this] def listExpired[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       limit: Int,
-      companion: javab.codegen.ContractCompanion[_ <: javab.codegen.Contract[Id, T], Id, T],
+      companion: TemplateCompanion[Id, T],
   )(coin: T => cc.coin.Coin)(implicit ec: ExecutionContext): Future[Seq[Contract[Id, T]]] =
     for {
       maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()

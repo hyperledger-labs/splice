@@ -15,7 +15,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ValueDecoder,
   Contract as CodegenContract,
 }
-import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Template, Value}
+import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Value}
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.lf.value as lf
@@ -43,10 +43,10 @@ import scala.util.Try
   * @param payload    Contract instance as defined in Daml template (without `contractId` and `agreementText`).
   * @tparam T Contract template type parameter.
   */
-final case class Contract[TCid <: ContractId[_], T](
+final case class Contract[TCid, T](
     identifier: Identifier,
-    contractId: TCid,
-    payload: T with DamlRecord[_],
+    contractId: TCid & ContractId[_],
+    payload: T & DamlRecord[_],
     metadata: Option[ContractMetadata],
     // TODO(M4-82): also add a createArgumentsBlob attribute to be able to disclose interface views.
 ) extends PrettyPrinting {
@@ -103,6 +103,11 @@ final case class Contract[TCid <: ContractId[_], T](
 }
 
 object Contract {
+  object Companion {
+    type Template[TCid, Data] = ContractCompanion[_ <: CodegenContract[TCid, Data], TCid, Data]
+    type Interface[ICid, Marker, View] = InterfaceCompanion[Marker, ICid, View]
+  }
+
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
     // Disabling logging and instead logging the result
     // because LF uses a different logging library.
@@ -110,8 +115,8 @@ object Contract {
       .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
       .valueOr(err => ErrorUtil.internalError(err))
 
-  def fromProto[TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[_, TCid, T]
+  def fromProto[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
   )(contract: v0.Contract): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val decoder: ValueDecoder[T] = ContractCompanion.valueDecoder[T](companion)
     for {
@@ -143,8 +148,8 @@ object Contract {
     )
   }
 
-  def fromJson[TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[_, TCid, T]
+  def fromJson[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
   )(contract: http.Contract)(implicit
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
@@ -181,8 +186,8 @@ object Contract {
     )
   }
 
-  def handleMaybeCachedContract[TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[_, TCid, T]
+  def handleMaybeCachedContract[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
   )(
       cachedValue: Option[Contract[TCid, T]],
       maybeCached: MaybeCachedContract,
@@ -199,7 +204,7 @@ object Contract {
     } yield res
   }
 
-  def fromCodegenContract[TCid <: ContractId[_], T <: DamlRecord[_]](
+  def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
       metadata: Option[ContractMetadata],
   ): Contract[TCid, T] = {
@@ -212,16 +217,16 @@ object Contract {
     )
   }
 
-  def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
+  def fromCreatedEvent[TCid <: ContractId[?], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
   )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
       .map(Contract.fromCodegenContract(_, Some(ev.getContractMetadata)))
   }
 
-  def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[View]](
-      companion: InterfaceCompanion[I, Id, View]
+  def fromCreatedEvent[Id <: ContractId[?], View <: DamlRecord[?]](
+      companion: InterfaceCompanion[?, Id, View]
   )(ev: CreatedEvent): Option[Contract[Id, View]] =
     JavaDecodeUtil
       .decodeCreated(companion)(ev)

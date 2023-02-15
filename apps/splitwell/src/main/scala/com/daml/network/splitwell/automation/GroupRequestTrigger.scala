@@ -25,7 +25,6 @@ class GroupRequestTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      splitwellCodegen.GroupRequest.Contract,
       splitwellCodegen.GroupRequest.ContractId,
       splitwellCodegen.GroupRequest,
     ](

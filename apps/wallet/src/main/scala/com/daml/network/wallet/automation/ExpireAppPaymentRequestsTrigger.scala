@@ -26,7 +26,6 @@ class ExpireAppPaymentRequestsTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      paymentCodegen.AppPaymentRequest.Contract,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
     ](

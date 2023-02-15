@@ -3,12 +3,7 @@ package com.daml.network.wallet.admin.http
 import akka.stream.Materializer
 import cats.implicits.showInterpolator
 import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{
-  ContractCompanion,
-  ContractId,
-  Update,
-  Contract as CodegenContract,
-}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Update}
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
@@ -624,10 +619,8 @@ class HttpWalletHandler(
   private[this] def getUserTreasury(user: String): Future[TreasuryService] =
     Future.successful(getUserWallet(user).treasury)
 
-  private def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[
-    T
-  ], T <: Template, ResponseT](
-      templateCompanion: ContractCompanion[TC, TCid, T],
+  private def listContracts[TCid <: ContractId[T], T <: Template, ResponseT](
+      templateCompanion: Contract.Companion.Template[TCid, T],
       user: String,
       mkResponse: Vector[definitions.Contract] => ResponseT,
   ): Future[ResponseT] =

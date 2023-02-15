@@ -25,7 +25,6 @@ class SplitwellInstallRequestTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      splitwellCodegen.SplitwellInstallRequest.Contract,
       splitwellCodegen.SplitwellInstallRequest.ContractId,
       splitwellCodegen.SplitwellInstallRequest,
     ](

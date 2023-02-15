@@ -81,7 +81,7 @@ trait UserWalletStore
   ] = listExpiredContracts(walletCodegen.AppPaymentRequest.COMPANION)(_.expiresAt)
 
   private[this] def listExpiredContracts[TCid <: jcg.ContractId[T], T <: Template](
-      companion: jcg.ContractCompanion[_ <: jcg.Contract[TCid, T], TCid, T]
+      companion: Contract.Companion.Template[TCid, T]
   )(expiresAt: T => Instant): ExpiredContractTrigger.ListExpiredContracts[TCid, T] = (now, limit) =>
     for {
       acs <- defaultAcs

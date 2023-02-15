@@ -23,7 +23,6 @@ class CoinRulesRequestTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      cc.coin.CoinRulesRequest.Contract,
       cc.coin.CoinRulesRequest.ContractId,
       cc.coin.CoinRulesRequest,
     ](

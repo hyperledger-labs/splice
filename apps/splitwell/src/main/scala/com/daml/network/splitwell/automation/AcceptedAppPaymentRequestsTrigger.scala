@@ -33,7 +33,6 @@ class AcceptedAppPaymentRequestsTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      walletCodegen.AcceptedAppPayment.Contract,
       walletCodegen.AcceptedAppPayment.ContractId,
       walletCodegen.AcceptedAppPayment,
     ](

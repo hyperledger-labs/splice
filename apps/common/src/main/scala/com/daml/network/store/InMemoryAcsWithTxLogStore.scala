@@ -10,7 +10,6 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,
@@ -18,6 +17,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.util.{Contract, Trees}
+import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -195,8 +195,8 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     })
   }
 
-  def findContractWithOffset[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def findContractWithOffset[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(p: Contract[TCid, T] => Boolean): Future[QueryResult[Option[Contract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     findContractWithOffset(Contract.fromCreatedEvent(templateCompanion))(p)
@@ -223,8 +223,8 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     }
   }
 
-  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
+  def listContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T],
       filter: Contract[TCid, T] => Boolean,
       limit: Option[Long],
   ): Future[Seq[Contract[TCid, T]]] = {
@@ -253,8 +253,8 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     }
   }
 
-  def lookupContractById[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def lookupContractById[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(id: ContractId[T]): Future[Option[Contract[TCid, T]]] = {
     requireInScope(templateCompanion)
     lookupContractById(Contract.fromCreatedEvent(templateCompanion))(id)
@@ -275,8 +275,8 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     )
   }
 
-  def streamContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def streamContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   ): Source[Contract[TCid, T], NotUsed] = {
     requireInScope(templateCompanion)
     streamContracts(Contract.fromCreatedEvent(templateCompanion))
@@ -289,8 +289,8 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     streamContracts(contractFilter.decodeInterface(interfaceCompanion)(_))
   }
 
-  def signalWhenIngested[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def signalWhenIngested[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   ): Future[Unit] = {
     requireInScope(templateCompanion)
     nextActiveContract(Contract.fromCreatedEvent(templateCompanion), 0).map(ssss => ())

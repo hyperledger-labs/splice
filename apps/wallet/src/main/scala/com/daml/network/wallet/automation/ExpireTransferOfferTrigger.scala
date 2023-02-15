@@ -27,7 +27,6 @@ class ExpireTransferOfferTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      transferOffersCodegen.TransferOffer.Contract,
       transferOffersCodegen.TransferOffer.ContractId,
       transferOffersCodegen.TransferOffer,
     ](

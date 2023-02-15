@@ -25,7 +25,6 @@ class ExpiredDirectoryEntryTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      directoryCodegen.DirectoryEntry.Contract,
       directoryCodegen.DirectoryEntry.ContractId,
       directoryCodegen.DirectoryEntry,
     ](

@@ -6,14 +6,7 @@ import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract,
-  ContractCompanion,
-  ContractId,
-  Created,
-  Exercised,
-  Update,
-}
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exercised, Update}
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -27,6 +20,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.network.store.AcsStore.IngestionFilter
 import com.daml.network.util.{Trees, UploadablePackage}
+import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{
@@ -113,10 +107,10 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: IngestionFilter,
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
 
-  def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+  def activeContractsWithOffset[TCid <: ContractId[T], T <: Template](
       domain: DomainId,
       party: PartyId,
-      companion: ContractCompanion[TC, TCid, T],
+      companion: TemplateCompanion[TCid, T],
   ): Future[(Seq[Contract[TCid, T]], LedgerOffset)]
 
   def activeContracts(
@@ -124,10 +118,10 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: IngestionFilter,
   ): Future[Seq[CreatedEvent]]
 
-  def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+  def activeContracts[TCid <: ContractId[T], T <: Template](
       domain: DomainId,
       party: PartyId,
-      companion: ContractCompanion[TC, TCid, T],
+      companion: TemplateCompanion[TCid, T],
   ): Future[Seq[Contract[TCid, T]]]
 
   def subscribeAsync(
@@ -440,12 +434,12 @@ object CoinLedgerConnection {
               ))
       }
 
-      override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
+      override def activeContractsWithOffset[TCid <: ContractId[
         T
       ], T <: Template](
           domain: DomainId,
           party: PartyId,
-          companion: ContractCompanion[TC, TCid, T],
+          companion: TemplateCompanion[TCid, T],
       ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
         activeContractsWithOffset(
           domain,
@@ -460,10 +454,10 @@ object CoinLedgerConnection {
       ): Future[Seq[CreatedEvent]] =
         activeContractsWithOffset(domain, filter).map(_._1)
 
-      override def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      override def activeContracts[TCid <: ContractId[T], T <: Template](
           domain: DomainId,
           party: PartyId,
-          companion: ContractCompanion[TC, TCid, T],
+          companion: TemplateCompanion[TCid, T],
       ): Future[Seq[Contract[TCid, T]]] =
         activeContractsWithOffset(domain, party, companion).map(_._1)
 

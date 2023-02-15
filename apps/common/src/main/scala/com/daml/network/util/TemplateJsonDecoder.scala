@@ -3,7 +3,7 @@ package com.daml.network.util
 import cats.syntax.either.*
 import com.daml.ledger.api.v1.{value as scalaValue}
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId, ValueDecoder}
-import com.daml.ledger.javaapi.data.{Template, Value}
+import com.daml.ledger.javaapi.data.Value
 import com.daml.lf.archive.{ArchivePayload, Dar, DarReader}
 import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.data.{ImmArray, Ref}
@@ -19,8 +19,8 @@ import spray.json.*
 import java.util.zip.ZipInputStream
 
 abstract class TemplateJsonDecoder {
-  def decodeTemplate[TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[_, TCid, T]
+  def decodeTemplate[TCid <: ContractId[T], T](
+      companion: ContractCompanion[?, TCid, T]
   )(json: Json): T
 }
 
@@ -41,8 +41,8 @@ class ResourceTemplateDecoder(
       ifaceType <- iface.typeDecls.get(id.qualifiedName)
     } yield ifaceType.`type`
 
-  override def decodeTemplate[TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[_, TCid, T]
+  override def decodeTemplate[TCid <: ContractId[T], T](
+      companion: ContractCompanion[?, TCid, T]
   )(json: Json): T = {
     val sprayJson = json.noSpaces.parseJson
     val lfIdentifier = typesig.TypeConName(

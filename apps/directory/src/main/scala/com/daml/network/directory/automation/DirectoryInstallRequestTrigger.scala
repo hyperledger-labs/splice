@@ -24,7 +24,6 @@ class DirectoryInstallRequestTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      directoryCodegen.DirectoryInstallRequest.Contract,
       directoryCodegen.DirectoryInstallRequest.ContractId,
       directoryCodegen.DirectoryInstallRequest,
     ](

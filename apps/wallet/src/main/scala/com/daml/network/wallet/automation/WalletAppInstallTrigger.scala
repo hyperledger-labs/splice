@@ -20,7 +20,6 @@ class WalletAppInstallTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      installCodegen.WalletAppInstall.Contract,
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
     ](

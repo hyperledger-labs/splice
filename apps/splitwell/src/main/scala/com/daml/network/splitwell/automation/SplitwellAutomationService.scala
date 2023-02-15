@@ -2,9 +2,9 @@ package com.daml.network.splitwell.automation
 
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.store.DomainStore
+import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId}
-import com.daml.ledger.javaapi.data.codegen.ContractCompanion
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
@@ -74,8 +74,8 @@ class SplitwellAutomationService(
     new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell)
   )
 
-  def createTransferOutTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
+  def createTransferOutTrigger[TCid <: ContractId[T], T <: Template](
+      companion: TemplateCompanion[TCid, T]
   )(domainAdded: DomainStore.DomainAdded, triggerContext: TriggerContext): Trigger =
     new TransferOutTrigger.Template(
       triggerContext,

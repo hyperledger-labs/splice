@@ -7,17 +7,12 @@ import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
-  ContractCompanion,
-  InterfaceCompanion,
-  ContractId,
-  DamlRecord,
-}
+import com.daml.ledger.javaapi.data.codegen.{InterfaceCompanion, ContractId, DamlRecord}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStore}
 import com.daml.network.util.{HasHealth, Contract}
+import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
@@ -244,18 +239,18 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 }
 
 object OnCreateTrigger {
-  trait Companion[C, TCid <: ContractId[_], T] {
+  trait Companion[-C, TCid <: ContractId[_], T] {
     def streamContracts(acs: AcsStore)(companion: C): Source[Contract[TCid, T], NotUsed]
     def lookupContractById(acs: AcsStore)(companion: C)(id: TCid): Future[Option[Contract[TCid, T]]]
   }
 
-  implicit def templateCompanion[TC <: CodegenContract[TCid, T], TCid <: ContractId[
+  implicit def templateCompanion[TCid <: ContractId[
     T
-  ], T <: CodegenTemplate]: Companion[ContractCompanion[TC, TCid, T], TCid, T] =
-    new Companion[ContractCompanion[TC, TCid, T], TCid, T] {
-      override def streamContracts(acs: AcsStore)(companion: ContractCompanion[TC, TCid, T]) =
+  ], T <: CodegenTemplate]: Companion[TemplateCompanion[TCid, T], TCid, T] =
+    new Companion[TemplateCompanion[TCid, T], TCid, T] {
+      override def streamContracts(acs: AcsStore)(companion: TemplateCompanion[TCid, T]) =
         acs.streamContracts(companion)
-      override def lookupContractById(acs: AcsStore)(companion: ContractCompanion[TC, TCid, T])(
+      override def lookupContractById(acs: AcsStore)(companion: TemplateCompanion[TCid, T])(
           id: TCid
       ): Future[Option[Contract[TCid, T]]] =
         acs.lookupContractById(companion)(id)
@@ -271,8 +266,8 @@ object OnCreateTrigger {
         acs.lookupContractById(companion)(id)
     }
 
-  type Template[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: CodegenTemplate] =
-    OnCreateTrigger[ContractCompanion[TC, TCid, T], TCid, T]
+  type Template[TCid <: ContractId[T], T <: CodegenTemplate] =
+    OnCreateTrigger[TemplateCompanion[TCid, T], TCid, T]
 }
 
 /** A trigger for processing contract create events.
@@ -536,13 +531,12 @@ object ScheduledTaskTrigger {
   */
 // TODO(tech-debt): if we happen to find LOTS of instances that just expire the contract based on its expiry date, then we should consider introducing a Daml-level interface 'ExpiringContract' and handle all of them using single trigger.
 abstract class ExpiredContractTrigger[
-    TC <: CodegenContract[TCid, T],
     TCid <: ContractId[T],
     T <: CodegenTemplate,
 ](
     acs: Future[AcsStore],
     listExpiredContracts: ExpiredContractTrigger.ListExpiredContracts[TCid, T],
-    templateCompanion: ContractCompanion[TC, TCid, T],
+    templateCompanion: TemplateCompanion[TCid, T],
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,

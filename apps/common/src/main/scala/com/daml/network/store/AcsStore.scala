@@ -8,7 +8,6 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
   DamlRecord,
   InterfaceCompanion,
-  Contract as CodegenContract,
 }
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
@@ -21,6 +20,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
 }
 import com.daml.network.util.Contract
+import Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.PrettyInstances.PrettyContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -48,8 +48,8 @@ trait AcsStore extends AutoCloseable {
   import AcsStore.*
 
   /** Lookup a contract by id. */
-  def lookupContractById[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def lookupContractById[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(id: ContractId[T]): Future[Option[Contract[TCid, T]]]
 
   /** Lookup a contract's interface view by id. */
@@ -61,8 +61,8 @@ trait AcsStore extends AutoCloseable {
     *
     * Throws [[Status.NOT_FOUND]] if no such contract exists.
     */
-  def getContractById[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def getContractById[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(id: ContractId[T])(implicit ec: ExecutionContext): Future[Contract[TCid, T]] =
     lookupContractById(templateCompanion)(id).map(result =>
       result.getOrElse(
@@ -96,8 +96,8 @@ trait AcsStore extends AutoCloseable {
     * Caution: this function traverses all contracts!
     * Not intended for production use, but very useful for prototyping.
     */
-  def findContractWithOffset[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def findContractWithOffset[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true
   ): Future[QueryResult[Option[Contract[TCid, T]]]]
@@ -107,8 +107,8 @@ trait AcsStore extends AutoCloseable {
     * Caution: this function traverses all contracts!
     * Not intended for production use, but very useful for prototyping.
     */
-  def findContract[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def findContract[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true
   )(implicit ec: ExecutionContext): Future[Option[Contract[TCid, T]]] =
@@ -141,8 +141,8 @@ trait AcsStore extends AutoCloseable {
     * TODO(M3-83): add indexes for ^.
     */
   // TODO(M3-83): add a limit parameter
-  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
+  def listContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T],
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Option[Long] = None,
   ): Future[Seq[Contract[TCid, T]]]
@@ -165,8 +165,8 @@ trait AcsStore extends AutoCloseable {
     *
     * '''completes''' never, as it tails newly ingested transactions
     */
-  def streamContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def streamContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   ): Source[Contract[TCid, T], NotUsed]
 
   /** A stream of contracts of the given interface.
@@ -185,8 +185,8 @@ trait AcsStore extends AutoCloseable {
   ): Source[Contract[Id, View], NotUsed]
 
   /** Signal when the store has ingested at least one contract of the given template. */
-  def signalWhenIngested[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def signalWhenIngested[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   ): Future[Unit]
 
   /** Signal when the store has finished ingesting ledger data from the given offset or a larger one. */
@@ -204,8 +204,8 @@ object AcsStore {
 
   final case class InterfaceImplementation[I, Id <: ContractId[I], View <: DamlRecord[
     _
-  ], TC <: CodegenContract[TCid, Tmpl], TCid <: ContractId[Tmpl], Tmpl <: Template](
-      companion: ContractCompanion[TC, TCid, Tmpl],
+  ], TCid <: ContractId[Tmpl], Tmpl <: Template](
+      companion: TemplateCompanion[TCid, Tmpl],
       view: Tmpl => View,
   ) {
     def toInterfaceContract(
@@ -226,12 +226,11 @@ object AcsStore {
   }
 
   object InterfaceImplementation {
-    def apply[I, Id <: ContractId[I], View <: DamlRecord[_], TC <: CodegenContract[
-      TCid,
-      Tmpl,
-    ], TCid <: ContractId[Tmpl], Tmpl <: Template](
-        companion: ContractCompanion[TC, TCid, Tmpl]
-    ): (Tmpl => View) => InterfaceImplementation[I, Id, View, TC, TCid, Tmpl] =
+    def apply[I, Id <: ContractId[I], View <: DamlRecord[_], TCid <: ContractId[
+      Tmpl
+    ], Tmpl <: Template](
+        companion: TemplateCompanion[TCid, Tmpl]
+    ): (Tmpl => View) => InterfaceImplementation[I, Id, View, TCid, Tmpl] =
       view => InterfaceImplementation(companion, view)
   }
 
@@ -342,8 +341,8 @@ object AcsStore {
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
-  def mkFilter[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
+  def mkFilter[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean
   ): (Identifier, CreatedEvent => Boolean) =
@@ -363,7 +362,7 @@ object AcsStore {
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(
       p: Contract[Id, View] => Boolean,
-      implementations: Seq[InterfaceImplementation[I, Id, View, _, _, _]],
+      implementations: Seq[InterfaceImplementation[I, Id, View, _, _]],
   ): (Identifier, (CreatedEvent => Boolean, InterfaceDecoder)) = {
     val decoder: InterfaceDecoder = new InterfaceDecoder {
 

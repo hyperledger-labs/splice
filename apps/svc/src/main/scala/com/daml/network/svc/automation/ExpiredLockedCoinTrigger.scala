@@ -19,7 +19,6 @@ class ExpiredLockedCoinTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      cc.coin.LockedCoin.Contract,
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ](

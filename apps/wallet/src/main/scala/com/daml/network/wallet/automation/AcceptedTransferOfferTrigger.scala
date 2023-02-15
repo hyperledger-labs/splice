@@ -33,7 +33,6 @@ class AcceptedTransferOfferTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      transferOffersCodegen.AcceptedTransferOffer.Contract,
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ](

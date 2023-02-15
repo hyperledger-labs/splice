@@ -20,7 +20,6 @@ class SummarizingMiningRoundTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnCreateTrigger.Template[
-      cc.round.SummarizingMiningRound.Contract,
       cc.round.SummarizingMiningRound.ContractId,
       cc.round.SummarizingMiningRound,
     ](

@@ -29,7 +29,6 @@ class SubscriptionReadyForPaymentTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      subsCodegen.SubscriptionIdleState.Contract,
       subsCodegen.SubscriptionIdleState.ContractId,
       subsCodegen.SubscriptionIdleState,
     ](

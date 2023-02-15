@@ -3,12 +3,7 @@ package com.daml.network.wallet.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import com.daml.ledger.javaapi.data.codegen.{
-  ContractCompanion,
-  ContractId,
-  DamlRecord,
-  Contract as CodegenContract,
-}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.history.{CoinArchive, CoinCreate, Tap, Transfer}
@@ -316,8 +311,8 @@ object UserWalletTxLogParser {
   }
 
   // Helper for parsing create nodes into TxLogEntries
-  def mkCreateParse[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
+  def mkCreateParse[TCid <: ContractId[T], T <: Template](
+      companion: Contract.Companion.Template[TCid, T]
   )(
       parse: (
           TransactionTree,
