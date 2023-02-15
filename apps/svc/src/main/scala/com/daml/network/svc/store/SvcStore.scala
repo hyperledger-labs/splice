@@ -10,7 +10,6 @@ import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{CoinUtil, Contract}
 import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -116,35 +115,28 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
     )
   )
 
-  // TODO (#2828) factor with UserWalletStore#listExpiredContracts
+  import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
+  import AcsStore.listExpiredFromPayloadExpiry
+
   /** List issuing mining rounds past their targetClosesAt */
-  def listExpiredIssuingMiningRounds(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[Contract[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound]]] =
-    for {
-      acs <- defaultAcs
-      imrContracts <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
-    } yield imrContracts.iterator
-      .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
-      .take(limit)
-      .toSeq
+  def listExpiredIssuingMiningRounds
+      : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
+    listExpiredFromPayloadExpiry(defaultAcs, cc.round.IssuingMiningRound.COMPANION)(
+      _.targetClosesAt
+    )
 
   /** List coins that are expired and can never be used as transfer input. */
-  def listExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]]] =
-    listExpired(limit, cc.coin.Coin.COMPANION)(identity)
+  def listExpiredCoins: ListExpiredContracts[cc.coin.Coin.ContractId, cc.coin.Coin] =
+    listExpiredRoundBased(cc.coin.Coin.COMPANION)(identity)
 
   /** List locked coins that are expired and can never be used as transfer input. */
-  def listLockedExpiredCoins(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]] =
-    listExpired(limit, cc.coin.LockedCoin.COMPANION)(_.coin)
+  def listLockedExpiredCoins
+      : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
+    listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
 
-  private[this] def listExpired[Id <: javab.codegen.ContractId[T], T <: javab.Template](
-      limit: Int,
-      companion: TemplateCompanion[Id, T],
-  )(coin: T => cc.coin.Coin)(implicit ec: ExecutionContext): Future[Seq[Contract[Id, T]]] =
+  private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
+      companion: TemplateCompanion[Id, T]
+  )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
     for {
       maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
       result <- maybeLatestOpenMiningRound.fold(

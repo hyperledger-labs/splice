@@ -417,4 +417,20 @@ object AcsStore {
       )
     }
   }
+
+  import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
+
+  private[network] def listExpiredFromPayloadExpiry[TCid <: ContractId[T], T <: Template](
+      acs: Future[AcsStore],
+      companion: TemplateCompanion[TCid, T],
+  )(
+      expiresAt: T => java.time.Instant
+  )(implicit ec: ExecutionContext): ListExpiredContracts[TCid, T] = (now, limit) =>
+    for {
+      acs <- acs
+      contracts <- acs.listContracts(companion)
+    } yield contracts.iterator
+      .filter(co => now.toInstant isAfter expiresAt(co.payload))
+      .take(limit)
+      .toSeq
 }

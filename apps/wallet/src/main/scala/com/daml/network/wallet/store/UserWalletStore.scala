@@ -1,7 +1,5 @@
 package com.daml.network.wallet.store
 
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen as jcg
 import com.daml.network.automation.ExpiredContractTrigger
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -39,7 +37,6 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import java.time.Instant
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
@@ -65,31 +62,29 @@ trait UserWalletStore
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     defaultAcs.flatMap(_.signalWhenIngested(offset))
 
-  def listExpiredTransferOffers: ExpiredContractTrigger.ListExpiredContracts[
+  import ExpiredContractTrigger.ListExpiredContracts
+  import AcsStore.listExpiredFromPayloadExpiry
+
+  def listExpiredTransferOffers: ListExpiredContracts[
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
-  ] = listExpiredContracts(transferOffersCodegen.TransferOffer.COMPANION)(_.expiresAt)
+  ] = listExpiredFromPayloadExpiry(defaultAcs, transferOffersCodegen.TransferOffer.COMPANION)(
+    _.expiresAt
+  )
 
-  def listExpiredAcceptedTransferOffers: ExpiredContractTrigger.ListExpiredContracts[
+  def listExpiredAcceptedTransferOffers: ListExpiredContracts[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
-  ] = listExpiredContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(_.expiresAt)
+  ] =
+    listExpiredFromPayloadExpiry(defaultAcs, transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
+      _.expiresAt
+    )
 
-  def listExpiredAppPaymentRequests: ExpiredContractTrigger.ListExpiredContracts[
+  def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,
     walletCodegen.AppPaymentRequest,
-  ] = listExpiredContracts(walletCodegen.AppPaymentRequest.COMPANION)(_.expiresAt)
-
-  private[this] def listExpiredContracts[TCid <: jcg.ContractId[T], T <: Template](
-      companion: Contract.Companion.Template[TCid, T]
-  )(expiresAt: T => Instant): ExpiredContractTrigger.ListExpiredContracts[TCid, T] = (now, limit) =>
-    for {
-      acs <- defaultAcs
-      contracts <- acs.listContracts(companion)
-    } yield contracts.iterator
-      .filter(co => now.toInstant isAfter expiresAt(co.payload))
-      .take(limit)
-      .toSeq
+  ] =
+    listExpiredFromPayloadExpiry(defaultAcs, walletCodegen.AppPaymentRequest.COMPANION)(_.expiresAt)
 
   def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext

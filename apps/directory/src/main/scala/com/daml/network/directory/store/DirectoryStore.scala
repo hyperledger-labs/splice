@@ -98,16 +98,14 @@ trait DirectoryStore extends CoinAppStoreWithoutHistory {
       )
     } yield list.take(pageSize)
 
-  // TODO (#2828) factor with UserWalletStore#listExpiredContracts
-  def listExpiredDirectoryEntries(now: CantonTimestamp, limit: Int): Future[
-    Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ] = for {
-    acs <- defaultAcs
-    entries <- acs.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
-  } yield entries.iterator
-    .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
-    .take(limit)
-    .toSeq
+  import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
+  import AcsStore.listExpiredFromPayloadExpiry
+
+  def listExpiredDirectoryEntries: ListExpiredContracts[
+    directoryCodegen.DirectoryEntry.ContractId,
+    directoryCodegen.DirectoryEntry,
+  ] =
+    listExpiredFromPayloadExpiry(defaultAcs, directoryCodegen.DirectoryEntry.COMPANION)(_.expiresAt)
 
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
