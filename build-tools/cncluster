@@ -519,7 +519,7 @@ function _cluster_reset() {
 
 subcommand_whitelist[ciapply]='Run only by CircleCI'
 
-function cluster_ciapply() {
+function subcmd_ciapply() {
     # A CI specific variant of 'cncluster apply' that removes the need
     # for manual confirmation and ensures that all pods are deleted
     # and recreated during the apply. With current (September 2022)
