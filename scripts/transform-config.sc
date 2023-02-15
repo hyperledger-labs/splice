@@ -1,4 +1,4 @@
-import com.daml.network.config.{CoinConfig, CoinConfigTransforms}
+import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.digitalasset.canton.config.CantonCommunityConfig
 
 import java.nio.file.Paths
@@ -11,13 +11,13 @@ object TransformConfig extends App {
   mode match {
     case "remoteCantonConfigWithAdminTokens" =>
       val inputConfig = CantonCommunityConfig.parseAndLoadOrExit(Seq(inputFileName.toFile))
-      val outputConfig = CoinConfigTransforms.remoteCantonConfigWithAdminTokens(inputConfig)
+      val outputConfig = CNNodeConfigTransforms.remoteCantonConfigWithAdminTokens(inputConfig)
       CantonCommunityConfig.writeToFile(outputConfig, outputFileName)
     case "useSelfSignedTokensForLedgerApiAuth" =>
-      val inputConfig = CoinConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
-      val outputConfig = CoinConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
+      val inputConfig = CNNodeConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
+      val outputConfig = CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
       // Deliberately leaking secrets to file
-      CoinConfig.writeToFile(outputConfig, outputFileName, confidential = false)
+      CNNodeConfig.writeToFile(outputConfig, outputFileName, confidential = false)
     case _ =>
       println(s"Unknown mode '$mode'")
       sys.exit(-1)

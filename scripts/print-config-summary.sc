@@ -1,7 +1,7 @@
 import java.io.File
 import scala.collection.mutable
 
-import com.daml.network.config.CoinConfig
+import com.daml.network.config.CNNodeConfig
 
 // TODO(tech-debt): make it easier/automatic to select the input config files
 // TODO(tech-debt): print daml user names used in the config
@@ -19,7 +19,7 @@ object ConfigSummaryPrinter extends App {
   private def printPortSummary(files: Seq[File]): Unit = {
     val ports = mutable.ListBuffer[(Int, String)]()
 
-    val config = CoinConfig.parseAndLoadOrThrow(files)
+    val config = CNNodeConfig.parseAndLoadOrThrow(files)
 
     config.domains.foreach { case (name, i) =>
       ports.addOne(
