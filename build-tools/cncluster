@@ -256,24 +256,24 @@ function subcmd_push() {
 
 ###
 
-subcommand_whitelist[logs]='Stream logs from an application container running in cluster'
+subcommand_whitelist[rlogs]='Stream a running application log stream to standard output'
 
 function _json_log_format() {
     jq -R 'fromjson? | select(type == "object")' \
         | jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
 }
 
-function subcmd_logs() {
+function subcmd_rlogs() {
     if [ "${1-}" = "--raw" ]; then
         raw=yes
         shift
     fi
 
-    app=$1
-
-    if [ -z "${app}" ]; then
+    if [ -z "${1-}" ]; then
         _error "No app specified"
     fi
+
+    app=$1
 
     _cluster_must_exist
 
@@ -289,6 +289,34 @@ function subcmd_logs() {
         else
             kubectl logs ${POD_SPEC} ${app} -f | _json_log_format
         fi
+    else
+        _error "No pod for app found: ${app}"
+    fi
+}
+
+###
+
+subcommand_whitelist[logs]='View an running application log stream in lnav'
+
+function subcmd_logs() {
+    if [ -z "${1-}" ]; then
+        _error "No app specified"
+    fi
+
+    app=$1
+
+    _cluster_must_exist
+
+    if POD_SPEC=$(kubectl get pod \
+                          --all-namespaces \
+                          -l app=${app} \
+                          -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
+                          2> /dev/null); then
+
+
+        LOGFILE=$(mktemp cnlogXXXXXXX.clog)
+        (kubectl logs ${POD_SPEC} ${app} -f >> ${LOGFILE} & lnav ${LOGFILE})
+        rm ${LOGFILE}
     else
         _error "No pod for app found: ${app}"
     fi
@@ -446,55 +474,6 @@ function subcmd_create() {
     subcmd_update_secrets
 
     _log "Cluster ready."
-}
-
-###
-
-subcommand_whitelist[check]='Runs a simple baseline check of cluster operation'
-
-function _check_cluster_grpc_port() {
-    PORT=$1
-
-    if  grpcurl -plaintext ${CLUSTER_DNS_NAME}:${PORT} list > /dev/null; then
-        _ok "gRPC API Reachable: $2"
-    else
-        _nope "gRPC API NOT Reachable: $2"
-    fi
-}
-
-function _check_cluster_ledger() {
-    if ! CLUSTER_ADDR="${CLUSTER_DNS_NAME}" coin \
-         --config ${REPO_ROOT}/build-tools/cluster-test.conf \
-         --bootstrap ${REPO_ROOT}/build-tools/cluster-test.sc; then
-        _error "Cannot run ledger access test."
-    fi
-}
-
-function subcmd_check() {
-    _cluster_show
-
-    _check_cluster_grpc_port 5008 "Canton Domain Connection"
-    _check_cluster_grpc_port 5009 "Canton Domain Admin"
-
-    _check_cluster_grpc_port 5001 "Ledger Participant API"
-    _check_cluster_grpc_port 5002 "Ledger Participant Admin API"
-
-    _check_cluster_grpc_port 5005 "SVC App API"
-    _check_cluster_grpc_port 5014 "SV1 App API"
-    _check_cluster_grpc_port 5114 "SV2 App API"
-    _check_cluster_grpc_port 5214 "SV3 App API"
-    _check_cluster_grpc_port 5314 "SV4 App API"
-    _check_cluster_grpc_port 5012 "Scan App API"
-
-    _check_cluster_grpc_port 5101 "Validator1: Ledger Participant API"
-    _check_cluster_grpc_port 5102 "Validator1: Ledger Participant Admin API"
-
-    _check_cluster_grpc_port 5201 "Splitwell: Ledger Participant API"
-    _check_cluster_grpc_port 5202 "Splitwell: Ledger Participant Admin API"
-    _check_cluster_grpc_port 5213 "Splitwell: Splitwell App API"
-
-    _log "Checking cluster via ping test..."
-    _check_cluster_ledger
 }
 
 ###

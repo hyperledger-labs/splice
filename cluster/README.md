@@ -55,19 +55,19 @@ of which are accessible only through VPN:
 | DevNet         | http://dev.network.canton.global         | Nightly, 6AM UTC                 | Current, Tested `main`             |
 | Staging        | http://staging.network.canton.global     | After every push to `main`       | Latest `main`                      |
 | ScratchNet     | http://scratch.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development  |
+| ScratchNetB    | http://scratchb.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
+| ScratchNetC    | http://scratchc.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
 | SqlScratchNet  | http://sqlscratch.network.canton.global  | Ad hoc, manual                   | CloudSQL Configuration Prototype   |
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/the-real-canton-coin/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fthe-real-canton-coin)
 [CI/CD](/.circleci/config.yml) in CircleCI.
 
-The ScratchNet and SqlScratchNet clusters are manually managed and
-intended to be test beds for new code, deployment process updates, and
-CloudSQL integration. These are a shared resource, so please
-coordinate with the team prior to making changes.
-
-Additional clusters can be created without difficulty, although with
-additional running costs.
+The ScratchNet, ScratchNetB, ScratchNetC, and SqlScratchNet clusters
+are manually managed and intended to be test beds for new code,
+deployment process updates, and CloudSQL integration. These are a
+shared resource, so please coordinate with the team prior to making
+changes.
 
 ## Connecting to a Cluster
 
@@ -138,17 +138,9 @@ this environment. This includes the REPL, participant nodes, and
 domain nodes.  If you don't have Canton, you may install it following the
 instructions [here](https://docs.daml.com/canton/usermanual/installation.html).
 
-Canton configuration files
-([`cluster-test.conf`](build-tools/cluster-test.conf) and
-[`cluster-test.sc`](build-tools/cluster-test.sc)) are available in the
-source code repository under [`build-tools`](build-tools). These are
-used by `cncluster check` as part of its ledger API test, and
-establish both a local participant connected to the Canton Network
-global domain and a connection to a remote participant.
-
-As part of the runbook a participant node is also spun up and connects
-to the DevNet domain. Therefore, the runbook contains alternative
-scripts for connecting a local participant to the DevNet domain.
+As part of the runbook a participant node is spun up and connects to
+the DevNet domain. Therefore, the runbook contains alternative scripts
+for connecting a local participant to the DevNet domain.
 
 ### Network Configuration Within Kubernetes
 
