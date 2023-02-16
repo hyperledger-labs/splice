@@ -125,10 +125,6 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       _.targetClosesAt
     )
 
-  /** List coins that are expired and can never be used as transfer input. */
-  def listExpiredCoins: ListExpiredContracts[cc.coin.Coin.ContractId, cc.coin.Coin] =
-    listExpiredRoundBased(cc.coin.Coin.COMPANION)(identity)
-
   /** List locked coins that are expired and can never be used as transfer input. */
   def listLockedExpiredCoins
       : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =

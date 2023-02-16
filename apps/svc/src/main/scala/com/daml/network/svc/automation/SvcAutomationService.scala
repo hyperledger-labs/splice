@@ -48,7 +48,6 @@ class SvcAutomationService(
       config.automation.enableUnclaimedRewardExpiration,
     )
   )
-  registerTrigger(new ExpiredCoinTrigger(triggerContext, store, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, store, connection))
   registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, store, connection))
   if (config.automation.enableUnclaimedRewardExpiration) {

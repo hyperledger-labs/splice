@@ -296,6 +296,19 @@ template SvcRules with
           pure ()
         create ValidatorLicense with ..
 
+
+    -- Coin management driven directly by the leader
+    --------------------------------------------------
+
+    nonconsuming choice SvcRules_Coin_Expire : ()
+      with
+        cid : ContractId Coin
+        choiceArg : Coin_Expire
+      controller leader
+      do
+        exercise cid choiceArg
+
+
     -- Reward management driven directly by the leader
     --------------------------------------------------
 
