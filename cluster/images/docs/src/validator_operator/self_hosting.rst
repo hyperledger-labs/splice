@@ -71,12 +71,9 @@ In order to become a validator, you need the sponsorship of a current supervalid
 In this feature preview, you can obtain such a sponsorship without interacting with a supervalidator operator.
 Use the following shell command to get sponsored by supervalidator 1 and obtain an onboarding secret from it (saved to `validator-onboarding.conf`):
 
-..
-   TODO(#2903) revisit the API so that we can use a nicer command here (without "admin", "POST" and a JSON request...)
-
 .. parsed-literal::
 
-   curl -X POST -H 'Content-Type: application/json' -d '{"expires_in": 3600}' https://|cn_cluster|.network.canton.global:6014/admin/validator/onboarding/prepare | jq '.secret' | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+   curl -X POST https://|cn_cluster|.network.canton.global:6014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 You can now start a console with the CN apps. Use the following command, making sure that the `validator-onboarding.conf` matches the file you created in the previous step.
 

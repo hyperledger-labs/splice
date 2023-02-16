@@ -157,6 +157,26 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
   }
 
+  "Validator candidates can self-service at the validator onboarding tap" in { implicit env =>
+    initSvc()
+    val sv = sv3 // a random sv
+    sv.listOngoingValidatorOnboardings() should have length 0
+    actAndCheck(
+      "the validator candidate requests a secret from the validator onboarding tap", {
+        sv.devNetOnboardValidatorPrepare()
+      },
+    )(
+      "a validator onboarding contract is created",
+      { secret =>
+        {
+          inside(sv.listOngoingValidatorOnboardings()) { case Seq(vo) =>
+            vo.payload.candidateSecret shouldBe secret
+          }
+        }
+      },
+    )
+  }
+
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV2 has created as many ValidatorOnboarding contracts as it's configured to.") {

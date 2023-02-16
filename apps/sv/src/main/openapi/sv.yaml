@@ -67,6 +67,31 @@ paths:
             text/plain:
               schema:
                 type: string
+  /devnet/onboard/validator/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      description: "faucet for validator candidates self-service"
+      operationId: "devNetOnboardValidatorPrepare"
+      responses:
+        "200":
+          description: ok
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+        "501":
+          description: not implemented
+          content:
+            text/plain:
+              schema:
+                type: string
   /debug:
     get:
       tags: [sv]

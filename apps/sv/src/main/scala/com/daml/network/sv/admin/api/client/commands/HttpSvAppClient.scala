@@ -105,6 +105,27 @@ object HttpSvAppClient {
     }
   }
 
+  case class DevNetOnboardValidatorPrepare()
+      extends BaseCommand[http.DevNetOnboardValidatorPrepareResponse, String] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.DevNetOnboardValidatorPrepareResponse] =
+      client.devNetOnboardValidatorPrepare(headers = headers)
+
+    override def handleResponse(response: http.DevNetOnboardValidatorPrepareResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, String] = response match {
+      case http.DevNetOnboardValidatorPrepareResponse.OK(secret) => Right(secret)
+      case http.DevNetOnboardValidatorPrepareResponse.InternalServerError(e) => Left(e)
+      case http.DevNetOnboardValidatorPrepareResponse.NotImplemented(e) => Left(e)
+    }
+  }
+
   case object GetDebugInfo extends BaseCommand[http.GetDebugInfoResponse, DebugInfo] {
 
     override def submitRequest(

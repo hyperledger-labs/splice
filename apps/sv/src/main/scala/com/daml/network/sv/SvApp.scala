@@ -93,6 +93,11 @@ class SvApp(
           )
         }
       _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, clock)
+      isDevNet <- retryProvider.retryForAutomation(
+        "get CoinRules to determine if we are in a DevNet",
+        svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
+        this,
+      )
       // TODO(M3-46) split the SV API into a client API and an admin API with auth
       routes = cors() {
         SvResource.routes(
@@ -101,6 +106,7 @@ class SvApp(
             config.ledgerApiUser,
             svStore,
             svcStore,
+            isDevNet,
             clock,
             retryProvider,
             flagCloseable = this,

@@ -20,24 +20,15 @@ abstract class SvAppReference(
 
   override protected val instanceType = "SV Client"
 
-  def listOngoingValidatorOnboardings()
-      : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.ListOngoingValidatorOnboardings
-      )
-    }
-
-  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn)
-      )
-    }
-
   def onboardValidator(validator: PartyId, secret: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.OnboardValidator(validator, secret))
+    }
+
+  @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via client API)")
+  def devNetOnboardValidatorPrepare(): String =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.DevNetOnboardValidatorPrepare())
     }
 
   def getDebugInfo(): HttpSvAppClient.DebugInfo =
@@ -89,6 +80,22 @@ class SvAppBackendReference(
   @Help.Summary("Return sv app config")
   def config: LocalSvAppConfig =
     consoleEnvironment.environment.config.svsByString(name)
+
+  def listOngoingValidatorOnboardings()
+      : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAppClient.ListOngoingValidatorOnboardings
+      )
+    }
+
+  @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via admin API)")
+  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn)
+      )
+    }
 
   /** Remote participant this sv app is configured to interact with. */
   lazy val remoteParticipant =

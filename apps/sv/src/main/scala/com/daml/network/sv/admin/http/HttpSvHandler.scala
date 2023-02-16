@@ -25,6 +25,7 @@ class HttpSvHandler(
     svUserName: String,
     svStore: SvSvStore,
     svcStore: SvSvcStore,
+    isDevNet: Boolean,
     clock: Clock,
     retryProvider: CoinRetries,
     flagCloseable: FlagCloseable,
@@ -101,6 +102,31 @@ class HttpSvHandler(
           }
         case Left(error) =>
           Future.successful(v0.SvResource.OnboardValidatorResponseBadRequest(error))
+      }
+    }
+
+  def devNetOnboardValidatorPrepare(
+      respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type
+  )(): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      if (isDevNet) {
+        val secret = generateRandomOnboardingSecret()
+        val expiresIn = NonNegativeFiniteDuration.ofHours(1)
+        SvApp
+          .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+          .map {
+            case Left(reason) =>
+              v0.SvResource.DevNetOnboardValidatorPrepareResponseInternalServerError(
+                s"Could not prepare onboarding: $reason"
+              )
+            case Right(()) => v0.SvResource.DevNetOnboardValidatorPrepareResponseOK(secret)
+          }
+      } else {
+        Future.successful(
+          v0.SvResource.DevNetOnboardValidatorPrepareResponseNotImplemented(
+            s"Validator onboarding preparation self-service is only available in DevNet."
+          )
+        )
       }
     }
 
