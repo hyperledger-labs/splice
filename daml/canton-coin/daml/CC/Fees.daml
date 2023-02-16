@@ -87,8 +87,8 @@ goChargeSteppedRate (remainder, currentRate, rate) ((step, steppedRate) :: steps
 scaleSteppedRate : Decimal -> SteppedRate -> SteppedRate
 scaleSteppedRate s r =
   SteppedRate with
-    initialRate = r.initialRate * s
-    steps = map (\(step, rate) -> (step, rate * s)) $ r.steps
+    initialRate = r.initialRate
+    steps = map (\(step, rate) -> (step * s, rate)) $ r.steps
 
 -- Expiring amounts
 ----------------------

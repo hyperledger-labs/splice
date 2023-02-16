@@ -130,18 +130,16 @@ testUSDSubscription = script do
   let expectedFeeInUnlockLeg =
         (
           transferConfigCC.createFee.fee +
-          transferConfigCC.transferFee.initialRate * payData.paymentAmount.amount
+          transferConfigCC.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.coinPrice)
         )
 
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty
-  -- reward.amount === expectedFeeInUnlockLeg
-  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
+  reward.amount === expectedFeeInUnlockLeg
   reward.featured === True
 
   rewards <- query @CC.Coin.ValidatorRewardCoupon alice.primaryParty
   let amounts = map (._2.amount) rewards
-  -- sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInUnlockLeg])
-  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
+  sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInUnlockLeg])
 
   coins1 <- query @Coin pizzeria.primaryParty
 
@@ -157,8 +155,7 @@ testUSDSubscription = script do
 
   rewards <- query @CC.Coin.AppRewardCoupon provider.primaryParty
   let amounts = map (._2.amount) rewards
-  -- sort amounts === sort ([expectedFeeInUnlockLeg, expectedFeeInUnlockLeg])
-  -- TODO(#2860): ^ uncomment once bug in stepped rate is fixed
+  sort amounts === sort ([expectedFeeInUnlockLeg, expectedFeeInUnlockLeg])
 
   coins2 <- query @Coin pizzeria.primaryParty
   map (\(_, c) -> c.amount.initialAmount) (coins2 `diffContracts` coins1) === [0.5]

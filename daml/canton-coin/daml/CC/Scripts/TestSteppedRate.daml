@@ -3,6 +3,7 @@ module CC.Scripts.TestSteppedRate where
 import DA.Assert
 
 import Daml.Script
+import DA.Foldable (forA_)
 
 import CC.Fees
 
@@ -28,3 +29,22 @@ test = script do
     === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0 + 0.00001 * 1.0
   chargeSteppedRate example (100.0 + 1000.0 + 1000000.0 + 1000000.0)
     === 0.01 * 100.0 + 0.001 * 1000.0 + 0.0001 * 1000000.0 + 0.00001 * 1000000.0
+
+testScaledSteppedRate : Script ()
+testScaledSteppedRate = script do
+  let unscaledRate = SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+  checkAllForScale unscaledRate 0.5
+  checkAllForScale unscaledRate 1.0
+  checkAllForScale unscaledRate 2.0
+
+checkAllForScale : SteppedRate -> Decimal -> Script ()
+checkAllForScale unscaledRate scale = do
+  let scaledRate = scaleSteppedRate scale unscaledRate
+  forA_ (map (._1) unscaledRate.steps) $ \(step) -> do
+    checkScaledSteppedRate unscaledRate scale scaledRate step
+    checkScaledSteppedRate unscaledRate scale scaledRate (step + 0.1)
+    checkScaledSteppedRate unscaledRate scale scaledRate (step / 2.0)
+
+checkScaledSteppedRate : SteppedRate -> Decimal -> SteppedRate -> Decimal -> Script ()
+checkScaledSteppedRate unscaledRate scale scaledRate value = do
+  chargeSteppedRate scaledRate value === (chargeSteppedRate unscaledRate (value / scale)) * scale
