@@ -465,7 +465,7 @@
                "moduleName": "canton-domain"
             },
             "name": "splitwell-domain",
-            "namespace": "svc"
+            "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
@@ -495,7 +495,7 @@
                            },
                            {
                               "name": "CANTON_DOMAIN_POSTGRES_SERVER",
-                              "value": "sw-postgres.splitwell"
+                              "value": "sw-postgres"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -557,7 +557,7 @@
          "metadata": {
             "clusterName": "cluster",
             "name": "splitwell-domain",
-            "namespace": "svc"
+            "namespace": "splitwell"
          },
          "spec": {
             "ports": [
@@ -1992,7 +1992,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain.svc:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain.splitwell:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2944,7 +2944,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
-                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain.svc:5008\"}]"
+                              "value": "[{\"alias\": \"splitwell\", \"url\": \"http://splitwell-domain:5008\"}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",

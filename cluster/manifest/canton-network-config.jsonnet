@@ -110,7 +110,7 @@ local svcDeployments(config) = [
       },
     ],
     image="canton-domain",
-    namespace="svc",
+    namespace="splitwell",
     ext={
       readinessProbe: {
         tcpSocket: {
@@ -135,7 +135,7 @@ local svcDeployments(config) = [
     cpuRequest=config.domainCpu,
     memoryLimitMiB=config.domainMemoryMib,
     extraEnvVars=[
-      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres.splitwell" },
+      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres" },
     ]
   ),
 
@@ -277,7 +277,7 @@ local validator1Deployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain.svc:5008",
+        url: "http://splitwell-domain.splitwell:5008",
       },
     ] },
   ]),
@@ -378,7 +378,7 @@ local splitwellDeployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain.svc:5008",
+        url: "http://splitwell-domain:5008",
       },
     ] },
   ]),
