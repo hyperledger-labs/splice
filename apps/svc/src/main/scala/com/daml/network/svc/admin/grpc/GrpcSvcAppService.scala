@@ -1,7 +1,6 @@
 package com.daml.network.svc.admin.grpc
 
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
@@ -42,10 +41,6 @@ class GrpcSvcAppService(
       for {
         // TODO (#2705) Set domain id from config here.
         domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-        coinRulesCids <-
-          connection
-            .activeContracts(domainId, store.svcParty, cc.coin.CoinRules.COMPANION)
-            .map(_.map(_.id))
       } yield v0.GetDebugInfoResponse(
         svcUser = svcUserName,
         svcPartyId = Proto.encode(store.svcParty),

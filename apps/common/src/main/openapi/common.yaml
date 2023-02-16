@@ -29,7 +29,10 @@ components:
           type: object
         metadata:
           $ref: '#/components/schemas/ContractMetadata'
-      required: ["template_id", "contract_id", "payload"]
+        create_arguments_blob:
+          type: string
+          format: binary # base-16 encoded.
+      required: ["template_id", "contract_id", "payload", "metadata", "create_arguments_blob"]
     ContractId:
       type: string
     ConnectedDomains:

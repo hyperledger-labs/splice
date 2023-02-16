@@ -210,17 +210,16 @@ object AcsStore {
   ) {
     def toInterfaceContract(
         interfaceCompanion: InterfaceCompanion[I, Id, View]
-    )(ev: CreatedEvent): Contract[Id, View] = {
-      val templateContract: Contract[TCid, Tmpl] =
-        Contract.fromCodegenContract[TCid, Tmpl](
-          companion.fromCreatedEvent(ev),
-          Some(ev.getContractMetadata),
+    )(ev: CreatedEvent): Option[Contract[Id, View]] = {
+      val templateContractO: Option[Contract[TCid, Tmpl]] = Contract.fromCreatedEvent(companion)(ev)
+      templateContractO.map(templateContract =>
+        Contract[Id, View](
+          interfaceCompanion.TEMPLATE_ID,
+          interfaceCompanion.toContractId(new ContractId(templateContract.contractId.contractId)),
+          view(templateContract.payload),
+          ev.getContractMetadata,
+          ev.getCreateArgumentsBlob,
         )
-      Contract[Id, View](
-        interfaceCompanion.TEMPLATE_ID,
-        interfaceCompanion.toContractId(new ContractId(templateContract.contractId.contractId)),
-        view(templateContract.payload),
-        Some(ev.getContractMetadata),
       )
     }
   }
@@ -348,13 +347,7 @@ object AcsStore {
   ): (Identifier, CreatedEvent => Boolean) =
     (
       templateCompanion.TEMPLATE_ID,
-      ev =>
-        p(
-          Contract.fromCodegenContract[TCid, T](
-            templateCompanion.fromCreatedEvent(ev),
-            Some(ev.getContractMetadata),
-          )
-        ),
+      ev => Contract.fromCreatedEvent(templateCompanion)(ev).exists(p),
     )
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -366,7 +359,7 @@ object AcsStore {
   ): (Identifier, (CreatedEvent => Boolean, InterfaceDecoder)) = {
     val decoder: InterfaceDecoder = new InterfaceDecoder {
 
-      val implementationViews: Map[Identifier, CreatedEvent => Contract[Id, View]] =
+      val implementationViews: Map[Identifier, CreatedEvent => Option[Contract[Id, View]]] =
         implementations.map { i =>
           i.companion.TEMPLATE_ID -> i.toInterfaceContract(interfaceCompanion)
         }.toMap
@@ -381,7 +374,7 @@ object AcsStore {
         case _: interfaceCompanion.type =>
           implementationViews
             .get(ev.getTemplateId)
-            .map(toIface => toIface(ev))
+            .flatMap(toIface => toIface(ev))
         case _ =>
           throw new IllegalArgumentException(
             s"Tried to decode ${companion.TEMPLATE_ID} but decoder is for ${interfaceCompanion.TEMPLATE_ID}"

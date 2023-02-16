@@ -521,9 +521,9 @@ class TreasuryService(
         )
         val contractsToDisclose =
           Seq(
-            coinRules.tryToDisclosedContract,
-            openRound.tryToDisclosedContract,
-          ) ++ openIssuingRounds.map(_.tryToDisclosedContract)
+            coinRules.toDisclosedContract,
+            openRound.toDisclosedContract,
+          ) ++ openIssuingRounds.map(_.toDisclosedContract)
         Some(
           (
             inputs,

@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter
 
 object ContractMetadataUtil {
 
-  def tryToJson(contractMetadata: ContractMetadata): http.ContractMetadata = {
+  def toJson(contractMetadata: ContractMetadata): http.ContractMetadata = {
 
     val res = http.ContractMetadata(
       createdAt = DateTimeFormatter.ISO_INSTANT.format(contractMetadata.createdAt),
@@ -20,7 +20,7 @@ object ContractMetadataUtil {
     res
   }
 
-  def tryFromJson(metadata: http.ContractMetadata): ContractMetadata = {
+  def fromJson(metadata: http.ContractMetadata): ContractMetadata = {
     val res = new ContractMetadata(
       Instant.from(DateTimeFormatter.ISO_INSTANT.parse(metadata.createdAt)),
       ByteString.copyFrom(Hex.decodeHex(metadata.contractKeyHash)),

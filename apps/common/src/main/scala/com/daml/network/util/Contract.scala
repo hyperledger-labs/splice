@@ -3,6 +3,7 @@
 
 package com.daml.network.util
 
+import com.google.protobuf
 import cats.syntax.either.*
 import com.daml.ledger.api.v1.contract_metadata.ContractMetadata.toJavaProto
 import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
@@ -29,6 +30,7 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.parser as circe
+import org.apache.commons.codec.binary.Hex
 
 import scala.util.Try
 
@@ -47,17 +49,18 @@ final case class Contract[TCid, T](
     identifier: Identifier,
     contractId: TCid & ContractId[_],
     payload: T & DamlRecord[_],
-    metadata: Option[ContractMetadata],
-    // TODO(M4-82): also add a createArgumentsBlob attribute to be able to disclose interface views.
+    metadata: ContractMetadata,
+    createArgumentsBlob: protobuf.Any,
 ) extends PrettyPrinting {
 
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
     contractId = contractId.contractId,
     payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
-    metadata = metadata.map(m =>
-      com.daml.ledger.api.v1.contract_metadata.ContractMetadata.fromJavaProto(m.toProto)
+    metadata = Some(
+      com.daml.ledger.api.v1.contract_metadata.ContractMetadata.fromJavaProto(metadata.toProto)
     ),
+    createArgumentsBlob = Some(com.google.protobuf.any.Any.fromJavaProto(createArgumentsBlob)),
   )
 
   def toJson(implicit elc: ErrorLoggingContext): http.Contract = {
@@ -74,18 +77,21 @@ final case class Contract[TCid, T](
             .compactPrint
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
-      metadata = metadata.map(m => ContractMetadataUtil.tryToJson(m)),
+      metadata = ContractMetadataUtil.toJson(metadata),
+      createArgumentsBlob = Hex.encodeHexString(createArgumentsBlob.toByteArray),
     )
   }
 
-  def tryToDisclosedContract: CommandsOuterClass.DisclosedContract = {
+  def toDisclosedContract: CommandsOuterClass.DisclosedContract = {
     com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract
       .newBuilder()
-      // TODO(M4-82): use setCreateArgumentsBlob instead for interface views.
-      .setCreateArguments(payload.toValue.toProtoRecord)
+      .setCreateArguments(
+        payload.toValue.toProtoRecord
+      ) // TODO(#2676): use createArgumentsBlob here. Can't use it yet because currently the blob is always empty when
+      // using the update-service.
       .setContractId(contractId.contractId)
       .setTemplateId(identifier.toProto)
-      .setMetadata(metadata.getOrElse(sys.error(s"found no metadata for contract $this")).toProto)
+      .setMetadata(metadata.toProto)
       .build()
   }
 
@@ -131,7 +137,6 @@ object Contract {
         ),
       )
       contractId = companion.toContractId(new ContractId[T](contract.contractId))
-      metadataO = contract.metadata.map(m => ContractMetadata.fromProto(toJavaProto(m)))
       payloadP <- ProtoConverter.required("payload", contract.payload)
       payload <- Try(
         decoder.decode(
@@ -140,11 +145,22 @@ object Contract {
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
+      metadata <- ProtoConverter.required(
+        "ContractMetadata",
+        contract.metadata.map(m => ContractMetadata.fromProto(toJavaProto(m))),
+      )
+      createArgumentsBlob <- ProtoConverter
+        .required(
+          "createArgumentsBlob",
+          contract.createArgumentsBlob,
+        )
+        .map(com.google.protobuf.any.Any.toJavaProto)
     } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
-      metadata = metadataO,
+      metadata = metadata,
+      createArgumentsBlob = createArgumentsBlob,
     )
   }
 
@@ -172,17 +188,19 @@ object Contract {
         ),
       )
       contractId = companion.toContractId(new ContractId[T](contract.contractId))
-      metadataO = contract.metadata.map(m => ContractMetadataUtil.tryFromJson(m))
       payload <- Try(
         decoder.decodeTemplate(companion)(contract.payload)
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
+      metadata = ContractMetadataUtil.fromJson(contract.metadata)
+      createArgumentsBlob = protobuf.Any.parseFrom(Hex.decodeHex(contract.createArgumentsBlob))
     } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
-      metadata = metadataO,
+      metadata = metadata,
+      createArgumentsBlob = createArgumentsBlob,
     )
   }
 
@@ -204,16 +222,22 @@ object Contract {
     } yield res
   }
 
-  def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
+  /** This method is private on purpose because we only want to allow the construction of a
+    * [[com.daml.network.util.Contract]] instance through passing a [[com.daml.ledger.javaapi.data.CreatedEvent]]
+    * instance and not through a [[com.daml.ledger.javaapi.data.Contract]] because
+    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `metadata` and `createArgumentsBlob`
+    * arguments we need.
+    */
+  private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
-      metadata: Option[ContractMetadata],
+      ev: CreatedEvent,
   ): Contract[TCid, T] = {
     Contract(
       identifier = contract.getContractTypeId,
       contractId = contract.id,
       payload = contract.data,
-      // TODO(#2577): this is why contractmetadata is optional.
-      metadata = metadata,
+      metadata = ev.getContractMetadata,
+      createArgumentsBlob = ev.getCreateArgumentsBlob,
     )
   }
 
@@ -222,7 +246,7 @@ object Contract {
   )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(Contract.fromCodegenContract(_, Some(ev.getContractMetadata)))
+      .map(fromCodegenContract(_, ev))
   }
 
   def fromCreatedEvent[Id <: ContractId[?], View <: DamlRecord[?]](
@@ -230,5 +254,5 @@ object Contract {
   )(ev: CreatedEvent): Option[Contract[Id, View]] =
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(Contract.fromCodegenContract(_, Some(ev.getContractMetadata)))
+      .map(fromCodegenContract(_, ev))
 }

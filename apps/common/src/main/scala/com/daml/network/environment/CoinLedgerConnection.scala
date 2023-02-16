@@ -42,6 +42,7 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import com.daml.network.util.CreatedEventImplicits.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
@@ -861,16 +862,8 @@ object CoinLedgerConnection {
     }
   }
 
-  private def transactionFilterByParty(partyId: PartyId, templateId: Identifier): IngestionFilter =
+  def transactionFilterByParty(partyId: PartyId, templateId: Identifier): IngestionFilter =
     IngestionFilter(partyId, templateIds = Set(templateId), interfaceIds = Set.empty)
 
   def uniqueId: String = UUID.randomUUID.toString
-
-  implicit class CreatedEventSyntax(private val event: CreatedEvent) extends AnyVal {
-    // We want to match ledger API ACS filtering here so we only include stakeholder contracts.
-    def hasStakeholder(party: PartyId): Boolean = {
-      val p = party.toProtoPrimitive
-      event.getSignatories.asScala.contains(p) || event.getObservers.asScala.contains(p)
-    }
-  }
 }

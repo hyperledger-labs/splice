@@ -3,11 +3,12 @@ package com.daml.network.v0;
 
 import "com/daml/ledger/api/v1/value.proto";
 import "com/daml/ledger/api/v1/contract_metadata.proto";
+import "google/protobuf/any.proto";
 
 message Contract {
   com.daml.ledger.api.v1.Identifier template_id = 1;
   string contract_id = 2;
   com.daml.ledger.api.v1.Record payload = 3;
   com.daml.ledger.api.v1.ContractMetadata metadata = 4;
-
+  google.protobuf.Any create_arguments_blob = 5;
 }

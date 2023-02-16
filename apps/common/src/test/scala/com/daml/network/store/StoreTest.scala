@@ -10,13 +10,13 @@ import com.daml.ledger.javaapi.data.{
   TreeEvent,
   Unit as damlUnit,
 }
+import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.google.protobuf.Any
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -47,7 +47,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),
-      metadata = Some(ContractMetadata.Empty()),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def validatorRewardCoupon(
@@ -66,7 +67,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),
-      metadata = Some(ContractMetadata.Empty()),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
@@ -80,8 +82,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
-      createArgumentsBlob = Any.getDefaultInstance, // TODO(#2577): pass through blob.
-      contractMetadata = contract.metadata.value,
+      createArgumentsBlob = contract.createArgumentsBlob,
+      contractMetadata = contract.metadata,
       witnessParties = Seq.empty.asJava,
       signatories = Seq.empty.asJava,
       observers = Seq.empty.asJava,
