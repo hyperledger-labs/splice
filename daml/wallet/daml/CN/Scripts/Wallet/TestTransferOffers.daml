@@ -11,7 +11,6 @@ import CN.Wallet.Payment
 
 import CC.Scripts.Util
 
-testTransferOffers : Script ()
 testTransferOffers = script do
 
   app <- setupApp
@@ -47,8 +46,7 @@ testTransferOffers = script do
           description = description
           expiresAt = curTime `addRelTime` minutes 5
 
--- TODO(#2957): remove read-as SVC. 
-  let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [alice.primaryParty, validator, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
+  let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [alice.primaryParty, validator] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
         inputs = [API.InputCoin $ toInterfaceContractId coin]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext

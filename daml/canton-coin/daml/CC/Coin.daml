@@ -578,7 +578,7 @@ template CoinRulesRequest
         if user `elem` rules.observers
           then pure ()  -- ignore duplicate requests
           else do
-            -- TODO(M3-46): its already a noop - now completely remove it. 
+            exercise coinRules (CoinRules_AddObserver user openRounds issuingRounds)
             pure ()
 
 

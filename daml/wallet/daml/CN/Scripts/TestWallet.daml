@@ -52,8 +52,7 @@ createSingleReceiverPaymentRequest app provider sender receiver amount = do
 acceptPaymentRequest : CCApp -> CCUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest coin = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  -- TODO(#2957): remove read-as SVC. 
-  (accept, change) <- submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+  (accept, change) <- submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     context
     walletProvider
@@ -525,8 +524,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   context <- getPaymentTransferContext app alice
   coin <- tap  app alice 5.0
-  -- TODO(#2957): remove read-as SVC. 
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -534,8 +532,7 @@ testInsufficientFundsBatchSubscriptions = script do
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   coin <- tap app alice 15.0
-  -- TODO(#2957): remove read-as SVC. 
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -548,16 +545,14 @@ testInsufficientFundsBatchSubscriptions = script do
   passTime (days 27)
 
   coin <- tap app alice 5.0
-  -- TODO(#2957): remove read-as SVC. 
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   coin <- tap app alice 15.0
-  -- TODO(#2957): remove read-as SVC. 
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitMulti [alice.primaryParty, validator] [] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context

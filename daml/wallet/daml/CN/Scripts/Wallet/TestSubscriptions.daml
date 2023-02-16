@@ -188,8 +188,7 @@ acceptSubscriptionRequestAndMakePayment
 acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getCoinInputs app sender.primaryParty
-  -- TODO(#2957): remove read-as SVC. 
-  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs
     context
     walletProvider
@@ -201,8 +200,7 @@ makeSubscriptionPayment
 makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getCoinInputs app sender.primaryParty
-  -- TODO(#2957): remove read-as SVC. 
-  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [] $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
     walletProvider
