@@ -298,6 +298,8 @@ local validator1Deployments(config) = [
     {
       name: "val1-wal-http",
       port: 6004,
+      // Internal, we proxy this under /v0/wallet in the UI.
+      internalOnly: true,
     },
   ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "canton-participant" },
@@ -397,6 +399,8 @@ local splitwellDeployments(config) = [
     {
       name: "sw-wal-http",
       port: 6004,
+      // Internal, we proxy this under /v0/wallet in the UI.
+      internalOnly: true,
     },
   ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding("wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
