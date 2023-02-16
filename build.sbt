@@ -194,7 +194,11 @@ lazy val `apps-common` =
         BuildInfoKey(
           "compiledVersion",
           BuildUtil.runCommandOptionalLog(Seq("./build-tools/version-gen")),
-        )
+        ),
+        BuildInfoKey(
+          "commitUnixTimestamp",
+          BuildUtil.runCommandOptionalLog(Seq("git", "show", "-s", "--format=%ct", "HEAD")),
+        ),
       ),
       buildInfoPackage := "com.daml.network.environment",
       buildInfoObject := "BuildInfo",

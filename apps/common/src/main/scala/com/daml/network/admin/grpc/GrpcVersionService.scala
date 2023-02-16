@@ -6,6 +6,7 @@ import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
+import com.google.protobuf.timestamp.Timestamp
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,6 +20,11 @@ class GrpcVersionService(
 
   override def getVersion(request: Empty): Future[v0.GetVersionResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { _ => span =>
-      Future(v0.GetVersionResponse(version = BuildInfo.compiledVersion))
+      Future(
+        v0.GetVersionResponse(
+          version = BuildInfo.compiledVersion,
+          commitTs = Some(Timestamp.of(seconds = BuildInfo.commitUnixTimestamp.toLong, nanos = 0)),
+        )
+      )
     }
 }

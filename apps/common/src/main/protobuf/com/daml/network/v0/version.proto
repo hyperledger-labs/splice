@@ -2,6 +2,7 @@ syntax = "proto3";
 package com.daml.network.v0;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 service VersionService {
   rpc GetVersion(google.protobuf.Empty) returns (GetVersionResponse);
@@ -9,4 +10,5 @@ service VersionService {
 
 message GetVersionResponse {
   string version = 1;
+  google.protobuf.Timestamp commit_ts = 2;
 }

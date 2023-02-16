@@ -16,6 +16,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 /** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
@@ -36,17 +37,18 @@ abstract class AppConnection(
 
   private def checkVersionCompatibility() = {
     val _ = for {
-      version <- getAppVersion()(TraceContext.empty)
+      versionInfo <- getAppVersionInfo()(TraceContext.empty)
     } yield {
-      logger.debug(s"Found app version: ${version}")(TraceContext.empty)
+      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
       val myVersion = BuildInfo.compiledVersion
-      if (version != myVersion) {
+      if (versionInfo.version != myVersion) {
+        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
         logger.error(
-          s"Versions do not match for $serviceName: server is on $version, but mine is: $myVersion"
+          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
         )(TraceContext.empty)
       } else {
         logger.debug(
-          s"Version verification passed for $serviceName, server is on the same version as mine: ${version}"
+          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
         )(
           TraceContext.empty
         )
@@ -109,7 +111,9 @@ abstract class AppConnection(
     } yield result
   }
 
-  protected def getAppVersion()(implicit traceContext: TraceContext): Future[String] =
+  protected def getAppVersionInfo()(implicit
+      traceContext: TraceContext
+  ): Future[GrpcVersionClient.VersionInfo] =
     runCmd(GrpcVersionClient.GetVersion())
 }
 
