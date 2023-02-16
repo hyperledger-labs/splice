@@ -452,8 +452,8 @@ class TreasuryService(
     for {
       coinRules <- scanConnection.getCoinRules()
       (openRound, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
-      configCC = openRound.payload.coinConfig
-      maxNumInputs = configCC.maxNumInputs.intValue()
+      configUsd = openRound.payload.transferConfigUsd
+      maxNumInputs = configUsd.maxNumInputs.intValue()
       openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))
       issuingRoundsMap = openIssuingRounds
         .map(r => (r.payload.round, r.payload))
@@ -475,7 +475,7 @@ class TreasuryService(
       )
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
-      val createFeeUsd = BigDecimal(configCC.createFee.fee) / openRound.payload.coinPrice
+      val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,

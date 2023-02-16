@@ -75,4 +75,6 @@ testSetConfigSchedule = do
   return ()
 
 makeCoinConfig : RelTime -> RatePerRound -> CoinConfig USD
-makeCoinConfig tickDuration holdingFee = defaultCoinConfig with tickDuration; holdingFee
+makeCoinConfig tickDuration holdingFee = defaultCoinConfig with
+    transferConfig = defaultTransferConfig with holdingFee
+    tickDuration

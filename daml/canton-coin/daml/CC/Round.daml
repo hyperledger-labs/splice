@@ -22,7 +22,9 @@ template OpenMiningRound
     opensAt : Time -- ^ Time after which transfers can use this mining round
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
     issuingFor : RelTime -- ^ Time for which the SVC has been issuing rewards. Determines the configuration for the issuance round.
-    coinConfig : CoinConfig CC
+    transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for CC transfers
+    issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   where
     signatory svc
     observer observers

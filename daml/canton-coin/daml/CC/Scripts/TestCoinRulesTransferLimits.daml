@@ -83,7 +83,7 @@ testTransferExceedsMaxLockHolders = do
     validator <- setupValidator app "validator"
     alice <- setupUser app "alice" validator
     let config = coinRules.configSchedule.currentValue
-    bobs <- forA [0..config.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) validator
+    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) validator
     charlie <- setupUser app "charlie" validator
     coin <- tap app alice 100.0
     context <- getPaymentTransferContext app alice

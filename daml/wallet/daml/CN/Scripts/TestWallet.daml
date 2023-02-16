@@ -7,6 +7,7 @@ import DA.List
 
 import qualified CC.API.V1.Coin as API
 import CC.Coin
+import CC.CoinConfig hiding (CC, USD)
 import CC.Schedule
 import CN.Wallet.Install
 import CN.Wallet.Payment
@@ -195,7 +196,7 @@ testCCPaymentRequest = script do
   featuredValidator <- featureApp app (CCUser validatorUserId validator)
 
   -- retrieve the config
-  Some (_, CoinRules{configSchedule = Schedule{currentValue = coinConfig} }) <- queryCoinRulesByKey app.svc
+  Some (_, CoinRules{configSchedule = Schedule{currentValue = CoinConfig {transferConfig = transferConfig}} }) <- queryCoinRulesByKey app.svc
 
   coin <- tap app alice 27.0
   t <- getTime
@@ -209,8 +210,8 @@ testCCPaymentRequest = script do
   lockedCoinPayload.coin.amount.initialAmount ===
     15.0 +
     10.0 +
-    coinConfig.createFee.fee + chargeSteppedRate coinConfig.transferFee 15.0 +
-    coinConfig.createFee.fee + chargeSteppedRate coinConfig.transferFee 10.0
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 15.0 +
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 10.0
   lockedCoinPayload.lock.holders === map (.primaryParty) [bob, charlie, provider]
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
@@ -241,15 +242,16 @@ testCCPaymentRequest = script do
   (_, round) <- getLatestActiveOpenRound app
 
   [(_, coupon)] <- query @AppRewardCoupon provider.primaryParty
+  let transferConfigCC = transferConfigCCFromOpenRound round
   coupon.amount ===
-    round.coinConfig.transferFee.initialRate * (15.0 + 10.0) +
-    round.coinConfig.createFee.fee * 2.0
+    transferConfigCC.transferFee.initialRate * (15.0 + 10.0) +
+    transferConfigCC.createFee.fee * 2.0
   coupon.featured === False
 
   [(_, coupon)] <- query @AppRewardCoupon validator
   coupon.amount ===
-    round.coinConfig.createFee.fee + -- for one locked coin
-    round.coinConfig.lockHolderFee.fee * 3.0
+    transferConfigCC.createFee.fee + -- for one locked coin
+    transferConfigCC.lockHolderFee.fee * 3.0
   coupon.provider === validator
   coupon.featured === True
 

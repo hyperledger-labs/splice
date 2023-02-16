@@ -5,7 +5,7 @@ import DA.Time
 import Daml.Script
 
 import qualified CC.API.V1.Coin as API
-import CC.Coin hiding (CC)
+import CC.Coin
 import CN.Wallet.Install
 import CN.Wallet.Payment
 

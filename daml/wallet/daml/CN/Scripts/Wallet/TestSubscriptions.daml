@@ -5,7 +5,7 @@ import DA.Time
 import DA.List
 import Daml.Script
 
-import CC.Coin hiding (CC, USD)
+import CC.Coin
 import qualified CC.API.V1.Coin as API
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -113,10 +113,11 @@ testUSDSubscription = script do
 
   (_, round) <- getLatestActiveOpenRound app
 
-  let expectedFeeInLockLeg =
+  let transferConfigCC = transferConfigCCFromOpenRound round
+      expectedFeeInLockLeg =
         (
-          (round.coinConfig.lockHolderFee.fee * 2.0) +
-          (round.coinConfig.createFee.fee)
+          (transferConfigCC.lockHolderFee.fee * 2.0) +
+          (transferConfigCC.createFee.fee)
         )
 
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon validator
@@ -128,8 +129,8 @@ testUSDSubscription = script do
 
   let expectedFeeInUnlockLeg =
         (
-          round.coinConfig.createFee.fee +
-          round.coinConfig.transferFee.initialRate * payData.paymentAmount.amount
+          transferConfigCC.createFee.fee +
+          transferConfigCC.transferFee.initialRate * payData.paymentAmount.amount
         )
 
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty

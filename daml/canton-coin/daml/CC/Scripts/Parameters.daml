@@ -11,8 +11,8 @@ import CC.Schedule
 --
 -- TODO(M3-90): it looks like we need to lower these fees a bit further
 -- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
-defaultCoinConfig : CoinConfig USD
-defaultCoinConfig = CoinConfig with
+defaultTransferConfig : TransferConfig USD
+defaultTransferConfig = TransferConfig with
     -- Fee to create a new coin.
     -- Set to the fixed part of the transfer fee.
     createFee = FixedFee 0.03
@@ -34,13 +34,6 @@ defaultCoinConfig = CoinConfig with
       initialRate = 0.01
       steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
 
-    -- Using steady state parameters from whitepaper
-    issuanceCurve = defaultIssuanceCurve
-
-    -- Duration of one tick, which is half the target duration of one round
-    -- default: 2.5 minutes
-    tickDuration = seconds 150
-
     -- These should be large enough to ensure efficient batching, but not too large
     -- to avoid creating very large transactions.
     maxNumInputs = 100
@@ -54,6 +47,18 @@ defaultCoinConfig = CoinConfig with
     --
     -- TODO(M3-90): charge per character
     maxPayloadLength = 32
+
+-- | Default proposal for issuance curve and tickDuration
+defaultCoinConfig : CoinConfig USD
+defaultCoinConfig = CoinConfig with
+    transferConfig = defaultTransferConfig
+
+    -- Using issuance curve defined in the CC whitepaper
+    issuanceCurve = defaultIssuanceCurve
+
+    -- Duration of one tick, which is half the target duration of one round
+    -- default: 2.5 minutes
+    tickDuration = seconds 150
 
 -- | Default configuration schedule with single current coin config
 defaultCoinConfigSchedule : Schedule Time (CoinConfig USD)

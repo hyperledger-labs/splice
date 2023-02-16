@@ -60,11 +60,11 @@ testWithSubscription = script do
     walletProvider = app.svc
 
   (_, round) <- getLatestActiveOpenRound app
-
+  let transferConfigCC = transferConfigCCFromOpenRound round
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
   reward.amount ===
-    round.coinConfig.createFee.fee +
-    round.coinConfig.lockHolderFee.fee
+    transferConfigCC.createFee.fee +
+    transferConfigCC.lockHolderFee.fee
   reward.featured === False
 
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
@@ -75,8 +75,8 @@ testWithSubscription = script do
 
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty
   reward.amount ===
-    round.coinConfig.createFee.fee +
-    round.coinConfig.transferFee.initialRate * entryFee
+    transferConfigCC.createFee.fee +
+    transferConfigCC.transferFee.initialRate * entryFee
   reward.featured === True
 
   Some entry <- queryContractId user.primaryParty entryCid

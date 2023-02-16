@@ -8,17 +8,24 @@ import DA.Time
 data CC = CC deriving (Show, Eq)
 data USD = USD deriving (Show, Eq)
 
+-- | Configuration includes TransferConfig, issuance curve and tickDuration
+--
+-- See CC.Scripts.Parameters for concrete values.
+data CoinConfig currency = CoinConfig with
+    transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
+    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+  deriving (Eq, Show)
+
 -- | Configuration determining the fees and limits for CC transfers granted by
 -- the CoinRules.
 --
 -- See CC.Scripts.Parameters for concrete values.
-data CoinConfig currency = CoinConfig with
+data TransferConfig currency = TransferConfig with
     createFee : FixedFee -- ^ Fee to create a new coin.
     holdingFee : RatePerRound -- ^ Fee for keeping a coin around
     transferFee : SteppedRate -- ^ Fee for transferring some amount of coin to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
-    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
-    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.

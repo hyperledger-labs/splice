@@ -263,11 +263,11 @@ template CoinRules
       controller svc, receiver
       do
         openRound <- fetch openRound
-        let config = openRound.coinConfig
+        let transferConfigCC = transferConfigCCFromOpenRound openRound
             expiringAmount = ExpiringAmount with
                         initialAmount = amount
                         createdAt = openRound.round
-                        ratePerRound = config.holdingFee
+                        ratePerRound = transferConfigCC.holdingFee
         create Coin with
                   owner = receiver
                   amount = expiringAmount
@@ -303,8 +303,7 @@ template CoinRules
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
-        let configCC = scaleConfig coinPrice configUsd
-        let tickDuration = configCC.tickDuration
+        let tickDuration = configUsd.tickDuration
         let opensAt0 = now
         let opensAt1 = now
         let opensAt2 = addRelTime now tickDuration
@@ -319,12 +318,18 @@ template CoinRules
         let issuingFor1 = issuingFor0 + tickDuration
         let issuingFor2 = issuingFor1 + tickDuration
 
+        let issuanceConfig0 = getValueAsOf issuingFor0 configUsd.issuanceCurve
+        let issuanceConfig1 = getValueAsOf issuingFor1 configUsd.issuanceCurve
+        let issuanceConfig2 = getValueAsOf issuingFor2 configUsd.issuanceCurve
+
+        let transferConfigUsd = configUsd.transferConfig
+
         create OpenMiningRound with
-          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; coinConfig = configCC
+          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         create OpenMiningRound with
-          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; coinConfig = configCC
+          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
         create OpenMiningRound with
-          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; coinConfig = configCC
+          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
@@ -344,7 +349,7 @@ template CoinRules
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
         require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
         require "latestRound is open" (latestRound.opensAt <= now)
-        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.coinConfig.tickDuration <= now)
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.tickDuration <= now)
 
         -- archive and create the rounds
         archive roundToArchiveCid
@@ -352,14 +357,14 @@ template CoinRules
             svc
             observers
             round = roundToArchive.round
-            issuanceConfig = getValueAsOf roundToArchive.issuingFor roundToArchive.coinConfig.issuanceCurve
-            tickDuration = roundToArchive.coinConfig.tickDuration
+            issuanceConfig = roundToArchive.issuanceConfig
+            tickDuration = roundToArchive.tickDuration
         newOpenRound <- do
           let configUsd = getValueAsOf now configSchedule
-              configCC = scaleConfig coinPrice configUsd
-              tickDuration = configCC.tickDuration
+              tickDuration = configUsd.tickDuration
               -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
               opensAt = addRelTime (max now latestRound.opensAt) tickDuration
+              newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
           create OpenMiningRound with
               svc
               observers
@@ -370,8 +375,10 @@ template CoinRules
               targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
               -- We advance the time for which the SVC has been issuing independent of how real world advances.
               -- Note that given the checks above the real time can only be slower.
-              issuingFor = latestRound.issuingFor + latestRound.coinConfig.tickDuration
-              coinConfig = configCC
+              issuingFor = newOpenRoundIssuingFor
+              transferConfigUsd = configUsd.transferConfig
+              issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
+              tickDuration
         return (newSummarizingRound, newOpenRound)
 
     nonconsuming choice CoinRules_MiningRound_StartIssuing
@@ -586,23 +593,27 @@ transferControllers t =
     addOutputController s (API.TransferOutput with receiver; lock; ..) =
       Set.insert receiver $ optional s (foldl (flip Set.insert) s) (API.holders <$> lock)
 
-scaleConfig : Decimal -> CoinConfig USD -> CoinConfig CC
-scaleConfig coinPrice config = scaleFees (1.0 / coinPrice) config
+scaleCoinConfig : Decimal -> CoinConfig USD -> CoinConfig CC
+scaleCoinConfig coinPrice config = CoinConfig with
+  transferConfig = scaleFees (1.0 / coinPrice) config.transferConfig
+  issuanceCurve = config.issuanceCurve
+  tickDuration = config.tickDuration
 
 computeFees : Party -> API.TransferContext -> Party -> [API.TransferOutput] -> Update [Decimal]
 computeFees svc context sender outputs = do
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
   require ("mining round matches svc") (openRound.svc == svc)
-  return $ map (computeOutputFee openRound.coinConfig sender) outputs
+  let transferConfigCC = transferConfigCCFromOpenRound openRound
+  return $ map (computeOutputFee transferConfigCC sender) outputs
 
-computeOutputFee : CoinConfig CC -> Party -> API.TransferOutput -> Decimal
-computeOutputFee config sender out =
-    config.createFee.fee + lockingFee + transferFee
+computeOutputFee : TransferConfig CC -> Party -> API.TransferOutput -> Decimal
+computeOutputFee transferConfigCC sender out =
+    transferConfigCC.createFee.fee + lockingFee + transferFee
   where
-    lockingFee = optional 0.0 (\l -> config.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
+    lockingFee = optional 0.0 (\l -> transferConfigCC.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
     transferFee
       | sender == out.receiver = 0.0
-      | otherwise = chargeSteppedRate config.transferFee out.amount
+      | otherwise = chargeSteppedRate transferConfigCC.transferFee out.amount
 
 data InvalidTransferReason
   = ITR_InsufficientFunds with missingAmount : Decimal
@@ -615,11 +626,11 @@ exception InvalidTransfer
   where
     message show reason
 
-checkTransferConstraints: API.Transfer -> API.TransferSummary -> CoinConfig CC -> Either InvalidTransferReason ()
-checkTransferConstraints transfer summary config
-    | length transfer.inputs > config.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
-    | length transfer.outputs > config.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
-    | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ ITR_Other $ "Payload length is above limit"
+checkTransferConstraints: API.Transfer -> API.TransferSummary -> TransferConfig CC -> Either InvalidTransferReason ()
+checkTransferConstraints transfer summary transferConfigCC
+    | length transfer.inputs > transferConfigCC.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
+    | length transfer.outputs > transferConfigCC.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
+    | DA.Text.length transfer.payload > transferConfigCC.maxPayloadLength = Left $ ITR_Other $ "Payload length is above limit"
     | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
     | otherwise = Right ()
 
@@ -651,7 +662,7 @@ executeTransfer coinRulesCid context svc t = do
 
 data TransferContextSummary = TransferContextSummary with
     featuredAppProvider : Optional Party
-    config : CoinConfig CC
+    config : TransferConfig CC
     openRound : OpenMiningRound
     issuingMiningRounds : Map API.Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
@@ -706,7 +717,7 @@ summarizeAndValidateContext context svc tf = do
       pure (user, rightCid)
 
   return TransferContextSummary with
-    config = openRound.coinConfig
+    config = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd
     featuredAppProvider
     openRound = openRound
     issuingMiningRounds = Map.fromList issuingMiningRounds
@@ -785,8 +796,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalRewardAmount = s.totalRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
 
-preprocessOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
-preprocessOutputs config sender outs =
+preprocessOutputs : TransferConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
+preprocessOutputs transferConfigCC sender outs =
     mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
     -- deduplicate lock-holders to store them and charge for them at most once
@@ -808,9 +819,9 @@ preprocessOutputs config sender outs =
             let lockDuration = subTime l.expiresAt now
             require "Positive lock duration" (days 0 <= lockDuration)
             require "Fewer than the allowed number of lock holders"
-              (length l.holders <= config.maxNumLockHolders)
+              (length l.holders <= transferConfigCC.maxNumLockHolders)
           -- compute output
-          let outputFee = computeOutputFee config sender out
+          let outputFee = computeOutputFee transferConfigCC sender out
               receiverOutputFee = outputFee * receiverFeeRatio
           require "Amount is larger than receiver output fee" (receiverOutputFee < amount)
           return PreprocessedTransferOutput with
@@ -819,8 +830,8 @@ preprocessOutputs config sender outs =
             amount = amount - receiverOutputFee
             lock
 
-summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
-summarizeTransfer config inp preprocessedOutputs = do
+summarizeTransfer : TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
+summarizeTransfer transferConfigCC inp preprocessedOutputs = do
     -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
     trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
   where
@@ -829,7 +840,7 @@ summarizeTransfer config inp preprocessedOutputs = do
     leftOverAmount =
       inp.totalCoinAmount + inp.totalRewardAmount
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
-    senderChangeFee = min config.createFee.fee leftOverAmount
+    senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
 
     summary = API.TransferSummary with
       inputCoinAmount = inp.totalCoinAmount
@@ -861,11 +872,10 @@ issueRewards csum sender provider summary
     -- note: we do not create featured app rewards in case the app provider uses their own app
     featured = Some provider == csum.featuredAppProvider && sender /= provider
 
-
 createTransferOutputs
-  : Time -> OpenMiningRound -> CoinConfig CC -> Party -> Party -> API.TransferSummary -> TransferOutputsSummary
+  : Time -> OpenMiningRound -> TransferConfig CC -> Party -> Party -> API.TransferSummary -> TransferOutputsSummary
   -> Update ([API.CreatedCoin], Optional (ContractId API.Coin))
-createTransferOutputs currentTime currentOpenRound config svc sender summary preprocessedOutputs = do
+createTransferOutputs currentTime currentOpenRound transferConfigCC svc sender summary preprocessedOutputs = do
     outputCoins <- mapA createOutput preprocessedOutputs
     senderChangeCoin <- createSenderChange
     return (outputCoins, senderChangeCoin)
@@ -876,12 +886,12 @@ createTransferOutputs currentTime currentOpenRound config svc sender summary pre
           Some . toInterfaceContractId <$> create Coin with
             svc
             owner = sender
-            amount = expiringAmount config.holdingFee summary.senderChangeAmount currentOpenRound.round
+            amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
     createOutput out = do
       let coin = Coin with
             svc
             owner = out.owner
-            amount = expiringAmount config.holdingFee out.amount currentOpenRound.round
+            amount = expiringAmount transferConfigCC.holdingFee out.amount currentOpenRound.round
 
       case out.lock of
         None -> API.TransferResultCoin . toInterfaceContractId <$> create coin
@@ -889,22 +899,23 @@ createTransferOutputs currentTime currentOpenRound config svc sender summary pre
           -- We require the lock to expire before the coin to allow CN app authors to
           -- assume that a locked coin is never archived by the SVC while the lock is held.
           require "lock expires before coin"
-            (doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount config.tickDuration)
+            (doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount currentOpenRound.tickDuration)
           API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
 
 -- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
-scaleFees : Decimal -> CoinConfig USD -> CoinConfig CC
-scaleFees s c = CoinConfig with
+scaleFees : Decimal -> TransferConfig USD -> TransferConfig CC
+scaleFees s c = TransferConfig with
     createFee = scaleFixedFee s c.createFee
     holdingFee = scaleRatePerRound s c.holdingFee
     lockHolderFee = scaleFixedFee s c.lockHolderFee
     transferFee = scaleSteppedRate s c.transferFee
-    issuanceCurve = c.issuanceCurve
-    tickDuration = c.tickDuration
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
     maxPayloadLength = c.maxPayloadLength
+
+transferConfigCCFromOpenRound : OpenMiningRound -> TransferConfig CC
+transferConfigCCFromOpenRound openRound = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd
 
 requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()
 requireCoinExpiredForAllOpenRounds roundCid coin = do
@@ -914,3 +925,4 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
+

@@ -132,6 +132,18 @@ object CoinUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
+    // transferConfig
+    defaultTransferConfig(initialMaxNumInputs),
+
+    // issuance curve from whitepaper
+    defaultIssuanceCurve,
+
+    // tick duration
+    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+  )
+  def defaultTransferConfig(
+      initialMaxNumInputs: Int
+  ): cc.coinconfig.TransferConfig[cc.coinconfig.USD] = new cc.coinconfig.TransferConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
     new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal),
@@ -157,12 +169,6 @@ object CoinUtil {
     // Chosen to match the update fee to cover the cost of informing lock-holders about
     // actions on the locked coin.
     new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal),
-
-    // tick duration
-    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
-
-    // issuance curve from whitepaper
-    defaultIssuanceCurve,
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.

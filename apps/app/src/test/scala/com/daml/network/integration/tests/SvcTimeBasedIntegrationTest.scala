@@ -154,9 +154,9 @@ class SvcTimeBasedIntegrationTest
       val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
 
       rounds.latestOpen.data.opensAt shouldBe (now + doubledTickDuration).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
@@ -189,9 +189,9 @@ class SvcTimeBasedIntegrationTest
       )
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
@@ -209,9 +209,9 @@ class SvcTimeBasedIntegrationTest
 
       val rounds = getOpenMiningRounds()
       // all active open mining rounds are created with doubled tick
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
@@ -257,9 +257,9 @@ class SvcTimeBasedIntegrationTest
       val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
 
       rounds.latestOpen.data.opensAt shouldBe (now + reducedTickDuration).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
@@ -282,7 +282,7 @@ class SvcTimeBasedIntegrationTest
       // Instead of latestOpen.opensAt middleOpen + tickDuration becomes the time when it is ready to advance rounds
       expectedAdvanceRoundAt shouldBe (
         rounds.middleOpen.data.opensAt plus fromRelTime(
-          rounds.middleOpen.data.coinConfig.tickDuration
+          rounds.middleOpen.data.tickDuration
         )
       )
       advanceTimeAndCheckOpenRounds(expectedAdvanceRoundAt)
@@ -297,9 +297,9 @@ class SvcTimeBasedIntegrationTest
       )
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       // As both tick durations of middleOpen and latestOpen are reduced,
@@ -321,9 +321,9 @@ class SvcTimeBasedIntegrationTest
 
       val rounds = getOpenMiningRounds()
       // all active open mining rounds are created with reduced tick
-      rounds.oldestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.middleOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.latestOpen.data.coinConfig.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       // rounds.latestOpen is the time when it is ready to advance rounds
@@ -441,9 +441,9 @@ class SvcTimeBasedIntegrationTest
     // config101 is never used as there is no round created at a time between now + 150 and now + 151 seconds
     eventually()({
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.maxNumInputs shouldBe 100
-      rounds.middleOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
-      rounds.latestOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
+      rounds.oldestOpen.data.transferConfigUsd.maxNumInputs shouldBe 100
+      rounds.middleOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
+      rounds.latestOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
     })
 
     val config201 = mkCoinConfig(defaultTickDuration, 201)
@@ -482,9 +482,9 @@ class SvcTimeBasedIntegrationTest
     // another new round is created with the config202 as it was the active config at that time.
     eventually()({
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.coinConfig.maxNumInputs shouldBe config102.maxNumInputs
-      rounds.middleOpen.data.coinConfig.maxNumInputs shouldBe config201.maxNumInputs
-      rounds.latestOpen.data.coinConfig.maxNumInputs shouldBe config202.maxNumInputs
+      rounds.oldestOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
+      rounds.middleOpen.data.transferConfigUsd.maxNumInputs shouldBe config201.transferConfig.maxNumInputs
+      rounds.latestOpen.data.transferConfigUsd.maxNumInputs shouldBe config202.transferConfig.maxNumInputs
     })
   }
 
@@ -730,7 +730,7 @@ class SvcTimeBasedIntegrationTest
       rounds.oldestOpen.data.targetClosesAt,
       Ordering[Instant].max(
         rounds.middleOpen.data.opensAt plus fromRelTime(
-          rounds.middleOpen.data.coinConfig.tickDuration
+          rounds.middleOpen.data.tickDuration
         ),
         rounds.latestOpen.data.opensAt,
       ),

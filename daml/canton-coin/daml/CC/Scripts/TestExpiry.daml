@@ -2,10 +2,10 @@ module CC.Scripts.TestExpiry where
 
 import Daml.Script
 
-import CC.Coin
 import CC.Expiry
 import CC.Fees
 import CC.Round
+import CC.Schedule
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
@@ -56,9 +56,12 @@ testEstimateOpenRoundCreatedAt = script do
       issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
 
       observers = []
-      coinConfig = scaleConfig coinPrice defaultCoinConfig
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; coinConfig
-      openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30
+      coinConfigUsd = defaultCoinConfig
+      transferConfigUsd = coinConfigUsd.transferConfig
+      issuanceConfig0 = getValueAsOf issuingFor0 coinConfigUsd.issuanceCurve
+      issuanceConfig3 = getValueAsOf issuingFor3 coinConfigUsd.issuanceCurve
+      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
 
   let almostMax = time (date 9999 Dec 31) 23 57 30

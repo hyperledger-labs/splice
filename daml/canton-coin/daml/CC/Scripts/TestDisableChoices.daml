@@ -30,7 +30,7 @@ testLockedCoin = do
   testChoice @"enable_LockedCoin_OwnerExpireLock" app [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules)
 
-  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (minutes 1)
+  cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
   replicateA_ 4 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
   testChoice @"enable_LockedCoin_ExpireCoin" app [app.svc] [app.svc] $ \coinRules ->
@@ -42,7 +42,7 @@ testCoin = do
   app <- setupApp
   alice <- setupUser app "alice" app.svc
 
-  cid <- tap app alice defaultCoinConfig.holdingFee.rate
+  cid <- tap app alice defaultTransferConfig.holdingFee.rate
   replicateA_ 3 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
   testChoice @"enable_Coin_Expire" app [app.svc] [app.svc] $ \coinRules ->

@@ -9,6 +9,7 @@ import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
 import CN.Util.Assert
 import CC.Coin
+import CC.CoinConfig
 import CC.Schedule
 import CC.RelRound
 import CC.Fees
@@ -75,7 +76,7 @@ test = do
   featureApp app arbiter
 
   -- retrieve the config
-  Some (_, CoinRules{configSchedule = Schedule{currentValue = coinConfig}}) <- queryCoinRulesByKey app.svc
+  Some (_, CoinRules{configSchedule = Schedule{currentValue = CoinConfig{transferConfig = coinConfig}}}) <- queryCoinRulesByKey app.svc
 
   -- start the example
 

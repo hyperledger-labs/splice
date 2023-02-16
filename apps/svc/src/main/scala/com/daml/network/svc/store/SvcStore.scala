@@ -316,7 +316,7 @@ object SvcStore {
     /** The time after which these can be advanced at assuming the given tick duration. */
     def readyToAdvanceAt: Instant = {
       val middleTickDuration = CoinUtil.relTimeToDuration(
-        middle.payload.coinConfig.tickDuration
+        middle.payload.tickDuration
       )
       Ordering[Instant].max(
         oldest.payload.targetClosesAt,
