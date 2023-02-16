@@ -2,6 +2,7 @@ import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
+import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
@@ -29,11 +30,11 @@ val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
 val charlieRequestCid = charlieDirectory.requestDirectoryInstall()
 
-aliceValidator.remoteParticipant.ledger_api.acs
+aliceValidator.remoteParticipant.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
-bobValidator.remoteParticipant.ledger_api.acs
+bobValidator.remoteParticipant.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
-charlieValidator.remoteParticipant.ledger_api.acs
+charlieValidator.remoteParticipant.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
 println("Ensuring that directory entries are allocated correctly...")
@@ -74,5 +75,5 @@ Seq(
   charlieSplitwell -> charlieUserParty,
 ).foreach { case (splitwell, party) =>
   splitwell.createInstallRequest()
-  splitwell.ledgerApi.ledger_api.acs.awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
+  splitwell.ledgerApi.ledger_api_extensions.acs.awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
 }

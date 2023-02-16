@@ -12,7 +12,6 @@ import com.daml.ledger.api.v1.admin.party_management_service.PartyDetails as Pro
 import com.daml.ledger.api.v1.command_completion_service.Checkpoint
 import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v1.completion.Completion
-import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_configuration_service.LedgerConfiguration
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
@@ -53,8 +52,7 @@ import com.digitalasset.canton.console.{
   ParticipantReference,
   RemoteParticipantReference,
 }
-import com.daml.ledger.javaapi
-import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, JavaDecodeUtil}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.metrics.MetricHandle.MetricsFactory
@@ -75,18 +73,18 @@ import scala.concurrent.{Await, ExecutionContext}
 trait BaseLedgerApiAdministration extends NoTracing {
 
   this: LedgerApiCommandRunner with NamedLogging with FeatureFlagFilter =>
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
   protected implicit lazy val executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
   protected val name: String
 
   protected def domainOfTransaction(transactionId: String): DomainId
-  protected def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       optTimeout: Option[NonNegativeDuration],
   ): Tx
-  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+  def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   protected def defaultLimit: PositiveInt =
     consoleEnvironment.environment.config.parameters.console.defaultLimit
 
@@ -128,28 +126,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
           "getTransactionTrees",
           observer,
           timeout,
-        )
-      })
-
-      @Help.Summary("Get transaction trees", FeatureFlag.Testing)
-      @Help.Description(
-        """This function connects to the transaction tree stream for the given parties and collects transaction trees
-          |until either `completeAfter` transaction trees have been received or `timeout` has elapsed.
-          |The returned transaction trees can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error."""
-      )
-      def treesJava(
-          partyIds: Set[PartyId],
-          completeAfter: Int,
-          beginOffset: LedgerOffset =
-            new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN),
-          endOffset: Option[LedgerOffset] = None,
-          verbose: Boolean = true,
-          timeout: NonNegativeDuration = timeouts.ledgerCommand,
-      ): Seq[javaapi.data.TransactionTree] = check(FeatureFlag.Testing)({
-        trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout).map(t =>
-          javaapi.data.TransactionTree.fromProto(TransactionTree.toJavaProto(t))
         )
       })
 
@@ -404,53 +380,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
       }
 
       @Help.Summary(
-        "Submit command and wait for the resulting transaction, returning the transaction tree or failing otherwise",
-        FeatureFlag.Testing,
-      )
-      @Help.Description(
-        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit and returns it.
-          | If the timeout is set, it also waits for the transaction to appear at all other configured
-          | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
-          | the timeout only specifies how long to wait at the other participants.
-          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
-          | the allotted time.
-          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
-          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
-          | return before the transaction appears at all the involved participants."""
-      )
-      def submitJava(
-          actAs: Seq[PartyId],
-          commands: Seq[javaapi.data.Command],
-          workflowId: String = "",
-          commandId: String = "",
-          optTimeout: Option[NonNegativeDuration] = Some(timeouts.ledgerCommand),
-          deduplicationPeriod: Option[DeduplicationPeriod] = None,
-          submissionId: String = "",
-          minLedgerTimeAbs: Option[Instant] = None,
-          readAs: Seq[PartyId] = Seq.empty,
-          applicationId: String = LedgerApiCommands.defaultApplicationId,
-          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
-      ): TransactionTree = check(FeatureFlag.Testing) {
-        val tx = consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
-              actAs.map(_.toLf),
-              readAs.map(_.toLf),
-              commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
-              applicationId,
-              workflowId,
-              commandId,
-              deduplicationPeriod,
-              submissionId,
-              minLedgerTimeAbs,
-              disclosedContracts,
-            )
-          )
-        }
-        optionallyAwait(tx, tx.transactionId, optTimeout)
-      }
-
-      @Help.Summary(
         "Submit command and wait for the resulting transaction, returning the flattened transaction or failing otherwise",
         FeatureFlag.Testing,
       )
@@ -649,36 +578,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
         }
       })
 
-      @Help.Summary("Wait until a contract becomes available", FeatureFlag.Testing)
-      @Help.Description(
-        """This function can be used for contracts with a code-generated Scala model.
-          |You can refine your search using the `filter` function argument.
-          |The command will wait until the contract appears or throw an exception once it times out."""
-      )
-      def awaitJava[
-          TC <: javaapi.data.codegen.Contract[TCid, T],
-          TCid <: javaapi.data.codegen.ContractId[T],
-          T <: javaapi.data.Template,
-      ](companion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
-          partyId: PartyId,
-          predicate: TC => Boolean = (x: TC) => true,
-          timeout: NonNegativeDuration = timeouts.ledgerCommand,
-      ): TC = check(FeatureFlag.Testing)({
-        val result = new AtomicReference[Option[TC]](None)
-        ConsoleMacros.utils.retry_until_true(timeout) {
-          val tmp = filterJava(companion)(partyId, predicate)
-          result.set(tmp.headOption)
-          tmp.nonEmpty
-        }
-        consoleEnvironment.run {
-          ConsoleCommandResult.fromEither(
-            result
-              .get()
-              .toRight(s"Failed to find contract of type ${companion.TEMPLATE_ID} after ${timeout}")
-          )
-        }
-      })
-
       @Help.Summary(
         "Filter the ACS for contracts of a particular Scala code-generated template",
         FeatureFlag.Testing,
@@ -697,40 +596,6 @@ trait BaseLedgerApiAdministration extends NoTracing {
           .flatMap(DecodeUtil.decodeCreated(templateCompanion)(_).toList)
           .filter(predicate)
       )
-
-      @Help.Summary(
-        "Filter the ACS for contracts of a particular Java code-generated template",
-        FeatureFlag.Testing,
-      )
-      @Help.Description(
-        """To use this function, ensure a code-generated Java model for the target template exists.
-          |You can refine your search using the `predicate` function argument."""
-      )
-      def filterJava[
-          TC <: javaapi.data.codegen.Contract[TCid, T],
-          TCid <: javaapi.data.codegen.ContractId[T],
-          T <: javaapi.data.Template,
-      ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
-          partyId: PartyId,
-          predicate: TC => Boolean = (x: TC) => true,
-      ): Seq[TC] = check(FeatureFlag.Testing) {
-        val javaTemplateId = templateCompanion.TEMPLATE_ID
-        val templateId = P.TemplateId(
-          javaTemplateId.getPackageId,
-          javaTemplateId.getModuleName,
-          javaTemplateId.getEntityName,
-        )
-        of_party(partyId, filterTemplates = Seq(templateId))
-          .map(_.event)
-          .flatMap(ev =>
-            JavaDecodeUtil
-              .decodeCreated(templateCompanion)(
-                javaapi.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(ev))
-              )
-              .toList
-          )
-          .filter(predicate)
-      }
 
       @Help.Summary("Generic search for contracts", FeatureFlag.Testing)
       @Help.Description(
@@ -1239,7 +1104,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
 
 trait LedgerApiAdministration extends BaseLedgerApiAdministration {
   this: LedgerApiCommandRunner with AdminCommandRunner with NamedLogging with FeatureFlagFilter =>
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
   protected val name: String
 
   override protected def domainOfTransaction(transactionId: String): DomainId = {
@@ -1334,7 +1199,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  protected def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       optTimeout: Option[NonNegativeDuration],

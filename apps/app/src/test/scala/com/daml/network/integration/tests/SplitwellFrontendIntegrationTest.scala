@@ -73,7 +73,7 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
       }
@@ -84,7 +84,7 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
         login(3005, charlieDamlUser)
-        charlieValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        charlieValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(charlieUserParty)
         click on className("request-membership-link")
       }
@@ -196,7 +196,7 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
       }
@@ -269,7 +269,7 @@ class SplitwellFrontendIntegrationTest
       // Bob requests to join groups abc and ab
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 3
@@ -287,7 +287,7 @@ class SplitwellFrontendIntegrationTest
       // Charlie requests to join groups abc and ac
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
         login(3005, charlieDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 3

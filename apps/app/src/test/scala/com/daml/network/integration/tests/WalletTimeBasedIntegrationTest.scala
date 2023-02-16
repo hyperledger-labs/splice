@@ -146,7 +146,7 @@ class WalletTimeBasedIntegrationTest
       }
       clue("Setting up directory as provider for the created subscriptions") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
       aliceWallet.listSubscriptions() shouldBe empty
@@ -524,7 +524,7 @@ class WalletTimeBasedIntegrationTest
 
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
 
@@ -545,7 +545,7 @@ class WalletTimeBasedIntegrationTest
         eventually()({
           aliceValidatorWallet.listAppRewardCoupons() should have length 1
           aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
-          directory.remoteParticipant.ledger_api.acs
+          directory.remoteParticipant.ledger_api_extensions.acs
             .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should have length 1
         })
       }
@@ -558,7 +558,7 @@ class WalletTimeBasedIntegrationTest
         _ => {
           aliceValidatorWallet.listAppRewardCoupons() should be(empty)
           aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
-          directory.remoteParticipant.ledger_api.acs
+          directory.remoteParticipant.ledger_api_extensions.acs
             .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should be(empty)
         },
       )

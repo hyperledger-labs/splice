@@ -17,7 +17,7 @@ trait DirectoryTestUtil extends CoinTestCommon with CnsTestUtil {
     actAndCheck("Request directory install", directory.requestDirectoryInstall())(
       "Install created",
       _ =>
-        directory.ledgerApi.ledger_api.acs
+        directory.ledgerApi.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty),
     )
 

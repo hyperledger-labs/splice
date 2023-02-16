@@ -86,7 +86,7 @@ class SvcTimeBasedIntegrationTest
           // Check for closing mining round in transactions instead of acs
           // to guard against automation archiving it concurrently.
           val transactions =
-            svc.remoteParticipantWithAdminToken.ledger_api.transactions
+            svc.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
               .treesJava(
                 Set(svcParty),
                 completeAfter = Int.MaxValue,
@@ -111,7 +111,7 @@ class SvcTimeBasedIntegrationTest
             .duration
         )
         eventually()( // closed round is archived eventually.
-          svc.remoteParticipantWithAdminToken.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .filterJava(ClosedMiningRound.COMPANION)(svcParty) should have size 0
         )
       },
@@ -557,7 +557,7 @@ class SvcTimeBasedIntegrationTest
       ),
     )
     // Create a bunch of rewards directly
-    svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+    svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svcParty),
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
@@ -594,8 +594,9 @@ class SvcTimeBasedIntegrationTest
     val numRewards = threshold + 1
     val rewardAmount = 0.1
 
-    def getUnclaimedRewardContracts() = svc.remoteParticipantWithAdminToken.ledger_api.acs
-      .filterJava(UnclaimedReward.COMPANION)(svcParty)
+    def getUnclaimedRewardContracts() =
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        .filterJava(UnclaimedReward.COMPANION)(svcParty)
 
     val existingUnclaimedRewards = getUnclaimedRewardContracts().length
 
@@ -605,7 +606,7 @@ class SvcTimeBasedIntegrationTest
           new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
         )
         if (!unclaimedRewards.isEmpty) {
-          svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
             actAs = Seq(svcParty),
             optTimeout = None,
             commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
@@ -625,13 +626,13 @@ class SvcTimeBasedIntegrationTest
     def getNumRewardCoupons(
         round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
     ): Int = {
-      svc.remoteParticipantWithAdminToken.ledger_api.acs
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(AppRewardCoupon.COMPANION)(
           svcParty,
           co => co.data.round.number == round.payload.round.number,
         )
         .length +
-        svc.remoteParticipantWithAdminToken.ledger_api.acs
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(ValidatorRewardCoupon.COMPANION)(
             svcParty,
             co => co.data.round.number == round.payload.round.number,
@@ -697,10 +698,10 @@ class SvcTimeBasedIntegrationTest
   private def setCoinConfigSchedule(
       configSchedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]
   )(implicit env: CoinTestConsoleEnvironment) = {
-    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
-    svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+    svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svcParty),
       optTimeout = None,
       commands =

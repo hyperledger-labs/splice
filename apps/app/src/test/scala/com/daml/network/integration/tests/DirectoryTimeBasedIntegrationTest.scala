@@ -40,7 +40,7 @@ class DirectoryTimeBasedIntegrationTest
         directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
         val now = directory.remoteParticipant.ledger_api.time.get()
-        directory.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+        directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -68,7 +68,7 @@ class DirectoryTimeBasedIntegrationTest
 
         clue("Request install and wait for provider to auto-accept") {
           aliceDirectory.requestDirectoryInstall()
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
         }
 
@@ -119,7 +119,7 @@ class DirectoryTimeBasedIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
 
@@ -148,11 +148,11 @@ class DirectoryTimeBasedIntegrationTest
       }
       // Wait for subscription to be expired.
       eventually() {
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(codegen.DirectoryEntryContext.COMPANION)(aliceUserParty) shouldBe empty
       }
     }

@@ -45,11 +45,11 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
   "initialize svc and validator apps" in { implicit env =>
     initSvc()
     // Check that there is exactly one CoinRule and OpenMiningRound
-    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
-    val openRounds = svc.remoteParticipantWithAdminToken.ledger_api.acs
+    val openRounds = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
     openRounds should have length 3
 
@@ -58,14 +58,14 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
     // Check that no coin rules request is outstanding
     eventually()(
-      svc.remoteParticipantWithAdminToken.ledger_api.acs
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cc.coin.CoinRulesRequest.COMPANION)(svcParty)
         shouldBe empty
     )
 
     // check that alice's validator can see the coinrules
     val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-    aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+    aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .awaitJava(cc.coin.CoinRules.COMPANION)(aliceValidatorParty)
 
     // onboard end user
@@ -86,7 +86,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
     clue("Bob's validator can see its own ValidatorLicense") {
       inside(
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
             bobValidatorParty
           )
@@ -97,7 +97,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       }
     }
     clue("Bob's validator can see the CoinRules") {
-      bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
+      bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)
     }
     clue("Bob's validator can restart cleanly.") {

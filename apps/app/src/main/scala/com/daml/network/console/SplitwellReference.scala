@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.LedgerApiUtils
+import com.daml.network.console.LedgerApiExtensions.*
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
@@ -16,6 +16,7 @@ import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
   GrpcRemoteInstanceReference,
+  LedgerApiCommandRunner,
   Help,
 }
 import com.digitalasset.canton.participant.ParticipantNode
@@ -33,7 +34,7 @@ abstract class SplitwellAppReference(
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
   // from the console.
-  def ledgerApi: BaseLedgerApiAdministration
+  def ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
 
   protected val remoteScanConfig: ScanAppClientConfig
 
@@ -94,12 +95,13 @@ final class SplitwellAppClientReference(
 
   private def getSplitwellInstall(): splitwellCodegen.SplitwellInstall.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
-    val installs = ledgerApi.ledger_api.acs.filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(
-      userParty,
-      (install: splitwellCodegen.SplitwellInstall.Contract) =>
-        install.data.user == userParty.toProtoPrimitive && install.data.provider == providerParty.toProtoPrimitive,
-    )
+    val userParty = getUserPrimaryParty()
+    val installs =
+      ledgerApi.ledger_api_extensions.acs.filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(
+        userParty,
+        (install: splitwellCodegen.SplitwellInstall.Contract) =>
+          install.data.user == userParty.toProtoPrimitive && install.data.provider == providerParty.toProtoPrimitive,
+      )
     installs match {
       case Seq(install) => install.id
       case _ =>
@@ -112,8 +114,8 @@ final class SplitwellAppClientReference(
   private def getGroup(
       groupKey: splitwellCodegen.GroupKey
   ): splitwellCodegen.Group.ContractId = {
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
-    val groups = ledgerApi.ledger_api.acs.filterJava(splitwellCodegen.Group.COMPANION)(
+    val userParty = getUserPrimaryParty()
+    val groups = ledgerApi.ledger_api_extensions.acs.filterJava(splitwellCodegen.Group.COMPANION)(
       userParty,
       (group: splitwellCodegen.Group.Contract) =>
         group.data.provider == groupKey.provider && group.data.owner == groupKey.owner && group.data.id == groupKey.id,
@@ -142,8 +144,8 @@ final class SplitwellAppClientReference(
       update: Update[T],
       commandId: Option[String] = None,
   ): T = {
-    LedgerApiUtils.submitWithResult(
-      ledgerApi,
+    import LedgerApiExtensions.*
+    ledgerApi.ledger_api_extensions.commands.submitWithResult(
       userId,
       actAs,
       readAs,
@@ -153,7 +155,7 @@ final class SplitwellAppClientReference(
     )
   }
 
-  private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
+  private def getUserPrimaryParty() = ledgerApi.ledger_api_extensions.users.getPrimaryParty(userId)
 
   // Commands for managing installs
 
@@ -221,7 +223,7 @@ final class SplitwellAppClientReference(
   ): splitwellCodegen.Group.ContractId = {
     val party = getUserPrimaryParty()
     val acceptedInvite =
-      ledgerApi.ledger_api.acs.awaitJava(splitwellCodegen.AcceptedGroupInvite.COMPANION)(
+      ledgerApi.ledger_api_extensions.acs.awaitJava(splitwellCodegen.AcceptedGroupInvite.COMPANION)(
         party,
         (c: splitwellCodegen.AcceptedGroupInvite.Contract) => c.id == acceptedGroupInvite,
       )

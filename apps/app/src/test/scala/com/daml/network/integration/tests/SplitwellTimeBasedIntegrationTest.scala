@@ -59,7 +59,7 @@ class SplitwellTimeBasedIntegrationTest
         aliceSplitwell.joinGroup(accepted.contractId)
       }
 
-      splitwellValidator.remoteParticipantWithAdminToken.ledger_api.acs
+      splitwellValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.Group.COMPANION)(providerSplitwellBackend.getProviderPartyId())
 
       charlieSplitwell.listBalances(key) shouldBe Map.empty

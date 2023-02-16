@@ -381,13 +381,13 @@ class ExternalLedgerApiClient(
   override protected def domainOfTransaction(transactionId: String): DomainId =
     throw new NotImplementedError("domain_of is not implemented for external ledger api clients")
 
-  override protected[console] def ledgerApiCommand[Result](
+  override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner
       .runCommand("sourceLedger", command, ClientConfig(hostname, port, tls), callCredentials)
 
-  override protected def optionallyAwait[Tx](
+  override def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       optTimeout: Option[NonNegativeDuration],
@@ -494,7 +494,7 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
     }
   }
 
-  override protected[console] def ledgerApiCommand[Result](
+  override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(
@@ -592,7 +592,7 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   override def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
 
-  override protected[console] def ledgerApiCommand[Result](
+  override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(

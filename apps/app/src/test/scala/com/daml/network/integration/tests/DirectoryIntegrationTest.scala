@@ -94,7 +94,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
                           new com.daml.network.codegen.java.da.internal.template.Archive()
                         )
                       try {
-                        aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands
+                        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
                           .submitJava(
                             actAs = Seq(aliceUserParty),
                             optTimeout = None,
@@ -116,11 +116,13 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
           )(
             "there is exactly one install and no left-over request",
             _ => {
-              val installs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
-                .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+              val installs =
+                aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
               installs should have size (1)
-              val requests = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
-                .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
+              val requests =
+                aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
               requests shouldBe Seq.empty
               // return install-cid
               installs(0).id
@@ -176,16 +178,17 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
               .commands
               .asScala
               .toSeq
-            aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-              actAs = Seq(aliceUserParty),
-              commands = cmds,
-              optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
-            )
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                actAs = Seq(aliceUserParty),
+                commands = cmds,
+                optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
+              )
           },
         )(
           "There is no install contract left",
           _ =>
-            aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
               .filterJava(codegen.DirectoryInstall.COMPANION)(
                 aliceUserParty
               ) shouldBe empty,
@@ -208,7 +211,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       })
       // Wait for the SubscriptionInitialPayment to be archived
       eventually() {
-        refs.validator.remoteParticipantWithAdminToken.ledger_api.acs
+        refs.validator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
             refs.userParty,
             (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
@@ -283,7 +286,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
-        directory.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+        directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -346,7 +349,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()
-        refs.validator.remoteParticipantWithAdminToken.ledger_api.acs
+        refs.validator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(userParty)
       }
 

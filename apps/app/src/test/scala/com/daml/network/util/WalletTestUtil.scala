@@ -13,7 +13,6 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
-  LedgerApiUtils,
   RemoteDirectoryAppReference,
   ValidatorAppBackendReference,
   ValidatorAppReference,
@@ -93,7 +92,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
       (coinOpt, expirationOpt) match {
         case (Some(coin), Right(expiration)) => {
-          userWallet.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+          userWallet.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
             Seq(userParty, validatorParty),
             optTimeout = None,
             commands = transferContext.coinRules
@@ -215,18 +214,18 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   ) = {
     val now = env.environment.clock.now
     val referenceId = clue(s"Create test delivery offer for $userParty") {
-      val result = LedgerApiUtils.submitWithResult(
-        remoteParticipant,
-        userId = userId,
-        actAs = Seq(userParty),
-        readAs = Seq.empty,
-        update = new testWalletCodegen.TestDeliveryOffer(
-          scan.getSvcPartyId().toProtoPrimitive,
-          userParty.toProtoPrimitive,
-          "description",
-        ).create,
-        domainId = domainId,
-      )
+      val result =
+        remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+          userId = userId,
+          actAs = Seq(userParty),
+          readAs = Seq.empty,
+          update = new testWalletCodegen.TestDeliveryOffer(
+            scan.getSvcPartyId().toProtoPrimitive,
+            userParty.toProtoPrimitive,
+            "description",
+          ).create,
+          domainId = domainId,
+        )
       testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
     }
 
@@ -248,8 +247,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         new RelTime(60 * 1000000),
         referenceId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )
-      val result = LedgerApiUtils.submitWithResult(
-        remoteParticipant,
+      val result = remoteParticipant.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -268,7 +266,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       userParty: PartyId,
       deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
   ) = {
-    remoteParticipant.ledger_api.acs
+    remoteParticipant.ledger_api_extensions.acs
       .filterJava(paymentCodegen.AcceptedAppPayment.COMPANION)(
         userParty,
         (c: paymentCodegen.AcceptedAppPayment.Contract) =>
@@ -291,8 +289,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       env: CoinTestConsoleEnvironment
   ) = {
     val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    LedgerApiUtils.submitWithResult(
-      remoteParticipant,
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(
@@ -314,8 +311,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       env: CoinTestConsoleEnvironment
   ) = {
     val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    LedgerApiUtils.submitWithResult(
-      remoteParticipant,
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(
@@ -364,7 +360,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   ): String = {
     val dirEntryName = "directory.cns"
     val dirParty = directory.getProviderPartyId()
-    directory.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+    directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(dirParty),
       commands = new dirCodegen.DirectoryEntry(
         dirParty.toProtoPrimitive,
@@ -401,7 +397,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
     eventually() {
-      directory.ledgerApi.ledger_api.acs
+      directory.ledgerApi.ledger_api_extensions.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
     directory.requestDirectoryEntry(dirEntry)
@@ -416,12 +412,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       "description",
     )
     clue("Create delivery offer") {
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = deliveryOffer.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(
           aliceUserParty,
           _.data == deliveryOffer,
@@ -459,12 +455,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         new RelTime(5 * 60 * 1000000L), // 5min collection duration.
         deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = paymentRequest.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(paymentCodegen.AppPaymentRequest.COMPANION)(aliceUserParty)
         .id
     }
@@ -497,12 +493,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       "description",
     )
     clue("Create a subscription context") {
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = context.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(
           aliceUserParty,
           _.data == context,
@@ -550,7 +546,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         subscription,
         payData,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
         commands = subscriptionRequest.create.commands.asScala.toSeq,
@@ -576,12 +572,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         svcParty.toProtoPrimitive,
         contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = subscription.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .awaitJava(subsCodegen.Subscription.COMPANION)(aliceUserParty, _.data == subscription)
         .id
     }
@@ -592,7 +588,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         payData,
         nextPaymentDueAt,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
         commands = state.create.commands.asScala.toSeq,

@@ -67,7 +67,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
     }
 
     clue("check that there are no outstanding CoinRulesRequest contracts") {
-      val results = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      val results = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(CoinRulesRequest.COMPANION)(svcParty)
       inside(results)(_.size shouldBe 0)
     }

@@ -91,12 +91,13 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-              actAs = Seq(aliceUserParty),
-              readAs = Seq(aliceValidatorParty),
-              optTimeout = None,
-              commands = collectCommand,
-            )
+            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                actAs = Seq(aliceUserParty),
+                readAs = Seq(aliceValidatorParty),
+                optTimeout = None,
+                commands = collectCommand,
+              )
           },
         )(
           // note that because this test sets paymentDuration = paymentInterval,
@@ -120,12 +121,13 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-              actAs = Seq(aliceUserParty),
-              readAs = Seq(aliceValidatorParty),
-              optTimeout = None,
-              commands = collectCommand2,
-            )
+            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                actAs = Seq(aliceUserParty),
+                readAs = Seq(aliceValidatorParty),
+                optTimeout = None,
+                commands = collectCommand2,
+              )
           },
         )(
           "the subscription is back in idle state",
@@ -150,17 +152,18 @@ class WalletSubscriptionsIntegrationTest
         env: CoinTestConsoleEnvironment
     ): subsCodegen.SubscriptionRequest = {
       val contextId = clue("Create a subscription context") {
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-          Seq(aliceUserParty),
-          optTimeout = None,
-          commands = new testSubsCodegen.TestSubscriptionContext(
-            scan.getSvcPartyId().toProtoPrimitive,
-            aliceUserParty.toProtoPrimitive,
-            aliceUserParty.toProtoPrimitive,
-            "description",
-          ).create.commands.asScala.toSeq,
-        )
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+          .submitJava(
+            Seq(aliceUserParty),
+            optTimeout = None,
+            commands = new testSubsCodegen.TestSubscriptionContext(
+              scan.getSvcPartyId().toProtoPrimitive,
+              aliceUserParty.toProtoPrimitive,
+              aliceUserParty.toProtoPrimitive,
+              "description",
+            ).create.commands.asScala.toSeq,
+          )
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(aliceUserParty)
           .id
       }
@@ -186,11 +189,12 @@ class WalletSubscriptionsIntegrationTest
           subscriptionData,
           payData,
         )
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-          actAs = Seq(aliceUserParty),
-          optTimeout = None,
-          commands = request.create.commands.asScala.toSeq,
-        )
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+          .submitJava(
+            actAs = Seq(aliceUserParty),
+            optTimeout = None,
+            commands = request.create.commands.asScala.toSeq,
+          )
         request
       }
     }

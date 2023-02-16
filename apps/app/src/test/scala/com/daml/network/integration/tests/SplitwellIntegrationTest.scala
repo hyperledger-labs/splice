@@ -42,7 +42,7 @@ class SplitwellIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
         aliceSplitwell.createInstallRequest()
-        aliceSplitwell.ledgerApi.ledger_api.acs
+        aliceSplitwell.ledgerApi.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
 
         def createGroup() = {
@@ -51,7 +51,7 @@ class SplitwellIntegrationTest
           // Wait for request to be archived and therefore either the group to be created or
           // the request to be rejected.
           eventually() {
-            aliceSplitwell.ledgerApi.ledger_api.acs
+            aliceSplitwell.ledgerApi.ledger_api_extensions.acs
               .filterJava(splitwellCodegen.GroupRequest.COMPANION)(
                 aliceUserParty,
                 (request: splitwellCodegen.GroupRequest.Contract) => request.id == groupRequest,
@@ -73,7 +73,7 @@ class SplitwellIntegrationTest
 
         // We read directly from the ledger API to avoid having to synchronize on the store.
         val groups =
-          aliceSplitwell.ledgerApi.ledger_api.acs
+          aliceSplitwell.ledgerApi.ledger_api_extensions.acs
             .filterJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
         groups should have size 1
     }
@@ -83,7 +83,7 @@ class SplitwellIntegrationTest
 
       aliceWallet.tap(50)
 
-      val install = aliceSplitwell.ledgerApi.ledger_api.acs
+      val install = aliceSplitwell.ledgerApi.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
       aliceValidator.remoteParticipant.transfer
         .lookup_contract_domain(install.id) shouldBe Map(

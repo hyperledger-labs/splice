@@ -138,14 +138,14 @@ trait TimeTestUtil extends CoinTestCommon {
   def getSortedOpenMiningRounds(
       remoteParticipant: CoinRemoteParticipantReference,
       validatorPartyId: PartyId,
-  ): Seq[OpenMiningRound.Contract] = remoteParticipant.ledger_api.acs
+  ): Seq[OpenMiningRound.Contract] = remoteParticipant.ledger_api_extensions.acs
     .filterJava(OpenMiningRound.COMPANION)(validatorPartyId)
     .sortBy(_.data.round.number)
 
   def getSortedIssuingRounds(
       remoteParticipant: CoinRemoteParticipantReference,
       validatorPartyId: PartyId,
-  ): Seq[IssuingMiningRound.Contract] = remoteParticipant.ledger_api.acs
+  ): Seq[IssuingMiningRound.Contract] = remoteParticipant.ledger_api_extensions.acs
     .filterJava(IssuingMiningRound.COMPANION)(
       validatorPartyId
     )

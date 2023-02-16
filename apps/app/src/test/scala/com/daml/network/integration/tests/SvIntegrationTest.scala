@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.console.LedgerApiUtils
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -68,8 +67,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
           val sv = sv3 // it doesn't really matter which sv we pick
           val svParty = sv.getDebugInfo().svParty
           sv.listOngoingValidatorOnboardings() shouldBe empty
-          LedgerApiUtils.submitWithResult(
-            sv.remoteParticipant,
+          sv.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
             sv.config.ledgerApiUser,
             actAs = Seq(svParty),
             readAs = Seq.empty,
@@ -138,7 +136,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
       Unit => {
         getCoinRules().observers should contain(candidate.toProtoPrimitive)
         inside(
-          svc.remoteParticipantWithAdminToken.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)
         ) {
           case Seq(usedSecret) => {
@@ -198,7 +196,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
 
   def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one SvcRules contract") {
-      val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
       foundSvcRules should have length 1
       foundSvcRules.head
@@ -206,7 +204,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
 
   def getCoinRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one CoinRules contract") {
-      val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api.acs
+      val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
       foundCoinRules should have length 1
       foundCoinRules.head

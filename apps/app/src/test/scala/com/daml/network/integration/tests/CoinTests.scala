@@ -9,6 +9,7 @@ import com.daml.network.console.{
   RemoteDirectoryAppReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
+  LedgerApiExtensions,
 }
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -30,7 +31,8 @@ object CoinTests {
   trait CoinIntegrationTest
       extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
       with IsolatedCoinEnvironments
-      with CoinTestCommon {
+      with CoinTestCommon
+      with LedgerApiExtensions {
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -42,7 +44,8 @@ object CoinTests {
       extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
       with SharedCoinEnvironment
       with BeforeAndAfterEach
-      with CoinTestCommon {
+      with CoinTestCommon
+      with LedgerApiExtensions {
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -133,7 +136,10 @@ object CoinTests {
     }
   }
 
-  trait CoinTestCommon extends BaseTest with CommonCoinAppInstanceReferences {
+  trait CoinTestCommon
+      extends BaseTest
+      with CommonCoinAppInstanceReferences
+      with LedgerApiExtensions {
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

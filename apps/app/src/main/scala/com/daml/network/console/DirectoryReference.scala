@@ -21,6 +21,7 @@ abstract class DirectoryAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
 ) extends HttpCoinAppReference {
+
   @Help.Summary("List directory entries")
   @Help.Description(
     "Lists all directory entries whose name is prefixed with the given prefix, up to a given number of entries"
@@ -114,6 +115,8 @@ class RemoteDirectoryAppReference(
 ) extends DirectoryAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference {
 
+  import LedgerApiExtensions.*
+
   override def httpClientConfig = config.adminApi
   lazy val ledgerApi = new ExternalLedgerApiClient(
     config.ledgerApi.clientConfig.address,
@@ -126,8 +129,8 @@ class RemoteDirectoryAppReference(
 
   private def getDirectoryInstall(): codegen.DirectoryInstall.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
-    val allInstalls = ledgerApi.ledger_api.acs.filterJava(
+    val userParty = ledgerApi.ledger_api_extensions.users.getPrimaryParty(config.ledgerApiUser)
+    val allInstalls = ledgerApi.ledger_api_extensions.acs.filterJava(
       codegen.DirectoryInstall.COMPANION
     )(
       userParty,
@@ -146,9 +149,8 @@ class RemoteDirectoryAppReference(
   @Help.Summary("Request DirectoryInstall contract")
   def requestDirectoryInstall(): codegen.DirectoryInstallRequest.ContractId = {
     val providerParty = getProviderPartyId()
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
-    val created = LedgerApiUtils.submitWithResult(
-      ledgerApi,
+    val userParty = ledgerApi.ledger_api_extensions.users.getPrimaryParty(config.ledgerApiUser)
+    val created = ledgerApi.ledger_api_extensions.commands.submitWithResult(
       userId = config.ledgerApiUser,
       actAs = Seq(userParty),
       readAs = Seq.empty,
@@ -164,10 +166,9 @@ class RemoteDirectoryAppReference(
   def requestDirectoryEntry(
       name: String
   ): (codegen.DirectoryEntryContext.ContractId, subsCodegen.SubscriptionRequest.ContractId) = {
-    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.ledgerApiUser)
-    val damlTuple = LedgerApiUtils
+    val userParty = ledgerApi.ledger_api_extensions.users.getPrimaryParty(config.ledgerApiUser)
+    val damlTuple = ledgerApi.ledger_api_extensions.commands
       .submitWithResult(
-        ledgerApi,
         userId = config.ledgerApiUser,
         actAs = Seq(userParty),
         readAs = Seq.empty,

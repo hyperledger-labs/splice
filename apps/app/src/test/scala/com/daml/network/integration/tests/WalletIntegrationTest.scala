@@ -131,7 +131,7 @@ class WalletIntegrationTest
         )
 
         // Wait until 2 transactions have been received
-        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
+        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
@@ -163,7 +163,7 @@ class WalletIntegrationTest
           )
 
         eventually() {
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs.filterJava(
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs.filterJava(
             walletCodegen.AppPaymentRequest.COMPANION
           )(alice) should have size (batchSize.toLong + 2)
         }
@@ -177,7 +177,7 @@ class WalletIntegrationTest
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
-        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
+        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
@@ -204,7 +204,7 @@ class WalletIntegrationTest
 
           // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
           aliceWallet.tap(10)
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .awaitJava(coinCodegen.Coin.COMPANION)(alice)
           // creating payment request
           val request =

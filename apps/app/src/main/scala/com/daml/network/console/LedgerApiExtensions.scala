@@ -1,0 +1,215 @@
+package com.daml.network.console
+
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
+import com.daml.ledger.client.binding.{Primitive as P}
+import com.daml.ledger.api.DeduplicationPeriod
+import com.daml.ledger.javaapi
+import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
+import com.daml.ledger.api.v1.event.CreatedEvent
+import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
+import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.ledger.javaapi.data.codegen.Update
+import com.daml.ledger.javaapi.data.{TransactionTree as JavaTransactionTree}
+import com.daml.network.environment.CoinLedgerConnection
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.console.{
+  ConsoleCommandResult,
+  ConsoleMacros,
+  FeatureFlag,
+  LedgerApiCommandRunner,
+  Help,
+}
+import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
+import scala.jdk.CollectionConverters.*
+
+trait LedgerApiExtensions {
+  implicit class LedgerApiSyntax(
+      private val ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
+  ) {
+    object ledger_api_extensions {
+      object commands {
+        @Help.Summary(
+          "Submit command and wait for the resulting transaction, returning the transaction tree or failing otherwise",
+          FeatureFlag.Testing,
+        )
+        @Help.Description(
+          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit and returns it.
+          | If the timeout is set, it also waits for the transaction to appear at all other configured
+          | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
+          | the timeout only specifies how long to wait at the other participants.
+          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
+          | the allotted time.
+          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
+          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
+          | return before the transaction appears at all the involved participants."""
+        )
+        def submitJava(
+            actAs: Seq[PartyId],
+            commands: Seq[javaapi.data.Command],
+            workflowId: String = "",
+            commandId: String = "",
+            optTimeout: Option[NonNegativeDuration] = Some(ledgerApi.timeouts.ledgerCommand),
+            deduplicationPeriod: Option[DeduplicationPeriod] = None,
+            submissionId: String = "",
+            minLedgerTimeAbs: Option[Instant] = None,
+            readAs: Seq[PartyId] = Seq.empty,
+            applicationId: String = LedgerApiCommands.defaultApplicationId,
+            disclosedContracts: Seq[DisclosedContract] = Seq.empty,
+        ): JavaTransactionTree = {
+          val tx = ledgerApi.consoleEnvironment.run {
+            ledgerApi.ledgerApiCommand(
+              LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
+                actAs.map(_.toLf),
+                readAs.map(_.toLf),
+                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                applicationId,
+                workflowId,
+                commandId,
+                deduplicationPeriod,
+                submissionId,
+                minLedgerTimeAbs,
+                disclosedContracts,
+              )
+            )
+          }
+          javaapi.data.TransactionTree.fromProto(
+            TransactionTree.toJavaProto(ledgerApi.optionallyAwait(tx, tx.transactionId, optTimeout))
+          )
+        }
+
+        def submitWithResult[T](
+            userId: String,
+            actAs: Seq[PartyId],
+            readAs: Seq[PartyId],
+            update: Update[T],
+            commandId: Option[String] = None,
+            domainId: Option[DomainId] = None,
+        ): T = {
+          val tree = submitJava(
+            actAs,
+            update.commands.asScala.toSeq,
+            workflowId = domainId.fold("")(CoinLedgerConnection.domainIdToWorkflowId(_)),
+            commandId.getOrElse(""),
+            readAs = readAs,
+            applicationId = userId,
+            optTimeout = None,
+          )
+          CoinLedgerConnection.decodeExerciseResult(
+            update,
+            tree,
+          )
+        }
+      }
+      object users {
+        def getPrimaryParty(userId: String) = {
+          val user = ledgerApi.ledger_api.users.get(userId)
+          val primaryParty = user.primaryParty.getOrElse(
+            throw new RuntimeException(s"User $userId has no primary party")
+          );
+          PartyId.tryFromLfParty(primaryParty)
+        }
+      }
+
+      object transactions {
+
+        @Help.Summary("Get transaction trees", FeatureFlag.Testing)
+        @Help.Description(
+          """This function connects to the transaction tree stream for the given parties and collects transaction trees
+          |until either `completeAfter` transaction trees have been received or `timeout` has elapsed.
+          |The returned transaction trees can be filtered to be between the given offsets (default: no filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
+          |this command fails with a `NOT_FOUND` error."""
+        )
+        def treesJava(
+            partyIds: Set[PartyId],
+            completeAfter: Int,
+            beginOffset: LedgerOffset =
+              new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN),
+            endOffset: Option[LedgerOffset] = None,
+            verbose: Boolean = true,
+            timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
+        ): Seq[javaapi.data.TransactionTree] = {
+          ledgerApi.ledger_api.transactions
+            .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
+            .map(t => javaapi.data.TransactionTree.fromProto(TransactionTree.toJavaProto(t)))
+        }
+      }
+
+      object acs {
+        @Help.Summary("Wait until a contract becomes available", FeatureFlag.Testing)
+        @Help.Description(
+          """This function can be used for contracts with a code-generated Scala model.
+          |You can refine your search using the `filter` function argument.
+          |The command will wait until the contract appears or throw an exception once it times out."""
+        )
+        def awaitJava[
+            TC <: javaapi.data.codegen.Contract[TCid, T],
+            TCid <: javaapi.data.codegen.ContractId[T],
+            T <: javaapi.data.Template,
+        ](companion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
+            partyId: PartyId,
+            predicate: TC => Boolean = (x: TC) => true,
+            timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
+        ): TC = {
+          val result = new AtomicReference[Option[TC]](None)
+          ConsoleMacros.utils.retry_until_true(timeout) {
+            val tmp = filterJava(companion)(partyId, predicate)
+            result.set(tmp.headOption)
+            tmp.nonEmpty
+          }
+          ledgerApi.consoleEnvironment.run {
+            ConsoleCommandResult.fromEither(
+              result
+                .get()
+                .toRight(
+                  s"Failed to find contract of type ${companion.TEMPLATE_ID} after ${timeout}"
+                )
+            )
+          }
+        }
+
+        @Help.Summary(
+          "Filter the ACS for contracts of a particular Java code-generated template",
+          FeatureFlag.Testing,
+        )
+        @Help.Description(
+          """To use this function, ensure a code-generated Java model for the target template exists.
+          |You can refine your search using the `predicate` function argument."""
+        )
+        def filterJava[
+            TC <: javaapi.data.codegen.Contract[TCid, T],
+            TCid <: javaapi.data.codegen.ContractId[T],
+            T <: javaapi.data.Template,
+        ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
+            partyId: PartyId,
+            predicate: TC => Boolean = (x: TC) => true,
+        ): Seq[TC] = {
+          val javaTemplateId = templateCompanion.TEMPLATE_ID
+          val templateId = P.TemplateId(
+            javaTemplateId.getPackageId,
+            javaTemplateId.getModuleName,
+            javaTemplateId.getEntityName,
+          )
+          ledgerApi.ledger_api.acs
+            .of_party(partyId, filterTemplates = Seq(templateId))
+            .map(_.event)
+            .flatMap(ev =>
+              JavaDecodeUtil
+                .decodeCreated(templateCompanion)(
+                  javaapi.data.CreatedEvent.fromProto(CreatedEvent.toJavaProto(ev))
+                )
+                .toList
+            )
+            .filter(predicate)
+        }
+      }
+    }
+  }
+}
+
+object LedgerApiExtensions extends LedgerApiExtensions {}
