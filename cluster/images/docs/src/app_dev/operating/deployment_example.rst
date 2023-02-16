@@ -18,8 +18,7 @@ To start the validator node, first start the validator participant using the Can
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/coin --config examples/splitwell/splitwell-participant.conf \
-      --bootstrap examples/splitwell/splitwell-participant.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-participant.conf --bootstrap examples/splitwell/splitwell-participant.sc
 
 Before starting the splitwell backend, some setup is required:
 
@@ -42,12 +41,18 @@ configuration.
     :start-after: BEGIN_SPLITWELL_CONFIG
     :end-before: END_SPLITWELL_CONFIG
 
-The release bundle already contains a configuration file with that
-section added so start your validator again with this configuration file:
+The release bundle already contains a configuration file with that section added.
+Request a validator onboarding secret...
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-validator.conf
+   curl -X POST https://|cn_cluster|.network.canton.global:6014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+
+...and then start the splitwell validator with this configuration file and the onboarding config you just obtained:
+
+.. parsed-literal::
+
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
 
 Now you can finally start the app backend. Splitwell is included as
 part of the standard release so it is started using the same binary.
