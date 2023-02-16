@@ -50,8 +50,9 @@ class SubscriptionPaymentTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        log: String => Unit = logger.warn(_),
     ) = {
-      logger.warn(s"rejecting subscription payment: $reason")
+      log(s"rejecting subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
       connection
         .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq, domainId)
@@ -89,7 +90,7 @@ class SubscriptionPaymentTrigger(
     for {
       domainId <- store.domains.getUniqueDomainId()
       acs <- store.acs(domainId)
-      context <- acs
+      directoryEntryContext <- acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
           _.getOrElse(
@@ -100,14 +101,28 @@ class SubscriptionPaymentTrigger(
         )
       transferContext <- scanConnection.getAppTransferContext(store.svcParty)
       // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
-      entryName = context.payload.name
+      entryName = directoryEntryContext.payload.name
       // check whether the entry exists
       result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
         case QueryResult(off, Some(entry)) =>
           // collect the payment and renew the entry
           collectPayment(entry, off, transferContext, domainId)
-        case QueryResult(_, None) =>
-          rejectPayment("entry doesn't exist.", transferContext, domainId)
+        case QueryResult(_, None) => {
+          if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
+            rejectPayment("entry doesn't exist.", transferContext, domainId)
+          } else {
+            // If the entry doesn't exist, and the payment is now past due, then
+            // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
+            // had a chance to renew it. We reject the payment but only log this at an INFO level
+            // rather than a warning.
+            rejectPayment(
+              "entry has already been expired",
+              transferContext,
+              domainId,
+              logger.info(_),
+            )
+          }
+        }
       }
     } yield result
   }
