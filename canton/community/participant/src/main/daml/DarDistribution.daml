@@ -40,7 +40,7 @@ template ShareDar
   where
     signatory owner
     observer recipient
-    
+
     controller recipient can
       Accept : ContractId AcceptedDar
         do

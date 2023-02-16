@@ -20,8 +20,8 @@ import com.digitalasset.canton.topology.Member
 object SequencerError extends SequencerErrorGroup {
 
   @Explanation("""
-                 |This error indicates that the member has acknowledged a timestamp that is after the events 
-                 |it has received. This violates the sequencing protocol. 
+                 |This error indicates that the member has acknowledged a timestamp that is after the events
+                 |it has received. This violates the sequencing protocol.
                  |""")
   object InvalidAcknowledgementTimestamp
       extends AlarmErrorCode("INVALID_ACKNOWLEDGEMENT_TIMESTAMP") {

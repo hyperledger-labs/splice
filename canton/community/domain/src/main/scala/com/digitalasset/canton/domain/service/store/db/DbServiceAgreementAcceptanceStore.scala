@@ -48,8 +48,8 @@ class DbServiceAgreementAcceptanceStore(
       storage.profile match {
         case _: DbStorage.Profile.Oracle =>
           sqlu"""insert /*+  ignore_row_on_dupkey_index ( service_agreement_acceptances ( agreement_id, participant_id ) ) */
-                into service_agreement_acceptances 
-                 (agreement_id, participant_id, signature, ts) 
+                into service_agreement_acceptances
+                 (agreement_id, participant_id, signature, ts)
                 values (${acceptance.agreementId}, ${acceptance.participantId}, ${acceptance.signature}, ${acceptance.timestamp})"""
         case _ =>
           sqlu"""insert into service_agreement_acceptances(agreement_id, participant_id, signature, ts)

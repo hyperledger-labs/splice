@@ -272,7 +272,7 @@
                 {
                   "service": "Microsoft.KeyVault"
                 },
-                { 
+                {
                   "service": "Microsoft.Sql"
                 }
               ]

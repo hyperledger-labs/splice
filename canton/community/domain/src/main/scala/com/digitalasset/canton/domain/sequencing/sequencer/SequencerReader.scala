@@ -413,7 +413,7 @@ class SequencerReader(
               existingLatestTopologyClientTimestampg,
             ) =>
           val message =
-            s"""|There is an existing checkpoint for member [$member] ($memberId) at counter ${checkpoint.counter} with timestamp $existingTimestamp and latest topology client timestamp $existingLatestTopologyClientTimestampg. 
+            s"""|There is an existing checkpoint for member [$member] ($memberId) at counter ${checkpoint.counter} with timestamp $existingTimestamp and latest topology client timestamp $existingLatestTopologyClientTimestampg.
                 |We attempted to write ${checkpoint.timestamp} and ${checkpoint.latestTopologyClientTimestamp}.""".stripMargin
           ErrorUtil.internalError(new CounterCheckpointInconsistentException(message))
       }

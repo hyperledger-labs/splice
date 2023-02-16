@@ -248,11 +248,11 @@ class DbContractStore(
     profile match {
       case _: DbStorage.Profile.Postgres =>
         sqlu"""insert into contracts as c (
-                 domain_id, contract_id, instance, metadata, 
+                 domain_id, contract_id, instance, metadata,
                  ledger_create_time, request_counter, creating_transaction_id, package_id, template_id, contract_salt)
-               values ($domainId, $contractId, $contract, $metadata, 
+               values ($domainId, $contractId, $contract, $metadata,
                  $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)
-               on conflict(domain_id, contract_id) do update 
+               on conflict(domain_id, contract_id) do update
                  set
                    metadata = $metadata,
                    ledger_create_time = $ledgerCreateTime,
@@ -261,7 +261,7 @@ class DbContractStore(
                    package_id = $packageId,
                    template_id = $templateId,
                    contract_salt = $contractSalt
-                 where (c.creating_transaction_id is null and ($creatingTransactionId is not null or c.request_counter < $requestCounter)) or 
+                 where (c.creating_transaction_id is null and ($creatingTransactionId is not null or c.request_counter < $requestCounter)) or
                        (c.creating_transaction_id is not null and $creatingTransactionId is not null and c.request_counter < $requestCounter)"""
       case _: DbStorage.Profile.H2 =>
         sqlu"""merge into contracts
@@ -286,10 +286,10 @@ class DbContractStore(
                  values ($domainId, $contractId, $contract, $metadata,
                   $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)"""
       case _: DbStorage.Profile.Oracle =>
-        sqlu"""merge into contracts 
+        sqlu"""merge into contracts
                using dual
                on (domain_id = $domainId and contract_id = ${storedContract.contract.contractId})
-               when matched then 
+               when matched then
                  update set
                    metadata = $metadata,
                    ledger_create_time = $ledgerCreateTime,
@@ -298,13 +298,13 @@ class DbContractStore(
                    package_id = $packageId,
                    template_id = $templateId,
                    contract_salt = $contractSalt
-                 where (creating_transaction_id is null and ($creatingTransactionId is not null or request_counter < $requestCounter)) or 
+                 where (creating_transaction_id is null and ($creatingTransactionId is not null or request_counter < $requestCounter)) or
                        (creating_transaction_id is not null and $creatingTransactionId is not null and request_counter < $requestCounter)
-               when not matched then 
+               when not matched then
                 insert
-                 (domain_id, contract_id, instance, metadata, 
+                 (domain_id, contract_id, instance, metadata,
                   ledger_create_time, request_counter, creating_transaction_id, package_id, template_id, contract_salt)
-                 values ($domainId, $contractId, $contract, $metadata, 
+                 values ($domainId, $contractId, $contract, $metadata,
                   $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)"""
     }
   }
@@ -364,7 +364,7 @@ class DbContractStore(
             // Here we use exactly the same expression as in idx_contracts_request_counter
             // to make sure the index is used.
             sqlu"""delete from contracts
-                 where (case when creating_transaction_id is null then domain_id end) = $domainId and 
+                 where (case when creating_transaction_id is null then domain_id end) = $domainId and
                        (case when creating_transaction_id is null then request_counter end) <= $upTo"""
         }
 

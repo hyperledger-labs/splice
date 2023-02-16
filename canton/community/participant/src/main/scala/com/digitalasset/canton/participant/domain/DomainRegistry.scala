@@ -111,7 +111,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
 
     @Explanation(
       """This error indicates that the domain this participant is trying to connect to is a domain where unique
-        contract keys are supported, while this participant is already connected to other domains. Multiple domains and 
+        contract keys are supported, while this participant is already connected to other domains. Multiple domains and
         unique contract keys are mutually exclusive features."""
     )
     @Resolution("Use isolated participants for domains that require unique keys.")
@@ -126,8 +126,8 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
     }
 
     @Explanation(
-      """This error indicates that the participant can not issue a domain trust certificate. Such a certificate is 
-        |necessary to become active on a domain. Therefore, it must be present in the authorized store of the 
+      """This error indicates that the participant can not issue a domain trust certificate. Such a certificate is
+        |necessary to become active on a domain. Therefore, it must be present in the authorized store of the
         |participant topology manager."""
     )
     @Resolution(
@@ -182,7 +182,7 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
   object HandshakeErrors extends ErrorGroup() {
 
     @Explanation(
-      """This error indicates that the domain is using crypto settings which are 
+      """This error indicates that the domain is using crypto settings which are
                                 either not supported or not enabled on this participant."""
     )
     @Resolution(
@@ -231,8 +231,8 @@ object DomainRegistryError extends DomainRegistryErrorGroup {
     }
 
     @Explanation(
-      """This error indicates that the domain-id does not match the one that the 
-        participant expects. If this error happens on a first connect, then the domain id 
+      """This error indicates that the domain-id does not match the one that the
+        participant expects. If this error happens on a first connect, then the domain id
         defined in the domain connection settings does not match the remote domain.
         If this happens on a reconnect, then the remote domain has been reset for some reason."""
     )

@@ -39,8 +39,8 @@ object AmmoniteConsoleConfig extends LazyLogging {
       Some(Defaults.ammoniteHome.toIO)
     else {
       logger.warn(
-        s"""Can not determine user home directory using the java system property `user.home` 
-        | (is set to ${System.getProperty("user.home")}). Please set it 
+        s"""Can not determine user home directory using the java system property `user.home`
+        | (is set to ${System.getProperty("user.home")}). Please set it
         |on jvm startup using -Duser.home=...""".stripMargin
       )
       None

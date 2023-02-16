@@ -180,5 +180,5 @@ export const customViews = (userId, party, role) => ({
       }
     ]
   }
-   
+
 })

@@ -739,8 +739,8 @@ The exact JSON format is defined in `tools.sc`.
 
 * Kubernetes Documentation
    * [Fundamentals of Kubernetes](https://kubernetes.io/docs/concepts/overview/).
-   * [`kubectl` Documentation](https://kubernetes.io/docs/reference/kubectl/)   
-   * [Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) 
+   * [`kubectl` Documentation](https://kubernetes.io/docs/reference/kubectl/)
+   * [Liveness and Readiness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
    * [`Deployment`](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
    * [`Service`](https://kubernetes.io/docs/concepts/services-networking/service/)
 * [Object model API reference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22)

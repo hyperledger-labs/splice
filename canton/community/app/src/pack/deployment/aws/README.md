@@ -30,7 +30,7 @@ To allow generating configuration and creating databases based on values from th
 
 ## Usage
 
-After stack is provisioned, in the _Outputs_ section of the CloudFormation Console you can find the AWS NLB DNS name together with ports for all services. 
+After stack is provisioned, in the _Outputs_ section of the CloudFormation Console you can find the AWS NLB DNS name together with ports for all services.
 For example `http://your-load-balancer.elb.eu-central-1.amazonaws.com:4100` will bring up Navigator for participant1.
 
 The default port assignments are as follows:
@@ -82,8 +82,8 @@ In order to interact with the models using a JSON/REST API, we can use Damls JSO
 ```
 daml json-api \
   --ledger-host <ledger_api_host> \
-  --ledger-port <ledger_api_port> \  
-  --http-port <port_for_json_api> \   
+  --ledger-port <ledger_api_port> \
+  --http-port <port_for_json_api> \
   --package-reload-interval 5s \
   --allow-insecure-tokens
 ```
@@ -92,7 +92,7 @@ In this case we are allowing insecure tokens to facilitate testing and swapping 
 
 ```json
 {
-    "https://daml.com/ledger-api": {   
+    "https://daml.com/ledger-api": {
         "ledgerId": "<ledger_id>",
         "applicationId": <application_id>,
         "actAs": [

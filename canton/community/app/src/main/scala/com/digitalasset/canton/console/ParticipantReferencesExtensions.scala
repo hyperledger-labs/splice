@@ -78,7 +78,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
 
     @Help.Summary("Reconnect to all domains for which `manualStart` = false")
     @Help.Description(
-      """If ignoreFailures is set to true (default), the reconnect all will succeed even if some domains are offline. 
+      """If ignoreFailures is set to true (default), the reconnect all will succeed even if some domains are offline.
           | The participants will continue attempting to establish a domain connection."""
     )
     def reconnect_all(ignoreFailures: Boolean = true): Unit = {

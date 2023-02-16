@@ -85,7 +85,7 @@ abstract class ParticipantRepairAdministration(
   @Help.Summary("Purge contracts with specified Contract IDs from local participant.")
   @Help.Description(
     """This is a last resort command to recover from data corruption, e.g. in scenarios in which participant
-      |contracts have somehow gotten out of sync and need to be manually purged, or in situations in which 
+      |contracts have somehow gotten out of sync and need to be manually purged, or in situations in which
       |stakeholders are no longer available to agree to their archival. The participant needs to be disconnected from
       |the domain on which the contracts with "contractIds" reside at the time of the call, and as of now the domain
       |cannot have had any inflight requests.
@@ -118,7 +118,7 @@ abstract class ParticipantRepairAdministration(
         |operation, use of this command requires (temporarily) enabling the "features.enable-repair-commands"
         |configuration. In addition repair commands can run for an unbounded time depending on the number of
         |contract ids passed in. Be sure to not connect the participant to either domain until the call returns.
-        
+
         Arguments:
         - contractIds - set of contract ids that should be moved to the new domain
         - sourceDomain - alias of the source domain
@@ -149,9 +149,9 @@ abstract class ParticipantRepairAdministration(
   @Help.Description(
     """This method can be used to migrate all the contracts associated with a domain to a new domain connection.
          This method will register the new domain, connect to it and then re-associate all contracts on the source
-         domain to the target domain. Please note that this migration needs to be done by all participants 
+         domain to the target domain. Please note that this migration needs to be done by all participants
          at the same time. The domain should only be used once all participants have finished their migration.
-         
+
          The arguments are:
          source: the domain alias of the source domain
          target: the configuration for the target domain
@@ -187,11 +187,11 @@ abstract class ParticipantRepairAdministration(
       |It is possible to mark events as ignored that the participant has not yet received.
       |
       |The command will fail, if marking events between `from` and `to` as ignored would result in a gap in sequencer counters,
-      |namely if `from <= to` and `from` is greater than `maxSequencerCounter + 1`, 
+      |namely if `from <= to` and `from` is greater than `maxSequencerCounter + 1`,
       |where `maxSequencerCounter` is the greatest sequencer counter of a sequenced event stored by the underlying participant.
       |
       |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
-      |that has been marked as clean. 
+      |that has been marked as clean.
       |(Ignoring such events would normally have no effect, as they have already been processed.)"""
   )
   def ignore_events(
@@ -209,12 +209,12 @@ abstract class ParticipantRepairAdministration(
     """This command has no effect on ordinary (i.e., not ignored) events and on events that do not exist.
       |
       |The command will fail, if marking events between `from` and `to` as unignored would result in a gap in sequencer counters,
-      |namely if there is one empty ignored event with sequencer counter between `from` and `to` and 
+      |namely if there is one empty ignored event with sequencer counter between `from` and `to` and
       |another empty ignored event with sequencer counter greater than `to`.
       |An empty ignored event is an event that has been marked as ignored and not yet received by the participant.
       |
       |The command will also fail, if `force == false` and `from` is smaller than the sequencer counter of the last event
-      |that has been marked as clean. 
+      |that has been marked as clean.
       |(Unignoring such events would normally have no effect, as they have already been processed.)"""
   )
   def unignore_events(
@@ -232,15 +232,15 @@ abstract class ParticipantRepairAdministration(
     """This command can be used to download the current active contract set of a given set of parties to a text file.
         |This is mainly interesting for recovery and operational purposes.
         |
-        |The file will contain base64 encoded strings, one line per contract. The lines are written 
+        |The file will contain base64 encoded strings, one line per contract. The lines are written
         |sorted according to their domain and contract id. This allows to compare the contracts stored
         |by two participants using standard file comparison tools.
         |The domain-id is printed with the prefix domain-id before the block of contracts starts.
         |
-        |This command may take a long time to complete and may require significant resources. 
+        |This command may take a long time to complete and may require significant resources.
         |It will first load the contract ids of the active contract set into memory and then subsequently
         |load the contracts in batches and inspect their stakeholders. As this operation needs to traverse
-        |the entire datastore, it might take a long time to complete. 
+        |the entire datastore, it might take a long time to complete.
         |
         |The command will return a map of domainId -> number of active contracts stored
         |
@@ -250,7 +250,7 @@ abstract class ParticipantRepairAdministration(
         - protocolVersion: optional the protocol version to use for the serialization. Defaults to the one of the domains.
         - filterDomainId: restrict the export to a given domain
         - timestamp: optionally a timestamp for which we should take the state (useful to reconcile states of a domain)
-        - batchSize: batch size used to load contracts. Defaults to 1000. 
+        - batchSize: batch size used to load contracts. Defaults to 1000.
         """
   )
   def download(

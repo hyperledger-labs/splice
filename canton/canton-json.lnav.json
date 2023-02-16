@@ -7,12 +7,12 @@
         "json": true,
         "hide-extra": false,
         "file-pattern": "\\.clog.*",
-        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 50 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, ") - ", { "field" : "message" }, 
+        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 50 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, ") - ", { "field" : "message" },
             " ",
             { "field" : "stack_trace", "default-value" : "" }
         ],
         "timestamp-field" : "@timestamp",
-        "body-field" : "message",        
+        "body-field" : "message",
         "level-field" : "level",
         "level" : {
             "trace" : "TRACE",
@@ -36,14 +36,14 @@
             "stack_trace" : {
                 "kind" : "string"
             },
-            "trace-id" : { 
+            "trace-id" : {
                 "kind" : "string"
             },
             "thread_name" : {
                 "kind" : "string"
             },
-            "@version" : { 
-		"hidden" : true 
+            "@version" : {
+		"hidden" : true
 	    }
         }
     }

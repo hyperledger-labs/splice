@@ -14,7 +14,7 @@ template Contact
       nonconsuming Send: () with
           message: Text
         do
-          create Message with 
+          create Message with
             sender = myself
             receiver = other
             message = message

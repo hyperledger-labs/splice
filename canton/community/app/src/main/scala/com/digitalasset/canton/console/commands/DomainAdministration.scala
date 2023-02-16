@@ -341,7 +341,7 @@ trait DomainAdministration {
 
     @Help.Summary("Try to update the max rate per participant for the domain")
     @Help.Description("""If the max request size is dynamic, update the value.
-                         The update won't have any effect unless the sequencer server is restarted. 
+                         The update won't have any effect unless the sequencer server is restarted.
     If the max request size is not dynamic (i.e., if the domain is running
     on protocol version lower than `4`), then it will throw an error.
     """)
@@ -384,19 +384,19 @@ trait DomainAdministration {
       "Update the `ledgerTimeRecordTimeTolerance` in the dynamic domain parameters."
     )
     @Help.Description(
-      """If it would be insecure to perform the change immediately, 
+      """If it would be insecure to perform the change immediately,
         |the command will block and wait until it is secure to perform the change.
         |The command will block for at most twice of ``newLedgerTimeRecordTimeTolerance``.
         |
-        |If the domain does not support ``mediatorDeduplicationTimeout``, 
+        |If the domain does not support ``mediatorDeduplicationTimeout``,
         |the method will update ``ledgerTimeRecordTimeTolerance`` immediately without blocking.
         |
         |The method will fail if ``mediatorDeduplicationTimeout`` is less than twice of ``newLedgerTimeRecordTimeTolerance``.
         |
-        |Do not modify domain parameters concurrently while running this command, 
+        |Do not modify domain parameters concurrently while running this command,
         |because the command may override concurrent changes.
         |
-        |force: update ``ledgerTimeRecordTimeTolerance`` immediately without blocking. 
+        |force: update ``ledgerTimeRecordTimeTolerance`` immediately without blocking.
         |This is safe to do during domain bootstrapping and in test environments, but should not be done in operational production systems.."""
     )
     def set_ledger_time_record_time_tolerance(

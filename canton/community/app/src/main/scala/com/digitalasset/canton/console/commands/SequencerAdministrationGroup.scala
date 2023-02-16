@@ -146,7 +146,7 @@ class SequencerAdministrationGroup(
 
     @Help.Summary("Remove data that has been read up until the specified time")
     @Help.Description(
-      """Similar to the above `prune` command but allows specifying the exact time at which to prune. 
+      """Similar to the above `prune` command but allows specifying the exact time at which to prune.
         |The command will fail if a client has not yet read and acknowledged some data up to the specified time."""
     )
     def prune_at(timestamp: CantonTimestamp): String = {
@@ -261,10 +261,10 @@ class SequencerAdministrationGroup(
     "Authorize a ledger identity (e.g. an EthereumAccount) on the underlying ledger. ",
     FeatureFlag.Preview,
   )
-  @Help.Description("""Authorize a ledger identity (e.g. an EthereumAccount) on the underlying ledger. 
+  @Help.Description("""Authorize a ledger identity (e.g. an EthereumAccount) on the underlying ledger.
                       |Currently only implemented for the Ethereum sequencer and has no effect for other sequencer
                       |integrations.
-                      | See the authorization documentation of the Ethereum sequencer integrations for more detail. 
+                      | See the authorization documentation of the Ethereum sequencer integrations for more detail.
                     """")
   def authorize_ledger_identity(ledgerIdentity: LedgerIdentity): Unit = check(FeatureFlag.Preview) {
     consoleEnvironment.run {

@@ -116,7 +116,7 @@ class TopologyAdministrationGroup(
     @Help.Summary("Check if the topology processing of a node is idle")
     @Help.Description("""Topology transactions pass through a set of queues before becoming effective on a domain.
         |This function allows to check if all the queues are empty.
-        |While both domain and participant nodes support similar queues, there is some ambiguity around 
+        |While both domain and participant nodes support similar queues, there is some ambiguity around
         |the participant queues. While the domain does really know about all in-flight transactions at any
         |point in time, a participant won't know about the state of any transaction that is currently being processed
         |by the domain topology dispatcher.""")
@@ -270,7 +270,7 @@ class TopologyAdministrationGroup(
     ops: Either Add or Remove the delegation.
     signedBy: Refers to the optional fingerprint of the authorizing key which in turn refers to a specific, locally existing certificate.
     authorizedKey: Fingerprint of the key to be authorized.
-    synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node    
+    synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
        """)
     def authorize(
         ops: TopologyChangeOp,
@@ -354,7 +354,7 @@ class TopologyAdministrationGroup(
     key: Fingerprint of key
     purposes: The purposes of the owner to key mapping.
     force: removing the last key is dangerous and must therefore be manually forced
-    synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node 
+    synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
     """)
     def authorize(
         ops: TopologyChangeOp,
@@ -478,7 +478,7 @@ class TopologyAdministrationGroup(
       side: The request side (RequestSide.From if we the transaction is from the perspective of the party, RequestSide.To from the participant.)
       privilege: The privilege of the given participant which allows us to restrict an association (e.g. Confirmation or Observation).
       replaceExisting: If true (default), replace any existing mapping with the new setting
-      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node      
+      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
       """)
     def authorize(
         ops: TopologyChangeOp,
@@ -889,7 +889,7 @@ class TopologyAdministrationGroup(
       permission: The privilege of the given participant which allows us to restrict an association (e.g. Confirmation or Observation). Will use the lower of if different between To/From.
       trustLevel: The trust level of the participant on the given domain. Will use the lower of if different between To/From.
       replaceExisting: If true (default), replace any existing mapping with the new setting
-      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node      
+      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
       """)
     def authorize(
         ops: TopologyChangeOp,
@@ -1191,7 +1191,7 @@ class TopologyAdministrationGroup(
       packageIds: The lf-package ids to be vetted.
       signedBy: Refers to the fingerprint of the authorizing key which in turn must be authorized by a valid, locally existing certificate.
       |  If none is given, a key is automatically determined.
-      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node       
+      synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
       force: Flag to enable dangerous operations (default false). Great power requires great care.
       """)
     def authorize(

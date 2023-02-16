@@ -1148,8 +1148,8 @@ class RepairService(
         startingPoints.processingAfterPublished,
         (),
         log(
-          s"""Cannot apply a repair command as events have been published up to 
-             |${startingPoints.eventPublishingNextLocalOffset} offset exclusive 
+          s"""Cannot apply a repair command as events have been published up to
+             |${startingPoints.eventPublishingNextLocalOffset} offset exclusive
              |and the repair command would be assigned the offset $rcRepair.
              |Reconnect to the domain to reprocess the dirty requests and retry repair afterwards.""".stripMargin
         ),
@@ -1166,7 +1166,7 @@ class RepairService(
         rtRepair > incrementalAcsSnapshotWatermark,
         (),
         log(
-          s"""Cannot apply a repair command as the incremental acs snapshot is already at $incrementalAcsSnapshotWatermark 
+          s"""Cannot apply a repair command as the incremental acs snapshot is already at $incrementalAcsSnapshotWatermark
              |and the repair command would be assigned a record time of $rtRepair.
              |Reconnect to the domain to reprocess dirty requests and retry repair afterwards.""".stripMargin
         ),

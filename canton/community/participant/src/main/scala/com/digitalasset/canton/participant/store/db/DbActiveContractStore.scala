@@ -282,20 +282,20 @@ class DbActiveContractStore(
                 with ordered_changes(contract_id, package_id, change, ts, request_counter, remote_domain_id, row_num) as (
                   select active_contracts.contract_id, contracts.package_id, change, ts, active_contracts.request_counter, remote_domain_id,
                      ROW_NUMBER() OVER (
-                     partition by active_contracts.domain_id, active_contracts.contract_id 
-                     order by 
-                        ts desc, 
-                        active_contracts.request_counter desc, 
+                     partition by active_contracts.domain_id, active_contracts.contract_id
+                     order by
+                        ts desc,
+                        active_contracts.request_counter desc,
                         change asc
                      )
-                   from active_contracts join contracts 
-                       on active_contracts.contract_id = contracts.contract_id 
+                   from active_contracts join contracts
+                       on active_contracts.contract_id = contracts.contract_id
                               and active_contracts.domain_id = contracts.domain_id
                    where active_contracts.domain_id = $domainId
                     and contracts.package_id = $pkg
                 )
                 select contract_id, package_id
-                from ordered_changes 
+                from ordered_changes
                 where row_num = 1
                 and change = 'activation'
                 """ ++ limitStatement).as[(LfContractId)]
@@ -342,8 +342,8 @@ class DbActiveContractStore(
           select distinct(contract_id), ts
           from active_contracts AC
           where not exists(select * from active_contracts AC2 where domain_id = $domainId and AC.contract_id = AC2.contract_id
-            and AC2.ts <= $timestamp 
-            and ((AC.ts, AC.request_counter) < (AC2.ts, AC2.request_counter) 
+            and AC2.ts <= $timestamp
+            and ((AC.ts, AC.request_counter) < (AC2.ts, AC2.request_counter)
               or (AC.ts = AC2.ts and AC.request_counter = AC2.request_counter and AC2.change = ${ChangeType.Deactivation})))
            and AC.ts <= $timestamp and domain_id = $domainId""" ++
           idsO.fold(sql"")(ids => sql" and AC.contract_id in " ++ ids))
@@ -359,9 +359,9 @@ class DbActiveContractStore(
           idsO.fold(sql"")(ids => sql" and AC1.contract_id in " ++ ids))
           .as[(LfContractId, CantonTimestamp)]
       case _: DbStorage.Profile.Oracle =>
-        (sql"""select distinct(contract_id), AC3.ts from active_contracts AC1, lateral 
+        (sql"""select distinct(contract_id), AC3.ts from active_contracts AC1, lateral
           (select ts, change from active_contracts AC2 where domain_id = $domainId
-             and AC2.contract_id = AC1.contract_id and ts <= $timestamp 
+             and AC2.contract_id = AC1.contract_id and ts <= $timestamp
              order by ts desc, request_counter desc, change desc
              fetch first 1 row only) AC3
           where AC1.domain_id = $domainId and AC3.change = 'activation'""" ++
@@ -463,7 +463,7 @@ class DbActiveContractStore(
       val changeQuery =
         sql"""select ts, request_counter, contract_id, change from active_contracts  where domain_id = $domainId and
                            ((ts = ${fromExclusive.timestamp} and request_counter > ${fromExclusive.rc}) or ts > ${fromExclusive.timestamp})
-                           and 
+                           and
                            ((ts = ${toInclusive.timestamp} and request_counter <= ${toInclusive.rc}) or ts <= ${toInclusive.timestamp})
                            order by ts asc, request_counter asc"""
           .as[(CantonTimestamp, RequestCounter, LfContractId, ChangeType)]
@@ -514,12 +514,12 @@ class DbActiveContractStore(
       storage.profile match {
         case _: DbStorage.Profile.Oracle =>
           sql"""select ts, request_counter from active_contracts
-              where domain_id = $domainId and contract_id = $contractId 
+              where domain_id = $domainId and contract_id = $contractId
                 and (ts < ${toc.timestamp} or (ts = ${toc.timestamp} and request_counter < ${toc.rc})) and operation != ${OperationType.Create}
               order by ts desc, request_counter desc, change asc"""
         case _ =>
           sql"""select ts, request_counter from active_contracts
-              where domain_id = $domainId and contract_id = $contractId 
+              where domain_id = $domainId and contract_id = $contractId
                 and (ts, request_counter) < (${toc.timestamp}, ${toc.rc}) and operation != CAST(${OperationType.Create} as operation_type)
               order by (ts, request_counter, change) desc"""
       }
@@ -656,10 +656,10 @@ class DbActiveContractStore(
 
     val insertQuery = storage.profile match {
       case _: DbStorage.Profile.Oracle =>
-        """merge /*+ INDEX ( active_contracts ( contract_id, ts, request_counter, change, domain_id ) ) */  
+        """merge /*+ INDEX ( active_contracts ( contract_id, ts, request_counter, change, domain_id ) ) */
           |into active_contracts
           |using (select ? contract_id, ? ts, ? request_counter, ? change, ? domain_id from dual) input
-          |on (active_contracts.contract_id = input.contract_id and active_contracts.ts = input.ts and 
+          |on (active_contracts.contract_id = input.contract_id and active_contracts.ts = input.ts and
           |    active_contracts.request_counter = input.request_counter and active_contracts.change = input.change and
           |    active_contracts.domain_id = input.domain_id)
           |when not matched then

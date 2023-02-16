@@ -294,17 +294,17 @@ object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
       )
 
   @Explanation(
-    """This error indicates that the admin workflow package could not be vetted. The admin workflows is 
-      |a set of packages that are pre-installed and can be used for administrative processes. 
-      |The error can happen if the participant is initialised manually but is missing the appropriate 
+    """This error indicates that the admin workflow package could not be vetted. The admin workflows is
+      |a set of packages that are pre-installed and can be used for administrative processes.
+      |The error can happen if the participant is initialised manually but is missing the appropriate
       |signing keys or certificates in order to issue new topology transactions within the participants
       |namespace.
       |The admin workflows can not be used until the participant has vetted the package."""
   )
   @Resolution(
-    """This error can be fixed by ensuring that an appropriate vetting transaction is issued in the 
+    """This error can be fixed by ensuring that an appropriate vetting transaction is issued in the
       |name of this participant and imported into this participant node.
-      |If the corresponding certificates have been added after the participant startup, then 
+      |If the corresponding certificates have been added after the participant startup, then
       |this error can be fixed by either restarting the participant node, issuing the vetting transaction manually
       |or re-uploading the Dar (leaving the vetAllPackages argument as true)"""
   )

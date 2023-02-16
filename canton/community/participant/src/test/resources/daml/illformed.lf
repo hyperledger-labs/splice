@@ -8,7 +8,7 @@
 //     bazel run daml-lf/repl -- validate /tmp/illformed.dar
 // - To inspect the generated package
 //     bazel run damlc -- inspect /tmp/illformed.dar
- 
+
 module Mod {
 
    val x: Bool = ();

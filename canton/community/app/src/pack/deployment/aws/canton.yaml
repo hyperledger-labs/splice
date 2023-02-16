@@ -212,7 +212,7 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnetTwo
       RouteTableId: !Ref PublicRouteTable
-  # Setup networking resources for the private subnets.  
+  # Setup networking resources for the private subnets.
   NatGatewayOneAttachment:
     Type: AWS::EC2::EIP
     DependsOn: GatewayAttachment
@@ -407,7 +407,7 @@ Resources:
       - LambdaCreateDBEventInvoke
     Properties:
       ServiceToken: !GetAtt 'LambdaCreateDB.Arn'
-  #EFS    
+  #EFS
   MountTargetSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     DependsOn:

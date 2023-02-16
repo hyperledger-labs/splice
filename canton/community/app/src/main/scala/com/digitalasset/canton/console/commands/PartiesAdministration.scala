@@ -69,7 +69,7 @@ class PartiesAdministrationGroup(runner: AdminCommandRunner, consoleEnvironment:
       filterDomain: Filter by domains whose id starts with the given string.
       asOf: Optional timestamp to inspect the topology state at a given point in time.
       limit: Limit on the number of parties fetched (defaults to canton.parameters.console.default-limit).
-            
+
       Example: participant1.parties.list(filterParty="alice")
       """
   )
@@ -129,7 +129,7 @@ class ParticipantPartiesAdministrationGroup(
 
   @Help.Summary("Find a party from a filter string")
   @Help.Description(
-    """Will search for all parties that match this filter string. If it finds exactly one party, it 
+    """Will search for all parties that match this filter string. If it finds exactly one party, it
       |will return that one. Otherwise, the function will throw."""
   )
   def find(filterParty: String): PartyId = {
@@ -144,7 +144,7 @@ class ParticipantPartiesAdministrationGroup(
   @Help.Summary("Enable/add party to participant")
   @Help.Description("""This function registers a new party with the current participant within the participants
       |namespace. The function fails if the participant does not have appropriate signing keys
-      |to issue the corresponding PartyToParticipant topology transaction. 
+      |to issue the corresponding PartyToParticipant topology transaction.
       |Optionally, a local display name can be added. This display name will be exposed on the
       |ledger API party management endpoint.
       |Specifying a set of domains via the `WaitForDomain` parameter ensures that the domains have

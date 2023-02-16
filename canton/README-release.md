@@ -1,6 +1,6 @@
 # Canton
 
-Canton is a next-generation Daml ledger interoperability protocol that implements Daml's built-in models of 
+Canton is a next-generation Daml ledger interoperability protocol that implements Daml's built-in models of
 authorization and privacy faithfully.
 
 * By partitioning the global state it solves both the privacy problems and the scaling bottlenecks of platforms such as
@@ -15,7 +15,7 @@ authorization and privacy faithfully.
 
 * Domains can be implemented on top of various technologies, depending on the trust requirements.
 
-* Domains are permissioned but can be federated at no interoperability cost, yielding a virtual global ledger that 
+* Domains are permissioned but can be federated at no interoperability cost, yielding a virtual global ledger that
   enables truly global workflow composition.
 
 Refer to the [Canton Whitepaper](https://www.canton.io/publications/canton-whitepaper.pdf) for further details.

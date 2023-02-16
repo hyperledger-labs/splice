@@ -206,7 +206,7 @@ object TransactionProcessor {
     @Explanation(
       """The participant has rejected all incoming commands during a configurable grace period."""
     )
-    @Resolution("""Configure more restrictive resource limits (enterprise only). 
+    @Resolution("""Configure more restrictive resource limits (enterprise only).
         |Change applications to submit commands at a lower rate.
         |Configure a higher value for `myParticipant.parameters.warnIfOverloadedFor`.""")
     object ParticipantOverloaded
@@ -279,7 +279,7 @@ object TransactionProcessor {
     )
     @Resolution(
       """Resubmit if the delay is caused by high load.
-        |If the command requires substantial processing on the participant, 
+        |If the command requires substantial processing on the participant,
         |specify a higher minimum ledger time with the command submission so that a higher max sequencing time is derived.
         |"""
     )

@@ -427,7 +427,7 @@ object DomainTopologyManagerError extends TopologyManagerError.DomainErrorGroup(
   }
 
   @Explanation(
-    """This error is returned if a domain topology manager attempts to activate a 
+    """This error is returned if a domain topology manager attempts to activate a
       participant without having all necessary data, such as keys or domain trust certificates."""
   )
   @Resolution("""Register the necessary keys or trust certificates and try again.""")
