@@ -72,13 +72,14 @@ setupApp = do
 
 setupValidator : CCApp -> Text -> Script Party
 setupValidator app name = do
-  user <- allocatePartyWithHint name (PartyIdHint name)
+  validatorParty <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  createUser (User userId (Some user)) [CanActAs user, CanReadAs user]
-  requestCoinRules app user
+  -- TODO(#2957): remove read-as SVC. 
+  createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
+  requestCoinRules app validatorParty
   runCoinRulesAcceptBot app
-  tap app (CCUser userId user) 1.0
-  return user
+  tap app (CCUser userId validatorParty) 1.0
+  return validatorParty
 
 data CCUser = CCUser
   with
@@ -90,7 +91,8 @@ setupUser : CCApp -> Text -> Party -> Script CCUser
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator]
+  -- TODO(#2957): remove read-as SVC. 
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs app.svc]
   recordValidatorOf app user validator
   let u = CCUser userId user
   tap app u 1.0
@@ -229,7 +231,9 @@ skipNRounds app n = do
 submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors readers arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
-  submitMulti actors readers $ exerciseCmd rules arg
+  -- TODO(#2957): remove read-as SVC. 
+  let adjustedReaders = (app.svc :: readers)
+  submitMulti actors adjustedReaders $ exerciseCmd rules arg
 
 submitExerciseCoinRulesByKey' : Choice CoinRules c r => CCApp -> CCUser -> c -> Script r
 submitExerciseCoinRulesByKey' app user arg = do
@@ -239,7 +243,9 @@ submitExerciseCoinRulesByKey' app user arg = do
 submitExerciseCoinRulesAPIByKey : Choice API.CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseCoinRulesAPIByKey app actors readers arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
-  submitMulti actors readers $ exerciseCmd (toInterfaceContractId @API.CoinRules rules) arg
+  -- TODO(#2957): remove read-as SVC. 
+  let adjustedReaders = (app.svc :: readers)
+  submitMulti actors adjustedReaders $ exerciseCmd (toInterfaceContractId @API.CoinRules rules) arg
 
 submitExerciseCoinRulesAPIByKey' : Choice API.CoinRules c r => CCApp -> CCUser -> c -> Script r
 submitExerciseCoinRulesAPIByKey' app user arg = do

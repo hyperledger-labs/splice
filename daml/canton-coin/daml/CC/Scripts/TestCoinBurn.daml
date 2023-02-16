@@ -15,7 +15,7 @@ testCoinBurn = do
   runNextIssuance app
   runCoinDepositBots app
 
-  -- -- -- -- bootstrap user and service provider party
+  -- bootstrap user and service provider party
   validator1 <- setupValidator app "validator1"
   provider1 <- setupUser app "provider1" validator1
   provider2 <- setupUser app "provider2" validator1
@@ -28,14 +28,14 @@ testCoinBurn = do
   tap app user 20.0
   runCoinDepositBots app
 
-  -- -- user pays provider 1
+  -- user pays provider 1
   pay app user provider1.primaryParty 5.0 "otc"
   runCoinDepositBots app
 
   advanceToIssuanceWithPrice app 1.2
   runCoinDepositBots app
 
-  -- -- test declaration of validator rights after the fact
+  -- test declaration of validator rights after the fact
   recordValidatorOf app validator1 validator1
   recordValidatorOf app user.primaryParty validator1
   recordValidatorOf app provider1.primaryParty validator1

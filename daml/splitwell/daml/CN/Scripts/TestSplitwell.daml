@@ -41,7 +41,7 @@ getSplitwellInstall user provider = do
 exerciseSplitwellInstall : Choice SplitwellInstall c r => CCUser -> CCUser -> c -> Script r
 exerciseSplitwellInstall user provider arg = do
   install <- getSplitwellInstall user provider
-  submit user.primaryParty $ exerciseCmd install arg
+  submitUser user.userId $ exerciseCmd install arg
 
 getGroup : CCUser -> GroupKey -> Script (ContractId Group)
 getGroup user k = do
@@ -113,6 +113,7 @@ completeTransfer app provider acceptedPaymentCid = do
   Some AcceptedAppPayment{deliveryOffer} <- queryContractId provider.primaryParty acceptedPaymentCid
   void $ submitUser provider.userId $ exerciseCmd (fromInterfaceContractId @TransferInProgress deliveryOffer) TransferInProgress_CompleteTransfer with ..
 
+testProviderHosted : Script ()
 testProviderHosted = script do
   app <- setupApp
   runNextIssuance app
