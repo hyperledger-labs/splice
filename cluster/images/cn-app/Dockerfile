@@ -1,9 +1,10 @@
 # This Dockerfile is a modified version of Canton's Dockerfile
 FROM openjdk:11-jdk-slim
 
-# Install screen for running the console in a headless server
+# Install screen for running the console in a headless server,
+# and curl for getting onboarding secrets.
 RUN apt-get update \
-   && DEBIAN_FRONTEND=noninteractive apt-get install -y screen \
+   && DEBIAN_FRONTEND=noninteractive apt-get install -y screen curl \
    && apt-get clean \
    && rm -rf /var/cache/apt/archives
 

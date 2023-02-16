@@ -8,7 +8,6 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
@@ -39,7 +38,6 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.*
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -216,50 +214,6 @@ class ValidatorApp(
     )
   }
 
-  private def createCoinRulesRequest(
-      connection: CoinLedgerConnection,
-      store: ValidatorStore,
-      svcParty: PartyId,
-      validatorParty: PartyId,
-      domainId: DomainId,
-  ): Future[Unit] = {
-    logger.info("Attempting to create CoinRulesRequest")
-    val coinRulesReq =
-      new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
-    retryProvider
-      .retryForAutomation(
-        "createCoinRulesRequest",
-        for {
-          coinRulesResult <- store.lookupCoinRulesWithOffset()
-          coinRulesRequestResult <- store.lookupCoinRulesRequestWithOffset()
-          _ <- (coinRulesResult, coinRulesRequestResult) match {
-            case (QueryResult(off1, None), QueryResult(off2, None)) =>
-              connection
-                .submitCommands(
-                  actAs = Seq(validatorParty),
-                  readAs = Seq.empty,
-                  commands = coinRulesReq.create.commands.asScala.toSeq,
-                  commandId = CoinLedgerConnection
-                    .CommandId(
-                      "com.daml.network.validator.createCoinRulesRequest",
-                      Seq(validatorParty),
-                    ),
-                  deduplicationOffset = Ordering.String.min(off1, off2),
-                  domainId = domainId,
-                )
-            case (QueryResult(_, Some(_)), _) =>
-              logger.info("CoinRulesRequest already exists, skipping")
-              Future.successful(())
-            case (_, QueryResult(_, Some(_))) =>
-              logger.info("CoinRules already exists, skipping")
-              Future.successful(())
-          }
-        } yield (),
-        this,
-      )
-      .map(_ => logger.info("Created CoinRulesRequest"))
-  }
-
   override def initialize(
       ledgerClient: CoinLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
@@ -322,12 +276,7 @@ class ValidatorApp(
         flagCloseable = this,
         logger,
       )
-      _ <- // TODO(#2862) activate this for all nodes
-        if (config.onboarding.isDefined) {
-          ensureOnboarded(connection, store, validatorParty, config.onboarding)
-        } else {
-          createCoinRulesRequest(connection, store, svcParty, validatorParty, domainId)
-        }
+      _ <- ensureOnboarded(connection, store, validatorParty, config.onboarding)
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
