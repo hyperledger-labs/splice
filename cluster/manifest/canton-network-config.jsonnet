@@ -287,12 +287,18 @@ local validator1Deployments(config) = [
                [
                  {
                    name: "val1-val-http",
-                   port: 6103,
+                   port: 6003,
+                   internalOnly: true,
                  },
                ],
-               image="validator1-validator-app",
+               image="validator-app",
                namespace="validator1",
-               extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet") + [{ name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" }]),
+               extraEnvVars=c.appAuthEnvBinding("validator") + c.appUserNameEnvBinding("wallet") +
+                            [
+                              { name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" },
+                              { name: "CN_APP_DARS", json: ["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
+                              { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "canton-participant" },
+                            ]),
 
   c.deployment(config, "wallet-app", [
     {
@@ -305,7 +311,6 @@ local validator1Deployments(config) = [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "canton-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
-    { name: "CN_APP_WALLET_VALIDATOR_HTTP_PORT", value: "6103" },
   ]),
 
   c.deployment(config, "wallet-web-ui", [
@@ -385,15 +390,29 @@ local splitwellDeployments(config) = [
     ] },
   ]),
 
-  c.deployment(config, "splitwell-validator-app", [
+  c.deployment(config, "validator-app", [
     {
       name: "sw-val-http",
-      port: 6203,
+      port: 6003,
+      internalOnly: true,
     },
-  ], namespace="splitwell", extraEnvVars=c.appAuthEnvBinding("validator", "splitwell_validator") +
-                                       c.appUserNameEnvBinding("splitwell") +
-                                       c.appUserNameEnvBinding("wallet", "splitwell_wallet") +
-                                       [{ name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }]),
+  ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding("validator", "validator") +
+                                                             c.appUserNameEnvBinding("splitwell") +
+                                                             c.appUserNameEnvBinding("wallet") +
+                                                             [
+                                                               {
+                                                                 name: "ADDITIONAL_CONFIG",
+                                                                 value: |||
+                                                                   canton.validator-apps.validator_backend.app-instances.splitwise = {
+                                                                     service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}
+                                                                     wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}
+                                                                     dars = ["coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
+                                                                   }
+                                                                 |||,
+                                                               },
+                                                               { name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }
+                                                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
+                                                             ]),
 
   c.deployment(config, "splitwell-wallet-app", [
     {
@@ -406,7 +425,6 @@ local splitwellDeployments(config) = [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwell-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
-    { name: "CN_APP_WALLET_VALIDATOR_HTTP_PORT", value: "6203" },
   ]),
 
   c.deployment(config, "splitwell-wallet-web-ui", [

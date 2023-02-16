@@ -19,6 +19,11 @@ if [ -f /app/app.conf ]; then
    ARGS="${ARGS} --config /app/app.conf"
 fi
 
+if [ ! -z "${ADDITIONAL_CONFIG:-}" ]; then
+   echo "${ADDITIONAL_CONFIG}" > /app/additional-config.conf
+   ARGS="${ARGS} --config /app/additional-config.conf"
+fi
+
 echo "Starting '${EXE}' with arguments: ${ARGS}"
 
 exec $EXE $ARGS

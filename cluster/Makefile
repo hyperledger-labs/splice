@@ -11,8 +11,7 @@ images := \
 	wallet-app \
 	wallet-new-web-ui \
 	wallet-web-ui \
-	validator1-validator-app \
-	splitwell-validator-app \
+	validator-app \
 	splitwell-app \
 	\
 	validator1-directory-web-ui \
