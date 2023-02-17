@@ -183,7 +183,7 @@ class PreflightIntegrationTest
 
     withFrontEnd("alice-v1") { implicit webDriver =>
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
-      tapAndListCoins(50)
+      tapAndListCoins(60)
       reserveDirectoryNameFor(aliceUser, directoryUiUrl, aliceDirectoryNameRaw)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
