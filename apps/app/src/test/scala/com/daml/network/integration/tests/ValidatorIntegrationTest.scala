@@ -202,4 +202,10 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       aliceValidator.listConnectedDomains().keySet shouldBe Set("global", "splitwell")
     }
   }
+
+  "stop an uninitialized validator" in { implicit env =>
+    // No svc initialized, so the validator will not succeed in initialization,
+    // but the test will terminate and close it before any initialization timeout
+    aliceValidator.start()
+  }
 }

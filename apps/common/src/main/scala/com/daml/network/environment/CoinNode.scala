@@ -31,6 +31,8 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Failure
+import scala.util.Success
 
 /** A running instance of a canton node */
 abstract class CoinNode[State <: AutoCloseable & HasHealth](
@@ -211,16 +213,33 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     isInitializedVar.set(true)
   }
 
-  // TODO(tech-debt): Cleanup init failures
-  initializeF.failed.foreach { err =>
-    logger.error(s"Initialization of $name failed", err)
-    sys.exit(1)
+  // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
+  // For example, if we fail to get the service party we won't close the ledger client.
+  // Note that we have a similar issue in app-initialization, so this should be handled
+  // in a generic way
+  val initUnlessClosing = initializeF.andThen {
+    case Failure(err) if this.isClosing =>
+      logger.info(
+        s"Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
+      )
+    case Failure(err) => {
+      logger.error(s"Initialization of $name failed", err)
+      sys.exit(1)
+    }
   }
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     logger.info(s"Stopping $name node")
     Seq(
-      AsyncCloseable(s"$name App state", initializeF.map(_.close()), closingTimeout),
+      AsyncCloseable(
+        s"$name App state",
+        initUnlessClosing.transform {
+          case Failure(_) if this.isClosing => Success(())
+          case Failure(e) => Failure(e)
+          case Success(node) => Success(node.close())
+        },
+        closingTimeout,
+      ),
       AsyncCloseable(
         s"$name Ledger API connection",
         ledgerClientF.map(_.close()),
