@@ -146,8 +146,7 @@ class WalletIntegrationTest
         // lock coin
         createdLockedCoinsInTx.sum shouldBe 3
 
-        createdCoinsInTx(0) shouldBe createdLockedCoinsInTx(0)
-        createdCoinsInTx(1) shouldBe createdLockedCoinsInTx(1)
+        (createdCoinsInTx zip createdLockedCoinsInTx).foreach { case (cc, clc) => cc shouldBe clc }
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
