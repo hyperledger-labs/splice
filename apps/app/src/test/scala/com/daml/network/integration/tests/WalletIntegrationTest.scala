@@ -41,8 +41,8 @@ class WalletIntegrationTest
             ConfigFactory.parseString(
               """
             |akka.http.host-connection-pool {
-            |  max-connections = 100
-            |  min-connections = 100
+            |  max-connections = 20
+            |  min-connections = 20
             |  max-open-requests = 128
             |}
             |""".stripMargin
