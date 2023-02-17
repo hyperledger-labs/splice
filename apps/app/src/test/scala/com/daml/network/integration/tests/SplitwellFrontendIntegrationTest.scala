@@ -287,8 +287,8 @@ class SplitwellFrontendIntegrationTest
       // Charlie requests to join groups abc and ac
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
         login(3005, charlieDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
+        charlieValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(charlieUserParty)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 3
         }
