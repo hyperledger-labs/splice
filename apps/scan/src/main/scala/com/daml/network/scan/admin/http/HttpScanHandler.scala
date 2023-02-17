@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.util.Proto
 
 class HttpScanHandler(
     ledgerClient: CoinLedgerClient,
@@ -180,4 +181,18 @@ class HttpScanHandler(
       )
     }
   }
+
+  def getTotalCoinBalance(
+      response: v0.ScanResource.GetTotalCoinBalanceResponse.type
+  )(): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
+    withNewTrace(workflowId) { _ => span =>
+      for {
+        (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
+      } yield {
+        definitions.GetTotalCoinBalanceResponse(
+          Proto.encode(totalCoins),
+          Proto.encode(totalLockedCoins),
+        )
+      }
+    }
 }

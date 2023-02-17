@@ -24,6 +24,8 @@ trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRound
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     defaultAcs.flatMap(_.findContract(cc.coin.CoinRules.COMPANION)(_ => true))
+
+  def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)]
 }
 
 object ScanStore {
@@ -55,6 +57,8 @@ object ScanStore {
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
       ),
     )
   }

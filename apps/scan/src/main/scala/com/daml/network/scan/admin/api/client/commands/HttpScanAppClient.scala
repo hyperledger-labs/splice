@@ -16,6 +16,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.util.Proto
 
 object HttpScanAppClient {
 
@@ -288,6 +289,37 @@ object HttpScanAppClient {
               } yield (k, v)
             }
             .map(_.toMap)
+      }
+  }
+
+  final case class TotalBalances(
+      totalUnlocked: BigDecimal,
+      totalLocked: BigDecimal,
+  )
+
+  case object GetTotalCoinBalance
+      extends BaseCommand[http.GetTotalCoinBalanceResponse, TotalBalances] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalCoinBalanceResponse] =
+      client.getTotalCoinBalance(headers)
+
+    override def handleResponse(
+        response: http.GetTotalCoinBalanceResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, TotalBalances] =
+      response match {
+        case http.GetTotalCoinBalanceResponse.OK(response) =>
+          for {
+            unlocked <- Proto.decode(Proto.BigDecimal)(response.totalUnlockedBalance)
+            locked <- Proto.decode(Proto.BigDecimal)(response.totalLockedBalance)
+          } yield {
+            TotalBalances(
+              totalUnlocked = unlocked,
+              totalLocked = locked,
+            )
+          }
       }
   }
 }

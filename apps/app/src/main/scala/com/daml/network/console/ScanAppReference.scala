@@ -94,6 +94,12 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.ListConnectedDomains)
     }
+
+  @Help.Summary("Get the total balance of Canton Coin in the network")
+  def getTotalCoinBalance(): HttpScanAppClient.TotalBalances =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetTotalCoinBalance)
+    }
 }
 
 final class ScanAppBackendReference(
