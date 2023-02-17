@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
@@ -46,36 +45,27 @@ class SplitwellFrontendIntegrationTest
     "settle debts with multiple parties" in { implicit env =>
       val aliceDamlUser = aliceSplitwell.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceParty = aliceUserParty.toProtoPrimitive
       val bobDamlUser = bobSplitwell.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      val bobParty = bobUserParty.toProtoPrimitive
       val charlieDamlUser = charlieSplitwell.config.ledgerApiUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
       val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
+      val charlieParty = charlieUserParty.toProtoPrimitive
       val groupName = "troika"
-
-      val aliceEntryName = perTestCaseName("alice.cns")
-      val bobEntryName = perTestCaseName("bob.cns")
-      val charlieEntryName = perTestCaseName("charlie.cns")
-      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectory, aliceWallet)
-      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectory, bobWallet)
-      initialiseDirectoryApp(charlieEntryName, charlieUserParty, charlieDirectory, charlieWallet)
-      val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
-      val bobCns = expectedCns(bobUserParty, bobEntryName)
-      val charlieCns = expectedCns(charlieUserParty, charlieEntryName)
 
       bobWallet.tap(550)
 
-      withFrontEnd("aliceSplitwell") { implicit webDriver =>
+      val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
         login(3002, aliceDamlUser)
         createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
-        click on className("request-membership-link")
+        requestGroupMembership(invite)
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
@@ -84,9 +74,7 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
         login(3005, charlieDamlUser)
-        charlieValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(charlieUserParty)
-        click on className("request-membership-link")
+        requestGroupMembership(invite)
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
@@ -120,11 +108,11 @@ class SplitwellFrontendIntegrationTest
           inside(findAll(className("balances-table-row")).toSeq) {
             case Seq(r1, r2) => // Need to sync here on the actual values (size not enough)
               r1.childElement(className("balances-table-receiver")).text should matchText(
-                aliceCns
+                aliceParty
               )
               r1.childElement(className("balances-table-amount")).text shouldBe "-400.0000000000"
               r2.childElement(className("balances-table-receiver")).text should matchText(
-                charlieCns
+                charlieParty
               )
               r2.childElement(className("balances-table-amount")).text shouldBe "-111.0000000000"
           }
@@ -140,11 +128,11 @@ class SplitwellFrontendIntegrationTest
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
             row1.childElement(className("balances-table-receiver")).text should matchText(
-              aliceCns
+              aliceParty
             )
             row1.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
             row2.childElement(className("balances-table-receiver")).text should matchText(
-              charlieCns
+              charlieParty
             )
             row2.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
           }
@@ -152,25 +140,25 @@ class SplitwellFrontendIntegrationTest
           rows should have size 4
           // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
           forExactly(1, rows)(
-            _.text should matchText(s"${bobCns} sent 111.0000000000 CC to ${charlieCns}")
+            _.text should matchText(s"${bobParty} sent 111.0000000000 CC to ${charlieParty}")
           )
           forExactly(1, rows)(
-            _.text should matchText(s"${bobCns} sent 400.0000000000 CC to ${aliceCns}")
+            _.text should matchText(s"${bobParty} sent 400.0000000000 CC to ${aliceParty}")
           )
           forExactly(1, rows)(
-            _.text should matchText(s"${charlieCns} paid 333.0000000000 CC for Digestivs")
+            _.text should matchText(s"${charlieParty} paid 333.0000000000 CC for Digestivs")
           )
           forExactly(1, rows)(
-            _.text should matchText(s"${aliceCns} paid 1200.0000000000 CC for Team lunch")
+            _.text should matchText(s"${aliceParty} paid 1200.0000000000 CC for Team lunch")
           )
         }
       }
 
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWallet, Seq((403.75, 404)))
-        checkWallet(bobUserParty, bobWallet, Seq((40.3, 40.5)))
-        checkWallet(charlieUserParty, charlieWallet, Seq((114.75, 115)))
+        checkWallet(aliceUserParty, aliceWallet, Seq((399.75, 400)))
+        checkWallet(bobUserParty, bobWallet, Seq((36.3, 36.7)))
+        checkWallet(charlieUserParty, charlieWallet, Seq((110.75, 111)))
       }
     }
 
@@ -189,16 +177,14 @@ class SplitwellFrontendIntegrationTest
       val bobCns = expectedCns(bobUserParty, bobEntryName)
       bobWallet.tap(510)
 
-      withFrontEnd("aliceSplitwell") { implicit webDriver =>
+      val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
         login(3002, aliceDamlUser)
         createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
-        click on className("request-membership-link")
+        requestGroupMembership(invite)
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
@@ -239,67 +225,35 @@ class SplitwellFrontendIntegrationTest
       val aliceDamlUser = aliceSplitwell.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val bobDamlUser = bobSplitwell.config.ledgerApiUser
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      onboardWalletUser(bobWallet, bobValidator)
       val charlieDamlUser = charlieSplitwell.config.ledgerApiUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
-      val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
-
-      val aliceEntryName = perTestCaseName("alice.cns")
-      val bobEntryName = perTestCaseName("bob.cns")
-      val charlieEntryName = perTestCaseName("charlie.cns")
-      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectory, aliceWallet)
-      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectory, bobWallet)
-      initialiseDirectoryApp(charlieEntryName, charlieUserParty, charlieDirectory, charlieWallet)
+      onboardWalletUser(charlieWallet, charlieValidator)
 
       // Alice creates three groups - abc, ab, ac
-      withFrontEnd("aliceSplitwell") { implicit webDriver =>
+      val (invite1, invite2, invite3) = withFrontEnd("aliceSplitwell") { implicit webDriver =>
         login(3002, aliceDamlUser)
 
-        createGroup("group-abc")
-        createGroup("group-ab")
-        createGroup("group-ac")
+        val invite1 = createGroupAndInviteLink("group-abc")
+        val invite2 = createGroupAndInviteLink("group-ab")
+        val invite3 = createGroupAndInviteLink("group-ac")
 
-        eventually() {
-          findAll(className("create-invite-link")).toSeq should have length 3
-        }
-        findAll(className("create-invite-link")).toSeq.map(click on _)
+        (invite1, invite2, invite3)
       }
 
       // Bob requests to join groups abc and ab
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         login(3003, bobDamlUser)
-        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(bobUserParty)
-        eventually() {
-          findAll(className("request-membership-link")).toSeq should have length 3
-        }
-        click on findAll(className("request-membership-link")).toSeq
-          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
-          .filter(_.attribute("data-group") == Some("group-abc"))
-          .head
-        click on findAll(className("request-membership-link")).toSeq
-          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
-          .filter(_.attribute("data-group") == Some("group-ab"))
-          .head
+        requestGroupMembership(invite1)
+        requestGroupMembership(invite2)
       }
 
       // Charlie requests to join groups abc and ac
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
         login(3005, charlieDamlUser)
-        charlieValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.GroupInvite.COMPANION)(charlieUserParty)
-        eventually() {
-          findAll(className("request-membership-link")).toSeq should have length 3
-        }
-        click on findAll(className("request-membership-link")).toSeq
-          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
-          .filter(_.attribute("data-group") == Some("group-abc"))
-          .head
-        click on findAll(className("request-membership-link")).toSeq
-          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
-          .filter(_.attribute("data-group") == Some("group-ac"))
-          .head
+        requestGroupMembership(invite1)
+        requestGroupMembership(invite3)
       }
 
       // Alice accepts all requests

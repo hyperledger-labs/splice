@@ -434,7 +434,7 @@ class WalletTimeBasedIntegrationTest
     }
 
     "handles rewards correctly in the context of 3rd party apps" in { implicit env =>
-      val (_, bobUserParty, _, splitwellProviderParty, key) =
+      val (_, bobUserParty, _, splitwellProviderParty, key, _) =
         initSplitwellTest()
 
       // TODO(#2871) Remove this again once the transfer no longer ends up picking the wrong

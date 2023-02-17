@@ -19,7 +19,7 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
     click on className("enter-payment-link")
   }
 
-  def enterSplitwellPayment(receiver: String, quantity: Double)(implicit
+  def enterSplitwellPayment(receiver: String, quantity: Double, complete: Boolean = true)(implicit
       webDriver: WebDriverType
   ) = {
     inside(find(className("transfer-amount-field"))) { case Some(field) =>
@@ -30,7 +30,9 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
       field.underlying.click()
       val input = reactTextInput(field)
       input.underlying.sendKeys(receiver)
-      input.underlying.sendKeys(Keys.ARROW_DOWN)
+      if (complete) {
+        input.underlying.sendKeys(Keys.ARROW_DOWN)
+      }
       input.underlying.sendKeys(Keys.ENTER)
     }
     click on className("transfer-link")
@@ -43,8 +45,31 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
   }
   def createGroupAndInviteLink(groupName: String)(implicit
       webDriver: WebDriverType
-  ) = {
+  ): String = {
     createGroup(groupName)
-    click on className("create-invite-link")
+    eventually() {
+      inside(
+        findAll(className("create-invite-link"))
+          .filter(_.attribute("data-group") == Some(groupName))
+          .toSeq
+      ) { case Seq(button) =>
+        click on button
+      }
+    }
+    eventually() {
+      inside(
+        findAll(className("invite-copy-button"))
+          .filter(_.attribute("data-group-id") == Some(groupName))
+          .toSeq
+      ) { case Seq(button) =>
+        button.attribute("data-invite-contract").value
+      }
+    }
+  }
+
+  def requestGroupMembership(invite: String)(implicit webDriver: WebDriverType) = {
+    val field = textField(id("group-invite-field"))
+    field.value = invite
+    click on id("request-membership-link")
   }
 }

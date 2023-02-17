@@ -79,7 +79,7 @@ class SplitwellIntegrationTest
     }
 
     "use its own app domain" in { implicit env =>
-      val (aliceUserParty, bobUserParty, _, _, key) = initSplitwellTest()
+      val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
 
       aliceWallet.tap(50)
 

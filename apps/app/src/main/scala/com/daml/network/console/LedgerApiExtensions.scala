@@ -4,13 +4,15 @@ import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.daml.ledger.client.binding.{Primitive as P}
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.javaapi
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.ledger.javaapi.data.codegen.Update
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.ledger.javaapi.data.{TransactionTree as JavaTransactionTree}
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
@@ -59,7 +61,7 @@ trait LedgerApiExtensions {
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
             applicationId: String = LedgerApiCommands.defaultApplicationId,
-            disclosedContracts: Seq[DisclosedContract] = Seq.empty,
+            disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): JavaTransactionTree = {
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
@@ -73,7 +75,7 @@ trait LedgerApiExtensions {
                 deduplicationPeriod,
                 submissionId,
                 minLedgerTimeAbs,
-                disclosedContracts,
+                disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
               )
             )
           }
@@ -89,6 +91,7 @@ trait LedgerApiExtensions {
             update: Update[T],
             commandId: Option[String] = None,
             domainId: Option[DomainId] = None,
+            disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): T = {
           val tree = submitJava(
             actAs,
@@ -98,13 +101,60 @@ trait LedgerApiExtensions {
             readAs = readAs,
             applicationId = userId,
             optTimeout = None,
+            disclosedContracts = disclosedContracts,
           )
           CoinLedgerConnection.decodeExerciseResult(
             update,
             tree,
           )
         }
+
+        // Submit a command that produces a contract id as a result and return that contract.
+        // This can be used to get the contract for an exercise that creates a contract in the choice body.
+        def submitWithCreate[TCid <: ContractId[_], T <: javaapi.data.codegen.DamlRecord[_]](
+            companion: Contract.Companion.Template[TCid, T]
+        )(
+            userId: String,
+            actAs: Seq[PartyId],
+            readAs: Seq[PartyId],
+            update: Update[Exercised[TCid]],
+            commandId: Option[String] = None,
+            domainId: Option[DomainId] = None,
+            disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
+        ): Contract[TCid, T] = {
+          val tree = submitJava(
+            actAs,
+            update.commands.asScala.toSeq,
+            workflowId = domainId.fold("")(CoinLedgerConnection.domainIdToWorkflowId(_)),
+            commandId.getOrElse(""),
+            readAs = readAs,
+            applicationId = userId,
+            optTimeout = None,
+            disclosedContracts = disclosedContracts,
+          )
+          val cid = CoinLedgerConnection
+            .decodeExerciseResult(
+              update,
+              tree,
+            )
+            .exerciseResult
+          val createdEvent = tree.getEventsById.values.asScala
+            .collectFirst {
+              case ev: javaapi.data.CreatedEvent if ev.getContractId == cid.contractId => ev
+            }
+            .getOrElse(
+              throw new IllegalArgumentException(
+                "Did not get a create event for the exercise result"
+              )
+            )
+          Contract
+            .fromCreatedEvent(companion)(createdEvent)
+            .getOrElse(
+              throw new IllegalArgumentException("Failed to convert created event to contract")
+            )
+        }
       }
+
       object users {
         def getPrimaryParty(userId: String) = {
           val user = ledgerApi.ledger_api.users.get(userId)

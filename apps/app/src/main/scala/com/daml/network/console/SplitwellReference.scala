@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
@@ -143,6 +144,7 @@ final class SplitwellAppClientReference(
       readAs: Seq[PartyId],
       update: Update[T],
       commandId: Option[String] = None,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
   ): T = {
     import LedgerApiExtensions.*
     ledgerApi.ledger_api_extensions.commands.submitWithResult(
@@ -152,6 +154,7 @@ final class SplitwellAppClientReference(
       update,
       commandId,
       Some(getSplitwellDomainId()),
+      disclosedContracts,
     )
   }
 
@@ -203,18 +206,19 @@ final class SplitwellAppClientReference(
     "Create invite for the group with the given id and make it visible to the observers"
   )
   def createGroupInvite(
-      id: String,
-      observers: Seq[PartyId],
-  ): splitwellCodegen.GroupInvite.ContractId = {
+      id: String
+  ): Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
-    submitWithResult(
-      actAs = Seq(party),
-      readAs = Seq.empty,
+    ledgerApi.ledger_api_extensions.commands.submitWithCreate(
+      splitwellCodegen.GroupInvite.COMPANION
+    )(
+      userId,
+      Seq(party),
+      Seq.empty,
       getSplitwellInstall().exerciseSplitwellInstall_CreateInvite(
-        getGroup(groupKey_(party, id)),
-        observers.map(_.toProtoPrimitive).asJava,
+        getGroup(groupKey_(party, id))
       ),
-    ).exerciseResult
+    )
   }
 
   @Help.Summary("Add the invitee on the accepted group invite to the group")
@@ -241,15 +245,16 @@ final class SplitwellAppClientReference(
 
   @Help.Summary("Accept the group invite")
   def acceptInvite(
-      groupInvite: splitwellCodegen.GroupInvite.ContractId
+      groupInvite: Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
   ): splitwellCodegen.AcceptedGroupInvite.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwellInstall().exerciseSplitwellInstall_AcceptInvite(
-        groupInvite
+        groupInvite.contractId
       ),
+      disclosedContracts = Seq(groupInvite.toDisclosedContract),
     ).exerciseResult
   }
 

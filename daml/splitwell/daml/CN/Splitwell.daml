@@ -69,10 +69,9 @@ template SplitwellInstall
     nonconsuming choice SplitwellInstall_CreateInvite : ContractId GroupInvite
       with
         group : ContractId Group
-        observers : [Party]
       controller user
       do assertOwner group user
-         exercise group Group_CreateInvite with ..
+         exercise group Group_CreateInvite
 
     nonconsuming choice SplitwellInstall_AcceptInvite : ContractId AcceptedGroupInvite
       with
@@ -157,8 +156,6 @@ template Group
     signatory provider, owner, members
 
     nonconsuming choice Group_CreateInvite : ContractId GroupInvite
-      with
-        observers : [Party]
       controller owner
       do create GroupInvite with group = this, ..
 
@@ -298,13 +295,8 @@ data BalanceUpdateType
 template GroupInvite
   with
     group : Group
-      -- We include the whole group to give users an idea of the group they’re likely to join.
-      -- Note that we don’t validate this though because we want to allow for the group to change
-      -- before the invite is accepted (to reduce contention).
-    observers : [Party]
   where
     signatory group.owner, group.provider
-    observer observers -- workaround for lack of explicit disclosure.
     nonconsuming choice GroupInvite_Accept : ContractId AcceptedGroupInvite
       with
         invitee : Party

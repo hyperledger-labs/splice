@@ -39,9 +39,13 @@ getSplitwellInstall user provider = do
     _ -> abort $ "Expected exactly one SplitwellInstall but got " <> show installs
 
 exerciseSplitwellInstall : Choice SplitwellInstall c r => CCUser -> CCUser -> c -> Script r
-exerciseSplitwellInstall user provider arg = do
+exerciseSplitwellInstall user provider arg = exerciseSplitwellInstall' user provider [] arg
+
+
+exerciseSplitwellInstall' : Choice SplitwellInstall c r => CCUser -> CCUser -> [Party] -> c -> Script r
+exerciseSplitwellInstall' user provider readAs arg = do
   install <- getSplitwellInstall user provider
-  submit user.primaryParty $ exerciseCmd install arg
+  submitMulti [user.primaryParty] readAs $ exerciseCmd install arg
 
 getGroup : CCUser -> GroupKey -> Script (ContractId Group)
 getGroup user k = do
@@ -55,9 +59,10 @@ createInvite owner provider groupKey observers = do
   group <- getGroup owner groupKey
   exerciseSplitwellInstall owner provider SplitwellInstall_CreateInvite with ..
 
-acceptInvite : CCUser -> CCUser -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
-acceptInvite invitee provider inviteCid = do
-  exerciseSplitwellInstall invitee provider (SplitwellInstall_AcceptInvite inviteCid)
+acceptInvite : CCUser -> CCUser -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite invitee provider groupOwner inviteCid = do
+  -- No explicit disclosure support in Daml script so we do readAs as the group owner.
+  exerciseSplitwellInstall' invitee provider [groupOwner] (SplitwellInstall_AcceptInvite inviteCid)
 
 joinAllInvites : CCUser -> CCUser -> Script ()
 joinAllInvites owner provider = do
@@ -155,10 +160,10 @@ testCase app Parties{..} = do
   let groupKey = GroupKey alice.primaryParty (getProvider alice).primaryParty (GroupId "group0")
   groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob.primaryParty, charlie.primaryParty]
 
-  acceptInvite bob (getProvider bob) groupInviteCid
+  acceptInvite bob (getProvider bob) alice.primaryParty groupInviteCid
   joinAllInvites alice (getProvider alice)
 
-  acceptInvite charlie (getProvider charlie) groupInviteCid
+  acceptInvite charlie (getProvider charlie) alice.primaryParty groupInviteCid
   joinAllInvites alice (getProvider alice)
 
   Some group <- queryContractId alice.primaryParty =<< getGroup alice groupKey

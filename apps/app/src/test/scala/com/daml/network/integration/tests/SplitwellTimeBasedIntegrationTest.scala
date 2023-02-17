@@ -30,7 +30,7 @@ class SplitwellTimeBasedIntegrationTest
   "splitwell" should {
 
     "support provider-hosted mode" in { implicit env =>
-      val (aliceUserParty, bobUserParty, charlieUserParty, _, key) =
+      val (aliceUserParty, bobUserParty, charlieUserParty, _, key, invite) =
         initSplitwellTest()
 
       aliceSplitwell.enterPayment(
@@ -49,9 +49,8 @@ class SplitwellTimeBasedIntegrationTest
       aliceSplitwell.listBalanceUpdates(key) should have size 2
       aliceSplitwell.listBalances(key) shouldBe Seq(bobUserParty -> 1100).toMap
 
-      inside(charlieSplitwell.listGroupInvites()) { case Seq(invite) =>
-        charlieSplitwell.acceptInvite(invite.contractId)
-      }
+      charlieSplitwell.acceptInvite(invite)
+
       eventually() {
         aliceSplitwell.listAcceptedGroupInvites("group1") should have size 1
       }

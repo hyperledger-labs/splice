@@ -46,17 +46,11 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
     eventually() {
       aliceSplitwell.listGroups() should have size 1
     }
-    aliceSplitwell.createGroupInvite(
-      "group1",
-      Seq(bobUserParty, charlieUserParty),
+    val invite = aliceSplitwell.createGroupInvite(
+      "group1"
     )
 
-    eventually() {
-      bobSplitwell.listGroupInvites() should not be empty
-    }
-    inside(bobSplitwell.listGroupInvites()) { case Seq(invite) =>
-      bobSplitwell.acceptInvite(invite.contractId)
-    }
+    bobSplitwell.acceptInvite(invite)
 
     eventually() {
       aliceSplitwell.listAcceptedGroupInvites("group1") should not be empty
@@ -86,7 +80,7 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
           ),
     )
 
-    (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key)
+    (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key, invite)
   }
 
   private def isSimTime()(implicit env: CoinTestConsoleEnvironment): Boolean =

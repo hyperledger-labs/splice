@@ -16,12 +16,10 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
 import java.net.URI
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Using
@@ -160,15 +158,11 @@ class PreflightIntegrationTest
   "test splitwell group creation and payment" taggedAs LiveDevNetTest in { _ =>
     var aliceUserPartyId = ""
     var bobUserPartyId = ""
-    val aliceDirectoryNameRaw = s"alice.cns-${UUID.randomUUID().toString.take(10)}"
-    val bobDirectoryNameRaw = s"bob.cns-${UUID.randomUUID().toString.take(10)}"
 
     val groupName = "troika"
 
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val splitwellUiUrl = s"https://splitwell.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val directoryUiUrl =
-      s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val aliceUser = auth0Users.get("alice-v1").value
     val bobUser = auth0Users.get("bob-v1").value
 
@@ -176,29 +170,19 @@ class PreflightIntegrationTest
       bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
       tapAndListCoins(710)
-      // bob needs a directory name because as our no-explicit-disclosure workaround, we send splitwell group invites
-      // to all parties who have a directory name
-      reserveDirectoryNameFor(bobUser, directoryUiUrl, bobDirectoryNameRaw)
     }
 
-    withFrontEnd("alice-v1") { implicit webDriver =>
+    val invite = withFrontEnd("alice-v1") { implicit webDriver =>
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       tapAndListCoins(60)
-      reserveDirectoryNameFor(aliceUser, directoryUiUrl, aliceDirectoryNameRaw)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
       createGroupAndInviteLink(groupName)
     }
 
-    // can assign these now after party id's of alice & bob are known.
-    val aliceCns =
-      expectedCns(PartyId.tryFromProtoPrimitive(aliceUserPartyId), aliceDirectoryNameRaw)
-    val bobCns = expectedCns(PartyId.tryFromProtoPrimitive(bobUserPartyId), bobDirectoryNameRaw)
-
     withFrontEnd("bob-v1") { implicit webDriver =>
       loginToSplitwellUi(bobUser, splitwellUiUrl)
-      waitForQuery(className("request-membership-link"))
-      click on className("request-membership-link")
+      requestGroupMembership(invite)
     }
 
     withFrontEnd("alice-v1") { implicit webDriver =>
@@ -210,7 +194,7 @@ class PreflightIntegrationTest
     }
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      enterSplitwellPayment(aliceDirectoryNameRaw, 50)
+      enterSplitwellPayment(aliceUserPartyId, 50, complete = false)
 
       // Bob is redirected to wallet ..
       click on className("accept-button")
@@ -218,18 +202,24 @@ class PreflightIntegrationTest
       // And then back to splitwell, where he is already logged in
       eventually(scaled(5 seconds)) {
         inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
-          row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
+          row.childElement(className("balances-table-receiver")).text should matchText(
+            aliceUserPartyId
+          )
           row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
         }
-        inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
-          case Seq(row1, row2) =>
-            row1.text should matchText(
-              s"${aliceCns} paid 100.0000000000 CC for Team lunch"
-            )
-            row2.text should matchText(
-              s"${bobCns} sent 50.0000000000 CC to ${aliceCns}"
-            )
-        }
+        val rows = findAll(className("balance-updates-list-item")).toSeq
+        rows should have size 2
+        // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
+        forExactly(1, rows)(
+          _.text should matchText(
+            s"${aliceUserPartyId} paid 100.0000000000 CC for Team lunch"
+          )
+        )
+        forExactly(1, rows)(
+          _.text should matchText(
+            s"${bobUserPartyId} sent 50.0000000000 CC to ${aliceUserPartyId}"
+          )
+        )
       }
     }
 

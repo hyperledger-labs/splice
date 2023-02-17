@@ -11,6 +11,7 @@ import {
   Command,
   Commands,
   CreateCommand,
+  DisclosedContract,
   ExerciseCommand,
 } from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
 import { CreatedEvent } from 'common-protobuf/com/daml/ledger/api/v1/event_pb';
@@ -27,7 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { Choice, ContractId, Template } from '@daml/types';
 
-import { Contract } from '..';
+import { Contract, decodeProtoMetadata } from '..';
 
 // Description of a command that we can log
 type CommandDescription =
@@ -74,6 +75,7 @@ export class LedgerApiClient {
     return {
       contractId: ev.getContractId() as ContractId<T>,
       payload: template.decodeProto(new Value().setRecord(ev.getCreateArguments())),
+      metadata: decodeProtoMetadata(ev.getMetadata()!),
     };
   }
 
@@ -81,7 +83,8 @@ export class LedgerApiClient {
     actAs: string[],
     template: Template<T, K>,
     payload: T,
-    domainId: string | undefined = undefined
+    domainId: string | undefined = undefined,
+    disclosedContracts: DisclosedContract[] = []
   ): Promise<Contract<T>> {
     const templateId = this.templateIdToIdentifier(template.templateId);
     const cmd = new Command().setCreate(
@@ -94,7 +97,14 @@ export class LedgerApiClient {
       templateId: template.templateId,
       payload: template.encode(payload),
     };
-    const transaction = await this.submitCommand(actAs, [], cmd, jsonCmd, domainId);
+    const transaction = await this.submitCommand(
+      actAs,
+      [],
+      cmd,
+      jsonCmd,
+      domainId,
+      disclosedContracts
+    );
     const createdEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -108,7 +118,8 @@ export class LedgerApiClient {
     choice: Choice<T, C, R, K>,
     contractId: ContractId<T>,
     argument: C,
-    domainId: string | undefined = undefined
+    domainId: string | undefined = undefined,
+    disclosedContracts: DisclosedContract[] = []
   ): Promise<R> {
     const encodedArg = choice.argumentSerializable().encodeProto(argument);
     const templateId = this.templateIdToIdentifier(choice.template().templateId);
@@ -126,7 +137,14 @@ export class LedgerApiClient {
       contractId: contractId,
       argument: choice.argumentEncode(argument),
     };
-    const transaction = await this.submitCommand(actAs, readAs, cmd, jsonCmd, domainId);
+    const transaction = await this.submitCommand(
+      actAs,
+      readAs,
+      cmd,
+      jsonCmd,
+      domainId,
+      disclosedContracts
+    );
     const exerciseEv = transaction
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
@@ -140,7 +158,8 @@ export class LedgerApiClient {
     readAs: string[],
     command: Command,
     jsonCommand: CommandDescription,
-    domainId: string | undefined
+    domainId: string | undefined,
+    disclosedContracts: DisclosedContract[] = []
   ): Promise<TransactionTree> {
     const commandId = uuidv4();
     const cmds = new Commands()
@@ -148,7 +167,8 @@ export class LedgerApiClient {
       .setActAsList(actAs)
       .setReadAsList(readAs)
       .setApplicationId(this.userId)
-      .setCommandId(commandId);
+      .setCommandId(commandId)
+      .setDisclosedContractsList(disclosedContracts);
     if (domainId) {
       cmds.setWorkflowId(`domain-id:${domainId}`);
     }

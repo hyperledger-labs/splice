@@ -174,6 +174,7 @@ export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | unde
         setPrimaryParty(await ledgerApiClient.getPrimaryParty());
       } catch (err) {
         console.error('Error finding primary party for user', err);
+        console.error(JSON.stringify(err));
         throw new Error(
           'Error finding primary party for user, please confirm user onboarded to this participant.'
         );

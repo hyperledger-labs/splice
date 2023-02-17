@@ -1,4 +1,4 @@
-import { DirectoryEntry, Contract, sameContracts, useInterval } from 'common-frontend';
+import { Contract, sameContracts, useInterval } from 'common-frontend';
 import {
   ListGroupInvitesRequest,
   SplitwellContext,
@@ -23,6 +23,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
+  const [groupInvite, setGroupInvite] = useState<string>('');
   const onCreateGroup = async () => {
     await ledgerApiClient.requestGroup(party, provider, svc, groupId, domainId);
   };
@@ -42,8 +43,19 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
 
   useInterval(fetchInvites, 500);
 
-  const onAcceptInvite = async (invite: Contract<GroupInvite>) => {
-    await ledgerApiClient.acceptInvite(party, provider, invite.contractId, domainId);
+  const onJoinGroup = async () => {
+    const inviteContract = Contract.decodeOpenAPI(JSON.parse(groupInvite), GroupInvite);
+    await ledgerApiClient.acceptInvite(
+      party,
+      provider,
+      inviteContract.contractId,
+      domainId,
+      inviteContract
+    );
+  };
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
   };
 
   return (
@@ -59,24 +71,30 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
           Create Group
         </Button>
       </FormGroup>
+      <TextField
+        label="Group Invite"
+        id="group-invite-field"
+        value={groupInvite}
+        onChange={event => setGroupInvite(event.target.value)}
+      ></TextField>
+      <Button variant="contained" id="request-membership-link" onClick={onJoinGroup}>
+        Request to join group
+      </Button>
       <List>
+        <Typography>Created group invites</Typography>
         {groupInvites.map(invite => (
           <ListItem className="invites-list-item" key={invite.contractId}>
             <Stack direction="row" alignItems="baseline">
-              <div>
-                <Typography variant="button">
-                  <DirectoryEntry partyId={invite.payload.group.owner} />
-                </Typography>{' '}
-                is inviting you to join{' '}
-                <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
-              </div>
+              <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
               <Button
-                data-owner={invite.payload.group.owner}
-                data-group={invite.payload.group.id.unpack}
-                className="request-membership-link"
-                onClick={() => onAcceptInvite(invite)}
+                variant="contained"
+                className="invite-copy-button"
+                sx={{ color: 'text.primary', fontWeight: 'regular' }}
+                data-invite-contract={JSON.stringify(invite)}
+                data-group-id={invite.payload.group.id.unpack}
+                onClick={() => copyToClipboard(JSON.stringify(invite))}
               >
-                Request membership
+                Copy invite
               </Button>
             </Stack>
           </ListItem>

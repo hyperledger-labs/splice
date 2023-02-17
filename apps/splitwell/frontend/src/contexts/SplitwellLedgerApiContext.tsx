@@ -1,4 +1,4 @@
-import { LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
+import { LedgerApiClient, buildLedgerApiClientInterface, Contract } from 'common-frontend';
 
 import {
   AcceptedGroupInvite,
@@ -39,7 +39,6 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     group: ContractId<Group>,
-    observers: string[],
     domainId: string
   ) {
     const install = await this.getSplitwellInstall(user, provider);
@@ -50,7 +49,6 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
       install.contractId,
       {
         group: group,
-        observers: observers,
       },
       domainId
     );
@@ -60,7 +58,8 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     inviteContractId: ContractId<GroupInvite>,
-    domainId: string
+    domainId: string,
+    groupInvite: Contract<GroupInvite>
   ) {
     const install = await this.getSplitwellInstall(user, provider);
     await this.exercise(
@@ -71,7 +70,8 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
       {
         cid: inviteContractId,
       },
-      domainId
+      domainId,
+      [Contract.toDisclosedContract(GroupInvite, groupInvite)]
     );
   }
   async joinGroup(

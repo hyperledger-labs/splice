@@ -366,13 +366,7 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider,
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const isOwner = party === group.payload.owner;
   const onCreateInvite = async () => {
-    await ledgerApiClient.createGroupInvite(
-      party,
-      provider,
-      group.contractId,
-      directoryEntries.getAllParties(),
-      domainId
-    );
+    await ledgerApiClient.createGroupInvite(party, provider, group.contractId, domainId);
   };
 
   return (
