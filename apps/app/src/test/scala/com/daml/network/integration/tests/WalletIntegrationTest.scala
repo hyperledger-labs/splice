@@ -134,18 +134,20 @@ class WalletIntegrationTest
         val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
         val createdLockedCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_))
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_).size)
+
+        // in rare cases all 3 commands get batched in one transaction,
+        // so we only check if the 3 commands are included in the 2 transactions
 
         // create change
-        createdCoinsInTx(0) should have size 1
+        createdCoinsInTx.sum shouldBe 3
         // lock coin
-        createdLockedCoinsInTx(0) should have size 1
-        // create change x2
-        createdCoinsInTx(1) should have size 2
-        // lock coin x2
-        createdLockedCoinsInTx(1) should have size 2
+        createdLockedCoinsInTx.sum shouldBe 3
+
+        createdCoinsInTx(0) shouldBe createdLockedCoinsInTx(0)
+        createdCoinsInTx(1) shouldBe createdLockedCoinsInTx(1)
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
