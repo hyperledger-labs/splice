@@ -30,7 +30,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `DecodeUtil.decodeArchivedExercise`
 * Support `readAs` in `commands.submit`, should be upstreamed
 * Added `internalErrorGrpc` to `ErrorUtil`
-* Added `ApiClientRequestLogger` and factored out code shared with `ApiRequestLogger`
+* Generalized `ApiRequestLogger` to allow its definition to be reused to build an Api Client request logger.
 * Make `applicationId` in console methods configurable everywhere
 * Fixed a bug where `RemoteClock` was not waiting for a proper channel shudown
 * Changed default log file name to `log/canton_network.clog` and `log/canton_network_test.clog`

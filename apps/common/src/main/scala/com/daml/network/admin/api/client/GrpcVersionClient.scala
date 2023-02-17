@@ -1,4 +1,4 @@
-package com.daml.network.admin.api.client.version
+package com.daml.network.admin.api.client
 
 import com.daml.network.v0
 import com.daml.network.v0.GetVersionResponse

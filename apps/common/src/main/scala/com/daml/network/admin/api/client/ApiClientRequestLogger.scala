@@ -1,15 +1,15 @@
 // Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.digitalasset.canton.networking.grpc
+package com.daml.network.admin.api.client
 
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.ApiRequestLoggerBase
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.common.annotations.VisibleForTesting
-import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
 import io.grpc.*
+import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
 
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,8 +25,7 @@ class ApiClientRequestLogger(
     with ClientInterceptor
     with NamedLogging {
 
-  @VisibleForTesting
-  private[networking] val cancelled: AtomicBoolean = new AtomicBoolean(false)
+  private val cancelled: AtomicBoolean = new AtomicBoolean(false)
 
   override def interceptCall[ReqT, RespT](
       method: MethodDescriptor[ReqT, RespT],

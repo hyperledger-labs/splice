@@ -349,6 +349,8 @@ Current Canton commit: `e7ceadad401b9b16df6548afcd650ee93759795e`
 5. Make a PR with your changes, so CI starts churning.
 6. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
+   - Some of our changes might have been upstreamed: adapt `CANTON_CODE_CHANGES.md` accordingly; and resolve the path
+     conflicts in favor of the upstreamed code.
    - Find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
    - We have some files that we added ourselves to the `canton/` directory, and the above steps happen to delete these.

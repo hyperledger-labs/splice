@@ -3,7 +3,7 @@ package com.daml.network.admin.api.client
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.admin.api.client.version.GrpcVersionClient
+import com.daml.network.admin.api.client.GrpcVersionClient
 import com.daml.network.environment.BuildInfo
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
