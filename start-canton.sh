@@ -1,6 +1,37 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
+function usage() {
+  echo "Usage: ./start-canton.sh <flags>"
+  echo "Flags:"
+  echo "  -h               display this help message"
+  echo "  -d               start in detached mode"
+  echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
+}
+
+# default values
+daemon=0
+POSTGRES_MODE=docker
+
+while getopts "hdap:" arg; do
+  case ${arg} in
+    h)
+      usage
+      exit 0
+      ;;
+    d)
+      daemon=1
+      ;;
+    p)
+      POSTGRES_MODE="${OPTARG}"
+      ;;
+    ?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 tmux_session="canton"
 tmux_window=0
 
@@ -10,8 +41,6 @@ if tmux has-session -t $tmux_session 2>/dev/null; then
 fi
 
 rm -f canton.tokens canton-simtime.tokens
-
-POSTGRES_MODE=${1:-docker}
 
 # Start Postgres
 ./scripts/postgres.sh "$POSTGRES_MODE" start
@@ -84,3 +113,12 @@ done
 echo "Canton instances started"
 
 tmux_cmd toxiproxy toxiproxy-server > log/toxi.log 2>&1
+
+if [ $daemon -eq 0 ]; then
+  tmux attach -t ${tmux_session}
+else
+  echo ""
+  echo ""
+  echo "-d specified, running in daemon mode. To attach to canton terminal, type:"
+  echo "  tmux attach -t ${tmux_session}"
+fi

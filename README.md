@@ -492,14 +492,8 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 
 To speed up our tests run against a long-running Canton instance.
 To start the instance run `./start-canton.sh`. It can be stopped via `./stop-canton.sh`.
-The Canton instance is run in a tmux instance in the background instance. You can attach to it using
 
-```
-tmux attach -t canton
-```
-
-That way you can also use the console. There are 3 tmux windows open
-in that session for Canton in wallclock time, Canton in simtime and
+There are 3 tmux windows open in the tmux session for Canton in wallclock time, Canton in simtime and
 toxyproxy. You can switch between those with `Ctrl-b w`.
 
 You should only need to restart it if you change
@@ -510,6 +504,12 @@ with the running Canton instance so try restarting.
 ```
 ERROR c.d.n.e.CoinLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
+
+NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"), install ncurses and setup terminfo:
+
+    brew install ncurses
+    /usr/local/opt/ncurses/bin/infocmp tmux-256color > ~/tmux-256color.info
+    tic -xe tmux-256color ~/tmux-256color.info  
 
 ### Managing Frontends for Tests
 
