@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.http.v0.wallet as http
 import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.util.{Contract, Proto}
 import com.daml.network.wallet.store.UserWalletTxLogParser
@@ -123,6 +124,10 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, ListResponse] = {
       response match {
+        case http.ListResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
+        case http.ListResponse.NotFound(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
         case http.ListResponse.OK(response) =>
           def decodePositions(position: definitions.CoinPosition) =
             for {
@@ -185,41 +190,16 @@ object HttpWalletAppClient {
       response match {
         case http.TapResponse.OK(response) =>
           Proto.decodeJavaContractId(coinCodegen.Coin.COMPANION)(response.contractId)
-        case http.TapResponse.NotFound => Err.TapResponse.NotFound
-        case http.TapResponse.Gone => Err.TapResponse.Aborted
+        case http.TapResponse.NotFound(ErrorResponse(err)) => Left(err)
+        case http.TapResponse.BadRequest(ErrorResponse(err)) => Left(err)
+        case http.TapResponse.TooManyRequests(ErrorResponse(err)) => Left(err)
+        case http.TapResponse.InternalServerError(ErrorResponse(err)) => Left(err)
+        case http.TapResponse.ServiceUnavailable(ErrorResponse(err)) => Left(err)
       }
     }
   }
 
   object Err {
-    object TapResponse {
-      val NotFound = Left("Tap request not found")
-      val Aborted = Left("Tap request aborted")
-    }
-    object AcceptAppPaymentRequestResponse {
-      val NotFound = Left("AcceptAppPayment request not found")
-    }
-    object RejectAppPaymentRequestResponse {
-      val NotFound = Left("RejectAppPayment request not found")
-    }
-    object AcceptSubscriptionRequestResponse {
-      val NotFound = Left("AcceptSubscription request not found")
-    }
-    object RejectSubscriptionRequestResponse {
-      val NotFound = Left("RejectSubscription request not found")
-    }
-    object CancelSubscriptionRequestResponse {
-      val NotFound = Left("CancelSubscription request not found")
-    }
-    object AcceptTransferOfferResponse {
-      val NotFound = Left("AcceptTransferOffer request not found")
-    }
-    object RejectTransferOfferResponse {
-      val NotFound = Left("RejectTransferOffer request not found")
-    }
-    object WithdrawTransferOfferResponse {
-      val NotFound = Left("WithdrawTransferOffer request not found")
-    }
     object CreateTransferOfferResponse {
       val Conflict = Left("CreateTransferOffer duplicate command")
     }
@@ -244,6 +224,10 @@ object HttpWalletAppClient {
       response match {
         case http.SelfGrantFeatureAppRightResponse.OK(response) =>
           Proto.decodeJavaContractId(coinCodegen.FeaturedAppRight.COMPANION)(response.contractId)
+        case http.SelfGrantFeatureAppRightResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.SelfGrantFeatureAppRightResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -278,6 +262,8 @@ object HttpWalletAppClient {
               totalHoldingFees,
             )
           }
+        case http.GetBalanceResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.GetBalanceResponse.InternalServerError(ErrorResponse(errorMsg)) => Left(errorMsg)
       }
     }
   }
@@ -307,6 +293,10 @@ object HttpWalletAppClient {
           response.paymentRequests
             .traverse(req => Contract.fromJson(walletCodegen.AppPaymentRequest.COMPANION)(req))
             .leftMap(_.toString)
+        case http.ListAppPaymentRequestsResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.ListAppPaymentRequestsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -333,8 +323,14 @@ object HttpWalletAppClient {
           Proto.decodeJavaContractId(walletCodegen.AcceptedAppPayment.COMPANION)(
             response.acceptedPaymentContractId
           )
-        case http.AcceptAppPaymentRequestResponse.NotFound =>
-          Err.AcceptAppPaymentRequestResponse.NotFound
+        case http.AcceptAppPaymentRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.AcceptAppPaymentRequestResponse.BadRequest(ErrorResponse(error)) => Left(error)
+        case http.AcceptAppPaymentRequestResponse.TooManyRequests(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptAppPaymentRequestResponse.ServiceUnavailable(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptAppPaymentRequestResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -358,8 +354,10 @@ object HttpWalletAppClient {
     ): Either[String, Unit] = {
       response match {
         case http.RejectAppPaymentRequestResponse.OK => Right(())
-        case http.RejectAppPaymentRequestResponse.NotFound =>
-          Err.RejectAppPaymentRequestResponse.NotFound
+        case http.RejectAppPaymentRequestResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.RejectAppPaymentRequestResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -389,6 +387,10 @@ object HttpWalletAppClient {
           response.acceptedAppPayments
             .traverse(req => Contract.fromJson(walletCodegen.AcceptedAppPayment.COMPANION)(req))
             .leftMap(_.toString)
+        case http.ListAcceptedAppPaymentsResponse.NotFound(ErrorResponse(err)) =>
+          Left(err)
+        case http.ListAcceptedAppPaymentsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -418,6 +420,10 @@ object HttpWalletAppClient {
           response.subscriptionRequests
             .traverse(req => Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(req))
             .leftMap(_.toString)
+        case http.ListSubscriptionRequestsResponse.NotFound(ErrorResponse(err)) =>
+          Left(err)
+        case http.ListSubscriptionRequestsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -455,6 +461,12 @@ object HttpWalletAppClient {
               Contract.fromJson(subsCodegen.SubscriptionInitialPayment.COMPANION)(req)
             )
             .leftMap(_.toString)
+        case http.ListSubscriptionInitialPaymentsResponse.NotFound(ErrorResponse(err)) =>
+          Left(err)
+        case http.ListSubscriptionInitialPaymentsResponse.InternalServerError(
+              ErrorResponse(errorMsg)
+            ) =>
+          Left(errorMsg)
       }
   }
 
@@ -500,6 +512,10 @@ object HttpWalletAppClient {
                 }).leftMap(_.toString)
               } yield Subscription(main, state)
             )
+        case http.ListSubscriptionsResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.ListSubscriptionsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -526,8 +542,16 @@ object HttpWalletAppClient {
           Proto.decodeJavaContractId(subsCodegen.SubscriptionInitialPayment.COMPANION)(
             response.initialPaymentContractId
           )
-        case http.AcceptSubscriptionRequestResponse.NotFound =>
-          Err.AcceptSubscriptionRequestResponse.NotFound
+        case http.AcceptSubscriptionRequestResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptSubscriptionRequestResponse.BadRequest(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptSubscriptionRequestResponse.TooManyRequests(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptSubscriptionRequestResponse.ServiceUnavailable(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptSubscriptionRequestResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -552,8 +576,10 @@ object HttpWalletAppClient {
       response match {
         case http.RejectSubscriptionRequestResponse.OK =>
           Right(())
-        case http.RejectSubscriptionRequestResponse.NotFound =>
-          Err.RejectSubscriptionRequestResponse.NotFound
+        case http.RejectSubscriptionRequestResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.RejectSubscriptionRequestResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -576,10 +602,10 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Unit] = {
       response match {
-        case http.CancelSubscriptionRequestResponse.OK =>
-          Right(())
-        case http.CancelSubscriptionRequestResponse.NotFound =>
-          Err.CancelSubscriptionRequestResponse.NotFound
+        case http.CancelSubscriptionRequestResponse.OK => Right(())
+        case http.CancelSubscriptionRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.CancelSubscriptionRequestResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -619,8 +645,10 @@ object HttpWalletAppClient {
           Proto.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
             response.offerContractId
           )
-        case http.CreateTransferOfferResponse.Conflict =>
-          Err.CreateTransferOfferResponse.Conflict
+        case http.CreateTransferOfferResponse.Conflict => Err.CreateTransferOfferResponse.Conflict
+        case http.CreateTransferOfferResponse.NotFound(ErrorResponse(errorMsg)) => Left(errorMsg)
+        case http.CreateTransferOfferResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -652,6 +680,10 @@ object HttpWalletAppClient {
           response.offers
             .traverse(req => Contract.fromJson(transferOfferCodegen.TransferOffer.COMPANION)(req))
             .leftMap(_.toString)
+        case http.ListTransferOffersResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.ListTransferOffersResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -678,8 +710,10 @@ object HttpWalletAppClient {
           Proto.decodeJavaContractId(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(
             response.acceptedOfferContractId
           )
-        case http.AcceptTransferOfferResponse.NotFound =>
-          Err.AcceptTransferOfferResponse.NotFound
+        case http.AcceptTransferOfferResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+        case http.AcceptTransferOfferResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -713,6 +747,9 @@ object HttpWalletAppClient {
               Contract.fromJson(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(req)
             )
             .leftMap(_.toString)
+        case http.ListAcceptedTransferOffersResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.ListAcceptedTransferOffersResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -736,8 +773,9 @@ object HttpWalletAppClient {
     ): Either[String, Unit] = {
       response match {
         case http.RejectTransferOfferResponse.OK => Right(())
-        case http.RejectTransferOfferResponse.NotFound =>
-          Err.RejectTransferOfferResponse.NotFound
+        case http.RejectTransferOfferResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.RejectTransferOfferResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -761,8 +799,9 @@ object HttpWalletAppClient {
     ): Either[String, Unit] = {
       response match {
         case http.WithdrawTransferOfferResponse.OK => Right(())
-        case http.WithdrawTransferOfferResponse.NotFound =>
-          Err.WithdrawTransferOfferResponse.NotFound
+        case http.WithdrawTransferOfferResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.WithdrawTransferOfferResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -788,6 +827,10 @@ object HttpWalletAppClient {
       Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
     ]] = {
       response match {
+        case http.ListAppRewardCouponsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
+        case http.ListAppRewardCouponsResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
         case http.ListAppRewardCouponsResponse.OK(response) =>
           response.appRewardCoupons
             .traverse(req => Contract.fromJson(coinCodegen.AppRewardCoupon.COMPANION)(req))
@@ -821,6 +864,9 @@ object HttpWalletAppClient {
           response.validatorRewardCoupons
             .traverse(req => Contract.fromJson(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
             .leftMap(_.toString)
+        case http.ListValidatorRewardCouponsResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case http.ListValidatorRewardCouponsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
     }
   }
@@ -839,6 +885,10 @@ object HttpWalletAppClient {
           Right(
             UserStatusData(response.partyId, response.userOnboarded, response.hasFeaturedAppRight)
           )
+        case http.UserStatusResponse.NotFound(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
+        case http.UserStatusResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
       }
   }
 
@@ -855,6 +905,8 @@ object HttpWalletAppClient {
         response: http.ListConnectedDomainsResponse
     )(implicit decoder: TemplateJsonDecoder): Either[String, Map[DomainAlias, DomainId]] =
       response match {
+        case http.ListConnectedDomainsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
+          Left(errorMsg)
         case http.ListConnectedDomainsResponse.OK(response) =>
           response.connectedDomains.toList
             .traverse { case (k, v) =>
@@ -902,6 +954,10 @@ object HttpWalletAppClient {
     )(implicit
         decoder: TemplateJsonDecoder
     ): Either[String, Seq[UserWalletTxLogParser.TxLogEntry]] =
-      response.fold(ok => ok.items.traverse(UserWalletTxLogParser.TxLogEntry.fromJson))
+      response.fold(
+        ok => ok.items.traverse(UserWalletTxLogParser.TxLogEntry.fromJson),
+        notFound => Left(notFound.error),
+        internal => Left(internal.error),
+      )
   }
 }

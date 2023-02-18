@@ -8,7 +8,6 @@ import com.daml.network.config.CNNodeConfigTransforms.{
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.SuppressionRule
@@ -103,9 +102,8 @@ class TimeBasedTreasuryIntegrationTest
       lines => {
         // \r is carriage return
         val regexAnything = "(.|\\n|\\r)*"
-        val abortedErr = HttpWalletAppClient.Err.TapResponse.Aborted.value
         val errorRegex = Seq(
-          s"(Connection reset|Connection refused|$abortedErr)"
+          s"(Connection reset|Connection refused)"
         ).mkString(regexAnything)
 
         val errorRegex2 = // TODO(#1942): these errors should occur during this test.

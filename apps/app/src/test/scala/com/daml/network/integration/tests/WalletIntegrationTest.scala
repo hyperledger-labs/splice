@@ -15,7 +15,6 @@ import com.daml.network.http.v0.wallet.WalletClient
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.WalletTestUtil
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
@@ -226,8 +225,7 @@ class WalletIntegrationTest
           val failedAcceptF = Future(
             loggerFactory.assertThrowsAndLogs[CommandFailure](
               aliceWallet.acceptAppPaymentRequest(request),
-              _.errorMessage should include regex ("acceptAppPaymentRequest: contract_id not found.*"),
-              _.errorMessage should include regex (HttpWalletAppClient.Err.AcceptAppPaymentRequestResponse.NotFound.value),
+              _.errorMessage should include regex ("(AppPaymentRequest|DeliveryOffer)"),
             )
           )
           val tap3F = Future(aliceWallet.tap(10))
@@ -277,16 +275,6 @@ class WalletIntegrationTest
             forAtLeast(1, entries)( // however, before failing, we see one retry in the logs
               _.message should include(
                 "The operation 'execute coin operation batch' has failed with an exception. Retrying after 200 milliseconds."
-              )
-            )
-            forAtLeast(1, entries)( // fails in HttpWalletHandler
-              _.message should include regex (
-                "contract_id not found.*"
-              )
-            )
-            forAtLeast(1, entries)( // fails in HttpWalletAppClient
-              _.message should include regex (
-                "AcceptAppPayment request not found.*"
               )
             )
           },
