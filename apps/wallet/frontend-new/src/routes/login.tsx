@@ -1,9 +1,10 @@
 import * as React from 'react';
 
 import { Person } from '@mui/icons-material';
-import { Button, Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
+import { Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
 import Container from '@mui/material/Container';
 
+import PillButton from '../components/PillButton';
 import theme from '../theme';
 
 const Login: React.FC = () => {
@@ -11,31 +12,16 @@ const Login: React.FC = () => {
     <Container maxWidth="xs">
       <Stack alignItems="center" paddingTop={16} spacing={4}>
         <Typography variant="h5">CANTON WALLET</Typography>
-        <LoginButton text={'Log In with OAuth2'} />
+        <PillButton fullWidth size="large">
+          Log In with OAuth2
+        </PillButton>
         <Divider flexItem>OR</Divider>
         <UsernameInput />
-        <LoginButton text={'Log In'} />
+        <PillButton fullWidth size="large">
+          Log In
+        </PillButton>
       </Stack>
     </Container>
-  );
-};
-
-const LoginButton: React.FC<{ text: string }> = ({ text }) => {
-  return (
-    <Button
-      variant="contained"
-      sx={{
-        // most straightforward way of making "pill" buttons:
-        // https://stackoverflow.com/questions/31617136/avoid-elliptical-shape-in-css-border-radius:
-        borderRadius: '9999px',
-        backgroundColor: '#577ff1',
-        color: 'white',
-      }}
-      fullWidth
-      size="large"
-    >
-      {text}
-    </Button>
   );
 };
 

@@ -10,6 +10,7 @@ import {
 
 import { CssBaseline } from '@mui/material';
 
+import ConfirmPayment from './routes/confirmPayment';
 import Login from './routes/login';
 import Root from './routes/root';
 import Transactions from './routes/transactions';
@@ -27,6 +28,7 @@ const router = createBrowserRouter(
       <Route path="/auth/">
         <Route path="login" element={<Login />} />
       </Route>
+      <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />
     </Route>
   )
 );
