@@ -173,29 +173,26 @@ class WalletIntegrationTest
 
         requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
 
-        // 3 txs;
+        // 3 txs; usually (but not always):
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
         val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
         val createdLockedCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_))
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_).size)
 
-        // create change
-        createdCoinsInTx(0) should have size 1
-        // lock coin
-        createdLockedCoinsInTx(0) should have size 1
-        // create change x batchSize
-        createdCoinsInTx(1) should have size batchSize.toLong
-        // lock coin x batchSize
-        createdLockedCoinsInTx(1) should have size batchSize.toLong
-        // create change
-        createdCoinsInTx(2) should have size 1
-        // lock coin
-        createdLockedCoinsInTx(2) should have size 1
+        // all operations are contained in at most 3 transactions
+        createdCoinsInTx.sum shouldBe (batchSize.toLong + 2)
+        createdLockedCoinsInTx.sum shouldBe (batchSize.toLong + 2)
+
+        // one transaction is "maxed out"
+        createdCoinsInTx.exists(_ == batchSize.toLong)
+        createdLockedCoinsInTx.exists(_ == batchSize.toLong)
+
+        (createdCoinsInTx zip createdLockedCoinsInTx).foreach { case (cc, clc) => cc shouldBe clc }
       }
 
       "fail operations early and independently that don't pass the activeness lookup checks" in {
