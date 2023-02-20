@@ -71,7 +71,6 @@ rm -rf canton-classpath
 mkdir -p canton-classpath/com/digitalasset/canton/participant/ledger/api
 cp ./canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class \
    ./canton-classpath/com/digitalasset/canton/participant/ledger/api
-export CLASSPATH=$PWD/canton-classpath
 
 function tmux_cmd() {
   local title=$1
@@ -90,7 +89,7 @@ function tmux_cmd() {
 tmux new-session -d -s "${tmux_session}"
 
 tmux_cmd canton-wallclocktime \
-  "CANTON_TOKEN_FILENAME=canton.tokens canton \
+  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton.tokens canton \
     -c ./apps/app/src/test/resources/simple-topology-canton.conf \
     --log-level-canton=DEBUG \
     --log-encoder json \
@@ -98,7 +97,7 @@ tmux_cmd canton-wallclocktime \
     --bootstrap bootstrap-canton.sc"
 
 tmux_cmd canton-simtime \
-  "CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
+  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
     -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
     --log-level-canton=DEBUG \
     --log-encoder json \
