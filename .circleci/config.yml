@@ -250,13 +250,6 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
-  download_sbt_dependencies:
-    description: Fetch SBT dependencies with retries
-    steps:
-      - execute_sbt_command:
-          cmd: "update"
-          cmd_retry_count: 5
-
   # Largely copied from Canton's CI definition
   execute_sbt_command:
     description: |
@@ -734,11 +727,10 @@ jobs:
     steps:
       - checkout
       - setup_sbt_test_job
-      - download_sbt_dependencies
       # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 5
+          cmd_retry_count: 2
       - execute_sbt_command:
           cmd: "lint"
       - run_todo_script
@@ -779,9 +771,9 @@ jobs:
     steps:
       - checkout
       - setup_sbt_test_job
-      - download_sbt_dependencies
       - execute_sbt_command:
           cmd: "Test/compile"
+          cmd_retry_count: 2
       - split_tests_for_parallel_run
       - execute_sbt_command:
           # run all tests except the live cluster ones
@@ -901,9 +893,9 @@ jobs:
       # sucks at cache invalidation
       - restore_sbt_cache
       - restore_precompiled_classes
-      - download_sbt_dependencies
       - execute_sbt_command:
           cmd: "Test/compile"
+          cmd_retry_count: 2
       - execute_sbt_command:
           pre_sbt_cmd: |
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
