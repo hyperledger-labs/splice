@@ -371,6 +371,9 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider,
 
   return (
     <Paper elevation={3} sx={{ width: 600 }}>
+      <div className="data-group-contract-id" style={{ display: 'none' }}>
+        {group.contractId}
+      </div>
       <Stack
         sx={{ px: 2, py: 1 }}
         direction="row"
