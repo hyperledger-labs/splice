@@ -454,9 +454,7 @@ class TreasuryService(
       (openRounds, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
       openRound = openRounds
         .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
-        // '-' so the last-created rounds are first
-        .sortBy(-_.payload.round.number)
-        .headOption
+        .lastOption
         .getOrElse(
           throw new IllegalStateException(
             s"tried to select the latest open mining round from $openRounds but none of the rounds are open. "
