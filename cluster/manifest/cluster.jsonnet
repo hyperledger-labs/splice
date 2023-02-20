@@ -103,7 +103,7 @@ local appAuthEnvBinding(appName, varBaseName=appName) =
 // hosting a JVM. The JVM heap size is the container limit less this
 // amount. The number here is a best estimate and may need to be
 // adjusted.
-local JVM_SYSTEM_MEMORY_MIB = 512;
+local JVM_SYSTEM_MEMORY_MIB = 1024;
 
 local expandEnvironment(env) =
   std.map(function(binding) (
