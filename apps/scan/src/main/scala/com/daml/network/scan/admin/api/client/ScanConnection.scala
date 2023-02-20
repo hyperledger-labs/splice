@@ -42,9 +42,9 @@ final class ScanConnection(
   private val cachedIssuingRounds
       : AtomicReference[Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]]] =
     new AtomicReference(Map())
-  private val cachedOpenMiningRound
-      : AtomicReference[Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    new AtomicReference(None)
+  private val cachedOpenRounds
+      : AtomicReference[Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
+    new AtomicReference(Map())
 
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
@@ -91,23 +91,23 @@ final class ScanConnection(
       mat: Materializer,
   ): Future[
     (
-        Contract[OpenMiningRound.ContractId, OpenMiningRound],
+        Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
 
     for {
-      (omr, issuingRounds) <- runHttpCmd(
+      (openRounds, issuingRounds) <- runHttpCmd(
         config.url,
-        HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(
-          cachedOpenMiningRound.get(),
+        HttpScanAppClient.GetOpenAndIssuingMiningRounds(
+          cachedOpenRounds.get(),
           cachedIssuingRounds.get(),
         ),
       )
     } yield {
       cachedIssuingRounds.set(issuingRounds)
-      cachedOpenMiningRound.set(Some(omr))
-      (omr, issuingRounds.values.toSeq)
+      cachedOpenRounds.set(openRounds)
+      (openRounds.values.toSeq, issuingRounds.values.toSeq)
     }
 
   }

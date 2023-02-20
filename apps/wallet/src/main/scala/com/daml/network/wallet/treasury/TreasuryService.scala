@@ -451,7 +451,17 @@ class TreasuryService(
   ]] =
     for {
       coinRules <- scanConnection.getCoinRules()
-      (openRound, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
+      (openRounds, issuingMiningRounds) <- scanConnection.getLatestOpenAndIssuingMiningRounds()
+      openRound = openRounds
+        .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
+        // '-' so the last-created rounds are first
+        .sortBy(-_.payload.round.number)
+        .headOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"tried to select the latest open mining round from $openRounds but none of the rounds are open. "
+          )
+        )
       configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
       openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))

@@ -66,14 +66,14 @@ abstract class ScanAppReference(
   @Help.Summary(
     "List the latest open mining round and all issuing mining rounds."
   )
-  def getLatestOpenAndIssuingMiningRounds(): (
-      Contract[OpenMiningRound.ContractId, OpenMiningRound],
+  def getOpenAndIssuingMiningRounds(): (
+      Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
       Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) = {
     val result = consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetLatestOpenAndIssuingMiningRounds(None, Map()))
+      httpCommand(HttpScanAppClient.GetOpenAndIssuingMiningRounds(Map(), Map()))
     }
-    (result._1, result._2.values.toSeq)
+    (result._1.values.toSeq, result._2.values.toSeq)
   }
 
   @Help.Summary("List all issued featured app rights")
@@ -110,6 +110,7 @@ final class ScanAppBackendReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Scan Backend"
+
   override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so

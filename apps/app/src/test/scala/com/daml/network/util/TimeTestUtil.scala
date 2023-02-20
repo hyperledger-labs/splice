@@ -65,71 +65,40 @@ trait TimeTestUtil extends CoinTestCommon {
     */
   @nowarn("msg=match may not be exhaustive")
   def advanceRoundsByOneTick(implicit env: CoinTestConsoleEnvironment) = {
-    // TODO(M4-82): remove wallet synchronization.
 
-    val Seq(lowestOpen, middleOpen, highestOpen) = getSortedOpenMiningRounds(
-      aliceWalletBackend.remoteParticipant,
-      aliceValidator.getValidatorPartyId(),
-    ).map(_.data.round.number)
-
-    val (latestOpenScan, previousIssuingRoundsScan) = scan.getLatestOpenAndIssuingMiningRounds()
-
-    val previousIssuingRounds = getSortedIssuingRounds(
-      aliceWalletBackend.remoteParticipant,
-      aliceValidator.getValidatorPartyId(),
-    ).map(_.data.round.number)
+    val (previousOpenRounds, previousIssuingRounds) = scan.getOpenAndIssuingMiningRounds()
+    val Seq(lowestOpen, middleOpen, highestOpen) = previousOpenRounds.map(_.payload.round.number)
 
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(Duration.ofSeconds(160)))(
       s"waiting for open and issuing round automation (should create OR ${highestOpen + 1}, should advance IR ${previousIssuingRounds}",
       _ =>
         eventually(5.seconds) {
-          val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) = getSortedOpenMiningRounds(
-            aliceWalletBackend.remoteParticipant,
-            aliceValidator.getValidatorPartyId(),
-          ).map(_.data.round.number)
 
-          val (newLatestOpenScan, newIssuingRoundsScan) =
-            scan.getLatestOpenAndIssuingMiningRounds()
+          val (newOpenRounds, newIssuingRounds) =
+            scan.getOpenAndIssuingMiningRounds()
+
+          val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
+            newOpenRounds.map(_.payload.round.number)
 
           newLowestOpen shouldBe lowestOpen + 1
           newLowestOpen shouldBe middleOpen
           newMiddleOpen shouldBe highestOpen
           newHighestOpen shouldBe highestOpen + 1
 
-          latestOpenScan.payload.round.number shouldBe newLatestOpenScan.payload.round.number - 1
-
-          val newIssuingRounds = getSortedIssuingRounds(
-            aliceWalletBackend.remoteParticipant,
-            aliceValidator.getValidatorPartyId(),
-          ).map(_.data.round.number)
-
           if (previousIssuingRounds.size < 3)
             newIssuingRounds.size shouldBe previousIssuingRounds.size + 1
           else {
-            val Seq(lowestIssuing, middleIssuing, highestIssuing) = previousIssuingRounds
+            val Seq(lowestIssuing, middleIssuing, highestIssuing) =
+              previousIssuingRounds.map(_.payload.round.number)
             newIssuingRounds should have size 3
-            val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) = newIssuingRounds
+            val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
+              newIssuingRounds.map(_.payload.round.number)
 
             newLowestIssuing shouldBe lowestIssuing + 1
             newLowestIssuing shouldBe middleIssuing
             newMiddleIssuing shouldBe highestIssuing
             newHighestIssuing shouldBe highestIssuing + 1
-          }
-
-          if (previousIssuingRoundsScan.size < 3)
-            newIssuingRoundsScan.size shouldBe previousIssuingRoundsScan.size + 1
-          else {
-            val Seq(lowestIssuingScan, middleIssuingScan, highestIssuingScan) =
-              previousIssuingRoundsScan.map(_.payload.round.number)
-            newIssuingRoundsScan should have size 3
-            val Seq(newLowestIssuingScan, newMiddleIssuingScan, newHighestIssuingScan) =
-              newIssuingRoundsScan.map(_.payload.round.number)
-
-            newLowestIssuingScan shouldBe lowestIssuingScan + 1
-            newLowestIssuingScan shouldBe middleIssuingScan
-            newMiddleIssuingScan shouldBe highestIssuingScan
-            newHighestIssuingScan shouldBe highestIssuingScan + 1
           }
         },
     )

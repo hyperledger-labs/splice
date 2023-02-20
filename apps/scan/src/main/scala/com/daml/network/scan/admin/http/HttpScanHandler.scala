@@ -3,14 +3,15 @@ package com.daml.network.scan.admin.http
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.time.Clock
 import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.http.v0.definitions.MaybeCachedContract
+import com.daml.network.util.Contract
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.util.Proto
@@ -36,46 +37,53 @@ class HttpScanHandler(
       Future.successful(definitions.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
     }
 
-  def getLatestOpenAndIssuingMiningRounds(
-      response: v0.ScanResource.GetLatestOpenAndIssuingMiningRoundsResponse.type
+  def getOpenAndIssuingMiningRounds(
+      response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetLatestOpenAndIssuingMiningRoundsRequest
-  ): Future[v0.ScanResource.GetLatestOpenAndIssuingMiningRoundsResponse] =
+      body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
+  ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       val now = clock.now
       for {
         latestOpen <- store.getLatestOpenMiningRound(now)
         acs <- store.defaultAcs
         issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
+        openRounds <- acs.listContracts(OpenMiningRound.COMPANION)
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
-        issuingRoundsResponseMap = issuingRounds
-          .map(round => {
-            val roundIsAlreadyCached =
-              issuingRoundsCachedByClient.contains(round.contractId.contractId)
-            (
-              round.contractId.contractId,
-              if (roundIsAlreadyCached) {
-                logger.debug(
-                  s"Not sending issuing mining round ${round.payload.round.number} again because it is already cached by the client."
-                )
-                MaybeCachedContract(None)
-              } else MaybeCachedContract(Some(round.toJson)),
-            )
-          })
-          .toMap
-        omrResponse = body.cachedOpenMiningRoundContractId match {
-          case Some(contractId) if contractId == latestOpen.contractId.contractId =>
-            MaybeCachedContract(Some(latestOpen.toJson))
-          case _ =>
-            MaybeCachedContract(Some(latestOpen.toJson))
-        }
+        openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
+        issuingRoundsResponseMap = selectRoundsToRespondWith(
+          issuingRounds,
+          issuingRoundsCachedByClient,
+        )
+        openRoundsResponseMap = selectRoundsToRespondWith(openRounds, openRoundsCachedByClient)
       } yield {
-        definitions.GetLatestOpenAndIssuingMiningRoundsResponse(
-          latestOpenMiningRound = omrResponse,
+        definitions.GetOpenAndIssuingMiningRoundsResponse(
+          openMiningRounds = openRoundsResponseMap,
           issuingMiningRounds = issuingRoundsResponseMap,
         )
       }
     }
+
+  private def selectRoundsToRespondWith[TCid, T](
+      rounds: Seq[Contract[TCid, T]],
+      cachedRounds: Set[String],
+  )(implicit tc: TraceContext): Map[String, MaybeCachedContract] = {
+    rounds
+      .map(round => {
+        val roundIsAlreadyCached =
+          cachedRounds.contains(round.contractId.contractId)
+        (
+          round.contractId.contractId,
+          if (roundIsAlreadyCached) {
+            logger.debug(
+              s"Not sending mining round with contract-id ${round.contractId.contractId} again because it is already cached by the client."
+            )
+            MaybeCachedContract(None)
+          } else MaybeCachedContract(Some(round.toJson)),
+        )
+      })
+      .toMap
+  }
 
   def getCoinRules(
       response: v0.ScanResource.GetCoinRulesResponse.type

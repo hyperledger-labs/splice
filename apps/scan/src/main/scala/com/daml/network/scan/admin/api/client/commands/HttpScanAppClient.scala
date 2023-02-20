@@ -101,13 +101,13 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetLatestOpenAndIssuingMiningRounds(
-      cachedOmr: Option[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+  case class GetOpenAndIssuingMiningRounds(
+      cachedOpenRounds: Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
       cachedIssuingRounds: Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) extends BaseCommand[
-        http.GetLatestOpenAndIssuingMiningRoundsResponse,
+        http.GetOpenAndIssuingMiningRoundsResponse,
         (
-            Contract[OpenMiningRound.ContractId, OpenMiningRound],
+            Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
             Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
         ),
       ] {
@@ -118,26 +118,26 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.GetLatestOpenAndIssuingMiningRoundsResponse] =
-      client.getLatestOpenAndIssuingMiningRounds(
-        definitions.GetLatestOpenAndIssuingMiningRoundsRequest(
-          cachedOmr.map(r => r.contractId.contractId),
+    ], http.GetOpenAndIssuingMiningRoundsResponse] =
+      client.getOpenAndIssuingMiningRounds(
+        definitions.GetOpenAndIssuingMiningRoundsRequest(
+          cachedOpenRounds.values.map(_.contractId.contractId).toVector,
           cachedIssuingRounds.values.map(_.contractId.contractId).toVector,
         ),
         headers,
       )
 
     override def handleResponse(
-        response: http.GetLatestOpenAndIssuingMiningRoundsResponse
+        response: http.GetOpenAndIssuingMiningRoundsResponse
     )(implicit decoder: TemplateJsonDecoder): Either[
       String,
       (
-          Contract[OpenMiningRound.ContractId, OpenMiningRound],
+          Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
           Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
       ),
     ] =
       response match {
-        case http.GetLatestOpenAndIssuingMiningRoundsResponse.OK(response) =>
+        case http.GetOpenAndIssuingMiningRoundsResponse.OK(response) =>
           for {
             issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
               case (contractId, maybeIssuingRound) =>
@@ -148,10 +148,16 @@ object HttpScanAppClient {
                   )
                 issuingRound.map((contractId, _))
             }
-            latestOpenMiningRound <- Contract.handleMaybeCachedContract(
-              roundCodegen.OpenMiningRound.COMPANION
-            )(cachedOmr, response.latestOpenMiningRound)
-          } yield (latestOpenMiningRound, issuingMiningRounds.toMap)
+            openMiningRounds <- response.openMiningRounds.toSeq.traverse {
+              case (contractId, maybeOpenRound) =>
+                val openRound =
+                  Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
+                    cachedOpenRounds.get(contractId),
+                    maybeOpenRound,
+                  )
+                openRound.map((contractId, _))
+            }
+          } yield (openMiningRounds.toMap, issuingMiningRounds.toMap)
       }
   }
 

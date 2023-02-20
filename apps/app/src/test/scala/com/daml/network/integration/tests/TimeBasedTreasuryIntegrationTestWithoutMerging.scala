@@ -329,6 +329,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       }
       // run a tx so alice wallet's cache is hydrated up to issuing round 1.
       aliceWallet.tap(5)
+      val Seq(_, issuingRound1) = scan.getOpenAndIssuingMiningRounds()._2
 
       clue("create issuing round 2") {
         advanceRoundsByOneTick
@@ -347,7 +348,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
             )(
               // but only the non-expired coin is selected as input.
               _.message should include regex (
-                "Not sending issuing mining round 1 again because it is already cached by the client."
+                s"Not sending mining round with contract-id ${issuingRound1.contractId.contractId} again because it is already cached by the client."
               )
             )
             forAtLeast(
