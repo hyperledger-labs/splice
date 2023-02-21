@@ -21,3 +21,9 @@ export interface TransferOffer {
   providerId: string;
   expiry: string;
 }
+
+export interface Subscription {
+  provider: { description: string; cns: string }; // Receiver is currently missing in the design
+  price: { amount: string; currency: string; perPeriod: string };
+  nextPaymentDue: string;
+}
