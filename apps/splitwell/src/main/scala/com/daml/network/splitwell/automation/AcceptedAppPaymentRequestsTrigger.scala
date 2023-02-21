@@ -53,7 +53,16 @@ class AcceptedAppPaymentRequestsTrigger(
     )
     for {
       domainId <- store.domains.getDomainId(globalDomain)
-      transferContext <- scanConnection.getAppTransferContext(store.providerParty)
+      round = payment.payload.round
+      transferContext <- scanConnection
+        .getAppTransferContextForRound(store.providerParty, round)
+        .map {
+          case Right(context) => context
+          case Left(reason) =>
+            throw new IllegalStateException(
+              s"Couldn't get transfer context for round $round; reason: $reason"
+            )
+        }
       transferInProgress <- store
         .acs(domainId)
         .flatMap(

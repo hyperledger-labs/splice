@@ -7,6 +7,7 @@ import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
 import CC.API.V1.Coin (AppTransferContext)
+import CC.API.V1.Round
 import CN.Util.Assert
 import CN.Wallet.Payment
 
@@ -244,6 +245,7 @@ template TransferInProgress
          require "Payment is for this TransferInProgress" (toInterfaceContractId self == acceptedPayment.deliveryOffer)
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
+         openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
 
          let  receivers = map (\r -> r.receiver) receiverAmounts
               expectedAcceptedPayment = AcceptedAppPayment with
@@ -253,6 +255,7 @@ template TransferInProgress
                svc = group.svc
                lockedCoin = acceptedPayment.lockedCoin
                deliveryOffer = acceptedPayment.deliveryOffer
+               round = openMiningRound.round
          acceptedPayment === expectedAcceptedPayment
          forA receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
            create BalanceUpdate with

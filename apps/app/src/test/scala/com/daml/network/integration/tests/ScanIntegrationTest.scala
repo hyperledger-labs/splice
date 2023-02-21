@@ -64,6 +64,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil with C
           svcParty.toProtoPrimitive,
           r.payload.lockedCoin,
           referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
+          r.payload.round,
         )
       }
     }

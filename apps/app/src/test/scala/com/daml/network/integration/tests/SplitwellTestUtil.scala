@@ -90,7 +90,7 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
       case _ => false
     }
 
-  private def syncOnTransfers[A](numTransfers: Int, act: => A)(implicit
+  def syncOnTransfers[A](numTransfers: Int, act: => A)(implicit
       env: CoinTestConsoleEnvironment
   ) =
     if (isSimTime()) {

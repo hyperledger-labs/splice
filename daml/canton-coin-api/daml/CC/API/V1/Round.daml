@@ -5,6 +5,7 @@ newtype Round = Round with number : Int
 
 data OpenMiningRoundView = OpenMiningRoundView with
   svc : Party
+  round : Round
   coinPrice : Decimal
 
 interface OpenMiningRound where

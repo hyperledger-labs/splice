@@ -90,6 +90,7 @@ class WalletPaymentIntegrationTest
             svcParty.toProtoPrimitive,
             r.payload.lockedCoin,
             referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
+            r.payload.round,
           )
         }
       }

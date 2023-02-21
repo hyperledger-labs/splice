@@ -137,6 +137,29 @@ final class ScanConnection(
     }
   }
 
+  def getAppTransferContextForRound(providerPartyId: PartyId, round: roundCodegen.Round)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Either[String, coinCodegen.AppTransferContext]] = {
+    for {
+      context <- getTransferContext()
+      featured <- lookupFeaturedAppRight(providerPartyId)
+    } yield {
+      val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+      context.openMiningRounds.find(_.payload.round == round) match {
+        case Some(openMiningRound) =>
+          Right(
+            new coinCodegen.AppTransferContext(
+              coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+              openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+              featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
+            )
+          )
+        case None => Left("round is not an open mining round")
+      }
+    }
+  }
+
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)
   )

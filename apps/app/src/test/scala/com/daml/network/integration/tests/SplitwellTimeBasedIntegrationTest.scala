@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -9,6 +10,8 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil, SplitwellTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
+import java.time.Duration
 
 class SplitwellTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -91,5 +94,44 @@ class SplitwellTimeBasedIntegrationTest
         splitwellProviderWallet.listAppRewardCoupons() should have length 1
       }
     }
+  }
+
+  "be able to collect app payments across round changes" in { implicit env =>
+    val (aliceUserParty, bobUserParty, _, _, key, _) =
+      initSplitwellTest()
+
+    aliceSplitwell.enterPayment(
+      key,
+      100.0,
+      "team lunch",
+    )
+    bobWallet.tap(710)
+    clue("Splitwell transfer with round change right after payment request") {
+      syncOnTransfers(
+        2,
+        bobSplitwell.initiateTransfer(
+          key,
+          Seq(
+            new walletCodegen.ReceiverCCAmount(
+              aliceUserParty.toProtoPrimitive,
+              BigDecimal(50.0).bigDecimal,
+            )
+          ),
+        ),
+      )
+      eventually()(bobWallet.listAppPaymentRequests() should not be empty)
+      providerSplitwellBackend.stop() // to avoid the automation triggering before the round change
+      inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
+        bobWallet.acceptAppPaymentRequest(request.contractId)
+      }
+      eventually()(bobWallet.listAppPaymentRequests() shouldBe empty)
+      advanceRoundsByOneTick
+      providerSplitwellBackend.start()
+    }
+    eventually() {
+      advanceTime(Duration.ofSeconds(1))
+      aliceSplitwell.listBalanceUpdates(key) should have size 2
+    }
+    aliceSplitwell.listBalances(key) shouldBe Seq(bobUserParty -> 0).toMap
   }
 }

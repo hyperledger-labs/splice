@@ -114,9 +114,10 @@ template AppPaymentRequest
               payload = "lock payment"
          result <- exercisePaymentTransfer context transfer
          let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+         let round = result.round
          acceptedPayment <- create AcceptedAppPayment
            with
-             svc, provider, ccReceiverAmounts, sender, deliveryOffer, lockedCoin
+             svc, provider, ccReceiverAmounts, sender, deliveryOffer, lockedCoin, round
          return (acceptedPayment, result.senderChangeCoin)
 
     choice AppPaymentRequest_Withdraw : ()
@@ -158,6 +159,7 @@ template AcceptedAppPayment
     svc : Party
     lockedCoin : ContractId LockedCoin
     deliveryOffer : ContractId DeliveryOffer
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
   where
     signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
 

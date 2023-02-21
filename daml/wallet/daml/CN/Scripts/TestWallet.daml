@@ -95,7 +95,7 @@ testSingleReceiverCCPaymentRequest = script do
 
   acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
   -- all of Alice's tapped coin is used up
   aliceCoins <- query @Coin alice.primaryParty
   aliceCoins === aliceInitialCoins
@@ -103,11 +103,12 @@ testSingleReceiverCCPaymentRequest = script do
     sender = alice.primaryParty
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = toInterfaceContractId lockedCoinCid
     deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
       ]
+    round = lockedCoin.coin.amount.createdAt
 
   pure ()
 
@@ -166,17 +167,18 @@ testSingleReceiverUSDPaymentRequest = script do
 
   acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = toInterfaceContractId lockedCoinCid
     deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
       ]
+    round = lockedCoin.coin.amount.createdAt
 
   pure ()
 
@@ -223,6 +225,7 @@ testCCPaymentRequest = script do
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
+    round = lockedCoinPayload.coin.amount.createdAt
 
   checkCoinPositions alice [1.0, 1.615]
   checkCoinPositions bob [1.0]
@@ -277,17 +280,18 @@ testUSDPaymentRequest = script do
       (charlie.primaryParty, PaymentAmount 15.0 USD)]
   acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = toInterfaceContractId lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
       (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 30.0)
       ]
+    round = lockedCoin.coin.amount.createdAt
 
   pure ()
 
@@ -311,18 +315,18 @@ testMixedPaymentRequest = script do
       (charlie.primaryParty, PaymentAmount 10.0 USD)]
   acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = toInterfaceContractId lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
       (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 20.0)
       ]
-
+    round = lockedCoin.coin.amount.createdAt
 
   pure ()
 
@@ -364,7 +368,7 @@ testSuccessfulBatchCCPaymentRequests = script do
   Some acceptedPayment <- queryContractId alice.primaryParty payment1Cid
   Some acceptedPayment2 <- queryContractId alice.primaryParty payment2Cid
   lockedCoins <- query @LockedCoin alice.primaryParty
-  let [(lockedCoin, _), (lockedCoin2, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.amount.initialAmount) lockedCoins
+  let [(lockedCoinCid, lockedCoin), (lockedCoinCid2, lockedCoin2)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.amount.initialAmount) lockedCoins
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
 
   -- check results
@@ -372,10 +376,11 @@ testSuccessfulBatchCCPaymentRequests = script do
     sender = alice.primaryParty
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = toInterfaceContractId lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
+    round = lockedCoin.coin.amount.createdAt
 
   acceptedPayment2 === AcceptedAppPayment with
     sender = alice.primaryParty
@@ -385,8 +390,9 @@ testSuccessfulBatchCCPaymentRequests = script do
       ]
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin2
+    lockedCoin = toInterfaceContractId lockedCoinCid2
     deliveryOffer = toInterfaceContractId deliveryOffer2
+    round = lockedCoin2.coin.amount.createdAt
 
   pure ()
 
@@ -431,7 +437,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
 
   -- Only one command executed, so there's only one locked coin
   lockedCoins <- query @LockedCoin alice.primaryParty
-  let [(lockedCoin4, _)] = lockedCoins
+  let [(lockedCoinCid4, lockedCoin4)] = lockedCoins
 
   acceptedPayment4 === AcceptedAppPayment with
     sender = alice.primaryParty
@@ -441,8 +447,9 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       ]
     provider = provider.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin4
+    lockedCoin = toInterfaceContractId lockedCoinCid4
     deliveryOffer = toInterfaceContractId deliveryOffer4
+    round = lockedCoin4.coin.amount.createdAt
 
   pure ()
 
