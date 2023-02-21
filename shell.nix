@@ -57,6 +57,7 @@ in pkgs.mkShell {
     pigz
     postgresql_11
     pre-commit
+    procps
     protobuf3_19
     protoc-gen-grpc-web
     ps
