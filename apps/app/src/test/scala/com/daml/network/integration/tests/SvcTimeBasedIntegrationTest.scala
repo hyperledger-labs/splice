@@ -146,7 +146,7 @@ class SvcTimeBasedIntegrationTest
     )
 
     // set configSchedule
-    setCoinConfigSchedule(configSchedule)
+    svcClient.setConfigSchedule(configSchedule)
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with doubled tick duration.
@@ -249,7 +249,7 @@ class SvcTimeBasedIntegrationTest
     )
 
     // set configSchedule
-    setCoinConfigSchedule(configSchedule)
+    svcClient.setConfigSchedule(configSchedule)
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with reduced tick duration.
@@ -432,7 +432,7 @@ class SvcTimeBasedIntegrationTest
         )
       }
       // set configSchedule
-      setCoinConfigSchedule(configSchedule)
+      svcClient.setConfigSchedule(configSchedule)
     }
 
     advanceRoundsByOneTick
@@ -468,7 +468,7 @@ class SvcTimeBasedIntegrationTest
       }
 
       // set configSchedule
-      setCoinConfigSchedule(configSchedule)
+      svcClient.setConfigSchedule(configSchedule)
     }
 
     // Each advanceRoundsByOneTick will advance the time by exactly 160 second.
@@ -694,20 +694,6 @@ class SvcTimeBasedIntegrationTest
 
   private def fromRelTime(duration: RelTime): Duration =
     Duration.ofMillis(duration.microseconds / 1000)
-
-  private def setCoinConfigSchedule(
-      configSchedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]
-  )(implicit env: CoinTestConsoleEnvironment) = {
-    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
-    coinRules should have length 1
-    svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-      actAs = Seq(svcParty),
-      optTimeout = None,
-      commands =
-        coinRules.head.id.exerciseCoinRules_SetConfigSchedule(configSchedule).commands.asScala.toSeq,
-    )
-  }
 
   private case class OpenMiningRoundsTriplet(
       oldestOpen: OpenMiningRound.Contract,

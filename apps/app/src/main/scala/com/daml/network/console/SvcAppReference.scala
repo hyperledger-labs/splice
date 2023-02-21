@@ -1,6 +1,8 @@
 package com.daml.network.console
 
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
@@ -8,6 +10,8 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+
+import java.time.Instant
 
 abstract class SvcAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -50,6 +54,12 @@ class SvcAppClientReference(
       adminCommand(GrpcSvcAppClient.WithdrawFeaturedAppRight(provider))
     }
   }
+
+  @Help.Summary("Set config schedule for the CoinRules.")
+  def setConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]]): Unit =
+    consoleEnvironment.run {
+      adminCommand(GrpcSvcAppClient.SetConfigSchedule(configSchedule))
+    }
 }
 
 /** Single SVC app backend reference. Defines the console commands that can be run against a backend SVC

@@ -8,13 +8,18 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinconfig as coinConfigCodegen,
+  round as roundCodegen,
+}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.util.Proto
 
@@ -61,6 +66,11 @@ object HttpScanAppClient {
       openMiningRounds: Seq[
         Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
       ],
+  )
+
+  case class ConfigSchedule(
+      currentConfig: coinConfigCodegen.CoinConfig[coinConfigCodegen.USD],
+      futureConfigs: Map[Instant, coinConfigCodegen.CoinConfig[coinConfigCodegen.USD]],
   )
 
   case object GetTransferContext

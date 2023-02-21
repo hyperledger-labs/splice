@@ -13,6 +13,7 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.jdk.OptionConverters.*
+import scala.jdk.CollectionConverters.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.config.CoinHttpClientConfig
 
@@ -36,6 +37,21 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTransferContext)
     }
+
+  @Help.Summary(
+    "Get the (cached) config schedule for the CoinRules. Note that changes to the config might take some time to propagate due to the client-side caching."
+  )
+  def getConfigSchedule(): Option[HttpScanAppClient.ConfigSchedule] = {
+    getTransferContext().coinRules
+      .map { cr =>
+        HttpScanAppClient.ConfigSchedule(
+          currentConfig = cr.payload.configSchedule.currentValue,
+          futureConfigs = cr.payload.configSchedule.futureValues.asScala.map { t =>
+            t._1 -> t._2
+          }.toMap,
+        )
+      }
+  }
 
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
