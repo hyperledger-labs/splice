@@ -7,6 +7,7 @@ images := \
 	sv-app \
 	svc-app \
 	scan-app \
+	scan-web-ui \
 	directory-app \
 	wallet-app \
 	wallet-new-web-ui \

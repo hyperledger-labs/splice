@@ -241,6 +241,14 @@ local svcDeployments(config) = [
       port: 6012,
     },
   ], namespace="svc", extraEnvVars=c.appAuthEnvBinding("scan")),
+
+  c.deployment(config, "scan-web-ui", [
+    {
+      name: "scan-ui",
+      port: 80,
+      internalOnly: true,
+    },
+  ], image="scan-web-ui", namespace="svc", cpuRequest=0.5),
 ];
 
 local validator1Deployments(config) = [

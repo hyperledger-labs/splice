@@ -37,6 +37,7 @@ function start_frontend() {
   local user=$3
   local node_name=$4
   local test_auth=$5
+  local algorithm="${6:-rs-256}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -49,6 +50,7 @@ function start_frontend() {
   local config_file=$(mktemp)
 
   jsonnet \
+    --tla-str authAlgorithm="$algorithm" \
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
     --tla-str app="$app" \
@@ -124,6 +126,7 @@ start_frontend splitwell 3002 alice   "alice" $enable_test_auth
 start_frontend splitwell 3003 bob     "bob"   $enable_test_auth
 start_frontend directory 3004 alice   "alice" $enable_test_auth
 start_frontend splitwell 3005 charlie "alice" $enable_test_auth
+start_frontend scan      3006 scan    "scan"  "false"           "none"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

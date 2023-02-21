@@ -27,6 +27,8 @@ local auth(algorithm) =
     { auth: authRs() }
   else if (algorithm == "hs-256-unsafe") then
     { auth: authHsUnsafe(authSecret) }
+  else if (algorithm == "none") then
+    {}
   else
     error "Unknown auth algorithm" + algorithm;
 
@@ -51,6 +53,9 @@ local validatorNodes = {
     wallet: { grpcUrl: "http://localhost:6304", uiUrl: "http://localhost:3001" },
     splitwell: { grpcUrl: "http://localhost:6113" },
     directory: { grpcUrl: "http://localhost:6110" },
+    scan: { grpcUrl: "http://localhost:6012" },
+  },
+  scan: {
     scan: { grpcUrl: "http://localhost:6012" },
   },
 };
