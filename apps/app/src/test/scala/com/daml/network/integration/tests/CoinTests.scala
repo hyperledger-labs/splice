@@ -11,14 +11,17 @@ import com.daml.network.console.{
   WalletAppClientReference,
   LedgerApiExtensions,
 }
+import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
+import com.daml.network.util.CoinUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.*
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.BeforeAndAfterEach
-
 import scala.language.implicitConversions
+import java.time.Duration
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -38,6 +41,17 @@ object CoinTests {
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
       CoinEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
+
+    protected def mkCoinConfig(
+        tickDuration: NonNegativeFiniteDuration,
+        maxNumInputs: Int = 100,
+    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
+      defaultCoinConfig(
+        tickDuration,
+        maxNumInputs,
+      )
+
+    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
   }
 
   trait CoinIntegrationTestWithSharedEnvironment

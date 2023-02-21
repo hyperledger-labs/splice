@@ -24,7 +24,6 @@ import scala.jdk.CollectionConverters.*
 import java.time.{Duration, Instant}
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.Contract
-import com.daml.network.util.CoinUtil.defaultCoinConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 import scala.concurrent.duration.*
@@ -133,7 +132,6 @@ class SvcTimeBasedIntegrationTest
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
 
-    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
     val doubledTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(300))
     val configSchedule = new cc.schedule.Schedule(
       mkCoinConfig(defaultTickDuration),
@@ -236,7 +234,6 @@ class SvcTimeBasedIntegrationTest
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
 
-    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
     val reducedTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(75))
     val configSchedule = new cc.schedule.Schedule(
       mkCoinConfig(defaultTickDuration),
@@ -410,7 +407,6 @@ class SvcTimeBasedIntegrationTest
   }
 
   "round management with very tightly scheduled config" in { implicit env =>
-    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
     val config101 = mkCoinConfig(defaultTickDuration, 101)
     val config102 = mkCoinConfig(defaultTickDuration, 102)
 
@@ -678,15 +674,6 @@ class SvcTimeBasedIntegrationTest
       },
     )
   }
-
-  private def mkCoinConfig(
-      tickDuration: NonNegativeFiniteDuration,
-      initialMaxNumInputs: Int = 100,
-  ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
-    defaultCoinConfig(
-      tickDuration,
-      initialMaxNumInputs,
-    )
 
   private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toScala.toMicros

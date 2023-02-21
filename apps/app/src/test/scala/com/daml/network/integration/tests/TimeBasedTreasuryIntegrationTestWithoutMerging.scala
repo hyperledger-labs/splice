@@ -1,14 +1,23 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.tests.CoinTests.{
+  CoinIntegrationTest,
+  CoinTestConsoleEnvironment,
+}
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
+import java.time.{Duration, Instant}
+import scala.jdk.CollectionConverters.*
 import scala.annotation.nowarn
 
 @nowarn("msg=match may not be exhaustive")
@@ -38,39 +47,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWallet.tap(100)
-    p2pTransfer(
-      aliceValidatorWallet,
-      aliceWallet,
-      alice,
-      5,
-    )
-
+    createRewardsInRound(aliceValidatorWallet, aliceWallet, alice, 1)
     advanceRoundsByOneTick
-
-    eventually() {
-      aliceValidatorWallet.list().coins should have length 1
-      aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
-      aliceValidatorWallet.listAppRewardCoupons() should have length 1
-    }
-
-    // creating rewards in round 2
-    p2pTransfer(
-      aliceValidatorWallet,
-      aliceWallet,
-      alice,
-      5,
-    )
+    createRewardsInRound(aliceValidatorWallet, aliceWallet, alice, 2)
     aliceValidatorWallet.tap(50)
-
-    eventually() {
-      aliceValidatorWallet.list().coins should have length 2
-      aliceValidatorWallet
-        .listValidatorRewardCoupons()
-        .filter(_.payload.round.number == 2) should have length 1
-      aliceValidatorWallet
-        .listAppRewardCoupons()
-        .filter(_.payload.round.number == 2) should have length 1
-    }
 
     // by advancing three rounds, both round 1 and round 2 are in their issuing phase.
     advanceRoundsByOneTick
@@ -96,9 +76,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       )
       eventually() {
         aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
-          .listValidatorRewardCoupons()
-          .filter(_.payload.round.number == 2) should have length 1
         aliceValidatorWallet
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
@@ -218,6 +195,115 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         aliceValidatorWallet
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
+      }
+    }
+  }
+
+  "respect scheduled change of maxNumInputs" in { implicit env =>
+    // current config: maxNumInputs = 4
+    // We then schedule a reduction of maxNumInputs to 3
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val configSchedule = new cc.schedule.Schedule(
+      mkCoinConfig(defaultTickDuration, 4),
+      List(
+        new Tuple2(
+          now.add(Duration.ofSeconds(160 * 4 - 10)).toInstant,
+          mkCoinConfig(defaultTickDuration, 3),
+        )
+      ).asJava,
+    )
+    svcClient.setConfigSchedule(configSchedule)
+
+    val (alice, _) = onboardAliceAndBob()
+
+    aliceValidatorWallet.tap(100)
+    createRewardsInRound(aliceValidatorWallet, aliceWallet, alice, 1)
+    advanceRoundsByOneTick
+    createRewardsInRound(aliceValidatorWallet, aliceWallet, alice, 2)
+    advanceRoundsByOneTick
+    createRewardsInRound(aliceValidatorWallet, aliceWallet, alice, 3)
+
+    // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+
+    aliceValidatorWallet.tap(5)
+    eventually() {
+      val currentInstant = svc.remoteParticipantWithAdminToken.ledger_api.time.get().toInstant
+      getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(1, 2)
+      aliceValidatorWallet.list().coins should have length 2
+      aliceValidatorWallet
+        .listValidatorRewardCoupons() should have length 3
+      aliceValidatorWallet
+        .listAppRewardCoupons() should have length 3
+    }
+
+    clue("rewards from round 1 are merged.") {
+      // Note that the rewards from round 2 are not merged as transfers allow at most 4 inputs
+      // and the rewards from round 1 are prioritized
+      p2pTransfer(
+        aliceValidatorWallet,
+        aliceWallet,
+        alice,
+        5,
+      )
+      eventually() {
+        aliceValidatorWallet.list().coins should have length 1
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 1) should have length 0
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 1) should have length 0
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 2) should have length 1
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 2) should have length 1
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 3) should have length 1
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 3) should have length 1
+      }
+    }
+
+    advanceRoundsByOneTick
+
+    clue("rewards from round 2 are merged but not round 3") {
+      p2pTransfer(
+        aliceValidatorWallet,
+        aliceWallet,
+        alice,
+        5,
+      )
+      eventually() {
+        val currentInstant = svc.remoteParticipantWithAdminToken.ledger_api.time.get().toInstant
+        getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
+        // As the max number of input is reduced to 3
+        // only 3 inputs are used: 1 coin, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2
+        aliceValidatorWallet.list().coins should have length 1
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 1) should have length 0
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 1) should have length 0
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 2) should have length 0
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 2) should have length 0
+        aliceValidatorWallet
+          .listValidatorRewardCoupons()
+          .filter(_.payload.round.number == 3) should have length 1
+        aliceValidatorWallet
+          .listAppRewardCoupons()
+          .filter(_.payload.round.number == 3) should have length 1
+
       }
     }
   }
@@ -364,5 +450,33 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         )
 
       }
+  }
+  private def getOpenIssuingRounds(now: Instant)(implicit env: CoinTestConsoleEnvironment) = {
+    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
+    issuingRounds.filter(r => now.isAfter(r.data.opensAt))
+  }
+
+  private def createRewardsInRound(
+      validatorWallet: WalletAppClientReference,
+      userWallet: WalletAppClientReference,
+      receiverParty: PartyId,
+      round: Int,
+  ) = {
+    p2pTransfer(
+      validatorWallet,
+      userWallet,
+      receiverParty,
+      5,
+    )
+
+    eventually() {
+      validatorWallet.list().coins should have length 1
+      validatorWallet
+        .listValidatorRewardCoupons()
+        .filter(_.payload.round.number == round) should have length 1
+      validatorWallet
+        .listAppRewardCoupons()
+        .filter(_.payload.round.number == round) should have length 1
+    }
   }
 }
