@@ -80,18 +80,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetProviderPartyIdResponse"
-  /connected-domains:
-    get:
-      tags: [directory]
-      x-jvm-package: directory
-      operationId: "listConnectedDomains"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
     ListEntriesResponse:
@@ -123,9 +111,3 @@ components:
       properties:
         provider_party_id:
           type: string
-    ListConnectedDomainsResponse:
-      type: object
-      required: ["connected_domains"]
-      properties:
-        connected_domains:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"

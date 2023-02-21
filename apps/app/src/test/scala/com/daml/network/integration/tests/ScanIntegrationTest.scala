@@ -14,12 +14,6 @@ class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil with C
     scan.startSync()
   }
 
-  "list one connected domain" in { implicit env =>
-    eventually() {
-      scan.listConnectedDomains().keySet shouldBe Set("global")
-    }
-  }
-
   "list total coin balances" in { implicit env =>
     val (aliceUserParty, _) = onboardAliceAndBob()
     aliceWallet.tap(100.0)

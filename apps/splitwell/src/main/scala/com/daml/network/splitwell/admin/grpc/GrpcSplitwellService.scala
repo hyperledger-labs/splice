@@ -232,15 +232,6 @@ class GrpcSplitwellService(
       Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
     }
 
-  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
-    withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      for {
-        domains <- store.domains.listConnectedDomains()
-      } yield {
-        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
-      }
-    }
-
   override def getSplitwellDomainId(request: Empty): Future[v0.GetSplitwellDomainIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       Future.successful(

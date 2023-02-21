@@ -115,15 +115,6 @@ class GrpcSvcAppService(
       } yield Empty()
     }
 
-  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { _ => span =>
-      for {
-        domains <- store.domains.listConnectedDomains()
-      } yield {
-        v0.ListConnectedDomainsResponse(Some(Proto.encode(domains)))
-      }
-    }
-
   // TODO(#2241) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
   override def joinConsortium(request: JoinConsortiumRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>

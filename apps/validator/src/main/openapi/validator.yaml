@@ -52,18 +52,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/OnboardUserResponse"
-  /connected-domains:
-    get:
-      tags: [validator]
-      x-jvm-package: validator
-      operationId: "listConnectedDomains"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
     OnboardUserRequest:
@@ -104,10 +92,3 @@ components:
           type: string
         user_name:
           type: string
-
-    ListConnectedDomainsResponse:
-      type: object
-      required: ["connected_domains"]
-      properties:
-        connected_domains:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"

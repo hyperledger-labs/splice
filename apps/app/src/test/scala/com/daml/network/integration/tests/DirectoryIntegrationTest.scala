@@ -338,12 +338,6 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       )
     }
 
-    "list one connected domain" in { implicit env =>
-      eventually() {
-        directory.listConnectedDomains().keySet shouldBe Set("global")
-      }
-    }
-
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
       val userParty = onboardWalletUser(refs.wallet, refs.validator)
 

@@ -177,22 +177,6 @@ class HttpScanHandler(
       }
     }
 
-  def listConnectedDomains(
-      response: com.daml.network.http.v0.scan.ScanResource.ListConnectedDomainsResponse.type
-  )(): Future[com.daml.network.http.v0.scan.ScanResource.ListConnectedDomainsResponse] = {
-    withNewTrace(workflowId) { _ => span =>
-      for {
-        domains <- store.domains.listConnectedDomains()
-      } yield v0.ScanResource.ListConnectedDomainsResponse.OK(
-        definitions.ListConnectedDomainsResponse(
-          domains.view.map { case (k, v) =>
-            k.toProtoPrimitive -> v.toProtoPrimitive
-          }.toMap
-        )
-      )
-    }
-  }
-
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
   )(): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =

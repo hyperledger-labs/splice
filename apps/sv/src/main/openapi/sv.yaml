@@ -104,18 +104,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetDebugInfoResponse"
-  /connected-domains:
-    get:
-      tags: [sv]
-      x-jvm-package: sv
-      operationId: "listConnectedDomains"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
 components:
   schemas:
     ListOngoingValidatorOnboardingsResponse:
@@ -189,10 +177,3 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules_contract_id:
           type: string
-
-    ListConnectedDomainsResponse:
-      type: object
-      required: ["connected_domains"]
-      properties:
-        connected_domains:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"

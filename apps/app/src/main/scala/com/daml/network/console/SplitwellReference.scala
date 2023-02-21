@@ -11,7 +11,6 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -50,12 +49,6 @@ abstract class SplitwellAppReference(
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwellAppClient.GetProviderPartyId())
-    }
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListConnectedDomains())
     }
 
   @Help.Summary("Get the domain id for the private splitwell app domain")

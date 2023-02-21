@@ -16,8 +16,7 @@ import com.daml.network.codegen.java.cc.{
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -280,31 +279,6 @@ object HttpScanAppClient {
           response.featuredAppRight
             .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
             .leftMap(_.toString)
-      }
-  }
-
-  case object ListConnectedDomains
-      extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListConnectedDomainsResponse] =
-      client.listConnectedDomains(headers)
-
-    override def handleResponse(
-        response: http.ListConnectedDomainsResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Map[DomainAlias, DomainId]] =
-      response match {
-        case http.ListConnectedDomainsResponse.OK(response) =>
-          response.connectedDomains.toList
-            .traverse { case (k, v) =>
-              for {
-                k <- DomainAlias.create(k)
-                v <- DomainId.fromString(v)
-              } yield (k, v)
-            }
-            .map(_.toMap)
       }
   }
 

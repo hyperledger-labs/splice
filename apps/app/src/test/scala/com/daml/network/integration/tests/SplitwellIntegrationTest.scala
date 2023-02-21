@@ -127,11 +127,5 @@ class SplitwellIntegrationTest
         .get(providerSplitwellBackend.config.providerUser)
       Some(providerSplitwellBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
     }
-
-    "list one connected domain" in { implicit env =>
-      eventually() {
-        providerSplitwellBackend.listConnectedDomains().keySet shouldBe Set("global", "splitwell")
-      }
-    }
   }
 }

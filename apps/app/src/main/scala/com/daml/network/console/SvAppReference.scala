@@ -6,10 +6,9 @@ import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -34,12 +33,6 @@ abstract class SvAppReference(
   def getDebugInfo(): HttpSvAppClient.DebugInfo =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.GetDebugInfo)
-    }
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.ListConnectedDomains)
     }
 }
 

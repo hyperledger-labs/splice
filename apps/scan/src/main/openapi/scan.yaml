@@ -107,18 +107,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-  /api/v0/connected-domains:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "listConnectedDomains"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
   /total-coin-balance:
     get:
       tags: [scan]
@@ -204,12 +192,6 @@ components:
       properties:
         featured_app_right:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-    ListConnectedDomainsResponse:
-      type: object
-      required: ["connected_domains"]
-      properties:
-        connected_domains:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"
     GetTotalCoinBalanceResponse:
       type: object
       required: ["total_unlocked_balance", "total_locked_balance"]

@@ -11,8 +11,7 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
@@ -161,30 +160,5 @@ object HttpSvAppClient {
           )
       }
     }
-  }
-
-  case object ListConnectedDomains
-      extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ) =
-      client.listConnectedDomains(headers)
-
-    override def handleResponse(
-        response: http.ListConnectedDomainsResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Map[DomainAlias, DomainId]] =
-      response match {
-        case http.ListConnectedDomainsResponse.OK(response) =>
-          response.connectedDomains.toList
-            .traverse { case (k, v) =>
-              for {
-                k <- DomainAlias.create(k)
-                v <- DomainId.fromString(v)
-              } yield (k, v)
-            }
-            .map(_.toMap)
-      }
   }
 }

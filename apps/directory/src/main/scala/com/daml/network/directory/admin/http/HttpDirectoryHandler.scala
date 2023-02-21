@@ -71,19 +71,4 @@ class HttpDirectoryHandler(
         )
       )
     }
-
-  override def listConnectedDomains(
-      respond: v0.DirectoryResource.ListConnectedDomainsResponse.type
-  )(): Future[v0.DirectoryResource.ListConnectedDomainsResponse] =
-    withNewTrace("HttpDirectoryHandler") { _ => span =>
-      for {
-        domains <- store.domains.listConnectedDomains()
-      } yield v0.DirectoryResource.ListConnectedDomainsResponse.OK(
-        definitions.ListConnectedDomainsResponse(
-          domains.view.map { case (k, v) =>
-            k.toProtoPrimitive -> v.toProtoPrimitive
-          }.toMap
-        )
-      )
-    }
 }

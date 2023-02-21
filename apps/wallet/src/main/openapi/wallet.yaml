@@ -658,24 +658,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /connected-domains:
-    get:
-      tags: [wallet]
-      x-jvm-package: wallet
-      operationId: "listConnectedDomains"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListConnectedDomainsResponse"
-        "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /cancel-featured-app-rights:
     delete:
       tags: [wallet]
@@ -991,14 +973,6 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-
-    ListConnectedDomainsResponse:
-      type: object
-      required:
-        - connected_domains
-      properties:
-        connected_domains:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ConnectedDomains"
 
     ListTransactionsRequest:
       type: object

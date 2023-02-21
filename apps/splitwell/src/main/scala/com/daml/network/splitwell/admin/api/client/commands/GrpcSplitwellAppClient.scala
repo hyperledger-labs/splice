@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
 import com.daml.network.util.{Contract, Proto}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
@@ -179,22 +178,6 @@ object GrpcSplitwellAppClient {
         response: v0.GetProviderPartyIdResponse
     ): Either[String, PartyId] =
       Proto.decode(Proto.Party)(response.partyId)
-  }
-
-  case class ListConnectedDomains(
-  ) extends BaseCommand[Empty, v0.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
-
-    override def submitRequest(
-        service: SplitwellServiceStub,
-        request: Empty,
-    ): Future[v0.ListConnectedDomainsResponse] = service.listConnectedDomains(request)
-
-    override def handleResponse(
-        response: v0.ListConnectedDomainsResponse
-    ): Either[String, Map[DomainAlias, DomainId]] =
-      Proto.decode(Proto.ConnectedDomains)(response.getDomains)
   }
 
   case class GetSplitwellDomainId(

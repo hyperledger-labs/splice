@@ -83,13 +83,4 @@ class SvcIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     )
 
   }
-
-  "list connected domains of svc and sv app" in { implicit env =>
-    eventually() {
-      svc.listConnectedDomains().keySet shouldBe Set("global")
-    }
-    eventually() {
-      sv1.listConnectedDomains().keySet shouldBe Set("global")
-    }
-  }
 }

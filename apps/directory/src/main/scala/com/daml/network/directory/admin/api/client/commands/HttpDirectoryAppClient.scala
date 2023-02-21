@@ -8,8 +8,7 @@ import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.http.v0.directory as http
 import com.daml.network.util.{Contract, Proto, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -120,30 +119,5 @@ object HttpDirectoryAppClient {
       case http.GetProviderPartyIdResponse.OK(response) =>
         Proto.decode(Proto.Party)(response.providerPartyId)
     }
-  }
-
-  case class ListConnectedDomains()
-      extends BaseCommand[http.ListConnectedDomainsResponse, Map[DomainAlias, DomainId]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ) =
-      client.listConnectedDomains()
-
-    override def handleResponse(
-        response: http.ListConnectedDomainsResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Map[DomainAlias, DomainId]] =
-      response match {
-        case http.ListConnectedDomainsResponse.OK(response) =>
-          response.connectedDomains.toList
-            .traverse { case (k, v) =>
-              for {
-                k <- DomainAlias.create(k)
-                v <- DomainId.fromString(v)
-              } yield (k, v)
-            }
-            .map(_.toMap)
-      }
   }
 }

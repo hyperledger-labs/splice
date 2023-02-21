@@ -16,11 +16,10 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
 }
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.daml.network.wallet.store.UserWalletTxLogParser
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 abstract class WalletAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -314,12 +313,6 @@ abstract class WalletAppReference(
   def cancelFeaturedAppRight(): Unit =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.CancelFeaturedAppRight)
-    }
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.ListConnectedDomains)
     }
 
   @Help.Summary("List transaction history")

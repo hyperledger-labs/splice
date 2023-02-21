@@ -7,10 +7,9 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
@@ -103,12 +102,6 @@ abstract class ScanAppReference(
   ): Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
-    }
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.ListConnectedDomains)
     }
 
   @Help.Summary("Get the total balance of Canton Coin in the network")

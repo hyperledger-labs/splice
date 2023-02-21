@@ -257,24 +257,6 @@ class HttpWalletHandler(
       )
     }
 
-  override def listConnectedDomains(respond: v0.WalletResource.ListConnectedDomainsResponse.type)()(
-      user: String
-  ): Future[r0.ListConnectedDomainsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleUnexpected(
-        for {
-          domains <- store.domains.listConnectedDomains()
-        } yield v0.WalletResource.ListConnectedDomainsResponse.OK(
-          d0.ListConnectedDomainsResponse(
-            domains.view.map { case (k, v) =>
-              k.toProtoPrimitive -> v.toProtoPrimitive
-            }.toMap
-          )
-        ),
-        r0.ListConnectedDomainsResponseInternalServerError,
-      )
-    }
-
   override def listTransactions(
       respond: v0.WalletResource.ListTransactionsResponse.type
   )(

@@ -146,23 +146,6 @@ class HttpSvHandler(
       )
     }
 
-  def listConnectedDomains(
-      respond: v0.SvResource.ListConnectedDomainsResponse.type
-  )(): Future[v0.SvResource.ListConnectedDomainsResponse] = {
-    withNewTrace(workflowId) { _ => span =>
-      for {
-        // both stores are typically (no hard guarantees) connected to the same domains
-        domains <- svcStore.domains.listConnectedDomains()
-      } yield v0.SvResource.ListConnectedDomainsResponse.OK(
-        definitions.ListConnectedDomainsResponse(
-          domains.view.map { case (k, v) =>
-            k.toProtoPrimitive -> v.toProtoPrimitive
-          }.toMap
-        )
-      )
-    }
-  }
-
   private def generateRandomOnboardingSecret(): String = {
     val rng = new SecureRandom();
     // 256 bits of entropy

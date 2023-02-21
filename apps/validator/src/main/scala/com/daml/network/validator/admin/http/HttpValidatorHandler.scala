@@ -64,22 +64,6 @@ class HttpValidatorHandler(
       )
     }
 
-  def listConnectedDomains(
-      respond: v0.ValidatorResource.ListConnectedDomainsResponse.type
-  )()(ledgerApiUser: String): Future[v0.ValidatorResource.ListConnectedDomainsResponse] = {
-    withNewTrace(workflowId) { _ => span =>
-      for {
-        domains <- store.domains.listConnectedDomains()
-      } yield v0.ValidatorResource.ListConnectedDomainsResponse.OK(
-        definitions.ListConnectedDomainsResponse(
-          domains.view.map { case (k, v) =>
-            k.toProtoPrimitive -> v.toProtoPrimitive
-          }.toMap
-        )
-      )
-    }
-  }
-
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
     ValidatorUtil
       .onboard(

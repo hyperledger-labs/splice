@@ -345,12 +345,6 @@ class WalletIntegrationTest
       responseForInvalidSignature.status should be(StatusCodes.Unauthorized)
     }
 
-    "list one connected domain" in { implicit env =>
-      eventually() {
-        providerSplitwellBackend.listConnectedDomains().keySet shouldBe Set("global", "splitwell")
-      }
-    }
-
     "support featured app rewards" in { implicit env =>
       val splitwellProvider = onboardWalletUser(splitwellProviderWallet, splitwellValidator)
       splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false

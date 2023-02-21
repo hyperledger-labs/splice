@@ -7,7 +7,6 @@ import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClie
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.Contract
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -15,7 +14,7 @@ import com.digitalasset.canton.console.{
   Help,
 }
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 abstract class DirectoryAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -54,12 +53,6 @@ abstract class DirectoryAppReference(
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
       httpCommand(HttpDirectoryAppClient.GetProviderPartyId())
-    }
-
-  @Help.Summary("List the connected domains of the participant the app is running on")
-  def listConnectedDomains(): Map[DomainAlias, DomainId] =
-    consoleEnvironment.run {
-      httpCommand(HttpDirectoryAppClient.ListConnectedDomains())
     }
 }
 
