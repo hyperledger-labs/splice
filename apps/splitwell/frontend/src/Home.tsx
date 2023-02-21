@@ -6,7 +6,6 @@ import { Container, Stack, Typography } from '@mui/material';
 
 import { SplitwellInstall, SplitwellInstallRequest } from '@daml.js/splitwell/lib/CN/Splitwell';
 
-import DirectoryEntries from './DirectoryEntries';
 import GroupSetup from './GroupSetup';
 import Groups from './Groups';
 import {
@@ -19,8 +18,7 @@ import { config } from './utils/config';
 const HomeWithContext: React.FC<{
   userId: string;
   svc: string | undefined;
-  dirEntries: DirectoryEntries;
-}> = ({ userId, svc, dirEntries }) => {
+}> = ({ svc }) => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const { updateStatus } = useUserState();
@@ -113,12 +111,7 @@ const HomeWithContext: React.FC<{
             svc={svc}
             domainId={splitwellDomainId}
           />
-          <Groups
-            directoryEntries={dirEntries}
-            party={primaryPartyId}
-            provider={provider}
-            domainId={splitwellDomainId}
-          />
+          <Groups party={primaryPartyId} provider={provider} domainId={splitwellDomainId} />
         </Stack>
       </Container>
     );
@@ -130,18 +123,17 @@ const HomeWithContext: React.FC<{
 interface HomeProps {
   userId: string;
   svc: string | undefined;
-  dirEntries: DirectoryEntries;
   ledgerApiToken: string;
 }
 
-const Home: React.FC<HomeProps> = ({ userId, svc, dirEntries, ledgerApiToken }) => {
+const Home: React.FC<HomeProps> = ({ userId, svc, ledgerApiToken }) => {
   return (
     <SplitwellLedgerApiClientProvider
       url={config.services.ledgerApi.grpcUrl}
       userId={userId}
       token={ledgerApiToken}
     >
-      <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
+      <HomeWithContext userId={userId} svc={svc} />
     </SplitwellLedgerApiClientProvider>
   );
 };

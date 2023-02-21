@@ -11,6 +11,7 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration.DurationInt
 
@@ -193,7 +194,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        enterSplitwellPayment(aliceEntryName, 500)
+        enterSplitwellPayment(aliceEntryName, aliceUserParty, 500)
 
         // Bob is redirected to wallet ..
         loginOnCurrentPage(bobDamlUser)
@@ -218,6 +219,15 @@ class SplitwellFrontendIntegrationTest
         // Check final amounts in the wallets
         checkWallet(aliceUserParty, aliceWallet, Seq((503.75, 504)))
         checkWallet(bobUserParty, bobWallet, Seq((12.3, 12.5)))
+      }
+
+      withFrontEnd("bobSplitwell") { implicit webDriver =>
+        val errorMsg = "is not part of the group"
+        loggerFactory.assertLogs(
+          enterSplitwellPayment("unknown::abc", PartyId.tryFromProtoPrimitive("unknown::abc"), 42),
+          _.errorMessage should include(errorMsg),
+        )
+        consumeError(errorMsg)
       }
     }
 

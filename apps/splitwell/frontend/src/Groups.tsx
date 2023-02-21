@@ -3,6 +3,7 @@ import {
   sameContracts,
   useInterval,
   DirectoryEntry as DirectoryEntryComponent,
+  DirectoryField,
 } from 'common-frontend';
 import { TransferButton } from 'common-frontend/lib/components/WalletButtons';
 import {
@@ -17,7 +18,6 @@ import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
 import {
-  Autocomplete,
   Box,
   Button,
   Divider,
@@ -41,7 +41,6 @@ import {
 } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
-import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwellLedgerApiClient } from './contexts/SplitwellLedgerApiContext';
 import { useSplitwellClient } from './contexts/SplitwellServiceContext';
 import { config } from './utils/config';
@@ -208,14 +207,13 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
 };
 
 interface EntryProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
   party: string;
   domainId: string;
 }
 
-const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider, domainId }) => {
+const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId }) => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
@@ -230,15 +228,24 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider,
     );
   };
   const [transferAmount, setTransferAmount] = useState<string>('');
-  const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
+  const [transferReceiver, setTransferReceiver] = useState<string | undefined>();
   const initiateTransfer = async () => {
-    return await ledgerApiClient.initiateTransfer(
-      party,
-      provider,
-      group.contractId,
-      [{ receiver: transferReceiverEntry!.user, ccAmount: transferAmount }],
-      domainId
-    );
+    const members = [group.payload.owner, ...group.payload.members];
+    if (!transferReceiver) {
+      throw new Error('Transfer receiver not set');
+    } else if (members.includes(transferReceiver)) {
+      return await ledgerApiClient.initiateTransfer(
+        party,
+        provider,
+        group.contractId,
+        [{ receiver: transferReceiver, ccAmount: transferAmount }],
+        domainId
+      );
+    } else {
+      throw new Error(
+        `Transfer receiver ${transferReceiver} is not part of the group’s members: ${members}`
+      );
+    }
   };
   return (
     <div
@@ -271,21 +278,9 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider,
             value={transferAmount}
             onChange={event => setTransferAmount(event.target.value)}
           ></TextField>
-          <Autocomplete<DirectoryEntry, false, false, true>
-            sx={{ width: '38%' }}
-            freeSolo
-            options={directoryEntries.getAllEntries()}
-            getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
-            value={transferReceiverEntry}
-            onChange={(_, newValue) => {
-              if (typeof newValue === 'string') {
-                setTransferReceiverEntry({ user: newValue, name: newValue });
-              } else {
-                setTransferReceiverEntry(newValue);
-              }
-            }}
-            renderInput={params => <TextField {...params} label="Receiver" />}
+          <DirectoryField
             className="transfer-receiver-field"
+            onPartyChanged={party => setTransferReceiver(party)}
           />
           <TransferButton
             className="transfer-link"
@@ -355,14 +350,13 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
 };
 
 interface GroupProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   party: string;
   provider: string;
   domainId: string;
 }
 
-const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider, domainId }) => {
+const Group: React.FC<GroupProps> = ({ group, party, provider, domainId }) => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const isOwner = party === group.payload.owner;
   const onCreateInvite = async () => {
@@ -400,13 +394,7 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider,
       {isOwner && (
         <MembershipRequests group={group} party={party} provider={provider} domainId={domainId} />
       )}
-      <Entry
-        group={group}
-        directoryEntries={directoryEntries}
-        party={party}
-        provider={provider}
-        domainId={domainId}
-      />
+      <Entry group={group} party={party} provider={provider} domainId={domainId} />
       <Divider />
       <Balances group={group} party={party} provider={provider} domainId={domainId} />
       <Divider />
@@ -417,13 +405,12 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider,
 };
 
 interface GroupsProps {
-  directoryEntries: DirectoryEntries;
   party: string;
   provider: string;
   domainId: string;
 }
 
-const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider, domainId }) => {
+const Groups: React.FC<GroupsProps> = ({ party, provider, domainId }) => {
   const splitwellClient = useSplitwellClient();
 
   const [groups, setGroups] = useState<Contract<CodegenGroup>[]>([]);
@@ -446,7 +433,6 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider, doma
       {groups.map(group => (
         <Group
           key={`${group.payload.owner}:${group.payload.id.unpack}`}
-          directoryEntries={directoryEntries}
           group={group}
           party={party}
           provider={provider}

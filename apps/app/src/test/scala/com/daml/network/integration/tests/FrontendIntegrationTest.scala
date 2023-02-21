@@ -195,9 +195,11 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     }
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
-    val text = inside(findAll(id("error")).toList) { case Seq(elem) => elem.text }
-    text shouldBe err
+    find(id("error")).value.text should include(err)
     click on "clear-error-button"
+    eventually() {
+      find(id("error")) shouldBe None
+    }
   }
 
   /** Takes a screenshot of the current browser state, into a timestamped png file in log directory.

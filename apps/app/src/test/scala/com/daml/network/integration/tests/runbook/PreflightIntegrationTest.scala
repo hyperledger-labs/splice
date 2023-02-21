@@ -16,6 +16,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
 import java.net.URI
@@ -194,7 +195,12 @@ class PreflightIntegrationTest
     }
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      enterSplitwellPayment(aliceUserPartyId, 50, complete = false)
+      enterSplitwellPayment(
+        aliceUserPartyId,
+        PartyId.tryFromProtoPrimitive(aliceUserPartyId),
+        50,
+        complete = false,
+      )
 
       // Bob is redirected to wallet ..
       click on className("accept-button")

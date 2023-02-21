@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.integration.tests.CoinTests.CoinTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
-import org.openqa.selenium.Keys
+import com.digitalasset.canton.topology.PartyId
 
 trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
   this: CommonCoinAppInstanceReferences & FrontendTestCommon =>
@@ -19,22 +19,23 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
     click on className("enter-payment-link")
   }
 
-  def enterSplitwellPayment(receiver: String, quantity: Double, complete: Boolean = true)(implicit
+  def enterSplitwellPayment(
+      receiver: String,
+      receiverPartyId: PartyId,
+      quantity: Double,
+      complete: Boolean = true,
+  )(implicit
       webDriver: WebDriverType
   ) = {
     inside(find(className("transfer-amount-field"))) { case Some(field) =>
       field.underlying.click()
       reactTextInput(field).value = quantity.toString
     }
-    inside(find(className("transfer-receiver-field"))) { case Some(field) =>
-      field.underlying.click()
-      val input = reactTextInput(field)
-      input.underlying.sendKeys(receiver)
-      if (complete) {
-        input.underlying.sendKeys(Keys.ARROW_DOWN)
-      }
-      input.underlying.sendKeys(Keys.ENTER)
-    }
+    setDirectoryField(
+      reactTextInput(find(className("transfer-receiver-field")).value),
+      receiver,
+      receiverPartyId.toProtoPrimitive,
+    )
     click on className("transfer-link")
   }
 
