@@ -93,20 +93,37 @@ class SubscriptionInitialPaymentTrigger(
             )
           )
         )
-      transferContext <- scanConnection.getAppTransferContext(store.svcParty)
-      // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
-      entryName = context.payload.name
-      // check whether the entry already exists
-      result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
-        case QueryResult(_, Some(entry)) =>
-          rejectPayment(
-            s"entry already exists and owned by ${entry.payload.user}.",
-            transferContext,
-            domainId,
-          )
-        case QueryResult(off, None) =>
-          // collect the payment and create the entry
-          collectPayment(entryName, off, transferContext, domainId)
+      transferContextE <- scanConnection.getAppTransferContextForRound(
+        store.svcParty,
+        payment.payload.round,
+      )
+      result <- transferContextE match {
+        case Right(transferContext) =>
+          // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
+          val entryName = context.payload.name
+          // check whether the entry already exists
+          store.lookupEntryByNameWithOffset(entryName).flatMap {
+            case QueryResult(_, Some(entry)) =>
+              rejectPayment(
+                s"entry already exists and owned by ${entry.payload.user}.",
+                transferContext,
+                domainId,
+              )
+            case QueryResult(off, None) =>
+              // collect the payment and create the entry
+              collectPayment(entryName, off, transferContext, domainId)
+          }
+
+        case Left(err) =>
+          scanConnection
+            .getAppTransferContext(store.svcParty)
+            .flatMap(
+              rejectPayment(
+                s"Round ${payment.payload.round} is no longer active: $err",
+                _,
+                domainId,
+              )
+            )
       }
     } yield result
   }

@@ -10,11 +10,12 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
+import scala.util.{Success, Try}
 
 class DirectoryTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -33,6 +34,9 @@ class DirectoryTimeBasedIntegrationTest
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         bobValidator.remoteParticipant.dars.upload(directoryDarPath)
       })
+
+  def tryGetEntry(entryName: String)(implicit env: CoinTestConsoleEnvironment) =
+    Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
 
   "Directory service" should {
     "archive expired directory entries also when running on simtime" in { implicit env =>
@@ -80,9 +84,9 @@ class DirectoryTimeBasedIntegrationTest
           aliceWallet.acceptSubscriptionRequest(subReqId)
         }
         val entry = clue("Getting Alice's new entry") {
-          def tryGetEntry() =
-            Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
-          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+          eventually()(
+            tryGetEntry(testEntryName).getOrElse(fail(s"Could not get entry $testEntryName"))
+          )
         }
         clue("Checking payload of new entry") {
           val expectedPayload = new codegen.DirectoryEntry(
@@ -157,5 +161,48 @@ class DirectoryTimeBasedIntegrationTest
       }
     }
 
+    "be able to collect subscription payments across round changes" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      aliceWallet.tap(50.0)
+
+      clue("Request install and wait for provider to auto-accept") {
+        aliceDirectory.requestDirectoryInstall()
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+      }
+
+      val (_, subReqId) = clue("Alice requests a directory entry") {
+        aliceDirectory.requestDirectoryEntry(testEntryName)
+      }
+      directory.stop() // to avoid automation triggering before the round change
+      clue("Alice accepts the subscription") {
+        aliceWallet.acceptSubscriptionRequest(subReqId)
+      }
+
+      advanceRoundsByOneTick
+      directory.startSync()
+      val entry = eventually() {
+        inside(tryGetEntry(testEntryName)) { case Success(e) =>
+          e
+        }
+      }
+      directory.stop() // to avoid automation triggering before the round change
+      // Advance so we’re within the renewalInterval
+      advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
+      eventually() {
+        aliceWallet
+          .listSubscriptions()
+          .headOption
+          .value
+          .state shouldBe a[HttpWalletAppClient.SubscriptionPayment]
+      }
+      advanceRoundsByOneTick
+      directory.startSync()
+      eventually() {
+        inside(tryGetEntry(testEntryName)) { case Success(e) =>
+          e.payload.expiresAt shouldBe entry.payload.expiresAt.plus(90, ChronoUnit.DAYS)
+        }
+      }
+    }
   }
 }

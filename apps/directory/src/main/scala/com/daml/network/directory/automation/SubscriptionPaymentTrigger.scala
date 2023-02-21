@@ -99,30 +99,46 @@ class SubscriptionPaymentTrigger(
             )
           )
         )
-      transferContext <- scanConnection.getAppTransferContext(store.svcParty)
-      // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
-      entryName = directoryEntryContext.payload.name
-      // check whether the entry exists
-      result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
-        case QueryResult(off, Some(entry)) =>
-          // collect the payment and renew the entry
-          collectPayment(entry, off, transferContext, domainId)
-        case QueryResult(_, None) => {
-          if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
-            rejectPayment("entry doesn't exist.", transferContext, domainId)
-          } else {
-            // If the entry doesn't exist, and the payment is now past due, then
-            // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
-            // had a chance to renew it. We reject the payment but only log this at an INFO level
-            // rather than a warning.
-            rejectPayment(
-              "entry has already been expired",
-              transferContext,
-              domainId,
-              logger.info(_),
-            )
+      transferContextE <- scanConnection.getAppTransferContextForRound(
+        store.svcParty,
+        payment.payload.round,
+      )
+      result <- transferContextE match {
+        case Right(transferContext) =>
+          // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
+          val entryName = directoryEntryContext.payload.name
+          // check whether the entry exists
+          store.lookupEntryByNameWithOffset(entryName).flatMap {
+            case QueryResult(off, Some(entry)) =>
+              // collect the payment and renew the entry
+              collectPayment(entry, off, transferContext, domainId)
+            case QueryResult(_, None) => {
+              if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
+                rejectPayment("entry doesn't exist.", transferContext, domainId)
+              } else {
+                // If the entry doesn't exist, and the payment is now past due, then
+                // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
+                // had a chance to renew it. We reject the payment but only log this at an INFO level
+                // rather than a warning.
+                rejectPayment(
+                  "entry has already been expired",
+                  transferContext,
+                  domainId,
+                  logger.info(_),
+                )
+              }
+            }
           }
-        }
+        case Left(err) =>
+          scanConnection
+            .getAppTransferContext(store.svcParty)
+            .flatMap(
+              rejectPayment(
+                s"Round ${payment.payload.round} is no longer active: $err",
+                _,
+                domainId,
+              )
+            )
       }
     } yield result
   }

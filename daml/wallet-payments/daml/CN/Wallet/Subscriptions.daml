@@ -7,6 +7,7 @@ import DA.Optional
 import CN.Wallet.Payment
 import CN.Util.Assert
 import CC.API.V1.Coin
+import CC.API.V1.Round
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,
@@ -114,7 +115,7 @@ template SubscriptionRequest
         assertContextValid subscriptionData
 
         now <- getTime
-        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         subscriptionPayment <- create SubscriptionInitialPayment with ..
 
@@ -138,6 +139,7 @@ template SubscriptionInitialPayment
     payData : SubscriptionPayData
     targetAmount : Decimal -- ^ Exact amount in CC that the receiver will get.
     lockedCoin : ContractId LockedCoin
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
   where
     signatory signatory subscriptionData
     ensure payDataIsValid payData
@@ -206,7 +208,7 @@ template SubscriptionIdleState
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
-        (lockedCoin, senderChange, targetAmount) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         payment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
@@ -244,6 +246,7 @@ template SubscriptionPayment
     thisPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
     targetAmount : Decimal
     lockedCoin : ContractId LockedCoin
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
   where
     signatory signatory subscriptionData
     ensure payDataIsValid payData
@@ -289,7 +292,7 @@ template SubscriptionPayment
 
 lockAndMakeChange
   : PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Party
-  -> Update (ContractId LockedCoin, Optional (ContractId Coin), Decimal)
+  -> Update (ContractId LockedCoin, Optional (ContractId Coin), Decimal, Round)
 lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentAmount; collectionDuration = lockDuration; .. } = payData
@@ -320,7 +323,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedCoin lockedCoin] = result.createdCoins
 
-  pure(lockedCoin, result.senderChangeCoin, targetAmount)
+  pure(lockedCoin, result.senderChangeCoin, targetAmount, result.round)
 
 
 unlockAndTransfer: AppTransferContext -> Subscription -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)
