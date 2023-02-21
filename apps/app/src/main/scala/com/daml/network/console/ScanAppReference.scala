@@ -88,7 +88,10 @@ abstract class ScanAppReference(
     val result = consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetOpenAndIssuingMiningRounds(Map(), Map()))
     }
-    (result._1.values.toSeq, result._2.values.toSeq)
+    (
+      result._1.values.toSeq.sortBy(_.payload.round.number),
+      result._2.values.toSeq.sortBy(_.payload.round.number),
+    )
   }
 
   @Help.Summary("List all issued featured app rights")

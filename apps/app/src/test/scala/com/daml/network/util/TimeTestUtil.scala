@@ -81,10 +81,12 @@ trait TimeTestUtil extends CoinTestCommon {
           val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
             newOpenRounds.map(_.payload.round.number)
 
-          newLowestOpen shouldBe lowestOpen + 1
-          newLowestOpen shouldBe middleOpen
-          newMiddleOpen shouldBe highestOpen
-          newHighestOpen shouldBe highestOpen + 1
+          (
+            newLowestOpen,
+            newLowestOpen,
+            newMiddleOpen,
+            newHighestOpen,
+          ) shouldBe (lowestOpen + 1, middleOpen, highestOpen, highestOpen + 1)
 
           if (previousIssuingRounds.size < 3)
             newIssuingRounds.size shouldBe previousIssuingRounds.size + 1

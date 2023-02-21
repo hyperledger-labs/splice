@@ -107,7 +107,10 @@ final class ScanConnection(
     } yield {
       cachedIssuingRounds.set(issuingRounds)
       cachedOpenRounds.set(openRounds)
-      (openRounds.values.toSeq, issuingRounds.values.toSeq)
+      (
+        openRounds.values.toSeq.sortBy(_.payload.round.number),
+        issuingRounds.values.toSeq.sortBy(_.payload.round.number),
+      )
     }
 
   }

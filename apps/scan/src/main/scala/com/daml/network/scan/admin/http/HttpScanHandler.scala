@@ -52,11 +52,11 @@ class HttpScanHandler(
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
         issuingRoundsResponseMap = selectRoundsToRespondWith(
-          issuingRounds.sortBy(_.payload.round.number),
+          issuingRounds,
           issuingRoundsCachedByClient,
         )
         openRoundsResponseMap = selectRoundsToRespondWith(
-          openRounds.sortBy(_.payload.round.number),
+          openRounds,
           openRoundsCachedByClient,
         )
       } yield {
@@ -125,7 +125,7 @@ class HttpScanHandler(
         acs <- store.defaultAcs
         rounds <- acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
-        val filteredRounds = rounds.sortBy(-_.payload.round.number)
+        val filteredRounds = rounds.sortBy(_.payload.round.number)
         definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toJson))
       }
     }
