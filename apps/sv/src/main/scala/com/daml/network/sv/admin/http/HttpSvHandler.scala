@@ -10,7 +10,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -22,6 +22,7 @@ import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
     ledgerClient: CoinLedgerClient,
+    globalDomain: DomainId,
     svUserName: String,
     svStore: SvSvStore,
     svcStore: SvSvcStore,
@@ -62,7 +63,15 @@ class HttpSvHandler(
       val secret = generateRandomOnboardingSecret()
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
       SvApp
-        .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+        .prepareValidatorOnboarding(
+          secret,
+          expiresIn,
+          svStore,
+          ledgerConnection,
+          globalDomain,
+          clock,
+          logger,
+        )
         .map {
           case Left(reason) =>
             v0.SvResource.PrepareValidatorOnboardingResponseInternalServerError(
@@ -113,7 +122,15 @@ class HttpSvHandler(
         val secret = generateRandomOnboardingSecret()
         val expiresIn = NonNegativeFiniteDuration.ofHours(1)
         SvApp
-          .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+          .prepareValidatorOnboarding(
+            secret,
+            expiresIn,
+            svStore,
+            ledgerConnection,
+            globalDomain,
+            clock,
+            logger,
+          )
           .map {
             case Left(reason) =>
               v0.SvResource.DevNetOnboardValidatorPrepareResponseInternalServerError(
@@ -163,8 +180,7 @@ class HttpSvHandler(
       ],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      domainId <- svcStore.domains.getUniqueDomainId()
-      acs <- svcStore.acs(domainId)
+      acs <- svcStore.acs(globalDomain)
       openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       issuingMiningRounds <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
       coinRules <- svcStore.getCoinRules()
@@ -189,7 +205,7 @@ class HttpSvHandler(
         Seq(svParty),
         Seq(svcParty),
         cmds,
-        domainId,
+        globalDomain,
       )
     } yield ()
 }

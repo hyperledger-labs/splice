@@ -41,7 +41,7 @@ class ExpireIssuingMiningRoundTrigger(
     val round = task.work
     for {
       coinRules <- store.getCoinRules()
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       cmd = coinRules.contractId.exerciseCoinRules_MiningRound_Close(round.contractId)
       cid <- connection
         .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)

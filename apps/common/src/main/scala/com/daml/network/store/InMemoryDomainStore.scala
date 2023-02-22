@@ -40,19 +40,6 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
         )
       )(Future.successful(_))
 
-  override def getUniqueDomainId(): Future[DomainId] = Future {
-    val domains = stateVar.connectedDomains
-    domains.headOption match {
-      case None =>
-        throw new IllegalStateException("Tried to call getUniqueDomainId on empty domain store")
-      case Some((_, domainId)) if (domains.size == 1) => domainId
-      case _ =>
-        throw new IllegalStateException(
-          s"Tried to call getUniqueDomainId but domain store contains more than one domain: ${domains}"
-        )
-    }
-  }
-
   override def signalWhenConnected(alias: DomainAlias): Future[DomainId] =
     updateState[Future[DomainId]](state =>
       state.connectedDomains.get(alias) match {

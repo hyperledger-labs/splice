@@ -15,12 +15,6 @@ abstract class DomainStore extends AutoCloseable {
   def listConnectedDomains(): Future[Map[DomainAlias, DomainId]]
   def getDomainId(alias: DomainAlias): Future[DomainId]
 
-  /** Return the unique domain id in the store.
-    * Fails if there is more than one domain.
-    * TODO(#2698) Remove all usages of this
-    */
-  def getUniqueDomainId(): Future[DomainId]
-
   def signalWhenConnected(alias: DomainAlias): Future[DomainId]
 
   /** Stream all domain connection events, starts with

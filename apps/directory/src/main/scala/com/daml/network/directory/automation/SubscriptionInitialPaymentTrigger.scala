@@ -82,7 +82,7 @@ class SubscriptionInitialPaymentTrigger(
       } yield TaskSuccess("created directory entry.")
     }
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- getDomainId()
       acs <- store.acs(domainId)
       context <- acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)

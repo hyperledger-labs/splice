@@ -53,7 +53,7 @@ class AdvanceOpenMiningRoundTrigger(
       .asScala
       .toSeq
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       tx <- connection
         .submitCommandsNoDedupTransaction(Seq(store.svcParty), Seq(), cmds, domainId)
       acs <- store.acs(domainId)

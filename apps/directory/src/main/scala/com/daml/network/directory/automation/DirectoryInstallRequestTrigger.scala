@@ -54,7 +54,7 @@ class DirectoryInstallRequestTrigger(
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- getDomainId()
       queryResult <- store.lookupInstallByUserWithOffset(user)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>

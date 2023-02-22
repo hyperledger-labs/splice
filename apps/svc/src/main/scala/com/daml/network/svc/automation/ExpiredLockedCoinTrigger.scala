@@ -33,7 +33,7 @@ class ExpiredLockedCoinTrigger(
         cc.coin.LockedCoin,
       ]]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    domainId <- store.domains.getUniqueDomainId()
+    domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
     coinRules <- store.getCoinRules()
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     cmd = co.work.contractId

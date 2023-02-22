@@ -41,7 +41,7 @@ class ExpiredDirectoryEntryTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
       co.work.contractId.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
-    store.domains.getUniqueDomainId().flatMap { domainId =>
+    store.domains.signalWhenConnected(store.defaultAcsDomain).flatMap { domainId =>
       connection
         .submitCommandsNoDedup(
           actAs = Seq(store.providerParty),

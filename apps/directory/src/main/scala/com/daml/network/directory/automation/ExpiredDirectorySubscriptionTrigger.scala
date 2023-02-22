@@ -34,7 +34,7 @@ class ExpiredDirectorySubscriptionTrigger(
     val cmd = task.work.state.contractId.exerciseSubscriptionIdleState_ExpireSubscription(
       store.providerParty.toProtoPrimitive
     )
-    store.domains.getUniqueDomainId().flatMap { domainId =>
+    store.domains.signalWhenConnected(store.defaultAcsDomain).flatMap { domainId =>
       connection
         .submitCommandsNoDedup(
           actAs = Seq(store.providerParty),

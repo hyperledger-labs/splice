@@ -88,7 +88,7 @@ class SubscriptionPaymentTrigger(
       } yield TaskSuccess("renewed directory entry.")
     }
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- getDomainId()
       acs <- store.acs(domainId)
       directoryEntryContext <- acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)

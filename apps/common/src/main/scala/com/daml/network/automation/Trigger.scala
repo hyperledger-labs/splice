@@ -275,7 +275,7 @@ object OnCreateTrigger {
   */
 abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
     store: CoinAppStore[_, _],
-    getDomainId: () => Future[DomainId],
+    protected val getDomainId: () => Future[DomainId],
     companion: C,
 )(implicit
     ec: ExecutionContext,

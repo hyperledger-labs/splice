@@ -35,7 +35,7 @@ class SummarizingMiningRoundTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       rewards <- queryRewards(summarizingRound.payload.round.number)
       coinRules <- store.getCoinRules()
       cmd = coinRules.contractId

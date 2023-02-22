@@ -21,7 +21,7 @@ import com.daml.network.svc.v0.{
 import com.daml.network.svc.v0
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
@@ -33,6 +33,7 @@ class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
     svcUserName: String,
     store: SvcStore,
+    globalDomain: DomainId,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -45,12 +46,11 @@ class GrpcSvcAppService(
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      for {
-        // TODO (#2705) Set domain id from config here.
-        domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      } yield v0.GetDebugInfoResponse(
-        svcUser = svcUserName,
-        svcPartyId = Proto.encode(store.svcParty),
+      Future.successful(
+        v0.GetDebugInfoResponse(
+          svcUser = svcUserName,
+          svcPartyId = Proto.encode(store.svcParty),
+        )
       )
     }
 
@@ -63,7 +63,6 @@ class GrpcSvcAppService(
       val svcParty = store.svcParty
       val providerParty = PartyId.tryFromProtoPrimitive(request.appProvider)
       for {
-        domainId <- store.domains.getUniqueDomainId()
         result <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
           case QueryResult(off, None) =>
             connection.submitWithResult(
@@ -78,7 +77,7 @@ class GrpcSvcAppService(
                 Seq(svcParty, providerParty),
               ),
               deduplicationConfig = DedupOffset(off),
-              domainId = domainId,
+              domainId = globalDomain,
             )
           case QueryResult(_, Some(_)) =>
             logger.info("Rejecting duplicate featured app requests")
@@ -96,7 +95,6 @@ class GrpcSvcAppService(
   override def withdrawFeaturedAppRight(request: WithdrawFeaturedAppRightRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        domainId <- store.domains.getUniqueDomainId()
         _ <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
           case QueryResult(_, None) =>
             throw new StatusRuntimeException(
@@ -109,7 +107,7 @@ class GrpcSvcAppService(
               actAs = Seq(store.svcParty),
               readAs = Seq.empty,
               update = c.contractId.exerciseFeaturedAppRight_Withdraw(request.reason),
-              domainId = domainId,
+              domainId = globalDomain,
             )
         }
       } yield Empty()
@@ -120,7 +118,6 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       logger.info(s"Party ${request.svParty} wants to join the SV consortium")
       for {
-        domainId <- store.domains.getUniqueDomainId()
         _ <- store.lookupSvcRules().flatMap {
           case None => {
             logger.info("SvcRules doesn't exist yet, waiting for the founding SV app to create it")
@@ -141,7 +138,7 @@ class GrpcSvcAppService(
                 readAs = Seq.empty,
                 update =
                   svcRules.contractId.exerciseSvcRules_AddMember(request.svParty, "mock bootstrap"),
-                domainId = domainId,
+                domainId = globalDomain,
               )
             }
         },
@@ -151,7 +148,6 @@ class GrpcSvcAppService(
   override def setConfigSchedule(request: SetConfigScheduleRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        domainId <- store.domains.getUniqueDomainId()
         coinRuleOpt <- store.lookupCoinRules()
         _ <- (request.schedule, coinRuleOpt) match {
           case (None, _) =>
@@ -175,7 +171,7 @@ class GrpcSvcAppService(
               readAs = Seq.empty,
               update = coinRules.contractId
                 .exerciseCoinRules_SetConfigSchedule(schedule),
-              domainId = domainId,
+              domainId = globalDomain,
             )
         }
       } yield Empty()

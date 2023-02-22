@@ -81,7 +81,13 @@ class SvcApp(
       adminServerRegistry
         .addService(
           SvcServiceGrpc.bindService(
-            new GrpcSvcAppService(ledgerClient, config.ledgerApiUser, store, loggerFactory),
+            new GrpcSvcAppService(
+              ledgerClient,
+              config.ledgerApiUser,
+              store,
+              domainId,
+              loggerFactory,
+            ),
             ec,
           )
         )

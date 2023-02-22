@@ -80,11 +80,11 @@ class SvApp(
         timeouts,
       )
       _ <- waitForDomainConnection(svStore.domains, config.domains.global)
-      _ <- waitForDomainConnection(svcStore.domains, config.domains.global)
+      globalDomain <- waitForDomainConnection(svcStore.domains, config.domains.global)
       ledgerConnection = ledgerClient.connection()
       _ <-
         if (config.foundConsortium) {
-          foundConsortium(svcStore, ledgerConnection, retryProvider, this)
+          foundConsortium(svcStore, ledgerConnection, globalDomain, retryProvider, this)
         } else {
           retryProvider.retryForAutomation(
             "join existing SV consortium",
@@ -92,7 +92,7 @@ class SvApp(
             this,
           )
         }
-      _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, clock)
+      _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
       isDevNet <- retryProvider.retryForAutomation(
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
@@ -103,6 +103,7 @@ class SvApp(
         SvResource.routes(
           new HttpSvHandler(
             ledgerClient,
+            globalDomain,
             config.ledgerApiUser,
             svStore,
             svcStore,
@@ -162,15 +163,15 @@ class SvApp(
   private def foundConsortium(
       svcStore: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
       retryProvider: CoinRetries,
       flagCloseable: FlagCloseable,
   ): Future[Unit] = {
     for {
-      domainId <- svcStore.domains.getUniqueDomainId()
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomation(
         "boostrapping SVC",
-        bootstrapSvc(svcStore, ledgerConnection, domainId),
+        bootstrapSvc(svcStore, ledgerConnection, globalDomain),
         flagCloseable,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
@@ -283,6 +284,7 @@ class SvApp(
   private def expectConfiguredValidatorOnboardings(
       svStore: SvSvStore,
       ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
       clock: Clock,
   ): Future[List[Unit]] = {
     if (config.expectedOnboardings.map(_.secret).toSet.size != config.expectedOnboardings.size) {
@@ -290,7 +292,14 @@ class SvApp(
     }
     Future.sequence(
       config.expectedOnboardings.map(c =>
-        expectValidatorOnboarding(c.secret, c.expiresIn, svStore, ledgerConnection, clock)
+        expectValidatorOnboarding(
+          c.secret,
+          c.expiresIn,
+          svStore,
+          ledgerConnection,
+          globalDomain,
+          clock,
+        )
       )
     )
   }
@@ -300,11 +309,20 @@ class SvApp(
       expiresIn: NonNegativeFiniteDuration,
       svStore: SvSvStore,
       ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
       clock: Clock,
   ): Future[Unit] = {
     logger.info("Ensuring that a validator lifecycle contract exists for preconfigured secret")
     SvApp
-      .prepareValidatorOnboarding(secret, expiresIn, svStore, ledgerConnection, clock, logger)
+      .prepareValidatorOnboarding(
+        secret,
+        expiresIn,
+        svStore,
+        ledgerConnection,
+        globalDomain,
+        clock,
+        logger,
+      )
       .map {
         case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
         case Right(()) => ()
@@ -346,6 +364,7 @@ object SvApp {
       expiresIn: NonNegativeFiniteDuration,
       svStore: SvSvStore,
       ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
       clock: Clock,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -356,7 +375,6 @@ object SvApp {
       (clock.now + expiresIn).toInstant,
     ).create.commands.asScala.toSeq
     for {
-      domainId <- svStore.domains.getUniqueDomainId()
       res <- svStore.lookupUsedSecret(secret).flatMap {
         case QueryResult(_, Some(usedSecret)) => {
           val validator = usedSecret.payload.validator
@@ -384,7 +402,7 @@ object SvApp {
                       secret, // not a leak as this gets hashed before it's used
                     ),
                   deduplicationOffset = off,
-                  domainId = domainId,
+                  domainId = globalDomain,
                 )
                 .map(_ => {
                   logger.info("Created new ValidatorOnboarding contract.")

@@ -27,7 +27,7 @@ class ArchiveClosedMiningRoundsTrigger(
       coinRules: Contract[CoinRules.ContractId, CoinRules],
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       appRewardCoupons <- store.listAppRewardCoupons(closedRound.payload.round.number, Some(1))
       validatorRewardCoupons <- store
         .listValidatorRewardCoupons(closedRound.payload.round.number, Some(1))

@@ -55,7 +55,7 @@ class CoinRulesRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
-      domainId <- store.domains.getUniqueDomainId()
+      domainId <- getDomainId()
       acs <- store.acs(domainId)
       openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       issuingMiningRounds <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
