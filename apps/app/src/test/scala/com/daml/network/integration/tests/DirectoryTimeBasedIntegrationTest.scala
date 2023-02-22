@@ -188,7 +188,7 @@ class DirectoryTimeBasedIntegrationTest
       }
       directory.stop() // to avoid automation triggering before the round change
       // Advance so we’re within the renewalInterval
-      advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
+      advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
       eventually() {
         aliceWallet
           .listSubscriptions()
