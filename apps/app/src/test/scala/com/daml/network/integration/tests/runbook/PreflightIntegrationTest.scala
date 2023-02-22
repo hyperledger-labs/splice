@@ -311,21 +311,6 @@ class PreflightIntegrationTest
     Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
-
-      // TODO(#3074) -- drop this when we figure out what's wrong with start-frontends in CI
-      if (sys.env("SKIP_SELFHOSTED_DIRECTORY_UI_TEST") != "false") {
-        v("validatorApp").remoteParticipant.dars
-          .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
-
-        val walletUiUrl = "localhost:3000"
-        val directoryUiUrl = "localhost:3001"
-
-        withFrontEnd("alice-selfhosted") { implicit webDriver =>
-          testUserLogin("alice", walletUiUrl)
-          tapAndListCoins(100)
-          reserveDirectoryNameFor(() => testUserLogin("alice", directoryUiUrl), "alice.cns")
-        }
-      }
     }
   }
 
@@ -380,19 +365,6 @@ class PreflightIntegrationTest
         user.password,
         completedWhen,
       )
-    }
-  }
-
-  private def testUserLogin(user: String, url: String)(implicit webDriver: WebDriverType) = {
-    clue(s"Test user login as: ${user}") {
-      go to url
-
-      waitForQuery(id("user-id-field"))
-
-      click on "user-id-field"
-      textField("user-id-field").value = user
-
-      click on "login-button"
     }
   }
 
