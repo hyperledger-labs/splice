@@ -222,4 +222,20 @@ object CoinTests {
     implicit def javaToScalaContractId[T](cid: ContractId[T]): LfContractId =
       LfContractId.assertFromString(cid.contractId)
   }
+
+  object BracketSynchronous {
+
+    /** Start a synchronous ad-hoc bracket that puts the cleanup immediately
+      * after the creation.  Sort of like try/finally but written backwards.
+      *
+      * {{{
+      *  bracket(doSetup(), doCleanupFromSetup()) {
+      *    doOtherThings
+      *  }
+      * }}}
+      */
+    def bracket[T](acquire: Any, release: => Any)(body: => T): T =
+      try body
+      finally release
+  }
 }

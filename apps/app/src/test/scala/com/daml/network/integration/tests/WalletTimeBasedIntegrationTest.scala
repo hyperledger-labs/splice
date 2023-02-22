@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
+import CoinTests.BracketSynchronous.*
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -178,31 +179,32 @@ class WalletTimeBasedIntegrationTest
           advanceTime(Duration.ofDays(10))
         }
       }
-      clue("Stopping directory backend so that payments aren't collected.") {
-        directory.stop()
-      }
-      actAndCheck(
-        "Wait for the time for a payment on the first subscription to arrive",
-        advanceTime(Duration.ofDays(60)),
-      )(
-        "2 idle subscriptions and 1 payment are listed",
-        _ => {
-          val subs = aliceWallet.listSubscriptions()
-          subs should have length 3
-          subs
-            .collect(_.state match {
-              case s: HttpWalletAppClient.SubscriptionIdleState => s
-            }) should have length 2
-          subs
-            .collect(_.state match {
-              case s: HttpWalletAppClient.SubscriptionPayment => s
-            }) should have length 1
+      bracket(
+        clue("Stopping directory backend so that payments aren't collected.") {
+          directory.stop()
         },
-      )
-
-      // TODO(tech-debt): find a better way to guarantee this happens even if the test fails
-      clue("Starting directory backend again so other tests can use it") {
-        directory.startSync()
+        clue("Starting directory backend again so other tests can use it") {
+          directory.startSync()
+        },
+      ) {
+        actAndCheck(
+          "Wait for the time for a payment on the first subscription to arrive",
+          advanceTime(Duration.ofDays(60)),
+        )(
+          "2 idle subscriptions and 1 payment are listed",
+          _ => {
+            val subs = aliceWallet.listSubscriptions()
+            subs should have length 3
+            subs
+              .collect(_.state match {
+                case s: HttpWalletAppClient.SubscriptionIdleState => s
+              }) should have length 2
+            subs
+              .collect(_.state match {
+                case s: HttpWalletAppClient.SubscriptionPayment => s
+              }) should have length 1
+          },
+        )
       }
     }
 

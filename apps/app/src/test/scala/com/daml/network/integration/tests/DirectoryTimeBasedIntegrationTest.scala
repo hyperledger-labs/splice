@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import CoinTests.BracketSynchronous.*
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -174,30 +175,32 @@ class DirectoryTimeBasedIntegrationTest
       val (_, subReqId) = clue("Alice requests a directory entry") {
         aliceDirectory.requestDirectoryEntry(testEntryName)
       }
-      directory.stop() // to avoid automation triggering before the round change
-      clue("Alice accepts the subscription") {
-        aliceWallet.acceptSubscriptionRequest(subReqId)
-      }
+      // to avoid automation triggering before the round change
+      bracket(directory.stop(), directory.startSync()) {
+        clue("Alice accepts the subscription") {
+          aliceWallet.acceptSubscriptionRequest(subReqId)
+        }
 
-      advanceRoundsByOneTick
-      directory.startSync()
+        advanceRoundsByOneTick
+      }
       val entry = eventually() {
         inside(tryGetEntry(testEntryName)) { case Success(e) =>
           e
         }
       }
-      directory.stop() // to avoid automation triggering before the round change
-      // Advance so we’re within the renewalInterval
-      advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
-      eventually() {
-        aliceWallet
-          .listSubscriptions()
-          .headOption
-          .value
-          .state shouldBe a[HttpWalletAppClient.SubscriptionPayment]
+      // to avoid automation triggering before the round change
+      bracket(directory.stop(), directory.startSync()) {
+        // Advance so we’re within the renewalInterval
+        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
+        eventually() {
+          aliceWallet
+            .listSubscriptions()
+            .headOption
+            .value
+            .state shouldBe a[HttpWalletAppClient.SubscriptionPayment]
+        }
+        advanceRoundsByOneTick
       }
-      advanceRoundsByOneTick
-      directory.startSync()
       eventually() {
         inside(tryGetEntry(testEntryName)) { case Success(e) =>
           e.payload.expiresAt shouldBe entry.payload.expiresAt.plus(90, ChronoUnit.DAYS)
