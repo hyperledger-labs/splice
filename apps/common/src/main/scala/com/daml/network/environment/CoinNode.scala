@@ -27,7 +27,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{DomainId, PartyId, UniqueIdentifier}
-import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -111,7 +111,8 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         response
       }
     }
-  def requestLogger: Directive0 = HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
+  def requestLogger(implicit traceContext: TraceContext): Directive0 =
+    HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
 
   def isActive: Boolean = {
     // initialized and the state reports itself as healthy

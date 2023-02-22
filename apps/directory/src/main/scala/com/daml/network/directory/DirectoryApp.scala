@@ -9,6 +9,7 @@ import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatch
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
@@ -117,13 +118,15 @@ class DirectoryApp(
         )
         .withAllowedHeaders(HttpHeaderRange.`*`)
       routes = cors() {
-        requestLogger {
-          DirectoryResource.routes(
-            new HttpDirectoryHandler(
-              store,
-              loggerFactory,
+        newTraceContext { traceContext =>
+          requestLogger(traceContext) {
+            DirectoryResource.routes(
+              new HttpDirectoryHandler(
+                store,
+                loggerFactory,
+              )
             )
-          )
+          }
         }
       }
       httpConfig = config.adminApi.clientConfig.copy(

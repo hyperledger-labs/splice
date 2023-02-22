@@ -1,10 +1,9 @@
 package com.daml.network.admin.api
 
-import akka.http.scaladsl.server.AuthorizationFailedRejection
+import akka.http.scaladsl.server.{AuthorizationFailedRejection, Directive0, RequestContext}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
 import akka.http.scaladsl.server.Directives.*
 import akka.http.scaladsl.server.RouteResult.{Complete, Rejected}
-import akka.http.scaladsl.server.{Directive0, RequestContext}
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -17,7 +16,7 @@ object HttpRequestLogger {
       maxStringLength: Int,
       maxMetadataSize: Int,
       loggerFactory: NamedLoggerFactory,
-  ): Directive0 = {
+  )(implicit traceContext: TraceContext): Directive0 = {
     new HttpRequestLogger(
       messagePayloads.getOrElse(false),
       maxPathLength,
@@ -31,7 +30,7 @@ object HttpRequestLogger {
   def apply(
       loggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
-  ): Directive0 = apply(
+  )(implicit traceContext: TraceContext): Directive0 = apply(
     messagePayloads = loggingConfig.messagePayloads,
     maxPathLength = loggingConfig.maxMethodLength,
     maxStringLength = loggingConfig.maxStringLength,
@@ -55,59 +54,56 @@ final class HttpRequestLogger(
     s"HTTP ${ctx.request.method.name} ${pathLimited} from (${remoteAddress}): ${message}"
   }
 
-  private def directive: Directive0 = {
-
+  private def directive(implicit traceContext: TraceContext): Directive0 = {
     extractClientIP.flatMap { remoteAddress =>
       extractRequestContext.flatMap { ctx =>
-        TraceContext.withNewTraceContext { implicit traceContext =>
-          val msg = createLogMessage(ctx, remoteAddress)
-          logger.debug(msg("received request."))
+        val msg = createLogMessage(ctx, remoteAddress)
+        logger.debug(msg("received request."))
 
-          if (messagePayloads) {
-            ctx.request.entity match {
-              // Only logging strict messages which are already in memory, not attempting to log streams
-              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                logger.debug(
-                  msg(s"Received entity data: ${data.utf8String.limit(maxStringLength)}")
-                )
-              case _ => logger.debug(msg(s"omitting logging of request entity data."))
-            }
+        if (messagePayloads) {
+          ctx.request.entity match {
+            // Only logging strict messages which are already in memory, not attempting to log streams
+            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+              logger.debug(
+                msg(s"Received entity data: ${data.utf8String.limit(maxStringLength)}")
+              )
+            case _ => logger.debug(msg(s"omitting logging of request entity data."))
           }
-          ctx.request.uri.rawQueryString.foreach { _ =>
-            logger.debug(msg(s"query string: ${ctx.request.uri.queryString()}"))
-          }
-          logger.trace(msg(s"headers: ${ctx.request.headers.toString.limit(maxMetadataSize)}"))
-          mapRouteResult { result =>
-            result match {
-              case Complete(response) =>
-                logger.debug(msg(s"Responding with status code: ${response.status}"))
-                if (messagePayloads) {
-                  response.entity match {
-                    // Only logging strict messages which are already in memory, not attempting to log streams
-                    case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                      logger.debug(
-                        msg(
-                          s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
-                        )
+        }
+        ctx.request.uri.rawQueryString.foreach { _ =>
+          logger.debug(msg(s"query string: ${ctx.request.uri.queryString()}"))
+        }
+        logger.trace(msg(s"headers: ${ctx.request.headers.toString.limit(maxMetadataSize)}"))
+        mapRouteResult { result =>
+          result match {
+            case Complete(response) =>
+              logger.debug(msg(s"Responding with status code: ${response.status}"))
+              if (messagePayloads) {
+                response.entity match {
+                  // Only logging strict messages which are already in memory, not attempting to log streams
+                  case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+                    logger.debug(
+                      msg(
+                        s"Responding with entity data: ${data.utf8String.limit(maxStringLength)}"
                       )
-                    case _ => logger.debug(msg(s"omitting logging of response entity data."))
-                  }
+                    )
+                  case _ => logger.debug(msg(s"omitting logging of response entity data."))
                 }
-                logger.trace(
-                  msg(
-                    s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
-                  )
+              }
+              logger.trace(
+                msg(
+                  s"Responding with headers: ${response.headers.toString.limit(maxMetadataSize)}"
                 )
+              )
 
-              case Rejected(rejections) =>
-                if (rejections.contains(AuthorizationFailedRejection)) {
-                  logger.debug(msg("Rejected: Unauthorized."))
-                } else {
-                  logger.debug(msg(s"""Rejected: ${rejections.mkString(",")}"""))
-                }
-            }
-            result
+            case Rejected(rejections) =>
+              if (rejections.contains(AuthorizationFailedRejection)) {
+                logger.debug(msg("Rejected: Unauthorized."))
+              } else {
+                logger.debug(msg(s"""Rejected: ${rejections.mkString(",")}"""))
+              }
           }
+          result
         }
       }
     }

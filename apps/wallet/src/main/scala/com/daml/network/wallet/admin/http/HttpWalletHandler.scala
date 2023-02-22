@@ -73,7 +73,7 @@ class HttpWalletHandler(
   override def list(respond: r0.ListResponse.type)()(
       user: String
   ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
-    def _list: Future[r0.ListResponse] = for {
+    for {
       userStore <- getUserStore(user)
       now = clock.now
       currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
@@ -88,81 +88,60 @@ class HttpWalletHandler(
         lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)).toVector,
       )
     )
-    handleErrors(_list, r0.ListResponseInternalServerError, r0.ListResponseNotFound)
   }
 
   override def listAcceptedAppPayments(
       respond: v0.WalletResource.ListAcceptedAppPaymentsResponse.type
   )()(user: String): Future[v0.WalletResource.ListAcceptedAppPaymentsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          walletCodegen.AcceptedAppPayment.COMPANION,
-          user,
-          d0.ListAcceptedAppPaymentsResponse(_),
-        ),
-        r0.ListAcceptedAppPaymentsResponseInternalServerError,
-        r0.ListAcceptedAppPaymentsResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        walletCodegen.AcceptedAppPayment.COMPANION,
+        user,
+        d0.ListAcceptedAppPaymentsResponse(_),
       )
     }
 
   override def listAcceptedTransferOffers(
       respond: v0.WalletResource.ListAcceptedTransferOffersResponse.type
   )()(user: String): Future[v0.WalletResource.ListAcceptedTransferOffersResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          transferOffersCodegen.AcceptedTransferOffer.COMPANION,
-          user,
-          d0.ListAcceptedTransferOffersResponse(_),
-        ),
-        r0.ListAcceptedTransferOffersResponseInternalServerError,
-        r0.ListAcceptedTransferOffersResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+        user,
+        d0.ListAcceptedTransferOffersResponse(_),
       )
     }
 
   override def listAppPaymentRequests(
       respond: v0.WalletResource.ListAppPaymentRequestsResponse.type
   )()(user: String): Future[v0.WalletResource.ListAppPaymentRequestsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          walletCodegen.AppPaymentRequest.COMPANION,
-          user,
-          d0.ListAppPaymentRequestsResponse(_),
-        ),
-        r0.ListAppPaymentRequestsResponseInternalServerError,
-        r0.ListAppPaymentRequestsResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        walletCodegen.AppPaymentRequest.COMPANION,
+        user,
+        d0.ListAppPaymentRequestsResponse(_),
       )
     }
 
   override def listAppRewardCoupons(respond: v0.WalletResource.ListAppRewardCouponsResponse.type)()(
       user: String
   ): Future[v0.WalletResource.ListAppRewardCouponsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          coinCodegen.AppRewardCoupon.COMPANION,
-          user,
-          d0.ListAppRewardCouponsResponse(_),
-        ),
-        r0.ListAppRewardCouponsResponseInternalServerError,
-        r0.ListAppRewardCouponsResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        coinCodegen.AppRewardCoupon.COMPANION,
+        user,
+        d0.ListAppRewardCouponsResponse(_),
       )
     }
 
   override def listSubscriptionInitialPayments(
       respond: v0.WalletResource.ListSubscriptionInitialPaymentsResponse.type
   )()(user: String): Future[v0.WalletResource.ListSubscriptionInitialPaymentsResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          subsCodegen.SubscriptionInitialPayment.COMPANION,
-          user,
-          d0.ListSubscriptionInitialPaymentsResponse(_),
-        ),
-        r0.ListSubscriptionInitialPaymentsResponseInternalServerError,
-        r0.ListSubscriptionInitialPaymentsResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        subsCodegen.SubscriptionInitialPayment.COMPANION,
+        user,
+        d0.ListSubscriptionInitialPaymentsResponse(_),
       )
     }
   }
@@ -170,15 +149,11 @@ class HttpWalletHandler(
   override def listSubscriptionRequests(
       respond: v0.WalletResource.ListSubscriptionRequestsResponse.type
   )()(user: String): Future[v0.WalletResource.ListSubscriptionRequestsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          subsCodegen.SubscriptionRequest.COMPANION,
-          user,
-          d0.ListSubscriptionRequestsResponse(_),
-        ),
-        r0.ListSubscriptionRequestsResponseInternalServerError,
-        r0.ListSubscriptionRequestsResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        subsCodegen.SubscriptionRequest.COMPANION,
+        user,
+        d0.ListSubscriptionRequestsResponse(_),
       )
     }
 
@@ -186,7 +161,7 @@ class HttpWalletHandler(
       user: String
   ): Future[v0.WalletResource.ListSubscriptionsResponse] = withNewTrace(workflowId) {
     implicit traceContext => span =>
-      def _listSubscriptions: Future[v0.WalletResource.ListSubscriptionsResponse] = for {
+      for {
         userStore <- getUserStore(user)
         acs <- userStore.defaultAcs
         subscriptions <- acs.listContracts(subsCodegen.Subscription.COMPANION)
@@ -215,25 +190,16 @@ class HttpWalletHandler(
           )
         )
       }
-      handleErrors(
-        _listSubscriptions,
-        r0.ListSubscriptionsResponseInternalServerError,
-        r0.ListSubscriptionsResponseNotFound,
-      )
   }
 
   override def listTransferOffers(respond: v0.WalletResource.ListTransferOffersResponse.type)()(
       user: String
   ): Future[v0.WalletResource.ListTransferOffersResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        listContracts(
-          transferOffersCodegen.TransferOffer.COMPANION,
-          user,
-          d0.ListTransferOffersResponse(_),
-        ),
-        r0.ListTransferOffersResponseInternalServerError,
-        r0.ListTransferOffersResponseNotFound,
+    withNewTrace(workflowId) { _ => _ =>
+      listContracts(
+        transferOffersCodegen.TransferOffer.COMPANION,
+        user,
+        d0.ListTransferOffersResponse(_),
       )
     }
   }
@@ -242,19 +208,15 @@ class HttpWalletHandler(
       respond: v0.WalletResource.ListValidatorRewardCouponsResponse.type
   )()(user: String): Future[v0.WalletResource.ListValidatorRewardCouponsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        for {
-          userStore <- getUserStore(user)
-          validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
-            userStore,
-            None,
-            None,
-          )
-        } yield d0.ListValidatorRewardCouponsResponse(
-          validatorRewardCoupons.map(_.toJson).toVector
-        ),
-        r0.ListValidatorRewardCouponsResponseInternalServerError,
-        r0.ListValidatorRewardCouponsResponseNotFound,
+      for {
+        userStore <- getUserStore(user)
+        validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
+          userStore,
+          None,
+          None,
+        )
+      } yield d0.ListValidatorRewardCouponsResponse(
+        validatorRewardCoupons.map(_.toJson).toVector
       )
     }
 
@@ -264,18 +226,14 @@ class HttpWalletHandler(
       request: d0.ListTransactionsRequest
   )(user: String): Future[r0.ListTransactionsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        for {
-          userStore <- getUserStore(user)
-          beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
-          transactions <- userStore.listTransactions(beginAfterId, request.pageSize.toInt)
-        } yield v0.WalletResource.ListTransactionsResponse.OK(
-          d0.ListTransactionsResponse(
-            items = transactions.map(_.toJson).toVector
-          )
-        ),
-        r0.ListTransactionsResponseInternalServerError,
-        r0.ListTransactionsResponseNotFound,
+      for {
+        userStore <- getUserStore(user)
+        beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
+        transactions <- userStore.listTransactions(beginAfterId, request.pageSize.toInt)
+      } yield v0.WalletResource.ListTransactionsResponse.OK(
+        d0.ListTransactionsResponse(
+          items = transactions.map(_.toJson).toVector
+        )
       )
     }
 
@@ -298,41 +256,33 @@ class HttpWalletHandler(
       user: String
   ): Future[r0.SelfGrantFeatureAppRightResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        for {
-          coinRules <- scanConnection.getCoinRules()
-          result <- exerciseWalletAction((installCid, _) =>
-            Future.successful(
-              installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
-            )
-          )(user, _.exerciseResult, dislosedContracts = Seq(coinRules.toDisclosedContract))
-        } yield d0.SelfGrantFeaturedAppRightResponse(Proto.encodeContractId(result)),
-        r0.SelfGrantFeatureAppRightResponseInternalServerError,
-        r0.SelfGrantFeatureAppRightResponseNotFound,
-      )
+      for {
+        coinRules <- scanConnection.getCoinRules()
+        result <- exerciseWalletAction((installCid, _) =>
+          Future.successful(
+            installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
+          )
+        )(user, _.exerciseResult, dislosedContracts = Seq(coinRules.toDisclosedContract))
+      } yield d0.SelfGrantFeaturedAppRightResponse(Proto.encodeContractId(result))
     }
 
   override def acceptTransferOffer(respond: r0.AcceptTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.AcceptTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        exerciseWalletAction((installCid, _) => {
-          val requestCid =
-            Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-              contractId
-            )
-          Future.successful(
-            installCid.exerciseWalletAppInstall_TransferOffer_Accept(
-              requestCid
-            )
+      exerciseWalletAction((installCid, _) => {
+        val requestCid =
+          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+            contractId
           )
-        })(
-          user,
-          cid => d0.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
-        ),
-        r0.AcceptTransferOfferResponseInternalServerError,
-        r0.AcceptTransferOfferResponseNotFound,
+        Future.successful(
+          installCid.exerciseWalletAppInstall_TransferOffer_Accept(
+            requestCid
+          )
+        )
+      })(
+        user,
+        cid => d0.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
       )
     }
 
@@ -340,23 +290,19 @@ class HttpWalletHandler(
       contractId: String
   )(user: String): Future[r0.RejectTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
-          val requestCid =
-            Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-              contractId
-            )
-          Future.successful(
-            installCid.exerciseWalletAppInstall_TransferOffer_Reject(
-              requestCid
-            )
+      exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
+        val requestCid =
+          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+            contractId
           )
-        })(
-          user,
-          _ => r0.RejectTransferOfferResponseOK,
-        ),
-        r0.RejectTransferOfferResponseInternalServerError,
-        r0.RejectTransferOfferResponseNotFound,
+        Future.successful(
+          installCid.exerciseWalletAppInstall_TransferOffer_Reject(
+            requestCid
+          )
+        )
+      })(
+        user,
+        _ => r0.RejectTransferOfferResponseOK,
       )
     }
 
@@ -364,25 +310,19 @@ class HttpWalletHandler(
       contractId: String
   )(user: String): Future[r0.WithdrawTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]](
-          (installCid, _) => {
-            val requestCid =
-              Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-                contractId
-              )
-            Future.successful(
-              installCid.exerciseWalletAppInstall_TransferOffer_Withdraw(
-                requestCid
-              )
-            )
-          }
-        )(
-          user,
-          _ => r0.WithdrawTransferOfferResponseOK,
-        ),
-        r0.WithdrawTransferOfferResponseInternalServerError,
-        r0.WithdrawTransferOfferResponseNotFound,
+      exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
+        val requestCid =
+          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+            contractId
+          )
+        Future.successful(
+          installCid.exerciseWalletAppInstall_TransferOffer_Withdraw(
+            requestCid
+          )
+        )
+      })(
+        user,
+        _ => r0.WithdrawTransferOfferResponseOK,
       )
     }
 
@@ -393,23 +333,15 @@ class HttpWalletHandler(
       val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
       )
-      handleErrors(
-        exerciseWalletCoinAction(
-          new coinoperation.CO_AppPayment(requestCid),
-          user,
-          (outcome: COO_AcceptedAppPayment) =>
-            r0.AcceptAppPaymentRequestResponse.OK(
-              d0.AcceptAppPaymentRequestResponse(
-                Proto.encodeContractId(outcome.contractIdValue)
-              )
-            ),
-        ),
-        r0.AcceptAppPaymentRequestResponseInternalServerError,
-        notFound = r0.AcceptAppPaymentRequestResponseNotFound,
-        aborted = Some(r0.AcceptAppPaymentRequestResponseTooManyRequests),
-        unavailable = Some(r0.AcceptAppPaymentRequestResponseServiceUnavailable),
-        internal = Some(r0.AcceptAppPaymentRequestResponseInternalServerError),
-        failedPrecondition = Some(r0.AcceptAppPaymentRequestResponseBadRequest),
+      exerciseWalletCoinAction(
+        new coinoperation.CO_AppPayment(requestCid),
+        user,
+        (outcome: COO_AcceptedAppPayment) =>
+          r0.AcceptAppPaymentRequestResponse.OK(
+            d0.AcceptAppPaymentRequestResponse(
+              Proto.encodeContractId(outcome.contractIdValue)
+            )
+          ),
       )
     }
 
@@ -417,23 +349,16 @@ class HttpWalletHandler(
       respond: r0.RejectAppPaymentRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectAppPaymentRequestResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      val exercise: Future[r0.RejectAppPaymentRequestResponse] =
-        exerciseWalletAction((installCid, _) => {
-          val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
-            contractId
+      exerciseWalletAction((installCid, _) => {
+        val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
+          contractId
+        )
+        Future.successful(
+          installCid.exerciseWalletAppInstall_AppPaymentRequest_Reject(
+            requestCid
           )
-          Future.successful(
-            installCid.exerciseWalletAppInstall_AppPaymentRequest_Reject(
-              requestCid
-            )
-          )
-        })(user, _ => r0.RejectAppPaymentRequestResponseOK)
-
-      handleErrors(
-        exercise,
-        r0.RejectAppPaymentRequestResponseInternalServerError,
-        r0.RejectAppPaymentRequestResponseNotFound,
-      )
+        )
+      })(user, _ => r0.RejectAppPaymentRequestResponseOK)
     }
 
   override def acceptSubscriptionRequest(
@@ -444,21 +369,13 @@ class HttpWalletHandler(
         Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
         )
-      handleErrors(
-        exerciseWalletCoinAction(
-          new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
-          user,
-          (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
-            d0.AcceptSubscriptionRequestResponse(
-              Proto.encodeContractId(outcome.contractIdValue)
-            ),
-        ),
-        r0.AcceptSubscriptionRequestResponseInternalServerError,
-        notFound = r0.AcceptSubscriptionRequestResponseNotFound,
-        aborted = Some(r0.AcceptSubscriptionRequestResponseTooManyRequests),
-        unavailable = Some(r0.AcceptSubscriptionRequestResponseServiceUnavailable),
-        internal = Some(r0.AcceptSubscriptionRequestResponseInternalServerError),
-        failedPrecondition = Some(r0.AcceptSubscriptionRequestResponseBadRequest),
+      exerciseWalletCoinAction(
+        new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
+        user,
+        (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
+          d0.AcceptSubscriptionRequestResponse(
+            Proto.encodeContractId(outcome.contractIdValue)
+          ),
       )
     }
 
@@ -466,81 +383,63 @@ class HttpWalletHandler(
       respond: r0.CancelSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.CancelSubscriptionRequestResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      val exercise: Future[r0.CancelSubscriptionRequestResponse] =
-        exerciseWalletAction((installCid, _) => {
-          val requestCid =
-            Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
-              contractId
-            )
-          Future.successful(
-            installCid.exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
-              requestCid
-            )
+      exerciseWalletAction((installCid, _) => {
+        val requestCid =
+          Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
+            contractId
           )
-        })(user, _ => r0.CancelSubscriptionRequestResponseOK)
-
-      handleErrors(
-        exercise,
-        r0.CancelSubscriptionRequestResponseInternalServerError,
-        r0.CancelSubscriptionRequestResponseNotFound,
-      )
+        Future.successful(
+          installCid.exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
+            requestCid
+          )
+        )
+      })(user, _ => r0.CancelSubscriptionRequestResponseOK)
     }
 
   override def rejectSubscriptionRequest(
       respond: r0.RejectSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectSubscriptionRequestResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      val exercise: Future[r0.RejectSubscriptionRequestResponse] =
-        exerciseWalletAction((installCid, _) => {
-          val requestCid = Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
-            contractId
+      exerciseWalletAction((installCid, _) => {
+        val requestCid = Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
+          contractId
+        )
+        Future.successful(
+          installCid.exerciseWalletAppInstall_SubscriptionRequest_Reject(
+            requestCid
           )
-          Future.successful(
-            installCid.exerciseWalletAppInstall_SubscriptionRequest_Reject(
-              requestCid
-            )
-          )
-        })(user, _ => r0.RejectSubscriptionRequestResponseOK)
-
-      handleErrors(
-        exercise,
-        r0.RejectSubscriptionRequestResponseInternalServerError,
-        r0.RejectSubscriptionRequestResponseNotFound,
-      )
+        )
+      })(user, _ => r0.RejectSubscriptionRequestResponseOK)
     }
 
   override def getBalance(respond: r0.GetBalanceResponse.type)()(
       user: String
   ): Future[r0.GetBalanceResponse] = withNewTrace(workflowId) { _ => _ =>
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      handleErrors(
-        for {
-          userStore <- getUserStore(user)
-          acs <- userStore.defaultAcs
-          coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
-          lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
-          now = clock.now
-          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-        } yield {
-          val unlockedHoldingFees =
-            coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
-          val unlockedQty =
-            coins.view.map(c => BigDecimal(CoinUtil.currentAmount(c.payload, currentRound))).sum
-          val lockedQty =
-            lockedCoins.view
-              .map(c => BigDecimal(CoinUtil.currentAmount(c.payload.coin, currentRound)))
-              .sum
+    withNewTrace(workflowId) { _ => _ =>
+      for {
+        userStore <- getUserStore(user)
+        acs <- userStore.defaultAcs
+        coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+        lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
+        now = clock.now
+        currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+      } yield {
+        val unlockedHoldingFees =
+          coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
+        val unlockedQty =
+          coins.view.map(c => BigDecimal(CoinUtil.currentAmount(c.payload, currentRound))).sum
+        val lockedQty =
+          lockedCoins.view
+            .map(c => BigDecimal(CoinUtil.currentAmount(c.payload.coin, currentRound)))
+            .sum
 
-          d0.GetBalanceResponse(
-            currentRound,
-            Proto.encode(unlockedQty),
-            Proto.encode(lockedQty),
-            Proto.encode(unlockedHoldingFees),
-          )
-        },
-        r0.GetBalanceResponseInternalServerError,
-        r0.GetBalanceResponseNotFound,
-      )
+        d0.GetBalanceResponse(
+          currentRound,
+          Proto.encode(unlockedQty),
+          Proto.encode(lockedQty),
+          Proto.encode(unlockedHoldingFees),
+        )
+      }
     }
   }
 
@@ -548,102 +447,80 @@ class HttpWalletHandler(
       request: d0.CreateTransferOfferRequest
   )(user: String): Future[r0.CreateTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      def _createTransferOffer = {
-        val sender = getUserWallet(user).store.key.endUserParty
-        exerciseWalletAction((installCid, _) => {
-          val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
-          val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
-          Future.successful(
-            installCid.exerciseWalletAppInstall_CreateTransferOffer(
-              receiver.toProtoPrimitive,
-              new PaymentAmount(amount, Currency.CC),
-              request.description,
-              expiresAt.toInstant,
-            )
+      val sender = getUserWallet(user).store.key.endUserParty
+      exerciseWalletAction((installCid, _) => {
+        val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+        val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
+        val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
+        Future.successful(
+          installCid.exerciseWalletAppInstall_CreateTransferOffer(
+            receiver.toProtoPrimitive,
+            new PaymentAmount(amount, Currency.CC),
+            request.description,
+            expiresAt.toInstant,
           )
-        })(
-          user,
-          cid =>
-            r0.CreateTransferOfferResponse.OK(
-              d0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult))
-            ),
-          dedup = Some(
-            (
-              CoinLedgerConnection.CommandId(
-                "com.daml.network.wallet.createTransferOffer",
-                Seq(
-                  sender,
-                  Proto.tryDecode(Proto.Party)(request.receiverPartyId),
-                ),
-                request.idempotencyKey,
-              ),
-              DedupDuration(
-                Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-              ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
-            )
+        )
+      })(
+        user,
+        cid =>
+          r0.CreateTransferOfferResponse.OK(
+            d0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult))
           ),
-        ).recover {
-          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
-            r0.CreateTransferOfferResponse.Conflict
-        }
+        dedup = Some(
+          (
+            CoinLedgerConnection.CommandId(
+              "com.daml.network.wallet.createTransferOffer",
+              Seq(
+                sender,
+                Proto.tryDecode(Proto.Party)(request.receiverPartyId),
+              ),
+              request.idempotencyKey,
+            ),
+            DedupDuration(
+              Duration.newBuilder().setSeconds(60 * 60 * 24).build()
+            ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
+          )
+        ),
+      ).recover {
+        case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
+          r0.CreateTransferOfferResponse.Conflict
       }
-      handleErrors(
-        _createTransferOffer,
-        r0.CreateTransferOfferResponseNotFound,
-        r0.CreateTransferOfferResponseInternalServerError,
-      )
     }
 
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
       user: String
   ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
-    def _tap: Future[r0.TapResponse] = {
-      val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
-      (for {
-        userStore <- getUserStore(user)
-        result <- exerciseWalletCoinAction(
-          new coinoperation.CO_Tap(
-            amount
-          ),
-          user,
-          (outcome: coinoperationoutcome.COO_Tap) =>
-            d0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
-        )
-      } yield result)
-    }
-    handleErrors(
-      _tap,
-      r0.TapResponseInternalServerError,
-      notFound = r0.TapResponseNotFound,
-      aborted = Some(r0.TapResponseTooManyRequests),
-      unavailable = Some(r0.TapResponseServiceUnavailable),
-      internal = Some(r0.TapResponseInternalServerError),
-      failedPrecondition = Some(r0.TapResponseBadRequest),
-    )
+    val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
+    (for {
+      userStore <- getUserStore(user)
+      result <- exerciseWalletCoinAction(
+        new coinoperation.CO_Tap(
+          amount
+        ),
+        user,
+        (outcome: coinoperationoutcome.COO_Tap) =>
+          d0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
+      )
+    } yield result)
   }
 
   override def userStatus(respond: r0.UserStatusResponse.type)()(
       user: String
-  ): Future[r0.UserStatusResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
-    handleErrors(
-      for {
-        optInstall <- store.lookupInstallByName(user)
-        hasFeaturedAppRight <- walletManager.lookupUserWallet(user) match {
-          case None => Future(false)
-          case Some(wallet) =>
-            wallet.store.lookupFeaturedAppRight().map(_.isDefined)
-        }
-      } yield {
-        d0.UserStatusResponse(
-          partyId = optInstall.fold("")(co => co.payload.endUserParty),
-          userOnboarded = optInstall.isDefined,
-          hasFeaturedAppRight = hasFeaturedAppRight,
-        )
-      },
-      r0.UserStatusResponseInternalServerError,
-      r0.UserStatusResponseNotFound,
-    )
+  ): Future[r0.UserStatusResponse] = withNewTrace(workflowId) { _ => _ =>
+    for {
+      optInstall <- store.lookupInstallByName(user)
+      hasFeaturedAppRight <- walletManager.lookupUserWallet(user) match {
+        case None => Future(false)
+        case Some(wallet) =>
+          wallet.store.lookupFeaturedAppRight().map(_.isDefined)
+      }
+    } yield {
+      d0.UserStatusResponse(
+        partyId = optInstall.fold("")(co => co.payload.endUserParty),
+        userOnboarded = optInstall.isDefined,
+        hasFeaturedAppRight = hasFeaturedAppRight,
+      )
+    }
   }
 
   override def cancelFeaturedAppRights(
@@ -816,66 +693,6 @@ class HttpWalletHandler(
 
     } yield {
       getResponse(result)
-    }
-  }
-
-  private def handleErrors[R](
-      f: => Future[R],
-      unexpected: d0.ErrorResponse => R,
-      notFound: d0.ErrorResponse => R,
-      aborted: Option[d0.ErrorResponse => R] = None,
-      unavailable: Option[d0.ErrorResponse => R] = None,
-      internal: Option[d0.ErrorResponse => R] = None,
-      failedPrecondition: Option[d0.ErrorResponse => R] = None,
-  )(implicit traceContext: TraceContext) = {
-    val fa = aborted.map(a => handleAborted(f, a)).getOrElse(f)
-    val fu = unavailable.map(a => handleUnavailable(fa, a)).getOrElse(fa)
-    val fi = internal.map(a => handleInternal(fu, a)).getOrElse(fu)
-    val fp = failedPrecondition.map(a => handleFailedPrecondition(fi, a)).getOrElse(fi)
-    handleUnexpected(handleNotFound(fp, notFound), unexpected)
-  }
-
-  private def handleNotFound[R](f: => Future[R], response: d0.ErrorResponse => R)(implicit
-      traceContext: TraceContext
-  ): Future[R] =
-    handleStatusCode(Status.Code.NOT_FOUND, f, response)
-  private def handleAborted[R](f: => Future[R], response: d0.ErrorResponse => R)(implicit
-      traceContext: TraceContext
-  ): Future[R] =
-    handleStatusCode(Status.Code.ABORTED, f, response)
-  private def handleUnavailable[R](f: => Future[R], response: d0.ErrorResponse => R)(implicit
-      traceContext: TraceContext
-  ): Future[R] =
-    handleStatusCode(Status.Code.UNAVAILABLE, f, response)
-  private def handleInternal[R](f: => Future[R], response: d0.ErrorResponse => R)(implicit
-      traceContext: TraceContext
-  ): Future[R] =
-    handleStatusCode(Status.Code.INTERNAL, f, response)
-  private def handleFailedPrecondition[R](
-      f: => Future[R],
-      response: d0.ErrorResponse => R,
-  )(implicit traceContext: TraceContext): Future[R] =
-    handleStatusCode(Status.Code.FAILED_PRECONDITION, f, response)
-
-  private def handleStatusCode[R](
-      statusCode: Status.Code,
-      f: => Future[R],
-      response: d0.ErrorResponse => R,
-  )(implicit traceContext: TraceContext): Future[R] = {
-    f.recover {
-      case e: StatusRuntimeException if e.getStatus.getCode == statusCode =>
-        logger.info(s"gRPC StatusRuntimeException: ${e.getMessage}", e)
-        response(d0.ErrorResponse(e.getStatus.getDescription))
-    }
-  }
-
-  private def handleUnexpected[R](
-      f: => Future[R],
-      response: d0.ErrorResponse => R,
-  )(implicit traceContext: TraceContext): Future[R] = {
-    f.recover { case e: Throwable =>
-      logger.error(s"Unexpected exception: ${e.getMessage}", e)
-      response(d0.ErrorResponse("An unexpected error occurred."))
     }
   }
 }

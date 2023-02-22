@@ -8,6 +8,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -16,7 +17,7 @@ import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.wallet.admin.http.HttpWalletHandler
+import com.daml.network.wallet.admin.http.{HttpWalletErrorHandler, HttpWalletHandler}
 import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
@@ -154,18 +155,22 @@ class WalletApp(
           )
         )
       ) {
-        requestLogger {
-          WalletResource.routes(
-            new HttpWalletHandler(
-              walletManager,
-              ledgerClient,
-              clock,
-              scanConnection,
-              loggerFactory,
-              retryProvider,
-            ),
-            AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
-          )
+        newTraceContext { traceContext =>
+          requestLogger(traceContext) {
+            HttpWalletErrorHandler(loggerFactory)(traceContext) {
+              WalletResource.routes(
+                new HttpWalletHandler(
+                  walletManager,
+                  ledgerClient,
+                  clock,
+                  scanConnection,
+                  loggerFactory,
+                  retryProvider,
+                ),
+                AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+              )
+            }
+          }
         }
       }
       httpConfig = config.adminApi.clientConfig.copy(

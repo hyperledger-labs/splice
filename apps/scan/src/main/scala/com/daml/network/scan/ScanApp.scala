@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -83,16 +84,18 @@ class ScanApp(
       _ <- store.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
 
       routes = cors() {
-        requestLogger {
-          ScanResource.routes(
-            new HttpScanHandler(
-              ledgerClient,
-              store,
-              clock,
-              retryProvider,
-              loggerFactory,
+        newTraceContext { traceContext =>
+          requestLogger(traceContext) {
+            ScanResource.routes(
+              new HttpScanHandler(
+                ledgerClient,
+                store,
+                clock,
+                retryProvider,
+                loggerFactory,
+              )
             )
-          )
+          }
         }
       }
 

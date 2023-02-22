@@ -7,6 +7,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
@@ -259,20 +260,22 @@ class ValidatorApp(
       }
 
       routes = cors() {
-        requestLogger {
-          ValidatorResource.routes(
-            new HttpValidatorHandler(
-              ledgerClient,
-              store,
-              validatorUserName = config.ledgerApiUser,
-              walletServiceUser = walletServiceUser,
-              domainId = domainId,
-              retryProvider = retryProvider,
-              flagCloseable = this,
-              loggerFactory,
-            ),
-            AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
-          )
+        newTraceContext { traceContext =>
+          requestLogger(traceContext) {
+            ValidatorResource.routes(
+              new HttpValidatorHandler(
+                ledgerClient,
+                store,
+                validatorUserName = config.ledgerApiUser,
+                walletServiceUser = walletServiceUser,
+                domainId = domainId,
+                retryProvider = retryProvider,
+                flagCloseable = this,
+                loggerFactory,
+              ),
+              AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+            )
+          }
         }
       }
       httpConfig = config.adminApi.clientConfig.copy(
