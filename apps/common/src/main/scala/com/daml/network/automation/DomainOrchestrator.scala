@@ -70,7 +70,7 @@ final class DomainOrchestrator private (
             (services, TaskSuccess(msg))
           } else {
             val perDomainLoggerFactory =
-              loggerFactory.append("domainId", event.domainId.toProtoPrimitive)
+              loggerFactory.append("domainId", show"${event.domainId}")
             val newServices =
               services + (event.domainId -> startService(event, perDomainLoggerFactory))
             (newServices, TaskSuccess(show"Started new service for ${event.domainId}"))
