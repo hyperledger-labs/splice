@@ -22,7 +22,7 @@ parameters:
     default: "11"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet, refresh-staging-tokens]
     default: build
 
 
@@ -390,6 +390,9 @@ commands:
       gce_authenticate:
         type: boolean
         default: false
+      auth0_authenticate:
+        type: boolean
+        default: false
       cluster:
         type: enum
         enum: ["staging", "devnet", "testnet", "none"]
@@ -415,6 +418,10 @@ commands:
             fi
             if [[ << parameters.cluster >> == staging ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
+            fi
+
+            if [[ << parameters.auth0_authenticate >> == true ]]; then
+              ADDITIONAL_NIX_ARGS+=" --keep AUTH0_MANAGEMENT_API_TOKEN"
             fi
 
             nix-shell shell.nix \
@@ -1036,6 +1043,32 @@ jobs:
                 fi
             done
 
+  refresh_tokens:
+    circleci_ip_ranges: true
+    parameters:
+      cluster:
+        type: enum
+        enum: ["staging", "devnet", "testnet"]
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Refresh auth0 tokens
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          auth0_authenticate: true
+          cmd: |
+            set -eou pipefail
+            cncluster activate
+            cncluster update_secrets
+          cmd_retry_count: 5
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+
 workflows:
   version: 2
   build:
@@ -1211,6 +1244,17 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+
+  refresh_staging_tokens:
+    when:
+      equal: [ refresh-staging-tokens, << pipeline.parameters.run-job >> ]
+    jobs:
+    - refresh_tokens:
+        cluster: "staging"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
 
   testnet_health_check:
     when:

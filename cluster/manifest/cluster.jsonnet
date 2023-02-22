@@ -63,41 +63,69 @@ local appUserNameEnvBinding(appName, varBaseName=appName) =
 
 local appUserNameEnvBindings(appNames) = std.flatMap(appUserNameEnvBinding, appNames);
 
-local appAuthEnvBinding(appName, varBaseName=appName) =
+local appAuthEnvBinding(clusterName, appName, varBaseName=appName) =
   local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_LEDGER_API_AUTH";
   local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
-  [
-    {
-      name: name + "_URL",
-      valueFrom: {
-        secretKeyRef: {
-          name: secret,
-          key: "url",
-          optional: false,
+  // In staging we use fixed tokens read from a k8s secret rather than refreshing through client credentials.
+  // See https://github.com/DACH-NY/the-real-canton-coin/issues/3053 for more details.
+  // We cannot override an object using a substitution so instead we set this through ADDITIONAL_CONFIG
+  // which first resets it back to null to disable object merging and then switches to static token config.
+  if (clusterName == "staging") then
+    [
+      {
+        name: "ADDITIONAL_CONFIG",
+        value: |||
+          _client_credentials_auth_config = null
+          _client_credentials_auth_config = {
+            type = "static"
+            token = ${%s}
+          }
+        ||| % (name + "_TOKEN"),
+      },
+      {
+        name: name + "_TOKEN",
+        valueFrom: {
+          secretKeyRef: {
+            name: secret,
+            key: "token",
+            optional: false,
+          },
         },
       },
-    },
-    {
-      name: name + "_CLIENT_ID",
-      valueFrom: {
-        secretKeyRef: {
-          name: secret,
-          key: "client-id",
-          optional: false,
+    ] + appUserNameEnvBinding(appName, varBaseName)
+  else
+    [
+      {
+        name: name + "_URL",
+        valueFrom: {
+          secretKeyRef: {
+            name: secret,
+            key: "url",
+            optional: false,
+          },
         },
       },
-    },
-    {
-      name: name + "_CLIENT_SECRET",
-      valueFrom: {
-        secretKeyRef: {
-          name: secret,
-          key: "client-secret",
-          optional: false,
+      {
+        name: name + "_CLIENT_ID",
+        valueFrom: {
+          secretKeyRef: {
+            name: secret,
+            key: "client-id",
+            optional: false,
+          },
         },
       },
-    },
-  ] + appUserNameEnvBinding(appName, varBaseName);
+      {
+        name: name + "_CLIENT_SECRET",
+        valueFrom: {
+          secretKeyRef: {
+            name: secret,
+            key: "client-secret",
+            optional: false,
+          },
+        },
+      },
+    ] + appUserNameEnvBinding(appName, varBaseName);
 
 // The amount of memory reserved for the operating system in containers
 // hosting a JVM. The JVM heap size is the container limit less this
@@ -106,10 +134,25 @@ local appAuthEnvBinding(appName, varBaseName=appName) =
 local JVM_SYSTEM_MEMORY_MIB = 1024;
 
 local expandEnvironment(env) =
+  local additional_config =
+    std.join(
+      "\n",
+      std.filterMap(
+        function(binding) binding.name == "ADDITIONAL_CONFIG",
+        function(binding) binding.value,
+        env
+      )
+    );
   std.map(function(binding) (
     local json = std.get(binding, "json");
     if json == null then binding else { name: binding.name, value: std.toString(json) }
-  ), env);
+  ), std.filter(function(binding) binding.name != "ADDITIONAL_CONFIG", env)) +
+  (if additional_config == "" then [] else [
+     {
+       name: "ADDITIONAL_CONFIG",
+       value: additional_config,
+     },
+   ]);
 
 // `image` defaults to `name`
 local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =

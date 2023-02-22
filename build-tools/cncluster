@@ -662,7 +662,7 @@ function _set_auth0_secret() {
   SECRET_NAME=$1
   CLIENT_ID=$2
   CLIENT_SECRET=$3
-  NAMESPACE=${4-default}
+  NAMESPACE=$4
 
   _log "Setting secret $SECRET_NAME ($NAMESPACE)"
 
@@ -675,11 +675,24 @@ function _set_auth0_secret() {
       kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
   fi
 
-  kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
-    --from-literal=url="${WELL_KNOWN_URL}" \
-    --from-literal=client-id="${CLIENT_ID}" \
-    --from-literal=client-secret="${CLIENT_SECRET}" \
-    --from-literal=ledger-api-user="${USER_NAME}"
+  if [ $GCP_CLUSTER_BASENAME = staging ]; then
+    TOKEN_RESPONSE=$(curl -s --show-error --fail --request POST \
+      --url https://canton-network-dev.us.auth0.com/oauth/token \
+      --header 'content-type: application/json' \
+      --data "{\"client_id\":\"$CLIENT_ID\",\"client_secret\":\"$CLIENT_SECRET\",\"audience\":\"https://canton.network.global\",\"grant_type\":\"client_credentials\"}")
+
+    ACCESS_TOKEN=$(echo $TOKEN_RESPONSE | jq -r ".access_token")
+
+    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+      --from-literal=ledger-api-user="${USER_NAME}" \
+      --from-literal=token="${ACCESS_TOKEN}"
+  else
+    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+      --from-literal=url="${WELL_KNOWN_URL}" \
+      --from-literal=client-id="${CLIENT_ID}" \
+      --from-literal=client-secret="${CLIENT_SECRET}" \
+      --from-literal=ledger-api-user="${USER_NAME}"
+  fi
 }
 
 function _set_auth0_api_user() {
@@ -746,9 +759,6 @@ function subcmd_update_secrets() {
     client_id="${appToClientId[$2]}"
     secret=$(echo $all | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
     _set_auth0_secret $1 "$client_id" $secret "$3"
-
-    # TODO (#2869) remove once secrets in the "default" namespace are no longer needed
-    _set_auth0_secret $1 "$client_id" $secret
   done
 
   for i in sv1 sv2 sv3 sv4

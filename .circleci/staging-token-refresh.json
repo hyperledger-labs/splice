@@ -1,0 +1,16 @@
+{
+    "name" : "Staging token refresh",
+    "description" : "Daily refresh of auth0 client credential tokens on staging",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "refresh-staging-tokens"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day" : [ 6 ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
