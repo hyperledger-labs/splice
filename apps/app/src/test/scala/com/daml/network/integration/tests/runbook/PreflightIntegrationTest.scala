@@ -156,7 +156,7 @@ class PreflightIntegrationTest
   }
 
   // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
-  "test splitwell group creation and payment" taggedAs LiveDevNetTest in { _ =>
+  "test splitwell group creation and payment against validator1" taggedAs LiveDevNetTest in { _ =>
     var aliceUserPartyId = ""
     var bobUserPartyId = ""
 
@@ -231,7 +231,7 @@ class PreflightIntegrationTest
 
   }
 
-  "test a directory entry allocation against cluster deployment" taggedAs LiveDevNetTest in { _ =>
+  "test a directory entry allocation against validator1" taggedAs LiveDevNetTest in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
@@ -297,7 +297,7 @@ class PreflightIntegrationTest
     entryName
   }
 
-  "run through runbook against cluster deployment" taggedAs LiveDevNetTest in { implicit env =>
+  "run through runbook with self-hosted validator" taggedAs LiveDevNetTest in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
     val cantonArgs = Seq(
