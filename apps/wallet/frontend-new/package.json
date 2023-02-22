@@ -2,7 +2,6 @@
   "name": "wallet-frontend-new",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -22,6 +21,7 @@
     "@mui/icons-material": "latest",
     "@mui/material": "latest",
     "bignumber.js": "^9.1.1",
+    "common-frontend": "^0.1.0",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "^6.8.1",

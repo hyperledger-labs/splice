@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
         <Hero balance={balance} upcomingRewardsBalance={upcomingRewardsBalance} />
       </Container>
 
-      <Box sx={{ backgroundColor: '#2c394f', flex: 1 }}>
+      <Box bgcolor="colors.neutral.25" sx={{ flex: 1 }}>
         <Container maxWidth="md">{props.children}</Container>
       </Box>
     </Box>

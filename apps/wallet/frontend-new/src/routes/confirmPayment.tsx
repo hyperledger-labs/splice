@@ -1,17 +1,16 @@
 import React from 'react';
 
 import { ArrowOutward } from '@mui/icons-material';
-import { Box, Container, Stack, styled, Typography } from '@mui/material';
+import { Box, Button, Container, Stack, styled, Typography } from '@mui/material';
 
 import AmountDisplay from '../components/AmountDisplay';
 import PaymentHeader from '../components/PaymentHeader';
-import PillButton from '../components/PillButton';
 
 export const ConfirmPayment: React.FC = () => {
   return (
     <Box display="flex" flexDirection="column" minHeight="100vh">
       <PaymentHeader />
-      <Box bgcolor={'#2c394f'} flex={1}>
+      <Box bgcolor="colors.neutral.25" flex={1}>
         <Container maxWidth="sm">
           <Stack alignItems="center" paddingTop={4} spacing={4}>
             <RecipientInfo />
@@ -63,7 +62,7 @@ const PaymentContainer: React.FC = () => {
   const isFirstPaymentToRecipient = true;
   return (
     <Container>
-      <Box bgcolor="#232f40" borderRadius={1} border="1px solid #32445c">
+      <Box bgcolor="colors.neutral.20" border={1} borderColor="colors.neutral.30">
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
@@ -76,7 +75,9 @@ const PaymentContainer: React.FC = () => {
               <AmountDisplay amount={usd.toString()} currency={'USD'} />
             </Typography>
           </Stack>
-          <PillButton size="large">Send Payment</PillButton>
+          <Button variant="pill" size="large">
+            Send Payment
+          </Button>
           {isFirstPaymentToRecipient && (
             <Typography variant="caption">
               {"You're sending a payment to this recipient for the first time."}

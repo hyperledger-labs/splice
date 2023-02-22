@@ -1,25 +1,23 @@
 import * as React from 'react';
+import { theme } from 'common-frontend';
 
 import { Person } from '@mui/icons-material';
-import { Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
+import { Button, Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
 import Container from '@mui/material/Container';
-
-import PillButton from '../components/PillButton';
-import theme from '../theme';
 
 const Login: React.FC = () => {
   return (
     <Container maxWidth="xs">
       <Stack alignItems="center" paddingTop={16} spacing={4}>
         <Typography variant="h5">CANTON WALLET</Typography>
-        <PillButton fullWidth size="large">
+        <Button variant="pill" fullWidth size="large">
           Log In with OAuth2
-        </PillButton>
+        </Button>
         <Divider flexItem>OR</Divider>
         <UsernameInput />
-        <PillButton fullWidth size="large">
+        <Button variant="pill" fullWidth size="large">
           Log In
-        </PillButton>
+        </Button>
       </Stack>
     </Container>
   );
@@ -35,7 +33,7 @@ const UsernameInput: React.FC = () => {
         <InputAdornment
           sx={{
             padding: theme.spacing(3.5, 2.5),
-            backgroundColor: '#2f3f56',
+            backgroundColor: theme.palette.colors.neutral[20],
             borderRadius: '9999px 0 0 9999px',
           }}
           position="start"

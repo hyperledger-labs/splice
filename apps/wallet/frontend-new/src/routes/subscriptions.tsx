@@ -2,8 +2,8 @@ import * as React from 'react';
 
 import {
   Box,
+  Button,
   Stack,
-  styled,
   Table,
   TableBody,
   TableCell,
@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 
 import AmountDisplay from '../components/AmountDisplay';
-import PillButton from '../components/PillButton';
 import { Subscription } from '../models/models';
 
 const Subscriptions: React.FC = () => {
@@ -50,10 +49,10 @@ const Subscriptions: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <HeaderCell>Provider</HeaderCell>
-              <HeaderCell align="right">Price</HeaderCell>
-              <HeaderCell>Payment Due</HeaderCell>
-              <HeaderCell>Actions</HeaderCell>
+              <TableCell>Provider</TableCell>
+              <TableCell align="right">Price</TableCell>
+              <TableCell>Payment Due</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -66,11 +65,6 @@ const Subscriptions: React.FC = () => {
     </Stack>
   );
 };
-
-const HeaderCell = styled(TableCell)({
-  textTransform: 'uppercase',
-  fontWeight: 'bold',
-});
 
 const SubscriptionRow: React.FC<{ subscription: Subscription }> = ({ subscription }) => {
   const { nextPaymentDue, price, provider } = subscription;
@@ -86,7 +80,9 @@ const SubscriptionRow: React.FC<{ subscription: Subscription }> = ({ subscriptio
         <PaymentDue due={nextPaymentDue} daysLeft={2} />
       </TableCell>
       <TableCell>
-        <PillButton size="small">Cancel</PillButton>
+        <Button variant="pill" size="small">
+          Cancel
+        </Button>
       </TableCell>
     </TableRow>
   );

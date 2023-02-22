@@ -37,7 +37,7 @@ const SendTransfer: React.FC = () => {
       <Typography mt={6} variant="h4">
         Transfers
       </Typography>
-      <Card variant="outlined" sx={{ marginBottom: '4px', backgroundColor: '#242F40' }}>
+      <Card variant="outlined">
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Recipient</Typography>

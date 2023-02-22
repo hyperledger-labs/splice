@@ -34,7 +34,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = props => (
         </TableBody>
       </Table>
     </TableContainer>
-    <Button variant="outlined">Load more...</Button>
+    <Button variant="outlined" size="small" color="secondary">
+      View More
+    </Button>
   </Stack>
 );
 

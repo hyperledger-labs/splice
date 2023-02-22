@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ThemeProvider } from '@emotion/react';
+import { theme } from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -8,7 +8,7 @@ import {
   RouterProvider,
 } from 'react-router-dom';
 
-import { CssBaseline } from '@mui/material';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import ConfirmPayment from './routes/confirmPayment';
 import Login from './routes/login';
@@ -16,7 +16,6 @@ import Root from './routes/root';
 import Subscriptions from './routes/subscriptions';
 import Transactions from './routes/transactions';
 import Transfer from './routes/transfer';
-import theme from './theme';
 
 const router = createBrowserRouter(
   createRoutesFromElements(

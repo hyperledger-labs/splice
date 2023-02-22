@@ -54,7 +54,7 @@ interface TransferOfferProps {
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const offer = props.transferOffer;
   return (
-    <Card variant="outlined" sx={{ backgroundColor: '#242F40' }}>
+    <Card variant="outlined">
       <CardContent
         sx={{
           display: 'flex',
@@ -80,14 +80,10 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Button variant="contained" sx={{ borderRadius: '16px' }} size="small">
+          <Button variant="pill" size="small">
             Accept
           </Button>
-          <Button
-            variant="contained"
-            sx={{ borderRadius: '16px', backgroundColor: 'indianred' }}
-            size="small"
-          >
+          <Button variant="pill" color="warning" size="small">
             Reject
           </Button>
           <Typography variant="caption">{offer.expiry}</Typography>
