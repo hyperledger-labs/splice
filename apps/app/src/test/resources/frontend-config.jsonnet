@@ -38,7 +38,7 @@ local testAuth(enabled) =
   else
     {};
 
-local validatorNodes = {
+local validatorNodes(clusterAddress) = {
   alice: {
     ledgerApi: { grpcUrl: "http://localhost:6201" },
     validator: { grpcUrl: "http://localhost:6203" },
@@ -55,14 +55,22 @@ local validatorNodes = {
     directory: { grpcUrl: "http://localhost:6110" },
     scan: { grpcUrl: "http://localhost:6012" },
   },
+  preflight: {
+    ledgerApi: { grpcUrl: "http://localhost:8001" },
+    validator: { grpcUrl: "http://localhost:6003" },
+    wallet: { grpcUrl: "http://localhost:6004", uiUrl: "http://localhost:3000" },
+    splitwell: { grpcUrl: "http://localhost:6113" },
+    directory: { grpcUrl: clusterAddress + ":6010" },
+    scan: { grpcUrl: clusterAddress + ":6012" },
+  },
   scan: {
     scan: { grpcUrl: "http://localhost:6012" },
   },
 };
 
-local services(node) =
-  if (std.objectHas(validatorNodes, node)) then
-    { services: validatorNodes[node] }
+local services(node, clusterAddress) =
+  if (std.objectHas(validatorNodes(clusterAddress), node)) then
+    { services: validatorNodes(clusterAddress)[node] }
   else
     error "Unknown node name " + node;
 
@@ -71,4 +79,5 @@ function(
   enableTestAuth,
   validatorNode,
   app,
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode)
+  clusterAddress
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterAddress)

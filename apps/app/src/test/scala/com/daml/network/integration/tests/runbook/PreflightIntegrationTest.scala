@@ -29,7 +29,7 @@ import scala.util.Using
   * This test also doubles as the pre-flight validator test.
   */
 class PreflightIntegrationTest
-    extends FrontendIntegrationTest("alice-v1", "bob-v1")
+    extends FrontendIntegrationTest("alice-selfhosted", "alice-validator1", "bob-validator1")
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
     with WalletTestUtil
@@ -62,8 +62,8 @@ class PreflightIntegrationTest
       s"Created user Bob ${bobUser.email} with password ${bobUser.password} (id: ${bobUser.id})"
     )
 
-    auth0Users += ("alice-v1" -> aliceUser)
-    auth0Users += ("bob-v1" -> bobUser)
+    auth0Users += ("alice-validator1" -> aliceUser)
+    auth0Users += ("bob-validator1" -> bobUser)
   }
 
   override def afterEach() = {
@@ -98,26 +98,26 @@ class PreflightIntegrationTest
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
-    val aliceUser = auth0Users.get("alice-v1").value
+    val aliceUser = auth0Users.get("alice-validator1").value
 
-    val bobUser = auth0Users.get("bob-v1").value
+    val bobUser = auth0Users.get("bob-validator1").value
 
     var alicePartyId = ""
 
-    withFrontEnd("alice-v1") { implicit webDriver =>
+    withFrontEnd("alice-validator1") { implicit webDriver =>
       alicePartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       findAll(className("coins-table-row")) should have size 0
     }
 
     var bobPartyId = ""
 
-    withFrontEnd("bob-v1") { implicit webDriver =>
+    withFrontEnd("bob-validator1") { implicit webDriver =>
       bobPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
       findAll(className("coins-table-row")) should have size 0
     }
 
-    withFrontEnd("alice-v1") { implicit webDriver =>
+    withFrontEnd("alice-validator1") { implicit webDriver =>
       tapAndListCoins(100)
 
       createTransferOffer(bobPartyId, "10", "p2ptransfer")
@@ -126,7 +126,7 @@ class PreflightIntegrationTest
       waitForQuery(id("oidc-login-button"))
     }
 
-    withFrontEnd("bob-v1") { implicit webDriver =>
+    withFrontEnd("bob-validator1") { implicit webDriver =>
       click on "transfer-offers-button"
 
       val acceptButton = eventually() {
@@ -164,16 +164,16 @@ class PreflightIntegrationTest
 
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val splitwellUiUrl = s"https://splitwell.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val aliceUser = auth0Users.get("alice-v1").value
-    val bobUser = auth0Users.get("bob-v1").value
+    val aliceUser = auth0Users.get("alice-validator1").value
+    val bobUser = auth0Users.get("bob-validator1").value
 
-    withFrontEnd("bob-v1") { implicit webDriver =>
+    withFrontEnd("bob-validator1") { implicit webDriver =>
       bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
       tapAndListCoins(710)
     }
 
-    val invite = withFrontEnd("alice-v1") { implicit webDriver =>
+    val invite = withFrontEnd("alice-validator1") { implicit webDriver =>
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       tapAndListCoins(60)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
@@ -181,12 +181,12 @@ class PreflightIntegrationTest
       createGroupAndInviteLink(groupName)
     }
 
-    withFrontEnd("bob-v1") { implicit webDriver =>
+    withFrontEnd("bob-validator1") { implicit webDriver =>
       loginToSplitwellUi(bobUser, splitwellUiUrl)
       requestGroupMembership(invite)
     }
 
-    withFrontEnd("alice-v1") { implicit webDriver =>
+    withFrontEnd("alice-validator1") { implicit webDriver =>
       actAndCheck("add user", click on className("add-user-link"))(
         "user has been added and invite link disappears",
         _ => findAll(className("add-user-link")).toSeq shouldBe empty,
@@ -194,7 +194,7 @@ class PreflightIntegrationTest
       addTeamLunch(100)
     }
 
-    withFrontEnd("bob-v1") { implicit webDriver =>
+    withFrontEnd("bob-validator1") { implicit webDriver =>
       enterSplitwellPayment(
         aliceUserPartyId,
         PartyId.tryFromProtoPrimitive(aliceUserPartyId),
@@ -236,31 +236,27 @@ class PreflightIntegrationTest
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
-    val aliceUser = auth0Users.get("alice-v1").value
+    val aliceUser = auth0Users.get("alice-validator1").value
 
-    withFrontEnd("alice-v1") { implicit webDriver =>
+    withFrontEnd("alice-validator1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
 
       tapAndListCoins(100)
 
-      allocateDirectoryEntry(aliceUser, directoryUiUrl, "alice.cns")
+      allocateDirectoryEntry(
+        () => auth0Login(aliceUser, directoryUiUrl, () => find(id("entry-name-field")).isDefined),
+        "alice.cns",
+      )
     }
   }
 
   private def allocateDirectoryEntry(
-      auth0User: Auth0User,
-      directoryUiUrl: String,
+      directoryUiLogin: () => Unit,
       entryName: String,
   )(implicit
       webDrive: WebDriverType
   ) = {
-    go to directoryUiUrl
-    click on "oidc-login-button"
-    completeAuth0Prompts(
-      auth0User.email,
-      auth0User.password,
-      () => find(id("entry-name-field")).isDefined,
-    )
+    directoryUiLogin()
 
     waitForQuery(id("entry-name-field"))
 
@@ -274,27 +270,29 @@ class PreflightIntegrationTest
     }
   }
 
-  def reserveDirectoryNameFor(auth0User: Auth0User, directoryUiUrl: String, entryName: String)(
-      implicit webDrive: WebDriverType
+  def reserveDirectoryNameFor(directoryUiLogin: () => Unit, entryName: String)(implicit
+      webDrive: WebDriverType
   ): String = {
-    allocateDirectoryEntry(auth0User, directoryUiUrl, entryName)
+    clue(s"Reserving directory name: ${entryName}") {
+      allocateDirectoryEntry(directoryUiLogin, entryName)
 
-    // user is redirected to their wallet...
-    eventually() {
-      findAll(className("sub-request-accept-button")) should have size 1
-    }
-    click on className("sub-request-accept-button")
+      // user is redirected to their wallet...
+      eventually() {
+        findAll(className("sub-request-accept-button")) should have size 1
+      }
+      click on className("sub-request-accept-button")
 
-    // And then back to directory, where they are already logged in
-    eventually(scaled(10 seconds)) {
-      findAll(className("entries-table-row")) should have size 1
+      // And then back to directory, where they are already logged in
+      eventually(scaled(10 seconds)) {
+        findAll(className("entries-table-row")) should have size 1
+      }
+      val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
+        row
+      }
+      val name = row.childElement(className("entries-table-name"))
+      name.text should be(entryName)
+      entryName
     }
-    val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
-      row
-    }
-    val name = row.childElement(className("entries-table-name"))
-    name.text should be(entryName)
-    entryName
   }
 
   "run through runbook with self-hosted validator" taggedAs LiveDevNetTest in { implicit env =>
@@ -313,6 +311,18 @@ class PreflightIntegrationTest
     Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
+
+      v("validatorApp").remoteParticipant.dars
+        .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
+
+      val walletUiUrl = "localhost:3000"
+      val directoryUiUrl = "localhost:3001"
+
+      withFrontEnd("alice-selfhosted") { implicit webDriver =>
+        testUserLogin("alice", walletUiUrl)
+        tapAndListCoins(100)
+        reserveDirectoryNameFor(() => testUserLogin("alice", directoryUiUrl), "alice.cns")
+      }
     }
   }
 
@@ -356,6 +366,33 @@ class PreflightIntegrationTest
     secret
   }
 
+  private def auth0Login(user: Auth0User, url: String, completedWhen: () => Boolean)(implicit
+      webDriver: WebDriverType
+  ) = {
+    clue(s"Auth0 user login as: ${user.email}") {
+      go to url
+      click on "oidc-login-button"
+      completeAuth0Prompts(
+        user.email,
+        user.password,
+        completedWhen,
+      )
+    }
+  }
+
+  private def testUserLogin(user: String, url: String)(implicit webDriver: WebDriverType) = {
+    clue(s"Test user login as: ${user}") {
+      go to url
+
+      waitForQuery(id("user-id-field"))
+
+      click on "user-id-field"
+      textField("user-id-field").value = user
+
+      click on "login-button"
+    }
+  }
+
   private def loginAndOnboardToWalletUi(
       user: Auth0User,
       walletUiUrl: String,
@@ -367,15 +404,8 @@ class PreflightIntegrationTest
       user: Auth0User,
       url: String,
   )(implicit webDriver: WebDriverType) = {
-    clue(s"Logging in and onboarding as user: ${user.email}") {
-      go to url
-      click on "oidc-login-button"
-      completeAuth0Prompts(
-        user.email,
-        user.password,
-        () => find(id("group-id-field")).isDefined,
-      )
-
+    clue(s"Logging in to splitwell UI at: ${url}") {
+      auth0Login(user, url, () => find(id("group-id-field")).isDefined)
       waitForQuery(id("logged-in-user"))
     }
   }
@@ -385,15 +415,8 @@ class PreflightIntegrationTest
       url: String,
       onboardUserToWallet: Boolean,
   )(implicit webDriver: WebDriverType): String = {
-    clue(s"Logging in and onboarding as user: ${user.email}") {
-      go to url
-      click on "oidc-login-button"
-      completeAuth0Prompts(
-        user.email,
-        user.password,
-        () => find(id("onboard-button")).isDefined,
-      )
-
+    clue(s"Logging in to wallet UI at: ${url}") {
+      auth0Login(user, url, () => find(id("onboard-button")).isDefined)
       waitForQuery(id("onboard-button"))
 
       if (onboardUserToWallet)

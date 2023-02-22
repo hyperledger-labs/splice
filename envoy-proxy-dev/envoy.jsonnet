@@ -19,11 +19,13 @@ function(hostname="host.docker.internal") {
       utils.listener("splitwell", 6113),
       utils.listener("alice_lapi", 6201),
       utils.listener("bob_lapi", 6301),
+      utils.listener("preflight_lapi", 8001),
     ],
     clusters: [
       cluster("splitwell", 5113),
       cluster("alice_lapi", 5201),
       cluster("bob_lapi", 5301),
+      cluster("preflight_lapi", 6001),
     ],
   },
 }

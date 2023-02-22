@@ -38,6 +38,7 @@ function start_frontend() {
   local node_name=$4
   local test_auth=$5
   local algorithm="${6:-rs-256}"
+  local cluster_address="${7:-'http://localhost'}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -50,6 +51,7 @@ function start_frontend() {
   local config_file=$(mktemp)
 
   jsonnet \
+    --tla-str clusterAddress="$cluster_address" \
     --tla-str authAlgorithm="$algorithm" \
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
@@ -73,13 +75,15 @@ function usage() {
   echo "  -h   display this help message"
   echo "  -d   start in detached mode"
   echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
+  echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
 }
 
 # default values
 daemon=0
 enable_test_auth="true"
+use_preflight_frontends=0
 
-while getopts "hda" arg; do
+while getopts "hdap" arg; do
   case ${arg} in
     h)
       usage
@@ -90,6 +94,9 @@ while getopts "hda" arg; do
       ;;
     a)
       enable_test_auth="false"
+      ;;
+    p)
+      use_preflight_frontends=1
       ;;
     ?)
       usage
@@ -119,14 +126,36 @@ do
     sleep 1
 done
 
-# start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth>
-start_frontend wallet    3000 alice   "alice" $enable_test_auth
-start_frontend wallet    3001 bob     "bob"   $enable_test_auth
-start_frontend splitwell 3002 alice   "alice" $enable_test_auth
-start_frontend splitwell 3003 bob     "bob"   $enable_test_auth
-start_frontend directory 3004 alice   "alice" $enable_test_auth
-start_frontend splitwell 3005 charlie "alice" $enable_test_auth
-start_frontend scan      3006 scan    "scan"  "false"           "none"
+# The set of frontends we want to start as part of typical integration testing
+function start_local_frontends() {
+  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm>
+  start_frontend   wallet    3000 alice   "alice" $enable_test_auth
+  start_frontend   wallet    3001 bob     "bob"   $enable_test_auth
+  start_frontend   splitwell 3002 alice   "alice" $enable_test_auth
+  start_frontend   splitwell 3003 bob     "bob"   $enable_test_auth
+  start_frontend   directory 3004 alice   "alice" $enable_test_auth
+  start_frontend   splitwell 3005 charlie "alice" $enable_test_auth
+  start_frontend   scan      3006 scan    "scan"  "false"           "none"
+}
+
+# The set of frontends we want to start for the preflight self-hosted directory UI test
+function start_preflight_frontends() {
+  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
+  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+  start_frontend   directory 3001 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+}
+
+if [ $use_preflight_frontends -eq 0 ]; then
+  start_local_frontends
+else
+  if [ "$enable_test_auth" == "true" ]; then
+    start_preflight_frontends
+  else
+    echo "enable_test_auth was set to false, -p is incompatible with -a"
+    exit 1
+  fi
+fi
+
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}
