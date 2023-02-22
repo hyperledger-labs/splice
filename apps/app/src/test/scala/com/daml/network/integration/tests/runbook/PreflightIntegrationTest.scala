@@ -312,16 +312,19 @@ class PreflightIntegrationTest
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 
-      v("validatorApp").remoteParticipant.dars
-        .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
+      // TODO(#3074) -- drop this when we figure out what's wrong with start-frontends in CI
+      if (sys.env("SKIP_SELFHOSTED_DIRECTORY_UI_TEST") != "false") {
+        v("validatorApp").remoteParticipant.dars
+          .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 
-      val walletUiUrl = "localhost:3000"
-      val directoryUiUrl = "localhost:3001"
+        val walletUiUrl = "localhost:3000"
+        val directoryUiUrl = "localhost:3001"
 
-      withFrontEnd("alice-selfhosted") { implicit webDriver =>
-        testUserLogin("alice", walletUiUrl)
-        tapAndListCoins(100)
-        reserveDirectoryNameFor(() => testUserLogin("alice", directoryUiUrl), "alice.cns")
+        withFrontEnd("alice-selfhosted") { implicit webDriver =>
+          testUserLogin("alice", walletUiUrl)
+          tapAndListCoins(100)
+          reserveDirectoryNameFor(() => testUserLogin("alice", directoryUiUrl), "alice.cns")
+        }
       }
     }
   }
