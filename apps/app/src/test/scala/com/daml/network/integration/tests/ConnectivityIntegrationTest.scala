@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -64,12 +63,6 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
 
     clue("wait for bob's validator app to become active") {
       eventually()(bobValidator.health.active shouldBe true)
-    }
-
-    clue("check that there are no outstanding CoinRulesRequest contracts") {
-      val results = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(CoinRulesRequest.COMPANION)(svcParty)
-      inside(results)(_.size shouldBe 0)
     }
   }
 }

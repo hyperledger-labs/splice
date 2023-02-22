@@ -76,8 +76,6 @@ setupValidator app name = do
   userId <- validateUserId name
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
-  requestCoinRules app validatorParty
-  runCoinRulesAcceptBot app
   tap app (CCUser userId validatorParty) 1.0
   return validatorParty
 
@@ -108,37 +106,14 @@ recordValidatorOf app u v =
   submitMulti [u, v] [] $
     void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
 
--- Workaround for explicit disclosure
--------------------------------------
-
 getUserReadAs : UserId -> Script [Party]
 getUserReadAs user = do
   rights <- listUserRights user
   pure [p | CanReadAs p <- rights]
 
--- TODO(M3-82): remove workaround for explicit disclosure
-requestCoinRules : CCApp -> Party -> Script ()
-requestCoinRules app user = do
-  submit user $ createCmd CoinRulesRequest with
-    svc = app.svc
-    user = user
-  pure ()
-
--- TODO(M3-82): remove workaround for explicit disclosure
--- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
-runCoinRulesAcceptBot : CCApp -> Script ()
-runCoinRulesAcceptBot app = do
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
-  openRounds <- query @OpenMiningRound app.svc
-  issuingRounds <- query @IssuingMiningRound app.svc
-  requests <- query @CoinRulesRequest app.svc
-  forA_ requests $ \(requestCid, request) -> do
-    submit app.svc $ exerciseCmd requestCid $ CoinRulesRequest_Accept coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
-  pure ()
 
 -- Issuance automation
 ----------------------
-
 
 -- Advance issuance such that the next transfers use a round with the given coin-price
 advanceToIssuanceWithPrice : CCApp -> Decimal -> Script ()

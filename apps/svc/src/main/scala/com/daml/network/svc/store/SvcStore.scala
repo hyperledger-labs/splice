@@ -279,7 +279,6 @@ object SvcStore {
       svcParty,
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coin.ValidatorRight.COMPANION)(co =>

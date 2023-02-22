@@ -151,7 +151,6 @@ object SvSvcStore {
       Map(
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),

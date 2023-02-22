@@ -57,13 +57,6 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     // Start Alice’s validator
     aliceValidator.startSync()
 
-    // Check that no coin rules request is outstanding
-    eventually()(
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cc.coin.CoinRulesRequest.COMPANION)(svcParty)
-        shouldBe empty
-    )
-
     // check that alice's validator can see its license.
     val aliceValidatorParty = aliceValidator.getValidatorPartyId()
     aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs

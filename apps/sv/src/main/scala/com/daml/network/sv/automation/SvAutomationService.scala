@@ -36,6 +36,5 @@ class SvAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new CoinRulesRequestTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
 }

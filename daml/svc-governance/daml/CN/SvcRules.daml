@@ -263,20 +263,6 @@ template SvcRules with
     -- Validator onboarding
     -----------------------
 
-    -- TODO(M3-46): deprecate this in favor of SV-sponsored `_OnboardValidator`
-    nonconsuming choice SvcRules_CoinRulesRequest_Accept : ()
-      with
-        cid : ContractId CoinRulesRequest
-        choiceArg : CoinRulesRequest_Accept
-      controller leader
-      do
-        -- NOTE: we do not use voting as missing the addition of a mining round obserer
-        -- to an already existing round only impacts that ability of the validator to
-        -- use that round, but will not impact any future rounds.
-        --
-        -- Moreover, this problem will be gone once we use explicit disclosure.
-        exercise cid choiceArg
-
     nonconsuming choice SvcRules_OnboardValidator : ContractId ValidatorLicense
       with
         sponsor : Party

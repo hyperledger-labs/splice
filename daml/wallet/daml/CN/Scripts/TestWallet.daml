@@ -488,7 +488,7 @@ testCO_MergeTransferInputs = script do
 
   let [COO_MergeTransferInputs (Some resultCoin)] = outcomes
   aliceCoins <- query @Coin alice.primaryParty
-  let [(mergedCoinCid, _), _] = aliceCoins
+  let [_, (mergedCoinCid, _)] = aliceCoins
   resultCoin === (toInterfaceContractId @API.Coin mergedCoinCid)
 
   pure ()

@@ -53,11 +53,6 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
       )
     )
 
-  def lookupCoinRulesRequestWithOffset(): Future[QueryResult[Option[
-    Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
-  ]]] =
-    defaultAcs.flatMap(_.findContractWithOffset(coinCodegen.CoinRulesRequest.COMPANION)(_ => true))
-
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   ): Future[
@@ -117,10 +112,6 @@ object ValidatorStore {
         mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
           co.payload.validator == validator && co.payload.svc == svc
-        ),
-        mkFilter(coinCodegen.CoinRulesRequest.COMPANION)(co =>
-          co.payload.user == validator &&
-            co.payload.svc == svc
         ),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&

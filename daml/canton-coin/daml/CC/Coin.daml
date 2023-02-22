@@ -538,37 +538,6 @@ template CoinRules
            require "Next change is not scheduled in the future" (now < t)
          create this with configSchedule = newConfigSchedule
 
--- | Workaround for missing explicit disclosure.
---
--- The validator creates a request contract, the SVC archives the request and creates a CoinRules contract
--- with the requesting validator as observer. The validator uses a regular transaction stream to learn about
--- the new CoinRules contracts.
--- Once explicit disclosure is available, we want to remove the request contracts and use an off-ledger flow
--- to stream in the latest CoinRules contracts.
--- TODO(M3-82): remove workaround for explicit disclosure
--- TODO(M3-46): remove this in favor of SV-sponsored `_OnboardValidator` flow
-template CoinRulesRequest
-  with
-    user : Party
-    svc : Party
-  where
-    signatory user
-    observer svc
-
-    choice CoinRulesRequest_Accept : ()
-      with
-        coinRules : ContractId CoinRules
-        openRounds : [ContractId OpenMiningRound]
-        issuingRounds : [ContractId IssuingMiningRound]
-      controller svc
-      do
-        rules <- fetch coinRules
-        if user `elem` rules.observers
-          then pure ()  -- ignore duplicate requests
-          else do
-            -- TODO(M3-46): its already a noop - now completely remove it.
-            pure ()
-
 
 -- Transfer logic
 -- ==============
