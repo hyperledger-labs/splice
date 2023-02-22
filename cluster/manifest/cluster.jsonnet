@@ -70,7 +70,7 @@ local appAuthEnvBinding(clusterName, appName, varBaseName=appName) =
   // See https://github.com/DACH-NY/the-real-canton-coin/issues/3053 for more details.
   // We cannot override an object using a substitution so instead we set this through ADDITIONAL_CONFIG
   // which first resets it back to null to disable object merging and then switches to static token config.
-  if (clusterName == "staging") then
+  if (clusterName == "cn-stagingnet") then
     [
       {
         name: "ADDITIONAL_CONFIG",
