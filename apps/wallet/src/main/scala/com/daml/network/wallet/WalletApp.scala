@@ -154,17 +154,19 @@ class WalletApp(
           )
         )
       ) {
-        WalletResource.routes(
-          new HttpWalletHandler(
-            walletManager,
-            ledgerClient,
-            clock,
-            scanConnection,
-            loggerFactory,
-            retryProvider,
-          ),
-          AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
-        )
+        requestLogger {
+          WalletResource.routes(
+            new HttpWalletHandler(
+              walletManager,
+              ledgerClient,
+              clock,
+              scanConnection,
+              loggerFactory,
+              retryProvider,
+            ),
+            AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+          )
+        }
       }
       httpConfig = config.adminApi.clientConfig.copy(
         port = config.adminApi.port + 1000

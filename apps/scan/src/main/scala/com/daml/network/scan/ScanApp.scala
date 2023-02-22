@@ -83,15 +83,17 @@ class ScanApp(
       _ <- store.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
 
       routes = cors() {
-        ScanResource.routes(
-          new HttpScanHandler(
-            ledgerClient,
-            store,
-            clock,
-            retryProvider,
-            loggerFactory,
+        requestLogger {
+          ScanResource.routes(
+            new HttpScanHandler(
+              ledgerClient,
+              store,
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
           )
-        )
+        }
       }
 
       httpConfig = config.adminApi.clientConfig.copy(

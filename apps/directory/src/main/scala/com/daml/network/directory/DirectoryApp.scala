@@ -117,12 +117,14 @@ class DirectoryApp(
         )
         .withAllowedHeaders(HttpHeaderRange.`*`)
       routes = cors() {
-        DirectoryResource.routes(
-          new HttpDirectoryHandler(
-            store,
-            loggerFactory,
+        requestLogger {
+          DirectoryResource.routes(
+            new HttpDirectoryHandler(
+              store,
+              loggerFactory,
+            )
           )
-        )
+        }
       }
       httpConfig = config.adminApi.clientConfig.copy(
         // TODO(#2019) Remove once we disabled gRPC Servers completely.

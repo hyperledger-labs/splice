@@ -1,12 +1,14 @@
 package com.daml.network.environment
 
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.store.DomainStore
 import akka.actor.ActorSystem
+import akka.http.scaladsl.server.Directive0
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
@@ -69,8 +71,47 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   private val httpExt = Http()(ac)
 
-  protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (req: HttpRequest) =>
-    httpExt.singleRequest(req)
+  protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) =>
+    {
+      import parameters.loggingConfig.api.*
+      val logPayload = messagePayloads.getOrElse(false)
+      val pathLimited = request.uri.path.toString
+        .limit(maxMethodLength)
+      def msg(message: String): String =
+        s"HTTP client ${request.method.name} ${pathLimited}): ${message}"
+
+      if (logPayload) {
+        request.entity match {
+          // Only logging strict messages which are already in memory, not attempting to log streams
+          case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+            logger.debug(
+              msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
+            )
+          case _ => logger.debug(msg(s"omitting logging of request entity data."))
+        }
+      }
+      logger.trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
+      httpExt.singleRequest(request).map { response =>
+        logger.debug(msg(s"Received response with status code: ${response.status}"))
+        if (logPayload) {
+          response.entity match {
+            // Only logging strict messages which are already in memory, not attempting to log streams
+            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
+              logger.debug(
+                msg(
+                  s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
+                )
+              )
+            case _ => logger.debug(msg(s"omitting logging of response entity data."))
+          }
+        }
+        logger.trace(
+          msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
+        )
+        response
+      }
+    }
+  def requestLogger: Directive0 = HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
 
   def isActive: Boolean = {
     // initialized and the state reports itself as healthy

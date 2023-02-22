@@ -259,19 +259,21 @@ class ValidatorApp(
       }
 
       routes = cors() {
-        ValidatorResource.routes(
-          new HttpValidatorHandler(
-            ledgerClient,
-            store,
-            validatorUserName = config.ledgerApiUser,
-            walletServiceUser = walletServiceUser,
-            domainId = domainId,
-            retryProvider = retryProvider,
-            flagCloseable = this,
-            loggerFactory,
-          ),
-          AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
-        )
+        requestLogger {
+          ValidatorResource.routes(
+            new HttpValidatorHandler(
+              ledgerClient,
+              store,
+              validatorUserName = config.ledgerApiUser,
+              walletServiceUser = walletServiceUser,
+              domainId = domainId,
+              retryProvider = retryProvider,
+              flagCloseable = this,
+              loggerFactory,
+            ),
+            AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+          )
+        }
       }
       httpConfig = config.adminApi.clientConfig.copy(
         port = config.adminApi.port + 1000
