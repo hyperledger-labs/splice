@@ -9,7 +9,6 @@ import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.*
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
@@ -72,6 +71,7 @@ class WalletApp(
       scanConnection <- Future {
         new ScanConnection(
           config.remoteScan.adminApi,
+          clock,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )
@@ -138,7 +138,6 @@ class WalletApp(
         timeouts,
       )
       domainId <- waitForDomainConnection(walletStore.domains, config.domains.global)
-      _ <- walletStore.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

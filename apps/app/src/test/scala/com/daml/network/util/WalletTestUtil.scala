@@ -1,8 +1,6 @@
 package com.daml.network.util
 
-import com.digitalasset.canton.topology.DomainId
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -11,25 +9,16 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.{
-  CoinRemoteParticipantReference,
-  RemoteDirectoryAppReference,
-  ValidatorAppBackendReference,
-  ValidatorAppReference,
-  WalletAppBackendReference,
-  WalletAppClientReference,
-}
+import com.daml.network.console.*
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
 trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   this: CommonCoinAppInstanceReferences =>
@@ -75,71 +64,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     }
   }
 
-  def lockCoins(
-      userWallet: WalletAppBackendReference,
-      userParty: PartyId,
-      validatorParty: PartyId,
-      coins: Seq[HttpWalletAppClient.CoinPosition],
-      amount: BigDecimal,
-      transferContext: v1.coin.AppTransferContext,
-      expiredDuration: Duration,
-  )(implicit coinEnv: CoinTestConsoleEnvironment): Unit =
-    clue(s"Locking $amount coins for $userParty") {
-      val coinOpt = coins.find(_.effectiveAmount >= amount)
-
-      val expiredAt = coinEnv.environment.clock.now.add(expiredDuration)
-      val expirationOpt = Proto.decode(Proto.Timestamp)(expiredAt.underlying.micros)
-
-      (coinOpt, expirationOpt) match {
-        case (Some(coin), Right(expiration)) => {
-          userWallet.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-            Seq(userParty, validatorParty),
-            optTimeout = None,
-            commands = transferContext.coinRules
-              .exerciseCoinRules_Transfer(
-                new v1.coin.Transfer(
-                  userParty.toProtoPrimitive,
-                  userParty.toProtoPrimitive,
-                  Seq[v1.coin.TransferInput](
-                    new v1.coin.transferinput.InputCoin(
-                      coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
-                    )
-                  ).asJava,
-                  Seq[v1.coin.TransferOutput](
-                    new TransferOutput(
-                      userParty.toProtoPrimitive,
-                      BigDecimal(0.0).bigDecimal,
-                      amount.bigDecimal,
-                      Some(
-                        new TimeLock(
-                          Seq(userParty.toProtoPrimitive).asJava,
-                          expiration.toInstant,
-                        )
-                      ).toJava,
-                    )
-                  ).asJava,
-                  "lock coins",
-                ),
-                new v1.coin.TransferContext(
-                  transferContext.openMiningRound,
-                  Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-                  Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
-                  // note: we don't provide a featured app right as sender == provider
-                  None.toJava,
-                ),
-              )
-              .commands
-              .asScala
-              .toSeq,
-          )
-        }
-        case _ => {
-          coinOpt shouldBe a[Some[_]]
-          expirationOpt shouldBe a[Right[_, _]]
-        }
-      }
-    }
-
   /** Onboards the daml user associated with the given wallet app user reference
     * onto the given validator, and waits until the wallet is usable for that user
     */
@@ -157,8 +81,8 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   /** The wallet is not immediately usable by an onboarded user, specifically, the wallet
-    *  app backend needs to ingest the wallet install contract first. This function waits for
-    *  that to complete.
+    * app backend needs to ingest the wallet install contract first. This function waits for
+    * that to complete.
     */
 
   def waitForWalletUser(

@@ -12,6 +12,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
@@ -48,6 +49,8 @@ class WalletSubscriptionsIntegrationTest
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
         val transferContext = scan.getUnfeaturedAppTransferContext()
+        val openRound = scan.getLatestOpenMiningRound(CantonTimestamp.now())
+        val coinRules = scan.getCoinRules()
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -97,6 +100,8 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand,
+                disclosedContracts =
+                  Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
               )
           },
         )(
@@ -127,6 +132,8 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand2,
+                disclosedContracts =
+                  Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
               )
           },
         )(

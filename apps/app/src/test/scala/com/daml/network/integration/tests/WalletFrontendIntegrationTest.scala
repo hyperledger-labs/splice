@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 
-import java.time.Duration
 import scala.util.Try
 
 class WalletFrontendIntegrationTest
@@ -23,46 +22,6 @@ class WalletFrontendIntegrationTest
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val amount = row.childElement(className("coins-table-amount"))
         amount.text should be("15.0CC")
-      }
-    }
-
-    "show balance and locked coins" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-      val tapQty = 50
-      val lockedQty = 10
-
-      withFrontEnd("alice") { implicit webDriver =>
-        browseToAliceWallet(aliceDamlUser)
-
-        eventually() {
-          find(id("locked-qty")).value.text should matchText("0.0000000000")
-          find(id("unlocked-qty")).value.text should matchText("0.0000000000")
-        }
-
-        tapAndListCoins(tapQty)
-
-        lockCoins(
-          aliceWalletBackend,
-          aliceParty,
-          aliceValidatorParty,
-          aliceWallet.list().coins,
-          lockedQty,
-          scan.getUnfeaturedAppTransferContext(),
-          Duration.ofDays(1),
-        )
-
-        eventually() {
-          val currentLockedQty = BigDecimal(find(id("locked-qty")).value.text)
-          val currentUnlockedQty = BigDecimal(find(id("unlocked-qty")).value.text)
-          val currentHoldingFees = BigDecimal(find(id("holding-fees")).value.text)
-          val expectedUnlockedQty = tapQty - lockedQty
-
-          assertInRange(currentUnlockedQty, (expectedUnlockedQty - 1, expectedUnlockedQty))
-          assertInRange(currentLockedQty, (lockedQty, lockedQty))
-          assertInRange(currentHoldingFees, (0, 1))
-        }
       }
     }
 

@@ -72,6 +72,7 @@ class DirectoryApp(
       scanConnection <- Future.successful(
         new ScanConnection(
           config.remoteScan.adminApi,
+          clock,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )

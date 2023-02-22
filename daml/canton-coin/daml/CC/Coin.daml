@@ -523,18 +523,6 @@ template CoinRules
       controller p
       do pure (self, this)
 
-    choice CoinRules_AddObserver : ContractId CoinRules
-      with
-        obs : Party
-        openRounds : [ContractId OpenMiningRound]
-        issuingRounds : [ContractId IssuingMiningRound]
-      controller svc
-      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
-         forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver obs)
-         forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver obs)
-         create this with
-           observers = obs :: observers
-
     choice CoinRules_SetEnabledChoices : ContractId CoinRules
       with
         newEnabledChoices : API.EnabledChoices
@@ -578,7 +566,7 @@ template CoinRulesRequest
         if user `elem` rules.observers
           then pure ()  -- ignore duplicate requests
           else do
-            exercise coinRules (CoinRules_AddObserver user openRounds issuingRounds)
+            -- TODO(M3-46): its already a noop - now completely remove it.
             pure ()
 
 

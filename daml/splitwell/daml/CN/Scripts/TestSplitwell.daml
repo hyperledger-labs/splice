@@ -118,6 +118,7 @@ completeTransfer app provider acceptedPaymentCid = do
   Some AcceptedAppPayment{deliveryOffer} <- queryContractId provider.primaryParty acceptedPaymentCid
   void $ submitUser provider.userId $ exerciseCmd (fromInterfaceContractId @TransferInProgress deliveryOffer) TransferInProgress_CompleteTransfer with ..
 
+testProviderHosted : Script ()
 testProviderHosted = script do
   app <- setupApp
   runNextIssuance app

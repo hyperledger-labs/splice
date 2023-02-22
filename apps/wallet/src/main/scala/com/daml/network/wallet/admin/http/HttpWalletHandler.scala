@@ -2,6 +2,7 @@ package com.daml.network.wallet.admin.http
 
 import akka.stream.Materializer
 import cats.implicits.showInterpolator
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{Template, Unit as DUnit}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
@@ -75,7 +76,7 @@ class HttpWalletHandler(
     def _list: Future[r0.ListResponse] = for {
       userStore <- getUserStore(user)
       now = clock.now
-      currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
+      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       acs <- userStore.defaultAcs
       coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
       lockedCoins <- acs.listContracts(
@@ -304,7 +305,7 @@ class HttpWalletHandler(
             Future.successful(
               installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
             )
-          )(user, _.exerciseResult)
+          )(user, _.exerciseResult, dislosedContracts = Seq(coinRules.toDisclosedContract))
         } yield d0.SelfGrantFeaturedAppRightResponse(Proto.encodeContractId(result)),
         r0.SelfGrantFeatureAppRightResponseInternalServerError,
         r0.SelfGrantFeatureAppRightResponseNotFound,
@@ -519,7 +520,7 @@ class HttpWalletHandler(
           coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
           lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
           now = clock.now
-          currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
+          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
         } yield {
           val unlockedHoldingFees =
             coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
@@ -781,6 +782,7 @@ class HttpWalletHandler(
       user: String,
       getResponse: ChoiceResult => Response,
       dedup: Option[(CommandId, DedupConfig)] = None,
+      dislosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit
       traceContext: TraceContext
   ): Future[Response] = {
@@ -797,6 +799,7 @@ class HttpWalletHandler(
             Seq(validatorParty, userParty),
             update,
             domainId,
+            dislosedContracts,
           )
         case Some((commandId, dedupConfig)) =>
           connection
@@ -807,6 +810,7 @@ class HttpWalletHandler(
               commandId,
               dedupConfig,
               domainId,
+              dislosedContracts,
             )
       }
 

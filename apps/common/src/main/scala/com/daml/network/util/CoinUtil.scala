@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -26,6 +27,19 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 object CoinUtil {
+
+  def selectLatestOpenMiningRound(
+      now: CantonTimestamp,
+      openMiningRounds: Seq[Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]],
+  ): Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound] =
+    openMiningRounds
+      .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
+      .maxByOption(_.payload.round.number)
+      .getOrElse(
+        throw new IllegalStateException(
+          s"tried to select the latest open mining round from $openMiningRounds but none of the rounds are open. "
+        )
+      )
 
   def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
     TemplateId(ApiTypes.TemplateId.unwrap(id))
@@ -141,6 +155,7 @@ object CoinUtil {
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
   )
+
   def defaultTransferConfig(
       initialMaxNumInputs: Int
   ): cc.coinconfig.TransferConfig[cc.coinconfig.USD] = new cc.coinconfig.TransferConfig(

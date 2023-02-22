@@ -2,6 +2,7 @@ package com.daml.network.splitwell.automation
 
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -56,11 +57,12 @@ class AcceptedAppPaymentRequestsTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")
       val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
       connection
-        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId)
+        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId, disclosedContracts)
         .map(_ => TaskSuccess(s"rejected accepted app payment: $reason"))
     }
     for {
@@ -69,7 +71,7 @@ class AcceptedAppPaymentRequestsTrigger(
       transferContextE <- scanConnection
         .getAppTransferContextForRound(store.providerParty, round)
       result <- transferContextE match {
-        case Right(transferContext) =>
+        case Right((transferContext, disclosedContracts)) =>
           for {
             transferInProgress <- store
               .acs(domainId)
@@ -94,18 +96,20 @@ class AcceptedAppPaymentRequestsTrigger(
               readAs = readAsWithValidatorUser.toSeq,
               commands = cmd.commands.asScala.toSeq,
               domainId = domainId,
+              disclosedContracts = disclosedContracts,
             )
           } yield TaskSuccess("accepted payment and completed transfer")
         case Left(err) =>
           scanConnection
             .getAppTransferContext(store.providerParty)
-            .flatMap(
+            .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
-                _,
+                transferContext,
                 domainId,
+                disclosedContracts,
               )
-            )
+            }
 
       }
     } yield result

@@ -1,6 +1,7 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
@@ -49,11 +50,18 @@ class SubscriptionInitialPaymentTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
       connection
-        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId)
+        .submitWithResultNoDedup(
+          Seq(store.providerParty),
+          Seq(),
+          cmd,
+          domainId,
+          disclosedContracts = disclosedContracts,
+        )
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
     def collectPayment(
@@ -61,6 +69,7 @@ class SubscriptionInitialPaymentTrigger(
         offset: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       val cmd =
         contextId
@@ -78,6 +87,7 @@ class SubscriptionInitialPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = offset,
             domainId = domainId,
+            disclosedContracts = disclosedContracts,
           )
       } yield TaskSuccess("created directory entry.")
     }
@@ -98,7 +108,7 @@ class SubscriptionInitialPaymentTrigger(
         payment.payload.round,
       )
       result <- transferContextE match {
-        case Right(transferContext) =>
+        case Right((transferContext, disclosedContracts)) =>
           // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
           val entryName = context.payload.name
           // check whether the entry already exists
@@ -108,22 +118,24 @@ class SubscriptionInitialPaymentTrigger(
                 s"entry already exists and owned by ${entry.payload.user}.",
                 transferContext,
                 domainId,
+                disclosedContracts,
               )
             case QueryResult(off, None) =>
               // collect the payment and create the entry
-              collectPayment(entryName, off, transferContext, domainId)
+              collectPayment(entryName, off, transferContext, domainId, disclosedContracts)
           }
 
         case Left(err) =>
           scanConnection
             .getAppTransferContext(store.svcParty)
-            .flatMap(
+            .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
-                _,
+                transferContext,
                 domainId,
+                disclosedContracts,
               )
-            )
+            }
       }
     } yield result
   }

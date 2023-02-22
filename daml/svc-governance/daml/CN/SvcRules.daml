@@ -1,6 +1,6 @@
 module CN.SvcRules where
 
-import DA.Action (void, unless)
+import DA.Action (void)
 import DA.Foldable (forA_)
 import DA.List as List
 import qualified DA.Map as Map
@@ -290,10 +290,6 @@ template SvcRules with
         -- TODO(M3-46): sponsor<->candidate relationship must be recorded somewhere
         rules <- fetch coinRules
         require "SVC of CoinRules matches" (rules.svc == svc)
-        -- TODO(M3-82): remove workaround for explicit disclosure
-        unless (validator `elem` rules.observers) do
-          exercise coinRules (CoinRules_AddObserver validator openRounds issuingRounds)
-          pure ()
         create ValidatorLicense with ..
 
 

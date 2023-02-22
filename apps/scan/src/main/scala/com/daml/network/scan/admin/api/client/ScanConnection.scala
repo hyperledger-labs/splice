@@ -4,7 +4,7 @@ import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.util.Contract
+import com.daml.network.util.{CoinUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -15,16 +15,18 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.util.TemplateJsonDecoder
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.HttpResponse
 import akka.stream.Materializer
+import com.daml.ledger.api.v1.CommandsOuterClass
+import com.digitalasset.canton.time.Clock
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
   */
 final class ScanConnection(
     config: CoinHttpClientConfig,
+    clock: Clock,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -86,7 +88,18 @@ final class ScanConnection(
     }
   }
 
-  def getLatestOpenAndIssuingMiningRounds()(implicit
+  def getLatestOpenMiningRound()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = {
+    for {
+      (openRounds, _) <- getOpenAndIssuingMiningRounds()
+      now = clock.now
+      openRound = CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+    } yield openRound
+  }
+
+  def getOpenAndIssuingMiningRounds()(implicit
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[
@@ -95,7 +108,6 @@ final class ScanConnection(
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
-
     for {
       (openRounds, issuingRounds) <- runHttpCmd(
         config.url,
@@ -125,17 +137,20 @@ final class ScanConnection(
   def getAppTransferContext(providerPartyId: PartyId)(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[coinCodegen.AppTransferContext] = {
+  ): Future[(coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])] = {
     for {
       context <- getTransferContext()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
       val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
       val openMiningRound = context.latestOpenMiningRound
-      new coinCodegen.AppTransferContext(
-        coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-        openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
-        featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
+      (
+        new coinCodegen.AppTransferContext(
+          coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+          openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+          featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
+        ),
+        Seq(coinRules.toDisclosedContract, openMiningRound.toDisclosedContract),
       )
     }
   }
@@ -143,7 +158,9 @@ final class ScanConnection(
   def getAppTransferContextForRound(providerPartyId: PartyId, round: roundCodegen.Round)(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Either[String, coinCodegen.AppTransferContext]] = {
+  ): Future[
+    Either[String, (coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])]
+  ] = {
     for {
       context <- getTransferContext()
       featured <- lookupFeaturedAppRight(providerPartyId)
@@ -152,10 +169,15 @@ final class ScanConnection(
       context.openMiningRounds.find(_.payload.round == round) match {
         case Some(openMiningRound) =>
           Right(
-            new coinCodegen.AppTransferContext(
-              coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-              openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
-              featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
+            (
+              new coinCodegen.AppTransferContext(
+                coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+                openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+                featured
+                  .map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE))
+                  .toJava,
+              ),
+              Seq(coinRules.toDisclosedContract, openMiningRound.toDisclosedContract),
             )
           )
         case None => Left("round is not an open mining round")

@@ -71,6 +71,7 @@ class SplitwellApp(
     scanConnection =
       new ScanConnection(
         config.remoteScan.adminApi,
+        clock,
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )

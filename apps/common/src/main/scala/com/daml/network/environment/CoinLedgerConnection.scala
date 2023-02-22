@@ -329,7 +329,9 @@ object CoinLedgerConnection {
           domainId: DomainId,
           disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[T] =
-        submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId).map(_._2)
+        submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts).map(
+          _._2
+        )
 
       def submitWithResultAndOffsetNoDedup[T](
           actAs: Seq[PartyId],

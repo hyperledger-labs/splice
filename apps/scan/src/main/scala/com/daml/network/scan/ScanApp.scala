@@ -27,7 +27,6 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.digitalasset.canton.lifecycle.AsyncCloseable
 import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.http.v0.scan.ScanResource
-
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.digitalasset.canton.config.ProcessingTimeout
 

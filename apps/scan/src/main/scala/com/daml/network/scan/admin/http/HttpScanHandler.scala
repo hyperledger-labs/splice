@@ -43,9 +43,7 @@ class HttpScanHandler(
       body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
   ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      val now = clock.now
       for {
-        latestOpen <- store.getLatestOpenMiningRound(now)
         acs <- store.defaultAcs
         issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
         openRounds <- acs.listContracts(OpenMiningRound.COMPANION)

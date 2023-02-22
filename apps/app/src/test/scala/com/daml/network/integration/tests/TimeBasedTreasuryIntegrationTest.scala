@@ -182,7 +182,7 @@ class TimeBasedTreasuryIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         10,
-        scan.getUnfeaturedAppTransferContext(),
+        scan,
         Duration.ofDays(10),
       )
       checkBalance(

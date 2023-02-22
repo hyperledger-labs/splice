@@ -1,12 +1,12 @@
 package com.daml.network.console
 
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.util.Contract
+import com.daml.network.util.{CoinUtil, Contract}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -15,6 +15,7 @@ import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.config.CoinHttpClientConfig
+import com.digitalasset.canton.data.CantonTimestamp
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -35,6 +36,25 @@ abstract class ScanAppReference(
   def getTransferContext(): HttpScanAppClient.TransferContext =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTransferContext)
+    }
+
+  @Help.Summary(
+    "Returns last-created open mining round that is open according to the passed time. "
+  )
+  def getLatestOpenMiningRound(
+      now: CantonTimestamp
+  ): Contract[OpenMiningRound.ContractId, OpenMiningRound] = {
+
+    val (openRounds, _) = getOpenAndIssuingMiningRounds()
+    CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+  }
+
+  @Help.Summary(
+    "Returns the CoinRules."
+  )
+  def getCoinRules(): Contract[CoinRules.ContractId, CoinRules] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetCoinRules(None))
     }
 
   @Help.Summary(

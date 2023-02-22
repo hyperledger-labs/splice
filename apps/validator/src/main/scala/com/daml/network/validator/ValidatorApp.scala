@@ -26,8 +26,8 @@ import com.daml.network.validator.config.{
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -123,31 +123,6 @@ class ValidatorApp(
     }
   }
 
-  private def waitForCoinRules(
-      connection: CoinLedgerConnection,
-      store: ValidatorStore,
-      svcParty: PartyId,
-      validatorParty: PartyId,
-  ): Future[Unit] = {
-    logger.info("Waiting for CoinRules contract to become visible")
-    retryProvider.retryForAutomation(
-      "Wait for CoinRules",
-      for {
-        coinRulesResult <- store.lookupCoinRulesWithOffset()
-        _ <- coinRulesResult match {
-          case QueryResult(_, Some(_)) =>
-            logger.info("CoinRules found, done waiting")
-            Future.successful(())
-          case _ =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(s"CoinRules contract not found yet")
-            )
-        }
-      } yield (),
-      this,
-    )
-  }
-
   private def ensureOnboarded(
       connection: CoinLedgerConnection,
       store: ValidatorStore,
@@ -224,6 +199,7 @@ class ValidatorApp(
         Future.successful(
           new ScanConnection(
             config.remoteScan.adminApi,
+            clock,
             coinAppParameters.processingTimeouts,
             loggerFactory,
           )
@@ -277,7 +253,6 @@ class ValidatorApp(
         logger,
       )
       _ <- ensureOnboarded(connection, store, validatorParty, config.onboarding)
-      _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

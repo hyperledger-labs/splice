@@ -10,6 +10,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -63,10 +64,10 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
         shouldBe empty
     )
 
-    // check that alice's validator can see the coinrules
+    // check that alice's validator can see its license.
     val aliceValidatorParty = aliceValidator.getValidatorPartyId()
     aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-      .awaitJava(cc.coin.CoinRules.COMPANION)(aliceValidatorParty)
+      .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorParty)
 
     // onboard end user
     aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
@@ -95,10 +96,6 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
           license.data.validator shouldBe bobValidatorParty.toProtoPrimitive
         }
       }
-    }
-    clue("Bob's validator can see the CoinRules") {
-      bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(cc.coin.CoinRules.COMPANION)(bobValidatorParty)
     }
     clue("Bob's validator can restart cleanly.") {
       bobValidator.stop()

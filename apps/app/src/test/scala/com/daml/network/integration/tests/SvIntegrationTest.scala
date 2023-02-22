@@ -132,9 +132,8 @@ class SvIntegrationTest extends CoinIntegrationTest {
       "request to onboard the candidate",
       sv.onboardValidator(candidate, secret),
     )(
-      "the candidate is now an observer to the CoinRules and the secret is marked as used",
+      "the candidate's secret is marked as used",
       Unit => {
-        getCoinRules().observers should contain(candidate.toProtoPrimitive)
         inside(
           svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)

@@ -53,9 +53,6 @@ class SvcTimeBasedIntegrationTest
     // Sync with background automation that onboards validator.
     eventually()({
       val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
-      rounds.map {
-        _.data.observers should have length 4
-      }
       rounds should have size 3
     })
 

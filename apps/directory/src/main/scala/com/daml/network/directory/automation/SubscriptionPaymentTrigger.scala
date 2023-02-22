@@ -1,6 +1,7 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
@@ -50,12 +51,19 @@ class SubscriptionPaymentTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
         log: String => Unit = logger.warn(_),
     ) = {
       log(s"rejecting subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
       connection
-        .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq, domainId)
+        .submitCommandsNoDedup(
+          Seq(provider),
+          Seq(),
+          cmd.asScala.toSeq,
+          domainId,
+          disclosedContracts,
+        )
         .map(_ => TaskSuccess(s"rejected subscription payment: $reason"))
     }
     def collectPayment(
@@ -66,6 +74,7 @@ class SubscriptionPaymentTrigger(
         offset: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
+        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       val cmd =
         contextId
@@ -84,6 +93,7 @@ class SubscriptionPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
             deduplicationOffset = offset,
             domainId = domainId,
+            disclosedContracts = disclosedContracts,
           )
       } yield TaskSuccess("renewed directory entry.")
     }
@@ -104,17 +114,17 @@ class SubscriptionPaymentTrigger(
         payment.payload.round,
       )
       result <- transferContextE match {
-        case Right(transferContext) =>
+        case Right((transferContext, disclosedContracts)) =>
           // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
           val entryName = directoryEntryContext.payload.name
           // check whether the entry exists
           store.lookupEntryByNameWithOffset(entryName).flatMap {
             case QueryResult(off, Some(entry)) =>
               // collect the payment and renew the entry
-              collectPayment(entry, off, transferContext, domainId)
+              collectPayment(entry, off, transferContext, domainId, disclosedContracts)
             case QueryResult(_, None) => {
               if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
-                rejectPayment("entry doesn't exist.", transferContext, domainId)
+                rejectPayment("entry doesn't exist.", transferContext, domainId, disclosedContracts)
               } else {
                 // If the entry doesn't exist, and the payment is now past due, then
                 // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
@@ -124,6 +134,7 @@ class SubscriptionPaymentTrigger(
                   "entry has already been expired",
                   transferContext,
                   domainId,
+                  disclosedContracts,
                   logger.info(_),
                 )
               }
@@ -132,13 +143,14 @@ class SubscriptionPaymentTrigger(
         case Left(err) =>
           scanConnection
             .getAppTransferContext(store.svcParty)
-            .flatMap(
+            .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
-                _,
+                transferContext,
                 domainId,
+                disclosedContracts,
               )
-            )
+            }
       }
     } yield result
   }
