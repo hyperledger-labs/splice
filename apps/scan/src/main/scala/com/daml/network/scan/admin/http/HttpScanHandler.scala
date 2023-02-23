@@ -4,14 +4,16 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.time.Clock
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.util.Contract
+import com.daml.network.util.PrettyInstances.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.util.Proto
@@ -77,7 +79,7 @@ class HttpScanHandler(
           round.contractId.contractId,
           if (roundIsAlreadyCached) {
             logger.debug(
-              s"Not sending mining round with contract-id ${round.contractId.contractId} again because it is already cached by the client."
+              show"Not sending ${PrettyContractId(round)}, as it is cached by the client."
             )
             MaybeCachedContract(None)
           } else MaybeCachedContract(Some(round.toJson)),
@@ -101,7 +103,7 @@ class HttpScanHandler(
         val response = body.cachedCoinRulesContractId match {
           case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
             logger.debug(
-              s"Not sending coin rules with contract-id $cachedContractId again because they are already cached by the client."
+              show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
             )
             MaybeCachedContract(None)
           case Some(_) => // else: coin rules are cached but outdated.
@@ -153,7 +155,7 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
         acs <- store.defaultAcs
-        apps <- acs.listContracts(FeaturedAppRight.COMPANION)
+        apps <- acs.listContracts(coinCodegen.FeaturedAppRight.COMPANION)
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toJson))
       }
@@ -167,7 +169,7 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => span =>
       for {
         acs <- store.defaultAcs
-        right <- acs.findContract(FeaturedAppRight.COMPANION)(co =>
+        right <- acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.provider == providerPartyId
         )
       } yield {

@@ -48,7 +48,7 @@ class WalletRewardsTimeBasedIntegrationTest
       val prevCoins = bobWallet.list().coins
 
       // Bob collects/realizes rewards
-      // it takes 3 ticks for IR 1 to be created and open.
+      // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
       advanceRoundsByOneTick
       advanceRoundsByOneTick
       advanceRoundsByOneTick

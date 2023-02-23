@@ -166,14 +166,25 @@ object PrettyInstances extends PrettyInstances {
   /** Helper class to pretty-print contract-id references together with their template or interface identifier. */
   case class PrettyContractId(
       identifier: javaapi.data.Identifier,
-      contractId: javaapi.data.codegen.ContractId[_],
+      contractId: String,
   ) extends PrettyPrinting {
 
     override def pretty: Pretty[this.type] =
       prettyNode(
         "ContractId",
-        param("id", typedCid => prettyContractIdString.treeOf(typedCid.contractId.contractId)),
+        param("id", typedCid => prettyContractIdString.treeOf(typedCid.contractId)),
         param("type", typedCid => prettyIdentifier.treeOf(typedCid.identifier)),
       )
+  }
+
+  object PrettyContractId {
+    def apply(contract: Contract[?, ?]): PrettyContractId =
+      PrettyContractId(contract.identifier, contract.contractId)
+
+    def apply(
+        identifier: javaapi.data.Identifier,
+        contractId: javaapi.data.codegen.ContractId[?],
+    ): PrettyContractId =
+      PrettyContractId(identifier, contractId.contractId)
   }
 }

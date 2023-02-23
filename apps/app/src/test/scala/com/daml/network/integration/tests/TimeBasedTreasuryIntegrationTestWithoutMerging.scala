@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -9,10 +10,12 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.ShowUtil.*
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
@@ -407,7 +410,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "egress caching avoids re-sending contracts if they are already known by the client" in {
     implicit env =>
       val (_, _) = onboardAliceAndBob()
-      val coinRules = scan.getUnfeaturedAppTransferContext().coinRules
+      val coinRulesId = scan.getUnfeaturedAppTransferContext().coinRules
 
       clue("create issuing rounds 0 and 1") {
         advanceRoundsByOneTick
@@ -433,8 +436,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               entries,
             )(
               // but only the non-expired coin is selected as input.
-              _.message should include regex (
-                s"Not sending mining round with contract-id ${issuingRound1.contractId.contractId} again because it is already cached by the client."
+              _.message should include(
+                show"Not sending ${PrettyContractId(issuingRound1)}"
               )
             )
             forAtLeast(
@@ -442,8 +445,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               entries,
             )(
               // but only the non-expired coin is selected as input.
-              _.message should include regex (
-                s"Not sending coin rules with contract-id ${coinRules.contractId} again because they are already cached by the client."
+              _.message should include(
+                show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, coinRulesId)}"
               )
             )
           },
