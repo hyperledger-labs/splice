@@ -1138,6 +1138,7 @@ workflows:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - hold:
+          <<: *main-branch-never
           type: approval
       # Deployment
       - docker_images_push:
@@ -1182,6 +1183,7 @@ workflows:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - hold:
+          <<: *main-branch-never
           type: approval
       # Deployment
       - docker_images_push:
@@ -1226,6 +1228,7 @@ workflows:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - hold:
+          <<: *main-branch-never
           type: approval
       # Deployment
       - docker_images_push:
