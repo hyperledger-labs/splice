@@ -7,7 +7,7 @@
         "json": true,
         "hide-extra": false,
         "file-pattern": "\\.clog.*",
-        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 20 },"] ", { "field": "level" }, " - ", { "field": "logger_name", "max-width" : 100 }, " (", { "field" : "trace-id", "default-value" : "" }, ") - ", { "field" : "message" },
+        "line-format": [ { "field" : "@timestamp" }, " [", { "field" : "thread_name", "max-width" : 20 },"] ", { "field": "level" }, " - ", { "field": "logger_name" }, " (", { "field" : "trace-id", "default-value" : "" }, ") - ", { "field" : "message" },
             " ",
             { "field" : "stack_trace", "default-value" : "" }
         ],
