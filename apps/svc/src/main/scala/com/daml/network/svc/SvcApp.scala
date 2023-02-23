@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.SvcAppBackendConfig
@@ -35,7 +35,6 @@ class SvcApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
-    val retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -48,7 +47,6 @@ class SvcApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      CoinRetries(loggerFactory),
     ) {
 
   override def initialize(

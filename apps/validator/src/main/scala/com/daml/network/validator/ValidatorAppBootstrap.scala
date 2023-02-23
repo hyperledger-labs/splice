@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
+import com.daml.network.environment.{CoinNodeBootstrapBase}
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -38,7 +38,6 @@ class ValidatorAppBootstrap(
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -75,7 +74,6 @@ class ValidatorAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          retryProvider,
           futureSupervisor,
         )
       )
@@ -98,7 +96,6 @@ object ValidatorAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
-      retryProvider: CoinRetries,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -119,7 +116,6 @@ object ValidatorAppBootstrap {
           new CommunityStorageFactory(validatorConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
-          retryProvider,
           futureSupervisor,
           configuredOpenTelemetry,
         )

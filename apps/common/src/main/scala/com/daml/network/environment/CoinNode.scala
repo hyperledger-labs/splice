@@ -43,7 +43,6 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     parameters: SharedCoinAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -54,6 +53,8 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     with HasUptime
     with NoTracing {
   val name: InstanceName
+
+  protected val retryProvider: CoinRetries = CoinRetries(loggerFactory)
 
   override val timeouts = parameters.processingTimeouts
 

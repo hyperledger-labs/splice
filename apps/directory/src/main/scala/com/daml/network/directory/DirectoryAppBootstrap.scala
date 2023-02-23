@@ -8,7 +8,7 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -36,7 +36,6 @@ class DirectoryAppBootstrap(
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -74,7 +73,6 @@ class DirectoryAppBootstrap(
           loggerFactory,
           tracerProvider,
           adminServerRegistry,
-          retryProvider,
           futureSupervisor,
         )
       )
@@ -98,7 +96,6 @@ object DirectoryAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
-      retryProvider: CoinRetries,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -119,7 +116,6 @@ object DirectoryAppBootstrap {
           new CommunityStorageFactory(directoryConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
-          retryProvider,
           futureSupervisor,
           configuredOpenTelemetry,
         )

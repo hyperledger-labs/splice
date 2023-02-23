@@ -8,7 +8,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
@@ -44,7 +44,6 @@ class ScanApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -57,7 +56,6 @@ class ScanApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      CoinRetries(loggerFactory),
     ) {
 
   override def initialize(

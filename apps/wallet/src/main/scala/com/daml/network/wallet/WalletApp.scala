@@ -12,7 +12,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
@@ -46,7 +46,6 @@ class WalletApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -60,7 +59,6 @@ class WalletApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      CoinRetries(loggerFactory),
     ) {
 
   override def initialize(

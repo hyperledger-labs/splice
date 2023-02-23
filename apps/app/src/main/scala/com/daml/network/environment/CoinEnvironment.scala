@@ -54,7 +54,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     )
       .valueOr(err =>
@@ -89,7 +88,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     )
       .valueOr(err =>
@@ -122,7 +120,6 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       futureSupervisor,
       configuredOpenTelemetry,
     )
@@ -158,7 +155,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     )
       .valueOr(err =>
@@ -193,7 +189,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     )
       .valueOr(err =>
@@ -228,7 +223,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     ).valueOr(err =>
       throw new RuntimeException(
@@ -262,7 +256,6 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(appLoggerFactory),
       configuredOpenTelemetry,
     )
       .valueOr(err =>

@@ -11,7 +11,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
@@ -49,7 +49,6 @@ class ValidatorApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -62,7 +61,6 @@ class ValidatorApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      retryProvider,
     ) {
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {

@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -37,7 +37,6 @@ class SplitwellAppBootstrap(
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -75,7 +74,6 @@ class SplitwellAppBootstrap(
           loggerFactory,
           tracerProvider,
           adminServerRegistry,
-          retryProvider,
           futureSupervisor,
         )
       )
@@ -99,7 +97,6 @@ object SplitwellAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
-      retryProvider: CoinRetries,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -120,7 +117,6 @@ object SplitwellAppBootstrap {
           new CommunityStorageFactory(splitwellConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
-          retryProvider,
           futureSupervisor,
           configuredOpenTelemetry,
         )

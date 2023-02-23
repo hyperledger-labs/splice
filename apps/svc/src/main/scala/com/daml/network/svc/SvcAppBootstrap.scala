@@ -6,14 +6,14 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.telemetry.{ConfiguredOpenTelemetry}
+import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -37,7 +37,6 @@ class SvcAppBootstrap(
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -75,7 +74,6 @@ class SvcAppBootstrap(
           loggerFactory,
           tracerProvider,
           adminServerRegistry,
-          retryProvider,
           futureSupervisor,
         )
       )
@@ -99,7 +97,6 @@ object SvcAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
-      retryProvider: CoinRetries,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -120,7 +117,6 @@ object SvcAppBootstrap {
           new CommunityStorageFactory(svcConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
-          retryProvider,
           futureSupervisor,
           configuredOpenTelemetry,
         )

@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -37,7 +37,6 @@ class WalletAppBootstrap(
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -76,7 +75,6 @@ class WalletAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          retryProvider,
           futureSupervisor,
         )
       )
@@ -100,7 +98,6 @@ object WalletAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
-      retryProvider: CoinRetries,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -121,7 +118,6 @@ object WalletAppBootstrap {
           new CommunityStorageFactory(walletConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
-          retryProvider,
           futureSupervisor,
           configuredOpenTelemetry,
         )

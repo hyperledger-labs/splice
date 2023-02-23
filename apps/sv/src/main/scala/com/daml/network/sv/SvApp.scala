@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.http.HttpSvHandler
@@ -20,7 +20,7 @@ import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, FlagCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
@@ -42,7 +42,6 @@ class SvApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
-    val retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -55,7 +54,6 @@ class SvApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      CoinRetries(loggerFactory),
     ) {
 
   override def initialize(
@@ -84,7 +82,7 @@ class SvApp(
       ledgerConnection = ledgerClient.connection()
       _ <-
         if (config.foundConsortium) {
-          foundConsortium(svcStore, ledgerConnection, globalDomain, retryProvider, this)
+          foundConsortium(svcStore, ledgerConnection, globalDomain)
         } else {
           retryProvider.retryForAutomation(
             "join existing SV consortium",
@@ -164,15 +162,13 @@ class SvApp(
       svcStore: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       globalDomain: DomainId,
-      retryProvider: CoinRetries,
-      flagCloseable: FlagCloseable,
   ): Future[Unit] = {
     for {
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomation(
         "boostrapping SVC",
         bootstrapSvc(svcStore, ledgerConnection, globalDomain),
-        flagCloseable,
+        this,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
       _ <- waiveSvcRights(svcStore.key.svcParty, ledgerConnection)

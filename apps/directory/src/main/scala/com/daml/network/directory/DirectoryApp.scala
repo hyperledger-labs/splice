@@ -16,7 +16,7 @@ import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
@@ -47,7 +47,6 @@ class DirectoryApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -61,7 +60,6 @@ class DirectoryApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      retryProvider,
     ) {
 
   override def initialize(

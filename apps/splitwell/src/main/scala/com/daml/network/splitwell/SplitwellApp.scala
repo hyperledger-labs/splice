@@ -5,7 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
 import com.daml.network.splitwell.automation.SplitwellAutomationService
@@ -39,7 +39,6 @@ class SplitwellApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
-    retryProvider: CoinRetries,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -52,7 +51,6 @@ class SplitwellApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-      retryProvider,
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
