@@ -1,5 +1,7 @@
 import { createTheme } from '@mui/material/styles';
 
+import { generateHslPalette } from './colors';
+
 // TS module augmentation to add custom theme vars for storing our CN-theme color values
 declare module '@mui/material/styles' {
   interface Palette {
@@ -31,16 +33,7 @@ let theme = createTheme({
   palette: {
     mode: 'dark',
     colors: {
-      neutral: {
-        '20': '#243042',
-        '25': '#2D3D52',
-        '30': '#364963',
-        '40': '#486184',
-        '50': '#5A79A5',
-        '60': '#7B94B7',
-        '70': '#9CAFC9',
-        '80': '#BDC9DB',
-      },
+      neutral: generateHslPalette(215, 29, [20, 25, 30, 40, 50, 60, 70, 80]),
     },
   },
 });
