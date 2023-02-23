@@ -944,6 +944,11 @@ jobs:
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            make cluster/images/docs/html
+           tar -zcf cluster/images/docs/docs.tar.gz --exclude-vcs  cluster/images/docs/target
+      - store_artifacts:
+         name: Storing archive of generated documentation
+         path: cluster/images/docs/docs.tar.gz
+         destination: docs.tar.gz
 
   docker_images_push:
     machine:
