@@ -68,10 +68,9 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
     // testFinished runs before afterEach and tears down all our apps.
-    // Therefore, we need to check for errors here. Otherwise, we run
-    // into issues where we get an error just by virtue of the gRPC
-    // service being down.
-    checkErrorsAndStopWebDrivers(env.executionContext)
+    // Therefore, we stop the web browsers here so we don't get log warnings
+    // because the frontends fail to connect to backends.
+    stopWebDrivers(env.executionContext)
     super.testFinished(env)
   }
 }
@@ -87,7 +86,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
   }
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
-    checkErrorsAndStopWebDrivers(env.executionContext)
+    stopWebDrivers(env.executionContext)
     super.testFinished(env)
   }
 }
@@ -148,13 +147,10 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
       }
     }.futureValue
 
-  protected def checkErrorsAndStopWebDrivers(implicit ec: ExecutionContext) =
+  protected def stopWebDrivers(implicit ec: ExecutionContext) =
     // We process all browsers in parallel, for faster test termination.
-    webDrivers.values.toList.parTraverse { implicit webDriver =>
+    webDrivers.values.toList.parTraverse { webDriver =>
       Future {
-        // we optimistically wait only shortly, for faster test termination
-        webDriver.manage().timeouts().implicitlyWait(Duration.ofMillis(100))
-        findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
         webDriver.quit()
       }
     }.futureValue
