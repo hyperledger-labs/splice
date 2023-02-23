@@ -6,6 +6,7 @@ import Daml.Script
 import DA.List
 
 import qualified CC.API.V1.Coin as API
+import CC.API.V1.Round (Round(..))
 import CC.Coin
 import CC.CoinConfig hiding (CC, USD)
 import CC.Schedule
@@ -61,10 +62,23 @@ acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transfer
 
 collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
 collectAcceptedPayment app provider acceptedAppPayment = do
+  (_, round) <- getLatestOpenRound app
+  collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
+
+collectAcceptedPaymentInRound : CCApp -> Round -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContextForRound app provider round
+  -- multi party submit to simplify test
+  _ <- submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  pure ()
+
+collectAcceptedPaymentMustFail : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContext app provider
   -- multi party submit to simplify test
-  _ <- submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  _ <- submitMultiMustFail (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
 checkCoinPositions : CCUser -> [Decimal] -> Script ()
@@ -258,6 +272,38 @@ testCCPaymentRequest = script do
     transferConfigCC.lockHolderFee.fee * 3.0
   coupon.provider === validator
   coupon.featured === True
+
+  pure ()
+
+testCCPaymentCollectionRoundInLatestRoundMustFail : Script ()
+testCCPaymentCollectionRoundInLatestRoundMustFail = script do
+  app <- setupApp
+  advanceToIssuanceWithPrice app 1.0
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  charlie <- setupUser app "charlie" validator
+
+  coin <- tap app alice 27.0
+  t <- getTime
+  (transferRequest, deliveryOffer) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 15.0 CC),
+      (charlie.primaryParty, PaymentAmount 10.0 CC)]
+
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice validator None transferRequest coin
+
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  
+  runNextIssuance app
+
+  collectAcceptedPaymentMustFail app alice acceptedPaymentCid
+
+  collectAcceptedPaymentInRound app acceptedPayment.round alice acceptedPaymentCid
 
   pure ()
 

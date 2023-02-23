@@ -7,6 +7,7 @@ import Daml.Script
 
 import CC.Coin
 import qualified CC.API.V1.Coin as API
+import CC.API.V1.Round (Round)
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
@@ -23,9 +24,16 @@ template TestSubscriptionContext
     interface instance SubscriptionContext for TestSubscriptionContext where
       view = SubscriptionContextView with description, svc, sender = user
 
+data Users = Users with
+  validator : Party
+  alice : CCUser
+  pizzeria : CCUser
+  provider : CCUser
 
-testSubscription : Script ()
-testSubscription = script do
+testPayData = SubscriptionPayData (PaymentAmount 12.0 CC) (days 28) (days 1) (minutes 5)
+
+testSetup : Script (CCApp, Users, ContractId TestSubscriptionContext, ContractId SubscriptionRequest)
+testSetup = script do
   app <- setupApp
   runNextIssuance app
   runCoinDepositBots app
@@ -36,20 +44,25 @@ testSubscription = script do
   provider <- setupUser app "la_famiglia" validator
 
   tap app alice 42.0
-  let payData = SubscriptionPayData (PaymentAmount 12.0 CC) (days 28) (days 1) (minutes 5)
-
+  
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
 
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
+  pure (app, Users with .., context, subscriptionRequestCid)
 
+
+testSubscription : Script ()
+testSubscription = script do
+  (app, Users with .., context, subscriptionRequestCid) <- testSetup
+  
   -- reject...
   submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   None <- queryContractId pizzeria.primaryParty context
   -- ...and retry
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
 
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
   None <- queryContractId alice.primaryParty subscriptionRequestCid
@@ -61,7 +74,7 @@ testSubscription = script do
   -- ..and retry
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
-  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
   (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
@@ -74,8 +87,44 @@ testSubscription = script do
   subscriptionState === SubscriptionIdleState with
     subscription = subscriptionCid
     subscriptionData
-    payData
+    payData = testPayData
     nextPaymentDueAt = t `addRelTime` (days 28)
+
+testInitialSubscriptionPaymentInLatestRoundMustFail: Script ()
+testInitialSubscriptionPaymentInLatestRoundMustFail = script do
+  (app, Users with .., context, subscriptionRequestCid) <- testSetup
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+  Some initialPayment <- queryContractId alice.primaryParty initialPaymentCid
+
+  runNextIssuance app
+
+  -- Cannot be collected through latest round.
+  collectInitialSubscriptionPaymentMustFail app provider pizzeria alice.primaryParty initialPaymentCid
+    -- Can still be collected if we select the right round.
+  collectInitialSubscriptionPaymentInRound app initialPayment.round provider pizzeria alice.primaryParty initialPaymentCid
+  pure ()
+
+testSubscriptionPaymentInLatestRoundMustFail : Script ()
+testSubscriptionPaymentInLatestRoundMustFail = script do
+  (app, Users with .., context, subscriptionRequestCid) <- testSetup
+  initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
+
+  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  passTime (days 27)
+  runNextIssuance app
+
+  paymentCid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
+  Some payment <- queryContractId alice.primaryParty paymentCid
+
+  runNextIssuance app
+
+  -- Cannot be collected through latest round.
+  collectSubscriptionPaymentMustFail app provider pizzeria alice.primaryParty paymentCid
+  -- Can still be collected if we select the right round.
+  collectSubscriptionPaymentInRound app payment.round provider pizzeria alice.primaryParty paymentCid
+
+  pure ()  
 
 testUSDSubscription : Script ()
 testUSDSubscription = script do
@@ -111,7 +160,7 @@ testUSDSubscription = script do
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator (Some featuredValidator) subscriptionRequestCid
 
-  (_, round) <- getLatestActiveOpenRound app
+  (_, round) <- getLatestOpenRound app
 
   let transferConfigCC = transferConfigCCFromOpenRound round
       expectedFeeInLockLeg =
@@ -216,23 +265,45 @@ failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight s
     context
     walletProvider
 
-
 collectInitialSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)
 collectInitialSubscriptionPayment app provider receiver sender payment = do
+  (_, round) <- getLatestOpenRound app
+  collectInitialSubscriptionPaymentInRound app round.round provider receiver sender payment
+
+collectInitialSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)
+collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  transferContext <- getAppTransferContext app provider
+  transferContext <- getAppTransferContextForRound app provider round
   (subscription, state, coin) <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
   return (subscription, state, coin)
 
+collectInitialSubscriptionPaymentMustFail : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
+collectInitialSubscriptionPaymentMustFail app provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContext app provider
+  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+    transferContext
 
 collectSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId API.Coin)
 collectSubscriptionPayment app provider receiver sender payment = do
+  (_, round) <- getLatestOpenRound app
+  collectSubscriptionPaymentInRound app round.round provider receiver sender payment
+
+collectSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId API.Coin)
+collectSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  transferContext <- getAppTransferContext app provider
+  transferContext <- getAppTransferContextForRound app provider round
   (state, coin) <- submitMulti [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
   return (state, coin)
+
+collectSubscriptionPaymentMustFail : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script ()
+collectSubscriptionPaymentMustFail app provider receiver sender payment = do
+  readAs <- getUserReadAs receiver.userId
+  transferContext <- getAppTransferContext app provider
+  submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
+    transferContext
 
 diffContracts : [(ContractId a, a)] -> [(ContractId a, a)] -> [(ContractId a, a)]
 diffContracts as bs =

@@ -13,6 +13,7 @@ import DA.List.Total
 import DA.Time
 
 import qualified CC.API.V1.Coin as API
+import CC.API.V1.Round (Round(..))
 import CC.Coin
 import CC.Issuance
 import CC.Round
@@ -411,6 +412,19 @@ getFeaturedAppRight app provider = do
 getAppTransferContext : CCApp -> CCUser -> Script API.AppTransferContext
 getAppTransferContext app provider = do
   openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
+  coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
+  featuredAppRight <- getFeaturedAppRight app provider.primaryParty
+  pure API.AppTransferContext with
+    coinRules
+    openMiningRound
+    featuredAppRight
+
+getAppTransferContextForRound : CCApp -> CCUser -> Round -> Script API.AppTransferContext
+getAppTransferContextForRound app provider round = do
+  openMiningRounds <- getOpenRoundsSorted app
+  openMiningRound <- case find (\(_, payload) -> payload.round == round) openMiningRounds of
+        None -> abort ("No open mining round for round " <> show round)
+        Some (cid, _) -> pure (toInterfaceContractId cid )
   coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
   featuredAppRight <- getFeaturedAppRight app provider.primaryParty
   pure API.AppTransferContext with

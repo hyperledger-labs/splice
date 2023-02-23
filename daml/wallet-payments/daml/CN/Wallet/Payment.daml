@@ -93,7 +93,6 @@ template AppPaymentRequest
            receiverAmountToCCReceiverAmount svc sender context.context.openMiningRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         -- TODO(#1492) Lock to specific round to avoid fees changing
          outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
 
          -- lock the coin and create an accepted payment
@@ -168,6 +167,8 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller signatory this
       do
+        contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
+        require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin (LockedCoin_Unlock context.coinRules)
         let transfer = Transfer with
