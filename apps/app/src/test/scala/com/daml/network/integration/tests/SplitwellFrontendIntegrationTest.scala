@@ -223,9 +223,9 @@ class SplitwellFrontendIntegrationTest
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
         val errorMsg = "is not part of the group"
-        loggerFactory.assertLogs(
+        loggerFactory.assertLoggedWarningsAndErrorsSeq(
           enterSplitwellPayment("unknown::abc", PartyId.tryFromProtoPrimitive("unknown::abc"), 42),
-          _.errorMessage should include(errorMsg),
+          logs => forExactly(1, logs)(_.errorMessage should include(errorMsg)),
         )
         consumeError(errorMsg)
       }

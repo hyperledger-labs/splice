@@ -182,10 +182,10 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
 
-  def submitTransferNoDedup(
+  def submitTransferAndWaitNoDedup(
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
-  ): Future[Unit]
+  )(implicit traceContext: TraceContext): Future[Unit]
 }
 
 /** Subscription for reading the ledger */
@@ -792,12 +792,99 @@ object CoinLedgerConnection {
         } yield ()
       }
 
-      override def submitTransferNoDedup(
+      override def submitTransferAndWaitNoDedup(
           submitter: PartyId,
           command: LedgerClient.TransferCommand,
-      ): Future[Unit] = {
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        val applicationId = coinLedgerClient.applicationId
         val commandId = UUID.randomUUID().toString()
-        client.submitTransfer(coinLedgerClient.applicationId, commandId, submitter, command)
+        val listenDomain = command match {
+          case in: LedgerClient.TransferCommand.In => in.target
+          case out: LedgerClient.TransferCommand.Out => out.source
+        }
+        logger.debug(s"transfer $commandId is for $command")
+        for {
+          _ <- cancelIfFailed(
+            client
+              .completions(applicationId, Seq(submitter), begin = None, listenDomain)
+              .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
+          )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
+            client.submitTransfer(
+              applicationId,
+              commandId,
+              submissionId = commandId,
+              submitter,
+              command,
+            )
+          )
+        } yield ()
+      }
+
+      // simulate the completion check of command service; future only yields
+      // successfully if the completion was OK
+      private[this] def awaitCompletion(
+          applicationId: String,
+          commandId: String,
+      )(implicit
+          traceContext: TraceContext
+      ): Sink[LedgerClient.CompletionStreamResponse, Future[LedgerClient.Completion]] = {
+        import io.grpc.Status.{DEADLINE_EXCEEDED, OK, UNAVAILABLE}
+        import concurrent.duration.*
+        val howLongToWait = timeouts.shutdownShort.asFiniteApproximation - 500.millis
+        Flow[LedgerClient.CompletionStreamResponse]
+          .completionTimeout(howLongToWait)
+          .recover { case te: concurrent.TimeoutException =>
+            val ex = DEADLINE_EXCEEDED
+              .withCause(te)
+              .augmentDescription(s"timeout while awaiting completion of transfer $commandId")
+              .asRuntimeException()
+            // TODO (#3001) mapError to ex instead of logging and faking success
+            logger.warn(
+              s"transfer $commandId did not deliver a completion in $howLongToWait, possibly due to duplicate submission; assuming success",
+              ex,
+            )
+            // fake a success
+            LedgerClient.CompletionStreamResponse(
+              Seq(LedgerClient.Completion(applicationId, commandId, commandId, OK, Seq.empty))
+            )
+          }
+          .collect(
+            Function unlift { csr =>
+              // TODO(tech-debt) don't parse completions that don't match
+              csr.completions find (_.matchesSubmission(applicationId, commandId, commandId))
+            }
+          )
+          .take(1)
+          .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
+          .toMat(
+            Sink
+              .headOption[LedgerClient.Completion]
+              .mapMaterializedValue(_ map (_ map { completion =>
+                if (completion.status.isOk) completion
+                else throw completion.status.asRuntimeException()
+              } getOrElse {
+                throw UNAVAILABLE
+                  .augmentDescription(
+                    s"participant stopped while awaiting completion of transfer $commandId"
+                  )
+                  .asRuntimeException()
+              }))
+          )(Keep.right)
+      }
+
+      // run in connected to out first, *then start* fb
+      // but proactively cancel the in->out graph if fb fails
+      private[this] def cancelIfFailed[A, E, B](in: Source[E, _])(out: Sink[E, Future[A]])(
+          fb: => Future[B]
+      ): Future[(A, B)] = {
+        val (ks, fa) = in.viaMat(KillSwitches.single)(Keep.right).toMat(out)(Keep.both).run()
+        fa zip fb.transform(
+          identity,
+          { t =>
+            ks.abort(t)
+            t
+          },
+        )
       }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()

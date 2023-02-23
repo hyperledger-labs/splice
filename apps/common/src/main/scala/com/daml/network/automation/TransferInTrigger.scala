@@ -42,7 +42,7 @@ class TransferInTrigger(
       outcome <-
         if (partyId == transferOut.submitter) {
           for {
-            _ <- connection.submitTransferNoDedup(
+            _ <- connection.submitTransferAndWaitNoDedup(
               submitter = partyId,
               command = LedgerClient.TransferCommand.In(
                 transferOutId = transferOut.event.transferOutId,

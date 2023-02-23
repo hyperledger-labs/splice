@@ -30,6 +30,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.digitalasset.canton.research.participant.multidomain.{
+  command_completion_service as mdcpl,
   transfer as xfr,
   transfer_command as xfrcmd,
   transfer_submission_service as xfrsvc,
@@ -39,7 +40,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, Duration}
-import io.grpc.{Channel, StatusRuntimeException}
+import io.grpc.{Channel, Status as GrpcStatus, StatusRuntimeException}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
@@ -68,7 +69,12 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     elc: ErrorLoggingContext,
 ) extends Closeable {
 
-  import LedgerClient.{GetTreeUpdatesResponse, GetUpdatesRequest, scalapbToJava}
+  import LedgerClient.{
+    GetTreeUpdatesResponse,
+    GetUpdatesRequest,
+    CompletionStreamResponse,
+    scalapbToJava,
+  }
 
   val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
     withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
@@ -89,6 +95,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   private val transferSubmissionServiceStub
       : xfrsvc.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
     withCredentials(xfrsvc.TransferSubmissionServiceGrpc.stub(channel), token)
+  private val multidomainCompletionServiceStub
+      : mdcpl.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
+    withCredentials(mdcpl.CommandCompletionServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -350,6 +359,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   def submitTransfer(
       applicationId: String,
       commandId: String,
+      submissionId: String,
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
   ): Future[Unit] =
@@ -359,12 +369,30 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
           .TransferSubmitRequest(
             applicationId,
             commandId,
+            submissionId,
             submitter,
             command,
           )
           .toProto
       )
       .map((_: Empty) => ())
+
+  def completions(
+      applicationId: String,
+      parties: Seq[PartyId],
+      begin: Option[LedgerOffset],
+      domain: DomainId,
+  ): Source[CompletionStreamResponse, NotUsed] =
+    ClientAdapter.serverStreaming(
+      mdcpl.CompletionStreamRequest(
+        ledgerId = "",
+        applicationId = applicationId,
+        parties = parties.map(_.toProtoPrimitive),
+        offset = begin map (lo => ledger_offset.LedgerOffset.fromJavaProto(lo.toProto)),
+        domainId = domain.toProtoPrimitive,
+      ),
+      multidomainCompletionServiceStub.completionStream,
+    ) map CompletionStreamResponse.fromProto
 }
 
 object LedgerClient {
@@ -566,6 +594,7 @@ object LedgerClient {
   final case class TransferSubmitRequest(
       applicationId: String,
       commandId: String,
+      submissionId: String,
       submitter: PartyId,
       command: TransferCommand,
   ) {
@@ -573,6 +602,7 @@ object LedgerClient {
       val baseCommand = xfrcmd.TransferCommand(
         applicationId = applicationId,
         commandId = commandId,
+        submissionId = submissionId,
         submitter = submitter.toProtoPrimitive,
       )
       val updatedCommand = command match {
@@ -584,6 +614,54 @@ object LedgerClient {
       xfrsvc.SubmitRequest(
         Some(updatedCommand)
       )
+    }
+  }
+
+  final case class CompletionStreamResponse(completions: Seq[Completion])
+
+  object CompletionStreamResponse {
+    def fromProto(spb: mdcpl.CompletionStreamResponse): CompletionStreamResponse =
+      // ignoring checkpoint
+      CompletionStreamResponse(spb.completions map Completion.fromProto)
+  }
+
+  import com.daml.error.utils.ErrorDetails, ErrorDetails.ErrorDetail
+
+  final case class Completion(
+      applicationId: String,
+      commandId: String,
+      submissionId: String,
+      status: GrpcStatus,
+      errorDetails: Seq[ErrorDetail],
+  ) {
+    def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
+      this.applicationId == applicationId &&
+        // TODO (#3002) transfer completions currently set literal "command-id";
+        // https://github.com/DACH-NY/canton/issues/11732
+        (this.commandId == commandId || this.commandId == "command-id") &&
+        this.submissionId == submissionId
+  }
+
+  object Completion {
+    def fromProto(spb: completion.Completion): Completion = {
+      // ignoring transactionId, actAs, deduplicationPeriod
+      val (grpcStatus, errors) =
+        spb.status map parseStatusScalapb getOrElse ((GrpcStatus.Code.UNKNOWN.toStatus, Seq.empty))
+      Completion(
+        applicationId = spb.applicationId,
+        commandId = spb.commandId,
+        submissionId = spb.submissionId,
+        status = grpcStatus,
+        errorDetails = errors,
+      )
+    }
+
+    @throws[IllegalStateException]
+    private def parseStatusScalapb(
+        spb: com.google.rpc.status.Status
+    ): (GrpcStatus, Seq[ErrorDetail]) = {
+      val jpb = scalapbToJava(spb)(_.companion)
+      (GrpcStatus fromCodeValue jpb.getCode withDescription jpb.getMessage, ErrorDetails from jpb)
     }
   }
 

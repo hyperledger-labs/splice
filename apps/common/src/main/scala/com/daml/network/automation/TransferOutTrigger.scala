@@ -57,7 +57,7 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
           )
         } else
           for {
-            _ <- connection.submitTransferNoDedup(
+            _ <- connection.submitTransferAndWaitNoDedup(
               submitter = partyId,
               command = LedgerClient.TransferCommand.Out(
                 contractId = contract.contractId,
