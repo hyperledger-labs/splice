@@ -25,7 +25,6 @@ parameters:
     enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet, refresh-staging-tokens]
     default: build
 
-
 notify-fail: &notify-fail
   context: slack-context
   post-steps:
@@ -41,6 +40,12 @@ main-branch-only: &main-branch-only
   filters:
     branches:
       only:
+         - main
+
+main-branch-never: &main-branch-never
+  filters:
+    branches:
+      ignore:
          - main
 
 commands:
@@ -395,7 +400,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet", "none"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -416,9 +421,10 @@ commands:
             if [[ << parameters.cluster >> =~ (dev|test)net  ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
-            if [[ << parameters.cluster >> == staging ]]; then
+            if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
+
 
             if [[ << parameters.auth0_authenticate >> == true ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep AUTH0_MANAGEMENT_API_TOKEN"
@@ -441,7 +447,7 @@ commands:
                 if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
                   echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
                 fi
-                if [[ << parameters.cluster >> == staging ]]; then
+                if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
                   echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
                 fi
               fi
@@ -607,7 +613,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -637,7 +643,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run:
           name: Checkout cluster version
@@ -699,7 +705,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "dev", "test", "devnet", "testnet"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
@@ -852,7 +858,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - setup_nix
@@ -872,7 +878,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet"]
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -1126,6 +1132,138 @@ workflows:
         context:
           - artifactory
           - slack-context
+
+  deploy_scratchnet:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: scratchnet
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-never
+          cluster: scratchnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+            - deploy_cluster
+
+  deploy_scratchnet_B:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: scratchnetb
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-never
+          cluster: scratchnetb
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+            - deploy_cluster
+
+  deploy_scratchnet_C:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: scratchnetc
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-never
+          cluster: scratchnetc
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - hold
+            - deployment_test
+            - docker_images_push
+            - deploy_cluster
 
   deploy_staging:
     when:

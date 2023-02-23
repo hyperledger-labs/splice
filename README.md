@@ -40,6 +40,7 @@
         1. [Configure Auth0 Environment](#configure-auth0-environment)
         1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
         1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
+    1. [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
 1. [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
     1. [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
     1. [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
@@ -509,7 +510,7 @@ NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminf
 
     brew install ncurses
     /usr/local/opt/ncurses/bin/infocmp tmux-256color > ~/tmux-256color.info
-    tic -xe tmux-256color ~/tmux-256color.info  
+    tic -xe tmux-256color ~/tmux-256color.info
 
 ### Managing Frontends for Tests
 
@@ -636,6 +637,12 @@ or errors.
 
 The easiest way to how to use `SuppressingLogger` is by looking at existing usages of its methods.
 If you don't find an usage of a given method within the CN network repo, you can look for usages in the Canton repo.
+
+### Testing CircleCI Deployment Config Changes
+
+If you've made changes to the logic of jobs in `.circleci/config.yaml` involved in a standard CI cluster deploy workflow (i.e., the docker build, preflight check, etc) then the only way to validate those changes is to run them on CircleCI.
+
+To do so before merging your changes into main, open CircleCI's UI to your PR's branch and manually approve one of the three scratchnet deploy holds corresponding to the cluster you've reserved amongst the team for use.
 
 ## Building and Running the Wallet and Splitwell Apps
 
