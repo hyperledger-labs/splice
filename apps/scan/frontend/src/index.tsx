@@ -1,17 +1,38 @@
+import { theme } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+  RouterProvider,
+} from 'react-router-dom';
 
-import App from './App';
-import reportWebVitals from './reportWebVitals';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+import AppLeaderboard from './routes/appLeaderboard';
+import RecentActivity from './routes/recentActivity';
+import Root from './routes/root';
+import ValidatorLeaderboard from './routes/validatorLeaderboard';
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route>
+      <Route path="/" element={<Root />}>
+        <Route index element={<RecentActivity />} />
+        <Route path="recent-activity" element={<RecentActivity />} />
+        <Route path="app-leaderboard" element={<AppLeaderboard />} />
+        <Route path="validator-leaderboard" element={<ValidatorLeaderboard />} />
+      </Route>
+    </Route>
+  )
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  </React.StrictMode>
+);

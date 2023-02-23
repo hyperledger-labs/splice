@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { AmountDisplay } from 'common-frontend';
 
 import { ArrowCircleLeftOutlined, ArrowCircleRightOutlined } from '@mui/icons-material';
 import {
@@ -14,7 +15,6 @@ import {
 import Typography from '@mui/material/Typography';
 
 import { Transaction } from '../models/models';
-import AmountDisplay from './AmountDisplay';
 
 interface TransactionHistoryProps {
   transactions: Transaction[];

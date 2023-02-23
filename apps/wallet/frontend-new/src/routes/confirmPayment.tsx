@@ -1,9 +1,9 @@
+import { AmountDisplay } from 'common-frontend';
 import React from 'react';
 
 import { ArrowOutward } from '@mui/icons-material';
 import { Box, Button, Container, Stack, styled, Typography } from '@mui/material';
 
-import AmountDisplay from '../components/AmountDisplay';
 import PaymentHeader from '../components/PaymentHeader';
 
 export const ConfirmPayment: React.FC = () => {

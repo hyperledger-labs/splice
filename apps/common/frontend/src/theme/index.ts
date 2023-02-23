@@ -119,6 +119,27 @@ theme = createTheme(theme, {
         },
       },
     },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'capitalize',
+          fontWeight: 'bold',
+          color: 'white',
+          '&.Mui-selected': {
+            color: 'white',
+          },
+        },
+      },
+    },
+    MuiTabs: {
+      styleOverrides: {
+        root: {
+          '.MuiTabs-indicator': {
+            backgroundColor: theme.palette.secondary.main,
+          },
+        },
+      },
+    },
   },
 });
 

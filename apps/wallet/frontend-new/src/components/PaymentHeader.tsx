@@ -1,8 +1,7 @@
 import * as React from 'react';
+import { AmountDisplay } from 'common-frontend';
 
 import { Stack, Toolbar, Typography } from '@mui/material';
-
-import AmountDisplay from './AmountDisplay';
 
 const PaymentHeader: React.FC = () => {
   const cns = 'alice.cns';

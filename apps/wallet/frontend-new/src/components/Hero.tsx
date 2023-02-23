@@ -1,10 +1,10 @@
 import * as React from 'react';
+import { AmountDisplay } from 'common-frontend';
 
 import { Divider, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { WalletBalance } from '../models/models';
-import AmountDisplay from './AmountDisplay';
 
 interface HeroProps {
   balance: WalletBalance;

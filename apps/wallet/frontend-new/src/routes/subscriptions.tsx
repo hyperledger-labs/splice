@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { AmountDisplay } from 'common-frontend';
 
 import {
   Box,
@@ -13,7 +14,6 @@ import {
   Typography,
 } from '@mui/material';
 
-import AmountDisplay from '../components/AmountDisplay';
 import { Subscription } from '../models/models';
 
 const Subscriptions: React.FC = () => {

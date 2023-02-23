@@ -1,11 +1,11 @@
 import * as React from 'react';
+import { AmountDisplay } from 'common-frontend';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { TransferOffer } from '../models/models';
-import AmountDisplay from './AmountDisplay';
 
 export const TransferOffers: React.FC = () => {
   const offers: TransferOffer[] = [
