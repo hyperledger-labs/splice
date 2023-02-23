@@ -12,6 +12,9 @@ println("Connecting all participants to global domain...")
 participants.all.domains.connect_local(global)
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
 Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(_.domains.connect_local(splitwell))
+// We only connect splitwell by default since we want to simulate users connecting gradually to the domain.
+println("Connecting splitwell to upgraded domain...")
+splitwellParticipant.domains.connect_local(splitwellUpgrade)
 
 def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[LfPartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
   val party = participant.ledger_api.parties.allocate(user, user).party

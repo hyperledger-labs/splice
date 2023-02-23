@@ -53,6 +53,7 @@ rm -f canton.tokens canton-simtime.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade"
 
 # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
@@ -62,6 +63,7 @@ rm -f canton.tokens canton-simtime.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade_simtime"
 
 # TODO(#1836) Avoid having to inject our patched auth service.
 sbt --batch canton-community-participant/compile
