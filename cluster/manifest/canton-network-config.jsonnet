@@ -28,7 +28,7 @@ local defineSvApp(num, config) =
         },
       ],
       image="sv-app",
-      extraEnvVars=c.appAuthEnvBinding(config.clusterName, "sv") + [
+      extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "sv") + [
         { name: "CN_APP_SV_ADMIN_API_PORT", value: std.toString(port) },
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
       ] + (
@@ -220,14 +220,14 @@ local svcDeployments(config) = [
       name: "dir-http-api",
       port: 6010,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "directory")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "directory")),
 
   c.deployment(config, "svc-app", [
     {
       name: "svc-app-adm-api",
       port: 5005,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "svc")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "svc")),
 
   [defineSvApp(num, config) for num in std.range(1, networkDefaults.numberOfSvNodes)],
 
@@ -240,7 +240,7 @@ local svcDeployments(config) = [
       name: "scan-api-http",
       port: 6012,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "scan")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "scan")),
 
   c.deployment(config, "scan-web-ui", [
     {
@@ -301,7 +301,7 @@ local validator1Deployments(config) = [
                ],
                image="validator-app",
                namespace="validator1",
-               extraEnvVars=c.appAuthEnvBinding(config.clusterName, "validator") + c.appUserNameEnvBinding("wallet") +
+               extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator") + c.appUserNameEnvBinding("wallet") +
                             [
                               { name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" },
                               { name: "CN_APP_DARS", json: ["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
@@ -315,7 +315,7 @@ local validator1Deployments(config) = [
       // Internal, we proxy this under /v0/wallet in the UI.
       internalOnly: true,
     },
-  ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "wallet") + [
+  ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "canton-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
@@ -404,7 +404,7 @@ local splitwellDeployments(config) = [
       port: 6003,
       internalOnly: true,
     },
-  ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "validator", "validator") +
+  ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator", "validator") +
                                                              c.appUserNameEnvBinding("splitwell") +
                                                              c.appUserNameEnvBinding("wallet") +
                                                              [
@@ -429,7 +429,7 @@ local splitwellDeployments(config) = [
       // Internal, we proxy this under /v0/wallet in the UI.
       internalOnly: true,
     },
-  ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "wallet") + [
+  ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwell-validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
@@ -460,7 +460,7 @@ local splitwellDeployments(config) = [
       name: "sw-api",
       port: 5213,
     },
-  ], namespace="splitwell", proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding(config.clusterName, "splitwell")),
+  ], namespace="splitwell", proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "splitwell")),
 ];
 
 local cantonNetwork(config) =
@@ -496,7 +496,8 @@ function(
   imageTag,
   ipAddr,
   clusterName,
-  clusterDnsName
+  clusterDnsName,
+  fixedTokens,
 ) cantonNetwork(networkDefaults {
   gcpRegion: gcpRegion,
   gcpRepoName: gcpRepoName,
@@ -506,4 +507,5 @@ function(
   ipAddr: ipAddr,
   clusterName: clusterName,
   clusterDnsName: clusterDnsName,
+  fixedTokens: fixedTokens,
 })

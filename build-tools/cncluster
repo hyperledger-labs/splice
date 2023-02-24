@@ -21,6 +21,10 @@ SOURCE_IMAGE_TAG=$(version-gen)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
+if [[ "$GCP_CLUSTER_BASENAME" = "staging" ]]; then
+    export CNCLUSTER_FIXED_TOKENS=1
+fi
+
 ################################
 ### Utilities
 ################################
@@ -74,6 +78,12 @@ function _cluster_apply() {
     # Apply cert-manager deployments
     kubectl apply -f $REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml
 
+    TOKEN_ARG=fixedTokens=false
+
+    if [ ! -z "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        TOKEN_ARG=fixedTokens=true
+    fi
+
     # Apply base cluster config
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
@@ -83,6 +93,7 @@ function _cluster_apply() {
             --tla-str ipAddr=$(_cluster_ip) \
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
             --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
+            --tla-code $TOKEN_ARG \
             $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
         | kubectl apply -f -
 }
@@ -675,7 +686,7 @@ function _set_auth0_secret() {
       kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
   fi
 
-  if [ $GCP_CLUSTER_BASENAME = staging ]; then
+  if [ ! -z "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
     TOKEN_RESPONSE=$(curl -s --show-error --fail --request POST \
       --url https://canton-network-dev.us.auth0.com/oauth/token \
       --header 'content-type: application/json' \

@@ -35,6 +35,7 @@
    1. [Force-updating the certificate](#force-updating-the-certificate)
 1. [Auth0 secrets](#auth0-secrets)
 1. [Participant User Configuration](#participant-user-configuration)
+1. [Token configuration](#token-configuration)
 1. [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
    1. [Manifests](#manifests)
 
@@ -726,6 +727,43 @@ how the Scan and Directory users share their primary party and
 ```
 
 The exact JSON format is defined in `tools.sc`.
+
+## Token configuration
+
+By default, our apps are configured using client ids and secrets and
+use a client credentials flow to request tokens from Auth0 on
+startup. However, auth0 has limits on how many tokens can be requested
+per month. To work around this, we configure our staging cluster
+(which is redeployed most frequently) with a fixed static token which
+is refreshed daily.
+
+The behavior can be switched by setting the following environment variable, e.g., to test this on scratchnet.
+
+```
+export CNCLUSTER_FIXED_TOKENS=1
+```
+
+After setting that first refresh the secrets. This will not set client
+id and secret but instead query auth0 for an m2m token and set that:
+
+```
+cncluster update_secret
+```
+
+After that, you can now apply the manifest (while still keeping the environment variable set).
+
+```
+cncluster apply
+```
+
+After you finished testing, make sure to reset scratchnet back to the
+default behavior by unsetting the environment variable and updating
+the secrets:
+
+```
+unset CNCLUSTER_FIXED_TOKENS
+cncluster update_secrets
+```
 
 ## Appendix: Kubernetes Resources
 

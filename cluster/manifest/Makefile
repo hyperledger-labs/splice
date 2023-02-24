@@ -8,7 +8,8 @@ test-vars=\
     --tla-str imageTag=tag \
     --tla-str ipAddr=ipaddr \
     --tla-str clusterName=cluster \
-	--tla-str clusterDnsName=cluster.network.global
+	--tla-str clusterDnsName=cluster.network.global \
+	--tla-code fixedTokens=false
 
 .PHONY: $(dir)/test
 $(dir)/test:

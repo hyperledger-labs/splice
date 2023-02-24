@@ -63,14 +63,15 @@ local appUserNameEnvBinding(appName, varBaseName=appName) =
 
 local appUserNameEnvBindings(appNames) = std.flatMap(appUserNameEnvBinding, appNames);
 
-local appAuthEnvBinding(clusterName, appName, varBaseName=appName) =
+local appAuthEnvBinding(fixedTokens, appName, varBaseName=appName) =
   local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_LEDGER_API_AUTH";
   local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
-  // In staging we use fixed tokens read from a k8s secret rather than refreshing through client credentials.
+  // In staging (where fixedTokens=true by default)
+  // we use fixed tokens read from a k8s secret rather than refreshing through client credentials.
   // See https://github.com/DACH-NY/the-real-canton-coin/issues/3053 for more details.
   // We cannot override an object using a substitution so instead we set this through ADDITIONAL_CONFIG
   // which first resets it back to null to disable object merging and then switches to static token config.
-  if (clusterName == "cn-stagingnet") then
+  if (fixedTokens) then
     [
       {
         name: "ADDITIONAL_CONFIG",
