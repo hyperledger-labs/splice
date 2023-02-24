@@ -9,6 +9,7 @@
         1. [`sbt` Tips\&Tricks](#sbt-tipstricks)
 1. [Contributing Changes](#contributing-changes)
     1. [Contributing as a New Joiner](#contributing-as-a-new-joiner)
+    1. [The Flake Rotation](#the-flake-rotation)
     1. [Contribution Guide](#contribution-guide)
     1. [Branch naming](#branch-naming)
     1. [Unused Import Warnings](#unused-import-warnings)
@@ -211,6 +212,69 @@ Things sometimes go wrong with `sbt` in ways that are hard to debug. This sectio
 ### Contributing as a New Joiner
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
 buddy for help with getting started on the code base.
+
+### The Flake Rotation
+
+The Canton Network team has a formal support rotation in the form of
+our flake process.  Each of our weekly sprints has a pair of engineers
+assigned to be responsible during the sprint for driving the
+resolution of test failures that occur in our test environments
+(`Staging`, `DevNet`, and `TestNet`) during that sprint.  For the
+engineers on flake duty, this work is their priority over any other
+issues on which they may be working.
+
+The job of an engineer on flake duty is to _drive the resolution_ of
+failures. This does not mean these engineers are responsible for
+fixing all problems themselves, nor does it even mean everything
+should be fixed. Driving the resolution means clearly communicating
+status of the issue as it progresses from beginning to end,
+marshalling any other staff on the team needed for a resolution, and
+then helping organize the work to fix. Canton Network is a team
+effort, and the team should be brought in to resolve flakes as it is
+helpful. The team may also decide based on priorities and future plans
+that a specific failure isn't worth the time to fix. This is fine, as
+long as there is consensus on the decision and it is clearly
+communicated.
+
+This is an excellent opportunity to learn about parts of the Canton
+Network that may be outside your usual area of expertise. This
+includes other parts of the software stack, our build and deployment
+mechanisms, networking design, and debugging techniques. It is also a
+way to be intentional about addressing the current 'least stable'
+parts of our code base, with an idea of improving reliability for our
+customers.
+
+Flake duty is assigneed based on the [team holiday calendar](https://docs.google.com/spreadsheets/d/1Sp12aNj-bPAuPD9aEnH_xk031dADiGHdQdJlCGxhW3k/edit#gid=1174224054).
+Please consult this spreadsheet to understand when you are on duty. There are
+pairs of weeks highlighted to indicate the schedule - flake duty
+begins with the sprint starting on the Wednesday of the first week and
+ends with the sprint on Wednesday of the second week. At each boundary,
+the outgoing and incoming engineers on flake duty rotation must
+have a brief touchpoint meeting to go over any issues still under resolution.
+
+For engineers on flake duty, the resolution process is as follows.
+
+* When there is a Slack message indicating a test failure, investigate
+  and assess if it's a new or existing failure. For new failures, create
+  a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/the-real-canton-coin/milestone/19)
+  GitHub milestone.  The issue for a given failure should be linked in the Slack
+  thread for the failure itself.
+* All relevent information should be tracked to the extent possible in the
+  Github issue. This includes logs, screenshots, links to CI jobs, and any
+  observations or notes that might be useful as the issue is investigated.
+* After assessing the issue, reach out to other team members as is useful to
+  resolve the issue. Once the root cause has been identified, note that in the
+  Github issue, along with any reproduction instructions if possible.
+  Where possible fix the root cause, or drive the fixing of the root cause
+  to keep the number of active flakes low and team productivity high.
+* PR's for any fixes should also be linked to the issue.
+* For failures that are not frequent enough to warrant a fix, the
+  issue in Github should be labeled "infrequent/no repo".
+
+
+We will periodically review the flaky test log in the Github milestone
+to look for systemic issues that might be underlying more than one
+flaky test and can be more holistically resolved.
 
 ### Contribution Guide
 
