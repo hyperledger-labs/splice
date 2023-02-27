@@ -11,6 +11,7 @@ import {
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import ConfirmPayment from './routes/confirmPayment';
+import ConfirmSubscription from './routes/confirmSubscription';
 import Login from './routes/login';
 import Root from './routes/root';
 import Subscriptions from './routes/subscriptions';
@@ -30,6 +31,7 @@ const router = createBrowserRouter(
         <Route path="login" element={<Login />} />
       </Route>
       <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />
+      <Route path="confirm-subscription/:cid/" element={<ConfirmSubscription />} />
     </Route>
   )
 );

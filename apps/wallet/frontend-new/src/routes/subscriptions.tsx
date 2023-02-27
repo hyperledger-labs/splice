@@ -20,22 +20,22 @@ const Subscriptions: React.FC = () => {
   const subscriptions: Subscription[] = [
     {
       provider: { description: 'Service Desc.', cns: 'alice.cns' },
-      price: { amount: '31', currency: 'CC', perPeriod: 'month' },
+      price: { amount: '31', currency: 'CC', perPeriod: '30 days' },
       nextPaymentDue: '22-02-2023',
     },
     {
       provider: { description: 'Service Desc.', cns: 'bob.cns' },
-      price: { amount: '130.12', currency: 'USD', perPeriod: 'month' },
+      price: { amount: '130.12', currency: 'USD', perPeriod: '30 days' },
       nextPaymentDue: '23-02-2023',
     },
     {
       provider: { description: 'Service Desc.', cns: 'thomas.cns' },
-      price: { amount: '31', currency: 'CC', perPeriod: 'month' },
+      price: { amount: '31', currency: 'CC', perPeriod: '30 days' },
       nextPaymentDue: '24-02-2023',
     },
     {
       provider: { description: 'Service Desc.', cns: 'kim.cns' },
-      price: { amount: '130.12', currency: 'USD', perPeriod: 'month' },
+      price: { amount: '130.12', currency: 'USD', perPeriod: '30 days' },
       nextPaymentDue: '25-02-2023',
     },
   ];
