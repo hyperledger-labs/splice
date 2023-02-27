@@ -48,9 +48,6 @@ ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when
 # TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
 .*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
 
-# Ignoring server shutting down
-.*SERVER_IS_SHUTTING_DOWN.*
-
 # TODO(#3001) remove when duplicates are detected instead of ignored
 transfer [0-9a-f-]{36} did not deliver a completion in [0-9a-z ]*, possibly due to duplicate submission; assuming success
 

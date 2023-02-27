@@ -3,9 +3,7 @@ package com.daml.network.environment
 import akka.Done
 import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
-import com.daml.error.definitions.CommonErrors.ServerIsShuttingDown
 import com.daml.error.utils.ErrorDetails
-import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.network.admin.api.client.AppConnection
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -287,7 +285,7 @@ object CoinRetries {
           FatalErrorKind
         }
 
-        def checkCategory = errorCategory match {
+        errorCategory match {
           case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
             //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
             val msg =
@@ -308,15 +306,6 @@ object CoinRetries {
             TransientErrorKind
           case _ => fatalError
         }
-
-        errorDetails
-          .collectFirst {
-            // While we could wait for the server to come back up in this case, at least in tests this won't happen
-            // and in prod, crashing and relying on a restart due to that seems like the better option.
-            case d: ErrorInfoDetail if d.errorCodeId == ServerIsShuttingDown.id =>
-              fatalError
-          }
-          .getOrElse(checkCategory)
 
       case Failure(
             ex: StreamTcpException
