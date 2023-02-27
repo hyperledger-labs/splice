@@ -6,7 +6,9 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -62,7 +64,7 @@ class SvcRewardTrigger(
       svcReward: SvcRewardContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     Future.successful(
-      TaskSuccess(s"ignoring SvcReward ${svcReward.contractId} as we're not the leader")
+      TaskSuccess(show"ignoring ${PrettyContractId(svcReward)}, as we're not the leader")
     )
   }
 

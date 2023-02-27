@@ -290,6 +290,14 @@ template SvcRules with
       do
         exercise cid choiceArg
 
+    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : ()
+      with
+        cid : ContractId LockedCoin
+        choiceArg : LockedCoin_ExpireCoin
+      controller leader
+      do
+        exercise cid choiceArg
+
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

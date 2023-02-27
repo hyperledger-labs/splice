@@ -13,48 +13,51 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-class ExpiredCoinTrigger(
+class ExpiredLockedCoinTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     connection: CoinLedgerConnection,
 )(implicit
-    override val ec: ExecutionContext,
+    ec: ExecutionContext,
     tracer: Tracer,
 ) extends ExpiredContractTrigger[
-      cc.coin.Coin.ContractId,
-      cc.coin.Coin,
+      cc.coin.LockedCoin.ContractId,
+      cc.coin.LockedCoin,
     ](
       store.defaultAcs,
-      store.listExpiredCoins,
-      cc.coin.Coin.COMPANION,
+      store.listLockedExpiredCoins,
+      cc.coin.LockedCoin.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[Contract[
-      cc.coin.Coin.ContractId,
-      cc.coin.Coin,
+      cc.coin.LockedCoin.ContractId,
+      cc.coin.LockedCoin,
     ]]] {
-  type Task = ScheduledTaskTrigger.ReadyTask[Contract[cc.coin.Coin.ContractId, cc.coin.Coin]]
+  type Task =
+    ScheduledTaskTrigger.ReadyTask[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]
 
-  override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
-    for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      coinRules <- store.getCoinRules()
-      latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-      svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId
-        .exerciseSvcRules_Coin_Expire(
-          co.work.contractId,
-          new cc.coin.Coin_Expire(
-            latestOpenMiningRound.contractId,
-            coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
-          ),
-        )
-      _ <- connection.submitCommandsNoDedup(
+  override protected def completeTaskAsLeader(
+      co: Task
+  )(implicit tc: TraceContext): Future[TaskOutcome] = for {
+    domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+    coinRules <- store.getCoinRules()
+    latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+    svcRules <- store.getSvcRules()
+    cmd = svcRules.contractId
+      .exerciseSvcRules_LockedCoin_ExpireCoin(
+        co.work.contractId,
+        new cc.coin.LockedCoin_ExpireCoin(
+          latestOpenMiningRound.contractId,
+          coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
+        ),
+      )
+    _ <- connection
+      .submitCommandsNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         commands = cmd.commands.asScala.toSeq,
         domainId = domainId,
       )
-    } yield TaskSuccess("archived expired coin")
+  } yield TaskSuccess(s"archived expired locked coin")
 
   override def completeTaskAsFollower(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     Future.successful(

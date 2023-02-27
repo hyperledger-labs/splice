@@ -1,6 +1,5 @@
 package com.daml.network.svc.store
 
-import com.daml.ledger.javaapi.data as javab
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
@@ -8,7 +7,6 @@ import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{CoinUtil, Contract}
-import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -62,19 +60,6 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
   ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
-  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
-  def getSvcRules(
-  )(implicit
-      ec: ExecutionContext
-  ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
-    lookupSvcRules().map(
-      _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active SvcRules contract")
-        )
-      )
-    )
-
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   ): Future[
@@ -100,22 +85,6 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       }
     } yield result
 
-  def lookupLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext
-  ): Future[Option[SvcStore.OpenMiningRoundContract]] =
-    lookupOpenMiningRoundTriple().map(_.map(_.newest))
-
-  /** get the latest active open mining round contract, which should always be present after bootstrapping. */
-  def getLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext
-  ): Future[SvcStore.OpenMiningRoundContract] = lookupLatestActiveOpenMiningRound().map(
-    _.getOrElse(
-      throw new StatusRuntimeException(
-        Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
-      )
-    )
-  )
-
   import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
   import AcsStore.listExpiredFromPayloadExpiry
 
@@ -125,31 +94,6 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
     listExpiredFromPayloadExpiry(defaultAcs, cc.round.IssuingMiningRound.COMPANION)(
       _.targetClosesAt
     )
-
-  /** List locked coins that are expired and can never be used as transfer input. */
-  def listLockedExpiredCoins
-      : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
-    listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
-
-  private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
-      companion: TemplateCompanion[Id, T]
-  )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
-    for {
-      maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
-      result <- maybeLatestOpenMiningRound.fold(
-        Future.successful(Seq.empty[Contract[Id, T]])
-      ) { latest =>
-        for {
-          acs <- defaultAcs
-          allExpired <- acs
-            .listContracts(
-              companion,
-              (e: Contract[Id, T]) =>
-                CoinUtil.coinExpiresAt(coin(e.payload)).number <= latest.payload.round.number - 2,
-            )
-        } yield allExpired.iterator.take(limit).toSeq
-      }
-    } yield result
 
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
