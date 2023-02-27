@@ -289,15 +289,20 @@ function subcmd_rlogs() {
     fi
 
     if [ -z "${1-}" ]; then
+        _error "No namespace specified"
+    fi
+
+    if [ -z "${2-}" ]; then
         _error "No app specified"
     fi
 
-    app=$1
+    namespace=$1
+    app=$2
 
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
-                          --all-namespaces \
+                          -n ${namespace} \
                           -l app=${app} \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
@@ -319,15 +324,20 @@ subcommand_whitelist[logs]='View an running application log stream in lnav'
 
 function subcmd_logs() {
     if [ -z "${1-}" ]; then
+        _error "No namespace specified"
+    fi
+
+    if [ -z "${2-}" ]; then
         _error "No app specified"
     fi
 
-    app=$1
+    namespace=$1
+    app=$2
 
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
-                          --all-namespaces \
+                          -n ${namespace} \
                           -l app=${app} \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
@@ -693,6 +703,9 @@ function _set_auth0_secret() {
       kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
   fi
 
+  # Create the namespace if it does not exist (no harm should be caused if it does)
+  kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
   if [ ! -z "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
     TOKEN_RESPONSE=$(curl -s --show-error --fail --request POST \
       --url https://canton-network-dev.us.auth0.com/oauth/token \
@@ -759,6 +772,7 @@ function subcmd_update_secrets() {
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
   )
 
+  # TODO(#3145) retire sv-app-X secrets in a week or two, after everything is migrated
   for i in \
     "cn-app-wallet-ledger-api-auth wallet validator1" \
     "cn-app-validator-ledger-api-auth validator validator1" \
@@ -767,6 +781,10 @@ function subcmd_update_secrets() {
     "cn-app-sv-ledger-api-auth sv2 sv-app-2" \
     "cn-app-sv-ledger-api-auth sv3 sv-app-3" \
     "cn-app-sv-ledger-api-auth sv4 sv-app-4" \
+    "cn-app-sv-ledger-api-auth sv1 sv-1" \
+    "cn-app-sv-ledger-api-auth sv2 sv-2" \
+    "cn-app-sv-ledger-api-auth sv3 sv-3" \
+    "cn-app-sv-ledger-api-auth sv4 sv-4" \
     "cn-app-scan-ledger-api-auth scan svc" \
     "cn-app-directory-ledger-api-auth directory svc" \
     "cn-app-splitwell-ledger-api-auth splitwell splitwell" \

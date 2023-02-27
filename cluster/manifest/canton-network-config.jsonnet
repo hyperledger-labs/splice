@@ -5,7 +5,7 @@ local postgres = import "./postgres.jsonnet";
 local c = import "./cluster.jsonnet";
 
 local defineSvApp(num, config) =
-  local name = std.format("sv-app-%d", num);
+  local namespace = std.format("sv-%d", num);
   local adminApi = std.format("sv%d-api", num);
   local adminApiHttp = adminApi + "-http";
   local authBinding = std.format("sv%d", num);
@@ -13,10 +13,10 @@ local defineSvApp(num, config) =
   local httpPort = port + 1000;
 
   [
-    c.namespace(std.format("sv-app-%d", num), config),
+    c.namespace(namespace, config),
     c.deployment(
       config,
-      name,
+      "sv-app",
       [
         {
           name: adminApi,
@@ -35,7 +35,7 @@ local defineSvApp(num, config) =
         // the first one is the founding SV app
         if num == 1 then [{ name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" }] else []
       ),
-      namespace=name
+      namespace=namespace
     ),
   ];
 
@@ -91,7 +91,7 @@ local svcDeployments(config) = [
   ),
   c.deployment(
     config,
-    "splitwell-domain",
+    "domain",
     [
       {
         name: "swd-pub-api",
@@ -139,7 +139,7 @@ local svcDeployments(config) = [
     ]
   ),
 
-  c.deployment(config, "svc-participant", [
+  c.deployment(config, "participant", [
     {
       name: "svcp-adm-api",
       port: 5002,
@@ -253,8 +253,8 @@ local svcDeployments(config) = [
 
 local validator1Deployments(config) = [
   c.namespace("validator1", config),
-  postgres.database("val1-postgres", config, namespace="validator1"),
-  c.deployment(config, "canton-participant", [
+  postgres.database("postgres", config, namespace="validator1"),
+  c.deployment(config, "participant", [
     {
       name: "val1-adm-api",
       port: 5002,
@@ -271,7 +271,7 @@ local validator1Deployments(config) = [
       externalPort: 10113,
     },
   ], image="canton-participant", namespace="validator1", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
-    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "val1-postgres" },
+    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
       {
@@ -285,7 +285,7 @@ local validator1Deployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain.splitwell:5008",
+        url: "http://domain.splitwell:5008",
       },
     ] },
   ]),
@@ -305,7 +305,7 @@ local validator1Deployments(config) = [
                             [
                               { name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" },
                               { name: "CN_APP_DARS", json: ["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
-                              { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "canton-participant" },
+                              { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
                             ]),
 
   c.deployment(config, "wallet-app", [
@@ -316,7 +316,7 @@ local validator1Deployments(config) = [
       internalOnly: true,
     },
   ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
-    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "canton-participant" },
+    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
     { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
   ]),
@@ -361,7 +361,7 @@ local validator1Deployments(config) = [
 local splitwellDeployments(config) = [
   c.namespace("splitwell", config),
   postgres.database("sw-postgres", config, namespace="splitwell"),
-  c.deployment(config, "splitwell-participant", [
+  c.deployment(config, "participant", [
     {
       name: "sw-adm-api",
       port: 5002,
@@ -393,7 +393,7 @@ local splitwellDeployments(config) = [
     { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
         alias: "splitwell",
-        url: "http://splitwell-domain:5008",
+        url: "http://domain:5008",
       },
     ] },
   ]),
@@ -419,10 +419,10 @@ local splitwellDeployments(config) = [
                                                                  |||,
                                                                },
                                                                { name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }
-                                                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
+                                                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
                                                              ]),
 
-  c.deployment(config, "splitwell-wallet-app", [
+  c.deployment(config, "wallet-app", [
     {
       name: "sw-wal-http",
       port: 6004,
@@ -430,12 +430,12 @@ local splitwellDeployments(config) = [
       internalOnly: true,
     },
   ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
-    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "splitwell-participant" },
-    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "splitwell-validator-app" },
+    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
+    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
     { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
   ]),
 
-  c.deployment(config, "splitwell-wallet-web-ui", [
+  c.deployment(config, "wallet-web-ui", [
     {
       name: "sw-wal-ui",
       port: 80,
@@ -445,7 +445,7 @@ local splitwellDeployments(config) = [
     { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
   ]),
 
-  c.deployment(config, "splitwell-wallet-new-web-ui", [
+  c.deployment(config, "wallet-new-web-ui", [
     {
       name: "sw-wal-new-ui",
       port: 80,

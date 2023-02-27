@@ -5,7 +5,7 @@ set -eou pipefail
 echo "Getting onboarding secret from SV1..."
 
 while true; do
-  if SECRET=$(curl -sSfL -X POST http://sv-app-1.sv-app-1:6014/devnet/onboard/validator/prepare); then
+  if SECRET=$(curl -sSfL -X POST http://sv-app.sv-1:6014/devnet/onboard/validator/prepare); then
     sed -i "s#PLACEHOLDER#$SECRET#" /app/app.conf
     break
   else
