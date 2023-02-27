@@ -51,6 +51,12 @@ function _docker_must_be_running() {
     fi
 }
 
+function _production_gate() {
+    if [ -n "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
+        _error "Please deploy to this cluster only via CircleCI (https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#manually-deploying-via-ci)"
+    fi
+}
+
 function _cluster_ip() {
     gcloud compute addresses list \
            --regions=${CLOUDSDK_COMPUTE_REGION} \
@@ -178,14 +184,15 @@ function subcmd_activate() {
 subcommand_whitelist[apply]='Apply the current manifest to the cluster. Accepts an optional tag for images.'
 
 function subcmd_apply() {
+    _production_gate
     _cluster_confirm "Apply configuration"
-    _docker_must_be_running
 
     IMAGE_TAG=${SOURCE_IMAGE_TAG}
 
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-         if ! make -C ${REPO_ROOT} docker-check -j; then
+          _docker_must_be_running
+          if ! make -C ${REPO_ROOT} docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
@@ -205,6 +212,7 @@ function subcmd_apply() {
 subcommand_whitelist[deploy]='Rebuild local working copy and deploy to cluster.'
 
 function subcmd_deploy() {
+    _production_gate
     _cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
     _docker_must_be_running
 
@@ -226,7 +234,7 @@ function subcmd_deploy() {
 subcommand_whitelist[push]='Update one or more modules running on a cluster'
 
 function subcmd_push() {
-
+    _production_gate
     _cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
     _cluster_must_exist
     _docker_must_be_running
@@ -339,7 +347,6 @@ subcommand_whitelist[set_machine_type]='Rebuilds the default node pool with curr
 
 function subcmd_set_machine_type() {
     _cluster_confirm "Rebuild default node pool to up to ${GCP_CLUSTER_MAX_NODES} ${GCP_CLUSTER_NODE_TYPE} nodes (This will interrupt all workloads.)"
-
     _cluster_must_exist
 
     _info "Creating temporary node pool..."

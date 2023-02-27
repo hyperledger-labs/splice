@@ -11,7 +11,7 @@
    1. [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
    1. [Docker Image Hosting](#docker-image-hosting)
    1. [Cluster Management Operations](#cluster-management-operations)
-   1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci-cd-deployment)
+   1. [Manually Deploying via CI](#manually-deploying-via-ci)
    1. [Observing Cluster Operation](#observing-cluster-operation)
       1. [Kubectl and `cncluster` operations.](#kubectl-and-cncluster-operations.)
       1. [GCE Dashboards](#gce-dashboards)
@@ -273,44 +273,35 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
-### Recovery from a Failed CI/CD Deployment
+### Manually Deploying via CI
 
-If the nightly CI/CD deployment results in an inoperative cluster, the
-CI/CD deployment can be manually run from a development laptop during
-the day. **For this to work, the working directory for the git
-repository must be in a clean state without uncommitted changes.**
+If necessary, it is possible to manually trigger CI/CD deployments to
+our production-like clusters. This can be useful if either `DevNet` or
+`TestNet` winds up in a bad state or needs a patch.  Before reading
+further, there are two caveats to be aware of:
 
-By default, images are tagged with `$USER-$commit` and if your `git
-status` is not clean a `-dirty` suffix is appended. For fast
-iterations it can often be conventient to not tie the tag to the
-version number. That allows you to make changes to only one image,
-commit, and only rebuild & redeploy that one image. To achieve that
-you can set the environment variable `CNCLUSTER_STATIC_DIRTY_VERSION`
-which will instead tag images with `$USER-dirty` independently of your
-current commit.
+* Our current CI deployment process forces a complete cluster reset,
+  including loss of all data.
+* These are environments in increasing use by our customers, with
+  expectations for uptime and data integrity. Do not reset these
+  environments before consulting with the team on Slack.
 
-First, from the root of the working directory, rebuild the required
-docker images from scratch:
+Given approval, a manual deployment of `main` can be done as follows:
 
-`make clean docker-build -j`
+1. Navigate to the CircleCI dashboard for [`main`](https://app.circleci.com/pipelines/github/DACH-NY/the-real-canton-coin?branch=main).
+2. Click on "Trigger Pipeline"
+3. Add a parameter named `run-job`, with one of the following values:
+   * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.
+   * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
+4. Observe progress of the job via the CI console.
 
-Secondly, from the same directory, push the docker images to the
-[Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images)
-with the appropriate tags.
+#### Confirming the Deployment
 
-`CI=true make docker-push -j`
-
-Setting `CI` to `true` requests a CI build. This enforces cleanliness
-of the working copy and generates image tags that do not contain a
-username prefix.
-
-Finally, apply the changes to the cluster. This is an example of
-applying cluster changes to DevNet.  (For this to work, you will
-need to be connected to the VPN.)
-
-`(cd cluster/deployment/devnet && CI=true cncluster apply)`
-
-Successful pod deplomyment can then be checked:
+To confirm the deployment, you can use a command like the following to
+inspect pod state. The `--all-namespaces` flag is necessary because we
+now run our clusters with multiple Kubernetes namespaces for various
+sub-modules. Without this flag, `kubectl get pods` will skip listing
+most of our `Pods`.
 
 `(cd cluster/deployment/devnet && kubectl get pods --all-namespaces)`
 
@@ -324,12 +315,6 @@ external-proxy-786cd9c644-59fbz            1/1     Running   0          31m
 gcs-proxy-794d475b46-47r5w                 1/1     Running   0          32m
 ```
 
-_Note_: This only shows the pods running in the `default` namespace, but some pods are running in a
-        different [namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-        and are not shown in this listing. Use `kubectl get pods --all-namespaces` to see all of the
-        pods at once, or `kubectl get pods --namespace <NAMESPACE>` to zoom in on a specific namespace
-        (you can list available namespaces with `kubectl get namespaces`).
-
 If Kubernetes is unable to pull the image for a pod, the status might
 look something like this:
 
@@ -339,6 +324,7 @@ NAME                                  READY   STATUS             RESTARTS      A
 canton-domain-5485476484-7ls9w        1/1     Running            0             108s
 canton-domain-6bfc8d8585-2wj55        0/1     ImagePullBackOff   0             15s
 canton-participant-6685859869-nh9vm   1/1     Running            1 (45s ago)   108s
+
 canton-participant-7c9674cfd6-8fj7v   0/1     ImagePullBackOff   0             14s
 docs-55f7b8967-67vcw                  1/1     Running            0             108s
 docs-78dddd9c8b-5swzv                 0/1     ImagePullBackOff   0             17s
@@ -353,14 +339,23 @@ Kubernetes deployment objects that wait for an updated pod to be
 running before stopping the previous pod. You can look for this
 scenario by checking the ages of the running vs. failed pods.
 
+Pods in `Pending` state indicate that they have not yet been scheduled
+to run on a `Node`. This can happen as the cluster autoscales upward
+to a larger cluster size necessary to accomdate increased load. If a
+`Pod` stays in `Pending ` state for more than a few minutes, the
+cluster may either be at the upper limit of the autoscaler, or the
+memory/CPU request of the `Pod` may be larger than can be accomodated
+by any single node.
+
 To skip the image pull backoff timeout, you can delete the failed pod,
 which will force an immediate recreation of the pod and attempt to
 repull the image.
 
 ```kubectl delete pod ${POD_NAME}```
 
-**Every** pod can be deleted and reset as follows. This can be useful
-for the moment, given that we rebuild the cluster nightly anyway.
+The entire state of the cluster can be reset as follows. This includes
+every `Pod` and all of the volumes used to store persistent state. ***If
+you do this, all data will be lost.***
 
 ```
 cncluster reset

@@ -7,10 +7,9 @@
 // system, disk buffers, and other off-heap memory allocated by the JVM.
 //
 // Hitting the Xms/Xmx memory limit in the JVM will be manifested as an
-// OOM through by the JVM itself.  If the Pod is in an OOMKilled state,
-// this signals that an OS process running on the pod (maybe the JVM,
-// maybe something else) was unable to allocate OS memory past the Pod
-// limit.
+// OOM by the JVM itself.  If the Pod is in an OOMKilled state, this
+// signals that an OS process running on the pod (maybe the JVM, maybe
+// something else) was unable to allocate OS memory past the Pod limit.
 
 {
   domainCpu: 1,
