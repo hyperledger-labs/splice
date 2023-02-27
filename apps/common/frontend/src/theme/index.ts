@@ -1,9 +1,23 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme, TypographyStyle } from '@mui/material';
 
 import { generateHslPalette } from './colors';
 
 // TS module augmentation to add custom theme vars for storing our CN-theme color values
 declare module '@mui/material/styles' {
+  interface Theme {
+    fonts: {
+      sansSerif: TypographyStyle;
+      monospace: TypographyStyle;
+    };
+  }
+
+  interface ThemeOptions {
+    fonts?: {
+      sansSerif: TypographyStyle;
+      monospace: TypographyStyle;
+    };
+  }
+
   interface Palette {
     colors: {
       neutral: Record<string, string>;
@@ -58,6 +72,39 @@ theme = createTheme(theme, {
     background: {
       default: theme.palette.colors.neutral[20],
     },
+  },
+});
+
+theme = createTheme(theme, {
+  fonts: {
+    sansSerif: {
+      fontFamily: '"Lato", sans-serif',
+      fontWeight: 400,
+    },
+    monospace: {
+      fontFamily: '"Source Code Pro", monospace',
+      fontWeight: 500,
+    },
+  },
+});
+
+theme = createTheme(theme, {
+  typography: {
+    // I couldn't figure out a less verbose way to reliably set the font family... specifying it at
+    // `theme.typography.fontFamily`, as indicated by the documentation, didn't actually do anything
+    h1: theme.fonts.sansSerif,
+    h2: theme.fonts.sansSerif,
+    h3: theme.fonts.sansSerif,
+    h4: theme.fonts.sansSerif,
+    h5: theme.fonts.sansSerif,
+    h6: theme.fonts.sansSerif,
+    subtitle1: theme.fonts.sansSerif,
+    subtitle2: theme.fonts.sansSerif,
+    body1: theme.fonts.sansSerif,
+    body2: theme.fonts.sansSerif,
+    button: theme.fonts.sansSerif,
+    caption: theme.fonts.sansSerif,
+    overline: theme.fonts.sansSerif,
   },
 });
 

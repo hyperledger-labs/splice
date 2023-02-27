@@ -37,7 +37,12 @@ const Header: React.FC<HeaderProps> = props => {
         alignItems: 'center',
       }}
     >
-      <Typography variant="h5" autoCapitalize="characters">
+      <Typography
+        variant="h5"
+        textTransform="uppercase"
+        fontFamily={theme => theme.fonts.monospace.fontFamily}
+        fontWeight={theme => theme.fonts.monospace.fontWeight}
+      >
         Canton Coin Wallet
       </Typography>
       <Stack direction="row" spacing={4} alignItems="center">
