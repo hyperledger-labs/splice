@@ -36,7 +36,7 @@ trait SignatureVerifier {
 
   protected def validateAlgorithm(algorithm: String): Either[String, Algorithm]
   protected def validateAudience(jwt: DecodedJWT): Either[String, DecodedJWT] = {
-    if (jwt.getAudience().contains(expectedAudience)) {
+    if (jwt.getAudience() != null && jwt.getAudience().contains(expectedAudience)) {
       Right(jwt)
     } else {
       Left(
