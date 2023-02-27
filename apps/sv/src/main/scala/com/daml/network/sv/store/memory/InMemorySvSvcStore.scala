@@ -19,5 +19,5 @@ class InMemorySvSvcStore(
 ) extends InMemoryCoinAppStoreWithoutHistory
     with SvSvcStore {
 
-  override lazy val acsContractFilter = SvSvcStore.contractFilter(key.svcParty)
+  override lazy val acsContractFilter = SvSvcStore.contractFilter(key.svcParty, key.svParty)
 }

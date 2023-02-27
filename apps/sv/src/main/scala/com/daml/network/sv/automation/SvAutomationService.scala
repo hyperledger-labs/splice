@@ -37,4 +37,6 @@ class SvAutomationService(
     ) {
 
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
 }

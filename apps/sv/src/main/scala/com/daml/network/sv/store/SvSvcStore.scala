@@ -142,16 +142,21 @@ object SvSvcStore {
     }
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(svcParty: PartyId): AcsStore.ContractFilter = {
+  def contractFilter(svcParty: PartyId, svParty: PartyId): AcsStore.ContractFilter = {
     import AcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
+    val sv = svParty.toProtoPrimitive
 
     AcsStore.SimpleContractFilter(
       svcParty,
       Map(
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
+          co.payload.svc == svc && co.payload.sv == sv
+        ),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands

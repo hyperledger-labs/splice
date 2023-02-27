@@ -123,7 +123,7 @@ object CoinUtil {
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
   // Curve taken as-is from whitepaper: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
-  private val defaultIssuanceCurve: cc.schedule.Schedule[RelTime, IssuanceConfig] =
+  val defaultIssuanceCurve: cc.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
       issuanceConfig(40e9, 0.5, 0.15),
       Seq(
