@@ -128,11 +128,6 @@ local appAuthEnvBinding(fixedTokens, appName, varBaseName=appName) =
       },
     ] + appUserNameEnvBinding(appName, varBaseName);
 
-// The amount of memory reserved for the operating system in containers
-// hosting a JVM. The JVM heap size is the container limit less this
-// amount. The number here is a best estimate and may need to be
-// adjusted.
-local JVM_SYSTEM_MEMORY_MIB = 1024;
 
 local expandEnvironment(env) =
   local additional_config =
@@ -211,7 +206,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                   env: [
                     {
                       name: "JAVA_TOOL_OPTIONS",
-                      value: "-Xms%sM -Xmx%sM -Dscala.concurrent.context.minThreads=4" % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
+                      value: "-Xms%sM -Xmx%sM -Dscala.concurrent.context.minThreads=4" % [memoryLimitMiB * config.jvmHeapMemoryFactor, memoryLimitMiB * config.jvmHeapMemoryFactor],
                     },
                   ] + expandEnvironment(extraEnvVars),
                   resources: {

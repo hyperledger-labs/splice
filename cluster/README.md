@@ -28,6 +28,7 @@
    1. [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
    1. [Update a Single Component in a Cluster](#update-a-single-component-in-a-cluster)
    1. [Add a Component to the Build](#add-a-component-to-the-build)
+   1. [Memory Settings](#memory-settings)
 1. [TLS Certificate Provisioning](#tls-certificate-provisioning)
    1. [First-time Infra Setup](#first-time-infra-setup)
    1. [Cluster Configuration](#cluster-configuration)
@@ -615,9 +616,16 @@ cncluster activate
        In particular, consider:
        1. `./cluster/manifest/canton-network-config.jsonnet` (ports used within the cluster)
        1. `./cluster/images/external-proxy/config` (egress of the cluster)
-       1. config files baked into individual component images (ports that the applications actually use)
+       1. config files baked into individual component images 
+       (ports that the applications actually use)
 1. If you touched `./cluster/manifest/canton-network-config.jsonnet`,
    run `make cluster/manifest/test-update`
+
+### Memory Settings
+
+The most commonly used memory settings for the cluster (Postgres and the ledger)
+are stored in [`network-defaults.json`](./manifest/network-defaults.json) and
+may be adjusted there.
 
 ## TLS Certificate Provisioning
 

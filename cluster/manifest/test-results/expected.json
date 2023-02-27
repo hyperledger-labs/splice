@@ -36,7 +36,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/docs:tag",
@@ -129,7 +129,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms-512M -Xmx-512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
@@ -267,11 +267,11 @@
                         "resources": {
                            "limits": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [
@@ -364,7 +364,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CANTON_DOMAIN_POSTGRES_SERVER",
@@ -402,11 +402,11 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "2048Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "2048Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "startupProbe": {
@@ -491,7 +491,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1024M -Xmx1024M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CANTON_DOMAIN_POSTGRES_SERVER",
@@ -529,11 +529,11 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "2048Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "2048Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "startupProbe": {
@@ -618,7 +618,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms7168M -Xmx7168M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
@@ -722,11 +722,11 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -804,7 +804,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_URL",
@@ -939,7 +939,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_URL",
@@ -1075,7 +1075,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
@@ -1232,7 +1232,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
@@ -1385,7 +1385,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
@@ -1538,7 +1538,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SV_LEDGER_API_AUTH_URL",
@@ -1681,7 +1681,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SCAN_LEDGER_API_AUTH_URL",
@@ -1816,7 +1816,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/scan-web-ui:tag",
@@ -1955,11 +1955,11 @@
                         "resources": {
                            "limits": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [
@@ -2052,7 +2052,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms7168M -Xmx7168M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
@@ -2100,11 +2100,11 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -2220,7 +2220,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -2368,7 +2368,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_URL",
@@ -2506,7 +2506,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
@@ -2596,7 +2596,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
@@ -2686,7 +2686,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
@@ -2772,7 +2772,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-splitwell-web-ui:tag",
@@ -2911,11 +2911,11 @@
                         "resources": {
                            "limits": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            },
                            "requests": {
                               "cpu": 2,
-                              "memory": "4096Mi"
+                              "memory": "8192Mi"
                            }
                         },
                         "volumeMounts": [
@@ -3008,7 +3008,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms7168M -Xmx7168M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
@@ -3056,11 +3056,11 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "8192Mi"
+                              "memory": "32768Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -3176,7 +3176,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -3330,7 +3330,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_LEDGER_API_AUTH_URL",
@@ -3468,7 +3468,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
@@ -3558,7 +3558,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
@@ -3648,7 +3648,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_URL",
@@ -3822,7 +3822,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms-512M -Xmx-512M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/external-proxy:tag",

@@ -1,17 +1,27 @@
-// memoryLimitMiB values for deployments are taken emperically from
-// DevNet with `kubectl top pod`. Note that these were taken on a very
-// lightly loaded cluster and will very likely need to be revised for
-// clusters with higher loads.
+// The memory limit settings below control the pod memory request and limits.
+//
+// jvmHeapMemoryFactor controls the fraction of a pod's memory
+// allocation that goes to the JVM heap. If the heap factor is 0.75, and
+// limit is 4096, then the Xmx and Xms settings for the JVM will be 3072.
+// This, then, leaves 1024MB for other purposes, including the operating
+// system, disk buffers, and other off-heap memory allocated by the JVM.
+//
+// Hitting the Xms/Xmx memory limit in the JVM will be manifested as an
+// OOM through by the JVM itself.  If the Pod is in an OOMKilled state,
+// this signals that an OS process running on the pod (maybe the JVM,
+// maybe something else) was unable to allocate OS memory past the Pod
+// limit.
 
 {
   domainCpu: 1,
-  domainMemoryMib: 2048,
+  domainMemoryMib: 4096,
   participantCpu: 1,
-  participantMemoryMib: 8192,
+  participantMemoryMib: 32768,
   postgresCpu: 2,
-  postgresMemoryMib: 4096,
+  postgresMemoryMib: 8192,
   ledgerDatabaseGib: 20,
   numberOfSvNodes: 4,
+  jvmHeapMemoryFactor: 0.75,
   externalIPRanges: [
     "35.194.81.56/32",
     "35.198.147.95/32",
