@@ -112,7 +112,6 @@ class ValidatorApp(
           walletServiceUser,
           domainId,
           retryProvider,
-          flagCloseable = this,
           logger,
         )
     } yield {
@@ -163,7 +162,7 @@ class ValidatorApp(
             )
         }
       } yield (),
-      this,
+      logger,
     )
   }
 
@@ -184,7 +183,7 @@ class ValidatorApp(
           .onboardValidator(validatorParty, secret)
           .andThen(_ => svConnection.close())
       },
-      this,
+      logger,
     )
   }
 
@@ -207,7 +206,7 @@ class ValidatorApp(
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
-        this,
+        logger,
       )
       (walletServiceParty, walletServiceUser) <- setupWallet(connection)
       key = ValidatorStore.Key(
@@ -215,7 +214,14 @@ class ValidatorApp(
         svcParty = svcParty,
         walletServiceParty = walletServiceParty,
       )
-      store = ValidatorStore(key, storage, config.domains, loggerFactory, futureSupervisor)
+      store = ValidatorStore(
+        key,
+        storage,
+        config.domains,
+        loggerFactory,
+        futureSupervisor,
+        retryProvider,
+      )
       automation = new ValidatorAutomationService(
         config.automation,
         clock,
@@ -248,7 +254,6 @@ class ValidatorApp(
         walletServiceUser,
         domainId,
         retryProvider,
-        flagCloseable = this,
         logger,
       )
       _ <- ensureOnboarded(connection, store, validatorParty, config.onboarding)
@@ -268,7 +273,6 @@ class ValidatorApp(
                 walletServiceUser = walletServiceUser,
                 domainId = domainId,
                 retryProvider = retryProvider,
-                flagCloseable = this,
                 loggerFactory,
               ),
               AuthExtractor(verifier, loggerFactory, "canton network validator realm"),

@@ -1,5 +1,6 @@
 package com.daml.network.sv.store.memory
 
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -13,6 +14,7 @@ class InMemorySvSvcStore(
     override protected[this] val domainConfig: SvDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
+    override protected val retryProvider: CoinRetries,
 )(implicit
     override protected val
     ec: ExecutionContext

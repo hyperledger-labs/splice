@@ -54,6 +54,7 @@ class UserWalletService(
       timeouts,
       futureSupervisor,
       connection,
+      retryProvider,
     )
 
   val treasury: TreasuryService = new TreasuryService(

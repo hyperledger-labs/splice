@@ -26,7 +26,7 @@ import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
 /** Convenience class to capture the shared context required to instantiate triggers in an automation service. */
@@ -128,7 +128,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
         .retryForAutomation(
           "processTaskWithRetry",
           processTaskWithStalenessCheck(),
-          callingService = this,
+          logger,
         )
         .transform {
           case Success(taskOutcomeE) =>
@@ -146,7 +146,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
             }
 
           case Failure(ex) =>
-            if (this.isClosing) {
+            if (context.retryProvider.isShuttingDown) {
               logger.info(
                 "Ignoring processing failure, as we are shutting down",
                 ex,
@@ -158,7 +158,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
               )
 
             // Here we recover from the failure so that processing can continue for other tasks.
-            // We signal though that we failed, so that the polling loop doesn't loop tightly when
+            // We signal though that we failed, so that the trigger polling loop doesn't loop tightly when
             // all its tasks fail processing.
             Success(false)
         }
@@ -185,6 +185,21 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
   private[this] val executionHandleRef: AtomicReference[Option[ExecutionHandle]] =
     new AtomicReference(None)
 
+  // When node-level shutdown is initiated, we need to kill the akka source.
+  context.retryProvider.runOnShutdown(new RunOnShutdown {
+    override def name: String = s"terminate source processing loop"
+    override def done: Boolean = executionHandleRef.get().exists(_.completed.isCompleted)
+    override def run(): Unit =
+      executionHandleRef
+        .get()
+        .foreach(handle => {
+          logger.debug("Terminating source processing loop, as we are shutting down.")(
+            TraceContext.empty
+          )
+          handle.killSwitch.shutdown()
+        })
+  })(TraceContext.empty)
+
   override def run(): Unit = blocking {
     // Using synchronized here, as we otherwise have to write cleanup code for recovering from a concurrent call
     synchronized {
@@ -196,8 +211,8 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
           )
 
           require(executionHandleRef.get().isEmpty, "run was called twice")
-          logger.debug("Starting processing loop")
-          val (killSwitch: UniqueKillSwitch, completed: Future[Done]) = AkkaUtil.runSupervised(
+          logger.debug("Starting source processing loop")
+          val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = AkkaUtil.runSupervised(
             logger.error("Fatally failed to handle task", _),
             source
               .viaMat(KillSwitches.single)(Keep.right)
@@ -205,7 +220,18 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
                 Keep.both
               ),
           )
+          val completed = completed0.transform(
+            context.retryProvider
+              .logTerminationAndRecoverOnShutdown("source processing loop", logger)
+          )
           executionHandleRef.set(Some(ExecutionHandle(killSwitch, completed)))
+          // Beware: the termination signal might have arrived before setting the reference above
+          if (context.retryProvider.isShuttingDown) {
+            logger.debug(
+              "Detected race of shutdown signal with setup of source processing loop: triggering termination now."
+            )
+            killSwitch.shutdown()
+          }
         }
       )
 
@@ -216,23 +242,11 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     Seq[AsyncOrSyncCloseable](
-      SyncCloseable(
-        s"terminating processing loop",
-        executionHandleRef.get().foreach(_.killSwitch.shutdown()),
-      ),
       AsyncCloseable(
-        "processing loop terminated",
-        executionHandleRef
-          .get()
-          .fold(Future.successful(Done.done()))(handle =>
-            handle.completed.recover(ex => {
-              // The retry loop terminates with the last exception it was retrying on. Ignore that.
-              logger.info("Ignoring exception due to shutdown", ex)(TraceContext.empty)
-              Done.done()
-            })
-          ),
+        "waiting for termination of source processing loop",
+        executionHandleRef.get().fold(Future.successful(Done.done()))(_.completed),
         timeouts.shutdownShort.unwrap,
-      ),
+      )
     )
   }
 
@@ -350,24 +364,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
-  private val pollingLoopRef = new AtomicReference[Option[Future[Unit]]](None)
-
-  // TODO(tech-debt): expose such a shutdown signal as a future directly from `FlagCloseable`
-  private val shutdownSignal = Promise[UnlessShutdown[Unit]]()
-  runOnShutdown(new RunOnShutdown {
-
-    /** the name, used for logging during shutdown */
-    override def name: String = "Signal shutdown to polling loop"
-
-    /** true if the task has already run (maybe elsewhere) */
-    override def done: Boolean = shutdownSignal.isCompleted
-
-    /** invoked by [FlagCloseable] during shutdown */
-    override def run(): Unit = {
-      logger.debug("Sending shutdown signal to polling loop")(TraceContext.empty)
-      val _ = shutdownSignal.tryComplete(Success(UnlessShutdown.AbortedDueToShutdown))
-    }
-  })(TraceContext.empty)
+  private val pollingLoopRef = new AtomicReference[Option[Future[Done]]](None)
 
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
 
@@ -375,36 +372,29 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
     require(pollingLoopRef.get().isEmpty, "run must not be called twice")
 
-    // We create a top-level tid for the polling loop for ease of navigation in lnav using 'o' and 'O'
+    // We create a top-level tid for the trigger polling loop for ease of navigation in lnav using 'o' and 'O'
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       {
 
         // Construct a future that loops until the Trigger is closing.
-        def pollingLoop(previousResult: Future[Boolean]): Future[Unit] = LoggerUtil.logOnThrow {
+        def pollingLoop(previousResult: Future[Boolean]): Future[Done] = LoggerUtil.logOnThrow {
 
-          def exitPollingLoop(): Future[Unit] = {
-            logger.debug("Exiting polling loop, as we are shutting down.")
-            Future.unit
-          }
+          def exitPollingLoop(): Future[Done] =
+            Future.successful(Done)
 
-          def loopWithDelay(): Future[Unit] = LoggerUtil.logOnThrow {
-            // Construct a promise that captures whether enough time has passed or whether we are shutting down
-            val continueOrShutdownSignal = Promise[UnlessShutdown[Unit]]()
-            continueOrShutdownSignal
-              .completeWith(
-                context.clock
-                  .scheduleAfter(
-                    _ => {
-                      // No work done here, as we are only interested in the scheduling notification
-                      ()
-                    },
-                    context.config.pollingInterval.duration,
-                  )
-                  .unwrap
-              )
-            continueOrShutdownSignal.completeWith(shutdownSignal.future)
+          def loopWithDelay(): Future[Done] = LoggerUtil.logOnThrow {
+            val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
+              context.clock
+                .scheduleAfter(
+                  _ => {
+                    // No work done here, as we are only interested in the scheduling notification
+                    ()
+                  },
+                  context.config.pollingInterval.duration,
+                )
+            )
             // Continue looping
-            continueOrShutdownSignal.future.flatMap {
+            continueOrShutdownSignal.unwrap.flatMap {
               case UnlessShutdown.AbortedDueToShutdown =>
                 exitPollingLoop()
               case UnlessShutdown.Outcome(()) =>
@@ -422,7 +412,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
               loopWithDelay()
 
             case Success(workDone) =>
-              if (this.isClosing) {
+              if (context.retryProvider.isShuttingDown) {
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.
@@ -437,11 +427,14 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
         }(loggingContext)
 
         logger.debug(
-          show"Starting polling loop (polling interval: ${context.config.pollingInterval})"
+          show"Starting trigger polling loop (polling interval: ${context.config.pollingInterval})"
         )
 
         // kick-off the first iteration, and store the handle to its final outcome
-        pollingLoopRef.set(Some(pollingLoop(Future.successful(true))))
+        val loopF = pollingLoop(Future.successful(true)).transform(
+          context.retryProvider.logTerminationAndRecoverOnShutdown("trigger polling loop", logger)
+        )
+        pollingLoopRef.set(Some(loopF))
       }
     }
   }
@@ -449,12 +442,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq(
       AsyncCloseable(
-        "polling loop",
-        // TODO(tech-debt): this kind of wrapping is repeated in multiple places => move it into a shared utility
-        pollingLoopRef
-          .get()
-          .getOrElse(Future.unit)
-          .recover(ex => logger.info("Ignoring exception due to shutdown", ex)(TraceContext.empty)),
+        "trigger polling loop",
+        pollingLoopRef.get().getOrElse(Future.successful(Done)),
         timeouts.shutdownNetwork.duration,
       )
     )

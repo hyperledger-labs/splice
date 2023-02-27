@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import akka.Done
 import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
 import com.daml.error.definitions.CommonErrors.ServerIsShuttingDown
@@ -7,8 +8,14 @@ import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.network.admin.api.client.AppConnection
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  RunOnShutdown,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -24,26 +31,116 @@ import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Try}
 
-class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedLogging {
+/** The CoinRetries class serves two purposes:
+  *  1. It provides methods for retrying failed futures when processing RPC requests
+  *     and background tasks.
+  *  2. It serves to communicate that a node is shutting down. Background services
+  *     are expected to use this to avoid retry-loops when the node is attempting to shut down.
+  *
+  *  TODO(tech-debt): the name of the class could likely be better. Find a better name and change to it.
+  */
+class CoinRetries(
+    override val loggerFactory: NamedLoggerFactory,
+    override val timeouts: ProcessingTimeout,
+) extends NamedLogging
+    with FlagCloseable {
+
+  // shutdown signal together with the registry of the callback setting it
+  private val shutdownSignal = Promise[UnlessShutdown[Nothing]]()
+
+  runOnShutdown(new RunOnShutdown {
+    override def name: String = s"trigger promise for shutdown signal"
+    override def done: Boolean = shutdownSignal.isCompleted
+    override def run(): Unit = {
+      logger.debug("Sending node-level shutdown signal (via future).")(
+        TraceContext.empty
+      )
+      val _ = shutdownSignal.trySuccess(UnlessShutdown.AbortedDueToShutdown)
+    }
+  })(TraceContext.empty)
+
+  /** True if node-level shutdown was initiated.
+    *
+    * This method relies on the guarantee that a `CoinNode` will close its retry provider
+    * before closing its other services.
+    */
+  def isShuttingDown: Boolean = shutdownSignal.isCompleted
+
+  /** Completes when node-level shutdown was initiated. */
+  def shutdownInitiated: Future[UnlessShutdown[Nothing]] = shutdownSignal.future
+
+  /** Use this function to log unexpected terminations from background processing loops and
+    * ignore exceptions propagated on shutdown.
+    *
+    * See its usages for examples.
+    */
+  def logTerminationAndRecoverOnShutdown(name: String, logger: TracedLogger)(
+      terminationResult: Try[Done]
+  )(implicit
+      tc: TraceContext
+  ): Try[Done] =
+    terminationResult match {
+      case scala.util.Success(_) if isShuttingDown =>
+        logger.debug(
+          s"Observed successful termination of $name during shutdown"
+        )
+        scala.util.Success(Done)
+
+      case scala.util.Success(_) =>
+        val msg = s"Unexpected termination of $name"
+        logger.error(msg)
+        Failure(new RuntimeException(msg))
+
+      case Failure(ex) if isShuttingDown =>
+        logger.debug(s"Ignoring termination of $name with exception, as we are shutting down", ex)
+        scala.util.Success(Done)
+
+      case Failure(ex) =>
+        val msg = s"Unexpected termination of $name with exception"
+        logger.error(msg, ex)
+        Failure(ex)
+    }
+
+  /** Wait for a signal unless shutdown was initiated.
+    *
+    * Use this for all functions that wait for an indefinite amount of time,
+    * and thereby avoid blocking a clean shutdown.
+    */
+  def waitUnlessShutdown[T](
+      waitForSignal: Future[T]
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
+    val signalOrShutdown = Promise[UnlessShutdown[T]]()
+    signalOrShutdown.completeWith(waitForSignal.map(UnlessShutdown.Outcome(_)))
+    signalOrShutdown.completeWith(shutdownInitiated)
+    FutureUnlessShutdown(signalOrShutdown.future)
+  }
+
+  /** Variant of [[waitUnlessShutdown]] that works with [[FutureUnlessShutdown]]. */
+  def waitUnlessShutdown[T](
+      waitForSignal: FutureUnlessShutdown[T]
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[T] =
+    FutureUnlessShutdown(
+      waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
+    )
 
   import CoinRetries.{AutomationRetryConfig, RetryConfig}
 
-  val retryForAutomationConfig =
+  private val retryForAutomationConfig =
     AutomationRetryConfig(
       RetryConfig(maxRetries = 35, initialDelay = 200.millis, maxDelay = 5.seconds),
       outerLoopDelay = 5.seconds,
     )
-  val retryForClientCallsConfig =
+  private val retryForClientCallsConfig =
     RetryConfig(maxRetries = 10, initialDelay = 100.millis, maxDelay = 1.seconds)
 
   /** A retry intended for automation calls, retries forever. */
   def retryForAutomation[T](
       operationName: String,
       task: => Future[T],
-      callingService: FlagCloseable,
+      logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
@@ -52,7 +149,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     retryForAutomation(
       operationName,
       task,
-      callingService,
+      logger,
       CoinRetries.RetryableError(_, additionalCodes),
     )
 
@@ -60,7 +157,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   private def retryForAutomation[T](
       operationName: String,
       task: => Future[T],
-      callingService: FlagCloseable,
+      logger: TracedLogger,
       retryable: String => ExceptionRetryable,
   )(implicit
       ec: ExecutionContext,
@@ -69,8 +166,8 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     def outerLoop(task: => Future[T]) = {
       implicit val success: Success[T] = Success.always
       Pause(
-        loggerFactory.getTracedLogger(callingService.getClass),
-        callingService,
+        logger,
+        this,
         Int.MaxValue, // This is special cased as infinite retries so don’t need to worry about overflows.
         retryForAutomationConfig.outerLoopDelay,
         operationName,
@@ -78,7 +175,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       ).apply(task, retryable(operationName))
     }
     outerLoop(
-      retry(operationName, task, callingService, retryForAutomationConfig.config, retryable)
+      retry(operationName, task, logger, retryForAutomationConfig.config, retryable)
     )
   }
 
@@ -86,7 +183,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   def retryForClientCalls[T](
       operationName: String,
       task: => Future[T],
-      callingService: FlagCloseable,
+      logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
@@ -95,7 +192,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     retry(
       operationName,
       task,
-      callingService,
+      logger,
       retryForClientCallsConfig,
       CoinRetries.RetryableError(_, additionalCodes),
     )
@@ -103,7 +200,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   private def retry[T](
       operationName: String,
       task: => Future[T],
-      callingService: FlagCloseable,
+      logger: TracedLogger,
       retryConfig: RetryConfig,
       retryable: String => ExceptionRetryable,
   )(implicit
@@ -113,8 +210,8 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     implicit val success: Success[T] = Success.always
 
     Backoff(
-      loggerFactory.getTracedLogger(callingService.getClass),
-      callingService,
+      logger,
+      this,
       retryConfig.maxRetries,
       retryConfig.initialDelay,
       retryConfig.maxDelay,
@@ -136,8 +233,8 @@ object CoinRetries {
       outerLoopDelay: FiniteDuration,
   )
 
-  def apply(loggerFactory: NamedLoggerFactory): CoinRetries = {
-    new CoinRetries(loggerFactory)
+  def apply(loggerFactory: NamedLoggerFactory, timeouts: ProcessingTimeout): CoinRetries = {
+    new CoinRetries(loggerFactory, timeouts)
   }
 
   /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,

@@ -61,7 +61,7 @@ class SplitwellApp(
       party: PartyId,
   ): Future[SplitwellApp.State] = for {
     store <- Future.successful(
-      SplitwellStore(party, storage, config.domains, loggerFactory, futureSupervisor)
+      SplitwellStore(party, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
     )
     connection = ledgerClient.connection()
     // TODO(M3-82): once we have explicit disclosure: remove the need to fetch these extra readAs rights, which are there to enable using the CoinRules, which are only visible to the validatorParty

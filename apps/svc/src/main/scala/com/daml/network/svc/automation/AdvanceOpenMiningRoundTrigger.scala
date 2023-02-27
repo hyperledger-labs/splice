@@ -59,7 +59,7 @@ class AdvanceOpenMiningRoundTrigger(
       acs <- store.acs(domainId)
       // make sure the store ingested our update so we don't
       // attempt to advance the same round twice
-      _ <- acs.signalWhenIngested(tx.getOffset())
+      _ <- acs.signalWhenIngestedOrShutdown(tx.getOffset())
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )

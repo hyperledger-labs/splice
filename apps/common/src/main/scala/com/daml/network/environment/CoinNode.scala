@@ -54,7 +54,8 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     with NoTracing {
   val name: InstanceName
 
-  protected val retryProvider: CoinRetries = CoinRetries(loggerFactory)
+  protected val retryProvider: CoinRetries =
+    CoinRetries(loggerFactory, parameters.processingTimeouts)
 
   override val timeouts = parameters.processingTimeouts
 
@@ -174,7 +175,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       }
     }
 
-    retryProvider.retryForAutomation("Wait for packages", query(), this)
+    retryProvider.retryForAutomation("Wait for packages", query(), logger)
 
   }
 
@@ -188,7 +189,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     token <- retryProvider.retryForAutomation(
       "Acquiring initial auth token",
       authTokenSource.getToken,
-      this,
+      logger,
     )
     _ = logger.debug(s"Using token $token for this ledger client")
     client <- retryProvider.retryForAutomation(
@@ -207,7 +208,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         loggerFactory,
         tracerProvider,
       ),
-      this,
+      logger,
     )
   } yield client
 
@@ -230,7 +231,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       retryProvider.retryForAutomation(
         "Querying primary party of user",
         connection.getPrimaryParty(serviceUser),
-        this,
+        logger,
         // Note: In general, app service users are allocated by the validator app.
         // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
         // all ledger API calls with fail with PERMISSION_DENIED.
@@ -274,6 +275,11 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     logger.info(s"Stopping $name node")
     Seq(
+      // Close first to trigger the node-wide shutdown signal before shutting down actual services
+      SyncCloseable(
+        s"$name retry provider",
+        retryProvider.close(),
+      ),
       AsyncCloseable(
         s"$name App state",
         initUnlessClosing.transform {

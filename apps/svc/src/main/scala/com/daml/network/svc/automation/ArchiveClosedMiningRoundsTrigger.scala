@@ -57,7 +57,7 @@ class ArchiveClosedMiningRoundsTrigger(
               // make sure the store ingested our update so we don't
               // attempt to archive the same round twice
               acs <- store.defaultAcs
-              _ <- acs.signalWhenIngested(tx.getOffset())
+              _ <- acs.signalWhenIngestedOrShutdown(tx.getOffset())
             } yield {
               logger.info(
                 s"successfully archived closed mining round ${closedRound.payload.round.number}"

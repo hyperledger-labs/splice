@@ -3,6 +3,7 @@ package com.daml.network.validator.store
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.Contract
@@ -72,10 +73,11 @@ object ValidatorStore {
       domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit ec: ExecutionContext): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, domains, loggerFactory, futureSupervisor)
+        new InMemoryValidatorStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

@@ -79,7 +79,7 @@ class DirectoryApp(
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
-        this,
+        logger,
       )
       store = DirectoryStore(
         providerParty = providerPartyId,
@@ -88,6 +88,7 @@ class DirectoryApp(
         config.domains,
         loggerFactory,
         futureSupervisor,
+        retryProvider,
       )
       automation = new DirectoryAutomationService(
         config.automation,

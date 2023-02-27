@@ -33,25 +33,26 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
   private val currentSubscription = new AtomicReference[Option[CoinLedgerSubscription]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
-  this.runOnShutdown(new RunOnShutdown {
+  retryProvider.runOnShutdown(new RunOnShutdown {
     override def name: String = s"terminate subscription"
     // this is not perfectly precise, but CoinLedgerSubscription.close is idempotent
     override def done: Boolean = false
     override def run(): Unit = currentSubscription
       .get()
       .foreach(subscription => {
-        logger.debug(s"shutdown initiated, terminating subscription")(TraceContext.empty)
+        logger
+          .debug(s"Terminating ledger ingestion loop, as we are shutting down.")(TraceContext.empty)
         subscription.close()
       })
   })(TraceContext.empty)
 
   protected def startIngestion(): Unit = {
-    withNewTrace("ingestion loop")(implicit traceContext =>
+    withNewTrace("ledger ingestion loop")(implicit traceContext =>
       _ => {
-        logger.debug(s"Starting ingestion loop")
+        logger.debug(s"Starting ledger ingestion loop")
         val retryLoopF = retryProvider
           .retryForAutomation(
-            "ingestion loop", {
+            "ledger ingestion loop", {
               newLedgerSubscription().flatMap(subscription => {
                 // Smuggle the current subscription out of the body here, so that we can use
                 // runOnShutdown outside to signal the termination via a call to .close().
@@ -59,7 +60,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                 // The creation of the new subscription races with the call to close the content of `currentSubscription`, which is issued
                 // at most once from outside and might end up closing the previous subscription set in a retry loop.
                 // We resolve that race by checking here whether we are closing, and issuing the call ourselves.
-                if (this.isClosing) {
+                if (retryProvider.isShuttingDown) {
                   logger.debug("detected shutdown, closing subscription")
                   subscription.close()
                 }
@@ -67,7 +68,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                 // which signals when the subscription terminated.
                 subscription.completed.map(_ => {
                   // Defensive programming: resubscribe if the subscription terminates normally, outside of closing
-                  if (!this.isClosing) {
+                  if (!retryProvider.isShuttingDown) {
                     val msg = "subscription terminated unexpectedly"
                     logger.error(msg)
                     throw Status.INTERNAL.withDescription(msg).asRuntimeException
@@ -77,11 +78,15 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
               })
             },
             // couple the lifecycle of retrying to the lifecycle of the AcsIngestionService
-            callingService = this,
+            logger,
             // also retry on the INTERNAL error above
             additionalCodes = Seq(Status.Code.INTERNAL),
           )
-        ingestionLoopTerminatedF.set(retryLoopF)
+        ingestionLoopTerminatedF.set(
+          retryLoopF.transform(
+            retryProvider.logTerminationAndRecoverOnShutdown("ledger ingestion loop", logger)
+          )
+        )
       }
     )
   }
@@ -94,14 +99,8 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
     implicit def traceContext: TraceContext = TraceContext.empty
     Seq(
       AsyncCloseable(
-        "ledger subscription terminated",
-        ingestionLoopTerminatedF
-          .get()
-          .recover(ex => {
-            // The retry loop terminates with the last exception it was retrying on. Ignore that.
-            logger.info("Ignoring exception due to shutdown", ex)
-            Done
-          }),
+        "waiting for termination of ledger ingestion loop",
+        ingestionLoopTerminatedF.get(),
         timeouts.shutdownNetwork.duration,
       )
     )

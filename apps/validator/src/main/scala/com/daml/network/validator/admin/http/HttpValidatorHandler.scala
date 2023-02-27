@@ -4,7 +4,6 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -20,7 +19,6 @@ class HttpValidatorHandler(
     walletServiceUser: String,
     domainId: DomainId,
     retryProvider: CoinRetries,
-    flagCloseable: FlagCloseable,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -75,7 +73,6 @@ class HttpValidatorHandler(
         walletServiceUser,
         domainId,
         retryProvider,
-        flagCloseable,
         logger,
       )
       .map(p => p.filterString)

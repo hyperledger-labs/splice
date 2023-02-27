@@ -6,7 +6,8 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree, TreeEvent}
-import com.daml.network.codegen.java.cc.{coin as directoryCodegen}
+import com.daml.network.codegen.java.cc.coin as directoryCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, Trees}
@@ -109,6 +110,7 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
       txFilter,
       TestTxLogStoreParser,
       FutureSupervisor.Noop,
+      CoinRetries(loggerFactory, timeouts),
     )
     for {
       // ingest test events
@@ -224,18 +226,20 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
     "signal when offsets have been ingested" in {
       for {
         store <- mkStore()
-        acsOffsetIngestedF = store.signalWhenIngested(acsOffset)
-        tx2OffsetIngestedF = store.signalWhenIngested(tx2Offset)
-        tx3OffsetIngestedF = store.signalWhenIngested(tx3Offset)
-        tx4OffsetIngestedF = store.signalWhenIngested(tx4Offset)
-        tx5OffsetIngestedF = store.signalWhenIngested(tx5Offset)
+        acsOffsetIngestedF = store.signalWhenIngestedOrShutdown(acsOffset)
+        tx2OffsetIngestedF = store.signalWhenIngestedOrShutdown(tx2Offset)
+        tx3OffsetIngestedF = store.signalWhenIngestedOrShutdown(tx3Offset)
+        tx4OffsetIngestedF = store.signalWhenIngestedOrShutdown(tx4Offset)
+        tx5OffsetIngestedF = store.signalWhenIngestedOrShutdown(tx5Offset)
         _ <- store.ingestionSink.ingestTransaction(tx4)
+        _ = logger.debug("Waiting for tx2OffsetIngestedF")
+        _ <- tx2OffsetIngestedF
+        _ = logger.debug("Waiting for tx3OffsetIngestedF")
+        _ <- tx3OffsetIngestedF
+        _ = logger.debug("Waiting for tx4OffsetIngestedF")
+        _ <- tx4OffsetIngestedF
+        _ = logger.debug("Done. Checking that tx5 is not signalled as ingested")
       } yield {
-        acsOffsetIngestedF.isCompleted shouldBe true
-        tx2OffsetIngestedF.isCompleted shouldBe true
-        // tx 3 is never directly ingested, however, since tx4 with the higher offset is ingested, it should still be signalled as
-        tx3OffsetIngestedF.isCompleted shouldBe true
-        tx4OffsetIngestedF.isCompleted shouldBe true
         // never ingested.
         tx5OffsetIngestedF.isCompleted shouldBe false
       }

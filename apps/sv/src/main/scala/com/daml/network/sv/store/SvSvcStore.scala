@@ -3,6 +3,7 @@ package com.daml.network.sv.store
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
@@ -135,9 +136,11 @@ object SvSvcStore {
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit ec: ExecutionContext): SvSvcStore =
     storage match {
-      case _: MemoryStorage => new InMemorySvSvcStore(key, domains, loggerFactory, futureSupervisor)
+      case _: MemoryStorage =>
+        new InMemorySvSvcStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

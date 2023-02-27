@@ -20,7 +20,7 @@ class DomainIngestionService(
       domainResults <- context.retryProvider.retryForClientCalls(
         "listConnectedDomains",
         adminConnection.listConnectedDomains(),
-        this,
+        logger,
       )
       domainMap = domainResults.view.map(result => result.domainAlias -> result.domainId).toMap
       _ <- sink.ingestConnectedDomains(domainMap)

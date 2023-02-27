@@ -2,6 +2,7 @@ package com.daml.network.directory.store.memory
 
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -15,6 +16,7 @@ class InMemoryDirectoryStore(
     override protected[this] val domainConfig: DirectoryDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
+    override protected val retryProvider: CoinRetries,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCoinAppStoreWithoutHistory
     with DirectoryStore {

@@ -184,13 +184,17 @@ trait AcsStore extends AutoCloseable {
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   ): Source[Contract[Id, View], NotUsed]
 
-  /** Signal when the store has ingested at least one contract of the given template. */
-  def signalWhenIngested[TCid <: ContractId[T], T <: Template](
+  /** Signal when the store has ingested at least one contract of the given template
+    * or node-level shutdown was initiated
+    */
+  def signalWhenIngestedOrShutdown[TCid <: ContractId[T], T <: Template](
       templateCompanion: TemplateCompanion[TCid, T]
-  ): Future[Unit]
+  )(implicit tc: TraceContext): Future[Unit]
 
-  /** Signal when the store has finished ingesting ledger data from the given offset or a larger one. */
-  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit]
+  /** Signal when the store has finished ingesting ledger data from the given offset or a larger one
+    * or node-level shutdown was initiated
+    */
+  def signalWhenIngestedOrShutdown(offset: String)(implicit tc: TraceContext): Future[Unit]
 }
 
 object AcsStore {

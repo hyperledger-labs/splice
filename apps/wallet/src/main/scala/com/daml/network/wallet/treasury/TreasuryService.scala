@@ -45,9 +45,19 @@ import com.daml.network.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  RunOnShutdown,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  TracedLogger,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -55,7 +65,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -79,11 +88,14 @@ class TreasuryService(
     override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends NamedLogging
-    with FlagCloseable
+    with FlagCloseableAsync
     with Spanning
     with HasHealth {
 
-  private val batchExecutorRunning = new AtomicBoolean(true)
+  private implicit val elc: ErrorLoggingContext =
+    ErrorLoggingContext(logger, Map.empty, TraceContext.empty)
+
+  private val queueTerminationResult: Promise[Done] = Promise()
 
   private val queue: BoundedSourceQueue[EnqueuedCoinOperation] =
     withNewTrace(this.getClass.getSimpleName)(implicit tc =>
@@ -96,16 +108,13 @@ class TreasuryService(
           // Execute the batches sequentially to avoid contention
           .mapAsync(1)(executeBatchWithRetry)
           .toMat(
-            Sink.onComplete(result => {
-              if (isClosing)
-                logger.debug(
-                  show"Coin operation batch executor shutting down with result: ${result.toString.unquoted}"
-                )
-              else
-                logger.error(
-                  show"Unexpected termination of coin operation batch executor with result: ${result.toString.unquoted}"
-                )
-              batchExecutorRunning.set(false)
+            Sink.onComplete(result0 => {
+              val result =
+                retryProvider
+                  .logTerminationAndRecoverOnShutdown("coin operation batch executor", logger)(
+                    result0
+                  )
+              val _ = queueTerminationResult.tryComplete(result)
             })
           )(Keep.left)
           .run()
@@ -116,7 +125,27 @@ class TreasuryService(
       }
     )
 
-  override def isHealthy: Boolean = batchExecutorRunning.get()
+  retryProvider.runOnShutdown(new RunOnShutdown {
+    override def name: String = s"terminate coin operation batch executor"
+    override def done: Boolean = false // It's OK to under-approximate this value
+    override def run(): Unit = {
+      logger.debug("Terminating coin operation batch executor, as we are shutting down.")(
+        TraceContext.empty
+      )
+      queue.complete()
+    }
+  })(TraceContext.empty)
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    Seq[AsyncOrSyncCloseable](
+      AsyncCloseable(
+        "waiting for coin operation batch executor shutdown",
+        queueTerminationResult.future,
+        timeouts.shutdownShort.unwrap,
+      )
+    )
+
+  override def isHealthy: Boolean = !queueTerminationResult.isCompleted
 
   // Overriding, as this method is used in "FlagCloseable" to pretty-print the object being closed.
   override def toString: String =
@@ -272,10 +301,10 @@ class TreasuryService(
         .retryForAutomation(
           "execute coin operation batch",
           executeBatch(batch),
-          this,
+          logger,
         )
         .recover(ex => {
-          val failure = if (this.isClosing) {
+          val failure = if (retryProvider.isShuttingDown) {
             // TODO(tech-debt): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
             logger.info("Ignoring batch execution failure, as we are shutting down", ex)
             closingException(_)
@@ -395,7 +424,7 @@ class TreasuryService(
         Future.unit
       } else {
         logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-        userStore.signalWhenIngested(offset)
+        userStore.signalWhenIngestedOrShutdown(offset)
       }
     } yield Done
   }
@@ -641,15 +670,6 @@ class TreasuryService(
         )
       )
     } yield (appRewardsCoinQuantity, appRewardInputs)
-  }
-
-  override def onClosed(): Unit = {
-    logger.debug(
-      show"Shutdown initiated, closing coin operation batch execution queue, which currently contains ${queue.size()} elements)."
-    )(
-      TraceContext.empty
-    )
-    queue.complete()
   }
 }
 

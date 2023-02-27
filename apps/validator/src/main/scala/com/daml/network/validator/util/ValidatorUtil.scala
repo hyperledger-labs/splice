@@ -4,7 +4,6 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,7 +26,6 @@ private[validator] object ValidatorUtil {
       store: ValidatorStore,
       domainId: DomainId,
       retryProvider: CoinRetries,
-      flagCloseable: FlagCloseable,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
@@ -64,7 +62,7 @@ private[validator] object ValidatorUtil {
             logger.info(s"WalletAppInstall for $endUserName already exists, skipping")
             Future.successful(())
         },
-        flagCloseable,
+        logger,
       )
     } yield ()
   }
@@ -78,7 +76,6 @@ private[validator] object ValidatorUtil {
       walletServiceUser: String,
       domainId: DomainId,
       retryProvider: CoinRetries,
-      flagCloseable: FlagCloseable,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     for {
@@ -107,7 +104,6 @@ private[validator] object ValidatorUtil {
         store = store,
         domainId = domainId,
         retryProvider = retryProvider,
-        flagCloseable = flagCloseable,
         logger = logger,
       )
       // Create validator right contract so validator can collect validator rewards
@@ -119,7 +115,6 @@ private[validator] object ValidatorUtil {
         lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
         domainId = domainId,
         retryProvider = retryProvider,
-        flagCloseable = flagCloseable,
         logger = logger,
       )
     } yield userPartyId

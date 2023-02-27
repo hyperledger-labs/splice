@@ -1,6 +1,7 @@
 package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
@@ -53,9 +54,11 @@ object SvSvStore {
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit ec: ExecutionContext): SvSvStore =
     storage match {
-      case _: MemoryStorage => new InMemorySvSvStore(key, domains, loggerFactory, futureSupervisor)
+      case _: MemoryStorage =>
+        new InMemorySvSvStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

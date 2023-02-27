@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight, ValidatorRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
@@ -66,12 +67,20 @@ object WalletStore {
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): WalletStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryWalletStore(key, globalDomain, loggerFactory, timeouts, futureSupervisor)
+        new InMemoryWalletStore(
+          key,
+          globalDomain,
+          loggerFactory,
+          timeouts,
+          futureSupervisor,
+          retryProvider,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

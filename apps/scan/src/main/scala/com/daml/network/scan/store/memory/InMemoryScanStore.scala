@@ -1,6 +1,7 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
@@ -15,6 +16,7 @@ class InMemoryScanStore(
     override protected[this] val domainConfig: ScanDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
+    override protected val retryProvider: CoinRetries,
 )(implicit
     ec: ExecutionContext
 ) extends InMemoryCoinAppStoreWithoutHistory

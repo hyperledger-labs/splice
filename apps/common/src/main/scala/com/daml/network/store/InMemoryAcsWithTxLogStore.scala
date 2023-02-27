@@ -2,9 +2,9 @@ package com.daml.network.store
 
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransactionTreeUpdate,
-  TransferUpdate,
   Transfer,
   TransferEvent,
+  TransferUpdate,
   TreeUpdate,
 }
 import akka.NotUsed
@@ -17,7 +17,9 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.util.{Contract, Trees}
+import com.daml.network.util.PrettyInstances.*
 import Contract.Companion.Template as TemplateCompanion
+import com.daml.network.environment.CoinRetries
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -37,6 +39,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     contractFilter: AcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     futureSupervisor: FutureSupervisor,
+    retryProvider: CoinRetries,
 
     // Boolean flag to enable very verbose state update logging
     logAllStateUpdates: Boolean = false,
@@ -142,19 +145,24 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
   }
 
   /** The implementation is idempotent. */
-  override def signalWhenIngested(
+  override def signalWhenIngestedOrShutdown(
       offset: String
-  )(implicit tc: TraceContext): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] =
     updateState[Future[Unit]](state =>
       if (state.offset.exists(_ >= offset)) {
         (state, Future.unit)
       } else {
-        val (newState, promise) = state.addOffsetToSignal(offset)
-        val future = futureSupervisor.supervised(s"signalWhenIngested($offset)")(promise.future)
-        (newState, future)
+        val (newState, offsetIngested) = state.addOffsetToSignal(offset)
+        val name = s"signalWhenIngested($offset)"
+        val ingestedOrShutdown = retryProvider
+          .waitUnlessShutdown(offsetIngested)
+          .onShutdown(
+            logger.debug(s"Aborted $name, as we are shutting down")
+          )
+        val supervisedFuture = futureSupervisor.supervised(name)(ingestedOrShutdown)
+        (newState, supervisedFuture)
       }
     ).flatten
-  }
 
   private def offsetAndStateAfterIngestingAcs()
       : Future[(String, InMemoryAcsWithTxLogStore.State[TXI, TXE])] =
@@ -289,11 +297,18 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     streamContracts(contractFilter.decodeInterface(interfaceCompanion)(_))
   }
 
-  def signalWhenIngested[TCid <: ContractId[T], T <: Template](
+  def signalWhenIngestedOrShutdown[TCid <: ContractId[T], T <: Template](
       templateCompanion: TemplateCompanion[TCid, T]
-  ): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] = {
     requireInScope(templateCompanion)
-    nextActiveContract(Contract.fromCreatedEvent(templateCompanion), 0).map(ssss => ())
+    val signal = nextActiveContract(Contract.fromCreatedEvent(templateCompanion), 0).map(ssss => ())
+    retryProvider
+      .waitUnlessShutdown(signal)
+      .onShutdown(
+        logger.debug(
+          show"Aborted signalWhenIngestedOrShutdown(${templateCompanion.TEMPLATE_ID}), as we are shutting down"
+        )
+      )
   }
 
   private def nextActiveContract[T](
@@ -606,12 +621,12 @@ object InMemoryAcsWithTxLogStore {
     /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
       * offset has already been requested, don't change the state.
       */
-    def addOffsetToSignal(offset: String): (State[TXI, TXE], Promise[Unit]) = {
+    def addOffsetToSignal(offset: String): (State[TXI, TXE], Future[Unit]) = {
       offsetIngestionsToSignal.get(offset) match {
         case None =>
           val p = Promise[Unit]()
-          (this.focus(_.offsetIngestionsToSignal).modify(_ + (offset -> p)), p)
-        case Some(existingP) => (this, existingP)
+          (this.focus(_.offsetIngestionsToSignal).modify(_ + (offset -> p)), p.future)
+        case Some(existingP) => (this, existingP.future)
       }
     }
   }

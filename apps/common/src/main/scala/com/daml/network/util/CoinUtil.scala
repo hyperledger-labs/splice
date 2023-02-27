@@ -14,7 +14,6 @@ import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -64,7 +63,6 @@ object CoinUtil {
       connection: CoinLedgerConnection,
       domainId: DomainId,
       retryProvider: CoinRetries,
-      flagCloseable: FlagCloseable,
       lookupValidatorRightByParty: (
           PartyId
       ) => Future[
@@ -90,7 +88,7 @@ object CoinUtil {
           logger.info(s"ValidatorRight for $user already exists, skipping")
           Future.successful(())
       },
-      flagCloseable,
+      logger,
     )
 
   lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6

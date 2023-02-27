@@ -1,5 +1,6 @@
 package com.daml.network.svc.store.memory
 
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{InMemoryCoinAppStore, TxLogStore}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.SvcStore
@@ -14,6 +15,7 @@ class InMemorySvcStore(
     override protected[this] val domainConfig: SvcDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
+    override protected val retryProvider: CoinRetries,
 )(implicit
     ec: ExecutionContext
 ) extends InMemoryCoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]]

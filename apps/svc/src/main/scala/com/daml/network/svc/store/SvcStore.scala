@@ -19,6 +19,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
+import com.daml.network.environment.CoinRetries
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait SvcStore extends CoinAppStoreWithoutHistory {
@@ -261,12 +262,19 @@ object SvcStore {
       domains: SvcDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): SvcStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySvcStore(svcParty = svcParty, domains, loggerFactory, futureSupervisor)
+        new InMemorySvcStore(
+          svcParty = svcParty,
+          domains,
+          loggerFactory,
+          futureSupervisor,
+          retryProvider,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

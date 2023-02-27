@@ -7,7 +7,6 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -29,7 +28,6 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     retryProvider: CoinRetries,
-    flagCloseable: FlagCloseable,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -105,7 +103,7 @@ class HttpSvHandler(
                 _ <- retryProvider.retryForAutomation(
                   "onboard validator via SvcRules",
                   onboardValidator(partyId, body.secret, vo),
-                  flagCloseable,
+                  logger,
                 )
               } yield v0.SvResource.OnboardValidatorResponseOK
           }

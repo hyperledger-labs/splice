@@ -87,12 +87,12 @@ class WalletApp(
       validatorUserInfo <- retryProvider.retryForAutomation(
         "getValidatorUserInfo",
         validatorConnection.getValidatorUserInfo(),
-        this,
+        logger,
       )
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
-        this,
+        logger,
       )
       walletStoreKey = WalletStore.Key(
         walletServiceParty = walletServiceParty,
@@ -108,6 +108,7 @@ class WalletApp(
           loggerFactory,
           coinAppParameters.processingTimeouts,
           futureSupervisor,
+          retryProvider,
         )
       walletManager =
         new UserWalletManager(

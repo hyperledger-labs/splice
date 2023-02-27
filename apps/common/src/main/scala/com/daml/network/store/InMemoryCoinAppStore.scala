@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.daml.network.environment.CoinRetries
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
@@ -16,6 +17,8 @@ abstract class InMemoryCoinAppStore[
     with CoinAppStore.InMemoryMutableStoreMap[TXI, TXE] {
   protected def futureSupervisor: FutureSupervisor
 
+  protected def retryProvider: CoinRetries
+
   private[network] override type PerDomainStore = InMemoryCoinAppStore.PerDomainStore[TXI, TXE]
 
   protected[this] override def newPerDomainStore(
@@ -28,6 +31,7 @@ abstract class InMemoryCoinAppStore[
         contractFilter = acsContractFilter,
         txLogParser = txLogParser,
         futureSupervisor = futureSupervisor,
+        retryProvider = retryProvider,
         logAllStateUpdates = false,
       ),
       new InMemoryTransferStore(loggerFactory, acsContractFilter.ingestionFilter.primaryParty),

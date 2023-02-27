@@ -1,6 +1,7 @@
 package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.environment.CoinRetries
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
@@ -35,12 +36,19 @@ object ScanStore {
       domainConfig: ScanDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): ScanStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryScanStore(svcParty = svcParty, domainConfig, loggerFactory, futureSupervisor)
+        new InMemoryScanStore(
+          svcParty = svcParty,
+          domainConfig,
+          loggerFactory,
+          futureSupervisor,
+          retryProvider,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

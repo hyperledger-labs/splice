@@ -56,7 +56,14 @@ class SvcApp(
   ): Future[SvcApp.State] =
     for {
       store <- Future.successful(
-        SvcStore(svcPartyId, storage, config.domains, loggerFactory, futureSupervisor)
+        SvcStore(
+          svcPartyId,
+          storage,
+          config.domains,
+          loggerFactory,
+          futureSupervisor,
+          retryProvider,
+        )
       )
       connection = ledgerClient.connection()
       // We can't move this to the SV app at the moment because of init order;

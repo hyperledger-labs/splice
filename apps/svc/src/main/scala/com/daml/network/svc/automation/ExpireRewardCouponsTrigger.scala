@@ -71,7 +71,8 @@ class ExpireRewardCouponsTrigger(
             .flatMap {
               // make sure the store ingested our update so we don't
               // attempt to collect the same coupon twice
-              case (offset, outcome) => acs.signalWhenIngested(offset).map(_ => Some(outcome))
+              case (offset, outcome) =>
+                acs.signalWhenIngestedOrShutdown(offset).map(_ => Some(outcome))
             }
         )
       )

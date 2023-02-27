@@ -62,10 +62,24 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] =
     for {
-      svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, this)
+      svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
-      svStore = SvSvStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
-      svcStore = SvSvcStore(storeKey, storage, config.domains, loggerFactory, futureSupervisor)
+      svStore = SvSvStore(
+        storeKey,
+        storage,
+        config.domains,
+        loggerFactory,
+        futureSupervisor,
+        retryProvider,
+      )
+      svcStore = SvSvcStore(
+        storeKey,
+        storage,
+        config.domains,
+        loggerFactory,
+        futureSupervisor,
+        retryProvider,
+      )
       automation = new SvAutomationService(
         clock,
         config,
@@ -87,14 +101,14 @@ class SvApp(
           retryProvider.retryForAutomation(
             "join existing SV consortium",
             joinConsortium(svPartyId),
-            this,
+            logger,
           )
         }
       _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
       isDevNet <- retryProvider.retryForAutomation(
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
-        this,
+        logger,
       )
       // TODO(M3-46) split the SV API into a client API and an admin API with auth
       routes = cors() {
@@ -108,7 +122,6 @@ class SvApp(
             isDevNet,
             clock,
             retryProvider,
-            flagCloseable = this,
             loggerFactory,
           )
           // TODO(M3-46) add client authentication via `AuthExtractor`
@@ -168,7 +181,7 @@ class SvApp(
       _ <- retryProvider.retryForAutomation(
         "boostrapping SVC",
         bootstrapSvc(svcStore, ledgerConnection, globalDomain),
-        this,
+        logger,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
       _ <- waiveSvcRights(svcStore.key.svcParty, ledgerConnection)

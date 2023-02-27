@@ -65,7 +65,7 @@ class ScanApp(
   ): Future[ScanApp.State] =
     for {
       store <- Future.successful(
-        ScanStore(svcParty, storage, config.domains, loggerFactory, futureSupervisor)
+        ScanStore(svcParty, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
       )
       automation = new ScanAutomationService(
         config.automation,
@@ -79,7 +79,7 @@ class ScanApp(
         store,
       )
       domainId <- waitForDomainConnection(store.domains, config.domains.global)
-      _ <- store.acs(domainId).flatMap(_.signalWhenIngested(OpenMiningRound.COMPANION))
+      _ <- store.acs(domainId).flatMap(_.signalWhenIngestedOrShutdown(OpenMiningRound.COMPANION))
 
       routes = cors() {
         newTraceContext { traceContext =>

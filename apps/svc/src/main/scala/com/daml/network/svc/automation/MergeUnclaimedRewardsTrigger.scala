@@ -46,7 +46,7 @@ class MergeUnclaimedRewardsTrigger(
                   acs <- store.defaultAcs
                   // make sure the store ingested our update so we don't
                   // attempt to merge the same reward twice
-                  _ <- acs.signalWhenIngested(offset)
+                  _ <- acs.signalWhenIngestedOrShutdown(offset)
                 } yield Some(outcome)
             }
           } yield {

@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.cn.{
   directory as directoryCodegen,
   splitwell as splitwellCodegen,
 }
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory}
 import com.daml.network.util.{CoinUtil, Contract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
@@ -59,8 +59,8 @@ trait UserWalletStore
     throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
   )
 
-  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    defaultAcs.flatMap(_.signalWhenIngested(offset))
+  def signalWhenIngestedOrShutdown(offset: String)(implicit tc: TraceContext): Future[Unit] =
+    defaultAcs.flatMap(_.signalWhenIngestedOrShutdown(offset))
 
   import ExpiredContractTrigger.ListExpiredContracts
   import AcsStore.listExpiredFromPayloadExpiry
@@ -227,6 +227,7 @@ object UserWalletStore {
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       connection: CoinLedgerConnection,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =
@@ -239,6 +240,7 @@ object UserWalletStore {
           timeouts,
           futureSupervisor,
           connection,
+          retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }

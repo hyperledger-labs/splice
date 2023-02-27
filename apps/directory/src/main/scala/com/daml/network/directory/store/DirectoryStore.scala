@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -147,6 +148,7 @@ object DirectoryStore {
       domains: DirectoryDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): DirectoryStore =
@@ -158,6 +160,7 @@ object DirectoryStore {
           domains,
           loggerFactory,
           futureSupervisor,
+          retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }

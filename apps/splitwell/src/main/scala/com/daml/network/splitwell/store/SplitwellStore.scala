@@ -2,6 +2,7 @@ package com.daml.network.splitwell.store
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
@@ -78,12 +79,19 @@ object SplitwellStore {
       domainConfig: SplitwellDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
   ): SplitwellStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySplitwellStore(providerParty, domainConfig, loggerFactory, futureSupervisor)
+        new InMemorySplitwellStore(
+          providerParty,
+          domainConfig,
+          loggerFactory,
+          futureSupervisor,
+          retryProvider,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
