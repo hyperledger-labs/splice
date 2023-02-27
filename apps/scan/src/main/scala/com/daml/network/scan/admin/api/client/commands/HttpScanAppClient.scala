@@ -110,16 +110,22 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetOpenAndIssuingMiningRounds(
-      cachedOpenRounds: Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-      cachedIssuingRounds: Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+  /** Rounds are sorted in ascending order according to their round number. */
+  case class GetSortedOpenAndIssuingMiningRounds(
+      cachedOpenRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+      cachedIssuingRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) extends BaseCommand[
         http.GetOpenAndIssuingMiningRoundsResponse,
         (
-            Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-            Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+            Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+            Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+            BigInt,
         ),
       ] {
+
+    private val cachedOpenRoundsMap = cachedOpenRounds.map(r => (r.contractId.contractId, r)).toMap
+    private val cachedIssuingRoundsMap =
+      cachedIssuingRounds.map(r => (r.contractId.contractId, r)).toMap
 
     override def submitRequest(
         client: Client,
@@ -130,8 +136,8 @@ object HttpScanAppClient {
     ], http.GetOpenAndIssuingMiningRoundsResponse] =
       client.getOpenAndIssuingMiningRounds(
         definitions.GetOpenAndIssuingMiningRoundsRequest(
-          cachedOpenRounds.values.map(_.contractId.contractId).toVector,
-          cachedIssuingRounds.values.map(_.contractId.contractId).toVector,
+          cachedOpenRounds.map(_.contractId.contractId).toVector,
+          cachedIssuingRounds.map(_.contractId.contractId).toVector,
         ),
         headers,
       )
@@ -141,8 +147,9 @@ object HttpScanAppClient {
     )(implicit decoder: TemplateJsonDecoder): Either[
       String,
       (
-          Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-          Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+          Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+          Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+          BigInt,
       ),
     ] =
       response match {
@@ -150,23 +157,23 @@ object HttpScanAppClient {
           for {
             issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
               case (contractId, maybeIssuingRound) =>
-                val issuingRound =
-                  Contract.handleMaybeCachedContract(roundCodegen.IssuingMiningRound.COMPANION)(
-                    cachedIssuingRounds.get(contractId),
-                    maybeIssuingRound,
-                  )
-                issuingRound.map((contractId, _))
+                Contract.handleMaybeCachedContract(roundCodegen.IssuingMiningRound.COMPANION)(
+                  cachedIssuingRoundsMap.get(contractId),
+                  maybeIssuingRound,
+                )
             }
             openMiningRounds <- response.openMiningRounds.toSeq.traverse {
               case (contractId, maybeOpenRound) =>
-                val openRound =
-                  Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
-                    cachedOpenRounds.get(contractId),
-                    maybeOpenRound,
-                  )
-                openRound.map((contractId, _))
+                Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
+                  cachedOpenRoundsMap.get(contractId),
+                  maybeOpenRound,
+                )
             }
-          } yield (openMiningRounds.toMap, issuingMiningRounds.toMap)
+          } yield (
+            openMiningRounds.sortBy(_.payload.round.number),
+            issuingMiningRounds.sortBy(_.payload.round.number),
+            response.timeToLiveInMicroseconds,
+          )
       }
   }
 

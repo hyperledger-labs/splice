@@ -1,22 +1,24 @@
 package com.daml.network.scan.admin.http
 
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.round.{
+  IssuingMiningRound,
+  OpenMiningRound,
+  SummarizingMiningRound,
+}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
+import com.daml.network.scan.store.ScanStore
+import com.daml.network.util.PrettyInstances.*
+import com.daml.network.util.{Contract, ContractMetadataUtil, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.scan.store.ScanStore
-import com.digitalasset.canton.time.Clock
-import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.http.v0.definitions.MaybeCachedContract
-import com.daml.network.util.Contract
-import com.daml.network.util.PrettyInstances.*
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.util.Proto
 
 class HttpScanHandler(
     ledgerClient: CoinLedgerClient,
@@ -49,6 +51,7 @@ class HttpScanHandler(
         acs <- store.defaultAcs
         issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
         openRounds <- acs.listContracts(OpenMiningRound.COMPANION)
+        summarizingRounds <- acs.listContracts(SummarizingMiningRound.COMPANION)
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
         issuingRoundsResponseMap = selectRoundsToRespondWith(
@@ -59,13 +62,36 @@ class HttpScanHandler(
           openRounds,
           openRoundsCachedByClient,
         )
+        ttl = tryComputeTimeToLive(openRounds, summarizingRounds, issuingRounds)
       } yield {
         definitions.GetOpenAndIssuingMiningRoundsResponse(
+          timeToLiveInMicroseconds = BigInt(ttl),
           openMiningRounds = openRoundsResponseMap,
           issuingMiningRounds = issuingRoundsResponseMap,
         )
       }
     }
+
+  /** We choose the smallest-tickDuration of all non-closed rounds as the TTL.
+    * Using this policy, clients will always know about any newly-created rounds before their `opensAt`.
+    * See the SVC round automation design document for details, but in short, this is safe because
+    * the minimum-duration between the creation and effective 'opening' of a round is always >= 1 tick.
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  private def tryComputeTimeToLive(
+      openRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+      summarizingRounds: Seq[Contract[SummarizingMiningRound.ContractId, SummarizingMiningRound]],
+      issuingRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+  ) = {
+    val microseconds: Seq[Long] = (openRounds.map(r =>
+      r.payload.tickDuration.microseconds.toLong
+    ) ++ summarizingRounds.map(_.payload.tickDuration.microseconds.toLong) ++ issuingRounds.map(r =>
+      (ContractMetadataUtil.instantToMicros(r.payload.targetClosesAt) - ContractMetadataUtil
+        .instantToMicros(r.payload.opensAt)) / 2
+    ))
+    // using the potentially-throwing `min` on-purpose as we don't want to accidentally set a very large TTL.
+    microseconds.min
+  }
 
   private def selectRoundsToRespondWith[TCid, T](
       rounds: Seq[Contract[TCid, T]],

@@ -407,7 +407,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     )
   }
 
-  "egress caching avoids re-sending contracts if they are already known by the client" in {
+  "scan-connection caching avoids unnecessary network calls and re-sending contracts if they are already known by the client" in {
     implicit env =>
       val (_, _) = onboardAliceAndBob()
       val coinRulesId = scan.getUnfeaturedAppTransferContext().coinRules
@@ -418,6 +418,26 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       }
       // run a tx so alice wallet's cache is hydrated up to issuing round 1.
       aliceWallet.tap(5)
+
+      clue("check that the cache is used when tapping twice in a row.") {
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+          {
+            aliceWallet.tap(5)
+          },
+          entries => {
+            forAtLeast(
+              1,
+              entries,
+            )(
+              _.message should include regex (
+                s"Using the client-cache to load the current round information"
+              )
+            )
+          },
+        )
+
+      }
+
       val Seq(_, issuingRound1) = scan.getOpenAndIssuingMiningRounds()._2
 
       clue("create issuing round 2") {
@@ -435,7 +455,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               1,
               entries,
             )(
-              // but only the non-expired coin is selected as input.
               _.message should include(
                 show"Not sending ${PrettyContractId(issuingRound1)}"
               )
@@ -444,7 +463,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               1,
               entries,
             )(
-              // but only the non-expired coin is selected as input.
+              _.message should include regex (
+                s"querying the scan app for the latest round information"
+              )
+            )
+            forAtLeast(
+              1,
+              entries,
+            )(
               _.message should include(
                 show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, coinRulesId)}"
               )
@@ -454,6 +480,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
       }
   }
+
   private def getOpenIssuingRounds(now: Instant)(implicit env: CoinTestConsoleEnvironment) = {
     val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))

@@ -415,7 +415,7 @@ class HttpWalletHandler(
   override def getBalance(respond: r0.GetBalanceResponse.type)()(
       user: String
   ): Future[r0.GetBalanceResponse] = withNewTrace(workflowId) { _ => _ =>
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit tc => _ =>
       for {
         userStore <- getUserStore(user)
         acs <- userStore.defaultAcs

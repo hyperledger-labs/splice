@@ -106,11 +106,11 @@ abstract class ScanAppReference(
       Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) = {
     val result = consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetOpenAndIssuingMiningRounds(Map(), Map()))
+      httpCommand(HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(Seq(), Seq()))
     }
     (
-      result._1.values.toSeq.sortBy(_.payload.round.number),
-      result._2.values.toSeq.sortBy(_.payload.round.number),
+      result._1.sortBy(_.payload.round.number),
+      result._2.sortBy(_.payload.round.number),
     )
   }
 

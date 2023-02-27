@@ -18,8 +18,13 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.HttpResponse
 import akka.stream.Materializer
-import com.daml.ledger.api.v1.CommandsOuterClass
+import com.daml.network.scan.admin.api.client.ScanConnection.CachedMiningRounds
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
+
+import java.time.Duration
+import com.daml.ledger.api.v1.CommandsOuterClass
+import com.digitalasset.canton.tracing.TraceContext
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -41,12 +46,9 @@ final class ScanConnection(
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
   private val coinRulesCache: AtomicReference[Option[Contract[CoinRules.ContractId, CoinRules]]] =
     new AtomicReference(None)
-  private val cachedIssuingRounds
-      : AtomicReference[Map[String, Contract[IssuingMiningRound.ContractId, IssuingMiningRound]]] =
-    new AtomicReference(Map())
-  private val cachedOpenRounds
-      : AtomicReference[Map[String, Contract[OpenMiningRound.ContractId, OpenMiningRound]]] =
-    new AtomicReference(Map())
+
+  private val cachedRounds: AtomicReference[CachedMiningRounds] =
+    new AtomicReference(CachedMiningRounds())
 
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
@@ -91,6 +93,7 @@ final class ScanConnection(
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,
       mat: Materializer,
+      tc: TraceContext,
   ): Future[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = {
     for {
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
@@ -102,27 +105,41 @@ final class ScanConnection(
   def getOpenAndIssuingMiningRounds()(implicit
       ec: ExecutionContext,
       mat: Materializer,
+      tc: TraceContext,
   ): Future[
     (
         Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
-    for {
-      (openRounds, issuingRounds) <- runHttpCmd(
-        config.url,
-        HttpScanAppClient.GetOpenAndIssuingMiningRounds(
-          cachedOpenRounds.get(),
-          cachedIssuingRounds.get(),
-        ),
+    val now = clock.now
+    val cache = cachedRounds.get()
+    if (cache.cacheValidUntil.exists(validUntil => now.isBefore(validUntil))) {
+      logger.debug(s"Using the client-cache to load the current round information.")
+      Future.successful(cache.getRoundTuple)
+    } else {
+      logger.debug(
+        s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
       )
-    } yield {
-      cachedIssuingRounds.set(issuingRounds)
-      cachedOpenRounds.set(openRounds)
-      (
-        openRounds.values.toSeq.sortBy(_.payload.round.number),
-        issuingRounds.values.toSeq.sortBy(_.payload.round.number),
-      )
+      for {
+        (openRounds, issuingRounds, ttlInMicros) <- runHttpCmd(
+          config.url,
+          HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(
+            cache.sortedOpenMiningRounds,
+            cache.sortedIssuingMiningRounds,
+          ),
+        )
+
+      } yield {
+        cachedRounds.set(
+          CachedMiningRounds(
+            Some(now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))),
+            openRounds,
+            issuingRounds,
+          )
+        )
+        cachedRounds.get().getRoundTuple
+      }
     }
 
   }
@@ -188,5 +205,22 @@ final class ScanConnection(
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)
   )
+
+}
+
+object ScanConnection {
+  private case class CachedMiningRounds(
+      cacheValidUntil: Option[CantonTimestamp] = None,
+      sortedOpenMiningRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = Seq(),
+      sortedIssuingMiningRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]] =
+        Seq(),
+  ) {
+    def getRoundTuple: (
+        Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
+        Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+    ) =
+      (sortedOpenMiningRounds, sortedIssuingMiningRounds)
+
+  }
 
 }
