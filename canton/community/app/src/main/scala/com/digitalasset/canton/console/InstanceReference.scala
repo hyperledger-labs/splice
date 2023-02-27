@@ -31,7 +31,6 @@ import com.digitalasset.canton.util.ErrorUtil
 import scala.util.hashing.MurmurHash3
 import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import io.grpc.CallCredentials
-import com.digitalasset.canton.admin.api.client.commands.HttpAdminCommand
 
 trait InstanceReference
     extends AdminCommandRunner
@@ -179,7 +178,6 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
   override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result],
-      httpCommand: HttpAdminCommand[_, _, Result],
       credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
@@ -201,7 +199,6 @@ trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
 
   override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result],
-      httpCommand: HttpAdminCommand[_, _, Result],
       credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(

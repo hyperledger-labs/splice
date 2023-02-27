@@ -369,7 +369,7 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `e7ceadad401b9b16df6548afcd650ee93759795e`
+Current Canton commit: `dd75dc44144f884a8af512227a2b7b91fc8f274a`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)

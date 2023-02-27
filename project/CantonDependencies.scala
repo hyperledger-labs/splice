@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.6.0-snapshot.20230206.11376.0.2713e2b4"
+  val version: String = "2.6.0-snapshot.20230210.11415.0.5c00481a"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -21,8 +21,8 @@ object CantonDependencies {
   lazy val akka_version = "2.6.18"
   lazy val akka_http_version = "10.2.8"
   lazy val grpc_version = "1.44.0"
-  lazy val logback_version = "1.2.8"
-  lazy val slf4j_version = "1.7.29"
+  lazy val logback_version = "1.4.5"
+  lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
   lazy val ammonite_version = "2.5.4-34-1c7b3c38"
   lazy val pprint_version = "0.7.1"
