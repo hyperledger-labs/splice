@@ -12,6 +12,7 @@ import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.api.v1
 import java.time.Duration
 import scala.annotation.nowarn
@@ -43,6 +44,11 @@ trait TimeTestUtil extends CoinTestCommon {
         // is that our period automation also takes sim time into account so if
         // the time does not change, it won’t continue sending commands.
         Threading.sleep(1000)
+        // Svc reward collection seems to take particularly long so wait for all of them to be collected before advancing.
+        eventually() {
+          svc.remoteParticipant.ledger_api_extensions.acs
+            .filterJava(SvcReward.COMPANION)(scan.getSvcPartyId()) shouldBe empty
+        }
 
         // it doesn't seem to matter which participant we run these from - all get synced
         val now = svc.remoteParticipant.ledger_api.time.get()
