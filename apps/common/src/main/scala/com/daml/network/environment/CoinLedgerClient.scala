@@ -67,6 +67,7 @@ object CoinLedgerClient {
       apiLoggingConfig: ApiLoggingConfig,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
+      retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContextExecutor,
       as: ActorSystem,
@@ -89,7 +90,7 @@ object CoinLedgerClient {
           CoinLedgerConnection(
             this,
             loggerFactoryForCoinLedgerConnectionOverride,
-            tracerProvider,
+            retryProvider,
           )
 
         override def applicationId: String = applicationId_

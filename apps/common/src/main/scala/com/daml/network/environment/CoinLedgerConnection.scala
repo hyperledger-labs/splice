@@ -31,7 +31,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
@@ -248,7 +248,7 @@ object CoinLedgerConnection {
   def apply(
       coinLedgerClient: CoinLedgerClient,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
-      tracerProvider: TracerProvider,
+      retryProvider: CoinRetries,
   ): CoinLedgerConnection with NamedLogging =
     new CoinLedgerConnection with NamedLogging {
       protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
@@ -839,10 +839,16 @@ object CoinLedgerConnection {
               .augmentDescription(s"timeout while awaiting completion of transfer $commandId")
               .asRuntimeException()
             // TODO (#3001) mapError to ex instead of logging and faking success
-            logger.warn(
-              s"transfer $commandId did not deliver a completion in $howLongToWait, possibly due to duplicate submission; assuming success",
-              ex,
-            )
+            if (retryProvider.isShuttingDown)
+              logger.info(
+                s"Ignoring that transfer $commandId did not deliver a completion in $howLongToWait, as we are shutting down",
+                ex,
+              )
+            else
+              logger.warn(
+                s"transfer $commandId did not deliver a completion in $howLongToWait, possibly due to duplicate submission; assuming success",
+                ex,
+              )
             // fake a success
             LedgerClient.CompletionStreamResponse(
               Seq(LedgerClient.Completion(applicationId, commandId, commandId, OK, Seq.empty))

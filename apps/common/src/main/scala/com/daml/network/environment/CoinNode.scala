@@ -207,6 +207,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         parameters.loggingConfig.api,
         loggerFactory,
         tracerProvider,
+        retryProvider,
       ),
       logger,
     )
