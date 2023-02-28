@@ -193,6 +193,21 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
   }
 
+  "SVs create approval contracts for configured approved SV identities" in { implicit env =>
+    initSvc()
+    clue("SV1 has created an ApprovedSvIdentity contract as it's configured to.") {
+      inside(
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getDebugInfo().svParty)
+      ) {
+        case Seq(approvedSvId) => {
+          approvedSvId.data.candidateName shouldBe "svX"
+          approvedSvId.data.candidateKey shouldBe "mock_key"
+        }
+      }
+    }
+  }
+
   def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one SvcRules contract") {
       val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs

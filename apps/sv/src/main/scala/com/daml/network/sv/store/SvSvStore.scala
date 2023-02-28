@@ -1,5 +1,6 @@
 package com.daml.network.sv.store
 
+import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
@@ -44,6 +45,17 @@ trait SvSvStore extends CoinAppStoreWithoutHistory {
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     defaultAcs.flatMap(_.listContracts(vo.ValidatorOnboarding.COMPANION))
 
+  def lookupApprovedSvIdentityByKeyWithOffset(
+      secret: String
+  ): Future[
+    QueryResult[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]]
+  ] =
+    defaultAcs.flatMap(
+      _.findContractWithOffset(so.ApprovedSvIdentity.COMPANION)(co =>
+        co.payload.candidateKey == key
+      )
+    )
+
   def key: SvStore.Key
 }
 
@@ -72,6 +84,7 @@ object SvSvStore {
       Map(
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
         mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
+        mkFilter(so.ApprovedSvIdentity.COMPANION)(co => co.payload.approvingSv == sv),
       ),
     )
   }

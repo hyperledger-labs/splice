@@ -11,7 +11,12 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomainConfig,
 }
-import com.daml.network.sv.config.{ExpectedOnboardingConfig, LocalSvAppConfig, RemoteSvAppConfig}
+import com.daml.network.sv.config.{
+  ApprovedSvIdentityConfig,
+  ExpectedOnboardingConfig,
+  LocalSvAppConfig,
+  RemoteSvAppConfig,
+}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
@@ -465,6 +470,8 @@ object CNNodeConfig {
       deriveReader[SvcAppClientConfig]
     implicit val expectedOnboardingConfigReader: ConfigReader[ExpectedOnboardingConfig] =
       deriveReader[ExpectedOnboardingConfig]
+    implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
+      deriveReader[ApprovedSvIdentityConfig]
     implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
       deriveReader[LocalSvAppConfig]
     implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
@@ -561,6 +568,8 @@ object CNNodeConfig {
       deriveWriter[SvcAppClientConfig]
     implicit val expectedOnboardingConfigWriter: ConfigWriter[ExpectedOnboardingConfig] =
       confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)
+    implicit val approvedSvIdentityConfigWriter: ConfigWriter[ApprovedSvIdentityConfig] =
+      deriveWriter[ApprovedSvIdentityConfig]
     implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
       deriveWriter[LocalSvAppConfig]
     implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =

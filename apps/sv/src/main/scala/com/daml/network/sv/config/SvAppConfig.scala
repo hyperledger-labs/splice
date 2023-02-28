@@ -22,6 +22,12 @@ object ExpectedOnboardingConfig {
   }
 }
 
+case class ApprovedSvIdentityConfig(
+    name: String,
+    // TODO(#3106) Once signature algorithm decided: add early check that this holds a valid key.
+    key: String,
+)
+
 case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -33,7 +39,9 @@ case class LocalSvAppConfig(
     // TODO(#2241): consider grouping below options into some form of `SvBootstrapConfig`
     isDevNet: Boolean = false,
     foundConsortium: Boolean = false,
+    // TODO(#2241): consider renaming this to `expectedValidatorOnboardings` once naming has stabilized
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
+    approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
     // TODO(#2168): test edge cases.
     initialMaxNumInputs: Int = 100,

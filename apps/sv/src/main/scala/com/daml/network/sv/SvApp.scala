@@ -105,6 +105,7 @@ class SvApp(
           )
         }
       _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
+      _ <- approveConfiguredSvIdentities(svStore, ledgerConnection, globalDomain)
       isDevNet <- retryProvider.retryForAutomation(
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
@@ -301,7 +302,7 @@ class SvApp(
     }
     Future.sequence(
       config.expectedOnboardings.map(c =>
-        expectValidatorOnboarding(
+        expectConfiguredValidatorOnboarding(
           c.secret,
           c.expiresIn,
           svStore,
@@ -312,8 +313,7 @@ class SvApp(
       )
     )
   }
-
-  private def expectValidatorOnboarding(
+  private def expectConfiguredValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStore: SvSvStore,
@@ -336,6 +336,43 @@ class SvApp(
         case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
         case Right(()) => ()
       }
+  }
+
+  private def approveConfiguredSvIdentities(
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
+  ): Future[List[Unit]] = {
+    if (config.approvedSvIdentities.map(_.key).toSet.size != config.approvedSvIdentities.size) {
+      sys.error("Approved SV keys must be unique! Check your SV app config.")
+    }
+    if (config.approvedSvIdentities.map(_.name).toSet.size != config.approvedSvIdentities.size) {
+      sys.error("Approved SV names must be unique! Check your SV app config.")
+    }
+    Future.sequence(
+      config.approvedSvIdentities.map(c =>
+        approveConfiguredSvIdentity(
+          c.name,
+          c.key,
+          svStore,
+          ledgerConnection,
+          globalDomain,
+        )
+      )
+    )
+  }
+  private def approveConfiguredSvIdentity(
+      name: String,
+      key: String,
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
+  ): Future[Unit] = {
+    logger.info("Ensuring that a SV state contract exists for the configured name and key")
+    SvApp.approveSvIdentity(name, key, svStore, ledgerConnection, globalDomain, logger).map {
+      case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
+      case Right(()) => ()
+    }
   }
 }
 
@@ -419,6 +456,56 @@ object SvApp {
                 })
             }
           }
+        }
+      }
+    } yield res
+  }
+
+  private def approveSvIdentity(
+      name: String,
+      key: String,
+      svStore: SvSvStore,
+      ledgerConnection: CoinLedgerConnection,
+      globalDomain: DomainId,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    val svParty = svStore.key.svParty
+    val approvedSvIdentity = new cn.svonboarding.ApprovedSvIdentity(
+      svParty.toProtoPrimitive,
+      name,
+      key,
+    ).create.commands.asScala.toSeq
+    for {
+      res <- svStore.lookupApprovedSvIdentityByKeyWithOffset(key).flatMap {
+        case QueryResult(_, Some(id)) => {
+          Future.successful(
+            Left(if (id.payload.candidateName == name) {
+              s"The SV identitiy ($name:$key) is already approved."
+            } else {
+              s"Tried to approve SV identity ($name:$key), but key $key " +
+                s"is already approved for SV identity (${id.payload.candidateName},$key)."
+            })
+          )
+        }
+        case QueryResult(off, None) => {
+          ledgerConnection
+            .submitCommands(
+              actAs = Seq(svParty),
+              readAs = Seq.empty,
+              commands = approvedSvIdentity,
+              commandId = CoinLedgerConnection
+                .CommandId(
+                  "com.daml.network.sv.approveSvIdentity",
+                  Seq(svParty),
+                  s"$key",
+                ),
+              deduplicationOffset = off,
+              domainId = globalDomain,
+            )
+            .map(_ => {
+              logger.info("Created new ApprovedSvIdentity contract.")
+              Right(())
+            })
         }
       }
     } yield res
