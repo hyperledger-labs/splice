@@ -1,10 +1,11 @@
 package com.daml.network.environment
 
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.TreeUpdate
 import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
+import com.daml.error.utils.ErrorDetails
+import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exercised, Update}
 import com.daml.ledger.javaapi.data.{
@@ -18,11 +19,14 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.TreeUpdate
 import com.daml.network.store.AcsStore.IngestionFilter
-import com.daml.network.util.{Trees, UploadablePackage}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
+import com.daml.network.util.CreatedEventImplicits.*
+import com.daml.network.util.{Trees, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -30,21 +34,22 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.AkkaUtil
+import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 
 import java.nio.file.{Files, Path}
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
-import com.daml.network.util.CreatedEventImplicits.*
 import scala.jdk.OptionConverters.*
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 trait CoinLedgerSubmit extends FlagCloseableAsync {
 
@@ -249,6 +254,7 @@ object CoinLedgerConnection {
       coinLedgerClient: CoinLedgerClient,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       retryProvider: CoinRetries,
+      inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
   ): CoinLedgerConnection with NamedLogging =
     new CoinLedgerConnection with NamedLogging {
       protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
@@ -261,6 +267,29 @@ object CoinLedgerConnection {
 
       implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
 
+      private def callCallbacksOnCompletion[T](result: Future[T]): Future[T] = {
+        import TraceContext.Implicits.Empty.*
+        def callCallbacksInternal(result: Try[?]): Unit =
+          LoggerUtil.logOnThrow { // in case the callbacks throw.
+            result match {
+              case Success(_) => ()
+              case Failure(ex: io.grpc.StatusRuntimeException)
+                  if ex.getMessage.contains(InactiveContracts.id) =>
+                val statusProto = io.grpc.protobuf.StatusProto.fromThrowable(ex)
+                ErrorDetails.from(statusProto).collect {
+                  case ResourceInfoDetail(contractId, type_)
+                      if type_ == CantonErrorResource.ContractId.asString =>
+                    inactiveContractCallbacks.get().foreach(f => f(contractId))
+                }: Unit
+
+              case Failure(_) => ()
+            }
+          }
+
+        result.onComplete(callCallbacksInternal)
+        result
+      }
+
       def submitCommandsNoDedup(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
@@ -268,15 +297,18 @@ object CoinLedgerConnection {
           domainId: DomainId,
           disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Unit] = {
-        client.submitAndWait(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          commandId = uniqueId,
-          deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts,
+        callCallbacksOnCompletion(
+          client
+            .submitAndWait(
+              workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+              applicationId = coinLedgerClient.applicationId,
+              actAs = actAs.map(_.toProtoPrimitive),
+              readAs = readAs.map(_.toProtoPrimitive),
+              commands = commands,
+              commandId = uniqueId,
+              deduplicationConfig = NoDedup,
+              disclosedContracts = disclosedContracts,
+            )
         )
       }
 
@@ -287,15 +319,18 @@ object CoinLedgerConnection {
           domainId: DomainId,
           disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Transaction] = {
-        client.submitAndWaitForTransaction(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          commandId = uniqueId,
-          deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts,
+        callCallbacksOnCompletion(
+          client
+            .submitAndWaitForTransaction(
+              workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+              applicationId = coinLedgerClient.applicationId,
+              actAs = actAs.map(_.toProtoPrimitive),
+              readAs = readAs.map(_.toProtoPrimitive),
+              commands = commands,
+              commandId = uniqueId,
+              deduplicationConfig = NoDedup,
+              disclosedContracts = disclosedContracts,
+            )
         )
       }
 
@@ -308,17 +343,20 @@ object CoinLedgerConnection {
           domainId: DomainId,
           disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
       )(implicit traceContext: TraceContext): Future[Unit] = {
-        client.submitAndWait(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
-          commandId = commandId.commandIdForSubmission,
-          deduplicationConfig = DedupOffset(
-            offset = deduplicationOffset
-          ),
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          disclosedContracts = disclosedContracts,
+        callCallbacksOnCompletion(
+          client
+            .submitAndWait(
+              workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+              applicationId = coinLedgerClient.applicationId,
+              commandId = commandId.commandIdForSubmission,
+              deduplicationConfig = DedupOffset(
+                offset = deduplicationOffset
+              ),
+              actAs = actAs.map(_.toProtoPrimitive),
+              readAs = readAs.map(_.toProtoPrimitive),
+              commands = commands,
+              disclosedContracts = disclosedContracts,
+            )
         )
       }
 
@@ -380,15 +418,18 @@ object CoinLedgerConnection {
           disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
       ): Future[(String, T)] = {
         for {
-          tree <- client.submitAndWaitForTransactionTree(
-            workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-            applicationId = coinLedgerClient.applicationId,
-            commandId = commandIdForSubmission,
-            actAs = actAs.map(_.toProtoPrimitive),
-            readAs = readAs.map(_.toProtoPrimitive),
-            commands = update.commands.asScala.toSeq,
-            deduplicationConfig = dedup,
-            disclosedContracts = disclosedContracts,
+          tree <- callCallbacksOnCompletion(
+            client
+              .submitAndWaitForTransactionTree(
+                workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+                applicationId = coinLedgerClient.applicationId,
+                commandId = commandIdForSubmission,
+                actAs = actAs.map(_.toProtoPrimitive),
+                readAs = readAs.map(_.toProtoPrimitive),
+                commands = update.commands.asScala.toSeq,
+                deduplicationConfig = dedup,
+                disclosedContracts = disclosedContracts,
+              )
           )
         } yield (
           tree.getOffset,
@@ -809,12 +850,15 @@ object CoinLedgerConnection {
               .completions(applicationId, Seq(submitter), begin = None, listenDomain)
               .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
           )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
-            client.submitTransfer(
-              applicationId,
-              commandId,
-              submissionId = commandId,
-              submitter,
-              command,
+            callCallbacksOnCompletion(
+              client
+                .submitTransfer(
+                  applicationId,
+                  commandId,
+                  submissionId = commandId,
+                  submitter,
+                  command,
+                )
             )
           )
         } yield ()

@@ -196,13 +196,14 @@ class ValidatorApp(
       scanConnection <-
         Future.successful(
           new ScanConnection(
+            ledgerClient,
             config.remoteScan.adminApi,
             clock,
             coinAppParameters.processingTimeouts,
             loggerFactory,
           )
         )
-      connection = ledgerClient.connection()
+      connection = ledgerClient.connection(this.getClass.getSimpleName)
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),

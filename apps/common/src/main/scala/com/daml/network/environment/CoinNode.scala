@@ -226,7 +226,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   ) = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
-    connection = ledgerClient.connection()
+    connection = ledgerClient.connection(this.getClass.getSimpleName)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       retryProvider.retryForAutomation(

@@ -293,7 +293,7 @@ class TreasuryService(
 
     def internal(op: installCodegen.CoinOperation) =
       Status.INTERNAL
-        .withDescription("Unexpected coin operation execution failure.")
+        .withDescription(show"Unexpected coin operation execution failure of operation $op.")
         .asRuntimeException()
 
     withSpan("executeBatchWithRetry") { implicit tc => _ =>

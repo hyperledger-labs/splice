@@ -36,7 +36,7 @@ class GrpcSplitwellService(
 
   import GrpcSplitwellService.*
 
-  private val connection = ledgerClient.connection()
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
   override def listGroups(
       request: v0.ListGroupsRequest

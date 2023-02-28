@@ -42,7 +42,7 @@ class GrpcSvcAppService(
     with Spanning
     with NamedLogging {
 
-  private val connection = ledgerClient.connection()
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>

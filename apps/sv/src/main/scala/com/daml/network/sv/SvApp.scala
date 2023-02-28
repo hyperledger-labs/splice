@@ -93,7 +93,7 @@ class SvApp(
       )
       _ <- waitForDomainConnection(svStore.domains, config.domains.global)
       globalDomain <- waitForDomainConnection(svcStore.domains, config.domains.global)
-      ledgerConnection = ledgerClient.connection()
+      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName)
       _ <-
         if (config.foundConsortium) {
           foundConsortium(svcStore, ledgerConnection, globalDomain)
@@ -313,6 +313,7 @@ class SvApp(
       )
     )
   }
+
   private def expectConfiguredValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
@@ -361,6 +362,7 @@ class SvApp(
       )
     )
   }
+
   private def approveConfiguredSvIdentity(
       name: String,
       key: String,

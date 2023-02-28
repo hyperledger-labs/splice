@@ -4,8 +4,10 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
   ScanAppBackendReference,
@@ -301,5 +303,26 @@ trait TimeTestUtil extends CoinTestCommon {
     }
     // ... before we advance time to trigger the automation.
     advanceTime(advanceTimeBy)
+  }
+
+  def createConfigSchedule(
+      newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val configSchedule = {
+      new cc.schedule.Schedule(
+        mkCoinConfig(defaultTickDuration),
+        newSchedules
+          .map { case (durationUntilScheduled, config) =>
+            new Tuple2(
+              now.add(durationUntilScheduled).toInstant,
+              config,
+            )
+          }
+          .toList
+          .asJava,
+      )
+    }
+    configSchedule
   }
 }

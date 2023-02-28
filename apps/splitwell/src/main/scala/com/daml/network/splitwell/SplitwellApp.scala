@@ -63,11 +63,12 @@ class SplitwellApp(
     store <- Future.successful(
       SplitwellStore(party, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
     )
-    connection = ledgerClient.connection()
+    connection = ledgerClient.connection(this.getClass.getSimpleName)
     // TODO(M3-82): once we have explicit disclosure: remove the need to fetch these extra readAs rights, which are there to enable using the CoinRules, which are only visible to the validatorParty
     readAs <- connection.getUserReadAs(config.providerUser)
     scanConnection =
       new ScanConnection(
+        ledgerClient,
         config.remoteScan.adminApi,
         clock,
         coinAppParameters.processingTimeouts,

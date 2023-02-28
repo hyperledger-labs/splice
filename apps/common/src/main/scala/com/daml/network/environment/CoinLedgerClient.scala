@@ -8,19 +8,28 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, Processin
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait CoinLedgerClient extends FlagCloseableAsync {
   def applicationId: String
+
   def client: LedgerClient
-  def connection(
-  ): CoinLedgerConnection with NamedLogging
+
+  def connection(origin: String): CoinLedgerConnection with NamedLogging
+
+  /** Callback function that will be called whenever a ledger submission fails due to an inactive-contracts exception.
+    * The argument given to the function is the contract-id of the inactive contract. Used for cache invalidation.
+    */
+  def registerInactiveContractsCallback(f: String => Unit): Unit
+
   def timeouts: ProcessingTimeout
 
   def actorSystem: ActorSystem
+
   def executionContextExecutor: ExecutionContextExecutor
 }
 
@@ -85,21 +94,34 @@ object CoinLedgerClient {
 
         override val client: LedgerClient = client_
 
-        override def connection(
-        ): CoinLedgerConnection with NamedLogging =
-          CoinLedgerConnection(
+        private val callbacks = new AtomicReference[Seq[String => Unit]](Seq())
+
+        override def registerInactiveContractsCallback(
+            f: String => Unit
+        ): Unit = {
+          callbacks.getAndUpdate(prev => prev :+ f)
+        }: Unit
+
+        override def connection(origin: String): CoinLedgerConnection with NamedLogging = {
+          val connection = CoinLedgerConnection(
             this,
             loggerFactoryForCoinLedgerConnectionOverride,
             retryProvider,
+            callbacks,
           )
+          logger.debug(s"Created a CoinLedgerConnection ($origin).")(TraceContext.empty)
+          connection
+        }
 
         override def applicationId: String = applicationId_
+
         override def timeouts: ProcessingTimeout = processingTimeouts
 
         protected val loggerFactory: NamedLoggerFactory =
           loggerFactoryForCoinLedgerConnectionOverride
 
         override def actorSystem: ActorSystem = as
+
         override def executionContextExecutor: ExecutionContextExecutor = ec
 
         override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List(

@@ -69,6 +69,7 @@ class WalletApp(
     for {
       scanConnection <- Future {
         new ScanConnection(
+          ledgerClient,
           config.remoteScan.adminApi,
           clock,
           coinAppParameters.processingTimeouts,
@@ -142,7 +143,14 @@ class WalletApp(
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
-
+      handler = new HttpWalletHandler(
+        walletManager,
+        ledgerClient,
+        clock,
+        scanConnection,
+        loggerFactory,
+        retryProvider,
+      )
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
           List(
@@ -158,14 +166,7 @@ class WalletApp(
           requestLogger(traceContext) {
             HttpWalletErrorHandler(loggerFactory)(traceContext) {
               WalletResource.routes(
-                new HttpWalletHandler(
-                  walletManager,
-                  ledgerClient,
-                  clock,
-                  scanConnection,
-                  loggerFactory,
-                  retryProvider,
-                ),
+                handler,
                 AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
               )
             }

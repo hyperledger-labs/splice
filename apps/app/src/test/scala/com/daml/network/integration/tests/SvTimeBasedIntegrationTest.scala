@@ -507,27 +507,6 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
     }
   }
 
-  private def createConfigSchedule(
-      newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
-  )(implicit env: CoinTestConsoleEnvironment) = {
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
-    val configSchedule = {
-      new cc.schedule.Schedule(
-        mkCoinConfig(defaultTickDuration),
-        newSchedules
-          .map { case (durationUntilScheduled, config) =>
-            new Tuple2(
-              now.add(durationUntilScheduled).toInstant,
-              config,
-            )
-          }
-          .toList
-          .asJava,
-      )
-    }
-    configSchedule
-  }
-
   private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
     Ordering[Instant].max(
       rounds.oldestOpen.data.targetClosesAt,

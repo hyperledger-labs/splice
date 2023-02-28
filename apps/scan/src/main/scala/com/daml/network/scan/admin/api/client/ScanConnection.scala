@@ -8,9 +8,11 @@ import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as ro
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.scan.admin.api.client.ScanConnection.CachedMiningRounds
+import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{CoinUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -18,6 +20,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
@@ -28,6 +31,7 @@ import scala.jdk.OptionConverters.*
   * to query for the SVC party id.
   */
 final class ScanConnection(
+    coinLedgerClient: CoinLedgerClient,
     config: CoinHttpClientConfig,
     clock: Clock,
     timeouts: ProcessingTimeout,
@@ -38,7 +42,26 @@ final class ScanConnection(
     templateDecoder: TemplateJsonDecoder,
 ) extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
 
+  // register the callback to potentially invalidate the CoinRules cache.
+  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
+
   override def serviceName: String = "scan"
+
+  /** We cache the CoinRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
+    * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
+    * to check for each inactive-contract we receive from the ledger that the failure was not caused by an outdated cache
+    * of the CoinRules.
+    */
+  private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
+    coinRulesCache.get() match {
+      case Some(cachedContract) if cachedContract.contractId.contractId == inactiveContract =>
+        logger.info(
+          show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract)}"
+        )(TraceContext.empty)
+        coinRulesCache.set(None)
+      case _ =>
+        ()
+    }
 
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
@@ -79,19 +102,29 @@ final class ScanConnection(
     } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }
 
-  def getCoinRules(invalidateCache: Boolean = false)(implicit
+  def getCoinRules()(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Contract[CoinRules.ContractId, CoinRules]] =
-    for {
-      coinRules <- runHttpCmd(
-        config.url,
-        HttpScanAppClient.GetCoinRules(coinRulesCache.get()),
-      )
-    } yield {
-      coinRulesCache.set(Some(coinRules))
-      coinRules
+      tc: TraceContext,
+  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
+    coinRulesCache.get() match {
+      case Some(coinRules) =>
+        Future.successful(coinRules)
+      case None =>
+        logger.debug(
+          s"CoinRules cache is empty, retrieving them from CC scan."
+        )
+        for {
+          coinRules <- runHttpCmd(
+            config.url,
+            HttpScanAppClient.GetCoinRules(None),
+          )
+        } yield {
+          coinRulesCache.set(Some(coinRules))
+          coinRules
+        }
     }
+  }
 
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,
@@ -221,7 +254,6 @@ object ScanConnection {
         Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
     ) =
       (sortedOpenMiningRounds, sortedIssuingMiningRounds)
-
   }
 
 }

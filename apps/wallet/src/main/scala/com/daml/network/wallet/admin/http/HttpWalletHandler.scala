@@ -68,14 +68,13 @@ class HttpWalletHandler(
   private val walletServiceParty: PartyId = store.key.walletServiceParty
   private val validatorParty: PartyId = store.key.validatorParty
 
-  private val connection = ledgerClient.connection()
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
   override def list(respond: r0.ListResponse.type)()(
       user: String
   ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
     for {
       userStore <- getUserStore(user)
-      now = clock.now
       currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       acs <- userStore.defaultAcs
       coins <- acs.listContracts(coinCodegen.Coin.COMPANION)

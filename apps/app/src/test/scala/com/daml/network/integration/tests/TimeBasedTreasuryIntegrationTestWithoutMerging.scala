@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -410,7 +409,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "scan-connection caching avoids unnecessary network calls and re-sending contracts if they are already known by the client" in {
     implicit env =>
       val (_, _) = onboardAliceAndBob()
-      val coinRulesId = scan.getUnfeaturedAppTransferContext(getLedgerTime).coinRules
 
       clue("create issuing rounds 0 and 1") {
         advanceRoundsByOneTick
@@ -465,14 +463,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
             )(
               _.message should include regex (
                 s"querying the scan app for the latest round information"
-              )
-            )
-            forAtLeast(
-              1,
-              entries,
-            )(
-              _.message should include(
-                show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, coinRulesId)}"
               )
             )
           },

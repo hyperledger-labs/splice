@@ -175,6 +175,40 @@ class SvcTimeBasedIntegrationTest
     )
   }
 
+  "coin rules cache should be invalidated when the coin rules change" in { implicit env =>
+    val (_, _) = onboardAliceAndBob()
+    // tap once so the CoinRules are cached...
+    aliceWallet.tap(5)
+    clue("schedule a config change, so the coinrules change") {
+      val configSchedule =
+        createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(maxNumInputs = 101)))
+      svcClient.setConfigSchedule(configSchedule)
+    }
+
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      // tapping again..
+      aliceWallet.tap(5),
+      entries => {
+        forAtLeast(
+          1,
+          entries,
+        )( // .. will initially fail and lead to a cache invalidation..
+          _.message should include regex (
+            s"Invalidating the CoinRules cache"
+          )
+        )
+        forAtLeast(
+          1,
+          entries,
+        )(
+          _.message should include regex ( // and cache refreshment
+            s"CoinRules cache is empty, retrieving them from CC scan."
+          )
+        )
+      },
+    )
+  }
+
   "collect expired reward coupons" in { implicit env =>
     def getNumRewardCoupons(
         round: Contract[OpenMiningRound.ContractId, OpenMiningRound]

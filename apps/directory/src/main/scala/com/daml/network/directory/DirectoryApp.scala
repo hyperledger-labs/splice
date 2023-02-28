@@ -70,6 +70,7 @@ class DirectoryApp(
     for {
       scanConnection <- Future.successful(
         new ScanConnection(
+          ledgerClient,
           config.remoteScan.adminApi,
           clock,
           coinAppParameters.processingTimeouts,
