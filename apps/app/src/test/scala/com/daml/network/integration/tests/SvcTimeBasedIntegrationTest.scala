@@ -3,22 +3,21 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{Contract, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level
 import monocle.macros.syntax.lens.*
+import org.slf4j.event.Level
 
-import scala.jdk.CollectionConverters.*
 import java.time.Duration
-import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.util.Contract
+import scala.jdk.CollectionConverters.*
 
 class SvcTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -132,6 +131,7 @@ class SvcTimeBasedIntegrationTest
     )
 
     def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
+
     val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
 
     inside(issuingRounds) { case Seq(issuingRound) =>
@@ -193,7 +193,7 @@ class SvcTimeBasedIntegrationTest
           .length
     }
 
-    val round = scan.getTransferContext().latestOpenMiningRound
+    val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
     // number of existing ones, and compare to that below
     val numRewards = getNumRewardCoupons(round)

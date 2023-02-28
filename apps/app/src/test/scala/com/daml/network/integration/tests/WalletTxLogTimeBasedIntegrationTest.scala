@@ -10,7 +10,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-class WalletTxLogIntegrationTest
+class WalletTxLogTimeBasedIntegrationTest
     extends CoinIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil

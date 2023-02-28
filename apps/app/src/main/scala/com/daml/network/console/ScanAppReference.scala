@@ -4,18 +4,18 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CoinUtil, Contract}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
-import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.config.CoinHttpClientConfig
-import com.digitalasset.canton.data.CantonTimestamp
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -33,10 +33,15 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns contracts required as inputs for a transfer."
   )
-  def getTransferContext(): HttpScanAppClient.TransferContext =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTransferContext)
-    }
+  def getTransferContextWithInstances(
+      now: CantonTimestamp
+  ): HttpScanAppClient.TransferContextWithInstances = {
+    val openAndIssuingRounds = getOpenAndIssuingMiningRounds()
+    val openRounds = openAndIssuingRounds._1
+    val latestOpenMiningRound = CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+    val coinRules = getCoinRules()
+    TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
+  }
 
   @Help.Summary(
     "Returns last-created open mining round that is open according to the passed time. "
@@ -60,33 +65,21 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Get the (cached) config schedule for the CoinRules. Note that changes to the config might take some time to propagate due to the client-side caching."
   )
-  def getConfigSchedule(): Option[HttpScanAppClient.ConfigSchedule] = {
-    getTransferContext().coinRules
-      .map { cr =>
-        HttpScanAppClient.ConfigSchedule(
-          currentConfig = cr.payload.configSchedule.currentValue,
-          futureConfigs = cr.payload.configSchedule.futureValues.asScala.map { t =>
-            t._1 -> t._2
-          }.toMap,
-        )
-      }
+  def getConfigSchedule(now: CantonTimestamp): HttpScanAppClient.ConfigSchedule = {
+    val cr = getTransferContextWithInstances(now).coinRules
+    HttpScanAppClient.ConfigSchedule(
+      currentConfig = cr.payload.configSchedule.currentValue,
+      futureConfigs = cr.payload.configSchedule.futureValues.asScala.map { t =>
+        t._1 -> t._2
+      }.toMap,
+    )
   }
 
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
   )
-  def getUnfeaturedAppTransferContext(): v1.coin.AppTransferContext = {
-    def notFound(description: String) = new IllegalStateException(description)
-
-    val transferContext = getTransferContext()
-    val openMiningRound = transferContext.latestOpenMiningRound
-    val coinRules =
-      transferContext.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
-    new v1.coin.AppTransferContext(
-      coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-      openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-      None.toJava,
-    )
+  def getUnfeaturedAppTransferContext(now: CantonTimestamp): v1.coin.AppTransferContext = {
+    getTransferContextWithInstances(now).toUnfeaturedAppTransferContext()
   }
 
   @Help.Summary(

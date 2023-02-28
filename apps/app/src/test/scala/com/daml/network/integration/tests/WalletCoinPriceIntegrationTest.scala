@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletCoinPriceIntegrationTest
@@ -26,7 +27,11 @@ class WalletCoinPriceIntegrationTest
     "see round with coin price 2.0" in { implicit env =>
       // Eventually to make sure we wait until Scan has ingested the round.
       eventually() {
-        scan.getTransferContext().latestOpenMiningRound.payload.coinPrice shouldBe BigDecimal(
+        scan
+          .getTransferContextWithInstances(CantonTimestamp.now())
+          .latestOpenMiningRound
+          .payload
+          .coinPrice shouldBe BigDecimal(
           2
         ).bigDecimal.setScale(10)
       }

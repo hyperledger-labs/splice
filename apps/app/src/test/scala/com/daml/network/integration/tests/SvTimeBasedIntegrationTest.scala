@@ -112,21 +112,10 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
-
     val doubledTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(300))
-    val configSchedule = new cc.schedule.Schedule(
-      mkCoinConfig(defaultTickDuration),
-      List(
-        new Tuple2(
-          now.add(Duration.ofSeconds(150)).toInstant,
-          mkCoinConfig(doubledTickDuration),
-        )
-      ).asJava,
+    svcClient.setConfigSchedule(
+      createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(doubledTickDuration)))
     )
-
-    // set configSchedule
-    svcClient.setConfigSchedule(configSchedule)
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with doubled tick duration.
@@ -214,21 +203,10 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
-
     val reducedTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(75))
-    val configSchedule = new cc.schedule.Schedule(
-      mkCoinConfig(defaultTickDuration),
-      List(
-        new Tuple2(
-          now.add(Duration.ofSeconds(150)).toInstant,
-          mkCoinConfig(reducedTickDuration),
-        )
-      ).asJava,
+    svcClient.setConfigSchedule(
+      createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(reducedTickDuration)))
     )
-
-    // set configSchedule
-    svcClient.setConfigSchedule(configSchedule)
     advanceRoundsByOneTick
 
     // latest OpenMiningRound was created with reduced tick duration.
@@ -392,26 +370,12 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
     val config101 = mkCoinConfig(defaultTickDuration, 101)
     val config102 = mkCoinConfig(defaultTickDuration, 102)
 
-    {
-      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
-      val configSchedule = {
-        new cc.schedule.Schedule(
-          mkCoinConfig(defaultTickDuration),
-          List(
-            new Tuple2(
-              now.add(Duration.ofSeconds(150)).toInstant,
-              config101,
-            ),
-            new Tuple2(
-              now.add(Duration.ofSeconds(151)).toInstant,
-              config102,
-            ),
-          ).asJava,
-        )
-      }
-      // set configSchedule
-      svcClient.setConfigSchedule(configSchedule)
-    }
+    svcClient.setConfigSchedule(
+      createConfigSchedule(
+        (Duration.ofSeconds(150), config101),
+        (Duration.ofSeconds(151), config102),
+      )
+    )
 
     advanceRoundsByOneTick
     advanceRoundsByOneTick
@@ -541,6 +505,27 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
         }
       }
     }
+  }
+
+  private def createConfigSchedule(
+      newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val configSchedule = {
+      new cc.schedule.Schedule(
+        mkCoinConfig(defaultTickDuration),
+        newSchedules
+          .map { case (durationUntilScheduled, config) =>
+            new Tuple2(
+              now.add(durationUntilScheduled).toInstant,
+              config,
+            )
+          }
+          .toList
+          .asJava,
+      )
+    }
+    configSchedule
   }
 
   private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {

@@ -42,16 +42,6 @@ object CoinTests {
       CoinEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
 
-    protected def mkCoinConfig(
-        tickDuration: NonNegativeFiniteDuration,
-        maxNumInputs: Int = 100,
-    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
-      defaultCoinConfig(
-        tickDuration,
-        maxNumInputs,
-      )
-
-    val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
   }
 
   trait CoinIntegrationTestWithSharedEnvironment
@@ -108,6 +98,7 @@ object CoinTests {
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser),
       )
     }
+
     private def extendLedgerApiUserWithCaseId(
         ref: RemoteDirectoryAppReference
     ): RemoteDirectoryAppReference = {
@@ -120,6 +111,7 @@ object CoinTests {
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
       )
     }
+
     private def extendLedgerApiUserWithCaseId(
         ref: SplitwellAppClientReference
     ): SplitwellAppClientReference = {
@@ -132,6 +124,7 @@ object CoinTests {
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
       )
     }
+
     private def updateUser(
         conf: AuthTokenSourceConfig,
         newUser: String,
@@ -154,6 +147,17 @@ object CoinTests {
       extends BaseTest
       with CommonCoinAppInstanceReferences
       with LedgerApiExtensions {
+
+    lazy val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
+
+    protected def mkCoinConfig(
+        tickDuration: NonNegativeFiniteDuration = defaultTickDuration,
+        maxNumInputs: Int = 100,
+    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
+      defaultCoinConfig(
+        tickDuration,
+        maxNumInputs,
+      )
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

@@ -156,25 +156,6 @@ class HttpScanHandler(
       }
     }
 
-  def getTransferContext(
-      response: v0.ScanResource.GetTransferContextResponse.type
-  )(): Future[v0.ScanResource.GetTransferContextResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
-      for {
-        coinRules <- store.lookupCoinRules()
-        now = clock.now
-        latestOpen <- store.getLatestOpenMiningRound(now)
-        rounds <- store.lookupSubmittableOpenMiningRounds(now)
-      } yield {
-        definitions.GetTransferContextResponse(
-          coinRules.map(_.toJson),
-          latestOpen.toJson,
-          // TODO(M3-09): consider just removing this attribute - not used except in tests.
-          rounds.toVector.map(_.toJson),
-        )
-      }
-    }
-
   def listFeaturedAppRights(
       response: v0.ScanResource.ListFeaturedAppRightsResponse.type
   )(): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =

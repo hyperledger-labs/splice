@@ -1,30 +1,28 @@
 package com.daml.network.scan.admin.api.client
 
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.Materializer
+import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.scan.admin.api.client.ScanConnection.CachedMiningRounds
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.util.{CoinUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.{Status, StatusRuntimeException}
+import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.HttpResponse
-import akka.stream.Materializer
-import com.daml.network.scan.admin.api.client.ScanConnection.CachedMiningRounds
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.time.Clock
-
-import java.time.Duration
-import com.daml.ledger.api.v1.CommandsOuterClass
-import com.digitalasset.canton.tracing.TraceContext
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -68,17 +66,23 @@ final class ScanConnection(
     }
   }
 
-  def getTransferContext()(implicit
+  def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[HttpScanAppClient.TransferContext] = {
-    runHttpCmd(config.url, HttpScanAppClient.GetTransferContext)
+      tc: TraceContext,
+  ): Future[HttpScanAppClient.TransferContextWithInstances] = {
+    for {
+      openAndIssuingRounds <- getOpenAndIssuingMiningRounds()
+      openRounds = openAndIssuingRounds._1
+      latestOpenMiningRound = CoinUtil.selectLatestOpenMiningRound(clock.now, openRounds)
+      coinRules <- getCoinRules()
+    } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }
 
-  def getCoinRules()(implicit
+  def getCoinRules(invalidateCache: Boolean = false)(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
+  ): Future[Contract[CoinRules.ContractId, CoinRules]] =
     for {
       coinRules <- runHttpCmd(
         config.url,
@@ -88,7 +92,6 @@ final class ScanConnection(
       coinRulesCache.set(Some(coinRules))
       coinRules
     }
-  }
 
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,
@@ -152,14 +155,15 @@ final class ScanConnection(
   }
 
   def getAppTransferContext(providerPartyId: PartyId)(implicit
+      tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[(coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])] = {
     for {
-      context <- getTransferContext()
+      context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
-      val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+      val coinRules = context.coinRules
       val openMiningRound = context.latestOpenMiningRound
       (
         new coinCodegen.AppTransferContext(
@@ -173,16 +177,17 @@ final class ScanConnection(
   }
 
   def getAppTransferContextForRound(providerPartyId: PartyId, round: roundCodegen.Round)(implicit
+      tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[
     Either[String, (coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])]
   ] = {
     for {
-      context <- getTransferContext()
+      context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
-      val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+      val coinRules = context.coinRules
       context.openMiningRounds.find(_.payload.round == round) match {
         case Some(openMiningRound) =>
           Right(
@@ -201,10 +206,6 @@ final class ScanConnection(
       }
     }
   }
-
-  private def notFound(description: String) = new StatusRuntimeException(
-    Status.NOT_FOUND.withDescription(description)
-  )
 
 }
 

@@ -48,9 +48,10 @@ class WalletSubscriptionsIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val transferContext = scan.getUnfeaturedAppTransferContext()
-        val openRound = scan.getLatestOpenMiningRound(CantonTimestamp.now())
-        val coinRules = scan.getCoinRules()
+        val transferContext = scan.getTransferContextWithInstances(CantonTimestamp.now())
+        val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
+        val openRound = transferContext.latestOpenMiningRound
+        val coinRules = transferContext.coinRules
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -90,7 +91,7 @@ class WalletSubscriptionsIntegrationTest
         val (_, paymentId) = actAndCheck(
           "Collect the initial payment (as the receiver), which creates the subscription", {
             val collectCommand = initialPaymentId
-              .exerciseSubscriptionInitialPayment_Collect(transferContext)
+              .exerciseSubscriptionInitialPayment_Collect(appTransferContext)
               .commands
               .asScala
               .toSeq
@@ -122,7 +123,7 @@ class WalletSubscriptionsIntegrationTest
         val (_, subscriptionStateId2) = actAndCheck(
           "Collect the second payment (as the receiver), which sets the subscription back to idle", {
             val collectCommand2 = paymentId
-              .exerciseSubscriptionPayment_Collect(transferContext)
+              .exerciseSubscriptionPayment_Collect(appTransferContext)
               .commands
               .asScala
               .toSeq

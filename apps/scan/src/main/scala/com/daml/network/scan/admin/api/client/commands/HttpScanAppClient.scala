@@ -6,6 +6,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.{
@@ -15,12 +16,12 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.http.v0.{definitions, scan as http}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, Proto, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.util.Proto
+import scala.jdk.OptionConverters.*
 
 object HttpScanAppClient {
 
@@ -54,10 +55,12 @@ object HttpScanAppClient {
       }
   }
 
-  case class TransferContext(
-      coinRules: Option[
-        Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]
-      ],
+  /** Very similar to the AppTransferContext we use in Daml, except
+    * (1) this class has contract instances attributes, not just interface-contract id attributes.
+    * (2) this class has no featuredAppRight attribute.
+    */
+  case class TransferContextWithInstances(
+      coinRules: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
       latestOpenMiningRound: Contract[
         roundCodegen.OpenMiningRound.ContractId,
         roundCodegen.OpenMiningRound,
@@ -65,50 +68,21 @@ object HttpScanAppClient {
       openMiningRounds: Seq[
         Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
       ],
-  )
+  ) {
+    def toUnfeaturedAppTransferContext() = {
+      val openMiningRound = latestOpenMiningRound
+      new v1.coin.AppTransferContext(
+        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+        None.toJava,
+      )
+    }
+  }
 
   case class ConfigSchedule(
       currentConfig: coinConfigCodegen.CoinConfig[coinConfigCodegen.USD],
       futureConfigs: Map[Instant, coinConfigCodegen.CoinConfig[coinConfigCodegen.USD]],
   )
-
-  case object GetTransferContext
-      extends BaseCommand[http.GetTransferContextResponse, TransferContext] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTransferContextResponse] =
-      client.getTransferContext(headers)
-
-    override def handleResponse(
-        response: http.GetTransferContextResponse
-    )(implicit
-        decoder: TemplateJsonDecoder
-    ): Either[String, TransferContext] =
-      response match {
-        case http.GetTransferContextResponse.OK(response) =>
-          for {
-            coinRules <- response.coinRules
-              .traverse(coinRules => Contract.fromJson(coinCodegen.CoinRules.COMPANION)(coinRules))
-              .leftMap(_.toString)
-
-            openMiningRounds <- response.openMiningRounds
-              .traverse(round => Contract.fromJson(roundCodegen.OpenMiningRound.COMPANION)(round))
-              .leftMap(_.toString)
-
-            latestOpenMiningRound <- Contract
-              .fromJson(roundCodegen.OpenMiningRound.COMPANION)(
-                response.latestOpenMiningRound
-              )
-              .leftMap(_.toString)
-          } yield TransferContext(
-            coinRules,
-            latestOpenMiningRound,
-            openMiningRounds,
-          )
-      }
-  }
 
   /** Rounds are sorted in ascending order according to their round number. */
   case class GetSortedOpenAndIssuingMiningRounds(

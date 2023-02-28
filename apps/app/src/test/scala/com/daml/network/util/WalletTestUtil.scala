@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -183,89 +182,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     }
 
     (referenceId, reqCid, reqC)
-  }
-
-  private def findAcceptedAppPaymentRequests(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-  ) = {
-    remoteParticipant.ledger_api_extensions.acs
-      .filterJava(paymentCodegen.AcceptedAppPayment.COMPANION)(
-        userParty,
-        (c: paymentCodegen.AcceptedAppPayment.Contract) =>
-          c.data.deliveryOffer.contractId == deliveryOffer.contractId,
-      )
-      .headOption
-      .getOrElse(
-        sys.error(s"No accepted app payment request found with delivery offer ${deliveryOffer}")
-      )
-  }
-
-  /** Rejects an accepted app payment request. */
-  def rejectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userId: String,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-      domainId: Option[DomainId] = None,
-  )(implicit
-      env: CoinTestConsoleEnvironment
-  ) = {
-    val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(userParty),
-      readAs = Seq(
-        getSvcParty()
-      ), // Workaround because the user does not see the contracts from the AppTransferContext
-      update = payment.id.exerciseAcceptedAppPayment_Reject(getAppTransferContext()),
-      domainId = domainId,
-    )
-  }
-
-  /** Collects an accepted app payment request without doing anything useful in return. */
-  def collectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userId: String,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-      domainId: Option[DomainId] = None,
-  )(implicit
-      env: CoinTestConsoleEnvironment
-  ) = {
-    val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(userParty),
-      readAs = Seq(
-        getSvcParty()
-      ), // Workaround because the user does not see the contracts from the AppTransferContext
-      update = payment.id.exerciseAcceptedAppPayment_Collect(getAppTransferContext()),
-      domainId = domainId,
-    )
-  }
-
-  private def getSvcParty()(implicit
-      env: CoinTestConsoleEnvironment
-  ): PartyId = {
-    env.scans.all.headOption.fold(sys.error("No scan app"))(_.getSvcPartyId())
-  }
-
-  private def getAppTransferContext()(implicit
-      env: CoinTestConsoleEnvironment
-  ): v1.coin.AppTransferContext = {
-    val transferContext =
-      env.scans.all.headOption.fold(sys.error("No scan app"))(_.getTransferContext())
-    new v1.coin.AppTransferContext(
-      new v1.coin.CoinRules.ContractId(
-        transferContext.coinRules.getOrElse(sys.error("No CoinRules")).contractId.coid
-      ),
-      new v1.round.OpenMiningRound.ContractId(
-        transferContext.latestOpenMiningRound.contractId.coid
-      ),
-      java.util.Optional.empty(),
-    )
   }
 
   private val directoryDarPath =

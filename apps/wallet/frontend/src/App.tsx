@@ -16,6 +16,7 @@ import {
   Route,
   RouterProvider,
 } from 'react-router-dom';
+import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi/dist/models/GetOpenAndIssuingMiningRoundsRequest';
 
 import {
   Alert,
@@ -102,11 +103,21 @@ const Content = () => {
   const scanClient = useScanClient();
 
   const fetchCoinPrice = useCallback(async () => {
-    const tctx = await scanClient.getTransferContext();
-    const omr = tctx.latestOpenMiningRound;
-    if (omr) {
-      const p = Contract.decodeOpenAPI(omr, OpenMiningRound);
-      const newCoinPrice = new Decimal(p.payload.coinPrice);
+    const request: GetOpenAndIssuingMiningRoundsRequest = {
+      cachedOpenMiningRoundContractIds: [],
+      cachedIssuingRoundContractIds: [],
+    };
+    const getOpenAndIssuingMiningRounds = await scanClient.getOpenAndIssuingMiningRounds(request);
+
+    const omr = getOpenAndIssuingMiningRounds.openMiningRounds;
+    const openOpenRounds = Object.values(omr)
+      .map(mybCached => Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound))
+      .filter(omr => Date.parse(omr.payload.opensAt) <= Date.now());
+    if (openOpenRounds.length > 0) {
+      const latestOpenRound = openOpenRounds.reduce((prevOmr, currentOmr) =>
+        prevOmr.payload.round.number > currentOmr.payload.round.number ? prevOmr : currentOmr
+      );
+      const newCoinPrice = new Decimal(latestOpenRound.payload.coinPrice);
       // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
       setCoinPrice(prevCoinPrice =>
         prevCoinPrice?.equals(newCoinPrice) ? prevCoinPrice : newCoinPrice

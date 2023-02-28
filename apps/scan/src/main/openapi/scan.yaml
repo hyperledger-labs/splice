@@ -29,18 +29,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetClosedRoundsResponse"
-  /api/v0/transfer-context:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getTransferContext"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetTransferContextResponse"
   /api/v0/open-and-issuing-mining-rounds:
     post:
       tags: [scan]
@@ -135,18 +123,6 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-    GetTransferContextResponse:
-      type: object
-      properties:
-        coin_rules:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-        latest_open_mining_round:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-        open_mining_rounds:
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-      required: ["latest_open_mining_round", "open_mining_rounds"]
     GetOpenAndIssuingMiningRoundsRequest:
       type: object
       required: ["cached_open_mining_round_contract_ids", "cached_issuing_round_contract_ids"]

@@ -410,7 +410,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "scan-connection caching avoids unnecessary network calls and re-sending contracts if they are already known by the client" in {
     implicit env =>
       val (_, _) = onboardAliceAndBob()
-      val coinRulesId = scan.getUnfeaturedAppTransferContext().coinRules
+      val coinRulesId = scan.getUnfeaturedAppTransferContext(getLedgerTime).coinRules
 
       clue("create issuing rounds 0 and 1") {
         advanceRoundsByOneTick
