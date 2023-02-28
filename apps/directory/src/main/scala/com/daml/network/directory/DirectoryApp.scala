@@ -117,14 +117,15 @@ class DirectoryApp(
           )
         )
         .withAllowedHeaders(HttpHeaderRange.`*`)
+      handler = new HttpDirectoryHandler(
+        store,
+        loggerFactory,
+      )
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             DirectoryResource.routes(
-              new HttpDirectoryHandler(
-                store,
-                loggerFactory,
-              )
+              handler
             )
           }
         }

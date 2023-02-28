@@ -112,19 +112,20 @@ class SvApp(
         logger,
       )
       // TODO(M3-46) split the SV API into a client API and an admin API with auth
+      handler = new HttpSvHandler(
+        ledgerClient,
+        globalDomain,
+        config.ledgerApiUser,
+        svStore,
+        svcStore,
+        isDevNet,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       routes = cors() {
         SvResource.routes(
-          new HttpSvHandler(
-            ledgerClient,
-            globalDomain,
-            config.ledgerApiUser,
-            svStore,
-            svcStore,
-            isDevNet,
-            clock,
-            retryProvider,
-            loggerFactory,
-          )
+          handler
           // TODO(M3-46) add client authentication via `AuthExtractor`
         )
       }

@@ -81,17 +81,19 @@ class ScanApp(
       domainId <- waitForDomainConnection(store.domains, config.domains.global)
       _ <- store.acs(domainId).flatMap(_.signalWhenIngestedOrShutdown(OpenMiningRound.COMPANION))
 
+      handler = new HttpScanHandler(
+        ledgerClient,
+        store,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             ScanResource.routes(
-              new HttpScanHandler(
-                ledgerClient,
-                store,
-                clock,
-                retryProvider,
-                loggerFactory,
-              )
+              handler
             )
           }
         }

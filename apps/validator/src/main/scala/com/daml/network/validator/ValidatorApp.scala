@@ -263,19 +263,21 @@ class ValidatorApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
+      handler = new HttpValidatorHandler(
+        ledgerClient,
+        store,
+        validatorUserName = config.ledgerApiUser,
+        walletServiceUser = walletServiceUser,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             ValidatorResource.routes(
-              new HttpValidatorHandler(
-                ledgerClient,
-                store,
-                validatorUserName = config.ledgerApiUser,
-                walletServiceUser = walletServiceUser,
-                domainId = domainId,
-                retryProvider = retryProvider,
-                loggerFactory,
-              ),
+              handler,
               AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
             )
           }
