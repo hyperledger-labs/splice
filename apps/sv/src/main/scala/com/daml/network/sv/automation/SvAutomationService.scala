@@ -36,6 +36,7 @@ class SvAutomationService(
       retryProvider,
     ) {
 
+  registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))

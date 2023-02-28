@@ -103,6 +103,22 @@ template SvReward with
   where
     signatory svc
 
+-- | A coin price agreed for the leader to create new open mining round.
+template AgreedCoinPrice
+  with
+    svc : Party
+    coinPrice : Decimal
+  where
+    ensure coinPrice > 0.0
+    signatory svc
+
+    -- | Update the agreed coin price
+    choice AgreedCoinPrice_Update : ContractId AgreedCoinPrice
+      with
+        newCoinPrice : Decimal
+      controller svc
+      do create this with coinPrice = newCoinPrice
+
 
 -- TODO(M3-46): support changing the config
 data SvcRulesConfig = SvcRulesConfig with
@@ -298,6 +314,22 @@ template SvcRules with
       do
         exercise cid choiceArg
 
+    -- Round management driven directly by the leader
+    -------------------------------------------------
+
+    nonconsuming choice SvcRules_AdvanceOpenMiningRounds
+      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+      with
+        coinRulesCid : ContractId CoinRules
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+        agreedCoinPriceCid : ContractId AgreedCoinPrice
+      controller leader
+      do
+        coinPriceContract <- fetch agreedCoinPriceCid
+        let coinPrice = coinPriceContract.coinPrice
+        exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

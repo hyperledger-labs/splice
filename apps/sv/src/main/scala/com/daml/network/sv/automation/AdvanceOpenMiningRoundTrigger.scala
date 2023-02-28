@@ -1,15 +1,15 @@
-package com.daml.network.svc.automation
+package com.daml.network.sv.automation
 
 import cats.data.OptionT
 import cats.instances.future.*
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.svc.config.SvcAppBackendConfig
-import com.daml.network.svc.store.SvcStore
+import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,13 +17,13 @@ import scala.jdk.CollectionConverters.*
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
-    svcAppConfig: SvcAppBackendConfig,
-    store: SvcStore,
+    store: SvSvcStore,
     connection: CoinLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task] {
+) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task]
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]] {
 
   /** Retrieve a batch of tasks that are ready for execution now. */
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
@@ -38,30 +38,41 @@ class AdvanceOpenMiningRoundTrigger(
     } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
 
   /** How to process a task. */
-  override protected def completeTask(
+  override protected def completeTaskAsLeader(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
-    val cmds = task.work.coinRulesId
-      .exerciseCoinRules_AdvanceOpenMiningRounds(
-        svcAppConfig.coinPrice.bigDecimal,
+    for {
+      svcRules <- store.getSvcRules()
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      agreedCoinPrice <- store.getAgreedCoinPrice()
+      cmd = svcRules.contractId.exerciseSvcRules_AdvanceOpenMiningRounds(
+        task.work.coinRulesId,
         rounds.oldest.contractId,
         rounds.middle.contractId,
         rounds.newest.contractId,
+        agreedCoinPrice.contractId,
       )
-      .commands
-      .asScala
-      .toSeq
-    for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      tx <- connection
-        .submitCommandsNoDedupTransaction(Seq(store.svcParty), Seq(), cmds, domainId)
+      tx <- connection.submitCommandsNoDedupTransaction(
+        Seq(store.key.svParty),
+        Seq(store.key.svcParty),
+        commands = cmd.commands.asScala.toSeq,
+        domainId = domainId,
+      )
       acs <- store.acs(domainId)
       // make sure the store ingested our update so we don't
       // attempt to advance the same round twice
       _ <- acs.signalWhenIngestedOrShutdown(tx.getOffset())
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+    )
+  }
+
+  override def completeTaskAsFollower(
+      task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    Future.successful(
+      TaskSuccess(show"ignoring ${task.work}, as we're not the leader")
     )
   }
 
@@ -80,13 +91,14 @@ class AdvanceOpenMiningRoundTrigger(
       )
     } yield ()).isEmpty
   }
+
+  override protected def isLeader(): Future[Boolean] = store.svIsLeader()
 }
 
 object AdvanceOpenMiningRoundTrigger {
-
   case class Task(
       coinRulesId: cc.coin.CoinRules.ContractId,
-      openRounds: SvcStore.OpenMiningRoundTriple,
+      openRounds: SvSvcStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*

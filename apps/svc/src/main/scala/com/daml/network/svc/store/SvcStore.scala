@@ -6,15 +6,13 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
-import com.daml.network.util.{CoinUtil, Contract}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 import com.daml.network.environment.CoinRetries
@@ -59,31 +57,6 @@ trait SvcStore extends CoinAppStoreWithoutHistory {
       ec: ExecutionContext
   ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
-
-  def lookupValidatorRightByPartyWithOffset(
-      party: PartyId
-  ): Future[
-    QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
-  ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(cc.coin.ValidatorRight.COMPANION)(co =>
-        co.payload.user == party.toProtoPrimitive
-      )
-    )
-
-  /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
-  def lookupOpenMiningRoundTriple()(implicit
-      ec: ExecutionContext
-  ): Future[Option[SvcStore.OpenMiningRoundTriple]] =
-    for {
-      acs <- defaultAcs
-      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
-      result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
-        case Seq(oldest, middle, newest) =>
-          Some(SvcStore.OpenMiningRoundTriple(oldest = oldest, middle = middle, newest = newest))
-        case _ => None
-      }
-    } yield result
 
   import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
   import AcsStore.listExpiredFromPayloadExpiry
@@ -247,34 +220,5 @@ object SvcStore {
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
       ),
     )
-  }
-
-  type OpenMiningRoundContract =
-    Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
-
-  case class OpenMiningRoundTriple(
-      oldest: OpenMiningRoundContract,
-      middle: OpenMiningRoundContract,
-      newest: OpenMiningRoundContract,
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(param("oldest", _.oldest), param("middle", _.middle), param("newest", _.newest))
-
-    /** The time after which these can be advanced at assuming the given tick duration. */
-    def readyToAdvanceAt: Instant = {
-      val middleTickDuration = CoinUtil.relTimeToDuration(
-        middle.payload.tickDuration
-      )
-      Ordering[Instant].max(
-        oldest.payload.targetClosesAt,
-        Ordering[Instant].max(
-          // TODO(M3-07): when changing CoinConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
-          middle.payload.opensAt.plus(middleTickDuration),
-          newest.payload.opensAt,
-        ),
-      )
-    }
-
-    def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
   }
 }

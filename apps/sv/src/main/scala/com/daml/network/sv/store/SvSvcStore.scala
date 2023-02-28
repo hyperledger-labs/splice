@@ -69,6 +69,29 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
       )
     )
 
+  def lookupAgreedCoinPriceWithOffset(
+  ): Future[
+    QueryResult[
+      Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
+    ]
+  ] =
+    defaultAcs.flatMap(_.findContractWithOffset(cn.svcrules.AgreedCoinPrice.COMPANION)(_ => true))
+
+  def lookupAgreedCoinPrice(): Future[
+    Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
+  ] =
+    lookupAgreedCoinPriceWithOffset().map(_.value)
+
+  def getAgreedCoinPrice()
+      : Future[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]] =
+    lookupAgreedCoinPrice().map(
+      _.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No active agreed coin price")
+        )
+      )
+    )
+
   /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
   def lookupOpenMiningRoundTriple()(implicit
       ec: ExecutionContext
@@ -153,6 +176,7 @@ object SvSvcStore {
     AcsStore.SimpleContractFilter(
       svcParty,
       Map(
+        mkFilter(cn.svcrules.AgreedCoinPrice.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv

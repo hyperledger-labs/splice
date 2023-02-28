@@ -39,7 +39,9 @@ template SvcBootstrap with
           observers = []
           enabledChoices
           isDevNet
-
+        _ <- create AgreedCoinPrice with
+          svc
+          coinPrice
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           coinPrice
         pure ()

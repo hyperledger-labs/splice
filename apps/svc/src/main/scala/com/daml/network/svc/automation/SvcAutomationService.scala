@@ -35,9 +35,6 @@ class SvcAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(
-    new AdvanceOpenMiningRoundTrigger(triggerContext, config, store, connection)
-  )
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, store, connection))
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, store, connection))
   registerTrigger(

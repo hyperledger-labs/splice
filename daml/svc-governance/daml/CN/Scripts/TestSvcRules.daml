@@ -37,7 +37,7 @@ testLeaderElection = do
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = sv1
-    ranking = [sv1, sv2, sv3,  mallory]
+    ranking = [sv1, sv2, sv3, mallory]
     reason = ERR_LeaderUnavailable
   req2 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = sv2
@@ -251,11 +251,17 @@ runNextIssuanceD app coinPrice = do
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
     [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
-    (summarizingRoundCid, openRoundCid) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
-      coinPrice
-      roundToArchiveCid
-      middleRoundCid = r2Cid
-      latestRoundCid = r3Cid
+
+    -- set the new agreed price. This should be done with confirmation
+    agreedCoinPriceCid <- updateAgreedCoinPrice app.svc consortiumCid coinPrice
+
+    (summarizingRoundCid, openRoundCid) <- leaderSubmits app $ \cid -> exerciseCmd cid $
+        SvcRules_AdvanceOpenMiningRounds with
+          coinRulesCid
+          roundToArchiveCid
+          middleRoundCid = r2Cid
+          latestRoundCid = r3Cid
+          agreedCoinPriceCid
 
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
@@ -341,3 +347,9 @@ unitTestVoting = do
   let winner = instantRunOffVoting 2 2 rankings
   trace (votes, candidates, winner) $
     instantRunOffVoting 2 2 rankings === "B"
+
+updateAgreedCoinPrice : Party -> ContractId SvcRules -> Decimal -> Script (ContractId AgreedCoinPrice)
+updateAgreedCoinPrice svc svcRulesCid coinPrice = do
+  [(agreedCoinPriceCid, agreedCoinPrice)] <- query @AgreedCoinPrice svc
+  submitMulti [svc] [svc] $ exerciseCmd agreedCoinPriceCid AgreedCoinPrice_Update with
+    newCoinPrice = coinPrice
