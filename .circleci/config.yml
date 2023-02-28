@@ -1046,7 +1046,7 @@ jobs:
                 echo "Pipeline still running, waiting ..."
                 sleep 5
                 n=$((n+1))
-                # 1440 = 120*60/5, i.e., 120h.
+                # 1440 = 120*60/5, i.e., 120min
                 if [[ $n -ge 1440 ]]; then
                     echo "Waited for 120min, continuing anyway"
                     break
