@@ -77,7 +77,9 @@ testSubscription = script do
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
-  (subscriptionCid, subscriptionStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  (subscriptionCid, subscriptionStateCid, coinCid) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  Some coin <- queryContractId pizzeria.primaryParty (fromInterfaceContractId @Coin coinCid)
+  coin.amount.initialAmount === 12.0
 
   Some subscription <- queryContractId alice.primaryParty subscriptionCid
   subscription === subscriptionData
@@ -216,7 +218,9 @@ testUSDSubscription = script do
   coins3 <- query @Coin pizzeria.primaryParty
 
   payment3Cid <- makeSubscriptionPayment app alice validator None subscriptionState2Cid
-  _ <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
+  (_, coinCid) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
+  Some coin <- queryContractId pizzeria.primaryParty (fromInterfaceContractId @Coin coinCid)
+  coin.amount.initialAmount === 2.0
 
   coins4 <- query @Coin pizzeria.primaryParty
   let amounts = map (\(_, c) -> c.amount.initialAmount) (coins4 `diffContracts` coins3)

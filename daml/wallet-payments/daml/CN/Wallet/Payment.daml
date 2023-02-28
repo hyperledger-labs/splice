@@ -182,7 +182,7 @@ template AcceptedAppPayment
               payload = "transfer locked payment"
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
-        let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
+        let coins = map (\(TransferResultCoin coinCid) -> coinCid) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
         let receivers = map (\r -> r.receiver) ccReceiverAmounts
