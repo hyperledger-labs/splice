@@ -28,7 +28,6 @@ testSchedule = script do
           , (1000, "s 1000")
           , (maxBound - 1, "s maxBound -1")
           ]
-    scheduleWithEmptyFuture = schedule with futureValues = []
     testGetValueAsOf from to config = do
       getValueAsOf from schedule === config
       getValueAsOf (from + 1) schedule === config

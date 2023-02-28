@@ -1,3 +1,6 @@
+-- Remove this once we upgrade past 2.6.0-snapshot.20230222.11471.0.d1a33784 which fixes this:
+-- https://github.com/digital-asset/daml/commit/05161438311ca5850701f5b2b6ea469bd2717153
+{-# OPTIONS -Wno-unused-matches #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 -- | The contracts representing the long-term state of CC.
 module CC.Coin where
@@ -608,9 +611,8 @@ executeTransfer coinRulesCid context svc t = do
   -- issue rewards for burns
   issueRewards csum t.sender t.provider summary
   -- record outputs
-  currentTime <- getTime
   (createdCoins, senderChangeCoin) <-
-    createTransferOutputs currentTime csum.openRound csum.config svc t.sender summary osum
+    createTransferOutputs csum.openRound csum.config svc t.sender summary osum
 
   return API.TransferResult with
     round = csum.openRound.round
@@ -717,7 +719,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalRewardAmount = s.totalRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
 
-    summarizeAndConsumeInput round s (API.InputAppRewardCoupon couponCid) = do
+    summarizeAndConsumeInput _round s (API.InputAppRewardCoupon couponCid) = do
       -- fetch and archive
       (_, coupon) <- downcastInterface @AppRewardCoupon "AppRewardCoupon" couponCid
       archive couponCid
@@ -734,7 +736,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalRewardAmount = s.totalRewardAmount + coupon.amount * issuancePerCoupon
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeAndConsumeInput round s (API.InputValidatorRewardCoupon couponCid) = do
+    summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
       -- fetch and archive
       (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
       do
@@ -830,9 +832,9 @@ issueRewards csum sender provider summary
     featured = Some provider == csum.featuredAppProvider && sender /= provider
 
 createTransferOutputs
-  : Time -> OpenMiningRound -> TransferConfig CC -> Party -> Party -> API.TransferSummary -> TransferOutputsSummary
+  : OpenMiningRound -> TransferConfig CC -> Party -> Party -> API.TransferSummary -> TransferOutputsSummary
   -> Update ([API.CreatedCoin], Optional (ContractId API.Coin))
-createTransferOutputs currentTime currentOpenRound transferConfigCC svc sender summary preprocessedOutputs = do
+createTransferOutputs currentOpenRound transferConfigCC svc sender summary preprocessedOutputs = do
     outputCoins <- mapA createOutput preprocessedOutputs
     senderChangeCoin <- createSenderChange
     return (outputCoins, senderChangeCoin)
@@ -856,7 +858,7 @@ createTransferOutputs currentTime currentOpenRound transferConfigCC svc sender s
           -- We require the lock to expire before the coin to allow CN app authors to
           -- assume that a locked coin is never archived by the SVC while the lock is held.
           require "lock expires before coin"
-            (doesLockExpireBeforeCoin currentTime currentOpenRound lock coin.amount currentOpenRound.tickDuration)
+            (doesLockExpireBeforeCoin currentOpenRound lock coin.amount currentOpenRound.tickDuration)
           API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
 
 -- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.

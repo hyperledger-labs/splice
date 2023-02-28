@@ -99,9 +99,6 @@ boundedCeiling AfterMaxBound = AfterMaxBound
 -- BoundedSet RelRound
 -----------------------
 
-maxRelRound : RelRound
-maxRelRound = RelRound maxInt
-
 -- | Add a BoundedSet of RelRound to a positive Round.
 addBoundedRelRound : API.Round -> BoundedSet RelRound -> BoundedSet API.Round
 addBoundedRelRound (API.Round x) y = API.Round <$> addBoundedInt x ((.diff) <$> y)
@@ -127,7 +124,7 @@ addBoundedRelTime : Time -> BoundedSet RelTime -> BoundedSet Time
 addBoundedRelTime d (Singleton rt)
   | rt > subTime maxTime d = AfterMaxBound
   | otherwise = Singleton (addRelTime d rt)
-addBoundedRelTime d AfterMaxBound = AfterMaxBound
+addBoundedRelTime _ AfterMaxBound = AfterMaxBound
 
 -- | Check if a time is less than a bounded set.
 -- If the bounded set is a `AfterMaxBound`, it will already return true.
@@ -163,11 +160,11 @@ estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRoun
         relMicros = (relRound.diff - 1) `boundedTimes` (convertRelTimeToMicroseconds tickDuration)
         relTime = convertMicrosecondsToRelTime <$> relMicros
     addBoundedRelTime currentMiningRound.opensAt relTime
-estimateOpenRoundCreatedAt config currentMiningRound AfterMaxBound = AfterMaxBound
+estimateOpenRoundCreatedAt _ _ AfterMaxBound = AfterMaxBound
 
 -- | `doesLockExpireBeforeCoin` computes whether a `TimeLock` expires before a `Coin`
-doesLockExpireBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringAmount -> RelTime -> Bool
-doesLockExpireBeforeCoin currentTime currentOpenRound lock e tickDuration =
+doesLockExpireBeforeCoin : OpenMiningRound -> API.TimeLock -> ExpiringAmount -> RelTime -> Bool
+doesLockExpireBeforeCoin currentOpenRound lock e tickDuration =
   let r = amountExpiresAt e
       -- Note: we exploit that there are exactly three open rounds active at any
       -- point in time;(Singleton  and we ensure that a coin can be expired as soon as it can

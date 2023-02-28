@@ -72,7 +72,7 @@ chargeSteppedRate SteppedRate{initialRate, steps} amount =
   goChargeSteppedRate (amount, initialRate, 0.0) steps
 
 goChargeSteppedRate : (Decimal, Decimal, Decimal) -> [(Decimal, Decimal)] -> Decimal
-goChargeSteppedRate (remainder, currentRate, rate) _
+goChargeSteppedRate (remainder, _currentRate, rate) _
   | remainder <= 0.0 = rate
 goChargeSteppedRate (remainder, currentRate, rate) [] = rate + remainder * currentRate
 goChargeSteppedRate (remainder, currentRate, rate) ((step, steppedRate) :: steps) =

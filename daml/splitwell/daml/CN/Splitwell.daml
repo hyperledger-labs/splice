@@ -222,19 +222,21 @@ template Group
 getGroupKey : Group -> GroupKey
 getGroupKey Group{..} = GroupKey{..}
 
+transferInProgress_receivers : TransferInProgress -> [Party]
+transferInProgress_receivers TransferInProgress{..} = map (\rq -> rq.receiver) receiverAmounts
+
 template TransferInProgress
   with
     group : Group
     sender : Party
     receiverAmounts : [ReceiverCCAmount]
   where
-    let receivers = map (\rq -> rq.receiver) receiverAmounts
     signatory signatory group
     interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with
         svc = group.svc
         sender
-        description = "Transfer from " <> show sender <> " to " <> show receivers
+        description = "Transfer from " <> show sender <> " to " <> show (transferInProgress_receivers this)
 
     postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
       with
@@ -247,8 +249,7 @@ template TransferInProgress
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
 
-         let  receivers = map (\r -> r.receiver) receiverAmounts
-              expectedAcceptedPayment = AcceptedAppPayment with
+         let  expectedAcceptedPayment = AcceptedAppPayment with
                sender = sender
                provider = group.provider
                ccReceiverAmounts = receiverAmounts

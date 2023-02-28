@@ -17,8 +17,6 @@ testSetConfigSchedule = do
   now <- getTime
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
-  provider <- setupUser app "provider" validator
   runNextIssuance app
   context <- getPaymentTransferContext app alice
 

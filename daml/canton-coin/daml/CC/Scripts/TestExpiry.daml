@@ -49,8 +49,6 @@ testEstimateOpenRoundCreatedAt = script do
       t07_30 = addRelRoundN 3 currentTime tickDuration
       t10_00 = addRelRoundN 4 currentTime tickDuration
       t12_30 = addRelRoundN 5 currentTime tickDuration
-      t15_00 = addRelRoundN 6 currentTime tickDuration
-      t17_30 = addRelRoundN 7 currentTime tickDuration
 
       issuingFor0 = days 0
       issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration

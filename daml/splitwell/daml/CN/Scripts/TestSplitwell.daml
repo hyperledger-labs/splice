@@ -15,8 +15,8 @@ import CC.Scripts.Util
 import CN.Wallet.Payment
 
 
-createInstall : CCApp -> CCUser -> CCUser -> Script (ContractId SplitwellInstall)
-createInstall app user provider = do
+createInstall : CCUser -> CCUser -> Script (ContractId SplitwellInstall)
+createInstall user provider = do
   request <- submit user.primaryParty $ createCmd SplitwellInstallRequest with user = user.primaryParty, provider = provider.primaryParty, ..
   submit provider.primaryParty $ exerciseCmd request SplitwellInstallRequest_Accept
 
@@ -54,8 +54,8 @@ getGroup user k = do
     [(group, _)] -> pure group
     _ -> abort $ "Expected exactly one Group but got " <> show groups
 
-createInvite : CCUser -> CCUser -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
-createInvite owner provider groupKey observers = do
+createInvite : CCUser -> CCUser -> GroupKey -> Script (ContractId GroupInvite)
+createInvite owner provider groupKey = do
   group <- getGroup owner groupKey
   exerciseSplitwellInstall owner provider SplitwellInstall_CreateInvite with ..
 
@@ -152,14 +152,14 @@ data Parties = Parties
 
 testCase : CCApp -> Parties -> Script ()
 testCase app Parties{..} = do
-  createInstall app alice (getProvider alice)
-  createInstall app bob (getProvider bob)
-  createInstall app charlie (getProvider charlie)
+  createInstall alice (getProvider alice)
+  createInstall bob (getProvider bob)
+  createInstall charlie (getProvider charlie)
 
   groupRequestCid <- requestGroup app alice (getProvider alice) "group0"
   submit (getProvider alice).primaryParty $ exerciseCmd groupRequestCid GroupRequest_Accept
   let groupKey = GroupKey alice.primaryParty (getProvider alice).primaryParty (GroupId "group0")
-  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob.primaryParty, charlie.primaryParty]
+  groupInviteCid <- createInvite alice (getProvider alice) groupKey
 
   acceptInvite bob (getProvider bob) alice.primaryParty groupInviteCid
   joinAllInvites alice (getProvider alice)

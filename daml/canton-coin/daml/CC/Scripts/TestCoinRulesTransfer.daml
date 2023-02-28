@@ -160,7 +160,6 @@ testCoinUsedAfterHoldingFeeChanged = do
 
   Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
 
-  context <- getPaymentTransferContext app alice
   submitMulti [app.svc] [app.svc] $ exerciseCmd coinRulesCid CoinRules_SetConfigSchedule with
     newConfigSchedule = coinRules.configSchedule with
       futureValues = [(

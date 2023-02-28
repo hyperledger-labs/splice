@@ -35,7 +35,7 @@ testTransferExceedsMaxInputs = do
     alice <- setupUser app "alice" validator
     bob <- setupUser app "bob" validator
     charlie <- setupUser app "charlie" validator
-    inputCoins <- forA [1..101] $ \i -> do
+    inputCoins <- forA [1..101] $ \_ -> do
       coin <- tap app alice 1.0
       pure $ API.InputCoin $ toInterfaceContractId coin
     context <- getPaymentTransferContext app alice

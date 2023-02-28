@@ -44,7 +44,7 @@ testSetup = script do
   provider <- setupUser app "la_famiglia" validator
 
   tap app alice 42.0
-  
+
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
 
@@ -55,7 +55,7 @@ testSetup = script do
 testSubscription : Script ()
 testSubscription = script do
   (app, Users with .., context, subscriptionRequestCid) <- testSetup
-  
+
   -- reject...
   submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   None <- queryContractId pizzeria.primaryParty context
@@ -77,7 +77,7 @@ testSubscription = script do
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
-  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  (subscriptionCid, subscriptionStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   Some subscription <- queryContractId alice.primaryParty subscriptionCid
   subscription === subscriptionData
@@ -92,7 +92,7 @@ testSubscription = script do
 
 testInitialSubscriptionPaymentInLatestRoundMustFail: Script ()
 testInitialSubscriptionPaymentInLatestRoundMustFail = script do
-  (app, Users with .., context, subscriptionRequestCid) <- testSetup
+  (app, Users with .., _context, subscriptionRequestCid) <- testSetup
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
   Some initialPayment <- queryContractId alice.primaryParty initialPaymentCid
 
@@ -106,10 +106,10 @@ testInitialSubscriptionPaymentInLatestRoundMustFail = script do
 
 testSubscriptionPaymentInLatestRoundMustFail : Script ()
 testSubscriptionPaymentInLatestRoundMustFail = script do
-  (app, Users with .., context, subscriptionRequestCid) <- testSetup
+  (app, Users with .., _context, subscriptionRequestCid) <- testSetup
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
-  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  (_subscriptionCid, subscriptionStateCid, _pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   passTime (days 27)
   runNextIssuance app
@@ -124,7 +124,7 @@ testSubscriptionPaymentInLatestRoundMustFail = script do
   -- Can still be collected if we select the right round.
   collectSubscriptionPaymentInRound app payment.round provider pizzeria alice.primaryParty paymentCid
 
-  pure ()  
+  pure ()
 
 testUSDSubscription : Script ()
 testUSDSubscription = script do
@@ -174,7 +174,7 @@ testUSDSubscription = script do
   reward.featured === True
 
   coins0 <- query @Coin pizzeria.primaryParty
-  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+  (_subscriptionCid, subscriptionStateCid, _pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   let expectedFeeInUnlockLeg =
         (
@@ -196,7 +196,7 @@ testUSDSubscription = script do
 
   passTime (days 27)
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
-  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
+  (subscriptionState2Cid, _pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
   rewards <- query @CC.Coin.AppRewardCoupon validator
   let amounts = map (._2.amount) rewards
@@ -216,7 +216,7 @@ testUSDSubscription = script do
   coins3 <- query @Coin pizzeria.primaryParty
 
   payment3Cid <- makeSubscriptionPayment app alice validator None subscriptionState2Cid
-  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
+  _ <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
 
   coins4 <- query @Coin pizzeria.primaryParty
   let amounts = map (\(_, c) -> c.amount.initialAmount) (coins4 `diffContracts` coins3)
@@ -233,7 +233,7 @@ acceptSubscriptionRequestAndMakePayment
   -> Script (ContractId SubscriptionInitialPayment)
 acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  inputs <- getCoinInputs app sender.primaryParty
+  inputs <- getCoinInputs sender.primaryParty
   -- TODO(#2957): remove read-as SVC.
   fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs
@@ -246,7 +246,7 @@ makeSubscriptionPayment
   -> Script (ContractId SubscriptionPayment)
 makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  inputs <- getCoinInputs app sender.primaryParty
+  inputs <- getCoinInputs sender.primaryParty
   -- TODO(#2957): remove read-as SVC.
   fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
@@ -259,7 +259,7 @@ failMakeSubscriptionPayment
 failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   readAs <- getUserReadAs sender.userId
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  inputs <- getCoinInputs app sender.primaryParty
+  inputs <- getCoinInputs sender.primaryParty
   submitMultiMustFail [sender.primaryParty, walletProvider] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context

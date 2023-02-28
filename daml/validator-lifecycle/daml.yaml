@@ -10,3 +10,5 @@ data-dependencies:
 - ../cn-util/.daml/dist/cn-util-0.1.0.dar
 build-options:
   - --target=1.dev
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches

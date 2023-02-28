@@ -1,3 +1,5 @@
+-- Disabled until https://github.com/digital-asset/daml/issues/16416 is fixed
+{-# OPTIONS -Wno-unused-matches #-}
 module CN.Wallet.Payment where
 
 import DA.Action
@@ -61,6 +63,9 @@ receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
       receiver = rq.receiver
       ccAmount = cc
 
+appPaymentRequest_receivers : AppPaymentRequest -> [Party]
+appPaymentRequest_receivers AppPaymentRequest{..} = map (\r -> r.receiver) receiverAmounts
+
 template AppPaymentRequest
   with
     sender : Party -- ^ The party that should pay.
@@ -71,10 +76,8 @@ template AppPaymentRequest
     collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
     deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
   where
-    let
-      receivers = map (\r -> r.receiver) receiverAmounts
 
-    signatory sender, receivers, provider
+    signatory sender, appPaymentRequest_receivers this, provider
     ensure (collectionDuration > aunit && all (\rq -> rq.amount.amount > 0.0) receiverAmounts)
 
     choice AppPaymentRequest_Accept
@@ -120,7 +123,7 @@ template AppPaymentRequest
          return (acceptedPayment, result.senderChangeCoin)
 
     choice AppPaymentRequest_Withdraw : ()
-      controller receivers
+      controller appPaymentRequest_receivers this
       do archive deliveryOffer
 
     choice AppPaymentRequest_Reject : ()

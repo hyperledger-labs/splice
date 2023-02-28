@@ -28,10 +28,8 @@ test = script do
       tickDuration = config.tickDuration
 
       t00_00 = currentTime
-      t02_30 = addRelRoundN 1 currentTime tickDuration
       t05_00 = addRelRoundN 2 currentTime tickDuration
       t07_30 = addRelRoundN 3 currentTime tickDuration
-      t10_00 = addRelRoundN 4 currentTime tickDuration
       t12_30 = addRelRoundN 5 currentTime tickDuration
       t15_00 = addRelRoundN 6 currentTime tickDuration
       t17_30 = addRelRoundN 7 currentTime tickDuration
@@ -67,20 +65,20 @@ test = script do
   estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Singleton t15_00
 
   -- lock expires at T00:12:30 before coin expires at T00:15:00
-  let lockExpireBeforeCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
+  let lockExpireBeforeCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
   assert lockExpireBeforeCoin
 
   -- lock expires at T00:15:00 while coin expires at T00:15:00
-  let lockExpiresAsCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
+  let lockExpiresAsCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
   assert $ not lockExpiresAsCoin
 
   -- lock expires at T00:17:30 after coin expires at T00:15:00
-  let lockExpiresAfterCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
+  let lockExpiresAfterCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
   assert $ not lockExpiresAfterCoin
 
   let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = config.transferConfig.holdingFee
   -- lock expires at T00:12:30 before coin with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
-  let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin currentTime openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
+  let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
   assert lockExpiresBeforeLargeCoin
 
 -- From #2336, This test case is to make sure we handle DA.Time overflow

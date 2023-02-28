@@ -13,3 +13,5 @@ data-dependencies:
 - ../wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
 build-options:
   - --target=1.dev
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches

@@ -26,7 +26,7 @@ template SvcBootstrap with
     choice SvcBootstrap_Bootstrap : ()
       controller svc
       do
-        svcRulesCid <- create SvcRules with
+        _ <- create SvcRules with
           svc
           epoch = 0
           nextMiningRound = Round 1

@@ -55,12 +55,12 @@ testAppRewardCoupon = do
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
 
-  cid <- tap app alice 10.0
+  _ <- tap app alice 10.0
   payWithTransferFeeRatio app alice bob.primaryParty 5.0 1.0 ""
-  [(cid, _)] <- query @AppRewardCoupon alice.primaryParty
+  [_] <- query @AppRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
-  (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
+  _ :: _ <- query @ClosedMiningRound app.svc
   pure ()
 
 testValidatorRewardCoupon : Script ()
@@ -74,7 +74,7 @@ testValidatorRewardCoupon = do
   [(cid, _)] <- query @ValidatorRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
-  (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
+  _ :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
   [(right, _)] <- query @ValidatorRight alice.primaryParty
 

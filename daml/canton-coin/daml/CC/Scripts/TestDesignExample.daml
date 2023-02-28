@@ -180,7 +180,6 @@ test = do
     owner = alice.primaryParty
     amount = expiringAmount coinConfig.holdingFee senderChangeAmount c2.round
 
-  let receiverTransferFee = chargeSteppedRate coinConfig.transferFee 1.0
   payment === Coin with
     svc = app.svc
     owner = arbiter.primaryParty

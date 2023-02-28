@@ -53,14 +53,13 @@ setupApp = do
 
   -- TOOD: reintroduce the price oracle
 
-  cid <- submit svc $ createCmd CoinRules with
+  _ <- submit svc $ createCmd CoinRules with
     configSchedule = defaultCoinConfigSchedule
     observers = []
     enabledChoices = API.enableAllChoices
     isDevNet = True
     ..
 
-  now <- getTime
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
       coinPrice = 1.0
 
@@ -97,8 +96,9 @@ setupUser app name validator = do
   tap app u 1.0
   return u
 
+-- dummy argument to avoid running this script by default.
 getAllValidatorRights : CCApp -> Script [ValidatorRight]
-getAllValidatorRights app = do
+getAllValidatorRights _app = do
   parties <- listKnownParties
   map snd <$> query @ValidatorRight (map party parties)
 
@@ -155,14 +155,14 @@ runNextIssuanceInternal app coinPrice = do
 
     -- close issuing rounds that are ready for close
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
-    forA_ imcs $ \(issuingRoundCid, issuingRound) ->
+    forA_ imcs $ \(issuingRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
         issuingRoundCid
 
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
     [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
-    (closingRoundCid, openRoundCid) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
+    (closingRoundCid, _) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
       coinPrice
       roundToArchiveCid
       middleRoundCid = r2Cid
@@ -256,7 +256,7 @@ payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text
 payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
-  coins <- getCoinInputs app sender.primaryParty
+  coins <- getCoinInputs sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
@@ -283,7 +283,7 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
-  coins <- getCoinInputs app sender.primaryParty
+  coins <- getCoinInputs sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
@@ -329,7 +329,7 @@ runCoinDepositBots app = do
       c.round `elem` issuingRoundNumbers && c.user `Map.member` validatorRights
 
     -- get all coins of this user
-    coins <- getCoinInputs app user
+    coins <- getCoinInputs user
     -- Need readAs rights for all hosted users to collect their validator rewards,
     -- and readAs rights for the validator to see mining round state contracts
     -- TODO(M4-82): remove the need for reading as the validator
@@ -356,8 +356,8 @@ runCoinDepositBots app = do
   pure ()
 
 -- | Retrieve the list of all coins that the given party can use as transfer inputs.
-getCoinInputs : CCApp -> Party -> Script [API.TransferInput]
-getCoinInputs app sender = do
+getCoinInputs : Party -> Script [API.TransferInput]
+getCoinInputs sender = do
   coins <- queryFilter @Coin sender (\coin -> coin.owner == sender)
   pure [ API.InputCoin (toInterfaceContractId coinCid) | (coinCid, _) <- coins]
 
@@ -467,7 +467,6 @@ tap app user amount = do
 
 featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do
-  (openRound, _) <- getLatestOpenRound app
   submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
     provider = provider.primaryParty
 
@@ -477,5 +476,5 @@ assertError f = do
     try do
       let _ = f ()
       pure False
-    catch (e : AnyException) -> pure True
+    catch (_ : AnyException) -> pure True
   unless isThrown (abort "expected exception but didn't get one")

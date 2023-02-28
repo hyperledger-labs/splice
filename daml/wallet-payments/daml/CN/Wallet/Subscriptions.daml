@@ -1,3 +1,5 @@
+-- Disabled until https://github.com/digital-asset/daml/issues/16416 is fixed
+{-# OPTIONS -Wno-unused-matches #-}
 module CN.Wallet.Subscriptions where
 
 import DA.Time
@@ -331,7 +333,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
 
 unlockAndTransfer: AppTransferContext -> Subscription -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)
 unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
-  let Subscription { sender; receiver; provider; svc } = subscriptionData
+  let Subscription { sender; receiver; provider } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
   coin <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
