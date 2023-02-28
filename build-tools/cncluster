@@ -118,14 +118,16 @@ function _cluster_update_module() {
 
     imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
 
-    dnames=$(kubectl get deployment -l moduleName=${module} -o jsonpath='{.items[*].metadata.name}')
+    dnames=$(kubectl get deployment --all-namespaces -l moduleName=${module} -o jsonpath='{.items[*].metadata}' \
+                 | jq -r '.name + if has("namespace") then "@" + .namespace else "" end')
 
     if [ -z "$dnames" ]; then
         _warning "No deployment found for module: ${module}"
     else
         for dname in $dnames; do
             _log "Setting module for deployment: ${dname}"
-            kubectl set image "deployment/${dname}" "${dname}=${imageTag}"
+            IFS='@' read -ra NAME_NS <<<"$dname"
+            kubectl set image --namespace "${NAME_NS[1]-default}" "deployment/${NAME_NS[0]}" "${NAME_NS[0]}=${imageTag}"
         done
 
         _log "Deleting module pods to force restart: ${module}"
@@ -133,7 +135,7 @@ function _cluster_update_module() {
         # Delete the pods to force recreation. This forces a reload of
         # the docker image, even if the tag has not changed, due to
         # the imagePullPolicy setting of "Always".
-        kubectl delete pods -l "moduleName=${module}"
+        kubectl delete pods --all-namespaces -l "moduleName=${module}"
     fi
 }
 
@@ -263,7 +265,7 @@ function subcmd_push() {
     make -C ${REPO_ROOT} ${db_targets} -j
 
     # Run the push serially (since the push is ultimately serialized across
-    # the shared upoad link anyway, and adding contention won't help speed
+    # the shared upload link anyway, and adding contention won't help speed
     # things up).
     make -C ${REPO_ROOT} ${dpf_targets}
 
