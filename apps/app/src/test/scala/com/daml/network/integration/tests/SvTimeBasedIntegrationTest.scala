@@ -39,7 +39,7 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
       rounds should have size 3
     })
 
-    // one tick - round 0 closes.
+    // one tick - round 0 closes.assertEventuallyLogsSeq
     advanceRoundsByOneTick
     eventually()(
       getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
@@ -55,7 +55,11 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
       getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
     )
 
-    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+    // Note: below we are checking that the "successfully archived closed mining round" line appears in the log.
+    // That line is not printed immediately after the ClosedMiningRound is archived, but only after the archive
+    // event is ingested back to the acsStore in the SVC app (see ArchiveClosedMiningRoundsTrigger.tryArchivingClosedRound).
+    // Therefore we need to use assertEventuallyLogsSeq.
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
         val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
         // next tick - issuing round 0 can be closed
@@ -91,10 +95,12 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
             .pollingInterval
             .duration
         )
-        eventually()( // closed round is archived eventually.
-          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
-        )
+        clue("Wait until the closed round is archived") {
+          eventually()(
+            svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+              .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
+          )
+        }
       },
       entries => {
         forAtLeast(1, entries)(
