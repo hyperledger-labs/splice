@@ -87,7 +87,7 @@ commands:
          sandbox = false
          netrc-file = /home/circleci/.config/nix/netrc
          EOF
-         sh <(curl -fsSL --retry 8 https://nixos.org/nix/install) --no-daemon
+         sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
          cat \<<EOF > ~/.config/nix/netrc
          machine digitalasset.jfrog.io
          login $ARTIFACTORY_USER
