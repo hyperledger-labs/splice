@@ -28,6 +28,7 @@ cn-image := cluster/images/cn-app
 
 $(foreach image,$(images),$(eval include cluster/images/$(image)/Makefile))
 include cluster/manifest/Makefile
+include cluster/pulumi/Makefile
 
 .PHONY: docker-build
 docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
@@ -59,6 +60,7 @@ $$(prefix)/docker-push-force: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker
 	cd $$(@D) && docker-push $$$$(cat $$(abspath $$<)) --force
 
 .PHONY: $$(prefix)/docker-build
+
 $$(prefix)/docker-build: $$(prefix)/$(docker-build)
 
 .PHONY: $$(prefix)/docker-push

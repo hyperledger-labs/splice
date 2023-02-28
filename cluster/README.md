@@ -37,6 +37,7 @@
 1. [Auth0 secrets](#auth0-secrets)
 1. [Participant User Configuration](#participant-user-configuration)
 1. [Token configuration](#token-configuration)
+1. [Pulumi and Helm](#pulumi-and-helm)
 1. [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
    1. [Manifests](#manifests)
 
@@ -767,6 +768,28 @@ the secrets:
 unset CNCLUSTER_FIXED_TOKENS
 cncluster update_secrets
 ```
+
+## Pulumi and Helm
+
+Canton Network is currently deployed by applying a manifest generated
+using Jsonnet to a GKE cluster via `kubectl apply`. To accomodate
+packaging needs for our customers, we are switching over to a Helm
+chart based deployment strategy that's managed using Pulumi
+scripts. While this work is not complete, the beginnings of it are
+already committed and are available as a prototype for testing.
+
+The current Pulumi deployment is capable of managing the four SV app
+nodes. Instructions for use are as follows:
+
+1. Start with a working cluster and change to its deployment directory.
+1. Delete the existing four SV app nodes: `kubectl delete namespace sv-app-1 sv-app-2 sv-app-3 sv-app-4`.
+1. Apply the Pulumi cluster (you will need to enter a passkey, even
+   though it is currently not used): `cncluster papply`.
+1. Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
+1. The Pulumi and Helm charts may now be edited and `cncluster papply`
+   once again used to apply only the changes to the cluster.
+1. `cncluster pulumi down` Will remove from the cluster, the portions
+   of the configuration managed by Pulumi.
 
 ## Appendix: Kubernetes Resources
 

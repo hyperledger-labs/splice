@@ -822,6 +822,52 @@ function subcmd_help() {
     done | column -ts $'\t'
 }
 
+
+###
+
+subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the current clustrt"
+
+function subcmd_pulumi() {
+    _production_gate
+
+    CONFIG_FILE="$(pwd)/Pulumi.${GCP_CLUSTER_BASENAME}.yaml"
+
+    pulumi --stack ${GCP_CLUSTER_BASENAME} \
+           --cwd ${REPO_ROOT}/cluster/pulumi  \
+           --config-file ${CONFIG_FILE} \
+           $@
+}
+
+###
+
+subcommand_whitelist[papply]="Apply the current Pulumi configuration"
+
+function subcmd_papply() {
+    _production_gate
+    _cluster_confirm "Apply Pulumi configuration"
+    _cluster_must_exist
+
+    IMAGE_TAG=${SOURCE_IMAGE_TAG}
+
+    if [ -z "${1-}" ]; then
+       if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
+          _docker_must_be_running
+          if ! make -C ${REPO_ROOT} docker-check -j; then
+             _error "Images missing from artifact registry, cannot apply."
+             exit 1
+         fi
+       else
+           _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+       fi
+    else
+        IMAGE_TAG=$1
+       _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
+    fi
+
+    subcmd_pulumi up -c "IMAGE_TAG=${IMAGE_TAG}" --yes
+}
+
+
 ################################
 ### Main
 ################################

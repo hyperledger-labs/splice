@@ -1,0 +1,94 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sv-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: sv-app
+    clusterName: {{ .Values.clusterName }}
+    moduleName: sv-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  strategy:
+    type: "Recreate"
+  template:
+    metadata:
+      labels:
+        app: sv-app
+        clusterName: {{ .Values.clusterName }}
+        moduleName: sv-app
+    spec:
+      containers:
+        - name: sv-app
+          image: "{{ .Values.image.region }}-docker.pkg.dev/{{ .Values.image.repoName }}/sv-app:{{ .Values.image.tag }}"
+          imagePullPolicy: "Always"
+          env:
+            - name: "JAVA_TOOL_OPTIONS"
+              value: "{{ .Values.resources.jvmOptions}}"
+            - name: "CN_APP_SV_LEDGER_API_AUTH_URL"
+              valueFrom:
+                secretKeyRef:
+                  key: "url"
+                  name: "cn-app-sv-ledger-api-auth"
+                  optional: false
+            - name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID"
+              valueFrom:
+                secretKeyRef:
+                  key: "client-id"
+                  name: "cn-app-sv-ledger-api-auth"
+                  optional: false
+            - name: "CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET"
+              valueFrom:
+                secretKeyRef:
+                  key: "client-secret"
+                  name: "cn-app-sv-ledger-api-auth"
+                  optional: false
+            - name: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME"
+              valueFrom:
+                secretKeyRef:
+                  key: "ledger-api-user"
+                  name: "cn-app-sv-ledger-api-auth"
+                  optional: false
+            - name: "CN_APP_SV_ADMIN_API_PORT"
+              value: "{{ .Values.service.apiPort }}"
+            - name: "CN_APP_SV_IS_DEV_NET"
+              value: "true"
+            - name: "CN_APP_SV_FOUND_CONSORTIUM"
+              value: "{{ .Values.foundConsortium }}"
+          ports:
+            - name: sv-api
+              containerPort: {{ .Values.service.apiPort }}
+              protocol: TCP
+            - name: sv-api-http
+              containerPort: {{ .Values.service.apiHttpPort }}
+              protocol: TCP
+          resources:
+            limits:
+              memory: "{{ .Values.resources.memoryLimit }}Mi"
+            requests:
+              cpu: {{ .Values.resources.cpuLimit }}
+              memory: "{{ .Values.resources.memoryLimit }}Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sv-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    clusterName: {{ .Values.clusterName }}
+spec:
+  selector:
+    app: sv-app
+  ports:
+  - name: sv-api
+    port: {{ .Values.service.apiPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.apiPort }}
+  - name: sv-api-http
+    port: {{ .Values.service.apiHttpPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.apiHttpPort }}

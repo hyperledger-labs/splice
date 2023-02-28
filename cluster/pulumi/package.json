@@ -1,0 +1,31 @@
+{
+    "name": "canton-network-pulumi-deployment",
+    "version": "1.0.0",
+    "main": "src/index.ts",
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.5",
+        "@types/lodash": "^4.14.189",
+        "@types/node": "^14",
+        "@typescript-eslint/eslint-plugin": "^5.54.0",
+        "@typescript-eslint/parser": "^5.54.0",
+        "eslint": "^8.35.0",
+        "eslint-config-prettier": "^8.6.0",
+        "eslint-plugin-import": "^2.27.5",
+        "prettier": "^2.7.1"
+    },
+    "dependencies": {
+        "@pulumi/gcp": "^6.0.0",
+        "@pulumi/kubernetes": "^3.22.1",
+        "@pulumi/pulumi": "^3.0.0",
+        "js-yaml": "^4.1.0",
+        "lodash": "^4.17.21"
+    },
+    "scripts": {
+        "fix": "npm run format:fix && npm run lint:fix",
+        "check": "npm run format:check && npm run lint:check",
+        "format:fix": "prettier --write src",
+        "format:check": "prettier --check src",
+        "lint:fix": "eslint src --fix",
+        "lint:check": "eslint src --max-warnings=0"
+    }
+}

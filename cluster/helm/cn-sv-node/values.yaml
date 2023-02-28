@@ -1,0 +1,12 @@
+clusterName: cn-sqlscratchnet
+foundConsortium: false
+service:
+  apiPort: 5014
+  apiHttpPort: 6014
+resources:
+  jvmOptions: "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
+  memoryLimit: 1536
+  cpuLimit: 1
+image:
+  region: "us-central1"
+  repoName: "da-cn-images/cn-images"

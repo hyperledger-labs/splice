@@ -49,6 +49,7 @@ in pkgs.mkShell {
     jq
     jsonnet
     kubectl
+    kubernetes-helm
     lnav
     nix
     nodejs
@@ -61,6 +62,7 @@ in pkgs.mkShell {
     protobuf3_19
     protoc-gen-grpc-web
     ps
+    pulumi-bin
     python3
     python3Packages.datadog
     python3Packages.sphinx_rtd_theme

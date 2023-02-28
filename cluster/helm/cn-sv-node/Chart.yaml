@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cn-sv-node
+description: Canton Network Supervalidator Node
+type: application
+
+version: 0.1.0
+appVersion: "1.16.0"

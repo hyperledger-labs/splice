@@ -13,7 +13,7 @@ directory-service-dar := ${REPO_ROOT}/daml/directory-service/.daml/dist/director
 splitwell-dar := ${REPO_ROOT}/daml/splitwell/.daml/dist/splitwell-0.1.0.dar
 
 .PHONY: build
-build: $(app-bundle)	## Build the Canton Coin app bundle
+build: $(app-bundle) cluster/pulumi/install ## Build the Canton Coin app bundle and ensure the Pulumi script is ready to run.
 
 $(app-bundle) $(directory-service-dar) $(splitwell-service-dar) &:
 	sbt --batch bundle
@@ -22,7 +22,7 @@ $(auth-service):
 	sbt --batch canton-community-participant/compile
 
 .PHONY: clean
-clean: images/clean
+clean: images/clean cluster/pulumi/clean
 	rm -rf apps/app/target/release
 
 .PHONY: clean-all
@@ -30,7 +30,7 @@ clean-all: clean	## Completely clean all local build state, including model code
 	sbt --batch clean-cn
 
 .PHONY: format
-format:	## Automatically reformat and apply scalaFix to source code
+format:	cluster/pulumi/format ## Automatically reformat and apply scalaFix to source code
 	sbt --batch formatFix
 
 .PHONY: help
