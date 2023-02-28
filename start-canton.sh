@@ -46,21 +46,23 @@ rm -f canton.tokens canton-simtime.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" start
 
 # Create new databases (one for each node used in `simple-topology-canton.conf`)
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv5"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade"
 
 # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
-./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv5_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade_simtime"
