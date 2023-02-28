@@ -40,21 +40,34 @@ trait TimeTestUtil extends CoinTestCommon {
       if (duration.isNegative()) {
         fail("Cannot advance time by negative duration.");
       } else if (!duration.isZero()) {
-        // We sleep for 1s before changing the time here. This avoids inflight commands
-        // getting dropped by the sequencer due to exceeding max-sequencing-time.
+        // As discussed in depth on https://github.com/DACH-NY/the-real-canton-coin/issues/3091
+        // we need to wait until the system is quiescent enough to avoid warnings on the
+        // sequencer due to the massive clock skew induced by bumping the time.
+        //
+        // More concretely, in-flight commands submitted before advancing the time,
+        // but being processed on the sequencer after advancing time
+        // get dropped by the sequencer due to exceeding max-sequencing-time.
         // While we do recover from such an issue, we recover from it once the participant
         // times out with LOCAL_VERDICT_TIMEOUT. That timeout is measured in wall clock
         // so we will wait the full participantResponseTimeout (30s by default) which
         // then results in `eventually`’s in tests never completing.
-        // Waiting 1s should ensure that existing background automation (e.g. coin merging)
+        //
+        // The waiting implement below should ensure that existing background automation (e.g. coin merging)
         // can complete in-flight commands before we change the time. The assumption here
         // is that our period automation also takes sim time into account so if
         // the time does not change, it won’t continue sending commands.
-        Threading.sleep(1000)
-        // Svc reward collection seems to take particularly long so wait for all of them to be collected before advancing.
-        eventually() {
-          svc.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(SvcReward.COMPANION)(scan.getSvcPartyId()) shouldBe empty
+        //
+        // The main source of activity are the follow-up action after advancing a round.
+        // We thus first wait for a successful Svc reward collection; and bet that the
+        // collection of app and validator rewards takes about the same time.
+        //
+        clue("wait for the system to quiet down after a round change") {
+          eventually() {
+            svc.remoteParticipant.ledger_api_extensions.acs
+              .filterJava(SvcReward.COMPANION)(scan.getSvcPartyId()) shouldBe empty
+          }
+          // We additionally sleep 1.5s to give some extra time for activity to quiesce.
+          Threading.sleep(1500)
         }
 
         // it doesn't seem to matter which participant we run these from - all get synced
