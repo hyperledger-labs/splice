@@ -24,6 +24,7 @@ import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Using
+import com.daml.network.util.FrontendLoginUtil
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
@@ -32,6 +33,7 @@ class PreflightIntegrationTest
     extends FrontendIntegrationTest("alice-selfhosted", "alice-validator1", "bob-validator1")
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
+    with FrontendLoginUtil
     with WalletTestUtil
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
@@ -311,6 +313,22 @@ class PreflightIntegrationTest
     Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
+
+      v("validatorApp").remoteParticipant.dars
+        .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
+
+      val walletUiPort = 3000
+      val directoryUiPort = 3001
+
+      // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+      val id = (new scala.util.Random).nextInt().toHexString
+      val cnsName = s"alice+${id}.cns"
+
+      withFrontEnd("alice-selfhosted") { implicit webDriver =>
+        login(walletUiPort, "alice")
+        tapAndListCoins(100)
+        reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
+      }
     }
   }
 

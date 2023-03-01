@@ -26,6 +26,7 @@ function tmux_cmd() {
   else
     tmux new-window -t "$t" -n "$title"
   fi
+  tmux send-keys -t "$t" "nix-shell" C-m
   tmux send-keys -t "$t" "cd $wd" C-m
   tmux send-keys -t "$t" "$cmd" C-m
   tmux_window=$((tmux_window+1))
@@ -121,10 +122,16 @@ tmux new-session -d -s "${tmux_session}"
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
 
+count=0
 while [ ! -f "$REPO_ROOT/apps/common/frontend/lib/index.js" ]
 do
     echo "Waiting for common-frontend to start..."
     sleep 1
+    count=$(( ++count ))
+    if [ "$count" -ge "100" ]; then
+      echo "Failure to start common-frontend, exiting"
+      exit 1
+    fi
 done
 
 # The set of frontends we want to start as part of typical integration testing

@@ -10,6 +10,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
 
   protected def login(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     go to s"http://localhost:$port"
+    waitForQuery(id("user-id-field"))
     loginOnCurrentPage(ledgerApiUser)
   }
 
