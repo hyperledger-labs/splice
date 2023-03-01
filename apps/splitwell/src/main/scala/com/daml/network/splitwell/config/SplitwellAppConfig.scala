@@ -13,7 +13,17 @@ import com.digitalasset.canton.config.*
 
 case class SplitwellDomainConfig(
     global: DomainAlias,
-    splitwell: DomainAlias,
+    splitwell: SplitwellDomains,
+)
+
+// Domains used for splitwell operations. There is one preferred domain
+// which will be chosen by default if possible, e.g., for new group creations.
+// and a list of other domains that will eventually be phased out.
+// During an upgrade the preferred domain will be switched to the new domain
+// while the old domain will be added to others.
+case class SplitwellDomains(
+    preferred: DomainAlias,
+    others: Seq[DomainAlias],
 )
 
 case class SplitwellAppBackendConfig(

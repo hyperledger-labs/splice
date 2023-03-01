@@ -180,19 +180,27 @@ object GrpcSplitwellAppClient {
       Proto.decode(Proto.Party)(response.partyId)
   }
 
-  case class GetSplitwellDomainId(
-  ) extends BaseCommand[Empty, v0.GetSplitwellDomainIdResponse, DomainId] {
+  case class SplitwellDomains(
+      preferred: DomainId,
+      others: Seq[DomainId],
+  )
+
+  case class GetSplitwellDomainIds(
+  ) extends BaseCommand[Empty, v0.GetSplitwellDomainIdsResponse, SplitwellDomains] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
 
     override def submitRequest(
         service: SplitwellServiceStub,
         request: Empty,
-    ): Future[v0.GetSplitwellDomainIdResponse] = service.getSplitwellDomainId(request)
+    ): Future[v0.GetSplitwellDomainIdsResponse] = service.getSplitwellDomainIds(request)
 
     override def handleResponse(
-        response: v0.GetSplitwellDomainIdResponse
-    ): Either[String, DomainId] =
-      Proto.decode(Proto.DomainId)(response.domainId)
+        response: v0.GetSplitwellDomainIdsResponse
+    ): Either[String, SplitwellDomains] =
+      for {
+        preferred <- Proto.decode(Proto.DomainId)(response.preferredDomainId)
+        others <- response.otherDomainIds.traverse(id => Proto.decode(Proto.DomainId)(id))
+      } yield SplitwellDomains(preferred, others)
   }
 }

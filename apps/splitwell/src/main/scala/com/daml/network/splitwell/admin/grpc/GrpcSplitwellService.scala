@@ -4,12 +4,13 @@ import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc
 import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
@@ -22,7 +23,7 @@ import scala.jdk.CollectionConverters.*
 @nowarn("cat=unused")
 class GrpcSplitwellService(
     ledgerClient: CoinLedgerClient,
-    splitwellDomainId: DomainId,
+    splitwellDomains: SplitwellDomains,
     scanConnection: ScanConnection,
     providerParty: PartyId,
     store: SplitwellStore,
@@ -50,7 +51,7 @@ class GrpcSplitwellService(
       for {
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
         groups <- connection.activeContracts(
-          splitwellDomainId,
+          splitwellDomains.preferred,
           filter,
         )
       } yield {
@@ -74,7 +75,7 @@ class GrpcSplitwellService(
       )
       for {
         groupInvites <- connection.activeContracts(
-          splitwellDomainId,
+          splitwellDomains.preferred,
           filter,
         )
       } yield {
@@ -98,7 +99,7 @@ class GrpcSplitwellService(
       )
       for {
         acceptedGroupInvites <- connection.activeContracts(
-          splitwellDomainId,
+          splitwellDomains.preferred,
           filter,
         )
       } yield {
@@ -126,7 +127,7 @@ class GrpcSplitwellService(
       )
       for {
         balanceUpdates <- connection.activeContracts(
-          splitwellDomainId,
+          splitwellDomains.preferred,
           filter,
         )
       } yield {
@@ -156,7 +157,7 @@ class GrpcSplitwellService(
       val javaUserParty = userParty.toProtoPrimitive
       for {
         balanceUpdates <- connection.activeContracts(
-          splitwellDomainId,
+          splitwellDomains.preferred,
           providerParty,
           splitwellCodegen.BalanceUpdate.COMPANION,
         )
@@ -232,10 +233,13 @@ class GrpcSplitwellService(
       Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
     }
 
-  override def getSplitwellDomainId(request: Empty): Future[v0.GetSplitwellDomainIdResponse] =
+  override def getSplitwellDomainIds(request: Empty): Future[v0.GetSplitwellDomainIdsResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       Future.successful(
-        v0.GetSplitwellDomainIdResponse(splitwellDomainId.toProtoPrimitive)
+        v0.GetSplitwellDomainIdsResponse(
+          splitwellDomains.preferred.toProtoPrimitive,
+          splitwellDomains.others.map(_.toProtoPrimitive),
+        )
       )
     }
 

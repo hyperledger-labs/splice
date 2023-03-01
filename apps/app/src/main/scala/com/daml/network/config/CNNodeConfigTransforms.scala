@@ -3,11 +3,16 @@ package com.daml.network.config
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
+import com.daml.network.splitwell.config.{
+  SplitwellAppBackendConfig,
+  SplitwellAppClientConfig,
+  SplitwellDomains,
+}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
@@ -450,6 +455,20 @@ object CNNodeConfigTransforms {
       c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
     })
   }
+
+  def useSplitwellUpgradeDomain(): CNNodeConfigTransform =
+    updateAllSplitwellAppConfigs_(c => {
+      c.copy(
+        domains = c.domains.copy(
+          splitwell = SplitwellDomains(
+            DomainAlias.tryCreate("splitwellUpgrade"),
+            Seq(
+              DomainAlias.tryCreate("splitwell")
+            ),
+          )
+        )
+      )
+    })
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]

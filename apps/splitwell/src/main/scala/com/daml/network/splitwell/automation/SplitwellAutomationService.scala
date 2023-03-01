@@ -60,15 +60,20 @@ class SplitwellAutomationService(
       store,
       connection,
       domainConfig.global,
-      domainConfig.splitwell,
+      domainConfig.splitwell.preferred,
       scanConnection,
     )
   )
   registerTrigger(
-    new SplitwellInstallRequestTrigger(triggerContext, store, connection, domainConfig.splitwell)
+    new SplitwellInstallRequestTrigger(
+      triggerContext,
+      store,
+      connection,
+      domainConfig.splitwell.preferred,
+    )
   )
   registerTrigger(
-    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell)
+    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell.preferred)
   )
 
   def createTransferOutTrigger[TCid <: ContractId[T], T <: Template](
@@ -78,7 +83,7 @@ class SplitwellAutomationService(
       triggerContext,
       store,
       connection,
-      domainConfig.splitwell,
+      domainConfig.splitwell.preferred,
       domainAdded.domainId,
       store.providerParty,
       companion,

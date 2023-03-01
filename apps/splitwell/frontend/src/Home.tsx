@@ -46,8 +46,8 @@ const HomeWithContext: React.FC<{
   useEffect(() => {
     const querySplitwellDomain = async () => {
       console.debug('Querying backend for splitwell domain');
-      const domainsResponse = await splitwellClient.getSplitwellDomainId(new Empty(), undefined);
-      const domainId = domainsResponse.getDomainId();
+      const domainsResponse = await splitwellClient.getSplitwellDomainIds(new Empty(), undefined);
+      const domainId = domainsResponse.getPreferredDomainId();
       console.debug(`Using splitwell domain id ${domainId}`);
       setSplitwellDomainId(domainId);
     };

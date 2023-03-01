@@ -21,7 +21,7 @@ trait SplitwellStore extends CoinAppStoreWithoutHistory {
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  override final def defaultAcsDomain = domainConfig.splitwell
+  override final def defaultAcsDomain = domainConfig.splitwell.preferred
 
   def lookupInstallWithOffset(
       user: PartyId

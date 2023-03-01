@@ -1,5 +1,6 @@
 package com.daml.network.splitwell
 
+import cats.syntax.traverse.*
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
@@ -7,6 +8,7 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
 import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
@@ -84,14 +86,16 @@ class SplitwellApp(
       timeouts,
     )
     _ <- store.domains.signalWhenConnected(config.domains.global)
-    splitwellDomainId <- store.domains.signalWhenConnected(config.domains.splitwell)
+    preferred <- store.domains.signalWhenConnected(config.domains.splitwell.preferred)
+    others <- config.domains.splitwell.others.toList.traverse(store.domains.signalWhenConnected(_))
   } yield {
+    val splitwellDomains = SplitwellDomains(preferred, others)
     adminServerRegistry
       .addService(
         SplitwellServiceGrpc.bindService(
           new GrpcSplitwellService(
             ledgerClient,
-            splitwellDomainId,
+            splitwellDomains,
             scanConnection,
             party,
             store,

@@ -10,6 +10,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
   SplitwellDomainConfig,
+  SplitwellDomains,
 }
 import com.daml.network.sv.config.{
   ApprovedSvIdentityConfig,
@@ -499,6 +500,8 @@ object CNNodeConfig {
       deriveReader[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
       deriveReader[RemoteDirectoryAppConfig]
+    implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
+      deriveReader[SplitwellDomains]
     implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
       deriveReader[SplitwellDomainConfig]
     implicit val splitwellConfigReader: ConfigReader[SplitwellAppBackendConfig] =
@@ -599,6 +602,8 @@ object CNNodeConfig {
       deriveWriter[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
       deriveWriter[RemoteDirectoryAppConfig]
+    implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
+      deriveWriter[SplitwellDomains]
     implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =
       deriveWriter[SplitwellDomainConfig]
     implicit val splitwellConfigWriter: ConfigWriter[SplitwellAppBackendConfig] =

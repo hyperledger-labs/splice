@@ -15,7 +15,7 @@ service SplitwellService {
 
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 
-  rpc GetSplitwellDomainId (google.protobuf.Empty) returns (GetSplitwellDomainIdResponse);
+  rpc GetSplitwellDomainIds (google.protobuf.Empty) returns (GetSplitwellDomainIdsResponse);
 }
 
 // The context from which a request originates.
@@ -86,6 +86,7 @@ message ListConnectedDomainsResponse {
   com.daml.network.v0.ConnectedDomains domains = 1;
 }
 
-message GetSplitwellDomainIdResponse {
-  string domain_id = 1;
+message GetSplitwellDomainIdsResponse {
+  string preferred_domain_id = 1;
+  repeated string other_domain_ids = 2;
 }

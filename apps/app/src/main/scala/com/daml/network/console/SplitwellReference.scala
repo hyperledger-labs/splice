@@ -20,7 +20,7 @@ import com.digitalasset.canton.console.{
   Help,
 }
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
@@ -51,10 +51,10 @@ abstract class SplitwellAppReference(
       adminCommand(GrpcSplitwellAppClient.GetProviderPartyId())
     }
 
-  @Help.Summary("Get the domain id for the private splitwell app domain")
-  def getSplitwellDomainId(): DomainId =
+  @Help.Summary("Get the domain ids for the private splitwell app domains")
+  def getSplitwellDomainIds(): GrpcSplitwellAppClient.SplitwellDomains =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.GetSplitwellDomainId())
+      adminCommand(GrpcSplitwellAppClient.GetSplitwellDomainIds())
     }
 }
 
@@ -146,7 +146,7 @@ final class SplitwellAppClientReference(
       readAs,
       update,
       commandId,
-      Some(getSplitwellDomainId()),
+      Some(getSplitwellDomainIds().preferred),
       disclosedContracts,
     )
   }
