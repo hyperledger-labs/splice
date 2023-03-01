@@ -357,6 +357,7 @@ local cluster(config, clusterDeployments) =
       "external-proxy",
       externalProxyPorts,
       memoryLimitMiB=512,
+      mountConfig="cluster-manifest",
       tlsCertSecret=tlsCertSecret
     ),
     externalService(config, externalProxyPorts),

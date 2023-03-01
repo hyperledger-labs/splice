@@ -3966,13 +3966,31 @@
                         },
                         "volumeMounts": [
                            {
+                              "mountPath": "/config",
+                              "name": "external-proxy-config-vol"
+                           },
+                           {
                               "mountPath": "/tmp",
                               "name": "external-proxy-tls-cert-vol"
                            }
                         ]
                      }
                   ],
-                  "volumes": [ ]
+                  "volumes": [
+                     {
+                        "configMap": {
+                           "name": "cluster-manifest"
+                        },
+                        "name": "external-proxy-config-vol"
+                     },
+                     {
+                        "name": "external-proxy-tls-cert-vol",
+                        "secret": {
+                           "optional": false,
+                           "secretName": "cluster-tls"
+                        }
+                     }
+                  ]
                }
             }
          }
