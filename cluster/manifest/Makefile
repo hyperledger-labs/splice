@@ -9,7 +9,8 @@ test-vars=\
     --tla-str ipAddr=ipaddr \
     --tla-str clusterName=cluster \
 	--tla-str clusterDnsName=cluster.network.global \
-	--tla-code fixedTokens=false
+	--tla-code fixedTokens=false \
+	--tla-code tickDuration=null
 
 .PHONY: $(dir)/test
 $(dir)/test:

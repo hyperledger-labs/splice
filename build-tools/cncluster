@@ -25,6 +25,10 @@ if [[ "$GCP_CLUSTER_BASENAME" = "staging" ]]; then
     export CNCLUSTER_FIXED_TOKENS=1
 fi
 
+if [[ "$GCP_CLUSTER_BASENAME" = "devnet" ]]; then
+    export CNCLUSTER_TICK_DURATION=30s
+fi
+
 ################################
 ### Utilities
 ################################
@@ -90,6 +94,12 @@ function _cluster_apply() {
         TOKEN_ARG=fixedTokens=true
     fi
 
+    TICK_DURATION_ARG="tickDuration=null"
+
+    if [ ! -z "${CNCLUSTER_TICK_DURATION:-}" ]; then
+        TICK_DURATION_ARG="tickDuration=\"${CNCLUSTER_TICK_DURATION}\""
+    fi
+
     # Apply base cluster config
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
@@ -100,6 +110,7 @@ function _cluster_apply() {
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
             --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
             --tla-code $TOKEN_ARG \
+            --tla-code $TICK_DURATION_ARG \
             $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
         | kubectl apply -f -
 }

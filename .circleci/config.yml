@@ -22,7 +22,7 @@ parameters:
     default: "11"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet, refresh-staging-tokens]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-staging-tokens]
     default: build
 
 notify-fail: &notify-fail
@@ -1419,6 +1419,18 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+
+  devnet_health_check:
+    when:
+      equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "devnet"
           context:
             - artifactory
             - canton-network-vpn

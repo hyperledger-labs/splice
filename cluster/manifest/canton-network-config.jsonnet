@@ -44,6 +44,7 @@ function(
   clusterName,
   clusterDnsName,
   fixedTokens,
+  tickDuration,
 ) cantonNetwork(networkDefaults {
   gcpRegion: gcpRegion,
   gcpRepoName: gcpRepoName,
@@ -54,4 +55,5 @@ function(
   clusterName: clusterName,
   clusterDnsName: clusterDnsName,
   fixedTokens: fixedTokens,
+  tickDuration: tickDuration,
 })
