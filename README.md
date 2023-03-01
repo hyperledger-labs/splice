@@ -252,6 +252,10 @@ ends with the sprint on Wednesday of the second week. At each boundary,
 the outgoing and incoming engineers on flake duty rotation must
 have a brief touchpoint meeting to go over any issues still under resolution.
 
+Important: we rely on there always being two engineers available on flake duty.
+Thus, engineers on flake duty that have a day off are required to
+ask another engineer to substitute for them.
+
 For engineers on flake duty, the resolution process is as follows.
 
 * When there is a Slack message indicating a test failure, investigate
