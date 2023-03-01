@@ -82,7 +82,7 @@ class WalletApp(
           config.validator.adminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
-          new JwtCallCredential(validatorAuthToken.getOrElse("")),
+          validatorAuthToken,
         )
       }
       validatorUserInfo <- retryProvider.retryForAutomation(

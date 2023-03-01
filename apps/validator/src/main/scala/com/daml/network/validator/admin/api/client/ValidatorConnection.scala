@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.auth.JwtCallCredential
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.validator.admin.api.client.commands.HttpValidatorAppClient
@@ -24,7 +23,7 @@ final class ValidatorConnection(
     config: CoinHttpClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-    credentials: JwtCallCredential,
+    tokenO: Option[String],
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
 
@@ -61,7 +60,7 @@ final class ValidatorConnection(
           userInfo <- runHttpCmd(
             config.url,
             HttpValidatorAppClient.GetValidatorUserInfo,
-            List(Authorization(OAuth2BearerToken(credentials.jwt))),
+            tokenO.map(s => Authorization(OAuth2BearerToken(s))).toList,
           )
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
