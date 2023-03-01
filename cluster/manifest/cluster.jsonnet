@@ -308,23 +308,6 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
     ],
   };
 
-local jsonFileConfigMap(config, name, fileName, data) = {
-  ports: [],
-  deploymentObjects: [
-    {
-      apiVersion: "v1",
-      kind: "ConfigMap",
-      metadata: {
-        name: name,
-      },
-      data: {
-        version: config.imageTag,
-        [fileName]: std.manifestJsonEx(data, "  ", "\n", ": "),
-      },
-    },
-  ],
-};
-
 local externalService(config, ports) = {
   ports: [],
   deploymentObjects: [
@@ -369,15 +352,11 @@ local cluster(config, clusterDeployments) =
   local externalProxyPorts = std.map(function(p) { name: p.name, port: externalPort(p) }, nonInternalPorts);
 
   objects(deployments + [
-    jsonFileConfigMap(config, "cluster-manifest", "manifest.json", {
-      ports: allPorts,
-    }),
     deployment(
       config,
       "external-proxy",
       externalProxyPorts,
       memoryLimitMiB=512,
-      mountConfig="cluster-manifest",
       tlsCertSecret=tlsCertSecret
     ),
     externalService(config, externalProxyPorts),

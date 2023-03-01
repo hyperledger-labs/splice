@@ -629,19 +629,6 @@ function subcmd_reset() {
 
 ###
 
-subcommand_whitelist[ports]='Display a table of all ports exposed from the cluster.'
-
-function subcmd_ports() {
-    _cluster_show
-    _cluster_must_exist
-
-    curl -L http://${CLUSTER_DNS_NAME}/manifest.json 2> /dev/null \
-        | jq -r '(["SERVICE","PORT-NAME","PORT","AS-GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@tsv' \
-        | column -t
-}
-
-###
-
 subcommand_whitelist[info]='Display information on current cluster configuration, including image tags'
 
 function subcmd_info() {

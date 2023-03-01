@@ -20,4 +20,4 @@ $(dir)/test:
 .PHONY: $(dir)/test-update
 $(dir)/test-update:
 	jsonnet $(test-vars) \
-		$(dir)/canton-network-config.jsonnet > $(dir)/test-results/expected.json
+		$(@D)/canton-network-config.jsonnet > $(@D)/test-results/expected.json
