@@ -3964,7 +3964,12 @@
                               "memory": "512Mi"
                            }
                         },
-                        "volumeMounts": [ ]
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/tmp",
+                              "name": "external-proxy-tls-cert-vol"
+                           }
+                        ]
                      }
                   ],
                   "volumes": [ ]

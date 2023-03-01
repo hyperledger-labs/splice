@@ -218,17 +218,17 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                       memory: memoryLimitMiB + "Mi",
                     },
                   },
-                  volumeMounts: if mountConfig == null then [] else [
-                    {
-                      mountPath: "/config",
-                      name: name + "-config-vol",
-                    },
-                  ] + if tlsCertSecret == null then [] else [
-                    {
-                      mountPath: "/tmp",
-                      name: name + "-tls-cert-vol",
-                    },
-                  ],
+                  volumeMounts: (if mountConfig == null then [] else [
+                                   {
+                                     mountPath: "/config",
+                                     name: name + "-config-vol",
+                                   },
+                                 ]) + (if tlsCertSecret == null then [] else [
+                                         {
+                                           mountPath: "/tmp",
+                                           name: name + "-tls-cert-vol",
+                                         },
+                                       ]),
                 } + ext,
               ] + (
                 if proxyPort != null then
