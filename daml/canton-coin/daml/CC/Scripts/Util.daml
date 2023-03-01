@@ -55,7 +55,6 @@ setupApp = do
 
   _ <- submit svc $ createCmd CoinRules with
     configSchedule = defaultCoinConfigSchedule
-    observers = []
     enabledChoices = API.enableAllChoices
     isDevNet = True
     ..

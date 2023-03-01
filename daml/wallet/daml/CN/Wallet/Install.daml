@@ -117,7 +117,7 @@ data CoinOperationOutcome
 -- This should be replaced by explicit disclosure
 template WalletAppInstall
   with
-    svcParty : Party -- TODO(M3-82): remove workaround for explicit disclosure
+    svcParty : Party
     validatorParty : Party -- The validator operator, who will receive app rewards for the first (locking) leg of payments by this user
     walletServiceParty : Party
     endUserName : Text -- The participant user name of the end-user

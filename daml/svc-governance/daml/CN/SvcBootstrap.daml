@@ -36,7 +36,6 @@ template SvcBootstrap with
         coinRulesCid <- create CoinRules with
           svc
           configSchedule = coinConfigSchedule
-          observers = []
           enabledChoices
           isDevNet
         _ <- create AgreedCoinPrice with

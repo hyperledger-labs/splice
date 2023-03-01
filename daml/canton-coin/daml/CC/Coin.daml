@@ -237,14 +237,12 @@ template CoinRules
   with
     svc : Party
     configSchedule : Schedule Time (CoinConfig USD)
-    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
   where
     ensure validSchedule configSchedule validCoinConfig
 
     signatory svc
-    observer observers -- TODO(M3-82): remove workaround for explicit disclosure
 
     interface instance API.CoinRules for CoinRules where
       view = API.CoinRulesView with ..
@@ -328,11 +326,11 @@ template CoinRules
         let transferConfigUsd = configUsd.transferConfig
 
         create OpenMiningRound with
-          svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+          svc; round = API.Round 0; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         create OpenMiningRound with
-          svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+          svc; round = API.Round 1; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
         create OpenMiningRound with
-          svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+          svc; round = API.Round 2; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
@@ -358,7 +356,6 @@ template CoinRules
         archive roundToArchiveCid
         newSummarizingRound <- create SummarizingMiningRound with
             svc
-            observers
             round = roundToArchive.round
             issuanceConfig = roundToArchive.issuanceConfig
             tickDuration = roundToArchive.tickDuration
@@ -370,7 +367,6 @@ template CoinRules
               newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
           create OpenMiningRound with
               svc
-              observers
               round = API.Round (latestRound.round.number + 1)
               coinPrice
               opensAt
@@ -419,7 +415,6 @@ template CoinRules
 
         create IssuingMiningRound with
           svc
-          observers
           round = miningRound.round
           opensAt = opensAt
           targetClosesAt = targetClosesAt
@@ -444,7 +439,6 @@ template CoinRules
         -- create closed round
         create ClosedMiningRound with
           svc
-          observers
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon

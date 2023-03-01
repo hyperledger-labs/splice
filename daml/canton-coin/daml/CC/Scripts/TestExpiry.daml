@@ -53,12 +53,11 @@ testEstimateOpenRoundCreatedAt = script do
       issuingFor0 = days 0
       issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
 
-      observers = []
       coinConfigUsd = defaultCoinConfig
       transferConfigUsd = coinConfigUsd.transferConfig
       issuanceConfig0 = getValueAsOf issuingFor0 coinConfigUsd.issuanceCurve
       issuanceConfig3 = getValueAsOf issuingFor3 coinConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; observers; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
 

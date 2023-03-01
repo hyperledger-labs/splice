@@ -1,7 +1,5 @@
 module CC.Round where
 
-import CN.Util.Assert
-
 import qualified CC.API.V1.Round as API
 import CC.API.V1.Round (Round(..))
 import CC.CoinConfig
@@ -18,7 +16,6 @@ template OpenMiningRound
     svc : Party
     round : Round
     coinPrice : Decimal
-    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     opensAt : Time -- ^ Time after which transfers can use this mining round
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
     issuingFor : RelTime -- ^ Time for which the SVC has been issuing rewards. Determines the configuration for the issuance round.
@@ -27,19 +24,10 @@ template OpenMiningRound
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   where
     signatory svc
-    observer observers
     ensure isDefinedRound round
 
     interface instance API.OpenMiningRound for OpenMiningRound where
       view = API.OpenMiningRoundView with ..
-
-    choice OpenMiningRound_AddObserver : ContractId OpenMiningRound
-      with
-        obs : Party
-      controller svc
-      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
-         create this with
-           observers = obs :: observers
 
 
 -- | A mining round for which the total sum of registered rewards
@@ -48,7 +36,6 @@ template SummarizingMiningRound
   with
     svc : Party
     round : Round
-    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     issuanceConfig : IssuanceConfig
     tickDuration : RelTime
   where
@@ -63,24 +50,14 @@ template IssuingMiningRound
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
-    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     opensAt : Time-- ^ Time after which rewards from this mining round can be collected
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
   where
     signatory svc
-    observer observers
     ensure isDefinedRound round
 
     interface instance API.IssuingMiningRound for IssuingMiningRound where
       view = API.IssuingMiningRoundView with ..
-
-    choice IssuingMiningRound_AddObserver : ContractId IssuingMiningRound
-      with
-        obs : Party
-      controller svc
-      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
-         create this with
-           observers = obs :: observers
 
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
@@ -91,10 +68,8 @@ template ClosedMiningRound
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
-    observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
   where
     signatory svc
-    observer observers
     ensure isDefinedRound round
 
 -- | Check if a round has a positive round number

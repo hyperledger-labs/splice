@@ -11,7 +11,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -25,11 +25,6 @@ class AcceptedAppPaymentRequestsTrigger(
     globalDomain: DomainAlias,
     splitwellDomain: DomainAlias,
     scanConnection: ScanConnection,
-    // extra readAs rights, which are required to readAs the validatorParty and thus see the CoinRules
-    // TODO(M3-82): once we have explicit disclosure: remove the need to fetch these extra readAs rights, which are there to enable using the CoinRules, which are only visible to the validatorParty
-    readAsWithValidatorUser: Set[
-      PartyId
-    ],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -93,7 +88,7 @@ class AcceptedAppPaymentRequestsTrigger(
             )
             _ <- connection.submitCommandsNoDedup(
               actAs = Seq(provider),
-              readAs = readAsWithValidatorUser.toSeq,
+              readAs = Seq(),
               commands = cmd.commands.asScala.toSeq,
               domainId = domainId,
               disclosedContracts = disclosedContracts,

@@ -23,7 +23,6 @@ import com.daml.network.splitwell.store.SplitwellStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -35,7 +34,6 @@ class SplitwellAutomationService(
     clock: Clock,
     store: SplitwellStore,
     ledgerClient: CoinLedgerClient,
-    readAs: Set[PartyId],
     scanConnection: ScanConnection,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
@@ -64,7 +62,6 @@ class SplitwellAutomationService(
       domainConfig.global,
       domainConfig.splitwell,
       scanConnection,
-      readAs,
     )
   )
   registerTrigger(

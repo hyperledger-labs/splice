@@ -201,7 +201,6 @@ svSubmits app sv mkCommands = do
   [(consortiumCid, _)] <- query @SvcRules app.svc
   submitMulti [sv] [app.svc] $ mkCommands consortiumCid
 
--- TODO(M3-82): remove workaround for explicit disclosure
 onboardValidator : CCApp -> Party -> Party -> Script ()
 onboardValidator app sponsor validator = do
   [(coinRulesCid, _)] <- query @CoinRules app.svc

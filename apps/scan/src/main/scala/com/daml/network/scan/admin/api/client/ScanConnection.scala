@@ -110,6 +110,8 @@ final class ScanConnection(
     coinRulesCache.get() match {
       case Some(coinRules) =>
         Future.successful(coinRules)
+      // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
+      // requests, and are not deduplicated against each other. We accept that as we expect low concurrency by default.
       case None =>
         logger.debug(
           s"CoinRules cache is empty, retrieving them from CC scan."
