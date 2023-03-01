@@ -7,9 +7,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# $REPO_ROOT/.circleci/install-trigger.sh $REPO_ROOT/.circleci/run-schedule-pipeline.json
+# Upload or patch trigger schedules
 
 for TRIGGER in $REPO_ROOT/.circleci/trigger-*.json
 do
     $REPO_ROOT/.circleci/install-trigger.sh ${TRIGGER}
 done
+
+# Delete unknown remote triggers
+
+$REPO_ROOT/.circleci/delete-unknown-triggers.sh
