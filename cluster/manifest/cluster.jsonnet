@@ -1,5 +1,3 @@
-local tls = import "./tls.jsonnet";
-
 local flatten(obj) =
   if std.isArray(obj)
   then std.flatMap(flatten, obj)
@@ -263,22 +261,22 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                     },
                   ] else []
               ),
-              volumes: if mountConfig == null then [] else [
-                {
-                  name: name + "-config-vol",
-                  configMap: {
-                    name: mountConfig,
-                  },
-                },
-              ] + if tlsCertSecret == null then [] else [
-                {
-                  name: name + "-tls-cert-vol",
-                  secret: {
-                    secretName: tlsCertSecret,
-                    optional: false,
-                  },
-                },
-              ],
+              volumes: (if mountConfig == null then [] else [
+                          {
+                            name: name + "-config-vol",
+                            configMap: {
+                              name: mountConfig,
+                            },
+                          },
+                        ]) + (if tlsCertSecret == null then [] else [
+                                {
+                                  name: name + "-tls-cert-vol",
+                                  secret: {
+                                    secretName: tlsCertSecret,
+                                    optional: false,
+                                  },
+                                },
+                              ]),
             },
           },
         },
@@ -323,63 +321,7 @@ local jsonFileConfigMap(config, name) = {
   ],
 };
 
-local externalService(config, ports) = {
-  ports: [],
-  deploymentObjects: [
-    {
-      apiVersion: "v1",
-      kind: "Service",
-      metadata: {
-        name: "external",
-        clusterName: config.clusterName,
-      },
-      spec: {
-        type: "LoadBalancer",
-        selector: {
-          app: "external-proxy",
-        },
-        ports: [
-          {
-            name: p.name,
-            protocol: "TCP",
-            port: externalPort(p),
-          }
-          for p in ports
-        ],
-        loadBalancerIP: config.ipAddr,
-        loadBalancerSourceRanges: config.externalIPRanges,
-      },
-    },
-  ],
-};
-
-
-local cluster(config, clusterDeployments) =
-  local deployments = flatten(clusterDeployments);
-
-  local tlsCertSecret = config.clusterName + "-tls";
-  local issuerName = "letsencrypt-production";
-  local issuerServer = "https://acme-v02.api.letsencrypt.org/directory";
-
-  local allPorts = flatten(std.map(function(i) i.ports, deployments));
-  local nonInternalPorts = std.filter(function(port) !std.get(port, "internalOnly", false),
-                                      allPorts);
-  local externalProxyPorts = std.map(function(p) { name: p.name, port: externalPort(p) }, nonInternalPorts);
-
-  objects(deployments + [
-    jsonFileConfigMap(config, "cluster-manifest"),
-    deployment(
-      config,
-      "external-proxy",
-      externalProxyPorts,
-      memoryLimitMiB=512,
-      mountConfig="cluster-manifest",
-      tlsCertSecret=tlsCertSecret
-    ),
-    externalService(config, externalProxyPorts),
-    tls.issuer(issuerName, issuerServer, config.gcpDnsProject, config.gcpDnsSASecret),
-    tls.certificate(issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
-  ]);
+local cluster(config, deployments) = objects(flatten(deployments));
 
 local namespace(name, config) = {
   ports: [],
@@ -398,10 +340,13 @@ local namespace(name, config) = {
 };
 
 {
-  deployment:: deployment,
-  cluster:: cluster,
   appAuthEnvBinding:: appAuthEnvBinding,
   appUserNameEnvBinding:: appUserNameEnvBinding,
   appUserNameEnvBindings:: appUserNameEnvBindings,
+  cluster:: cluster,
+  deployment:: deployment,
+  externalPort:: externalPort,
+  flatten:: flatten,
+  jsonFileConfigMap:: jsonFileConfigMap,
   namespace:: namespace,
 }

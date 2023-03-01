@@ -28,4 +28,8 @@
     "34.132.91.75/32",
     "18.210.210.130/32",
   ],
+  tls: {
+    issuerName: "letsencrypt-production",
+    issuerServer: "https://acme-v02.api.letsencrypt.org/directory",
+  },
 }
