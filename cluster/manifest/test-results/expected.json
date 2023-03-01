@@ -3777,6 +3777,16 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "data": {
+            "version": "tag"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "name": "cluster-manifest"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
