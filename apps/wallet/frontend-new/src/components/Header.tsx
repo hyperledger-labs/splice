@@ -1,8 +1,9 @@
 import * as React from 'react';
+import { useUserState } from 'common-frontend';
 import { NavLink } from 'react-router-dom';
 
 import { Logout } from '@mui/icons-material';
-import { Divider, Stack, Toolbar } from '@mui/material';
+import { Button, Divider, Stack, Toolbar } from '@mui/material';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
@@ -26,6 +27,8 @@ const Header: React.FC<HeaderProps> = props => {
 
     return isActive ? { ...style, textDecoration: 'underline' } : style;
   };
+
+  const { logout } = useUserState();
 
   return (
     <Toolbar
@@ -53,14 +56,16 @@ const Header: React.FC<HeaderProps> = props => {
         ))}
       </Stack>
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Typography>{props.currentUser}</Typography>
+        <Typography id="logged-in-user">{props.currentUser}</Typography>
         <Divider orientation="vertical" variant="middle" flexItem />
-        <Stack direction="row" alignItems="center">
-          <Logout />
-          <Link href="#" color="inherit">
-            Logout
-          </Link>
-        </Stack>
+        <Button id="logout-button" onClick={logout} color="inherit">
+          <Stack direction="row" alignItems="center">
+            <Logout />
+            <Link color="inherit" textTransform="none">
+              Logout
+            </Link>
+          </Stack>
+        </Button>
       </Stack>
     </Toolbar>
   );

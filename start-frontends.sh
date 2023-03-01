@@ -39,8 +39,9 @@ function start_frontend() {
   local test_auth=$5
   local algorithm="${6:-rs-256}"
   local cluster_address="${7:-'http://localhost'}"
+  local frontend_dir_in_app="${8:-'frontend'}"
 
-  local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
+  local frontend_dir="${REPO_ROOT}/apps/${app}/${frontend_dir_in_app}"
 
   # Note: We are sending the content of the whole config.js file as a string to the webpack dev server.
   # There are two issues with this:
@@ -59,7 +60,7 @@ function start_frontend() {
     $REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet \
     > "$config_file"
 
-  local log_file="${LOG_DIR}/npm-${app}-${user}.log"
+  local log_file="${LOG_DIR}/npm-${app}-${user}-${frontend_dir_in_app}.log"
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "trap \"rm -f ${config_file}\" EXIT"
@@ -128,7 +129,7 @@ done
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {
-  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm>
+  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <frontend_dir_in_app>
   start_frontend   wallet    3000 alice   "alice" $enable_test_auth
   start_frontend   wallet    3001 bob     "bob"   $enable_test_auth
   start_frontend   splitwell 3002 alice   "alice" $enable_test_auth
@@ -136,6 +137,7 @@ function start_local_frontends() {
   start_frontend   directory 3004 alice   "alice" $enable_test_auth
   start_frontend   splitwell 3005 charlie "alice" $enable_test_auth
   start_frontend   scan      3006 scan    "scan"  "false"           "none"
+  start_frontend   wallet    3007 alice   "alice" $enable_test_auth "rs-256" "http://localhost" "frontend-new"
 }
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test

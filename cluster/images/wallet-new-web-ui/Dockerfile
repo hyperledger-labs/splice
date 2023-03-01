@@ -7,6 +7,8 @@ RUN apt-get update && \
 COPY default.conf /etc/nginx/conf.d
 COPY --from=0 app/coin-0.1.0-SNAPSHOT/web-uis/wallet-new /usr/share/nginx/html/
 
+COPY config.js /tmpl/config.js.tmpl
+
 COPY docker-entrypoint.sh /custom-docker-entrypoint.sh
 RUN chmod 500 /custom-docker-entrypoint.sh
 ENTRYPOINT ["/custom-docker-entrypoint.sh"]
