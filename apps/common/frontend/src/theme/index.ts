@@ -1,6 +1,6 @@
 import { createTheme, TypographyStyle } from '@mui/material';
 
-import { generateHslPalette } from './colors';
+import { generateHslPalette, generateRemValue } from './utils';
 
 // TS module augmentation to add custom theme vars for storing our CN-theme color values
 declare module '@mui/material/styles' {
@@ -70,7 +70,7 @@ theme = createTheme(theme, {
       main: 'indianred',
     },
     background: {
-      default: theme.palette.colors.neutral[20],
+      default: theme.palette.colors.neutral[25],
     },
   },
 });
@@ -88,22 +88,52 @@ theme = createTheme(theme, {
   },
 });
 
+// Based on the Major Third type scale: https://typescale.com/?size=16&scale=1.250&text=A%20Visual%20Type%20Scale&font=Lato&fontweight=400&bodyfont=body_font_default&bodyfontweight=400&lineheight=1.75&backgroundcolor=%23ffffff&fontcolor=%23000000&preview=false
+const TYPE_SCALE = 1.25;
+
 theme = createTheme(theme, {
   typography: {
     // I couldn't figure out a less verbose way to reliably set the font family... specifying it at
     // `theme.typography.fontFamily`, as indicated by the documentation, didn't actually do anything
-    h1: theme.fonts.sansSerif,
-    h2: theme.fonts.sansSerif,
-    h3: theme.fonts.sansSerif,
-    h4: theme.fonts.sansSerif,
-    h5: theme.fonts.sansSerif,
-    h6: theme.fonts.sansSerif,
+    h1: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(5, TYPE_SCALE),
+    },
+    h2: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(4, TYPE_SCALE),
+    },
+    h3: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(3, TYPE_SCALE),
+    },
+    h4: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(2, TYPE_SCALE),
+    },
+    h5: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(1, TYPE_SCALE),
+    },
+    h6: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(0, TYPE_SCALE),
+    },
     subtitle1: theme.fonts.sansSerif,
     subtitle2: theme.fonts.sansSerif,
-    body1: theme.fonts.sansSerif,
-    body2: theme.fonts.sansSerif,
+    body1: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(0, TYPE_SCALE),
+    },
+    body2: {
+      ...theme.fonts.sansSerif,
+      fontSize: '0.875rem',
+    },
     button: theme.fonts.sansSerif,
-    caption: theme.fonts.sansSerif,
+    caption: {
+      ...theme.fonts.sansSerif,
+      fontSize: generateRemValue(-1, TYPE_SCALE),
+    },
     overline: theme.fonts.sansSerif,
   },
 });
@@ -119,6 +149,17 @@ theme = createTheme(theme, {
   components: {
     MuiButton: {
       variants: [
+        {
+          props: { color: 'secondary' },
+          style: {
+            color: 'white',
+            textTransform: 'none',
+            '.MuiButton-startIcon': {
+              color: theme.palette.secondary.main,
+              marginRight: theme.spacing(0.5),
+            },
+          },
+        },
         {
           props: { variant: 'pill' },
           style: {
@@ -148,22 +189,34 @@ theme = createTheme(theme, {
         root: {
           marginBottom: '4px',
           backgroundColor: theme.palette.colors.neutral[20],
+          backgroundImage: 'none',
         },
       },
     },
     MuiTableCell: {
       styleOverrides: {
+        root: {
+          borderColor: theme.palette.colors.neutral[40],
+        },
         head: {
+          ...theme.fonts.monospace,
+          fontSize: '0.8125rem',
+          fontWeight: 700,
           textTransform: 'uppercase',
-          fontWeight: 'bold',
         },
       },
     },
     MuiTab: {
+      defaultProps: {
+        disableRipple: true,
+      },
       styleOverrides: {
         root: {
           textTransform: 'capitalize',
           fontWeight: 'bold',
+          paddingLeft: '0px',
+          paddingRight: '0px',
+          marginRight: theme.spacing(4),
           color: 'white',
           '&.Mui-selected': {
             color: 'white',
@@ -176,6 +229,7 @@ theme = createTheme(theme, {
         root: {
           '.MuiTabs-indicator': {
             backgroundColor: theme.palette.secondary.main,
+            borderBottomSize: '4px',
           },
         },
       },

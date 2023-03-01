@@ -17,7 +17,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const upcomingRewardsBalance: WalletBalance = { totalCC: '210', totalUSD: '420' };
 
   return (
-    <Box display="flex" flexDirection="column" minHeight="100vh">
+    <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
         <Header currentUser={currentUser} />
       </Container>

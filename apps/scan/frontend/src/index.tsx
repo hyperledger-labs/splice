@@ -8,7 +8,8 @@ import {
   RouterProvider,
 } from 'react-router-dom';
 
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import { CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material';
 
 import AppLeaderboard from './routes/appLeaderboard';
 import RecentActivity from './routes/recentActivity';

@@ -15,3 +15,6 @@ export const generateHslPalette = (
       }),
       {}
     );
+
+export const generateRemValue = (stepSize: number, multiplier: number): string =>
+  `${multiplier ** stepSize}rem`;

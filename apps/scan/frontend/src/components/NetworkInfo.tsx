@@ -17,24 +17,24 @@ import {
 const NetworkInfo: React.FC = () => {
   const configurationUpdate = addDays(new Date(), 1);
   return (
-    <Card variant="outlined">
+    <Card>
       <CardContent>
         <Stack spacing={4}>
-          <Typography variant="h5">Current Canton Coin Configuration</Typography>
+          <Typography variant="h3">Current Canton Coin Configuration</Typography>
           <Typography variant="body1">
             The details below fluctuate based on x and y.
             <br />
             Refresh for most up to date information.
           </Typography>
           <Stack spacing={1}>
-            <Typography variant="h5">Fees</Typography>
+            <Typography variant="h3">Fees</Typography>
             <Typography variant="body1">
               Fees exist because of x and z. Here are important things you should know...
             </Typography>
           </Stack>
           <FeesTable />
           <Stack spacing={2}>
-            <Typography variant="h5">Next Configuration Update</Typography>
+            <Typography variant="h3">Next Configuration Update</Typography>
             <Typography variant="body1">
               {formatRelative(configurationUpdate, new Date())}
             </Typography>
