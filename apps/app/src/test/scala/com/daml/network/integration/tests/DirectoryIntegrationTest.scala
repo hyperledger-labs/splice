@@ -145,10 +145,19 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
             // Note the DirectoryInstallTrigger completes with log lines of the form:
             //   DirectoryInstallRequestTrigger:DirectoryIntegrationTest/config=8b549e20/directory=directory-app tid:796c4cc07dc9db97b87db1feb158efb4 - Completed processing with outcome: accepted install request.
-
             // Collect and check the logged outcomes from these lines
             val outcomeRegex =
-              "DirectoryInstallRequestTrigger.*Completed processing with outcome: (.*)".r
+              "Completed processing with outcome: (.*)".r
+            val ignoredRegexes =
+              Seq(
+                "(?s)Processing.*Contract.*".r,
+                "(?s)Checking whether the task is stale, as its processing failed with.*".r,
+                "(?s)The operation 'processTaskWithRetry' failed with a retryable error.*".r,
+                "(?s)The operation 'processTaskWithRetry' has failed with an exception.*".r,
+                "(?s)Rejecting duplicate install request.*".r,
+                "(?s)Now retrying operation 'processTaskWithRetry'.*".r,
+                "(?s)skipped, as the task has become stale.*".r,
+              )
             val expectedOutcomes = Seq(
               "accepted install request",
               "rejected request for already existing installation",
@@ -157,7 +166,15 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
             // Note that we might not get an outcome for every request, as some create events might never be seen by the trigger
             val actualOutcomes =
               lines
-                .flatMap(line => outcomeRegex.findAllMatchIn(line.toString))
+                .filter(entry => entry.loggerName.contains("DirectoryInstallRequestTrigger"))
+                .flatMap(line => {
+                  val outcome = outcomeRegex.findAllMatchIn(line.message).toSeq
+                  if (outcome.isEmpty && !ignoredRegexes.exists(_.matches(line.message))) {
+                    // Sanity check to make sure our parsing really catches anything interesting.
+                    fail(s"Unexpected message: ${line.message}")
+                  }
+                  outcome
+                })
                 .map(_.group(1).stripSuffix("."))
 
             forAll(actualOutcomes) { (outcome: String) =>
