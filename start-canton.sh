@@ -90,8 +90,12 @@ function tmux_cmd() {
 
 tmux new-session -d -s "${tmux_session}"
 
+# Numbers chosen such that we don't run out of memory and CI runs are not measurably slower.
+# Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
+JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g"
+
 tmux_cmd canton-wallclocktime \
-  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton.tokens canton \
+  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" canton \
     -c ./apps/app/src/test/resources/simple-topology-canton.conf \
     --log-level-canton=DEBUG \
     --log-encoder json \
@@ -99,7 +103,7 @@ tmux_cmd canton-wallclocktime \
     --bootstrap bootstrap-canton.sc"
 
 tmux_cmd canton-simtime \
-  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
+  "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\"  canton \
     -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
     --log-level-canton=DEBUG \
     --log-encoder json \

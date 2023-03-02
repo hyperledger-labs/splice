@@ -790,7 +790,7 @@ jobs:
       - split_tests_for_parallel_run
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh -d -p external && ./start-frontends.sh -d
+          pre_sbt_cmd: ./start-canton.sh -d -p external && ./start-frontends.sh -d && $(top -b -o %MEM -c -w 256 > log/memory &)
           cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
