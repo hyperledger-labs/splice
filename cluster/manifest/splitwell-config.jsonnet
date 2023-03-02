@@ -21,7 +21,7 @@ local deployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="sw-lg-api", extraEnvVars=
+  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["sw-lg-api", "sw-adm-api"], extraEnvVars=
                c.appUserNameEnvBinding("validator", "splitwell_validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
@@ -104,7 +104,7 @@ local deployments(config) = [
       name: "sw-api",
       port: 5213,
     },
-  ], namespace="splitwell", proxyToGrpcWeb="sw-api", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "splitwell")),
+  ], namespace="splitwell", proxyToGrpcWeb=["sw-api"], extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "splitwell")),
 ];
 
 

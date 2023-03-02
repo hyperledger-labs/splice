@@ -1,4 +1,11 @@
-import { Contract, usePrimaryParty, useUserState } from 'common-frontend';
+import {
+  Contract,
+  usePrimaryParty,
+  useUserState,
+  useDomainConnectivityClient,
+  DomainConnectivityClientProvider,
+} from 'common-frontend';
+import { ListConnectedDomainsRequest } from 'common-protobuf/com/digitalasset/canton/participant/admin/v0/domain_connectivity_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useState, useEffect } from 'react';
 
@@ -21,6 +28,7 @@ const HomeWithContext: React.FC<{
 }> = ({ svc }) => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
+  const domainConnectivityClient = useDomainConnectivityClient();
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
@@ -58,10 +66,17 @@ const HomeWithContext: React.FC<{
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.
   useEffect(() => {
+    const getParticipantDomains = async () => {
+      const req = new ListConnectedDomainsRequest();
+      return domainConnectivityClient.listConnectedDomains(req);
+    };
+
     const setupInstallContract = async () => {
       if (primaryPartyId && provider && splitwellDomainId) {
         console.debug('Searching for SplitwellInstall');
         const install = await ledgerApiClient.querySplitwellInstall(primaryPartyId, provider);
+        const participantDomains = await getParticipantDomains();
+        console.debug(`The participant is connected to domains: ${participantDomains}`);
         if (install) {
           console.debug('SplitwellInstall found');
           setInstall(install);
@@ -99,7 +114,7 @@ const HomeWithContext: React.FC<{
       }
     };
     setupInstallContract();
-  }, [primaryPartyId, provider, ledgerApiClient, splitwellDomainId]);
+  }, [primaryPartyId, provider, ledgerApiClient, splitwellDomainId, domainConnectivityClient]);
 
   if (provider && primaryPartyId && svc && install && splitwellDomainId) {
     return (
@@ -133,7 +148,9 @@ const Home: React.FC<HomeProps> = ({ userId, svc, ledgerApiToken }) => {
       userId={userId}
       token={ledgerApiToken}
     >
-      <HomeWithContext userId={userId} svc={svc} />
+      <DomainConnectivityClientProvider url={config.services.participantAdmin.grpcUrl}>
+        <HomeWithContext userId={userId} svc={svc} />
+      </DomainConnectivityClientProvider>
     </SplitwellLedgerApiClientProvider>
   );
 };

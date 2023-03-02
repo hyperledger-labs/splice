@@ -38,6 +38,8 @@ temp/
 **/com/daml/ledger/api/**/*.js
 **/com/daml/network/**/*.ts
 **/com/daml/network/**/*.js
+**/com/digitalasset/canton/**/*.ts
+**/com/digitalasset/canton/**/*.js
 **/google/**/*.js
 **/google/**/*.ts
 cluster/images/docs/src/app_dev/api

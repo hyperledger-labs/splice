@@ -35,5 +35,9 @@ window.canton_network_config = {
       // URL of the scan app's HTTP API
       grpcUrl: `https://scan.${cluster}`,
     },
+    participantAdmin: {
+      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/participant-admin",
+    }
   },
 };

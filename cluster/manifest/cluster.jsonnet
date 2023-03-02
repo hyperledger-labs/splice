@@ -156,18 +156,46 @@ local expandEnvironment(env) =
      },
    ]);
 
+local envoyConfig(config, proxyPort) =
+  {
+    name: "envoy-proxy-" + proxyPort.name,
+    image: imageName(config, "envoy-proxy"),
+    imagePullPolicy: "Always",
+    resources: {
+      requests: {
+        memory: "256Mi",
+      },
+      limits: {
+        memory: "256Mi",
+      },
+    },
+    ports: [toContainerPortDefn(toGrpcWebPort(proxyPort))],
+    env: [
+      {
+        name: "GRPC_ADDRESS",
+        value: "127.0.0.1",
+      },
+      {
+        name: "GRPC_PORT",
+        value: std.toString(proxyPort.port),
+      },
+      {
+        name: "GRPC_WEB_PORT",
+        value: std.toString(toGrpcWebPort(proxyPort).port),
+      },
+    ],
+  };
+
 // `image` defaults to `name`
 local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =
 
-  local proxyPort =
-    if proxyToGrpcWeb == null then null
-    else findPort(ports, proxyToGrpcWeb);
+  local proxyPorts =
+    if proxyToGrpcWeb == null then []
+    else [findPort(ports, port) for port in proxyToGrpcWeb];
 
-  local allPorts = ports + (
-    if proxyPort == null then [] else [
-      toGrpcWebPort(proxyPort),
-    ]
-  );
+  local grpcWebPorts = [toGrpcWebPort(port) for port in proxyPorts];
+
+  local allPorts = ports + grpcWebPorts;
 
   {
     ports: std.map(function(p) (p { service: name }), allPorts),
@@ -234,39 +262,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                                          },
                                        ]),
                 } + ext,
-              ] + (
-                if proxyPort != null then
-                  [
-                    {
-                      name: "envoy-proxy",
-                      image: imageName(config, "envoy-proxy"),
-                      imagePullPolicy: "Always",
-                      resources: {
-                        requests: {
-                          memory: "256Mi",
-                        },
-                        limits: {
-                          memory: "256Mi",
-                        },
-                      },
-                      ports: [toContainerPortDefn(toGrpcWebPort(proxyPort))],
-                      env: [
-                        {
-                          name: "GRPC_ADDRESS",
-                          value: "127.0.0.1",
-                        },
-                        {
-                          name: "GRPC_PORT",
-                          value: std.toString(proxyPort.port),
-                        },
-                        {
-                          name: "GRPC_WEB_PORT",
-                          value: std.toString(toGrpcWebPort(proxyPort).port),
-                        },
-                      ],
-                    },
-                  ] else []
-              ),
+              ] + [envoyConfig(config, port) for port in proxyPorts],
               volumes: (if mountConfig == null then [] else [
                           {
                             name: name + "-config-vol",

@@ -41,6 +41,7 @@ local testAuth(enabled) =
 local validatorNodes(clusterAddress) = {
   alice: {
     ledgerApi: { grpcUrl: "http://localhost:6201" },
+    participantAdmin: { grpcUrl: "http://localhost:6202" },
     validator: { grpcUrl: "http://localhost:6203" },
     wallet: { grpcUrl: "http://localhost:6204", uiUrl: "http://localhost:3000" },
     splitwell: { grpcUrl: "http://localhost:6113" },
@@ -49,6 +50,7 @@ local validatorNodes(clusterAddress) = {
   },
   bob: {
     ledgerApi: { grpcUrl: "http://localhost:6301" },
+    participantAdmin: { grpcUrl: "http://localhost:6302" },
     validator: { grpcUrl: "http://localhost:6303" },
     wallet: { grpcUrl: "http://localhost:6304", uiUrl: "http://localhost:3001" },
     splitwell: { grpcUrl: "http://localhost:6113" },
@@ -57,6 +59,7 @@ local validatorNodes(clusterAddress) = {
   },
   preflight: {
     ledgerApi: { grpcUrl: "http://localhost:8001" },
+    participantAdmin: { grpcUrl: "http://localhost:8002" },
     validator: { grpcUrl: "http://localhost:6003" },
     wallet: { grpcUrl: "http://localhost:6004", uiUrl: "http://localhost:3000" },
     splitwell: { grpcUrl: "http://localhost:6113" },

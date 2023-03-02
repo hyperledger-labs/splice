@@ -2183,11 +2183,44 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy",
+                        "name": "envoy-proxy-val1-lg-api",
                         "ports": [
                            {
                               "containerPort": 6001,
                               "name": "val1-lg-api-gw"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5002"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6002"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy-val1-adm-api",
+                        "ports": [
+                           {
+                              "containerPort": 6002,
+                              "name": "val1-adm-api-gw"
                            }
                         ],
                         "resources": {
@@ -2233,6 +2266,11 @@
                {
                   "name": "val1-lg-api-gw",
                   "port": 6001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-adm-api-gw",
+                  "port": 6002,
                   "protocol": "TCP"
                }
             ],
@@ -3158,11 +3196,44 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy",
+                        "name": "envoy-proxy-sw-lg-api",
                         "ports": [
                            {
                               "containerPort": 6001,
                               "name": "sw-lg-api-gw"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5002"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6002"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy-sw-adm-api",
+                        "ports": [
+                           {
+                              "containerPort": 6002,
+                              "name": "sw-adm-api-gw"
                            }
                         ],
                         "resources": {
@@ -3208,6 +3279,11 @@
                {
                   "name": "sw-lg-api-gw",
                   "port": 6001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sw-adm-api-gw",
+                  "port": 6002,
                   "protocol": "TCP"
                }
             ],
@@ -3814,7 +3890,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy",
+                        "name": "envoy-proxy-sw-api",
                         "ports": [
                            {
                               "containerPort": 6213,
@@ -4029,6 +4105,10 @@
                               "name": "val1-lg-api-gw"
                            },
                            {
+                              "containerPort": 6102,
+                              "name": "val1-adm-api-gw"
+                           },
+                           {
                               "containerPort": 5202,
                               "name": "sw-adm-api"
                            },
@@ -4043,6 +4123,10 @@
                            {
                               "containerPort": 6201,
                               "name": "sw-lg-api-gw"
+                           },
+                           {
+                              "containerPort": 6202,
+                              "name": "sw-adm-api-gw"
                            },
                            {
                               "containerPort": 5213,
@@ -4243,6 +4327,11 @@
                   "protocol": "TCP"
                },
                {
+                  "name": "val1-adm-api-gw",
+                  "port": 6102,
+                  "protocol": "TCP"
+               },
+               {
                   "name": "sw-adm-api",
                   "port": 5202,
                   "protocol": "TCP"
@@ -4260,6 +4349,11 @@
                {
                   "name": "sw-lg-api-gw",
                   "port": 6201,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sw-adm-api-gw",
+                  "port": 6202,
                   "protocol": "TCP"
                },
                {
@@ -4436,6 +4530,11 @@
                   "protocol": "TCP"
                },
                {
+                  "name": "val1-adm-api-gw",
+                  "port": 6102,
+                  "protocol": "TCP"
+               },
+               {
                   "name": "sw-adm-api",
                   "port": 5202,
                   "protocol": "TCP"
@@ -4453,6 +4552,11 @@
                {
                   "name": "sw-lg-api-gw",
                   "port": 6201,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sw-adm-api-gw",
+                  "port": 6202,
                   "protocol": "TCP"
                },
                {

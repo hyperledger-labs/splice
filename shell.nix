@@ -80,5 +80,6 @@ in pkgs.mkShell {
   ] ++ linuxOnly;
 
   DAML_PROTOBUFS = "${daml_pbs}";
+  CANTON = "${pkgs.canton}";
   SDK_VERSION = "${daml_pbs.sdk_version}";
 }

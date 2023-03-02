@@ -21,7 +21,7 @@ local deployments(config) = [
       port: 10013,
       externalPort: 10113,
     },
-  ], image="canton-participant", namespace="validator1", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb="val1-lg-api", extraEnvVars=c.appUserNameEnvBinding("validator") + [
+  ], image="canton-participant", namespace="validator1", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["val1-lg-api", "val1-adm-api"], extraEnvVars=c.appUserNameEnvBinding("validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
