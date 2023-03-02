@@ -8,6 +8,13 @@ import com.digitalasset.canton.topology.PartyId
 
 println("Running canton bootstrap script...")
 
+Seq(global, splitwell,splitwellUpgrade).foreach(domain =>
+  // Reduce participant response timeout to force faster timeouts in particular around time changes in simtime.
+  // See #3186
+  domain.service.update_dynamic_domain_parameters(
+    _.update(participantResponseTimeout = NonNegativeFiniteDuration.ofSeconds(10)))
+)
+
 println("Connecting all participants to global domain...")
 participants.all.domains.connect_local(global)
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
