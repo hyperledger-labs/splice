@@ -124,14 +124,12 @@ class CoinConsoleEnvironment(
       svs.local,
       scans.local,
       directories.local,
-      validators.local.filter(v => v.name == "directoryValidator"),
     ),
     mergeRemoteCoinInstances(
       remoteSvcOpt.toList,
       svs.remote,
       scans.remote,
       directories.remote,
-      validators.remote.filter(v => v.name == "directoryValidator"),
     ),
   )
 

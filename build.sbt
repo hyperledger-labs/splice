@@ -279,6 +279,7 @@ lazy val `apps-sv` =
     )
     .dependsOn(
       `apps-svc`,
+      `directory-daml`,
       `validator-lifecycle-daml`,
     )
 

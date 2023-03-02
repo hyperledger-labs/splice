@@ -32,7 +32,6 @@ println(s"Allocating validator service users and SVC user...")
 Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
-  (directoryParticipant, "directory_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
 ).foreach { case (participant, user) =>
   createUser(participant, user)
@@ -47,6 +46,14 @@ Seq(
 ).foreach { user =>
   createUser(svcParticipant,user, additionalActAsParties = Set(svcParty))
 }
+
+svcParticipant.ledger_api.users.create(
+    id = "directory_provider",
+    actAs = Set(svcParty),
+    primaryParty = Some(svcParty),
+    readAs = Set(),
+    participantAdmin = false,
+)
 
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()

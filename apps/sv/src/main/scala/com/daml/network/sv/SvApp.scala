@@ -195,6 +195,7 @@ class SvApp(
       _ <- ledgerConnection.uploadDarFile(SvApp.coinPackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.validatorLifecyclePackage)
+      _ <- ledgerConnection.uploadDarFile(SvApp.directoryPackage)
     } yield ()
 
   // Create SvcRules and CoinRules and open the first mining round
@@ -528,5 +529,9 @@ object SvApp {
     lazy val packageId: String =
       cn.validatoronboarding.ValidatorOnboarding.COMPANION.TEMPLATE_ID.getPackageId
     lazy val resourcePath: String = "dar/validator-lifecycle-0.1.0.dar"
+  }
+  val directoryPackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String = cn.directory.DirectoryInstall.TEMPLATE_ID.getPackageId
+    lazy val resourcePath: String = "dar/directory-service-0.1.0.dar"
   }
 }

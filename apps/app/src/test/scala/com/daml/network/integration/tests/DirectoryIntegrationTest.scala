@@ -57,7 +57,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       // The user of the directory service.
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val offsetBefore =
-        directoryValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+        directory.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
       for (_ <- 1 to 3)
@@ -67,7 +67,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
       // Wait for one transaction, so that automation likely kicks-off but shutdown initiates quickly
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
-      directoryValidator.remoteParticipantWithAdminToken.ledger_api.transactions
+      directory.remoteParticipantWithAdminToken.ledger_api.transactions
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 

@@ -96,11 +96,6 @@ trait CommonCoinAppInstanceReferences {
     "bobValidator"
   )
 
-  def directoryValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
-    v(
-      "directoryValidator"
-    )
-
   def splitwellValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
     v(
       "splitwellValidator"

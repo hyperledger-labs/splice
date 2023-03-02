@@ -548,7 +548,10 @@ class WalletTimeBasedIntegrationTest
           aliceValidatorWallet.listAppRewardCoupons() should have length 1
           aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
           directory.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should have length 1
+            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
+              dirParty,
+              _.data.provider == dirParty.toProtoPrimitive,
+            ) should have length 1
         })
       }
 
@@ -561,7 +564,10 @@ class WalletTimeBasedIntegrationTest
           aliceValidatorWallet.listAppRewardCoupons() should be(empty)
           aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
           directory.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(dirParty) should be(empty)
+            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
+              dirParty,
+              _.data.provider == dirParty.toProtoPrimitive,
+            ) should be(empty)
         },
       )
 

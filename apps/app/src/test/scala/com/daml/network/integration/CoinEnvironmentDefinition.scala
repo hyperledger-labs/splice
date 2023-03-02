@@ -76,6 +76,13 @@ case class CoinEnvironmentDefinition(
             participantAdmin = true,
           )
         })
+        directories.local.foreach(directory =>
+          svc.remoteParticipantWithAdminToken.ledger_api.users.create(
+            id = directory.config.ledgerApiUser,
+            actAs = Set(svcParty),
+            primaryParty = Some(svcParty),
+          )
+        )
       })
     })
 
