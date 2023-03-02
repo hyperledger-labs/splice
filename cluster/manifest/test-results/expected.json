@@ -88,6 +88,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "docs",
             "namespace": "docs"
          },
@@ -181,6 +184,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "gcs-proxy",
             "namespace": "docs"
          },
@@ -336,6 +342,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "postgres",
             "namespace": "svc"
          },
@@ -455,6 +464,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "global-domain",
             "namespace": "svc"
          },
@@ -523,7 +535,7 @@
                            },
                            {
                               "name": "CANTON_DOMAIN_POSTGRES_SERVER",
-                              "value": "sw-postgres"
+                              "value": "postgres"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -584,6 +596,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "domain",
             "namespace": "splitwell"
          },
@@ -772,6 +787,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "participant",
             "namespace": "svc"
          },
@@ -914,6 +932,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "directory-app",
             "namespace": "svc"
          },
@@ -1047,6 +1068,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "svc-app",
             "namespace": "svc"
          },
@@ -1202,6 +1226,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "sv-app",
             "namespace": "sv-1"
          },
@@ -1358,6 +1385,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "sv-app",
             "namespace": "sv-2"
          },
@@ -1514,6 +1544,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "sv-app",
             "namespace": "sv-3"
          },
@@ -1670,6 +1703,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "sv-app",
             "namespace": "sv-4"
          },
@@ -1807,6 +1843,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "scan-app",
             "namespace": "svc"
          },
@@ -1900,6 +1939,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "scan-web-ui",
             "namespace": "svc"
          },
@@ -2055,6 +2097,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "postgres",
             "namespace": "validator1"
          },
@@ -2243,6 +2288,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "participant",
             "namespace": "validator1"
          },
@@ -2413,6 +2461,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "validator-app",
             "namespace": "validator1"
          },
@@ -2553,6 +2604,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-app",
             "namespace": "validator1"
          },
@@ -2645,6 +2699,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-web-ui",
             "namespace": "validator1"
          },
@@ -2737,6 +2794,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-new-web-ui",
             "namespace": "validator1"
          },
@@ -2825,6 +2885,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "directory-web-ui",
             "namespace": "validator1"
          },
@@ -2913,6 +2976,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "splitwell-web-ui",
             "namespace": "validator1"
          },
@@ -2951,11 +3017,11 @@
          "kind": "ConfigMap",
          "metadata": {
             "labels": {
-               "app": "sw-postgres",
+               "app": "postgres",
                "clusterName": "cluster",
                "cnjClusterName": "cluster"
             },
-            "name": "sw-postgres-configuration",
+            "name": "postgres-configuration",
             "namespace": "splitwell"
          }
       },
@@ -2964,25 +3030,25 @@
          "kind": "StatefulSet",
          "metadata": {
             "labels": {
-               "app": "sw-postgres",
+               "app": "postgres",
                "clusterName": "cluster",
                "cnjClusterName": "cluster"
             },
-            "name": "sw-postgres",
+            "name": "postgres",
             "namespace": "splitwell"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "sw-postgres"
+                  "app": "postgres"
                }
             },
-            "serviceName": "sw-postgres",
+            "serviceName": "postgres",
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "sw-postgres",
+                     "app": "postgres",
                      "clusterName": "cluster",
                      "cnjClusterName": "cluster"
                   },
@@ -2994,7 +3060,7 @@
                         "envFrom": [
                            {
                               "configMapRef": {
-                                 "name": "sw-postgres-configuration"
+                                 "name": "postgres-configuration"
                               }
                            }
                         ],
@@ -3012,7 +3078,7 @@
                               ]
                            }
                         },
-                        "name": "sw-postgres",
+                        "name": "postgres",
                         "ports": [
                            {
                               "containerPort": 5432,
@@ -3068,7 +3134,10 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "sw-postgres",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "postgres",
             "namespace": "splitwell"
          },
          "spec": {
@@ -3080,7 +3149,7 @@
                }
             ],
             "selector": {
-               "app": "sw-postgres"
+               "app": "postgres"
             }
          }
       },
@@ -3136,7 +3205,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
-                              "value": "sw-postgres"
+                              "value": "postgres"
                            },
                            {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -3256,6 +3325,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "participant",
             "namespace": "splitwell"
          },
@@ -3432,6 +3504,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "validator-app",
             "namespace": "splitwell"
          },
@@ -3572,6 +3647,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-app",
             "namespace": "splitwell"
          },
@@ -3664,6 +3742,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-web-ui",
             "namespace": "splitwell"
          },
@@ -3756,6 +3837,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "wallet-new-web-ui",
             "namespace": "splitwell"
          },
@@ -3917,6 +4001,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "splitwell-app",
             "namespace": "splitwell"
          },
@@ -4182,6 +4269,9 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "external-proxy"
          },
          "spec": {

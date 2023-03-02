@@ -100,7 +100,7 @@ local deployments(config) = [
     cpuRequest=config.domainCpu,
     memoryLimitMiB=config.domainMemoryMib,
     extraEnvVars=[
-      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "sw-postgres" },
+      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
     ]
   ),
 

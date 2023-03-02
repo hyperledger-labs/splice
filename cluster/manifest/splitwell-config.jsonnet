@@ -4,7 +4,7 @@ local c = import "./cluster.jsonnet";
 
 local deployments(config) = [
   c.namespace("splitwell", config),
-  postgres.database("sw-postgres", config, namespace="splitwell"),
+  postgres.database("postgres", config, namespace="splitwell"),
   c.deployment(config, "participant", [
     {
       name: "sw-adm-api",
@@ -23,7 +23,7 @@ local deployments(config) = [
     },
   ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["sw-lg-api", "sw-adm-api"], extraEnvVars=
                c.appUserNameEnvBinding("validator", "splitwell_validator") + [
-    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "sw-postgres" },
+    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
       {

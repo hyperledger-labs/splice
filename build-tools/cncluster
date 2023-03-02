@@ -531,6 +531,9 @@ function _cluster_reset() {
     _info "Deleting all pods..."
     kubectl delete Pods --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
+    _info "Deleting all services..."
+    kubectl delete Service --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+
     _info "Deleting all persistent volume claims..."
     kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 

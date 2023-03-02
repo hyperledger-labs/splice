@@ -114,6 +114,9 @@ local database(name, config, namespace=null) = {
         name: name,
         clusterName: config.clusterName,
         [if namespace != null then "namespace"]: namespace,
+        labels: {
+          clusterName: config.clusterName,
+        },
       },
       spec: {
         selector: {
