@@ -1,6 +1,8 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 import com.daml.network.environment.LedgerClient
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
@@ -366,6 +368,14 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
   private val pollingLoopRef = new AtomicReference[Option[Future[Done]]](None)
 
+  private val retryable = CoinRetries.RetryableError(
+    "pollingTriggerTask",
+    Seq.empty,
+    "transient",
+    "non-transient",
+    s"restarting after ${context.config.pollingInterval}",
+  )
+
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
 
   override def run(): Unit = LoggerUtil.logOnThrow {
@@ -405,10 +415,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
           previousResult.transformWith {
             case Failure(ex) =>
-              logger.error(
-                s"Unexpected processing failure (restarting after ${context.config.pollingInterval})",
-                ex,
-              )
+              // We only call this to get logging
+              (retryable.retryOK(Failure(ex), logger)).discard[ErrorKind]
               loopWithDelay()
 
             case Success(workDone) =>

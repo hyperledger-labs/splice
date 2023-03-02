@@ -46,6 +46,10 @@ class CoinRetries(
 ) extends NamedLogging
     with FlagCloseable {
 
+  private val transientDescription = "retryable"
+  private val nonTransientDescription = "non-retryable"
+  private val fatalBehavior = "not retrying"
+
   // shutdown signal together with the registry of the callback setting it
   private val shutdownSignal = Promise[UnlessShutdown[Nothing]]()
 
@@ -148,7 +152,13 @@ class CoinRetries(
       operationName,
       task,
       logger,
-      CoinRetries.RetryableError(_, additionalCodes),
+      CoinRetries.RetryableError(
+        _,
+        additionalCodes,
+        transientDescription,
+        nonTransientDescription,
+        fatalBehavior,
+      ),
     )
 
   /** A retry intended for automation calls, retries forever. */
@@ -192,7 +202,13 @@ class CoinRetries(
       task,
       logger,
       retryForClientCallsConfig,
-      CoinRetries.RetryableError(_, additionalCodes),
+      CoinRetries.RetryableError(
+        _,
+        additionalCodes,
+        transientDescription,
+        nonTransientDescription,
+        fatalBehavior,
+      ),
     )
 
   private def retry[T](
@@ -241,6 +257,9 @@ object CoinRetries {
   case class RetryableError(
       operationName: String,
       additionalCodes: Seq[Status.Code],
+      transientDescription: String,
+      nonTransientDescription: String,
+      fatalBehavior: String,
   ) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
@@ -274,7 +293,7 @@ object CoinRetries {
         def fatalError: ErrorKind = {
           logger.warn(
             Seq(
-              s"The operation ${operationName.singleQuoted} failed with a non-retryable error:",
+              s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription error, $fatalBehavior:",
               s"category=$errorCategory",
               s"statusCode=$statusCode",
             )
@@ -290,7 +309,7 @@ object CoinRetries {
             //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
             val msg =
               Seq(
-                s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted):",
+                s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted):",
                 s"category=$errorCategory",
               )
                 // the message of the exception is already in the error details, so we don't need to append it
@@ -299,7 +318,7 @@ object CoinRetries {
             TransientErrorKind
           case None if retryableStatusCodes.contains(statusCode) =>
             val msg = Seq(
-              s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): ${ex.getMessage}",
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",
               s"statusCode=$statusCode",
             )
             logger.info(msg.mkString("\n"))
@@ -311,7 +330,7 @@ object CoinRetries {
             ex: StreamTcpException
           ) =>
         val msg =
-          s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): $ex"
+          s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
       case Failure(
@@ -319,11 +338,11 @@ object CoinRetries {
           ) =>
         // TODO (tech-debt) Revisit whether we can provide more useful info here.
         val msg =
-          s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): $ex"
+          s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
       case Failure(ex) =>
-        logger.warn(s"$operationName failed with an unknown exception, not retrying", ex)
+        logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
         FatalErrorKind
       case util.Success(_) =>
         NoErrorKind
