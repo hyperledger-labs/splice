@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
-import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -10,7 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.{Contract, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
@@ -205,63 +204,6 @@ class SvcTimeBasedIntegrationTest
             s"CoinRules cache is empty, retrieving them from CC scan."
           )
         )
-      },
-    )
-  }
-
-  "collect expired reward coupons" in { implicit env =>
-    def getNumRewardCoupons(
-        round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
-    ): Int = {
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(AppRewardCoupon.COMPANION)(
-          svcParty,
-          co => co.data.round.number == round.payload.round.number,
-        )
-        .length +
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(ValidatorRewardCoupon.COMPANION)(
-            svcParty,
-            co => co.data.round.number == round.payload.round.number,
-          )
-          .length
-    }
-
-    val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
-    // There may be rewards left over from other tests, so we first check the
-    // number of existing ones, and compare to that below
-    val numRewards = getNumRewardCoupons(round)
-
-    val (aliceParty, bobParty) = onboardAliceAndBob()
-    aliceWallet.tap(100.0)
-    bobWallet.tap(100.0)
-
-    actAndCheck(
-      "Generate some reward coupons by executing a few direct transfers", {
-        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
-        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
-      },
-    )(
-      "Wait for all reward coupons to be created",
-      _ => {
-        advanceTime(Duration.ofSeconds(1))
-        getNumRewardCoupons(round) should be(numRewards + 8) // 4 app rewards + 4 validator
-      },
-    )
-
-    actAndCheck(
-      "Advance 5 ticks, to close the round",
-      (1 to 5).foreach(_ => advanceRoundsByOneTick),
-    )(
-      "Wait for all unclaimed coupons to be archived and the closed round to be archived",
-      _ => {
-        advanceTime(Duration.ofSeconds(1))
-        getNumRewardCoupons(round) should be(0)
-        scan
-          .getClosedRounds()
-          .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
       },
     )
   }

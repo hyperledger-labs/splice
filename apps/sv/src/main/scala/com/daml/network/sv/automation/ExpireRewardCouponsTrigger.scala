@@ -1,31 +1,33 @@
-package com.daml.network.svc.automation
+package com.daml.network.sv.automation
 
-import com.daml.network.codegen.java.cc.coin.{CoinRules}
-import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.automation.PollingTrigger
-import com.daml.network.automation.TriggerContext
-import com.daml.network.svc.store.SvcStore
-import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.Contract
-import scala.concurrent.{Future, ExecutionContext}
-import io.opentelemetry.api.trace.Tracer
-import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.{Exercised, Update}
+import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_ClaimExpiredRewards}
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward.ContractId
-import java.util.Optional
+import com.daml.network.codegen.java.cc.round.ClosedMiningRound
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
+
+import java.util.Optional
+import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
-    store: SvcStore,
+    store: SvSvcStore,
     connection: CoinLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
 
-  def getCmdsForRound(
+  private def getCmdsForRound(
       closedRound: Contract[ClosedMiningRound.ContractId, ClosedMiningRound],
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
   ): Future[Seq[Update[Exercised[Optional[ContractId]]]]] = {
     for {
@@ -34,10 +36,13 @@ class ExpireRewardCouponsTrigger(
         totalCouponsLimit = Some(100),
       )
       appRewardCmds = appRewards.map(group =>
-        coinRules.contractId.exerciseCoinRules_ClaimExpiredRewards(
-          closedRound.contractId,
-          Seq.empty.asJava,
-          group.asJava,
+        svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+          coinRules.contractId,
+          new CoinRules_ClaimExpiredRewards(
+            closedRound.contractId,
+            Seq.empty.asJava,
+            group.asJava,
+          ),
         )
       )
       validatorRewards <- store.listValidatorRewardCouponsGroupedByCounterparty(
@@ -45,29 +50,38 @@ class ExpireRewardCouponsTrigger(
         totalCouponsLimit = Some(100),
       )
       validatorRewardCmds = validatorRewards.map(group =>
-        coinRules.contractId.exerciseCoinRules_ClaimExpiredRewards(
-          closedRound.contractId,
-          group.asJava,
-          Seq.empty.asJava,
+        svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+          coinRules.contractId,
+          new CoinRules_ClaimExpiredRewards(
+            closedRound.contractId,
+            group.asJava,
+            Seq.empty.asJava,
+          ),
         )
       )
     } yield appRewardCmds ++ validatorRewardCmds
   }
 
-  def expireRewardCouponsForRound(
+  private def expireRewardCouponsForRound(
       closedRound: Contract[ClosedMiningRound.ContractId, ClosedMiningRound],
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
   )(implicit
       tc: TraceContext
   ): Future[Boolean] = {
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      cmds <- getCmdsForRound(closedRound, coinRules)
+      cmds <- getCmdsForRound(closedRound, svcRules, coinRules)
       acs <- store.defaultAcs
       _ <- Future.sequence(
         cmds.map(cmd =>
           connection
-            .submitWithResultAndOffsetNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
+            .submitWithResultAndOffsetNoDedup(
+              Seq(store.key.svParty),
+              Seq(store.key.svcParty),
+              cmd,
+              domainId,
+            )
             .flatMap {
               // make sure the store ingested our update so we don't
               // attempt to collect the same coupon twice
@@ -79,9 +93,9 @@ class ExpireRewardCouponsTrigger(
     } yield !cmds.isEmpty
   }
 
-  def performWorkIfAvailable()(implicit
+  private def performWorkAsLeader(svcRules: Contract[SvcRules.ContractId, SvcRules])(implicit
       traceContext: TraceContext
-  ): scala.concurrent.Future[Boolean] = {
+  ): Future[Boolean] = {
     store
       .lookupCoinRules()
       .flatMap({
@@ -95,8 +109,27 @@ class ExpireRewardCouponsTrigger(
               case None =>
                 Future.successful(false)
               case Some(closedRound) =>
-                expireRewardCouponsForRound(closedRound, coinRules)
+                expireRewardCouponsForRound(closedRound, svcRules, coinRules)
             })
       })
+  }
+
+  def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+    store
+      .lookupSvcRules()
+      .flatMap({
+        case None =>
+          logger.debug("SvcRules contract not found")
+          Future.successful(false)
+        case Some(svcRules) =>
+          store
+            .svIsLeader()
+            .flatMap(if (_) {
+              performWorkAsLeader(svcRules)
+            } else {
+              Future.successful(false)
+            })
+      })
+
   }
 }

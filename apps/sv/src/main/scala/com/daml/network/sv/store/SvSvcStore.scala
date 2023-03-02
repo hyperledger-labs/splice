@@ -131,6 +131,80 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
       : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
     listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
 
+  def listAppRewardCoupons(
+      round: Long,
+      limit: Option[Long] = None,
+  ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]] =
+    defaultAcs.flatMap(
+      _.listContracts(
+        cc.coin.AppRewardCoupon.COMPANION,
+        (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
+          co.payload.round.number == round,
+        limit,
+      )
+    )
+
+  def listAppRewardCouponsGroupedByCounterparty(
+      round: Long,
+      totalCouponsLimit: Option[Long],
+  ): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]] = {
+    for {
+      appRewards <- listAppRewardCoupons(round, totalCouponsLimit)
+      providerToCoupons = appRewards.foldLeft(
+        Map[String, Seq[cc.coin.AppRewardCoupon.ContractId]]()
+      ) { (m, r) =>
+        m +
+          (r.payload.provider -> (Seq(r.contractId) ++ m.getOrElse(
+            r.payload.provider,
+            Seq[cc.coin.AppRewardCoupon.ContractId](),
+          )))
+      }
+      appRewardCouponsGrouped = providerToCoupons.toSeq.map { case (_, coupons) => coupons }
+    } yield appRewardCouponsGrouped
+  }
+
+  def listValidatorRewardCoupons(
+      round: Long,
+      limit: Option[Long] = None,
+  ): Future[
+    Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
+  ] =
+    defaultAcs.flatMap(
+      _.listContracts(
+        cc.coin.ValidatorRewardCoupon.COMPANION,
+        (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
+          co.payload.round.number == round,
+        limit,
+      )
+    )
+
+  def listValidatorRewardCouponsGroupedByCounterparty(
+      round: Long,
+      totalCouponsLimit: Option[Long],
+  ): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]] = {
+    for {
+      validatorRewards <- listValidatorRewardCoupons(round, totalCouponsLimit)
+      validatorToCoupons = validatorRewards.foldLeft(
+        Map[String, Seq[cc.coin.ValidatorRewardCoupon.ContractId]]()
+      ) { (m, r) =>
+        m +
+          (r.payload.user -> (Seq(r.contractId) ++ m.getOrElse(
+            r.payload.user,
+            Seq[cc.coin.ValidatorRewardCoupon.ContractId](),
+          )))
+      }
+      validatorRewardCouponsGrouped = validatorToCoupons.toSeq.map { case (_, coupons) => coupons }
+    } yield validatorRewardCouponsGrouped
+  }
+
+  def lookupOldestClosedMiningRound(): Future[
+    Option[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
+  ] =
+    for {
+      acs <- defaultAcs
+      rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
+    } yield rounds.sortBy(_.payload.round.number).headOption
+
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
@@ -187,6 +261,9 @@ object SvSvcStore {
         mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ),
     )
