@@ -51,4 +51,7 @@ ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when
 # TODO(#3001) remove when duplicates are detected instead of ignored
 transfer [0-9a-f-]{36} did not deliver a completion in [0-9a-z ]*, possibly due to duplicate submission; assuming success
 
+# TODO(#2756) consider removing after transitioning to JSON API
+ACS stream for.*CN.Directory:DirectoryEntry failed
+
 # Make sure to have a trailing newline
