@@ -2,15 +2,28 @@
    "apiVersion": "apps/v1",
    "items": [
       {
+         "apiVersion": "v1",
+         "kind": "Namespace",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "docs"
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
             "labels": {
                "app": "docs",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "docs"
             },
-            "name": "docs"
+            "name": "docs",
+            "namespace": "docs"
          },
          "spec": {
             "replicas": 1,
@@ -27,6 +40,7 @@
                   "labels": {
                      "app": "docs",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "docs"
                   }
                },
@@ -74,7 +88,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "docs"
+            "name": "docs",
+            "namespace": "docs"
          },
          "spec": {
             "ports": [
@@ -101,9 +116,11 @@
             "labels": {
                "app": "gcs-proxy",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "gcs-proxy"
             },
-            "name": "gcs-proxy"
+            "name": "gcs-proxy",
+            "namespace": "docs"
          },
          "spec": {
             "replicas": 1,
@@ -120,6 +137,7 @@
                   "labels": {
                      "app": "gcs-proxy",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "gcs-proxy"
                   }
                },
@@ -163,7 +181,8 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "name": "gcs-proxy"
+            "name": "gcs-proxy",
+            "namespace": "docs"
          },
          "spec": {
             "ports": [
@@ -183,7 +202,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "svc"
          }
@@ -200,7 +220,8 @@
          "metadata": {
             "labels": {
                "app": "postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres-configuration",
             "namespace": "svc"
@@ -212,7 +233,8 @@
          "metadata": {
             "labels": {
                "app": "postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "svc"
@@ -229,7 +251,8 @@
                "metadata": {
                   "labels": {
                      "app": "postgres",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
                   },
                   "namespace": "svc"
                },
@@ -288,7 +311,8 @@
                {
                   "metadata": {
                      "labels": {
-                        "clusterName": "cluster"
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
                      },
                      "name": "pg-data"
                   },
@@ -335,6 +359,7 @@
             "labels": {
                "app": "global-domain",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "canton-domain"
             },
             "name": "global-domain",
@@ -355,6 +380,7 @@
                   "labels": {
                      "app": "global-domain",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "canton-domain"
                   }
                },
@@ -462,6 +488,7 @@
             "labels": {
                "app": "domain",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "canton-domain"
             },
             "name": "domain",
@@ -482,6 +509,7 @@
                   "labels": {
                      "app": "domain",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "canton-domain"
                   }
                },
@@ -589,6 +617,7 @@
             "labels": {
                "app": "participant",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "canton-participant"
             },
             "name": "participant",
@@ -609,6 +638,7 @@
                   "labels": {
                      "app": "participant",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "canton-participant"
                   }
                },
@@ -775,6 +805,7 @@
             "labels": {
                "app": "directory-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "directory-app"
             },
             "name": "directory-app",
@@ -795,6 +826,7 @@
                   "labels": {
                      "app": "directory-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "directory-app"
                   }
                },
@@ -910,6 +942,7 @@
             "labels": {
                "app": "svc-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "svc-app"
             },
             "name": "svc-app",
@@ -930,6 +963,7 @@
                   "labels": {
                      "app": "svc-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "svc-app"
                   }
                },
@@ -1034,7 +1068,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-1"
          }
@@ -1046,6 +1081,7 @@
             "labels": {
                "app": "sv-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "sv-app"
             },
             "name": "sv-app",
@@ -1066,6 +1102,7 @@
                   "labels": {
                      "app": "sv-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "sv-app"
                   }
                },
@@ -1191,7 +1228,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-2"
          }
@@ -1203,6 +1241,7 @@
             "labels": {
                "app": "sv-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "sv-app"
             },
             "name": "sv-app",
@@ -1223,6 +1262,7 @@
                   "labels": {
                      "app": "sv-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "sv-app"
                   }
                },
@@ -1344,7 +1384,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-3"
          }
@@ -1356,6 +1397,7 @@
             "labels": {
                "app": "sv-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "sv-app"
             },
             "name": "sv-app",
@@ -1376,6 +1418,7 @@
                   "labels": {
                      "app": "sv-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "sv-app"
                   }
                },
@@ -1497,7 +1540,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-4"
          }
@@ -1509,6 +1553,7 @@
             "labels": {
                "app": "sv-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "sv-app"
             },
             "name": "sv-app",
@@ -1529,6 +1574,7 @@
                   "labels": {
                      "app": "sv-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "sv-app"
                   }
                },
@@ -1652,6 +1698,7 @@
             "labels": {
                "app": "scan-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "scan-app"
             },
             "name": "scan-app",
@@ -1672,6 +1719,7 @@
                   "labels": {
                      "app": "scan-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "scan-app"
                   }
                },
@@ -1787,6 +1835,7 @@
             "labels": {
                "app": "scan-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "scan-web-ui"
             },
             "name": "scan-web-ui",
@@ -1807,6 +1856,7 @@
                   "labels": {
                      "app": "scan-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "scan-web-ui"
                   }
                },
@@ -1871,7 +1921,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator1"
          }
@@ -1888,7 +1939,8 @@
          "metadata": {
             "labels": {
                "app": "postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres-configuration",
             "namespace": "validator1"
@@ -1900,7 +1952,8 @@
          "metadata": {
             "labels": {
                "app": "postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "validator1"
@@ -1917,7 +1970,8 @@
                "metadata": {
                   "labels": {
                      "app": "postgres",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
                   },
                   "namespace": "validator1"
                },
@@ -1976,7 +2030,8 @@
                {
                   "metadata": {
                      "labels": {
-                        "clusterName": "cluster"
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
                      },
                      "name": "pg-data"
                   },
@@ -2023,6 +2078,7 @@
             "labels": {
                "app": "participant",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "canton-participant"
             },
             "name": "participant",
@@ -2043,6 +2099,7 @@
                   "labels": {
                      "app": "participant",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "canton-participant"
                   }
                },
@@ -2191,6 +2248,7 @@
             "labels": {
                "app": "validator-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "validator-app"
             },
             "name": "validator-app",
@@ -2211,6 +2269,7 @@
                   "labels": {
                      "app": "validator-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "validator-app"
                   }
                },
@@ -2339,6 +2398,7 @@
             "labels": {
                "app": "wallet-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-app"
             },
             "name": "wallet-app",
@@ -2359,6 +2419,7 @@
                   "labels": {
                      "app": "wallet-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-app"
                   }
                },
@@ -2477,6 +2538,7 @@
             "labels": {
                "app": "wallet-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-web-ui"
             },
             "name": "wallet-web-ui",
@@ -2497,6 +2559,7 @@
                   "labels": {
                      "app": "wallet-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-web-ui"
                   }
                },
@@ -2567,6 +2630,7 @@
             "labels": {
                "app": "wallet-new-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-new-web-ui"
             },
             "name": "wallet-new-web-ui",
@@ -2587,6 +2651,7 @@
                   "labels": {
                      "app": "wallet-new-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-new-web-ui"
                   }
                },
@@ -2657,6 +2722,7 @@
             "labels": {
                "app": "directory-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "validator1-directory-web-ui"
             },
             "name": "directory-web-ui",
@@ -2677,6 +2743,7 @@
                   "labels": {
                      "app": "directory-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "validator1-directory-web-ui"
                   }
                },
@@ -2743,6 +2810,7 @@
             "labels": {
                "app": "splitwell-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "validator1-splitwell-web-ui"
             },
             "name": "splitwell-web-ui",
@@ -2763,6 +2831,7 @@
                   "labels": {
                      "app": "splitwell-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "validator1-splitwell-web-ui"
                   }
                },
@@ -2827,7 +2896,8 @@
          "kind": "Namespace",
          "metadata": {
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "splitwell"
          }
@@ -2844,7 +2914,8 @@
          "metadata": {
             "labels": {
                "app": "sw-postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sw-postgres-configuration",
             "namespace": "splitwell"
@@ -2856,7 +2927,8 @@
          "metadata": {
             "labels": {
                "app": "sw-postgres",
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sw-postgres",
             "namespace": "splitwell"
@@ -2873,7 +2945,8 @@
                "metadata": {
                   "labels": {
                      "app": "sw-postgres",
-                     "clusterName": "cluster"
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
                   },
                   "namespace": "splitwell"
                },
@@ -2932,7 +3005,8 @@
                {
                   "metadata": {
                      "labels": {
-                        "clusterName": "cluster"
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
                      },
                      "name": "pg-data"
                   },
@@ -2979,6 +3053,7 @@
             "labels": {
                "app": "participant",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "canton-participant"
             },
             "name": "participant",
@@ -2999,6 +3074,7 @@
                   "labels": {
                      "app": "participant",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "canton-participant"
                   }
                },
@@ -3147,6 +3223,7 @@
             "labels": {
                "app": "validator-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "validator-app"
             },
             "name": "validator-app",
@@ -3167,6 +3244,7 @@
                   "labels": {
                      "app": "validator-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "validator-app"
                   }
                },
@@ -3301,6 +3379,7 @@
             "labels": {
                "app": "wallet-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-app"
             },
             "name": "wallet-app",
@@ -3321,6 +3400,7 @@
                   "labels": {
                      "app": "wallet-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-app"
                   }
                },
@@ -3439,6 +3519,7 @@
             "labels": {
                "app": "wallet-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-web-ui"
             },
             "name": "wallet-web-ui",
@@ -3459,6 +3540,7 @@
                   "labels": {
                      "app": "wallet-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-web-ui"
                   }
                },
@@ -3529,6 +3611,7 @@
             "labels": {
                "app": "wallet-new-web-ui",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "wallet-new-web-ui"
             },
             "name": "wallet-new-web-ui",
@@ -3549,6 +3632,7 @@
                   "labels": {
                      "app": "wallet-new-web-ui",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "wallet-new-web-ui"
                   }
                },
@@ -3619,6 +3703,7 @@
             "labels": {
                "app": "splitwell-app",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "splitwell-app"
             },
             "name": "splitwell-app",
@@ -3639,6 +3724,7 @@
                   "labels": {
                      "app": "splitwell-app",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "splitwell-app"
                   }
                },
@@ -3793,6 +3879,7 @@
             "labels": {
                "app": "external-proxy",
                "clusterName": "cluster",
+               "cnjClusterName": "cluster",
                "moduleName": "external-proxy"
             },
             "name": "external-proxy"
@@ -3812,6 +3899,7 @@
                   "labels": {
                      "app": "external-proxy",
                      "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
                      "moduleName": "external-proxy"
                   }
                },

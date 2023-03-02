@@ -1,3 +1,5 @@
+local c = import "./cluster.jsonnet";
+
 local database(name, config, namespace=null) = {
   ports: [],
   deploymentObjects: [
@@ -6,9 +8,8 @@ local database(name, config, namespace=null) = {
       kind: "ConfigMap",
       metadata: {
         name: name + "-configuration",
-        labels: {
+        labels: c.standardLabels(config) + {
           app: name,
-          clusterName: config.clusterName,
         },
         [if namespace != null then "namespace"]: namespace,
       },
@@ -24,9 +25,8 @@ local database(name, config, namespace=null) = {
       kind: "StatefulSet",
       metadata: {
         name: name,
-        labels: {
+        labels: c.standardLabels(config) + {
           app: name,
-          clusterName: config.clusterName,
         },
         [if namespace != null then "namespace"]: namespace,
       },
@@ -40,9 +40,8 @@ local database(name, config, namespace=null) = {
         },
         template: {
           metadata: {
-            labels: {
+            labels: c.standardLabels(config) + {
               app: name,
-              clusterName: config.clusterName,
             },
             [if namespace != null then "namespace"]: namespace,
           },
@@ -93,9 +92,7 @@ local database(name, config, namespace=null) = {
           {
             metadata: {
               name: "pg-data",
-              labels: {
-                clusterName: config.clusterName,
-              },
+              labels: c.standardLabels(config),
             },
             spec: {
               accessModes: ["ReadWriteOnce"],

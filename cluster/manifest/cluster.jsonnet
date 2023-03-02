@@ -126,6 +126,14 @@ local appAuthEnvBinding(fixedTokens, appName, varBaseName=appName) =
       },
     ] + appUserNameEnvBinding(appName, varBaseName);
 
+local standardLabels(config) = {
+  clusterName: config.clusterName,
+
+  // Canton Network _JSonnet_ cluster name. This label is applied to
+  // CN resources defined in Jsonnet code, to distinguish them from
+  // resources created and more fully managed by Pulumi/Helm.
+  cnjClusterName: config.clusterName,
+};
 
 local expandEnvironment(env) =
   local additional_config =
@@ -169,10 +177,9 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
         kind: "Deployment",
         metadata: {
           name: name,
-          labels: {
+          labels: standardLabels(config) + {
             app: name,
             moduleName: if image == null then name else image,
-            clusterName: config.clusterName,
           },
           [if namespace != null then "namespace"]: namespace,
         },
@@ -188,10 +195,9 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
           },
           template: {
             metadata: {
-              labels: {
+              labels: standardLabels(config) + {
                 app: name,
                 moduleName: if image == null then name else image,
-                clusterName: config.clusterName,
               },
             },
             spec: {
@@ -331,9 +337,7 @@ local namespace(name, config) = {
       kind: "Namespace",
       metadata: {
         name: name,
-        labels: {
-          clusterName: config.clusterName,
-        },
+        labels: standardLabels(config),
       },
     },
   ],
@@ -349,4 +353,5 @@ local namespace(name, config) = {
   flatten:: flatten,
   jsonFileConfigMap:: jsonFileConfigMap,
   namespace:: namespace,
+  standardLabels:: standardLabels,
 }
