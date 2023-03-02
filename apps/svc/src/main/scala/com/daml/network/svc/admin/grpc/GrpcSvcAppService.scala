@@ -93,7 +93,7 @@ class GrpcSvcAppService(
   /** Withdraw a featured app right from an app provider, with a textual reasoning
     */
   override def withdrawFeaturedAppRight(request: WithdrawFeaturedAppRightRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+    withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       for {
         _ <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
           case QueryResult(_, None) =>
@@ -146,7 +146,7 @@ class GrpcSvcAppService(
     }
 
   override def setConfigSchedule(request: SetConfigScheduleRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+    withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       for {
         coinRuleOpt <- store.lookupCoinRules()
         _ <- (request.schedule, coinRuleOpt) match {

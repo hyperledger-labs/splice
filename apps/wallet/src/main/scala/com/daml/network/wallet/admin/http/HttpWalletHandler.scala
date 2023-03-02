@@ -268,7 +268,7 @@ class HttpWalletHandler(
   override def acceptTransferOffer(respond: r0.AcceptTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.AcceptTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
           Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -288,7 +288,7 @@ class HttpWalletHandler(
   override def rejectTransferOffer(respond: r0.RejectTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.RejectTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
           Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -308,7 +308,7 @@ class HttpWalletHandler(
   override def withdrawTransferOffer(respond: r0.WithdrawTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.WithdrawTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
           Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -347,7 +347,7 @@ class HttpWalletHandler(
   override def rejectAppPaymentRequest(
       respond: r0.RejectAppPaymentRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectAppPaymentRequestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
           contractId
@@ -381,7 +381,7 @@ class HttpWalletHandler(
   override def cancelSubscriptionRequest(
       respond: r0.CancelSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.CancelSubscriptionRequestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
           Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
@@ -398,7 +398,7 @@ class HttpWalletHandler(
   override def rejectSubscriptionRequest(
       respond: r0.RejectSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectSubscriptionRequestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid = Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
@@ -445,7 +445,7 @@ class HttpWalletHandler(
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest
   )(user: String): Future[r0.CreateTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { traceContext => span =>
       val sender = getUserWallet(user).store.key.endUserParty
       exerciseWalletAction((installCid, _) => {
         val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
@@ -659,8 +659,6 @@ class HttpWalletHandler(
       getResponse: ChoiceResult => Response,
       dedup: Option[(CommandId, DedupConfig)] = None,
       dislosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
-  )(implicit
-      traceContext: TraceContext
   ): Future[Response] = {
     for {
       userStore <- getUserStore(user)

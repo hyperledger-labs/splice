@@ -93,7 +93,7 @@ class AcceptedTransferOfferTrigger(
   private def abortAcceptedTransferOffer(
       acceptedOffer: Contract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+  ): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
       domainId <- store.domains.getDomainId(globalDomain)

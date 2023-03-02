@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import java.security.SecureRandom
@@ -176,7 +175,7 @@ class HttpSvHandler(
         cn.validatoronboarding.ValidatorOnboarding.ContractId,
         cn.validatoronboarding.ValidatorOnboarding,
       ],
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  ): Future[Unit] =
     for {
       acs <- svcStore.acs(globalDomain)
       openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)

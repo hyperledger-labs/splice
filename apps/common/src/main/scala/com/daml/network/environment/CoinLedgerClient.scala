@@ -62,7 +62,7 @@ class CoinLedgerClient(
   }: Unit
 
   def connection(origin: String): CoinLedgerConnection = {
-    val connection = CoinLedgerConnection(
+    val connection = new CoinLedgerConnection(
       this,
       loggerFactory,
       retryProvider,
