@@ -328,7 +328,14 @@ class PreflightIntegrationTest
         login(walletUiPort, "alice")
         tapAndListCoins(100)
         reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
+        // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
+        go to "about:blank"
+        eventually() {
+          pageTitle shouldBe ""
+        }
       }
+      // Stop nodes before Canton is shutdown
+      env.coinNodes.local.foreach(_.stop())
     }
   }
 
