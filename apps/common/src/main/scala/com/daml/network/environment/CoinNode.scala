@@ -191,27 +191,24 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       authTokenSource.getToken,
       logger,
     )
-    _ = logger.debug(s"Using token $token for this ledger client")
-    client <- retryProvider.retryForAutomation(
-      "Acquiring coin ledger client",
-      CoinLedgerClient.create(
-        remoteParticipant.ledgerApi.clientConfig,
-        // Note: When ledger API auth is enabled, application ID must be equal to user ID
-        serviceUser,
-        // TODO(#1596): Make sure the client correctly refreshes tokens.
-        //  E.g., by adding something like [[com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenManager]] to
-        //  automatically re-fetch tokens shortly before they expire and then a [[io.grpc.ClientInterceptor]] to add the current token
-        //  to all requests.
-        token,
-        timeouts,
-        parameters.loggingConfig.api,
-        loggerFactory,
-        tracerProvider,
-        retryProvider,
-      ),
-      logger,
+  } yield {
+    logger.debug(s"Using token $token for this ledger client")
+    new CoinLedgerClient(
+      remoteParticipant.ledgerApi.clientConfig,
+      // Note: When ledger API auth is enabled, application ID must be equal to user ID
+      serviceUser,
+      // TODO(#1596): Make sure the client correctly refreshes tokens.
+      //  E.g., by adding something like [[com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenManager]] to
+      //  automatically re-fetch tokens shortly before they expire and then a [[io.grpc.ClientInterceptor]] to add the current token
+      //  to all requests.
+      token,
+      timeouts,
+      parameters.loggingConfig.api,
+      loggerFactory,
+      tracerProvider,
+      retryProvider,
     )
-  } yield client
+  }
 
   private def createParticipantAdminConnection(): ParticipantAdminConnection =
     new ParticipantAdminConnection(

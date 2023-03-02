@@ -5,48 +5,33 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.daml.network.admin.api.client.ApiClientRequestLogger
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
-trait CoinLedgerClient extends FlagCloseableAsync {
-  def applicationId: String
+class CoinLedgerClient(
+    config: ClientConfig,
+    val applicationId: String,
+    token: Option[String],
+    override val timeouts: ProcessingTimeout,
+    apiLoggingConfig: ApiLoggingConfig,
+    override protected val loggerFactory: NamedLoggerFactory,
+    tracerProvider: TracerProvider,
+    retryProvider: CoinRetries,
+)(implicit
+    ec: ExecutionContextExecutor,
+    as: ActorSystem,
+    esf: ExecutionSequencerFactory,
+    elc: ErrorLoggingContext,
+) extends FlagCloseable
+    with NamedLogging {
 
-  def client: LedgerClient
-
-  def connection(origin: String): CoinLedgerConnection with NamedLogging
-
-  /** Callback function that will be called whenever a ledger submission fails due to an inactive-contracts exception.
-    * The argument given to the function is the contract-id of the inactive contract. Used for cache invalidation.
-    */
-  def registerInactiveContractsCallback(f: String => Unit): Unit
-
-  def timeouts: ProcessingTimeout
-
-  def actorSystem: ActorSystem
-
-  def executionContextExecutor: ExecutionContextExecutor
-}
-
-object CoinLedgerClient {
-
-  private def createLedgerClient(
-      config: ClientConfig,
-      token: Option[String],
-      tracerProvider: TracerProvider,
-      loggerFactory: NamedLoggerFactory,
-      apiLoggingConfig: ApiLoggingConfig,
-  )(implicit
-      ec: ExecutionContextExecutor,
-      esf: ExecutionSequencerFactory,
-      elc: ErrorLoggingContext,
-  ): Future[LedgerClient] = {
-
+  val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
       // Hard-coding the maximum value (= 2GB).
@@ -64,69 +49,34 @@ object CoinLedgerClient {
       )
 
     val channel = builder.build
-    val client = new LedgerClient(channel, token)
-    Future.successful(client)
+
+    new LedgerClient(channel, token)
   }
 
-  def create(
-      clientConfig: ClientConfig,
-      applicationId_ : String,
-      token: Option[String],
-      processingTimeouts: ProcessingTimeout,
-      apiLoggingConfig: ApiLoggingConfig,
-      loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
-      tracerProvider: TracerProvider,
-      retryProvider: CoinRetries,
-  )(implicit
-      ec: ExecutionContextExecutor,
-      as: ActorSystem,
-      esf: ExecutionSequencerFactory,
-      elc: ErrorLoggingContext,
-  ): Future[CoinLedgerClient with NamedLogging] =
-    createLedgerClient(
-      clientConfig,
-      token,
-      tracerProvider,
-      loggerFactoryForCoinLedgerConnectionOverride,
-      apiLoggingConfig,
-    ).map { client_ =>
-      new CoinLedgerClient with NamedLogging {
+  private val callbacks = new AtomicReference[Seq[String => Unit]](Seq())
 
-        override val client: LedgerClient = client_
+  def registerInactiveContractsCallback(
+      f: String => Unit
+  ): Unit = {
+    callbacks.getAndUpdate(prev => prev :+ f)
+  }: Unit
 
-        private val callbacks = new AtomicReference[Seq[String => Unit]](Seq())
+  def connection(origin: String): CoinLedgerConnection = {
+    val connection = CoinLedgerConnection(
+      this,
+      loggerFactory,
+      retryProvider,
+      callbacks,
+    )
+    logger.debug(s"Created a CoinLedgerConnection ($origin).")(TraceContext.empty)
+    connection
+  }
 
-        override def registerInactiveContractsCallback(
-            f: String => Unit
-        ): Unit = {
-          callbacks.getAndUpdate(prev => prev :+ f)
-        }: Unit
+  val actorSystem: ActorSystem = as
 
-        override def connection(origin: String): CoinLedgerConnection with NamedLogging = {
-          val connection = CoinLedgerConnection(
-            this,
-            loggerFactoryForCoinLedgerConnectionOverride,
-            retryProvider,
-            callbacks,
-          )
-          logger.debug(s"Created a CoinLedgerConnection ($origin).")(TraceContext.empty)
-          connection
-        }
+  val executionContextExecutor: ExecutionContextExecutor = ec
 
-        override def applicationId: String = applicationId_
-
-        override def timeouts: ProcessingTimeout = processingTimeouts
-
-        protected val loggerFactory: NamedLoggerFactory =
-          loggerFactoryForCoinLedgerConnectionOverride
-
-        override def actorSystem: ActorSystem = as
-
-        override def executionContextExecutor: ExecutionContextExecutor = ec
-
-        override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List(
-          SyncCloseable("client", client.close())
-        )
-      }
-    }
+  override def onClosed(): Unit = {
+    client.close()
+  }
 }
