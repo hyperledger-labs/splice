@@ -607,7 +607,7 @@ subcommand_whitelist[preflight]='Run the runbook preflight test against the clus
 function subcmd_preflight() {
     _log "Starting preflight"
 
-    subcmd_sbt_for_preflight "testOnly *PreflightIntegrationTest"
+    subcmd_sbt_for_preflight "apps-app/testOnly *PreflightIntegrationTest"
 }
 
 ###
