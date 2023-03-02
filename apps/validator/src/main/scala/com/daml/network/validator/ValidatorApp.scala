@@ -197,7 +197,7 @@ class ValidatorApp(
         Future.successful(
           new ScanConnection(
             ledgerClient,
-            config.remoteScan.adminApi,
+            config.remoteScan,
             clock,
             coinAppParameters.processingTimeouts,
             loggerFactory,

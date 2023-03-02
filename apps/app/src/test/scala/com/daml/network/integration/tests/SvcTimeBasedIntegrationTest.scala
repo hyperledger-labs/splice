@@ -178,7 +178,7 @@ class SvcTimeBasedIntegrationTest
     val (_, _) = onboardAliceAndBob()
     // tap once so the CoinRules are cached...
     aliceWallet.tap(5)
-    clue("schedule a config change, so the coinrules change") {
+    clue("schedule a config change, so the coinrules change, invalidating the cache.") {
       val configSchedule =
         createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(maxNumInputs = 101)))
       svcClient.setConfigSchedule(configSchedule)
@@ -201,7 +201,7 @@ class SvcTimeBasedIntegrationTest
           entries,
         )(
           _.message should include regex ( // and cache refreshment
-            s"CoinRules cache is empty, retrieving them from CC scan."
+            s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan"
           )
         )
       },

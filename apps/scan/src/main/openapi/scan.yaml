@@ -155,8 +155,7 @@ components:
       properties:
         coin_rules_update:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContract"
-      required:
-        - coin_rules_update
+      required: ["coin_rules_update"]
     ListFeaturedAppRightsResponse:
       type: object
       required: ["featured_apps"]

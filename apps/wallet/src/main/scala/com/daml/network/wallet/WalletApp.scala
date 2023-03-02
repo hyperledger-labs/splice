@@ -70,7 +70,7 @@ class WalletApp(
       scanConnection <- Future {
         new ScanConnection(
           ledgerClient,
-          config.remoteScan.adminApi,
+          config.remoteScan,
           clock,
           coinAppParameters.processingTimeouts,
           loggerFactory,

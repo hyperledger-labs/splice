@@ -7,11 +7,11 @@ import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{CoinUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -32,7 +32,7 @@ import scala.jdk.OptionConverters.*
   */
 final class ScanConnection(
     coinLedgerClient: CoinLedgerClient,
-    config: CoinHttpClientConfig,
+    config: ScanAppClientConfig,
     clock: Clock,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
@@ -40,7 +40,7 @@ final class ScanConnection(
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
+) extends AppConnection(config.adminApi.clientConfig, timeouts, loggerFactory) {
 
   // register the callback to potentially invalidate the CoinRules cache.
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
@@ -54,18 +54,19 @@ final class ScanConnection(
     */
   private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
     coinRulesCache.get() match {
-      case Some(cachedContract) if cachedContract.contractId.contractId == inactiveContract =>
+      case Some(CachedCoinRules(_, cachedContract))
+          if cachedContract.contractId.contractId == inactiveContract =>
         logger.info(
           show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract)}"
         )(TraceContext.empty)
         coinRulesCache.set(None)
-      case _ =>
-        ()
+      case _ => ()
     }
 
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
-  private val coinRulesCache: AtomicReference[Option[Contract[CoinRules.ContractId, CoinRules]]] =
+
+  private val coinRulesCache: AtomicReference[Option[CachedCoinRules]] =
     new AtomicReference(None)
 
   private val cachedRounds: AtomicReference[CachedMiningRounds] =
@@ -80,7 +81,7 @@ final class ScanConnection(
       case Some(partyId) => Future.successful(partyId)
       case None =>
         for {
-          partyId <- runHttpCmd(config.url, HttpScanAppClient.GetSvcPartyId(List()))
+          partyId <- runHttpCmd(config.adminApi.url, HttpScanAppClient.GetSvcPartyId(List()))
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           svcRef.set(Some(partyId))
@@ -107,22 +108,26 @@ final class ScanConnection(
       mat: Materializer,
       tc: TraceContext,
   ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
+    val now = clock.now
     coinRulesCache.get() match {
-      case Some(coinRules) =>
+      case Some(CachedCoinRules(cacheValidUntil, coinRules)) if now.isBefore(cacheValidUntil) =>
         Future.successful(coinRules)
-      // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
-      // requests, and are not deduplicated against each other. We accept that as we expect low concurrency by default.
-      case None =>
+      case cacheO =>
+        // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
+        // requests that are not deduplicated against each other. We accept that as we expect low concurrency by default.
         logger.debug(
-          s"CoinRules cache is empty, retrieving them from CC scan."
+          s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan."
         )
         for {
           coinRules <- runHttpCmd(
-            config.url,
-            HttpScanAppClient.GetCoinRules(None),
+            config.adminApi.url,
+            HttpScanAppClient.GetCoinRules(cacheO.map(_.coinRules)),
           )
         } yield {
-          coinRulesCache.set(Some(coinRules))
+
+          coinRulesCache.set(
+            Some(CachedCoinRules(now.add(config.coinRulesCacheTimeToLive.duration), coinRules))
+          )
           coinRules
         }
     }
@@ -161,7 +166,7 @@ final class ScanConnection(
       )
       for {
         (openRounds, issuingRounds, ttlInMicros) <- runHttpCmd(
-          config.url,
+          config.adminApi.url,
           HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(
             cache.sortedOpenMiningRounds,
             cache.sortedIssuingMiningRounds,
@@ -186,7 +191,7 @@ final class ScanConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    runHttpCmd(config.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
   def getAppTransferContext(providerPartyId: PartyId)(implicit
@@ -245,6 +250,12 @@ final class ScanConnection(
 }
 
 object ScanConnection {
+
+  private case class CachedCoinRules(
+      cacheValidUntil: CantonTimestamp,
+      coinRules: Contract[CoinRules.ContractId, CoinRules],
+  ) {}
+
   private case class CachedMiningRounds(
       cacheValidUntil: Option[CantonTimestamp] = None,
       sortedOpenMiningRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = Seq(),

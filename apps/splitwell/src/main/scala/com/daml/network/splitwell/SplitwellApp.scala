@@ -68,7 +68,7 @@ class SplitwellApp(
     scanConnection =
       new ScanConnection(
         ledgerClient,
-        config.remoteScan.adminApi,
+        config.remoteScan,
         clock,
         coinAppParameters.processingTimeouts,
         loggerFactory,
