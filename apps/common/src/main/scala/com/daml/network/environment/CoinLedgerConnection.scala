@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import akka.actor.ActorSystem
-import akka.stream.KillSwitches
+import akka.stream.{KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.error.utils.ErrorDetails
@@ -30,6 +30,7 @@ import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
+  FlagCloseable,
   FlagCloseableAsync,
   SyncCloseable,
 }
@@ -47,30 +48,27 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.Seq
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
 class CoinLedgerConnection(
-    coinLedgerClient: CoinLedgerClient,
+    client: LedgerClient,
+    applicationId: String,
     loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
+    override protected val timeouts: ProcessingTimeout,
     retryProvider: CoinRetries,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
-) extends FlagCloseableAsync
+)(implicit as: ActorSystem, ec: ExecutionContextExecutor)
+    extends FlagCloseable
     with NamedLogging {
+
+  override def onClosed(): Unit = {}
 
   import CoinLedgerConnection.*
 
   protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
-
-  override protected def timeouts: ProcessingTimeout = coinLedgerClient.timeouts
-
-  private def client = coinLedgerClient.client
-
-  implicit private def as: ActorSystem = coinLedgerClient.actorSystem
-
-  implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
 
   private def callCallbacksOnCompletion[T](result: Future[T]): Future[T] = {
     import TraceContext.Implicits.Empty.*
@@ -106,7 +104,7 @@ class CoinLedgerConnection(
       client
         .submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
+          applicationId = applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,
@@ -128,7 +126,7 @@ class CoinLedgerConnection(
       client
         .submitAndWaitForTransaction(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
+          applicationId = applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,
@@ -152,7 +150,7 @@ class CoinLedgerConnection(
       client
         .submitAndWait(
           workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = coinLedgerClient.applicationId,
+          applicationId = applicationId,
           commandId = commandId.commandIdForSubmission,
           deduplicationConfig = DedupOffset(
             offset = deduplicationOffset
@@ -213,7 +211,7 @@ class CoinLedgerConnection(
     )
       .map(_._2)
 
-  def doSubmitWithResultAndOffset[T](
+  protected def doSubmitWithResultAndOffset[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
@@ -227,7 +225,7 @@ class CoinLedgerConnection(
         client
           .submitAndWaitForTransactionTree(
             workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
-            applicationId = coinLedgerClient.applicationId,
+            applicationId = applicationId,
             commandId = commandIdForSubmission,
             actAs = actAs.map(_.toProtoPrimitive),
             readAs = readAs.map(_.toProtoPrimitive),
@@ -329,13 +327,15 @@ class CoinLedgerConnection(
       beginOffset: LedgerOffset,
       party: PartyId,
       domain: DomainId,
-  )(mapOperator: Flow[TreeUpdate, Any, _]): CoinLedgerSubscription = {
-    makeSubscription(
+  )(mapOperator: Flow[TreeUpdate, Any, _]): CoinLedgerSubscription[?] = {
+    new CoinLedgerSubscription(
       client.updates(
         LedgerClient.GetUpdatesRequest(beginOffset, None, party, domain)
       ),
       Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
       subscriptionName,
+      timeouts,
+      loggerFactoryForCoinLedgerConnectionOverride,
     )
   }
 
@@ -386,7 +386,7 @@ class CoinLedgerConnection(
       beginOffset: LedgerOffset,
       filter: PartyId,
       domain: DomainId,
-  )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription =
+  )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription[?] =
     subscription(subscriptionName, beginOffset, filter, domain)({
       Flow[TreeUpdate].mapAsync(1)(f)
     })
@@ -398,7 +398,7 @@ class CoinLedgerConnection(
     LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
   ], NotUsed] = {
     import LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent, TransferUpdate}
-    coinLedgerClient.client
+    client
       .updates(
         LedgerClient.GetUpdatesRequest(
           // fixme
@@ -415,53 +415,6 @@ class CoinLedgerConnection(
         }
       }
   }
-
-  private def makeSubscription[S, T](
-      source: Source[S, NotUsed],
-      mapOperator: Flow[S, T, _],
-      subscriptionName: String,
-  ): CoinLedgerSubscription =
-    new CoinLedgerSubscription {
-      override protected def timeouts: ProcessingTimeout = coinLedgerClient.timeouts
-
-      import TraceContext.Implicits.Empty.*
-
-      val (killSwitch, completed) = AkkaUtil.runSupervised(
-        logger.error("Fatally failed to handle transaction", _),
-        source
-          // we place the kill switch before the map operator, such that
-          // we can shut down the operator quickly and signal upstream to cancel further sending
-          .viaMat(KillSwitches.single)(Keep.right)
-          .viaMat(mapOperator)(Keep.left)
-          // and we get the Future[Done] as completed from the sink so we know when the last message
-          // was processed
-          .toMat(Sink.ignore)(Keep.both),
-      )
-      override val loggerFactory: NamedLoggerFactory =
-        if (subscriptionName.isEmpty)
-          loggerFactoryForCoinLedgerConnectionOverride
-        else
-          loggerFactoryForCoinLedgerConnectionOverride.append("client", subscriptionName)
-
-      override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-        import TraceContext.Implicits.Empty.*
-        List[AsyncOrSyncCloseable](
-          SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
-          AsyncCloseable(
-            s"ledger api stream terminated",
-            completed.transform {
-              case Success(v) => Success(v)
-              case Failure(_: StatusRuntimeException) =>
-                // don't fail to close if there was a grpc status runtime exception
-                // this can happen (i.e. server not available etc.)
-                Success(Done)
-              case Failure(ex) => Failure(ex)
-            },
-            coinLedgerClient.timeouts.shutdownShort.unwrap,
-          ),
-        )
-      }
-    }
 
   def tryGetTransactionTreeById(
       parties: Seq[PartyId],
@@ -641,7 +594,6 @@ class CoinLedgerConnection(
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val applicationId = coinLedgerClient.applicationId
     val commandId = UUID.randomUUID().toString()
     val listenDomain = command match {
       case in: LedgerClient.TransferCommand.In => in.target
@@ -740,13 +692,59 @@ class CoinLedgerConnection(
       },
     )
   }
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()
 }
 
 /** Subscription for reading the ledger */
-trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
-  val completed: Future[Done]
+class CoinLedgerSubscription[S](
+    source: Source[S, NotUsed],
+    mapOperator: Flow[S, ?, ?],
+    subscriptionName: String,
+    override protected val timeouts: ProcessingTimeout,
+    loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
+)(implicit ec: ExecutionContext, mat: Materializer)
+    extends FlagCloseableAsync
+    with NamedLogging {
+
+  import TraceContext.Implicits.Empty.*
+
+  private val (killSwitch, completed_) = AkkaUtil.runSupervised(
+    logger.error("Fatally failed to handle transaction", _),
+    source
+      // we place the kill switch before the map operator, such that
+      // we can shut down the operator quickly and signal upstream to cancel further sending
+      .viaMat(KillSwitches.single)(Keep.right)
+      .viaMat(mapOperator)(Keep.left)
+      // and we get the Future[Done] as completed from the sink so we know when the last message
+      // was processed
+      .toMat(Sink.ignore)(Keep.both),
+  )
+
+  def completed: Future[Done] = completed_
+
+  override protected val loggerFactory: NamedLoggerFactory =
+    if (subscriptionName.isEmpty)
+      loggerFactoryForCoinLedgerConnectionOverride
+    else
+      loggerFactoryForCoinLedgerConnectionOverride.append("client", subscriptionName)
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    import TraceContext.Implicits.Empty.*
+    List[AsyncOrSyncCloseable](
+      SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
+      AsyncCloseable(
+        s"ledger api stream terminated",
+        completed.transform {
+          case Success(v) => Success(v)
+          case Failure(_: StatusRuntimeException) =>
+            // don't fail to close if there was a grpc status runtime exception
+            // this can happen (i.e. server not available etc.)
+            Success(Done)
+          case Failure(ex) => Failure(ex)
+        },
+        timeouts.shutdownShort.unwrap,
+      ),
+    )
+  }
 }
 
 object CoinLedgerConnection {

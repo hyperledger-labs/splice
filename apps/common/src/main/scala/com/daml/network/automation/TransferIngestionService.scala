@@ -34,7 +34,7 @@ class TransferIngestionService(
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription] = for {
+  ): Future[CoinLedgerSubscription[?]] = for {
     transfers <- getTransferStore(domain)
   } yield connection.subscribeAsync(
     s"TransferIngestion($name)",

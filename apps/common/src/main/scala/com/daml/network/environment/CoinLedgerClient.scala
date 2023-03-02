@@ -16,9 +16,9 @@ import scala.concurrent.ExecutionContextExecutor
 
 class CoinLedgerClient(
     config: ClientConfig,
-    val applicationId: String,
+    applicationId: String,
     token: Option[String],
-    override val timeouts: ProcessingTimeout,
+    override protected val timeouts: ProcessingTimeout,
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -31,7 +31,7 @@ class CoinLedgerClient(
 ) extends FlagCloseable
     with NamedLogging {
 
-  val client = {
+  private val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
       // Hard-coding the maximum value (= 2GB).
@@ -63,18 +63,16 @@ class CoinLedgerClient(
 
   def connection(origin: String): CoinLedgerConnection = {
     val connection = new CoinLedgerConnection(
-      this,
+      this.client,
+      applicationId,
       loggerFactory,
+      timeouts,
       retryProvider,
       callbacks,
     )
     logger.debug(s"Created a CoinLedgerConnection ($origin).")(TraceContext.empty)
     connection
   }
-
-  val actorSystem: ActorSystem = as
-
-  val executionContextExecutor: ExecutionContextExecutor = ec
 
   override def onClosed(): Unit = {
     client.close()

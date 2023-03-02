@@ -26,11 +26,11 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
   /** Allocate a new subscription that drives ingestion. */
   protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription]
+  ): Future[CoinLedgerSubscription[?]]
 
   // Note that we are tracking the current subscription outside the retry loop instead of just
   // calling 'runOnShutdown' on every newly acquired subscription, as that would leak memory.
-  private val currentSubscription = new AtomicReference[Option[CoinLedgerSubscription]](None)
+  private val currentSubscription = new AtomicReference[Option[CoinLedgerSubscription[?]]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
   retryProvider.runOnShutdown(new RunOnShutdown {

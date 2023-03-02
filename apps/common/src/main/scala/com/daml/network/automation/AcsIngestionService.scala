@@ -31,7 +31,7 @@ class AcsIngestionService(
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription] =
+  ): Future[CoinLedgerSubscription[?]] =
     for {
       lastIngestedOffset <- ingestionSink.getLastIngestedOffset
       subscribeFrom <- lastIngestedOffset match {
