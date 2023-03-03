@@ -16,7 +16,7 @@ const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard })
 
   const onOnboardUser = async () => {
     setOnboardClicked(true);
-    await validatorClient.onboardUser(userId);
+    await validatorClient.registerUser();
     await onOnboard();
   };
 

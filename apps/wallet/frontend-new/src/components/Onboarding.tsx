@@ -18,7 +18,7 @@ const Onboarding: React.FC = () => {
 
   const onOnboardUser = async () => {
     setOnboardClicked(true);
-    await validatorService.onboardUser(userId);
+    await validatorService.registerUser();
     const status = await walletService.userStatus();
     updateStatus(status);
   };

@@ -3,7 +3,6 @@ import React, { useContext, useMemo } from 'react';
 import {
   Middleware,
   createConfiguration,
-  OnboardUserRequest as HttpOnboardUserRequest,
   ValidatorApi,
   ServerConfiguration,
   RequestContext,
@@ -18,7 +17,7 @@ export interface ValidatorProps {
   url: string;
 }
 export interface ValidatorClient {
-  onboardUser: (userId: string) => Promise<void>;
+  registerUser: () => Promise<void>;
 }
 
 class ApiMiddleware
@@ -40,9 +39,7 @@ export const ValidatorClientProvider: React.FC<React.PropsWithChildren<Validator
     const validatorClient = new ValidatorApi(configuration);
 
     return {
-      onboardUser: async (userId: string): Promise<void> => {
-        const req = new HttpOnboardUserRequest();
-        req.name = userId;
+      registerUser: async (): Promise<void> => {
         await validatorClient.register();
       },
     };
