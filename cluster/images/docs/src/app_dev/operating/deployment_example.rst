@@ -18,7 +18,7 @@ To start the validator node, first start the validator participant using the Can
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-participant.conf --bootstrap examples/splitwell/splitwell-participant.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-participant.conf --bootstrap examples/splitwell/splitwell-participant.sc
 
 Before starting the splitwell backend, some setup is required:
 
@@ -115,13 +115,13 @@ running.
 
 First, start the splitwell domain ::
 
-  ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-domain.conf
+  ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-domain.conf
 
 Next, in a separate terminal, start the participant again using the same command that we used in the single-domain setup:
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-participant.conf --bootstrap examples/splitwell/splitwell-participant.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/splitwell/splitwell-participant.conf --bootstrap examples/splitwell/splitwell-participant.sc
 
 Once the console opened, connect it to the domain you started earlier ::
 

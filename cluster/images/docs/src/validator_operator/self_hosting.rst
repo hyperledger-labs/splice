@@ -64,7 +64,7 @@ you extracted Canton research next to the Canton network tarball. If you placed 
 
 .. parsed-literal::
 
-  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf --bootstrap examples/validator/validator-participant.sc
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf --bootstrap examples/validator/validator-participant.sc
 
 Next, open a second terminal and navigate to the extracted bundle's root directory.
 In order to become a validator, you need the sponsorship of a current supervalidator.
@@ -244,7 +244,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.6.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
 
 4. Get participant id from the Canton console. We'll need to configure Auth0 to issue tokens for this participant. The actual participant id you see will vary slightly::
 
