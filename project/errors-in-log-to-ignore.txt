@@ -57,5 +57,7 @@ The sequencer time.*has exceeded the max-sequencing-time of the send request
 Submission timed out at
 Rejected transaction due to a participant determined timeout
 Response message for request.*timed out at
+Sequencing result message timed out
+Late processing (or clock skew) of batch with
 
 # Make sure to have a trailing newline
