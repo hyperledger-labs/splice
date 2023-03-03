@@ -15,7 +15,6 @@ import { WalletClientProvider } from './contexts/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
 import ConfirmPayment from './routes/confirmPayment';
 import ConfirmSubscription from './routes/confirmSubscription';
-import Login from './routes/login';
 import Root from './routes/root';
 import Subscriptions from './routes/subscriptions';
 import Transactions from './routes/transactions';
@@ -30,12 +29,6 @@ const router = createBrowserRouter(
         <Route path="transactions" element={<Transactions />} />
         <Route path="transfer" element={<Transfer />} />
         <Route path="subscriptions" element={<Subscriptions />} />
-      </Route>
-      <Route path="/auth/">
-        <Route
-          path="login"
-          element={<Login authConfig={config.auth} testAuthConfig={config.testAuth} />}
-        />
       </Route>
       <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />
       <Route path="confirm-subscription/:cid/" element={<ConfirmSubscription />} />

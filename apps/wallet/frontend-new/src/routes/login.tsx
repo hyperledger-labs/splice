@@ -2,7 +2,6 @@ import * as React from 'react';
 import { isHs256UnsafeAuthConfig, theme, useUserState } from 'common-frontend';
 import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
 
 import { Person } from '@mui/icons-material';
 import { Button, Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
@@ -14,11 +13,6 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ authConfig, testAuthConfig }) => {
-  const { isAuthenticated } = useUserState();
-  if (isAuthenticated) {
-    return <Navigate to="/" />;
-  }
-
   // We have some integration tests that do Auth0 login tests and others that do self-signed token login tests,
   // but because we start the UIs outside sbt they have one static config.
   // So for tests the UI must support both algorithms at the same time;
