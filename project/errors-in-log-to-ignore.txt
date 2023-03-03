@@ -58,6 +58,6 @@ Submission timed out at
 Rejected transaction due to a participant determined timeout
 Response message for request.*timed out at
 Sequencing result message timed out
-Late processing (or clock skew) of batch with
+Late processing.*of batch
 
 # Make sure to have a trailing newline
