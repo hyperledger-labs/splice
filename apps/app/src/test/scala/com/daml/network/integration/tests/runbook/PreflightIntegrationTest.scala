@@ -208,7 +208,7 @@ class PreflightIntegrationTest
       click on className("accept-button")
 
       // And then back to splitwell, where he is already logged in
-      eventually(scaled(5 seconds)) {
+      eventually() {
         inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
           row.childElement(className("balances-table-receiver")).text should matchText(
             aliceUserPartyId
