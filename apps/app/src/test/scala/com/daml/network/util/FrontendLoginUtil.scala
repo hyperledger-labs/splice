@@ -27,8 +27,12 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
       },
     )(
       "Logged in user shows up",
-      _ => find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up")),
+      _ => userIsLoggedIn(),
     )
+  }
+
+  protected def userIsLoggedIn()(implicit webDriver: WebDriver) = {
+    waitForQuery(id("logged-in-user"))
   }
 
   protected def browseToAliceWallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {

@@ -21,6 +21,8 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
+import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
+
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
 export interface WalletProps {
@@ -95,23 +97,9 @@ export interface WalletClient {
   selfGrantFeaturedAppRights: () => Promise<void>;
 }
 
-class ApiMiddleware implements Middleware {
-  private token: string | undefined;
-
-  async pre(context: RequestContext): Promise<RequestContext> {
-    if (!this.token) {
-      throw new Error('Request issued before access token was set');
-    }
-    context.setHeaderParam('Authorization', `Bearer ${this.token}`);
-    return context;
-  }
-  post(context: ResponseContext): Promise<ResponseContext> {
-    return Promise.resolve(context);
-  }
-  constructor(accessToken: string | undefined) {
-    this.token = accessToken;
-  }
-}
+class ApiMiddleware
+  extends BaseApiMiddleware<RequestContext, ResponseContext>
+  implements Middleware {}
 
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
   url,

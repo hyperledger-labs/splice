@@ -17,7 +17,7 @@ interface UserState {
   userAccessToken?: string;
 
   isAuthenticated: boolean;
-  isOnboarded: boolean;
+  onboardedStatus: OnboardedStatus;
   primaryPartyId?: string; // undefined when not onboarded
 
   // It makes to sense to track user onboarding status & party info in the user store,
@@ -29,6 +29,12 @@ interface UserState {
   loginWithSst: (id: string, secret: string, audience: string, scope?: string) => void;
   loginWithOidc: () => void;
   logout: () => void;
+}
+
+export enum OnboardedStatus {
+  Loading,
+  NotOnboarded,
+  Onboarded,
 }
 
 export const UserContext = React.createContext<UserState | undefined>(undefined);
@@ -56,7 +62,7 @@ export const UserProvider: React.FC<{
   //   - oidc: OpenID Connect logins based on OAuth2.0
   const authMethod: 'sst' | 'oidc' = isHs256UnsafeAuthConfig(authConf) ? 'sst' : 'oidc';
 
-  const [isOnboarded, setIsOnboarded] = useState(false);
+  const [onboardedStatus, setOnboardedStatus] = useState(OnboardedStatus.Loading);
   const [userId, setUserId] = useState<string>();
   const [primaryPartyId, setPrimaryPartyId] = useState<string>();
   const [userAccessToken, setUserAccessToken] = useState<string>();
@@ -122,12 +128,14 @@ export const UserProvider: React.FC<{
     <UserContext.Provider
       value={{
         isAuthenticated,
-        isOnboarded,
+        onboardedStatus,
         userId,
         userAccessToken,
         primaryPartyId,
         updateStatus: ({ userOnboarded, partyId }) => {
-          setIsOnboarded(userOnboarded);
+          setOnboardedStatus(
+            userOnboarded ? OnboardedStatus.Onboarded : OnboardedStatus.NotOnboarded
+          );
           setPrimaryPartyId(partyId);
         },
         loginWithSst,
@@ -136,7 +144,7 @@ export const UserProvider: React.FC<{
           setUserId(undefined);
           setPrimaryPartyId(undefined);
           setUserAccessToken(undefined);
-          setIsOnboarded(false);
+          setOnboardedStatus(OnboardedStatus.Loading);
 
           if (auth && authMethod === 'oidc') {
             auth.removeUser();

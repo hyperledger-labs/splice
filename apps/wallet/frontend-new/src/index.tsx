@@ -10,6 +10,8 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
+import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
+import { WalletClientProvider } from './contexts/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
 import ConfirmPayment from './routes/confirmPayment';
 import ConfirmSubscription from './routes/confirmSubscription';
@@ -45,10 +47,14 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <RouterProvider router={router} />
-        </ThemeProvider>
+        <ValidatorClientProvider url={config.services.validator.grpcUrl}>
+          <WalletClientProvider url={config.services.wallet.grpcUrl}>
+            <ThemeProvider theme={theme}>
+              <CssBaseline />
+              <RouterProvider router={router} />
+            </ThemeProvider>
+          </WalletClientProvider>
+        </ValidatorClientProvider>
       </UserProvider>
     </AuthProvider>
   </React.StrictMode>

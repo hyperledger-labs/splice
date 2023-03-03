@@ -1,13 +1,14 @@
 import {
-  useScanClient,
-  ErrorBoundary,
+  Contract,
   DirectoryEntry,
-  useUserState,
+  ErrorBoundary,
+  FeaturedAppRight,
   Login,
   useInterval,
-  Contract,
-  FeaturedAppRight,
+  useScanClient,
+  useUserState,
 } from 'common-frontend';
+import { OnboardedStatus } from 'common-frontend/lib/contexts/UserContext';
 import { Decimal } from 'decimal.js';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -91,11 +92,9 @@ const App: React.FC = () => {
 };
 
 const Content = () => {
-  const { updateStatus, isOnboarded, isAuthenticated, userId } = useUserState();
+  const { updateStatus, onboardedStatus, isAuthenticated, userId } = useUserState();
   const walletClient = useWalletClient();
 
-  // show a loading spinner until we fully determine user status
-  const [loading, setLoading] = useState(true);
   // show an error page if we suspect an auth misconfiguration
   const [authError, setAuthError] = useState(false);
 
@@ -153,7 +152,6 @@ const Content = () => {
       const status = await walletClient.userStatus();
       updateStatus(status);
       setAuthError(false);
-      setLoading(false);
     },
     [walletClient, updateStatus]
   );
@@ -172,12 +170,12 @@ const Content = () => {
       tryGetUserStatus();
 
       // Periodically when the user is not onboarded
-      if (!isOnboarded) {
+      if (onboardedStatus !== OnboardedStatus.Onboarded) {
         const timer = setInterval(tryGetUserStatus, 5000);
         return () => clearInterval(timer);
       }
     }
-  }, [isOnboarded, isAuthenticated, userId, getUserStatus]);
+  }, [onboardedStatus, isAuthenticated, userId, getUserStatus]);
 
   const boxSx = {
     width: '100%',
@@ -195,7 +193,7 @@ const Content = () => {
         </Alert>
       </Box>
     );
-  } else if (loading) {
+  } else if (onboardedStatus === OnboardedStatus.Loading) {
     return (
       <Box sx={boxSx}>
         <CircularProgress sx={{ display: 'flex' }} />
@@ -203,7 +201,7 @@ const Content = () => {
     );
   }
 
-  return isOnboarded ? (
+  return onboardedStatus === OnboardedStatus.Onboarded ? (
     <RouterProvider router={routes} />
   ) : (
     <Onboarding onOnboard={() => getUserStatus(userId)} />
