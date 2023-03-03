@@ -7,6 +7,10 @@ import Daml.Script
 import qualified CC.API.V1.Coin as API
 import CC.Scripts.Util
 
+import CC.Coin
+import CC.Fees
+
+
 template Test
   with
     sender : Party
@@ -75,3 +79,60 @@ test = script do
       , 0.03 + 0.01 * 100.0 + 0.001 * 1.0  -- create + stepped transfer
       ]
     pure()
+
+testScaledHoldingFees: Script ()
+testScaledHoldingFees = do
+  let
+    holdingFee = 1.0
+    initialCoinPrice = 2.0
+    scaledHoldingFee = (holdingFee / initialCoinPrice)
+  app <- setupApp
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+
+  Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
+
+  -- Set holding fee and initial coin price
+  now <- getTime
+  submitMulti [app.svc] [app.svc] $ exerciseCmd coinRulesCid CoinRules_SetConfigSchedule with
+    newConfigSchedule = coinRules.configSchedule with
+      futureValues = [(
+          addRelTime now (minutes 1),
+          coinRules.configSchedule.currentValue with
+            transferConfig = coinRules.configSchedule.currentValue.transferConfig with
+              holdingFee = RatePerRound holdingFee
+        )]
+
+  advanceToIssuanceWithPrice app initialCoinPrice
+  cid <- tap app alice 100.0
+  Some coin <- queryContractId @Coin alice.primaryParty cid
+  coin.amount.ratePerRound.rate === scaledHoldingFee
+
+  -- Change coin price, and advance 3 rounds
+  advanceToIssuanceWithPrice app 10.0
+
+  -- Alice's coins were merged in the process, get the new one (which should still have a holding fee based on the old fee and coin price)
+  [(curCoinCid, curCoin)] <- queryFilter @Coin alice.primaryParty (\c -> c.owner == alice.primaryParty)
+  curCoin.amount.ratePerRound.rate === scaledHoldingFee
+
+  -- Make a transfer, so that holding fees will be charged
+  context <- getPaymentTransferContext app alice
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
+    exerciseCmd context.coinRules API.CoinRules_Transfer with
+      transfer = API.Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [API.InputCoin $ toInterfaceContractId curCoinCid]
+        outputs = [ API.TransferOutput with
+                      receiver = bob.primaryParty
+                      amount = 10.0
+                      lock = None
+                      receiverFeeRatio = 1.0]
+        payload = "test"
+      context = context.context
+
+  -- Actual holding fee should be based on the coin price when the coin was created, not the current one
+  transferResult.summary.holdingFees === scaledHoldingFee
+
+  pure ()
