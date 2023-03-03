@@ -706,10 +706,15 @@ commands:
       cluster:
         type: enum
         enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+      channel_notify:
+        type: string
+        # #team-canton-network-internal
+        default: C03J6NCPSE4
     steps:
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
+          channel: << parameters.channel_notify >>
           branch_pattern: main
           event: fail
           custom: |
@@ -879,6 +884,10 @@ jobs:
       cluster:
         type: enum
         enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+      channel_notify:
+        type: string
+        # #team-canton-network-internal
+        default: C03J6NCPSE4
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -930,6 +939,7 @@ jobs:
           timeout: "10m"
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
@@ -1431,6 +1441,10 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "devnet"
+          # TODO (#3237) Move this back to the main slack channel and consider removing the
+          # infrastructure to specify different channels.
+          # #temp-cn-devnet-notifications
+          channel_notify: C04RSPJ5SBH
           context:
             - artifactory
             - canton-network-vpn
