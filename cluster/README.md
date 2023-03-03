@@ -392,6 +392,16 @@ you with to observe. For ScratchNet, this is
       1. Add `-f` to get the live log (new entries streaming to your console)
       1. Add `--since=30m` to only return entries from the past 30min
       1. Add `-p` to get the log from the previous instance. Use this to access the log of a crashed container after it restarted.
+1. Run `cncluster gcloud_logs` to download logs from gcloud log
+   explorer and open them in lnav. This is useful if the logs are no longer available in
+   k8s, e.g., because the cluster got reset. Example:
+
+```
+cncluster gcloud_logs validator1 wallet-app 'timestamp>="2023-03-03T11:00:00" AND timestamp<"2023-03-03T11:30:00"'
+```
+
+See See https://cloud.google.com/logging/docs/view/logging-query-language for docs on the query language.
+
 1. Run `kubectl get svc` or `cncluster ports` to get an overview of
    ports used within the cluster.
 1. Use `lnav` to quickly analyze log files downloaded using `kubectl
@@ -612,7 +622,7 @@ cncluster activate
        In particular, consider:
        1. `./cluster/manifest/canton-network-config.jsonnet` (ports used within the cluster)
        1. `./cluster/images/external-proxy/config` (egress of the cluster)
-       1. config files baked into individual component images 
+       1. config files baked into individual component images
        (ports that the applications actually use)
 1. If you touched `./cluster/manifest/canton-network-config.jsonnet`,
    run `make cluster/manifest/test-update`

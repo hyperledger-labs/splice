@@ -364,6 +364,34 @@ function subcmd_logs() {
     fi
 }
 
+subcommand_whitelist[gcloud_logs]='View the logs of an application through gcloud. This allows viewing historical logs'
+
+function subcmd_gcloud_logs() {
+    if [ -z "${1-}" ]; then
+        _error "No namespace specified"
+    fi
+
+    if [ -z "${2-}" ]; then
+        _error "No app specified"
+    fi
+
+    if [ -z "${3-}" ]; then
+        _error "No filter specified. See https://cloud.google.com/logging/docs/view/logging-query-language for docs on the query language."
+    fi
+
+    namespace=$1
+    app=$2
+    filter=$3
+
+    _cluster_must_exist
+
+    LOGFILE=$(mktemp cnlogXXXXXXX.clog)
+    echo "Writing log to $LOGFILE"
+
+    gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter" \
+        | jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload' > $LOGFILE & lnav $LOGFILE
+}
+
 ###
 
 subcommand_whitelist[set_machine_type]='Rebuilds the default node pool with current cluster machine type and count'
