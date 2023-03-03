@@ -17,6 +17,7 @@ import com.daml.network.sv.config.{
   ExpectedOnboardingConfig,
   LocalSvAppConfig,
   RemoteSvAppConfig,
+  SvBootstrapConfig,
 }
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
@@ -469,14 +470,25 @@ object CNNodeConfig {
       deriveReader[SvcAppBackendConfig]
     implicit val remoteSvcConfigReader: ConfigReader[SvcAppClientConfig] =
       deriveReader[SvcAppClientConfig]
+
+    implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
+      deriveReader[RemoteSvAppConfig]
+
+    implicit val svBootstrapConfigHint = new FieldCoproductHint[SvBootstrapConfig]("type")
+    implicit val svBootstrapFoundConsortiumReader: ConfigReader[SvBootstrapConfig.FoundConsortium] =
+      deriveReader[SvBootstrapConfig.FoundConsortium]
+    implicit val svBootstrapJoinViaSvcAppReader: ConfigReader[SvBootstrapConfig.JoinViaSvcApp] =
+      deriveReader[SvBootstrapConfig.JoinViaSvcApp]
+    implicit val svBootstrapJoinWithKeyReader: ConfigReader[SvBootstrapConfig.JoinWithKey] =
+      deriveReader[SvBootstrapConfig.JoinWithKey]
+    implicit val svBootstrapConfigReader: ConfigReader[SvBootstrapConfig] =
+      deriveReader[SvBootstrapConfig]
     implicit val expectedOnboardingConfigReader: ConfigReader[ExpectedOnboardingConfig] =
       deriveReader[ExpectedOnboardingConfig]
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
     implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
       deriveReader[LocalSvAppConfig]
-    implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
-      deriveReader[RemoteSvAppConfig]
 
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
@@ -569,14 +581,27 @@ object CNNodeConfig {
       deriveWriter[SvcAppBackendConfig]
     implicit val remoteSvcConfigWriter: ConfigWriter[SvcAppClientConfig] =
       deriveWriter[SvcAppClientConfig]
+
+    implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
+      deriveWriter[RemoteSvAppConfig]
+
+    implicit val svBootstrapConfigHint: FieldCoproductHint[SvBootstrapConfig] =
+      new FieldCoproductHint[SvBootstrapConfig]("type")
+    implicit val svBootstrapFoundConsortiumWriter: ConfigWriter[SvBootstrapConfig.FoundConsortium] =
+      deriveWriter[SvBootstrapConfig.FoundConsortium]
+    implicit val svBootstrapJoinViaSvcAppWriter: ConfigWriter[SvBootstrapConfig.JoinViaSvcApp] =
+      deriveWriter[SvBootstrapConfig.JoinViaSvcApp]
+    implicit val svBootstrapJoinWithKeyWriter: ConfigWriter[SvBootstrapConfig.JoinWithKey] =
+      deriveWriter[SvBootstrapConfig.JoinWithKey]
+    implicit val svBootstrapConfigWriter: ConfigWriter[SvBootstrapConfig] =
+      confidentialWriter[SvBootstrapConfig](SvBootstrapConfig.hideConfidential)
+
     implicit val expectedOnboardingConfigWriter: ConfigWriter[ExpectedOnboardingConfig] =
       confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)
     implicit val approvedSvIdentityConfigWriter: ConfigWriter[ApprovedSvIdentityConfig] =
       deriveWriter[ApprovedSvIdentityConfig]
     implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
       deriveWriter[LocalSvAppConfig]
-    implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
-      deriveWriter[RemoteSvAppConfig]
 
     implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
       deriveWriter[SharedCoinAppParameters]

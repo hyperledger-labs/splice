@@ -8,6 +8,7 @@ import com.daml.network.environment.{
   CoinEnvironmentImpl,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.sv.config.SvBootstrapConfig
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.EnvironmentFactory
@@ -67,10 +68,10 @@ case class CoinEnvironmentDefinition(
           }
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
-            actAs =
-              // the SV app will revoke the "act as svcParty" right at the end of its init
-              if (sv.config.foundConsortium) Set(svParty, svcParty)
-              else Set(svParty),
+            actAs = sv.config.bootstrap match {
+              case _: SvBootstrapConfig.FoundConsortium => Set(svParty, svcParty)
+              case _ => Set(svParty)
+            },
             primaryParty = Some(svParty),
             readAs = Set(svcParty),
             participantAdmin = true,

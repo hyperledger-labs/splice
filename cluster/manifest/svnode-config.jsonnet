@@ -31,7 +31,7 @@ local deployments(num, config) =
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
       ] + (
         // the first one is the founding SV app
-        if num == 1 then [{ name: "CN_APP_SV_FOUND_CONSORTIUM", value: "true" }] else []
+        if num == 1 then [{ name: "CN_APP_SV_BOOTSTRAP_TYPE", value: "found-consortium" }] else []
       ) + (
         if config.tickDuration != null then [{ name: "CN_APP_SV_INITIAL_TICK_DURATION", value: config.tickDuration }] else []
       ),

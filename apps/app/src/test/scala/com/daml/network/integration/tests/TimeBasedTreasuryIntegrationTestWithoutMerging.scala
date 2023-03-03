@@ -41,7 +41,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
         CNNodeConfigTransforms
-          .updateAllSvAppConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
+          .updateAllSvAppFoundConsortiumConfigs_(_.focus(_.initialMaxNumInputs).replace(4))(config)
       )
   }
 

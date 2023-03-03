@@ -24,9 +24,43 @@ object ExpectedOnboardingConfig {
 
 case class ApprovedSvIdentityConfig(
     name: String,
-    // TODO(#3106) Once signature algorithm decided: add early check that this holds a valid key.
     key: String,
 )
+
+sealed trait SvBootstrapConfig {
+  // TODO(#3188): make sure this ends up in the `SvcRules`
+  val name: String // the human-readable name we want others to use for us
+}
+object SvBootstrapConfig {
+  case class FoundConsortium(
+      name: String,
+      initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
+      // TODO(#2168): test edge cases.
+      initialMaxNumInputs: Int = 100,
+      initialCoinPrice: BigDecimal = 1.0,
+  ) extends SvBootstrapConfig
+
+  // TODO(#2241): mock; remove once not needed anymore
+  case class JoinViaSvcApp(name: String = "not yet used") extends SvBootstrapConfig
+
+  case class JoinWithKey(
+      name: String,
+      remoteSv: RemoteSvAppConfig, // an SV that we'll contact to start our onboarding
+      publicKey: String, // the key that identifies us together with our name
+      privateKey: String, // the private key we use for authenticating ourselves
+  ) extends SvBootstrapConfig
+
+  // TODO(#3232) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
+
+  def hideConfidential(config: SvBootstrapConfig): SvBootstrapConfig = {
+    val hidden = "****"
+    config match {
+      case JoinWithKey(name, remoteSv, publicKey, _) =>
+        JoinWithKey(name, remoteSv, publicKey, hidden)
+      case other => other
+    }
+  }
+}
 
 case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
@@ -36,18 +70,11 @@ case class LocalSvAppConfig(
     remoteSvc: SvcAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
-    // TODO(#2241): consider grouping below options into some form of `SvBootstrapConfig`
     isDevNet: Boolean = false,
-    foundConsortium: Boolean = false,
     // TODO(#2241): consider renaming this to `expectedValidatorOnboardings` once naming has stabilized
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
-    initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
-    // TODO(#2168): test edge cases.
-    initialMaxNumInputs: Int = 100,
-    // TODO(M3-07): use price from SvcRules
-    // TODO(M3-46): use this also for mining rounds automation, not just init
-    coinPrice: BigDecimal = 1.0,
+    bootstrap: SvBootstrapConfig = SvBootstrapConfig.JoinViaSvcApp(),
 ) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "SV"
 

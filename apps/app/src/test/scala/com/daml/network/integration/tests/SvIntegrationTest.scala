@@ -201,8 +201,10 @@ class SvIntegrationTest extends CoinIntegrationTest {
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getDebugInfo().svParty)
       ) {
         case Seq(approvedSvId) => {
-          approvedSvId.data.candidateName shouldBe "svX"
-          approvedSvId.data.candidateKey shouldBe "mock_key"
+          // if this check fails:
+          // make sure that the values (especially the key) are in sync with sv1's config file
+          approvedSvId.data.candidateName shouldBe "sv4"
+          approvedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
         }
       }
     }

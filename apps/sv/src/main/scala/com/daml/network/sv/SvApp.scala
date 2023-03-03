@@ -12,8 +12,9 @@ import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.http.HttpSvHandler
 import com.daml.network.sv.automation.SvAutomationService
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CoinUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{HasHealth, UploadablePackage}
@@ -94,16 +95,28 @@ class SvApp(
       _ <- waitForDomainConnection(svStore.domains, config.domains.global)
       globalDomain <- waitForDomainConnection(svcStore.domains, config.domains.global)
       ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName)
-      _ <-
-        if (config.foundConsortium) {
-          foundConsortium(svcStore, ledgerConnection, globalDomain)
-        } else {
+      _ <- config.bootstrap match {
+        case foundingConfig: SvBootstrapConfig.FoundConsortium =>
+          foundConsortium(foundingConfig, svcStore, ledgerConnection, globalDomain)
+        case _: SvBootstrapConfig.JoinViaSvcApp =>
           retryProvider.retryForAutomation(
             "join existing SV consortium",
             joinConsortium(svPartyId),
             logger,
           )
-        }
+        case SvBootstrapConfig.JoinWithKey(_, _, publicKey, privateKey) =>
+          SvUtil.keyPairMatches(publicKey, privateKey) match {
+            case Right(()) => {
+              logger.info("Joining via SVC as joining with key is not implemented yet.")
+              retryProvider.retryForAutomation(
+                "join existing SV consortium",
+                joinConsortium(svPartyId),
+                logger,
+              )
+            }
+            case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
+          }
+      }
       _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
       _ <- approveConfiguredSvIdentities(svStore, ledgerConnection, globalDomain)
       isDevNet <- retryProvider.retryForAutomation(
@@ -174,6 +187,7 @@ class SvApp(
   }
 
   private def foundConsortium(
+      foundingConfig: SvBootstrapConfig.FoundConsortium,
       svcStore: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       globalDomain: DomainId,
@@ -182,7 +196,7 @@ class SvApp(
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomation(
         "boostrapping SVC",
-        bootstrapSvc(svcStore, ledgerConnection, globalDomain),
+        bootstrapSvc(foundingConfig, svcStore, ledgerConnection, globalDomain),
         logger,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
@@ -200,6 +214,7 @@ class SvApp(
 
   // Create SvcRules and CoinRules and open the first mining round
   private def bootstrapSvc(
+      foundingConfig: SvBootstrapConfig.FoundConsortium,
       store: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       domainId: DomainId,
@@ -225,10 +240,10 @@ class SvApp(
                     svcParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
                     defaultCoinConfigSchedule(
-                      config.initialTickDuration,
-                      config.initialMaxNumInputs,
+                      foundingConfig.initialTickDuration,
+                      foundingConfig.initialMaxNumInputs,
                     ),
-                    config.coinPrice.bigDecimal,
+                    foundingConfig.initialCoinPrice.bigDecimal,
                     new cn.svcrules.SvcRulesConfig(
                       10
                     ), // TODO(M3-46) handle default config values better
@@ -479,40 +494,44 @@ object SvApp {
       name,
       key,
     ).create.commands.asScala.toSeq
-    for {
-      res <- svStore.lookupApprovedSvIdentityByKeyWithOffset(key).flatMap {
-        case QueryResult(_, Some(id)) => {
-          Future.successful(
-            Left(if (id.payload.candidateName == name) {
-              s"The SV identitiy ($name:$key) is already approved."
-            } else {
-              s"Tried to approve SV identity ($name:$key), but key $key " +
-                s"is already approved for SV identity (${id.payload.candidateName},$key)."
-            })
-          )
-        }
-        case QueryResult(off, None) => {
-          ledgerConnection
-            .submitCommands(
-              actAs = Seq(svParty),
-              readAs = Seq.empty,
-              commands = approvedSvIdentity,
-              commandId = CoinLedgerConnection
-                .CommandId(
-                  "com.daml.network.sv.approveSvIdentity",
-                  Seq(svParty),
-                  s"$key",
-                ),
-              deduplicationOffset = off,
-              domainId = globalDomain,
-            )
-            .map(_ => {
-              logger.info("Created new ApprovedSvIdentity contract.")
-              Right(())
-            })
-        }
-      }
-    } yield res
+    SvUtil.parsePublicKey(key) match {
+      case Left(error) => Future.successful(Left(error))
+      case Right(_) =>
+        for {
+          res <- svStore.lookupApprovedSvIdentityByKeyWithOffset(key).flatMap {
+            case QueryResult(_, Some(id)) => {
+              Future.successful(
+                Left(if (id.payload.candidateName == name) {
+                  s"The SV identitiy ($name:$key) is already approved."
+                } else {
+                  s"Tried to approve SV identity ($name:$key), but key $key " +
+                    s"is already approved for SV identity (${id.payload.candidateName},$key)."
+                })
+              )
+            }
+            case QueryResult(off, None) => {
+              ledgerConnection
+                .submitCommands(
+                  actAs = Seq(svParty),
+                  readAs = Seq.empty,
+                  commands = approvedSvIdentity,
+                  commandId = CoinLedgerConnection
+                    .CommandId(
+                      "com.daml.network.sv.approveSvIdentity",
+                      Seq(svParty),
+                      s"$key",
+                    ),
+                  deduplicationOffset = off,
+                  domainId = globalDomain,
+                )
+                .map(_ => {
+                  logger.info("Created new ApprovedSvIdentity contract.")
+                  Right(())
+                })
+            }
+          }
+        } yield res
+    }
   }
 
   val coinPackage: UploadablePackage = new UploadablePackage {

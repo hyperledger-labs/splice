@@ -8,7 +8,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
@@ -166,7 +166,7 @@ object CNNodeConfigTransforms {
     config =>
       Seq(
         updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
-        updateAllSvAppConfigs_(c => c.focus(_.coinPrice).replace(price)),
+        updateAllSvAppFoundConsortiumConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
       ).foldLeft(config)((c, tf) => tf(c))
 
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CNNodeConfigTransform =
@@ -229,6 +229,17 @@ object CNNodeConfigTransforms {
       update: LocalSvAppConfig => LocalSvAppConfig
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs((_, config) => update(config))
+
+  def updateAllSvAppFoundConsortiumConfigs_(
+      update: SvBootstrapConfig.FoundConsortium => SvBootstrapConfig.FoundConsortium
+  ): CNNodeConfigTransform =
+    updateAllSvAppConfigs_(c =>
+      c.focus(_.bootstrap)
+        .modify(_ match {
+          case found: SvBootstrapConfig.FoundConsortium => update(found)
+          case other => other
+        })
+    )
 
   def updateAllValidatorConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
