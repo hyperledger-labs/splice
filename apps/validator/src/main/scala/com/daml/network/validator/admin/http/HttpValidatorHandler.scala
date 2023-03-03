@@ -27,7 +27,7 @@ class HttpValidatorHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 
   def onboardUser(
       respond: v0.ValidatorResource.OnboardUserResponse.type

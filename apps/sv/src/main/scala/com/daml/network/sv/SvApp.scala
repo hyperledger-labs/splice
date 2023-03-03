@@ -94,7 +94,7 @@ class SvApp(
       )
       _ <- waitForDomainConnection(svStore.domains, config.domains.global)
       globalDomain <- waitForDomainConnection(svcStore.domains, config.domains.global)
-      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName)
+      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       _ <- config.bootstrap match {
         case foundingConfig: SvBootstrapConfig.FoundConsortium =>
           foundConsortium(foundingConfig, svcStore, ledgerConnection, globalDomain)

@@ -17,12 +17,12 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class TransferIngestionService(
-    name: String,
+    ingestionTargetName: String,
     getTransferStore: DomainId => Future[TransferStore],
     domain: DomainId,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
-    loggerFactory0: NamedLoggerFactory,
+    baseLoggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
@@ -30,14 +30,15 @@ class TransferIngestionService(
 ) extends LedgerIngestionService {
 
   override protected val loggerFactory: NamedLoggerFactory =
-    loggerFactory0.append("transferIngestionLoopFor", name)
+    baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
   ): Future[CoinLedgerSubscription[?]] = for {
     transfers <- getTransferStore(domain)
   } yield connection.subscribeAsync(
-    s"TransferIngestion($name)",
+    this.getClass.getSimpleName,
+    loggerFactory,
     // TODO(#2729) Stop streaming from ledger begin here.
     LedgerOffset.LedgerBegin.getInstance,
     transfers.ingestionSink.ingestionFilter,

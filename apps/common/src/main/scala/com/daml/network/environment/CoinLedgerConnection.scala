@@ -56,7 +56,7 @@ import scala.util.{Failure, Success, Try}
 class CoinLedgerConnection(
     client: LedgerClient,
     applicationId: String,
-    loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
+    protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
     retryProvider: CoinRetries,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
@@ -64,11 +64,13 @@ class CoinLedgerConnection(
     extends FlagCloseable
     with NamedLogging {
 
+  logger.debug(s"Created connection with applicationId=$applicationId")(
+    TraceContext.empty
+  )
+
   override def onClosed(): Unit = {}
 
   import CoinLedgerConnection.*
-
-  protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
 
   private def callCallbacksOnCompletion[T](result: Future[T]): Future[T] = {
     import TraceContext.Implicits.Empty.*
@@ -323,7 +325,8 @@ class CoinLedgerConnection(
   // on contracts which include those filters and for the PoC
   // we can assume that we know the templates that implement a given interface.
   private def subscription(
-      subscriptionName: String,
+      clientName: String,
+      baseLoggerFactory: NamedLoggerFactory,
       beginOffset: LedgerOffset,
       party: PartyId,
       domain: DomainId,
@@ -333,9 +336,8 @@ class CoinLedgerConnection(
         LedgerClient.GetUpdatesRequest(beginOffset, None, party, domain)
       ),
       Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
-      subscriptionName,
       timeouts,
-      loggerFactoryForCoinLedgerConnectionOverride,
+      baseLoggerFactory.append("subsClient", clientName),
     )
   }
 
@@ -382,12 +384,13 @@ class CoinLedgerConnection(
   // TODO (#2706)
   // See `subscribe` for limitations of this method.
   def subscribeAsync(
-      subscriptionName: String,
+      clientName: String,
+      baseLoggerFactory: NamedLoggerFactory,
       beginOffset: LedgerOffset,
       filter: PartyId,
       domain: DomainId,
   )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription[?] =
-    subscription(subscriptionName, beginOffset, filter, domain)({
+    subscription(clientName, baseLoggerFactory, beginOffset, filter, domain)({
       Flow[TreeUpdate].mapAsync(1)(f)
     })
 
@@ -698,9 +701,8 @@ class CoinLedgerConnection(
 class CoinLedgerSubscription[S](
     source: Source[S, NotUsed],
     mapOperator: Flow[S, ?, ?],
-    subscriptionName: String,
     override protected val timeouts: ProcessingTimeout,
-    loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends FlagCloseableAsync
     with NamedLogging {
@@ -720,12 +722,6 @@ class CoinLedgerSubscription[S](
   )
 
   def completed: Future[Done] = completed_
-
-  override protected val loggerFactory: NamedLoggerFactory =
-    if (subscriptionName.isEmpty)
-      loggerFactoryForCoinLedgerConnectionOverride
-    else
-      loggerFactoryForCoinLedgerConnectionOverride.append("client", subscriptionName)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*

@@ -35,7 +35,7 @@ class HttpSvHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
 

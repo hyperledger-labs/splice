@@ -203,7 +203,7 @@ class ValidatorApp(
             loggerFactory,
           )
         )
-      connection = ledgerClient.connection(this.getClass.getSimpleName)
+      connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),

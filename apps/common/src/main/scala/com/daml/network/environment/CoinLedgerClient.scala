@@ -8,7 +8,7 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, Processin
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.util.concurrent.atomic.AtomicReference
@@ -44,8 +44,8 @@ class CoinLedgerClient(
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
       .intercept(
-        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor(),
         new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
+        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor(),
       )
 
     val channel = builder.build
@@ -61,18 +61,18 @@ class CoinLedgerClient(
     callbacks.getAndUpdate(prev => prev :+ f)
   }: Unit
 
-  def connection(origin: String): CoinLedgerConnection = {
-    val connection = new CoinLedgerConnection(
+  def connection(
+      connectionClient: String,
+      baseLoggerFactory: NamedLoggerFactory,
+  ): CoinLedgerConnection =
+    new CoinLedgerConnection(
       this.client,
       applicationId,
-      loggerFactory,
+      baseLoggerFactory.append("connClient", connectionClient),
       timeouts,
       retryProvider,
       callbacks,
     )
-    logger.debug(s"Created a CoinLedgerConnection ($origin).")(TraceContext.empty)
-    connection
-  }
 
   override def onClosed(): Unit = {
     client.close()

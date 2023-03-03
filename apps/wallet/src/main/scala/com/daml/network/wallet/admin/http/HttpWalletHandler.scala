@@ -68,7 +68,7 @@ class HttpWalletHandler(
   private val walletServiceParty: PartyId = store.key.walletServiceParty
   private val validatorParty: PartyId = store.key.validatorParty
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 
   override def list(respond: r0.ListResponse.type)()(
       user: String

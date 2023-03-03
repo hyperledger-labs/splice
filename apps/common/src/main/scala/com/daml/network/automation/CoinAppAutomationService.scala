@@ -26,7 +26,9 @@ abstract class CoinAppAutomationService(
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clock, retryProvider) {
 
-  protected val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
+  protected val connection = registerResource(
+    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+  )
 
   private[this] def registerDomainAcs(
       store: CoinAppStore[?, ?],
@@ -35,7 +37,7 @@ abstract class CoinAppAutomationService(
   ) = {
     val stores = store.installNewPerDomainStore(domain, perDomainLoggerFactory)
     val ingestionService = new AcsIngestionService(
-      s"${this.getClass.getSimpleName}(${store.getClass.getSimpleName})",
+      store.getClass.getSimpleName,
       store.storesIngestionSink(stores),
       domain,
       connection,
@@ -60,8 +62,8 @@ abstract class CoinAppAutomationService(
       perDomainLoggerFactory: NamedLoggerFactory,
   ) =
     new TransferIngestionService(
-      s"${this.getClass.getSimpleName}(${store.getClass.getSimpleName})",
-      store.transferStore(_),
+      store.getClass.getSimpleName,
+      store.transferStore,
       domain,
       connection,
       retryProvider,

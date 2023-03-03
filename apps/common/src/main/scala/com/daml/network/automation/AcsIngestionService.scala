@@ -12,22 +12,22 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class AcsIngestionService(
-    name: String,
+    ingestionTargetName: String,
     ingestionSink: AcsStore.IngestionSink,
     domain: DomainId,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
-    loggerFactory0: NamedLoggerFactory,
+    baseLoggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends LedgerIngestionService {
 
-  override protected val loggerFactory: NamedLoggerFactory =
-    loggerFactory0.append("ingestionLoopFor", name)
-
   private val igFilter = ingestionSink.ingestionFilter
+
+  override protected val loggerFactory: NamedLoggerFactory =
+    baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
@@ -39,7 +39,8 @@ class AcsIngestionService(
         case Some(off) => Future.successful(off)
       }
     } yield connection.subscribeAsync(
-      s"AcsIngestion($name)",
+      this.getClass.getSimpleName,
+      loggerFactory,
       new LedgerOffset.Absolute(subscribeFrom),
       igFilter.primaryParty,
       domain,
