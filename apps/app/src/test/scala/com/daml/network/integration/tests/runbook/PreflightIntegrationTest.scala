@@ -382,7 +382,7 @@ class PreflightIntegrationTest
   private def auth0Login(user: Auth0User, url: String, completedWhen: () => Boolean)(implicit
       webDriver: WebDriverType
   ) = {
-    clue(s"Auth0 user login as: ${user.email}") {
+    clue(s"Auth0 user login as: ${user.id} (${user.email})") {
       go to url
       click on "oidc-login-button"
       completeAuth0Prompts(

@@ -74,6 +74,15 @@ export const UserProvider: React.FC<{
     userAccessToken !== undefined &&
     (auth?.isAuthenticated || isHs256UnsafeToken(userAccessToken));
 
+  if (!isAuthenticated) {
+    console.debug(
+      `Not authenticated, userId: ${userId}, userAccessToken is set: ${
+        userAccessToken !== undefined
+      }, ` +
+        `auth provider is authenticated: ${auth?.isAuthenticated}, isHs256unsafetoken: ${isHs256UnsafeToken}`
+    );
+  }
+
   const loginWithSst = useCallback(
     async (userId: string, secret: string, audience: string, scope?: string) => {
       setUserId(userId);
@@ -165,6 +174,9 @@ export const useUserState: () => UserState = () => {
   if (!user) {
     throw new Error('User context not initialized');
   }
+  console.debug(
+    `user state: userId: ${user.userId}, primaryParty: ${user.primaryPartyId}, isAuthenticated: ${user.isAuthenticated}, onboarded: ${user.onboardedStatus}`
+  );
   return user;
 };
 
