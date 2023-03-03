@@ -1,6 +1,6 @@
 {
-    "name" : "DevNet nightly deployment",
-    "description" : "Daily deployment of DevNet",
+    "name": "DevNet periodic redeployment",
+    "description": "Periodic redeployment of DevNet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
@@ -8,7 +8,11 @@
     },
     "timetable" : {
       "per-hour" : 1,
-      "hours-of-day" : [ 6 ],
+      "hours-of-day": [
+        6,
+        14,
+        22
+      ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
