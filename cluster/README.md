@@ -20,6 +20,8 @@
          1. [Manual configuration actions taken by DA employees](#manual-configuration-actions-taken-by-da-employees)
          1. [Configuration actions initiated by CircleCI](#configuration-actions-initiated-by-circleci)
          1. [Pod error states](#pod-error-states)
+         1. [Check for Cluster Updates](#check-for-cluster-updates)
+         1. [Check for Autoscaler Activity](#check-for-autoscaler-activity)
       1. [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
    1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
 1. [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
@@ -438,6 +440,11 @@ The query language itself is documented [here](https://cloud.google.com/logging/
 
 ##### Exclude noisy/non-JSON containers
 
+This excludes logs that are either too voluminous to be useful or in
+the wrong format for the Google log viewer to correctly handle. This
+query can be useful to cull out noise from an overly verbose log stream.
+
+
 ```
 -resource.labels.container_name="envoy-proxy"
 -resource.labels.container_name="gke-metrics-agent"
@@ -447,6 +454,9 @@ The query language itself is documented [here](https://cloud.google.com/logging/
 
 ##### Manual configuration actions taken by DA employees
 
+This will show all configuration changes applied by a user with
+Digital Asset credentials.
+
 ```
 protoPayload.authenticationInfo.principalEmail=~"^.*@digitalasset.com$"
 protoPayload.serviceName="k8s.io"
@@ -454,16 +464,48 @@ protoPayload.serviceName="k8s.io"
 
 ##### Configuration actions initiated by CircleCI
 
+This will show all configuration changes applied by a user with
+Circle CI credentials.
+
 ```
 protoPayload.authenticationInfo.principalEmail="circleci@da-cn-devnet.iam.gserviceaccount.com"
 ```
 
 ##### Pod error states
 
+This will show all cases where a pod moves into an error state.
+
 ```
 resource.type="k8s_pod"
 resource.labels.location="us-central1"
 severity=WARNING
+```
+
+##### Check for Cluster Updates
+
+Google will periodically update the software running on a cluster in a
+way that disrupts the operation of the cluster. If you see all nodes
+in a given cluster's node pool with a younger age than you expect,
+this can identity when Google has updated the cluster. (Which involves
+restarting all nodes around the same time.)
+
+```
+protoPayload.methodName="google.container.internal.ClusterManagerInternal.UpdateClusterInternal"
+resource.type="gke_nodepool"
+```
+
+##### Check for Autoscaler Activity
+
+This can be used to inspect when the autoscaler scales a cluster up
+and down. A scale up is not disruptive to cluster operation, but a
+scale down often results in Pod downtime as a node is drained of
+running pods to be relocated elsewhere.
+
+
+```
+resource.type="k8s_cluster" AND
+log_id("events") AND
+(jsonPayload.source.component="cluster-autoscaler" OR jsonPayload.source.component="default-scheduler")
 ```
 
 #### Canton Ledger Prometheus Metrics
