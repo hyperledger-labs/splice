@@ -1348,6 +1348,10 @@
                            {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
+                           },
+                           {
+                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "value": "join-via-svc-app"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1507,6 +1511,10 @@
                            {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
+                           },
+                           {
+                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "value": "join-via-svc-app"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1666,6 +1674,10 @@
                            {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
+                           },
+                           {
+                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "value": "join-via-svc-app"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
