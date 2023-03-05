@@ -79,7 +79,9 @@ export const UserProvider: React.FC<{
       `Not authenticated, userId: ${userId}, userAccessToken is set: ${
         userAccessToken !== undefined
       }, ` +
-        `auth provider is authenticated: ${auth?.isAuthenticated}, isHs256unsafetoken: ${isHs256UnsafeToken}`
+        `auth provider is authenticated: ${auth?.isAuthenticated}, isHs256unsafeToken: ${
+          userAccessToken ? isHs256UnsafeToken(userAccessToken) : 'undefined'
+        }`
     );
   }
 

@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
+import org.openqa.selenium.bidi.Event
 import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.openqa.selenium.{
@@ -18,11 +19,12 @@ import org.openqa.selenium.{
   TakesScreenshot,
   WebDriver,
 }
+import org.openqa.selenium.json.{Json, JsonInput}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
-import java.io.File
+import java.io.{File, StringReader}
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -93,6 +95,8 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
 
 trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatchers {
 
+  import FrontendIntegrationTest.NavigationInfo
+
   val frontendNames: Seq[String] = Seq()
 
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
@@ -143,6 +147,18 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
               }
             }
           },
+        );
+        val JSON = new Json()
+        biDi.addListener[NavigationInfo](
+          new Event[NavigationInfo](
+            "browsingContext.domContentLoaded",
+            params => {
+              val reader = new StringReader(JSON.toJson(params))
+              val input = JSON.newInput(reader)
+              NavigationInfo.fromJson(input)
+            },
+          ),
+          navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
         );
       }
     }.futureValue
@@ -291,6 +307,41 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
 }
 
 object FrontendIntegrationTest {
+  class NavigationInfo(
+      val context: String,
+      val navigation: Option[String],
+      val timestamp: Long,
+      val url: String,
+  )
+  object NavigationInfo {
+    @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+    // Implemented using the selenium APIs so we can potentially upstream this.
+    def fromJson(input: JsonInput): NavigationInfo = {
+      var context: String = ""
+      var navigation: Option[String] = None
+      var timestamp: Long = 0
+      var url: String = ""
+      input.beginObject()
+      while (input.hasNext()) {
+        input.nextName() match {
+          case "context" => {
+            context = input.read[String](classOf[String])
+          }
+          case "navigation" => {
+            navigation = Option(input.read[String](classOf[String]))
+          }
+          case "timestamp" => {
+            timestamp = input.read[Long](classOf[Long])
+          }
+          case "url" => {
+            url = input.read[String](classOf[String])
+          }
+        }
+      }
+      input.endObject()
+      new NavigationInfo(context, navigation, timestamp, url)
+    }
+  }
   // counter to generate unique log-file names as otherwise each new test overwrites the previous one's log
   val counter = new AtomicLong(0)
 }
