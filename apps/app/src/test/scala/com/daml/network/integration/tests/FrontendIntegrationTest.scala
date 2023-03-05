@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.Event
-import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
+import org.openqa.selenium.bidi.log.{Log, LogLevel, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.openqa.selenium.{
   JavascriptExecutor,
@@ -102,7 +102,7 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
 
   val options: FirefoxOptions =
-    new FirefoxOptions().setHeadless(true).setLogLevel(FirefoxDriverLogLevel.DEBUG)
+    new FirefoxOptions().addArguments("-headless").setLogLevel(FirefoxDriverLogLevel.DEBUG)
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
@@ -140,10 +140,10 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
             logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
               val msg = consoleLogEntry.getText
               consoleLogEntry.getLevel match {
-                case BaseLogEntry.LogLevel.DEBUG => logger.debug(msg)
-                case BaseLogEntry.LogLevel.INFO => logger.info(msg)
-                case BaseLogEntry.LogLevel.WARNING => logger.warn(msg)
-                case BaseLogEntry.LogLevel.ERROR => logger.error(msg)
+                case LogLevel.DEBUG => logger.debug(msg)
+                case LogLevel.INFO => logger.info(msg)
+                case LogLevel.WARNING => logger.warn(msg)
+                case LogLevel.ERROR => logger.error(msg)
               }
             }
           },
