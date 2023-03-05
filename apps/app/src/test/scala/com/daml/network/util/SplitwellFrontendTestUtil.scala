@@ -73,4 +73,8 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
     field.value = invite
     click on id("request-membership-link")
   }
+
+  def getGroupContractIds()(implicit driver: WebDriverType): Set[String] =
+    // The element is hidden so we need to use .attribute("textContent") instead of .text
+    findAll(className("data-group-contract-id")).map(_.attribute("textContent").value).toSet
 }

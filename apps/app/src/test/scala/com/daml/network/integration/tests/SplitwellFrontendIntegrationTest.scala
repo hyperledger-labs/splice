@@ -270,16 +270,20 @@ class SplitwellFrontendIntegrationTest
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
         eventually(timeUntilSuccess = 20.minute) {
           findAll(className("add-user-link")) should have length 4
-          findAll(className("data-group-contract-id")) should have length 3
+          getGroupContractIds() should have size 3
         }
         val allLinks = findAll(className("add-user-link")).toSeq
         (allLinks zip (4L to 1 by -1)).foreach { case (elem, i) =>
-          val groupsBefore = findAll(className("data-group-contract-id")).toSet
+          val groupsBefore = getGroupContractIds()
+          groupsBefore should have size 3
           click on elem
           // Wait for the join to finish. Otherwise we get contention on the group contract.
           eventually() {
             findAll(className("add-user-link")) should have length i - 1
-            findAll(className("data-group-contract-id")).toSet should not equal groupsBefore
+            // Wait for the contract id to change.
+            val groupsAfter = getGroupContractIds()
+            groupsAfter should have size 3
+            groupsAfter should not equal groupsBefore
           }
         }
       }
