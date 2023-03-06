@@ -1426,6 +1426,8 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          requires:
+             - wait_for_previous_pipeline
 
   devnet_health_check:
     when:
@@ -1433,12 +1435,14 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_devnet"
       - preflight_check:
+          <<: *main-branch-only
           cluster: "devnet"
           # TODO (#3237) Move this back to the main slack channel and consider removing the
           # infrastructure to specify different channels.
@@ -1448,3 +1452,5 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          requires:
+             - wait_for_previous_pipeline
