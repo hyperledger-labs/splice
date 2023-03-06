@@ -778,7 +778,6 @@ function _set_auth0_api_user() {
 
 function subcmd_update_secrets() {
 
-
   if [ -z "${AUTH0_MANAGEMENT_API_TOKEN-}" ]; then
       _error "Environment variable AUTH0_MANAGEMENT_API_TOKEN is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets"
       exit 1

@@ -1,4 +1,4 @@
-clusterName: cn-sqlscratchnet
-image:
+cluster:
+  name: cn-sqlscratchnet
   region: "us-central1"
   repoName: "da-cn-images/cn-images"

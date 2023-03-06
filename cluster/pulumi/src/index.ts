@@ -15,7 +15,8 @@ const config = new pulumi.Config();
 // world. To avoid fully declaring these external data types, these are
 // modeled as 'any', with the any warning disabled.
 
-function loadYamlFromFile(path: PathLike): any { // eslint-disable-line @typescript-eslint/no-explicit-any
+function loadYamlFromFile(path: PathLike): any {
+  // eslint-disable-line @typescript-eslint/no-explicit-any
   return load(fs.readFileSync(path, "utf-8"));
 }
 
@@ -36,12 +37,30 @@ const WELL_KNOWN_URL =
 type Auth0SecretMap = Map<string, { [key: string]: string }>;
 
 function getAuth0(): Promise<Auth0SecretMap> {
+  const auth0Token = process.env.AUTH0_MANAGEMENT_API_TOKEN;
+  if (!auth0Token) {
+    console.error(
+      "Environment variable AUTH0_MANAGEMENT_API_TOKEN is undefined."
+    );
+    console.error(
+      "   Please see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets"
+    );
+    process.exit(1);
+  }
+
   return fetch("https://canton-network-dev.us.auth0.com/api/v2/clients", {
     headers: {
-      Authorization: "Bearer " + process.env.AUTH0_MANAGEMENT_API_TOKEN,
+      Authorization: "Bearer " + auth0Token,
     },
   })
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) {
+        console.error("Error fetching secrets from Auth0.");
+        process.exit(1);
+      }
+
+      return response.json();
+    })
     .then((data) => {
       const secrets = new Map() as Auth0SecretMap;
 
@@ -59,90 +78,90 @@ function getAuth0(): Promise<Auth0SecretMap> {
     });
 }
 
+function chartValues(chartPath: string, overrides: any = {}): any {
+  const CHART_DEFAULT_VALUES = loadYamlFromFile(
+    process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
+  );
+
+  return _.merge(
+    CHART_DEFAULT_VALUES,
+    {
+      cluster: {
+        imageTag: IMAGE_TAG,
+      },
+    },
+    overrides
+  );
+}
+
 const auth0Secrets = getAuth0();
 
 function installSvNodes() {
-    nodes.forEach((nodename: string) => {
-        const namespace = new k8s.core.v1.Namespace(nodename, {
-            metadata: {
-                name: nodename
-            }
-        });
-
-        const namespaceName = namespace.metadata.name;
-
-        const auth0Secret = new k8s.core.v1.Secret(
-            "auth0-secret-" + nodename,
-            {
-                metadata: {
-                    name: "cn-app-sv-ledger-api-auth",
-                    namespace: namespaceName,
-                },
-                stringData: auth0Secrets.then(
-                    (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
-                ),
-            },
-            {
-                dependsOn: namespace,
-            }
-        );
-
-        const CHART_DEFAULT_VALUES = loadYamlFromFile(
-            process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/values.yaml"
-        );
-
-        const bootstrapType = nodename === "sv-1" ? "found-consortium" : "join-via-svc-app";
-
-        new k8s.helm.v3.Release(
-            nodename,
-            {
-                name: "sv-app",
-                namespace: namespaceName,
-                chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
-                values: _.merge(CHART_DEFAULT_VALUES, {
-                    image: {
-                        tag: IMAGE_TAG,
-                    },
-                    bootstrapType,
-                }),
-                timeout: GLOBAL_TIMEOUT_SEC,
-            },
-            {
-                dependsOn: [namespace, auth0Secret],
-            }
-        );
+  nodes.forEach((nodename: string) => {
+    const namespace = new k8s.core.v1.Namespace(nodename, {
+      metadata: {
+        name: nodename,
+      },
     });
+
+    const namespaceName = namespace.metadata.name;
+
+    const auth0Secret = new k8s.core.v1.Secret(
+      "auth0-secret-" + nodename,
+      {
+        metadata: {
+          name: "cn-app-sv-ledger-api-auth",
+          namespace: namespaceName,
+        },
+        stringData: auth0Secrets.then(
+          (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
+        ),
+      },
+      {
+        dependsOn: namespace,
+      }
+    );
+
+    const bootstrapType =
+      nodename === "sv-1" ? "found-consortium" : "join-via-svc-app";
+
+    new k8s.helm.v3.Release(
+      nodename,
+      {
+        name: "sv-app",
+        namespace: namespaceName,
+        chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
+        values: chartValues("cn-sv-node", { bootstrapType }),
+        timeout: GLOBAL_TIMEOUT_SEC,
+      },
+      {
+        dependsOn: [namespace, auth0Secret],
+      }
+    );
+  });
 }
 
 function installDocs() {
-    const namespace = new k8s.core.v1.Namespace("docs", {
-        metadata: {
-            name: "docs"
-        }
-    });
-    const namespaceName = namespace.metadata.name;
+  const namespace = new k8s.core.v1.Namespace("docs", {
+    metadata: {
+      name: "docs",
+    },
+  });
+  const namespaceName = namespace.metadata.name;
 
-    const CHART_DEFAULT_VALUES = loadYamlFromFile(
-        process.env.REPO_ROOT + "/cluster/helm/cn-docs/values.yaml"
-    );
-
-    new k8s.helm.v3.Release(
-        "docs",
-        {
-            name: "docs",
-            namespace: namespaceName,
-            chart: process.env.REPO_ROOT + "/cluster/helm/cn-docs/",
-            values: _.merge(CHART_DEFAULT_VALUES, {
-                image: {
-                    tag: IMAGE_TAG,
-                },
-            }),
-            timeout: GLOBAL_TIMEOUT_SEC,
-        },
-        {
-            dependsOn: [namespace],
-        }
-    );
+  new k8s.helm.v3.Release(
+    "docs",
+    {
+      name: "docs",
+      namespace: namespaceName,
+      chart: process.env.REPO_ROOT + "/cluster/helm/cn-docs/",
+      values: chartValues("cn-docs"),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn: [namespace],
+    }
+  );
 }
 
 installSvNodes();

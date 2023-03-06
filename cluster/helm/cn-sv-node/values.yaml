@@ -1,4 +1,7 @@
-clusterName: cn-sqlscratchnet
+cluster:
+  name: cn-sqlscratchnet
+  region: "us-central1"
+  repoName: "da-cn-images/cn-images"
 bootstrapType: join-via-svc-app
 service:
   apiPort: 5014
@@ -7,6 +10,3 @@ resources:
   jvmOptions: "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
   memoryLimit: 1536
   cpuLimit: 1
-image:
-  region: "us-central1"
-  repoName: "da-cn-images/cn-images"
