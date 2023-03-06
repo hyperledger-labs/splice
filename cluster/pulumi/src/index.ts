@@ -15,21 +15,19 @@ const config = new pulumi.Config();
 // world. To avoid fully declaring these external data types, these are
 // modeled as 'any', with the any warning disabled.
 
-function loadYamlFromFile(path: PathLike): {
-  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-} {
+function loadYamlFromFile(path: PathLike): any { // eslint-disable-line @typescript-eslint/no-explicit-any
   return load(fs.readFileSync(path, "utf-8"));
 }
 
 const IMAGE_TAG = config.require("IMAGE_TAG");
 
-const nodes = ["sv-app-1", "sv-app-2", "sv-app-3", "sv-app-4"];
+const nodes = ["sv-1", "sv-2", "sv-3", "sv-4"];
 
 const appToClientId = {
-  "sv-app-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
-  "sv-app-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
-  "sv-app-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
-  "sv-app-4": "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN",
+  "sv-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
+  "sv-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
+  "sv-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
+  "sv-4": "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN",
 } as { [key: string]: string };
 
 const WELL_KNOWN_URL =
@@ -63,48 +61,89 @@ function getAuth0(): Promise<Auth0SecretMap> {
 
 const auth0Secrets = getAuth0();
 
-nodes.forEach((nodename: string) => {
-  const namespace = new k8s.core.v1.Namespace(nodename);
-  const namespaceName = namespace.metadata.name;
+function installSvNodes() {
+    nodes.forEach((nodename: string) => {
+        const namespace = new k8s.core.v1.Namespace(nodename, {
+            metadata: {
+                name: nodename
+            }
+        });
 
-  const auth0Secret = new k8s.core.v1.Secret(
-    "auth0-secret-" + nodename,
-    {
-      metadata: {
-        name: "cn-app-sv-ledger-api-auth",
-        namespace: namespaceName,
-      },
-      stringData: auth0Secrets.then(
-        (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
-      ),
-    },
-    {
-      dependsOn: namespace,
-    }
-  );
+        const namespaceName = namespace.metadata.name;
 
-  const CHART_DEFAULT_VALUES = loadYamlFromFile(
-    process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/values.yaml"
-  );
+        const auth0Secret = new k8s.core.v1.Secret(
+            "auth0-secret-" + nodename,
+            {
+                metadata: {
+                    name: "cn-app-sv-ledger-api-auth",
+                    namespace: namespaceName,
+                },
+                stringData: auth0Secrets.then(
+                    (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
+                ),
+            },
+            {
+                dependsOn: namespace,
+            }
+        );
 
-  const foundConsortium = nodename === "sv-app-1";
+        const CHART_DEFAULT_VALUES = loadYamlFromFile(
+            process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/values.yaml"
+        );
 
-  new k8s.helm.v3.Release(
-    nodename,
-    {
-      name: "sv-app",
-      namespace: namespaceName,
-      chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
-      values: _.merge(CHART_DEFAULT_VALUES, {
-        image: {
-          tag: IMAGE_TAG,
+        const bootstrapType = nodename === "sv-1" ? "found-consortium" : "join-via-svc-app";
+
+        new k8s.helm.v3.Release(
+            nodename,
+            {
+                name: "sv-app",
+                namespace: namespaceName,
+                chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
+                values: _.merge(CHART_DEFAULT_VALUES, {
+                    image: {
+                        tag: IMAGE_TAG,
+                    },
+                    bootstrapType,
+                }),
+                timeout: GLOBAL_TIMEOUT_SEC,
+            },
+            {
+                dependsOn: [namespace, auth0Secret],
+            }
+        );
+    });
+}
+
+function installDocs() {
+    const namespace = new k8s.core.v1.Namespace("docs", {
+        metadata: {
+            name: "docs"
+        }
+    });
+    const namespaceName = namespace.metadata.name;
+
+    const CHART_DEFAULT_VALUES = loadYamlFromFile(
+        process.env.REPO_ROOT + "/cluster/helm/cn-docs/values.yaml"
+    );
+
+    new k8s.helm.v3.Release(
+        "docs",
+        {
+            name: "docs",
+            namespace: namespaceName,
+            chart: process.env.REPO_ROOT + "/cluster/helm/cn-docs/",
+            values: _.merge(CHART_DEFAULT_VALUES, {
+                image: {
+                    tag: IMAGE_TAG,
+                },
+            }),
+            timeout: GLOBAL_TIMEOUT_SEC,
         },
-        foundConsortium,
-      }),
-      timeout: GLOBAL_TIMEOUT_SEC,
-    },
-    {
-      dependsOn: [namespace, auth0Secret],
-    }
-  );
-});
+        {
+            dependsOn: [namespace],
+        }
+    );
+}
+
+installSvNodes();
+installDocs();

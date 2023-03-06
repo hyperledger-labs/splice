@@ -1,5 +1,5 @@
 clusterName: cn-sqlscratchnet
-foundConsortium: false
+bootstrapType: join-via-svc-app
 service:
   apiPort: 5014
   apiHttpPort: 6014

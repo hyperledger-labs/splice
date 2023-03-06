@@ -1,0 +1,1 @@
+Canton Network documentation server successfully installed.

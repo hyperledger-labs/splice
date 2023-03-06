@@ -57,8 +57,8 @@ spec:
               value: "{{ .Values.service.apiPort }}"
             - name: "CN_APP_SV_IS_DEV_NET"
               value: "true"
-            - name: "CN_APP_SV_FOUND_CONSORTIUM"
-              value: "{{ .Values.foundConsortium }}"
+            - name: "CN_APP_SV_BOOTSTRAP_TYPE"
+              value: "{{ .Values.bootstrapType }}"
           ports:
             - name: sv-api
               containerPort: {{ .Values.service.apiPort }}
