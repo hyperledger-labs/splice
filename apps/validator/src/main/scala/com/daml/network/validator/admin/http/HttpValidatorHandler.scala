@@ -62,6 +62,15 @@ class HttpValidatorHandler(
       )
     }
 
+  def listUsers(
+      respond: v0.ValidatorResource.ListUsersResponse.type
+  )()(ledgerApiUser: String): Future[
+    v0.ValidatorResource.ListUsersResponse
+  ] =
+    withNewTrace(workflowId) { _ => _ =>
+      store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
+    }
+
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
     ValidatorUtil
       .onboard(

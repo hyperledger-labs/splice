@@ -83,4 +83,22 @@ object HttpValidatorAppClient {
       }
     }
   }
+
+  case object ListUsers extends BaseCommand[http.ListUsersResponse, Seq[String]] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListUsersResponse] =
+      client.listUsers(headers = headers)
+
+    override def handleResponse(
+        response: http.ListUsersResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Seq[String]] = {
+      response match {
+        case http.ListUsersResponse.OK(response) =>
+          Right(response.usernames.toSeq)
+      }
+    }
+  }
+
 }

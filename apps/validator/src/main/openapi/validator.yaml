@@ -52,6 +52,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/OnboardUserResponse"
+    get:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "listUsers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListUsersResponse"
+
 components:
   schemas:
     OnboardUserRequest:
@@ -92,3 +104,13 @@ components:
           type: string
         user_name:
           type: string
+
+    ListUsersResponse:
+      type: object
+      required:
+        - usernames
+      properties:
+        usernames:
+          type: array
+          items:
+            type: string

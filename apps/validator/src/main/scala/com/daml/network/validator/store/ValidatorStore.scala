@@ -64,6 +64,13 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
         co.payload.user == party.toProtoPrimitive
       )
     )
+
+  def listUsers(): Future[Seq[String]] = {
+    for {
+      acs <- defaultAcs
+      installs <- acs.listContracts(walletCodegen.WalletAppInstall.COMPANION)
+    } yield installs.map(i => i.payload.endUserName)
+  }
 }
 
 object ValidatorStore {

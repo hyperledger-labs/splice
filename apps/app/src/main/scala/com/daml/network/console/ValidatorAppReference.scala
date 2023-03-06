@@ -57,6 +57,15 @@ abstract class ValidatorAppReference(
       )
     }
   }
+
+  @Help.Summary("List all onboarded users")
+  def listUsers(): Seq[String] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAppClient.ListUsers
+      )
+    }
+  }
 }
 
 final class ValidatorAppBackendReference(

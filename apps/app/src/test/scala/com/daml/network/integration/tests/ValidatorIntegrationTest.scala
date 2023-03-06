@@ -185,9 +185,30 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     party1 shouldBe party2
   }
 
+  "onboard & list users" in { implicit env =>
+    initSvc()
+    aliceValidator.startSync()
+
+    actAndCheck("Register a user", aliceValidator.register())(
+      "Wait for user to be listed",
+      _ => {
+        val usernames = aliceValidator.listUsers()
+        usernames should contain theSameElementsAs Seq(
+          aliceValidator.config.ledgerApiUser,
+          aliceValidator.config.validatorWalletUser.value,
+        )
+      },
+    )
+  }
+
   "stop an uninitialized validator" in { implicit env =>
     // No svc initialized, so the validator will not succeed in initialization,
     // but the test will terminate and close it before any initialization timeout
     aliceValidator.start()
   }
+
+  // TODO(#3272): Adding a test here (e.g. by uncommenting the following) throws an ERROR "Channel ManagedChannelImpl{logId=2370, target=0.0.0.0:5012} was not shutdown properly"
+  // "this fails" in { implicit env =>
+  //   initSvc()
+  // }
 }
