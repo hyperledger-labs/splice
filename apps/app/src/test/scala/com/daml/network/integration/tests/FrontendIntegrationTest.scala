@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -35,7 +36,6 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.util.Try
-import scala.util.control.NonFatal
 
 trait CustomMatchers {
 
@@ -121,19 +121,21 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
             .toString,
         )
         val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
-        val webDriver = eventually() {
-          try {
-            new FirefoxDriver(options)
-          } catch {
-            case NonFatal(e) => {
+        val (webDriver, biDi) = eventually() {
+          val driver =
+            Try(new FirefoxDriver(options)).toEither.valueOr { e =>
               logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
               fail()
             }
+          val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
+            logger.info(s"Failed to get BiDi connection to web driver. The error was $e")
+            driver.quit()
+            fail()
           }
+          (driver, bidi)
         }
         webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
         webDrivers += (name -> webDriver)
-        val biDi = webDriver.getBiDi();
         biDi.addListener[LogEntry](
           Log.entryAdded(),
           logEntry => {
