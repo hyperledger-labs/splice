@@ -2,19 +2,18 @@ package com.daml.network.splitwell.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.CreatedEventImplicits.*
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,26 +38,23 @@ class GrpcSplitwellService(
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 
+  private def groupMembers(group: splitwellCodegen.Group): Set[String] =
+    group.members.asScala.toSet + group.owner
+
   override def listGroups(
       request: v0.ListGroupsRequest
   ): Future[v0.ListGroupsResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      val filter = CoinLedgerConnection.transactionFilterByParty(
-        providerParty,
-        splitwellCodegen.Group.COMPANION.TEMPLATE_ID,
-      )
       for {
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
-        groups <- connection.activeContracts(
-          splitwellDomains.preferred,
-          filter,
-        )
+        acs <- store.acs(splitwellDomains.preferred)
+        groups <- acs.listContracts(splitwellCodegen.Group.COMPANION)
       } yield {
-        val filtered = groups.filter(c => c.hasStakeholder(userParty))
+        val filtered =
+          groups.filter(c => groupMembers(c.payload).contains(userParty.toProtoPrimitive))
         v0.ListGroupsResponse(
           filtered
-            .flatMap(c => Contract.fromCreatedEvent(splitwellCodegen.Group.COMPANION)(c))
             .map(_.toProtoV0)
         )
       }
@@ -69,20 +65,13 @@ class GrpcSplitwellService(
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      val filter = CoinLedgerConnection.transactionFilterByParty(
-        providerParty,
-        splitwellCodegen.GroupInvite.COMPANION.TEMPLATE_ID,
-      )
       for {
-        groupInvites <- connection.activeContracts(
-          splitwellDomains.preferred,
-          filter,
-        )
+        acs <- store.acs(splitwellDomains.preferred)
+        groupInvites <- acs.listContracts(splitwellCodegen.GroupInvite.COMPANION)
       } yield {
-        val filtered = groupInvites.filter(c => c.hasStakeholder(userParty))
+        val filtered = groupInvites.filter(c => c.payload.group.owner == userParty.toProtoPrimitive)
         v0.ListGroupInvitesResponse(
           filtered
-            .flatMap(c => Contract.fromCreatedEvent(splitwellCodegen.GroupInvite.COMPANION)(c))
             .map(_.toProtoV0)
         )
       }
@@ -93,25 +82,18 @@ class GrpcSplitwellService(
   ): Future[v0.ListAcceptedGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      val filter = CoinLedgerConnection.transactionFilterByParty(
-        providerParty,
-        splitwellCodegen.AcceptedGroupInvite.COMPANION.TEMPLATE_ID,
-      )
       for {
-        acceptedGroupInvites <- connection.activeContracts(
-          splitwellDomains.preferred,
-          filter,
-        )
+        acs <- store.acs(splitwellDomains.preferred)
+        acceptedGroupInvites <- acs.listContracts(splitwellCodegen.AcceptedGroupInvite.COMPANION)
       } yield {
         val filtered =
-          acceptedGroupInvites.filter(c => c.hasStakeholder(userParty))
-        v0.ListAcceptedGroupInvitesResponse(
-          filtered
-            .flatMap(c =>
-              Contract.fromCreatedEvent(splitwellCodegen.AcceptedGroupInvite.COMPANION)(c)
+          acceptedGroupInvites
+            .filter(c =>
+              c.payload.groupKey.owner == userParty.toProtoPrimitive &&
+                c.payload.groupKey == groupKey(userParty, providerParty, request.groupId)
             )
-            .filter(c => c.payload.groupKey == groupKey(userParty, providerParty, request.groupId))
-            .map(_.toProtoV0)
+        v0.ListAcceptedGroupInvitesResponse(
+          filtered.map(_.toProtoV0)
         )
       }
     }
@@ -121,29 +103,22 @@ class GrpcSplitwellService(
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
-      val filter = CoinLedgerConnection.transactionFilterByParty(
-        providerParty,
-        splitwellCodegen.BalanceUpdate.COMPANION.TEMPLATE_ID,
-      )
       for {
-        balanceUpdates <- connection.activeContracts(
-          splitwellDomains.preferred,
-          filter,
-        )
+        acs <- store.acs(splitwellDomains.preferred)
+        balanceUpdates <- acs.listContracts(splitwellCodegen.BalanceUpdate.COMPANION)
       } yield {
-        val filtered = balanceUpdates.filter(c => c.hasStakeholder(userParty))
+        val filtered = balanceUpdates.filter(c =>
+          groupMembers(c.payload.group).contains(userParty.toProtoPrimitive) &&
+            new splitwellCodegen.GroupKey(
+              c.payload.group.owner,
+              c.payload.group.provider,
+              c.payload.group.id,
+            ) == groupKey(
+              request.getGroupKey
+            )
+        )
         v0.ListBalanceUpdatesResponse(
           filtered
-            .flatMap(c => Contract.fromCreatedEvent(splitwellCodegen.BalanceUpdate.COMPANION)(c))
-            .filter(c =>
-              new splitwellCodegen.GroupKey(
-                c.payload.group.owner,
-                c.payload.group.provider,
-                c.payload.group.id,
-              ) == groupKey(
-                request.getGroupKey
-              )
-            )
             .map(_.toProtoV0)
         )
       }
@@ -156,24 +131,23 @@ class GrpcSplitwellService(
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       val javaUserParty = userParty.toProtoPrimitive
       for {
-        balanceUpdates <- connection.activeContracts(
-          splitwellDomains.preferred,
-          providerParty,
-          splitwellCodegen.BalanceUpdate.COMPANION,
+        acs <- store.acs(splitwellDomains.preferred)
+        balanceUpdates <- acs.listContracts(
+          splitwellCodegen.BalanceUpdate.COMPANION
         )
       } yield {
         val filtered = balanceUpdates
           .filter(c =>
-            c.hasStakeholder(userParty) &&
+            groupMembers(c.payload.group).contains(userParty.toProtoPrimitive) &&
               new splitwellCodegen.GroupKey(
-                c.data.group.owner,
-                c.data.group.provider,
-                c.data.group.id,
+                c.payload.group.owner,
+                c.payload.group.provider,
+                c.payload.group.id,
               ) == groupKey(
                 request.getGroupKey
               )
           )
-          .map(_.data)
+          .map(_.payload)
 
         def combine(
             acc: Map[String, BigDecimal],

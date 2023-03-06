@@ -115,6 +115,12 @@ object SplitwellStore {
         mkFilter(splitwellCodegen.GroupRequest.COMPANION)(co =>
           co.payload.group.provider == provider
         ),
+        mkFilter(splitwellCodegen.GroupInvite.COMPANION)(co =>
+          co.payload.group.provider == provider
+        ),
+        mkFilter(splitwellCodegen.AcceptedGroupInvite.COMPANION)(co =>
+          co.payload.groupKey.provider == provider
+        ),
         mkFilter(splitwellCodegen.BalanceUpdate.COMPANION)(co =>
           co.payload.group.provider == provider
         ),
