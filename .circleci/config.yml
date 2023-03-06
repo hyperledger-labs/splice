@@ -1030,49 +1030,17 @@ jobs:
       - image: cimg/base:2021.04
     environment:
       <<: *env
+    parameters:
+      # space separated strings of workflow names to wait for.
+      workflow_names:
+        type: string
     steps:
       - checkout
       - run:
           name: "Wait for previous pipeline"
           command: |
             set -eou pipefail
-            fetch() {
-                url=$1
-                target=$2
-                curl -sSL --fail -X GET -u $CIRCLECI_TOKEN: -H "Content-Type: application/json" -o "${target}" -w "%{http_code}" "${url}"
-            }
-            fetch_previous_pipeline() {
-                fetch "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "/tmp/pipelines.json"
-                OUT=$(jq < /tmp/pipelines.json ".items | map(select(.trigger.type == \"webhook\" and .number < << pipeline.number >>)) | first")
-                >&2 echo "Waiting for build $(echo $OUT | jq '.number')"
-                echo $OUT | jq -r '.id'
-            }
-            pipeline_workflows_complete() {
-              pipeline_id=$1
-              fetch "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
-              RESULT=$(jq < /tmp/workflows.json '.items | map(.status) | all(. != "running")')
-              if [[ $RESULT == "true" ]]
-              then
-                  return 0
-              else
-                  >&2 echo "Pipeline still running"
-                  >&2 cat /tmp/workflows.json
-                  return 1
-              fi
-            }
-            PIPELINE_ID=$(fetch_previous_pipeline)
-            n=0
-            while ! pipeline_workflows_complete $PIPELINE_ID
-            do
-                echo "Pipeline still running, waiting ..."
-                sleep 5
-                n=$((n+1))
-                # 1440 = 120*60/5, i.e., 120min
-                if [[ $n -ge 1440 ]]; then
-                    echo "Waited for 120min, continuing anyway"
-                    break
-                fi
-            done
+            .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
 
   refresh_tokens:
     circleci_ip_ranges: true
@@ -1306,15 +1274,13 @@ workflows:
         context:
           - artifactory
           - slack-context
-    # Sequence all builds on main
-    # to make sure deployment & preflight check of previous
-    # build completes first.
     - wait_for_previous_pipeline:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
           - slack-context
+        workflow_names: "deploy_staging"
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -1353,6 +1319,13 @@ workflows:
         context:
           - artifactory
           - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_devnet devnet_health_check"
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -1362,6 +1335,7 @@ workflows:
         requires:
            - deployment_test
            - docker_images_push
+           - wait_for_previous_pipeline
     - preflight_check:
         cluster: "devnet"
         <<: *main-branch-only
@@ -1390,6 +1364,13 @@ workflows:
         context:
           - artifactory
           - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_testnet testnet_health_check"
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -1399,6 +1380,7 @@ workflows:
         requires:
            - deployment_test
            - docker_images_push
+           - wait_for_previous_pipeline
     - preflight_check:
         cluster: "testnet"
         <<: *main-branch-only
@@ -1426,6 +1408,14 @@ workflows:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
     jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_testnet"
       - preflight_check:
           <<: *main-branch-only
           cluster: "testnet"
@@ -1438,8 +1428,14 @@ workflows:
     when:
       equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
     jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_devnet"
       - preflight_check:
-          <<: *main-branch-only
           cluster: "devnet"
           # TODO (#3237) Move this back to the main slack channel and consider removing the
           # infrastructure to specify different channels.
