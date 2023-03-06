@@ -8,7 +8,7 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
-private[sv] object SvUtil {
+object SvUtil {
 
   def keyPairMatches(publicKeyBase64: String, privateKeyBase64: String): Either[String, Unit] = {
 
