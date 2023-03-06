@@ -630,9 +630,9 @@ commands:
           command: |
             set -eoux pipefail
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            # Virtual IP setup by charon-cmd, we assume this is the only dynamic interface.
+            # Virtual IP setup by charon-cmd, we assume this is only ip4 interface without a broadcast address.
             echo "Querying for VPN IP"
-            VPN_IP=$(sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.[0].addr_info|.[]|select(.dynamic)|.local')
+            VPN_IP=$(sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.[0].addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
             echo "Querying for network gateway"
             GATEWAY=$(sudo ip --json route list | tee /dev/stderr | jq -r '.[]|select(.gateway)|.gateway')
             echo "Querying for egress IP"
