@@ -152,59 +152,72 @@ class WalletTimeBasedIntegrationTest
       }
       aliceWallet.listSubscriptions() shouldBe empty
 
-      clue("Creating 3 subscriptions, 10 days apart") {
-        for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
-
-          val (_, requestId) = actAndCheck(
-            "Request directory entry", {
-              aliceDirectory.requestDirectoryEntry(name)._1
-            },
-          )(
-            "the corresponding subscription request is created",
-            { _ =>
-              inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) => r.contractId }
-            },
-          )
-          actAndCheck(
-            "Accept subscription request", {
-              aliceWallet.acceptSubscriptionRequest(requestId)
-            },
-          )(
-            "subscription is created",
-            _ => {
-              val subs = aliceWallet.listSubscriptions()
-              subs should have length (i + 1L)
-            },
-          )
-          advanceTime(Duration.ofDays(10))
-        }
-      }
       bracket(
-        clue("Stopping directory backend so that payments aren't collected.") {
-          directory.stop()
+        clue("Creating 3 subscriptions, 10 days apart") {
+          for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
+
+            val (_, requestId) = actAndCheck(
+              "Request directory entry", {
+                aliceDirectory.requestDirectoryEntry(name)._1
+              },
+            )(
+              "the corresponding subscription request is created",
+              { _ =>
+                inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) => r.contractId }
+              },
+            )
+            actAndCheck(
+              "Accept subscription request", {
+                aliceWallet.acceptSubscriptionRequest(requestId)
+              },
+            )(
+              "subscription is created",
+              _ => {
+                val subs = aliceWallet.listSubscriptions()
+                subs should have length (i + 1L)
+              },
+            )
+            advanceTimeAndWaitForRoundAutomation(Duration.ofDays(10))
+            advanceTimeToRoundOpen
+          }
         },
-        clue("Starting directory backend again so other tests can use it") {
-          directory.startSync()
+        clue("Cancel subscriptions to avoid affecting other test cases") {
+          // to trigger a payment->idle state transition if needed
+          advanceTime(Duration.ofSeconds(1))
+          cancelAllSubscriptions(aliceWallet)
         },
       ) {
-        actAndCheck(
-          "Wait for the time for a payment on the first subscription to arrive",
-          advanceTime(Duration.ofDays(60)),
-        )(
-          "2 idle subscriptions and 1 payment are listed",
-          _ => {
-            val subs = aliceWallet.listSubscriptions()
-            subs should have length 3
-            subs
-              .collect(_.state match {
-                case s: HttpWalletAppClient.SubscriptionIdleState => s
-              }) should have length 2
-            subs
-              .collect(_.state match {
-                case s: HttpWalletAppClient.SubscriptionPayment => s
-              }) should have length 1
+        bracket(
+          clue("Stopping directory backend so that payments aren't collected.") {
+            directory.stop()
           },
-        )
+          clue("Starting directory backend again so other tests can use it") {
+            directory.startSync()
+          },
+        ) {
+          actAndCheck(
+            "Wait for a payment on the first subscription to become possible", {
+              // We time the advances so that automation doesn't trigger before
+              // payments can be made.
+              advanceTimeAndWaitForRoundAutomation(Duration.ofDays(59).minus(Duration.ofMinutes(9)))
+              advanceTimeToRoundOpen
+            },
+          )(
+            "2 idle subscriptions and 1 payment are listed",
+            _ => {
+              val subs = aliceWallet.listSubscriptions()
+              subs should have length 3
+              subs
+                .collect(_.state match {
+                  case s: HttpWalletAppClient.SubscriptionIdleState => s
+                }) should have length 2
+              subs
+                .collect(_.state match {
+                  case s: HttpWalletAppClient.SubscriptionPayment => s
+                }) should have length 1
+            },
+          )
+        }
       }
     }
 
@@ -512,7 +525,6 @@ class WalletTimeBasedIntegrationTest
       )
 
       transferAndCheckRewards((0.5, 0.6))
-
     }
 
     "generate rewards for subscriptions" in { implicit env =>
@@ -524,6 +536,12 @@ class WalletTimeBasedIntegrationTest
         directory.getProviderPartyId()
       }
 
+      clue(
+        "Advance seven rounds to ensure that rewards from previous test cases were claimed or expired"
+      ) {
+        Range(1, 8).foreach(_ => advanceRoundsByOneTick)
+      }
+
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
         aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
@@ -533,55 +551,60 @@ class WalletTimeBasedIntegrationTest
       val (_, subReqId) = clue("Alice requests a directory entry") {
         aliceDirectory.requestDirectoryEntry(testEntryName)
       }
-      clue("Alice obtains some coins and accepts the subscription") {
-        aliceWallet.tap(50.0)
-        aliceWallet.acceptSubscriptionRequest(subReqId)
-      }
-      clue("Getting Alice's new entry") {
-        def tryGetEntry() =
-          Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
-        eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
-      }
-
-      clue("Wait for reward coupons to be issued") {
-        eventually()({
-          aliceValidatorWallet.listAppRewardCoupons() should have length 1
-          aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
-          directory.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
-              dirParty,
-              _.data.provider == dirParty.toProtoPrimitive,
-            ) should have length 1
-        })
-      }
-
-      actAndCheck(
-        "Advance six rounds - all rewards should be claimed or expired",
-        Range(1, 7).foreach(_ => advanceRoundsByOneTick),
-      )(
-        "",
-        _ => {
-          aliceValidatorWallet.listAppRewardCoupons() should be(empty)
-          aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
-          directory.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
-              dirParty,
-              _.data.provider == dirParty.toProtoPrimitive,
-            ) should be(empty)
+      bracket(
+        clue("Alice obtains some coins and accepts the subscription") {
+          aliceWallet.tap(50.0)
+          aliceWallet.acceptSubscriptionRequest(subReqId)
         },
-      )
+        clue("Cancel subscription to avoid affecting other test cases") {
+          cancelAllSubscriptions(aliceWallet)
+        },
+      ) {
+        clue("Getting Alice's new entry") {
+          def tryGetEntry() =
+            Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+        }
 
-      actAndCheck(
-        "Advance time until directory entry is up for renewal",
-        advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10))),
-      )(
-        "Wait for another coupon to be generated upon renewal",
-        // We test here that subscription renewal leads to issuing reward coupons.
-        // Since we are using a shared environment, there may be leftover subscriptions from other
-        // tests which will also be renewed here, and generate reward coupons, thus we are not checking
-        // for any exact number of coupons here, just that some reward coupons have been issued.
-        _ => aliceValidatorWallet.listAppRewardCoupons() should not be (empty),
-      )
+        clue("Wait for reward coupons to be issued") {
+          eventually()({
+            aliceValidatorWallet.listAppRewardCoupons() should have length 1
+            aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
+            directory.remoteParticipant.ledger_api_extensions.acs
+              .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
+                dirParty,
+                _.data.provider == dirParty.toProtoPrimitive,
+              ) should have length 1
+          })
+        }
+
+        actAndCheck(
+          "Advance six rounds - all rewards should be claimed or expired",
+          Range(1, 7).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "",
+          _ => {
+            aliceValidatorWallet.listAppRewardCoupons() should be(empty)
+            aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
+            directory.remoteParticipant.ledger_api_extensions.acs
+              .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
+                dirParty,
+                _.data.provider == dirParty.toProtoPrimitive,
+              ) should be(empty)
+          },
+        )
+
+        actAndCheck(
+          "Advance time until directory entry is up for renewal", {
+            // We time the advances so that automation doesn't trigger before payments can be made.
+            advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))
+            advanceTimeToRoundOpen
+          },
+        )(
+          "Wait for another coupon to be generated upon renewal",
+          _ => aliceValidatorWallet.listAppRewardCoupons() should have length 1,
+        )
+      }
     }
   }
 }

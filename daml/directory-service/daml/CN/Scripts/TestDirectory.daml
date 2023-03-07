@@ -35,7 +35,6 @@ testWithSubscription = script do
   directoryInstall <- submit provider.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
     svc = app.svc
     entryFee = entryFee
-    collectionDuration = minutes 5
     renewalDuration = days 30
     entryLifetime = days 90
 
@@ -91,6 +90,11 @@ testWithSubscription = script do
   -- cc wallet automatically selects a large enough coin and initiates a subscription payment during the scheduled renewal period
   -- how: cc wallet
   passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app user
+  appContext <- getAppTransferContext app provider
+
   coin <- tap app user 1.5
   (paymentCid, _) <- submitMulti [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
@@ -114,6 +118,10 @@ testWithSubscription = script do
     walletProvider = app.svc
 
   passTime (days 90)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app user
+  appContext <- getAppTransferContext app provider
 
   -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
   (paymentCid, _) <- submitMulti [user.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
@@ -129,6 +137,8 @@ testWithSubscription = script do
 
   -- directory provider can eventually expire an unfunded entry
   passTime (days 121)
+  runNextIssuance app
+  passTimeToRoundOpen app
   submit provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   -- directory provider can then also terminate the subscription

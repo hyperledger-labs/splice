@@ -43,7 +43,6 @@ createPaymentRequest app provider sender receiverAmounts = do
     receiverAmounts = map (uncurry ReceiverAmount) receiverAmounts
     deliveryOffer = toInterfaceContractId deliveryOffer
     expiresAt = t `addRelTime` minutes 5
-    collectionDuration = minutes 5
   return (res, deliveryOffer)
 
 createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
@@ -566,12 +565,9 @@ testInsufficientFundsBatchSubscriptions = script do
     svcParty = app.svc
     validatorParty = validator
 
-
-
   let payData = SubscriptionPayData with
         paymentInterval = days 28
         paymentDuration = days 1
-        collectionDuration = minutes 5
         paymentAmount = PaymentAmount 10.0 USD
 
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
@@ -607,6 +603,9 @@ testInsufficientFundsBatchSubscriptions = script do
   (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   passTime (days 27)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  context <- getPaymentTransferContext app alice
 
   coin <- tap app alice 5.0
   -- TODO(#2957): remove read-as SVC.

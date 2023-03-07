@@ -183,6 +183,16 @@ runNextIssuanceInternal app coinPrice = do
 
     pure ()
 
+-- Set time so that at least one mining round is open and usable
+passTimeToRoundOpen : CCApp -> Script ()
+passTimeToRoundOpen app = do
+  now <- getTime
+  -- only get rounds that won't close soon
+  rounds <- queryFilter @OpenMiningRound app.svc (\round -> now < round.targetClosesAt)
+  case minimumOn (\(_, r) -> r.opensAt) rounds of
+    None -> abort "No open open mining rounds that aren't past their target close time"
+    Some (_, r) -> setTime (max now r.opensAt)
+
 -- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
 skipNRounds : CCApp -> Int -> Script ()
 skipNRounds app n = do

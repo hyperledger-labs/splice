@@ -33,9 +33,6 @@ class DirectoryInstallRequestTrigger(
     ) {
 
   private val entryFee: BigDecimal = 1.0
-  private val collectionDuration = new RelTime(
-    10_000_000
-  )
   private val renewalDuration = new RelTime(
     // 1 day, so subscriptions can be payed between day 89 and day 90
     24 * 60 * 60 * 1_000_000L
@@ -69,7 +66,6 @@ class DirectoryInstallRequestTrigger(
           val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
             store.svcParty.toProtoPrimitive,
             entryFee.bigDecimal,
-            collectionDuration,
             renewalDuration,
             entryLifetime,
           )

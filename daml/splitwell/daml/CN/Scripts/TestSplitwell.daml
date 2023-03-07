@@ -28,7 +28,6 @@ requestGroup app p provider id =
     members = []
     id = GroupId id
     svc = app.svc
-    collectionDuration = minutes 5
     acceptDuration = minutes 5
 
 getSplitwellInstall : CCUser -> CCUser -> Script (ContractId SplitwellInstall)

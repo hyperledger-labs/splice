@@ -4,7 +4,6 @@ module CN.Wallet.Payment where
 
 import DA.Action
 import DA.List (dedupSort)
-import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
@@ -44,18 +43,17 @@ data ReceiverCCAmount = ReceiverCCAmount
    ccAmount : Decimal
  deriving (Show, Eq, Ord)
 
-paymentAmountToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentAmount -> Update Decimal
+paymentAmountToCC : Party -> Party -> OpenMiningRoundView -> PaymentAmount -> Update Decimal
 paymentAmountToCC svc submitter openMiningRound pq =
   case pq.currency of
     USD ->
       do
-        round <- exercise @OpenMiningRound openMiningRound (OpenMiningRound_Fetch submitter)
-        require "SVC matches" (round.svc == svc)
-        pure (pq.amount / round.coinPrice)
+        require "SVC matches" (openMiningRound.svc == svc)
+        pure (pq.amount / openMiningRound.coinPrice)
     CC ->
       pure pq.amount
 
-receiverAmountToCCReceiverAmount : Party -> Party -> (ContractId OpenMiningRound) -> ReceiverAmount -> Update ReceiverCCAmount
+receiverAmountToCCReceiverAmount : Party -> Party -> OpenMiningRoundView -> ReceiverAmount -> Update ReceiverCCAmount
 receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
   do
     cc <- paymentAmountToCC svc submitter openMiningRound rq.amount
@@ -73,12 +71,11 @@ template AppPaymentRequest
     provider : Party -- ^ The app provider; receives usage rewards.
     svc : Party -- ^ The issuer of CC that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
-    collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
     deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
   where
 
     signatory sender, appPaymentRequest_receivers this, provider
-    ensure (collectionDuration > aunit && all (\rq -> rq.amount.amount > 0.0) receiverAmounts)
+    ensure all (\rq -> rq.amount.amount > 0.0) receiverAmounts
 
     choice AppPaymentRequest_Accept
       : (ContractId AcceptedAppPayment, Optional (ContractId Coin))
@@ -91,9 +88,12 @@ template AppPaymentRequest
          -- check that the reference is active and implements DeliveryOffer
          void $ fetch deliveryOffer
 
+         contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
+         require "Round is set to expire in the future" (now < contextRound.targetClosesAt)
+
          -- Convert from USD to CC amounts
          ccReceiverAmounts <- forA receiverAmounts $ \rq ->
-           receiverAmountToCCReceiverAmount svc sender context.context.openMiningRound rq
+           receiverAmountToCCReceiverAmount svc sender contextRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
          outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
@@ -110,7 +110,7 @@ template AppPaymentRequest
                     amount = sum outputFees + sum (map (.ccAmount) ccReceiverAmounts)
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
-                      expiresAt = now `addRelTime` collectionDuration
+                      expiresAt = contextRound.targetClosesAt
                     receiverFeeRatio = 0.0
                 ]
               payload = "lock payment"

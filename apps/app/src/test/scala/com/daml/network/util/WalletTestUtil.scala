@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -183,7 +184,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         userParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         now.plus(Duration.ofMinutes(1)).toInstant,
-        new RelTime(60 * 1000000),
         referenceId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )
       val result = remoteParticipant.ledger_api_extensions.commands.submitWithResult(
@@ -308,7 +308,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         aliceUserParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         Instant.now().plus(5, ChronoUnit.MINUTES), // expires in 5 min
-        new RelTime(5 * 60 * 1000000L), // 5min collection duration.
         deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )
       aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
@@ -382,7 +381,6 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       amount,
       new RelTime(60 * 60 * 1000000L),
       new RelTime(10 * 60 * 1000000L),
-      new RelTime(60 * 1000000L),
     )
     (subscription, payData)
   }
@@ -450,5 +448,16 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         commands = state.create.commands.asScala.toSeq,
       )
     }
+  }
+
+  def cancelAllSubscriptions(wallet: WalletAppClientReference) = eventually() {
+    wallet
+      .listSubscriptions()
+      .map(sub =>
+        wallet.cancelSubscription(inside(sub.state) {
+          case HttpWalletAppClient.SubscriptionIdleState(c) => c.contractId
+        })
+      )
+    wallet.listSubscriptions() shouldBe empty
   }
 }

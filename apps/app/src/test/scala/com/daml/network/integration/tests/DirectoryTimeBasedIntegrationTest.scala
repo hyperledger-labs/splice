@@ -98,8 +98,11 @@ class DirectoryTimeBasedIntegrationTest
           )
           entry.payload shouldBe expectedPayload
         }
-        // Advance so we’re within the renewalInterval
-        advanceTime(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
+        // Advance so we're within the renewalInterval + make sure that we have
+        // an open round that we can use. We time the advances so that
+        // automation doesn't trigger before payments can be made.
+        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
+        advanceTimeToRoundOpen
         val renewedEntry = clue(
           "Eventually, Alice makes a follup-up subscription payment, which the directory collects, renewing her entry."
         ) {
@@ -190,8 +193,11 @@ class DirectoryTimeBasedIntegrationTest
       }
       // to avoid automation triggering before the round change
       bracket(directory.stop(), directory.startSync()) {
-        // Advance so we’re within the renewalInterval
-        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).plus(Duration.ofSeconds(10)))
+        // Advance so we're within the renewalInterval + make sure that we have
+        // an open round that we can use. We time the advances so that
+        // automation doesn't trigger before payments can be made.
+        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
+        advanceTimeToRoundOpen
         eventually() {
           aliceWallet
             .listSubscriptions()

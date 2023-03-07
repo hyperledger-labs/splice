@@ -286,6 +286,22 @@ trait TimeTestUtil extends CoinTestCommon {
     )
   }
 
+  /** This function advances time until at least one mining round that is not
+    *  past its target closing time is open. The function fails if no open
+    *  mining round exists where this is possible.
+    */
+  def advanceTimeToRoundOpen(implicit env: CoinTestConsoleEnvironment) = {
+    val now = svc.remoteParticipant.ledger_api.time.get().toInstant
+    val (openRounds, _) = scan.getOpenAndIssuingMiningRounds()
+    val earliestOpen = openRounds
+      .filter(round => now.isBefore(round.payload.targetClosesAt))
+      .map(_.payload.opensAt)
+      .min
+    if (now.isBefore(earliestOpen)) {
+      advanceTime(Duration.between(now, earliestOpen))
+    }
+  }
+
   def getSortedOpenMiningRounds(
       remoteParticipant: CoinRemoteParticipantReference,
       validatorPartyId: PartyId,

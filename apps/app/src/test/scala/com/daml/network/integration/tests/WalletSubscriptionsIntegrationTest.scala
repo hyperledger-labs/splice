@@ -190,7 +190,6 @@ class WalletSubscriptionsIntegrationTest
           ),
           new RelTime(60 * 60 * 1000000L),
           new RelTime(60 * 60 * 1000000L),
-          new RelTime(60 * 1000000L),
         ) // paymentDuration == paymenInterval, so we can make a second payment immediately,
         // without having to mess with time
         val request = new subsCodegen.SubscriptionRequest(

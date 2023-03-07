@@ -151,7 +151,6 @@ template Group
     members : [Party]
     id: GroupId
     provider : Party -- In non-provider centric model: provider = owner
-    collectionDuration : RelTime -- Time user has to collect an approved transfer via the group
     acceptDuration : RelTime -- Time user has to accept a transfer request in their wallet
   where
     signatory provider, owner, members
@@ -199,7 +198,6 @@ template Group
            sender, provider, svc
            receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
            expiresAt = now `addRelTime` acceptDuration
-           collectionDuration = collectionDuration
            deliveryOffer = toInterfaceContractId deliveryOffer
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate

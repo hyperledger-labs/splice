@@ -9,6 +9,8 @@ data OpenMiningRoundView = OpenMiningRoundView with
   svc : Party
   round : Round
   coinPrice : Decimal
+  opensAt : Time
+  targetClosesAt : Time
 
 interface OpenMiningRound where
   viewtype OpenMiningRoundView

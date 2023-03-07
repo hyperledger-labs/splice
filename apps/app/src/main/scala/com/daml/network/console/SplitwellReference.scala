@@ -65,9 +65,6 @@ final class SplitwellAppClientReference(
 ) extends SplitwellAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
-  private val collectionDuration = new RelTime(
-    10_000_000
-  )
   private val acceptDuration = new RelTime(
     60_000_000
   )
@@ -188,7 +185,6 @@ final class SplitwellAppClientReference(
           Seq.empty.asJava,
           new splitwellCodegen.GroupId(id),
           provider.toProtoPrimitive,
-          collectionDuration,
           acceptDuration,
         )
       ),

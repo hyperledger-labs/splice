@@ -10,7 +10,6 @@ import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment
 import { ContractId } from '@daml/types';
 
 class SplitwellLedgerApiClient extends LedgerApiClient {
-  collectionDuration: string = (5 * 60 * 1000000).toString();
   acceptDuration: string = (5 * 60 * 1000000).toString();
 
   async requestGroup(user: string, provider: string, svc: string, id: string, domainId: string) {
@@ -27,7 +26,6 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
           svc: svc,
           id: { unpack: id },
           members: [],
-          collectionDuration: { microseconds: this.collectionDuration },
           acceptDuration: { microseconds: this.acceptDuration },
         },
       },
