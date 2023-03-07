@@ -4,6 +4,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.DomainId
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.DomainStore
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
@@ -25,7 +26,7 @@ import DomainOrchestrator.*
 final class DomainOrchestrator private (
     triggerContext: TriggerContext,
     domainStore: DomainStore,
-    startService: (DomainStore.DomainAdded, NamedLoggerFactory) => Svc,
+    startService: (DomainStore.DomainAdded, TriggerContext) => Svc,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends SourceBasedTrigger[DomainStore.DomainConnectionEvent]
     with HasHealth
@@ -41,9 +42,21 @@ final class DomainOrchestrator private (
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private[this] var services: Map[DomainId, Svc] = Map.empty
+  private[this] var services: Map[DomainId, (TriggerContext, Svc)] = Map.empty
 
-  private def updateServices[T](f: Map[DomainId, Svc] => (Map[DomainId, Svc], T)): Future[T] =
+  triggerContext.retryProvider.runOnShutdown(new RunOnShutdown {
+    override def name = s"shutdown per domain retry providers"
+    // this is not perfectly precise, but CoinRetries.close is idempotent
+    override def done = false
+    override def run() =
+      services.values.foreach { case (ctx, _) =>
+        ctx.retryProvider.close()
+      }
+  })(TraceContext.empty)
+
+  private def updateServices[T](
+      f: Map[DomainId, (TriggerContext, Svc)] => (Map[DomainId, (TriggerContext, Svc)], T)
+  ): Future[T] =
     Future {
       blocking {
         synchronized {
@@ -70,9 +83,18 @@ final class DomainOrchestrator private (
             (services, TaskSuccess(msg))
           } else {
             val perDomainLoggerFactory =
-              loggerFactory.append("domainId", show"${event.domainId}")
+              triggerContext.loggerFactory.append("domainId", show"${event.domainId}")
+            val perDomainRetries =
+              new CoinRetries(perDomainLoggerFactory, triggerContext.retryProvider.timeouts)
+            val perDomainContext = triggerContext.copy(
+              retryProvider = perDomainRetries,
+              loggerFactory = perDomainLoggerFactory,
+            )
             val newServices =
-              services + (event.domainId -> startService(event, perDomainLoggerFactory))
+              services + (event.domainId -> (perDomainContext, startService(
+                event,
+                perDomainContext,
+              )))
             (newServices, TaskSuccess(show"Started new service for ${event.domainId}"))
           }
         )
@@ -84,7 +106,8 @@ final class DomainOrchestrator private (
                 show"Received domain disconnection for ${event.domainId} without a connect before, ignoring..."
               logger.warn(msg)
               (services, TaskSuccess(msg))
-            case Some(svc) =>
+            case Some((context, svc)) =>
+              context.retryProvider.close()
               svc.close()
               val newServices = services - event.domainId
               (newServices, TaskSuccess(show"Stopped service for ${event.domainId}"))
@@ -96,12 +119,12 @@ final class DomainOrchestrator private (
   protected def isStaleTask(task: DomainStore.DomainConnectionEvent)(implicit tc: TraceContext) =
     Future.successful(false)
 
-  override def isHealthy: Boolean = services.values.forall(_.isHealthy)
+  override def isHealthy: Boolean = services.values.forall(_._2.isHealthy)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     SyncCloseable(
       "Per-domain services",
-      Lifecycle.close(services.values.toSeq: _*)(logger),
+      Lifecycle.close(services.values.map(_._2).toSeq: _*)(logger),
     ) +: super.closeAsync()
 }
 
@@ -111,32 +134,31 @@ object DomainOrchestrator {
   def apply(
       triggerContext: TriggerContext,
       domainStore: DomainStore,
-      startService: (DomainStore.DomainAdded, NamedLoggerFactory) => Svc,
+      startService: (DomainStore.DomainAdded, TriggerContext) => Svc,
   )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): DomainOrchestrator =
     new DomainOrchestrator(triggerContext, domainStore, startService)
 
   def multipleServices(
-      services: Seq[(DomainStore.DomainAdded, NamedLoggerFactory) => Svc],
+      services: Seq[(DomainStore.DomainAdded, TriggerContext) => Svc],
       loggerFactory: NamedLoggerFactory,
-  ): (DomainStore.DomainAdded, NamedLoggerFactory) => Svc = {
-    case (event, perDomainLoggerFactory) =>
-      val lf = loggerFactory
-      new HasHealth with AutoCloseable with NamedLogging {
-        private val (started, failure) = mapOrAbort(services)(f =>
-          try Right(f(event, perDomainLoggerFactory))
-          catch { case NonFatal(t) => Left(t) }
-        )
-        failure.foreach { err =>
-          close()
-          throw err
-        }
-
-        override def isHealthy = started.forall(_.isHealthy)
-
-        override def close(): Unit = Lifecycle.close(started: _*)(logger)
-
-        protected override def loggerFactory = lf
+  ): (DomainStore.DomainAdded, TriggerContext) => Svc = { case (event, triggerContext) =>
+    val lf = loggerFactory
+    new HasHealth with AutoCloseable with NamedLogging {
+      private val (started, failure) = mapOrAbort(services)(f =>
+        try Right(f(event, triggerContext))
+        catch { case NonFatal(t) => Left(t) }
+      )
+      failure.foreach { err =>
+        close()
+        throw err
       }
+
+      override def isHealthy = started.forall(_.isHealthy)
+
+      override def close(): Unit = Lifecycle.close(started: _*)(logger)
+
+      protected override def loggerFactory = lf
+    }
   }
 
   import collection.immutable.SeqOps

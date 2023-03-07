@@ -4,7 +4,6 @@ import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.daml.network.store.CoinAppStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
@@ -33,17 +32,17 @@ abstract class CoinAppAutomationService(
   private[this] def registerDomainAcs(
       store: CoinAppStore[?, ?],
       domain: DomainId,
-      perDomainLoggerFactory: NamedLoggerFactory,
+      perDomainTriggerContext: TriggerContext,
   ) = {
-    val stores = store.installNewPerDomainStore(domain, perDomainLoggerFactory)
+    val stores = store.installNewPerDomainStore(domain, perDomainTriggerContext.loggerFactory)
     val ingestionService = new AcsIngestionService(
       store.getClass.getSimpleName,
       store.storesIngestionSink(stores),
       domain,
       connection,
-      retryProvider,
-      perDomainLoggerFactory,
-      timeouts,
+      perDomainTriggerContext.retryProvider,
+      perDomainTriggerContext.loggerFactory,
+      perDomainTriggerContext.timeouts,
     )
     import com.daml.network.util.HasHealth
     new HasHealth with AutoCloseable {
@@ -59,16 +58,16 @@ abstract class CoinAppAutomationService(
   def newTransferIngestionService(
       store: CoinAppStore[?, ?],
       domain: DomainId,
-      perDomainLoggerFactory: NamedLoggerFactory,
+      perDomainTriggerContext: TriggerContext,
   ) =
     new TransferIngestionService(
       store.getClass.getSimpleName,
       store.transferStore,
       domain,
       connection,
-      retryProvider,
-      perDomainLoggerFactory,
-      timeouts,
+      perDomainTriggerContext.retryProvider,
+      perDomainTriggerContext.loggerFactory,
+      perDomainTriggerContext.timeouts,
     )
 
   stores.values.foreach(store => {
@@ -84,10 +83,8 @@ abstract class CoinAppAutomationService(
       store.domains,
       DomainOrchestrator.multipleServices(
         Seq(
-          (da, perDomainLoggerFactory) =>
-            registerDomainAcs(store, da.domainId, perDomainLoggerFactory),
-          (da, perDomainLoggerFactory) =>
-            newTransferIngestionService(store, da.domainId, perDomainLoggerFactory),
+          (da, triggerContext) => registerDomainAcs(store, da.domainId, triggerContext),
+          (da, triggerContext) => newTransferIngestionService(store, da.domainId, triggerContext),
         ),
         loggerFactory,
       ),

@@ -105,10 +105,10 @@ class UserWalletAutomationService(
             ),
           createTransferInTrigger,
         ).map { createTrigger =>
-          { case (domainAdded, perDomainLoggerFactory) =>
+          { case (domainAdded, triggerContext) =>
             val trigger = createTrigger(
               domainAdded,
-              triggerContext.copy(loggerFactory = perDomainLoggerFactory),
+              triggerContext,
             )
             trigger.run()
             trigger

@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -10,6 +11,8 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
@@ -126,6 +129,37 @@ class SplitwellIntegrationTest
       val user = providerSplitwellBackend.remoteParticipantWithAdminToken.ledger_api.users
         .get(providerSplitwellBackend.config.providerUser)
       Some(providerSplitwellBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
+    }
+
+    "domain disconnect" in { implicit env =>
+      val alice = onboardWalletUser(aliceWallet, aliceValidator)
+      aliceSplitwell.createInstallRequest()
+      aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+        .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
+      actAndCheck("alice creates group1", aliceSplitwell.requestGroup("group1"))(
+        "alice observes group",
+        _ => aliceSplitwell.listGroups() should have size 1,
+      )
+      try {
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+          providerSplitwellBackend.remoteParticipant.domains
+            .disconnect(DomainAlias.tryCreate("splitwell")),
+          logs =>
+            logs.filter(
+              _.message.contains(
+                "Completed processing with outcome: Stopped service for splitwell::"
+              )
+            ) should have size 8,
+        )
+      } finally {
+        providerSplitwellBackend.remoteParticipant.domains.reconnect(
+          DomainAlias.tryCreate("splitwell")
+        )
+      }
+      actAndCheck("alice creates group2", aliceSplitwell.requestGroup("group2"))(
+        "alice observes group",
+        _ => aliceSplitwell.listGroups() should have size 2,
+      )
     }
   }
 }

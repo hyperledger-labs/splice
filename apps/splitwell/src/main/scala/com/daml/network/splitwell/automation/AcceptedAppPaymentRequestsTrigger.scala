@@ -23,7 +23,6 @@ class AcceptedAppPaymentRequestsTrigger(
     store: SplitwellStore,
     connection: CoinLedgerConnection,
     globalDomain: DomainAlias,
-    splitwellDomain: DomainAlias,
     scanConnection: ScanConnection,
 )(implicit
     ec: ExecutionContext,

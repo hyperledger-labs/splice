@@ -54,27 +54,36 @@ class SplitwellAutomationService(
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  registerTrigger(
+  // TODO(#3285) Consider not even starting this on non-splitwell
+  // domains.
+  def createAcceptedAppPaymentRequestTrigger(
+      domainAdded: DomainStore.DomainAdded,
+      triggerContext: TriggerContext,
+  ) =
     new AcceptedAppPaymentRequestsTrigger(
       triggerContext,
       store,
       connection,
-      domainConfig.global,
-      domainConfig.splitwell.preferred,
+      domainAdded.domainAlias,
       scanConnection,
     )
-  )
-  registerTrigger(
+
+  def createSplitwellInstallRequestTrigger(
+      domainAdded: DomainStore.DomainAdded,
+      triggerContext: TriggerContext,
+  ) =
     new SplitwellInstallRequestTrigger(
       triggerContext,
       store,
       connection,
-      domainConfig.splitwell.preferred,
+      domainAdded.domainAlias,
     )
-  )
-  registerTrigger(
-    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell.preferred)
-  )
+
+  def createGroupRequestTrigger(
+      domainAdded: DomainStore.DomainAdded,
+      triggerContext: TriggerContext,
+  ) =
+    new GroupRequestTrigger(triggerContext, store, connection, domainAdded.domainAlias)
 
   def createTransferOutTrigger[TCid <: ContractId[T], T <: Template](
       companion: TemplateCompanion[TCid, T]
@@ -108,11 +117,14 @@ class SplitwellAutomationService(
         Seq(
           createTransferOutTrigger(splitwellCodegen.BalanceUpdate.COMPANION),
           createTransferInTrigger,
+          createAcceptedAppPaymentRequestTrigger,
+          createSplitwellInstallRequestTrigger,
+          createGroupRequestTrigger,
         ).map { createTrigger =>
-          { case (domainAdded, perDomainLoggerFactory) =>
+          { case (domainAdded, triggerContext) =>
             val trigger = createTrigger(
               domainAdded,
-              triggerContext.copy(loggerFactory = perDomainLoggerFactory),
+              triggerContext,
             )
             trigger.run()
             trigger
