@@ -109,8 +109,17 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
                   }
                 }
               )
-              clue("waiting for all requests to be handled or archived") {
+              clue(
+                "waiting for all install requests creations and archive submissions to be completed"
+              ) {
                 Future.sequence(installAttemptsFs).futureValue
+              }
+              clue("Waiting for all install requests to be archived") {
+                eventually() {
+                  aliceValidator.remoteParticipant.ledger_api_extensions.acs.filterJava(
+                    codegen.DirectoryInstallRequest.COMPANION
+                  )(aliceUserParty) shouldBe empty
+                }
               }
             },
           )(
@@ -131,62 +140,67 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
           installCid
         }
 
-        // Start executing the actual test
-        val installCid = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          raceInstalls(),
-          lines => {
-            // check that all errors are due to races on the contracts
-            forAll(lines) { line =>
-              if (line.level == Level.ERROR)
-                line.message should (include("ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS") or include(
-                  "NOT_FOUND/LOCAL_VERDICT_INACTIVE_CONTRACTS"
-                ))
-            }
+        // We need to use assertEventuallyLogsSeq. Otherwise,
+        // we wait for the trigger to finish handling the install requests but the logs
+        // are slightly delayed.
+        // Confusingly log suppression is still active during the log assertion
+        // so you can end up seeing the log being suppressed while the assertion does not see it.
+        val installCid =
+          loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+            raceInstalls(),
+            lines => {
+              // check that all errors are due to races on the contracts
+              forAll(lines) { line =>
+                if (line.level == Level.ERROR)
+                  line.message should (include("ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS") or include(
+                    "NOT_FOUND/LOCAL_VERDICT_INACTIVE_CONTRACTS"
+                  ))
+              }
 
-            // Note the DirectoryInstallTrigger completes with log lines of the form:
-            //   DirectoryInstallRequestTrigger:DirectoryIntegrationTest/config=8b549e20/directory=directory-app tid:796c4cc07dc9db97b87db1feb158efb4 - Completed processing with outcome: accepted install request.
-            // Collect and check the logged outcomes from these lines
-            val outcomeRegex =
-              "Completed processing with outcome: (.*)".r
-            val ignoredRegexes =
-              Seq(
-                "(?s)Processing.*Contract.*".r,
-                "(?s)Checking whether the task is stale, as its processing failed with.*".r,
-                "(?s)The operation 'processTaskWithRetry' failed with a retryable error.*".r,
-                "(?s)The operation 'processTaskWithRetry' has failed with an exception.*".r,
-                "(?s)Rejecting duplicate install request.*".r,
-                "(?s)Now retrying operation 'processTaskWithRetry'.*".r,
-                "(?s)skipped, as the task has become stale.*".r,
+              // Note the DirectoryInstallTrigger completes with log lines of the form:
+              //   DirectoryInstallRequestTrigger:DirectoryIntegrationTest/config=8b549e20/directory=directory-app tid:796c4cc07dc9db97b87db1feb158efb4 - Completed processing with outcome: accepted install request.
+              // Collect and check the logged outcomes from these lines
+              val outcomeRegex =
+                "Completed processing with outcome: (.*)".r
+              val ignoredRegexes =
+                Seq(
+                  "(?s)Processing.*Contract.*".r,
+                  "(?s)Checking whether the task is stale, as its processing failed with.*".r,
+                  "(?s)The operation 'processTaskWithRetry' failed with a retryable error.*".r,
+                  "(?s)The operation 'processTaskWithRetry' has failed with an exception.*".r,
+                  "(?s)Rejecting duplicate install request.*".r,
+                  "(?s)Now retrying operation 'processTaskWithRetry'.*".r,
+                  "(?s)skipped, as the task has become stale.*".r,
+                )
+              val expectedOutcomes = Seq(
+                "accepted install request",
+                "rejected request for already existing installation",
+                "skipped, as the task has become stale",
               )
-            val expectedOutcomes = Seq(
-              "accepted install request",
-              "rejected request for already existing installation",
-              "skipped, as the task has become stale",
-            )
-            // Note that we might not get an outcome for every request, as some create events might never be seen by the trigger
-            val actualOutcomes =
-              lines
-                .filter(entry => entry.loggerName.contains("DirectoryInstallRequestTrigger"))
-                .flatMap(line => {
-                  val outcome = outcomeRegex.findAllMatchIn(line.message).toSeq
-                  if (outcome.isEmpty && !ignoredRegexes.exists(_.matches(line.message))) {
-                    // Sanity check to make sure our parsing really catches anything interesting.
-                    fail(s"Unexpected message: ${line.message}")
-                  }
-                  outcome
-                })
-                .map(_.group(1).stripSuffix("."))
+              // Note that we might not get an outcome for every request, as some create events might never be seen by the trigger
+              val actualOutcomes =
+                lines
+                  .filter(entry => entry.loggerName.contains("DirectoryInstallRequestTrigger"))
+                  .flatMap(line => {
+                    val outcome = outcomeRegex.findAllMatchIn(line.message).toSeq
+                    if (outcome.isEmpty && !ignoredRegexes.exists(_.matches(line.message))) {
+                      // Sanity check to make sure our parsing really catches anything interesting.
+                      fail(s"Unexpected message: ${line.message}")
+                    }
+                    outcome
+                  })
+                  .map(_.group(1).stripSuffix("."))
 
-            forAll(actualOutcomes) { (outcome: String) =>
-              expectedOutcomes should contain(outcome)
-            }
-            actualOutcomes should (contain allOf)(
-              "accepted install request",
-              "rejected request for already existing installation",
-            )
+              forAll(actualOutcomes) { (outcome: String) =>
+                expectedOutcomes should contain(outcome)
+              }
+              actualOutcomes should (contain allOf)(
+                "accepted install request",
+                "rejected request for already existing installation",
+              )
 
-          },
-        )
+            },
+          )
 
         actAndCheck(
           "Cancel install", {
