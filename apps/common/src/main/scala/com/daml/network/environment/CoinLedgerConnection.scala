@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import akka.actor.ActorSystem
-import akka.stream.{KillSwitches, Materializer}
+import akka.stream.{KillSwitch, KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.error.utils.ErrorDetails
@@ -32,6 +32,7 @@ import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
   FlagCloseable,
   FlagCloseableAsync,
+  RunOnShutdown,
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -603,24 +604,31 @@ class CoinLedgerConnection(
       case out: LedgerClient.TransferCommand.Out => out.source
     }
     logger.debug(s"transfer $commandId is for $command")
-    for {
-      _ <- cancelIfFailed(
+
+    val (ks, completion) = cancelIfFailed(
+      client
+        .completions(applicationId, Seq(submitter), begin = None, listenDomain)
+        .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
+    )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
+      callCallbacksOnCompletion(
         client
-          .completions(applicationId, Seq(submitter), begin = None, listenDomain)
-          .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
-      )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
-        callCallbacksOnCompletion(
-          client
-            .submitTransfer(
-              applicationId,
-              commandId,
-              submissionId = commandId,
-              submitter,
-              command,
-            )
-        )
+          .submitTransfer(
+            applicationId,
+            commandId,
+            submissionId = commandId,
+            submitter,
+            command,
+          )
       )
-    } yield ()
+    )
+
+    retryProvider.runOnShutdown(new RunOnShutdown {
+      override def name: String = "close-completions-stream"
+      override def done: Boolean = completion.isCompleted
+      override def run(): Unit = ks.shutdown()
+    })
+
+    completion.map(_ => ())
   }
 
   // simulate the completion check of command service; future only yields
@@ -633,6 +641,7 @@ class CoinLedgerConnection(
   ): Sink[LedgerClient.CompletionStreamResponse, Future[LedgerClient.Completion]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, OK, UNAVAILABLE}
     import concurrent.duration.*
+    // TODO (#3001) increase timeout
     val howLongToWait = timeouts.shutdownShort.asFiniteApproximation - 500.millis
     Flow[LedgerClient.CompletionStreamResponse]
       .completionTimeout(howLongToWait)
@@ -685,15 +694,15 @@ class CoinLedgerConnection(
   // but proactively cancel the in->out graph if fb fails
   private[this] def cancelIfFailed[A, E, B](in: Source[E, _])(out: Sink[E, Future[A]])(
       fb: => Future[B]
-  ): Future[(A, B)] = {
+  ): (KillSwitch, Future[(A, B)]) = {
     val (ks, fa) = in.viaMat(KillSwitches.single)(Keep.right).toMat(out)(Keep.both).run()
-    fa zip fb.transform(
+    ks -> (fa zip fb.transform(
       identity,
       { t =>
         ks.abort(t)
         t
       },
-    )
+    ))
   }
 }
 
