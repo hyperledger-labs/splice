@@ -376,7 +376,13 @@ you with to observe. For ScratchNet, this is
    1. `kubectl get pods --all-namespaces` to get the status of all pods, regardless of namespace
    1. `kubectl get pod -n splitwell` to get the status of all pods, in the `splitwell namespace`
 1. Run `kubectl get namespace` to get a list of all namespaces
+1. Run `kubectl get service,pod,deployment` to list multiple resources with a single command
 1. Run `kubectl api-resources` to get a list of Kubernetes object types
+1. Run the following command to list *all* resources in the `splitwell` namespace:
+   ```
+   kubectl api-resources --verbs=list --namespaced -o name \
+        | xargs printf '%s,' | sed -e 's/,$//' | xargs -n 1 kubectl get --ignore-not-found -n splitwell
+   ```
 1. Run `kubectl describe pod <pod-name>` to get a detailed status of
    the given pod, including state transitions that might indicate
    memory or configuratoin failures.
