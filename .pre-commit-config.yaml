@@ -9,3 +9,10 @@ repos:
         language: system
         entry: "jsonnetfmt --string-style d --in-place --"
         types: [jsonnet]
+      - id: scalafmt
+        name: scalafmt
+        language: system
+        require_serial: true
+        entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
+        types: [scala]
+        exclude: '/bootstrap.scala$'

@@ -114,6 +114,10 @@ clusters.)
    # or:
    pre-commit install -t pre-push
    ```
+   _Note_: if you want to skip specific pre-commit hooks, add the hook ids to the `SKIP` variable separated by commas,
+           e.g. `export SKIP=scalafmt` (see https://pre-commit.com/#temporarily-disabling-hooks).
+
+           Also, you can bypass running pre-commit hooks altogether using the `--no-verify` / `-n` git commit option.
 
 **Important:** start your IDE and other development tools from a console that
 has this `direnv` loaded; and thus has the proper version of all the
