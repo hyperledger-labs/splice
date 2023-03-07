@@ -66,6 +66,7 @@ in pkgs.mkShell {
     python3
     python3Packages.datadog
     python3Packages.sphinx_rtd_theme
+    python3Packages.sphinx-copybutton
     ripgrep
     sbt
     scala

@@ -26,14 +26,33 @@ author = u'Digital Asset'
 
 # -- General configuration ---------------------------------------------------
 
+# We highlight code blocks by default as Scala, which is used in Canton
+# scripts. Other languages need to be marked explicitly as part of a
+# code-block directive.
+highlight_language = 'scala'
+
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.todo'
+    'sphinx.ext.todo',
+    'sphinx_copybutton'
+    # ^^ Adds a copy-to-clipboard button to code-blocks.
+    # It does not (yet) work for `parsed-literal::` directives, which
+    # we use to inject version strings.
+    # See https://github.com/executablebooks/sphinx-copybutton/issues/68
+    #
+    # Note: adjusting the copybutton_selector does not work directly, as
+    # parsed_literal blocks just output a single <pre> tag, which does not
+    # interact the right way with how copy-buttons are placed.
 ]
 
 todo_include_todos = True
+
+
+# Configure the sphinx copy-button plugin as per
+# https://sphinx-copybutton.readthedocs.io/en/latest/use.html#strip-and-configure-input-prompts-for-code-cells
+copybutton_prompt_text = "@ "
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
