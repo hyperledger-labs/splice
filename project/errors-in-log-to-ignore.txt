@@ -59,5 +59,6 @@ Rejected transaction due to a participant determined timeout
 Response message for request.*timed out at
 Sequencing result message timed out
 Late processing.*of batch
+The payload to event time bound.*has been been exceeded by payload time
 
 # Make sure to have a trailing newline
