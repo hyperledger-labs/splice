@@ -9,7 +9,6 @@ import {
   ServerConfiguration,
   RequestContext,
   ResponseContext,
-  CoinPosition,
 } from 'wallet-openapi';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
@@ -21,50 +20,21 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
+import {
+  GetBalanceResponse,
+  ListAcceptedTransferOffersResponse,
+  ListAppPaymentRequestsResponse,
+  ListResponse,
+  ListSubscriptionRequestsResponse,
+  ListSubscriptionsResponse,
+  ListTransferOffersResponse,
+} from '../models/models';
 import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
 export interface WalletProps {
   url: string;
-}
-
-export interface GetBalanceResponse {
-  round: number;
-  effectiveUnlockedQty: string;
-  effectiveLockedQty: string;
-  totalHoldingFees: string;
-}
-
-export interface ListResponse {
-  lockedCoins: CoinPosition[];
-  coins: CoinPosition[];
-}
-
-export interface ListTransferOffersResponse {
-  offersList: Contract<TransferOffer>[];
-}
-
-export interface ListAcceptedTransferOffersResponse {
-  acceptedOffersList: Contract<AcceptedTransferOffer>[];
-}
-
-export interface ListAppPaymentRequestsResponse {
-  paymentRequestsList: Contract<AppPaymentRequest>[];
-}
-
-export interface ListSubscriptionRequestsResponse {
-  subscriptionRequestsList: Contract<SubscriptionRequest>[];
-}
-
-export type SubscriptionTuple = [Contract<Subscription>, SubscriptionState];
-
-export type SubscriptionState =
-  | { type: 'idle'; value: Contract<SubscriptionIdleState> }
-  | { type: 'payment'; value: Contract<SubscriptionPayment> };
-
-export interface ListSubscriptionsResponse {
-  subscriptionsList: SubscriptionTuple[];
 }
 
 export interface WalletClient {

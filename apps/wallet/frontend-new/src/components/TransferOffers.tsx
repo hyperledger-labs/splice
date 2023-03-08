@@ -5,10 +5,10 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { TransferOffer } from '../models/models';
+import { WalletTransferOffer } from '../models/models';
 
 export const TransferOffers: React.FC = () => {
-  const offers: TransferOffer[] = [
+  const offers: WalletTransferOffer[] = [
     {
       totalCCAmount: '31',
       totalUSDAmount: '372',
@@ -48,7 +48,7 @@ export const TransferOffers: React.FC = () => {
 };
 
 interface TransferOfferProps {
-  transferOffer: TransferOffer;
+  transferOffer: WalletTransferOffer;
 }
 
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {

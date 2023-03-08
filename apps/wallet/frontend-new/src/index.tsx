@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { AuthProvider, theme, UserProvider } from 'common-frontend';
+import { AuthProvider, ScanClientProvider, theme, UserProvider } from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -42,10 +42,12 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
         <ValidatorClientProvider url={config.services.validator.grpcUrl}>
           <WalletClientProvider url={config.services.wallet.grpcUrl}>
-            <ThemeProvider theme={theme}>
-              <CssBaseline />
-              <RouterProvider router={router} />
-            </ThemeProvider>
+            <ScanClientProvider url={config.services.scan.grpcUrl}>
+              <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <RouterProvider router={router} />
+              </ThemeProvider>
+            </ScanClientProvider>
           </WalletClientProvider>
         </ValidatorClientProvider>
       </UserProvider>

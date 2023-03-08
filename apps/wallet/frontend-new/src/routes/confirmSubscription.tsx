@@ -4,7 +4,7 @@ import React from 'react';
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 
 import PaymentHeader from '../components/PaymentHeader';
-import { Subscription } from '../models/models';
+import { WalletSubscription } from '../models/models';
 
 export const ConfirmSubscription: React.FC = () => {
   const via = 'credap.cns';
@@ -29,7 +29,7 @@ export const ConfirmSubscription: React.FC = () => {
 export default ConfirmSubscription;
 
 const SubscriptionContainer: React.FC = () => {
-  const subscription: Subscription = {
+  const subscription: WalletSubscription = {
     provider: { description: 'Canton Name Service', cns: 'alice.cns' },
     price: { amount: '8.0', currency: 'CC', perPeriod: '30 days' },
     nextPaymentDue: '22-02-2023',

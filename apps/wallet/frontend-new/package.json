@@ -22,6 +22,7 @@
     "@mui/material": "latest",
     "bignumber.js": "^9.1.1",
     "common-frontend": "^0.1.0",
+    "decimal.js": "^10.4.3",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "^6.8.1",

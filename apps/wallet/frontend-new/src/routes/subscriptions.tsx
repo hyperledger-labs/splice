@@ -14,10 +14,10 @@ import {
   Typography,
 } from '@mui/material';
 
-import { Subscription } from '../models/models';
+import { WalletSubscription } from '../models/models';
 
 const Subscriptions: React.FC = () => {
-  const subscriptions: Subscription[] = [
+  const subscriptions: WalletSubscription[] = [
     {
       provider: { description: 'Service Desc.', cns: 'alice.cns' },
       price: { amount: '31', currency: 'CC', perPeriod: '30 days' },
@@ -66,7 +66,7 @@ const Subscriptions: React.FC = () => {
   );
 };
 
-const SubscriptionRow: React.FC<{ subscription: Subscription }> = ({ subscription }) => {
+const SubscriptionRow: React.FC<{ subscription: WalletSubscription }> = ({ subscription }) => {
   const { nextPaymentDue, price, provider } = subscription;
   return (
     <TableRow>
