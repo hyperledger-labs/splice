@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
+import org.openqa.selenium.firefox.GeckoDriverService
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -111,19 +112,20 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     // We start all browsers in parallel, for faster test init.
     frontendNames.toList.parTraverse { name =>
       Future {
-        System.setProperty(
-          FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
+        val browserLogFile =
           Paths
             .get(
               "log",
               s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
             )
-            .toString,
-        )
+            .toFile
         val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
         val (webDriver, biDi) = eventually() {
           val driver =
-            Try(new FirefoxDriver(options)).toEither.valueOr { e =>
+            Try {
+              val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
+              new FirefoxDriver(builder.build(), options)
+            }.toEither.valueOr { e =>
               logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
               fail()
             }
