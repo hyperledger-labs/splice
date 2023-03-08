@@ -11,6 +11,7 @@ local externalService(config, ports) = {
       metadata: {
         name: "external",
         clusterName: config.clusterName,
+        cnjClusterName: config.clusterName,
       },
       spec: {
         type: "LoadBalancer",

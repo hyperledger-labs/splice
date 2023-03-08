@@ -840,7 +840,7 @@ The current Pulumi deployment is capable of managing the four SV app
 nodes. Instructions for use are as follows:
 
 1. Start with a working cluster and change to its deployment directory.
-1. Delete the existing resources to be managed by Pulumi: `kubectl delete namespace docs validator1 sv-app-1 sv-app-2 sv-app-3 sv-app-4`.
+1. Delete the existing cluster resources: `cncluster reset --full`.
 1. Apply the Pulumi cluster (you will need to enter a passkey, even
    though it is currently not used): `cncluster papply`.
 1. Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
