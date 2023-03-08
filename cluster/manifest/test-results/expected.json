@@ -498,6 +498,138 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "domain",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "canton-domain"
+            },
+            "name": "domain",
+            "namespace": "splitwell"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "domain"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "domain",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "canton-domain"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CANTON_DOMAIN_POSTGRES_SERVER",
+                              "value": "postgres"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "name": "domain",
+                        "ports": [
+                           {
+                              "containerPort": 5008,
+                              "name": "swd-pub-api"
+                           },
+                           {
+                              "containerPort": 5009,
+                              "name": "swd-adm-api"
+                           },
+                           {
+                              "containerPort": 10013,
+                              "name": "swd-metrics"
+                           }
+                        ],
+                        "readinessProbe": {
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "resources": {
+                           "limits": {
+                              "memory": "4096Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "4096Mi"
+                           }
+                        },
+                        "startupProbe": {
+                           "failureThreshold": 20,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "swd-pub-api"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "domain",
+            "namespace": "splitwell"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "swd-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10013,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "domain"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "participant",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
@@ -3038,138 +3170,6 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "domain",
-               "clusterName": "cluster",
-               "cnjClusterName": "cluster",
-               "moduleName": "canton-domain"
-            },
-            "name": "domain",
-            "namespace": "splitwell"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "domain"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "domain",
-                     "clusterName": "cluster",
-                     "cnjClusterName": "cluster",
-                     "moduleName": "canton-domain"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
-                           },
-                           {
-                              "name": "CANTON_DOMAIN_POSTGRES_SERVER",
-                              "value": "postgres"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
-                        "imagePullPolicy": "Always",
-                        "livenessProbe": {
-                           "failureThreshold": 5,
-                           "periodSeconds": 10,
-                           "tcpSocket": {
-                              "port": "swd-pub-api"
-                           }
-                        },
-                        "name": "domain",
-                        "ports": [
-                           {
-                              "containerPort": 5008,
-                              "name": "swd-pub-api"
-                           },
-                           {
-                              "containerPort": 5009,
-                              "name": "swd-adm-api"
-                           },
-                           {
-                              "containerPort": 10013,
-                              "name": "swd-metrics"
-                           }
-                        ],
-                        "readinessProbe": {
-                           "tcpSocket": {
-                              "port": "swd-pub-api"
-                           }
-                        },
-                        "resources": {
-                           "limits": {
-                              "memory": "4096Mi"
-                           },
-                           "requests": {
-                              "cpu": 1,
-                              "memory": "4096Mi"
-                           }
-                        },
-                        "startupProbe": {
-                           "failureThreshold": 20,
-                           "periodSeconds": 10,
-                           "tcpSocket": {
-                              "port": "swd-pub-api"
-                           }
-                        },
-                        "volumeMounts": [ ]
-                     }
-                  ],
-                  "volumes": [ ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "clusterName": "cluster",
-            "labels": {
-               "clusterName": "cluster"
-            },
-            "name": "domain",
-            "namespace": "splitwell"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "swd-pub-api",
-                  "port": 5008,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-adm-api",
-                  "port": 5009,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-metrics",
-                  "port": 10013,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "domain"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
                "app": "participant",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
@@ -4112,6 +4112,18 @@
                               "name": "cd-metrics"
                            },
                            {
+                              "containerPort": 5108,
+                              "name": "swd-pub-api"
+                           },
+                           {
+                              "containerPort": 5109,
+                              "name": "swd-adm-api"
+                           },
+                           {
+                              "containerPort": 10413,
+                              "name": "swd-metrics"
+                           },
+                           {
                               "containerPort": 5002,
                               "name": "svcp-adm-api"
                            },
@@ -4194,18 +4206,6 @@
                            {
                               "containerPort": 6102,
                               "name": "val1-adm-api-gw"
-                           },
-                           {
-                              "containerPort": 5108,
-                              "name": "swd-pub-api"
-                           },
-                           {
-                              "containerPort": 5109,
-                              "name": "swd-adm-api"
-                           },
-                           {
-                              "containerPort": 10413,
-                              "name": "swd-metrics"
                            },
                            {
                               "containerPort": 5202,
@@ -4314,6 +4314,21 @@
                   "protocol": "TCP"
                },
                {
+                  "name": "swd-pub-api",
+                  "port": 5108,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5109,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10413,
+                  "protocol": "TCP"
+               },
+               {
                   "name": "svcp-adm-api",
                   "port": 5002,
                   "protocol": "TCP"
@@ -4416,21 +4431,6 @@
                {
                   "name": "val1-adm-api-gw",
                   "port": 6102,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-pub-api",
-                  "port": 5108,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-adm-api",
-                  "port": 5109,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-metrics",
-                  "port": 10413,
                   "protocol": "TCP"
                },
                {
@@ -4479,7 +4479,6 @@
          "kind": "Service",
          "metadata": {
             "clusterName": "cluster",
-            "cnjClusterName": "cluster",
             "name": "external"
          },
          "spec": {
@@ -4515,6 +4514,21 @@
                {
                   "name": "cd-metrics",
                   "port": 10313,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-pub-api",
+                  "port": 5108,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-adm-api",
+                  "port": 5109,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "swd-metrics",
+                  "port": 10413,
                   "protocol": "TCP"
                },
                {
@@ -4620,21 +4634,6 @@
                {
                   "name": "val1-adm-api-gw",
                   "port": 6102,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-pub-api",
-                  "port": 5108,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-adm-api",
-                  "port": 5109,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-metrics",
-                  "port": 10413,
                   "protocol": "TCP"
                },
                {

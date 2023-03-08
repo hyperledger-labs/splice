@@ -550,27 +550,22 @@ function subcmd_create() {
 subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'
 
 function _cluster_reset() {
-    _info "Deleting all Canton Network Namespaces..."
-    kubectl delete Namespace -l cnjClusterName=${GCP_CLUSTER_NAME}
+    _info "Deleting all stateful sets..."
+    kubectl delete StatefulSet --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
-    if [ "${1-}" = "--full" ]; then
-        _info "Full delete.... deleting cert-manager..."
-        kubectl delete Namespace cert-manager
+    _info "Deleting all deployments..."
+    kubectl delete Deployment --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
-        _info "Full delete... deleting default namespace deployments..."
-        kubectl delete Deployment -l cnjClusterName=${GCP_CLUSTER_NAME}
+    _info "Deleting all pods..."
+    kubectl delete Pods --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
-        _info "Full delete... deleting default namespace services..."
-        kubectl delete Service -l cnjClusterName=${GCP_CLUSTER_NAME}
+    _info "Deleting all services..."
+    kubectl delete Service --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
-        # Delete the external service manually, since it does not have
-        # the CNJ prefix cluster name label.
-        kubectl delete Service external
+    _info "Deleting all persistent volume claims..."
+    kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
 
-        _info "Cluster fully reset."
-    else
-        _info "Cluster reset"
-    fi
+    _info "Cluster in reset/idle state."
 }
 
 ###
@@ -671,7 +666,7 @@ function subcmd_sbt_for_preflight() {
 function subcmd_reset() {
     _cluster_confirm "Reset cluster state by deleting ALL pods."
 
-    _cluster_reset "$@"
+    _cluster_reset
 }
 
 ###
