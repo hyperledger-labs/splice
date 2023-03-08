@@ -23,7 +23,6 @@ service UpdateService {
   // Get the current ledger end.
   // Subscriptions started with the returned offset will serve updates created after this RPC was called.
   rpc GetLedgerEnd (GetLedgerEndRequest) returns (GetLedgerEndResponse);
-
 }
 
 message GetUpdatesRequest {

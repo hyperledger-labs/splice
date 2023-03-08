@@ -1,0 +1,63 @@
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates
+//
+// Proprietary code. All rights reserved.
+
+syntax = "proto3";
+
+package com.digitalasset.canton.research.participant.multidomain;
+
+import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
+
+option java_outer_classname = "UpdateServiceOuterClass";
+option java_package = "com.digitalasset.canton.research.participant.multidomain";
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
+
+// Allows clients to get state from the ledger.
+service StateSnapshotService {
+
+  // Get the list of in-flight transfers.
+  // Clients SHOULD use the offset in the GetInFlightTransfersResponse message to continue streaming updates with the update service.
+  // Clients SHOULD NOT assume that the set of in-flight transfers they receive reflects the state at the ledger end.
+  // Clients SHOULD be aware of limitations of this endpoint.
+
+  /* About the GetInFlightTransfersResponse
+
+    A transfer included in the response must satisfy:
+     1. Transfer-out was done before or at `valid_at_offset` (which defaults to the ledger end).
+     2. At least one party in `stakeholders` was a confirming party in the transfer-out and
+       was expected to be able to submit the transfer-in.
+
+    Note that 2. may not be valid at the time of the query if topology was changed.
+   */
+  rpc GetInFlightTransfers (GetInFlightTransfersRequest) returns (GetInFlightTransfersResponse);
+}
+
+
+message GetInFlightTransfersRequest {
+  // Must be a valid domain ID
+  // Required
+  string source_domain_id = 1;
+
+  // The offset at which the snapshot of the in-flight transfers will be computed.
+  // Must be no greater than the current ledger end offset.
+  // Must be greater than or equal to the last pruning offset.
+  // If not set the current ledger end offset will be used.
+  // Optional
+  string valid_at_offset = 2;
+
+  // Return only transfers of contracts which have at least one stakeholder included in this list.
+  // Must be a non-empty list of valid PartyIdString (as described in ``value.proto``).
+  // Required
+  repeated string stakeholders = 5;
+}
+
+message GetInFlightTransfersResponse {
+  // The absolute offset. The format of this field is described in ``ledger_offset.proto``.
+  // Required
+  string offset = 1;
+
+  // All transfer-outs on the source domain before offset `offset` that MAY still be eligible for transfer-in.
+  // No guarantees are made with respect to synchronization on transfer-ins on other domains.
+  // You should attempt to transfer in all in-flight transfers and handle errors where the contract has already been transferred in.
+  repeated TransferredOutEvent transfer_outs = 2;
+}

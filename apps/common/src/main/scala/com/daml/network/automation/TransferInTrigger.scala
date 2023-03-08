@@ -40,7 +40,7 @@ class TransferInTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       outcome <-
-        if (partyId == transferOut.submitter) {
+        if (partyId == transferOut.event.submitter) {
           for {
             _ <- connection.submitTransferAndWaitNoDedup(
               submitter = partyId,

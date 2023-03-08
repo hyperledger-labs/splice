@@ -453,14 +453,12 @@ object LedgerClient {
     final case class Transfer[+E](
         updateId: String,
         offset: LedgerOffset.Absolute,
-        submitter: PartyId,
         event: E & TransferEvent,
     ) extends PrettyPrinting {
       override def pretty: Pretty[this.type] =
         prettyOfClass(
           param("updateId", (x: this.type) => x.updateId)(PrettyInstances.prettyString),
           param("offset", (x: this.type) => x.offset.getOffset)(PrettyInstances.prettyString),
-          param("submitter", _.submitter),
           param("event", _.event),
         )
     }
@@ -468,7 +466,6 @@ object LedgerClient {
     object Transfer {
       private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer[TransferEvent] = {
         val offset = new LedgerOffset.Absolute(proto.offset)
-        val submitter = PartyId.tryFromProtoPrimitive(proto.submitter)
         val event = proto.event match {
           case xfr.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
           case xfr.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
@@ -478,13 +475,16 @@ object LedgerClient {
         Transfer(
           proto.updateId,
           offset,
-          submitter,
           event,
         )
       }
     }
 
-    sealed trait TransferEvent extends Product with Serializable with PrettyPrinting
+    sealed trait TransferEvent extends Product with Serializable with PrettyPrinting {
+      def submitter: PartyId
+      def source: DomainId
+      def target: DomainId
+    }
 
     object TransferEvent {
       private case class TransferOutId(s: String) extends PrettyPrinting {
@@ -492,39 +492,44 @@ object LedgerClient {
       }
 
       final case class Out(
+          override val submitter: PartyId,
+          override val source: DomainId,
+          override val target: DomainId,
           transferOutId: String,
           contractId: ContractId[_],
-          source: DomainId,
-          target: DomainId,
       ) extends TransferEvent {
         def pretty: Pretty[this.type] =
           prettyOfClass(
-            param("transferOutId", o => TransferOutId(o.transferOutId)),
-            param("contractId", _.contractId),
+            param("submitter", _.submitter),
             param("source", _.source),
             param("target", _.target),
+            param("transferOutId", o => TransferOutId(o.transferOutId)),
+            param("contractId", _.contractId),
           )
       }
 
       object Out {
         private[LedgerClient] def fromProto(proto: xfr.TransferredOutEvent): Out = {
           Out(
-            transferOutId = proto.transferOutId,
-            contractId = new ContractId(proto.contractId),
+            submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
             source = DomainId.tryFromString(proto.source),
             target = DomainId.tryFromString(proto.target),
+            transferOutId = proto.transferOutId,
+            contractId = new ContractId(proto.contractId),
           )
         }
       }
 
       final case class In(
-          source: DomainId,
-          target: DomainId,
+          override val submitter: PartyId,
+          override val source: DomainId,
+          override val target: DomainId,
           transferOutId: String,
           createdEvent: CreatedEvent,
       ) extends TransferEvent {
         def pretty: Pretty[this.type] =
           prettyOfClass(
+            param("submitter", _.submitter),
             param("source", _.source),
             param("target", _.target),
             param("transferOutId", i => TransferOutId(i.transferOutId)),
@@ -536,6 +541,7 @@ object LedgerClient {
         private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In = {
           import com.daml.ledger.api.v1.event as scalaEvent
           In(
+            submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
             source = DomainId.tryFromString(proto.source),
             target = DomainId.tryFromString(proto.target),
             transferOutId = proto.transferOutId,

@@ -395,31 +395,6 @@ class CoinLedgerConnection(
       Flow[TreeUpdate].mapAsync(1)(f)
     })
 
-  def updateTransferOuts(
-      domainId: DomainId,
-      party: PartyId,
-  ): Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
-    LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-  ], NotUsed] = {
-    import LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent, TransferUpdate}
-    client
-      .updates(
-        LedgerClient.GetUpdatesRequest(
-          // fixme
-          begin = LedgerOffset.LedgerBegin.getInstance,
-          end = None,
-          party = party,
-          domainId = domainId,
-        )
-      )
-      .mapConcat { response =>
-        response.updates.collect {
-          case TransferUpdate(Transfer(updateId, offset, submitter, out: TransferEvent.Out)) =>
-            Transfer(updateId, offset, submitter, out)
-        }
-      }
-  }
-
   def tryGetTransactionTreeById(
       parties: Seq[PartyId],
       id: String,

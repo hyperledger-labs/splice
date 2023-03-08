@@ -26,7 +26,7 @@ message Transfer {
   // Optional
   string command_id = 2;
 
-  // The workflow ID used in command submission. Only set if the ``workflow_id`` for the command was set.
+  // The workflow ID used in transfer command submission. Only set if the ``workflow_id`` for the command was set.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Optional
   string workflow_id = 3;
@@ -35,14 +35,9 @@ message Transfer {
   // Required
   string offset = 4;
 
-  // Party on whose behalf the command was executed.
-  // Must be a valid PartyIdString (as described in ``value.proto``).
-  // Required
-  string submitter = 5;
-
   oneof event {
-    TransferredOutEvent transfer_out_event = 6;
-    TransferredInEvent transfer_in_event = 7;
+    TransferredOutEvent transfer_out_event = 5;
+    TransferredInEvent transfer_in_event = 6;
   }
 }
 
@@ -71,11 +66,16 @@ message TransferredOutEvent {
   // Required
   string target = 4;
 
+  // Party on whose behalf the transfer command was executed.
+  // Must be a valid PartyIdString (as described in ``value.proto``).
+  // Required
+  string submitter = 5;
+
   // Transfer-in exclusivity
   // Before this time (measured on the target domain), only the submitter of the transfer-out can initiate the transfer-in
   // Missing for everyone except on the submitting participant
   // optional
-  google.protobuf.Timestamp transfer_in_exclusivity = 5;
+  google.protobuf.Timestamp transfer_in_exclusivity = 6;
 }
 
 // Records that a contract has been transferred-in, and it becomes usable on the target domain
@@ -97,7 +97,12 @@ message TransferredInEvent {
   // Required
   string transfer_out_id = 3;
 
+  // Party on whose behalf the transfer command was executed.
+  // Must be a valid PartyIdString (as described in ``value.proto``).
   // Required
-  com.daml.ledger.api.v1.CreatedEvent created_event = 4;
+  string submitter = 4;
+
+  // Required
+  com.daml.ledger.api.v1.CreatedEvent created_event = 5;
 }
 

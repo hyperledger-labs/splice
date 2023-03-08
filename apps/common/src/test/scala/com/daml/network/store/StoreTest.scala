@@ -154,6 +154,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def toTransferOutEvent(contractId: ContractId[_]): TransferEvent.Out =
     TransferEvent.Out(
       transferOutId = "",
+      submitter = userParty(1),
       contractId = contractId,
       source = dummyDomain,
       target = dummyDomain,
@@ -163,6 +164,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract: Contract[TCid, T]
   ): TransferEvent.In = TransferEvent.In(
     transferOutId = "",
+    submitter = userParty(1),
     source = dummyDomain,
     target = dummyDomain,
     createdEvent = toCreatedEvent(contract),
@@ -188,7 +190,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkTransfer[T <: TransferEvent](offset: String, event: T): Transfer[T] =
     Transfer(
       updateId = "",
-      submitter = userParty(1),
       offset = new LedgerOffset.Absolute(offset),
       event = event,
     )
