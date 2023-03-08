@@ -576,7 +576,7 @@ function _cluster_reset() {
 }
 
 function subcmd_reset() {
-    _cluster_confirm "Reset cluster state by deleting ALL pods."
+    _prompt_to_confirm
 
     _cluster_reset "$@"
 }
