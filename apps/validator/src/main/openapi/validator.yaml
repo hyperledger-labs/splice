@@ -64,6 +64,27 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListUsersResponse"
 
+  /users/offboard:
+    post:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "offboardUser"
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     OnboardUserRequest:
@@ -114,3 +135,11 @@ components:
           type: array
           items:
             type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

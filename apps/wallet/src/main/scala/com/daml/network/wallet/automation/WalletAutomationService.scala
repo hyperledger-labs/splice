@@ -39,4 +39,5 @@ class WalletAutomationService(
     ) {
 
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, globalDomain))
+  registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager))
 }

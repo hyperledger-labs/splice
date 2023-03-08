@@ -66,6 +66,18 @@ abstract class ValidatorAppReference(
       )
     }
   }
+
+  @Help.Summary("Offboard user")
+  @Help.Description(
+    "Offboards a user from the validator by deleting their wallet install contracts, and closing their wallet automations"
+  )
+  def offboardUser(username: String) = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAppClient.OffboardUser(username)
+      )
+    }
+  }
 }
 
 final class ValidatorAppBackendReference(

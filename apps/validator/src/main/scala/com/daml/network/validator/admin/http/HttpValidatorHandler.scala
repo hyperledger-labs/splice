@@ -5,12 +5,14 @@ import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import io.grpc.{Status, StatusRuntimeException}
+import scala.jdk.CollectionConverters.*
 
 class HttpValidatorHandler(
     ledgerClient: CoinLedgerClient,
@@ -71,6 +73,20 @@ class HttpValidatorHandler(
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
     }
 
+  def offboardUser(
+      respond: v0.ValidatorResource.OffboardUserResponse.type
+  )(username: String)(ledgerApiUser: String): Future[
+    v0.ValidatorResource.OffboardUserResponse
+  ] = withNewTrace(workflowId) { implicit traceContext => span =>
+    offboardUser(username)
+      .map(_ => v0.ValidatorResource.OffboardUserResponse.OK)
+      .recover({
+        case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+          v0.ValidatorResource
+            .OffboardUserResponseNotFound(definitions.ErrorResponse(e.getMessage()))
+      })
+  }
+
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
     ValidatorUtil
       .onboard(
@@ -85,5 +101,39 @@ class HttpValidatorHandler(
         logger,
       )
       .map(p => p.filterString)
+  }
+
+  private def offboardUser(
+      user: String
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    logger.debug(s"Offboarding user: ${user}")
+    for {
+      install <- store.lookupWalletInstallByName(user)
+      res <- install match {
+        case None =>
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(s"No install contract found for user ${user}")
+              .asRuntimeException()
+          )
+        case Some(c) =>
+          connection.submitCommandsNoDedup(
+            actAs = Seq(
+              store.key.validatorParty,
+              store.key.walletServiceParty,
+              PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
+            ),
+            readAs = Seq.empty,
+            commands = c.contractId
+              .exerciseArchive(
+                new com.daml.network.codegen.java.da.internal.template.Archive()
+              )
+              .commands
+              .asScala
+              .toSeq,
+            domainId = domainId,
+          )
+      }
+    } yield res
   }
 }

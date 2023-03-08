@@ -86,7 +86,7 @@ class UserWalletService(
   override def isHealthy: Boolean = automation.isHealthy && treasury.isHealthy
 
   override def onClosed(): Unit = {
-    // Close treasury first, that will result in it no longer accepting new requests
+    // Close treasury early, that will result in it no longer accepting new requests
     // but in-flight requests can complete. If we close the automation first,
     // a task can get stuck forever waiting for store ingestion to complete.
     treasury.close()

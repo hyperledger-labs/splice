@@ -11,6 +11,7 @@ import com.daml.network.validator.admin.api.client.UserInfo
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.http.v0.definitions.ErrorResponse
 
 object HttpValidatorAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -101,4 +102,23 @@ object HttpValidatorAppClient {
     }
   }
 
+  case class OffboardUser(username: String) extends BaseCommand[http.OffboardUserResponse, Unit] {
+
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OffboardUserResponse] =
+      client.offboardUser(username, headers)
+
+    override def handleResponse(
+        response: http.OffboardUserResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Unit] = {
+      response match {
+        case http.OffboardUserResponse.OK =>
+          Right(())
+        case http.OffboardUserResponse.NotFound(ErrorResponse(error)) =>
+          Left(error)
+      }
+    }
+  }
 }

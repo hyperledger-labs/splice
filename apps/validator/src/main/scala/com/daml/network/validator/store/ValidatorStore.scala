@@ -37,6 +37,13 @@ trait ValidatorStore extends CoinAppStoreWithoutHistory {
       )
     )
 
+  def lookupWalletInstallByName(
+      endUserName: String
+  ): Future[
+    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+  ] =
+    lookupWalletInstallByNameWithOffset(endUserName).map(_.value)
+
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =

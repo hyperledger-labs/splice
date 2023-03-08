@@ -13,7 +13,7 @@ import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -23,6 +23,9 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
+import io.grpc.StatusRuntimeException
+import io.grpc.Status
+import com.digitalasset.canton.lifecycle.RunOnShutdown
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
@@ -45,17 +48,30 @@ class UserWalletManager(
     with HasHealth {
 
   // map from end user name to end-user treasury service
-  private[this] val endUserWalletsMap: scala.collection.concurrent.Map[String, UserWalletService] =
+  private[this] val endUserWalletsMap
+      : scala.collection.concurrent.Map[String, (CoinRetries, UserWalletService)] =
     TrieMap.empty
+
+  retryProvider.runOnShutdown(new RunOnShutdown {
+    override def name = s"shutdown per-user retry providers"
+    // this is not perfectly precise, but CoinRetries.close is idempotent
+    override def done = false
+    override def run() =
+      endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
+        userRetryProvider.close()
+      }
+  })(TraceContext.empty)
 
   /** Lookup an end-user's wallet.
     *
     * Succeeds if the user has been onboarded and its wallet has been initialized.
     */
   final def lookupUserWallet(endUserName: String): Option[UserWalletService] =
-    endUserWalletsMap.get(endUserName)
+    endUserWalletsMap.get(endUserName).map(_._2)
 
-  final def endUserWallets: Iterable[UserWalletService] = endUserWalletsMap.values
+  final def endUserWallets: Iterable[(CoinRetries, UserWalletService)] = endUserWalletsMap.values
+
+  final def listUsers: Seq[String] = endUserWallets.map(_._2.store.key.endUserName).toSeq
 
   /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
     *
@@ -76,6 +92,9 @@ class UserWalletManager(
         endUserName,
         endUserParty,
       )
+    // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
+    // without the entire node going down.
+    val userRetryProvider = CoinRetries(loggerFactory, retryProvider.timeouts)
     val walletService = new UserWalletService(
       ledgerClient,
       globalDomain,
@@ -85,7 +104,7 @@ class UserWalletManager(
       clock,
       treasuryConfig,
       storage,
-      retryProvider,
+      userRetryProvider,
       loggerFactory,
       scanConnection,
       timeouts,
@@ -93,11 +112,23 @@ class UserWalletManager(
     )
 
     endUserWalletsMap
-      .putIfAbsent(endUserName, walletService)
+      .putIfAbsent(endUserName, (userRetryProvider, walletService))
       .fold(true)(_ => {
         walletService.close()
         false
       })
+  }
+
+  def offboardUser(username: String): Unit = {
+    endUserWalletsMap.remove(username) match {
+      case None =>
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription(s"No wallet service found for user ${username}")
+        )
+      case Some((userRetryProvider, walletService)) =>
+        userRetryProvider.close()
+        walletService.close()
+    }
   }
 
   // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
@@ -151,7 +182,10 @@ class UserWalletManager(
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
     } yield validatorRewardCoupons.flatten.take(maxNumInputs.getOrElse(Int.MaxValue))
 
-  override def isHealthy: Boolean = endUserWalletsMap.values.forall(_.isHealthy)
+  override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)
 
-  override def close(): Unit = Lifecycle.close(endUserWalletsMap.values.toSeq *)(logger)
+  override def close(): Unit = Lifecycle.close(
+    // per-user retry providers should have been closed by the shutdown signal, so only closing the services here
+    endUserWalletsMap.values.map(_._2).toSeq *
+  )(logger)
 }

@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
+import cats.syntax.traverseFilter.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
@@ -57,6 +58,15 @@ trait WalletStore extends CoinAppStoreWithoutHistory {
         co.payload.provider == key.validatorParty.toProtoPrimitive
       )
     )
+
+  def listUsersWithArchivedWalletInstalls(
+      usernames: Seq[String],
+      limit: Integer,
+  ): Future[Seq[String]] = {
+    usernames.toList
+      .filterA(lookupInstallByName(_).map(!_.isDefined))
+      .map(_.take(limit))
+  }
 }
 
 object WalletStore {
