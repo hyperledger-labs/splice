@@ -25,6 +25,8 @@ const IMAGE_TAG = config.require("IMAGE_TAG");
 const nodes = ["sv-1", "sv-2", "sv-3", "sv-4"];
 
 const appToClientId = {
+  "wallet": "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
+  "validator": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
   "sv-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
   "sv-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
   "sv-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
@@ -96,22 +98,13 @@ function chartValues(chartPath: string, overrides: any = {}): any {
 
 const auth0Secrets = getAuth0();
 
-function installSvNodes() {
-  nodes.forEach((nodename: string) => {
-    const namespace = new k8s.core.v1.Namespace(nodename, {
-      metadata: {
-        name: nodename,
-      },
-    });
-
-    const namespaceName = namespace.metadata.name;
-
-    const auth0Secret = new k8s.core.v1.Secret(
+function installAuth0Secret(namespace: k8s.core.v1.Namespace, secretApp: string, nodename: string) : k8s.core.v1.Secret {
+    return new k8s.core.v1.Secret(
       "auth0-secret-" + nodename,
       {
         metadata: {
-          name: "cn-app-sv-ledger-api-auth",
-          namespace: namespaceName,
+          name: "cn-app-" + secretApp + "-ledger-api-auth",
+          namespace: namespace.metadata.name
         },
         stringData: auth0Secrets.then(
           (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
@@ -122,16 +115,27 @@ function installSvNodes() {
       }
     );
 
-    const bootstrapType =
-      nodename === "sv-1" ? "found-consortium" : "join-via-svc-app";
+}
+
+function installSvNodes() {
+  nodes.forEach((nodename: string) => {
+    const namespace = new k8s.core.v1.Namespace(nodename, {
+      metadata: {
+        name: nodename,
+      },
+    });
+
+    const auth0Secret = installAuth0Secret(namespace, "sv", nodename);
 
     new k8s.helm.v3.Release(
       nodename,
       {
         name: "sv-app",
-        namespace: namespaceName,
+        namespace: namespace.metadata.name,
         chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
-        values: chartValues("cn-sv-node", { bootstrapType }),
+          values: chartValues("cn-sv-node", {
+              bootstrapType: nodename === "sv-1" ? "found-consortium" : "join-via-svc-app"
+          }),
         timeout: GLOBAL_TIMEOUT_SEC,
       },
       {
@@ -164,5 +168,32 @@ function installDocs() {
   );
 }
 
+
+function installValidator() {
+    const namespace = new k8s.core.v1.Namespace("validator", {
+        metadata: {
+            name: "validator"
+        }
+    });
+
+    const auth0ValidatorSecret = installAuth0Secret(namespace, "validator", "validator");
+    const auth0WalletSecret = installAuth0Secret(namespace, "wallet", "wallet");
+
+    new k8s.helm.v3.Release(
+        "validator",
+        {
+            name: "validator",
+            namespace: namespace.metadata.name,
+            chart: process.env.REPO_ROOT + "/cluster/helm/cn-validator/",
+            values: chartValues("cn-validator"),
+            timeout: GLOBAL_TIMEOUT_SEC,
+        },
+        {
+            dependsOn: [auth0ValidatorSecret, auth0WalletSecret, namespace],
+        }
+    );
+}
+
 installSvNodes();
 installDocs();
+installValidator();

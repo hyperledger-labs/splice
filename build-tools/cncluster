@@ -862,8 +862,7 @@ function subcmd_pulumi() {
 
     pulumi --stack ${GCP_CLUSTER_BASENAME} \
            --cwd ${REPO_ROOT}/cluster/pulumi  \
-           --config-file ${CONFIG_FILE} \
-           $@
+            $@
 }
 
 ###
@@ -894,7 +893,6 @@ function subcmd_papply() {
 
     subcmd_pulumi up -c "IMAGE_TAG=${IMAGE_TAG}" --yes
 }
-
 
 ################################
 ### Main

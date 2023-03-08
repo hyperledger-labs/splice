@@ -1,0 +1,94 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: val1-postgres-configuration
+  namespace: {{ .Release.Namespace }}
+data:
+  PGDATA: "/var/lib/postgresql/data/pgdata"
+  POSTGRES_DB: "cantonnet"
+  POSTGRES_USER: "cnadmin"
+  POSTGRES_PASSWORD: "cnadmin"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        namespace: {{ .Release.Namespace }}
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: val1-postgres-configuration
+        livenessProbe:
+          exec:
+            command:
+            - psql
+            - -U
+            - cnadmin
+            - -d
+            - template1
+            - -c
+            - SELECT 1
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 5432
+          name: postgresdb
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "2"
+            memory: 8Gi
+          requests:
+            cpu: "2"
+            memory: 8Gi
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: pg-data
+      restartPolicy: Always
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: pg-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      storageClassName: standard-rwo
+      volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: postgresdb
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    app: postgres

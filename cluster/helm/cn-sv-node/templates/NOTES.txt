@@ -1,1 +1,1 @@
-Canton Network sv-app node successfully installed.
+Canton Network sv-app node

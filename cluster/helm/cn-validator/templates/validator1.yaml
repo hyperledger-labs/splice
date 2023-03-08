@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: participant
+  name: participant
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: participant
+  template:
+    metadata:
+      labels:
+        app: participant
+    spec:
+      containers:
+      - name: participant
+        image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/canton-participant:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CANTON_PARTICIPANT_POSTGRES_SERVER
+          value: postgres
+        - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
+          value: val1_participant
+        - name: CANTON_PARTICIPANT_USERS
+          value: '[{"actAs": [{"fromUser": "self"}], "admin": true, "name": {"env":
+            "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME"}, "primaryParty": {"allocate":
+            "validator1_validator_service_user"}, "readAs": [ ]}]'
+        - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
+          value: '[{"alias": "splitwell", "url": "http://domain.splitwell:5008"}]'
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5002
+          name: val1-adm-api
+          protocol: TCP
+        - containerPort: 5001
+          name: val1-lg-api
+          protocol: TCP
+        - containerPort: 10013
+          name: val1-metrics
+          protocol: TCP
+        resources:
+          limits:
+            memory: 32Gi
+          requests:
+            cpu: "1"
+            memory: 32Gi
+      - name: envoy-proxy-val1-lg-api
+        image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: GRPC_ADDRESS
+          value: 127.0.0.1
+        - name: GRPC_PORT
+          value: "5001"
+        - name: GRPC_WEB_PORT
+          value: "6001"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6001
+          name: val1-lg-api-gw
+          protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+      - name: envoy-proxy-val1-adm-api
+        image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: GRPC_ADDRESS
+          value: 127.0.0.1
+        - name: GRPC_PORT
+          value: "5002"
+        - name: GRPC_WEB_PORT
+          value: "6002"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 6002
+          name: val1-adm-api-gw
+          protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: validator-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: validator-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: validator-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: validator-app
+    spec:
+      containers:
+      - name: validator-app
+        image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/validator-app:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client-secret
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-wallet-ledger-api-auth
+              optional: false
+        - name: CN_APP_VALIDATOR_WALLET_USER_NAME
+          value: auth0|63e3d75ff4114d87a2c1e4f5
+        - name: CN_APP_DARS
+          value: '["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]'
+        - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
+          value: participant
+        ports:
+        - containerPort: 6003
+          name: val1-val-http
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: "1"
+            memory: 1536Mi
