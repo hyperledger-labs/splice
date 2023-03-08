@@ -163,12 +163,6 @@ function _cluster_show() {
     _log ""
 }
 
-function _cluster_confirm() {
-    _cluster_show
-
-    _confirm "GKE Cluster Operation: $@"
-}
-
 ################################
 ### Commands
 ################################
@@ -181,6 +175,19 @@ function _cluster_confirm() {
 ##    whitelist dictionary to be invoked.
 
 declare -A subcommand_whitelist
+
+function _prompt_to_confirm() {
+    _cluster_show
+
+    if [ -z "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
+        if [ -n "${CNCLUSTER_AUTOCONFIRM-}" ] ; then
+            _warning "Automatically confirmed (via environment variable): ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
+            return
+        fi
+    fi
+
+    _confirm "Confirm: ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
+}
 
 ###
 
@@ -198,7 +205,7 @@ subcommand_whitelist[apply]='Apply the current manifest to the cluster. Accepts 
 
 function subcmd_apply() {
     _production_gate
-    _cluster_confirm "Apply configuration"
+    _prompt_to_confirm
 
     IMAGE_TAG=${SOURCE_IMAGE_TAG}
 
@@ -226,7 +233,7 @@ subcommand_whitelist[deploy]='Rebuild local working copy and deploy to cluster.'
 
 function subcmd_deploy() {
     _production_gate
-    _cluster_confirm "Rebuild and apply configuration, forcibly pushing images."
+    _prompt_to_confirm
     _docker_must_be_running
 
     make -C ${REPO_ROOT} clean -j
@@ -248,7 +255,7 @@ subcommand_whitelist[push]='Update one or more modules running on a cluster'
 
 function subcmd_push() {
     _production_gate
-    _cluster_confirm "Rebuild and forcibly push module to update cluster: $@"
+    _prompt_to_confirm
     _cluster_must_exist
     _docker_must_be_running
 
@@ -397,7 +404,7 @@ function subcmd_gcloud_logs() {
 subcommand_whitelist[set_machine_type]='Rebuilds the default node pool with current cluster machine type and count'
 
 function subcmd_set_machine_type() {
-    _cluster_confirm "Rebuild default node pool to up to ${GCP_CLUSTER_MAX_NODES} ${GCP_CLUSTER_NODE_TYPE} nodes (This will interrupt all workloads.)"
+    _prompt_to_confirm
     _cluster_must_exist
 
     _info "Creating temporary node pool..."
@@ -428,7 +435,7 @@ function subcmd_set_machine_type() {
 subcommand_whitelist[create]='Create a cluster from scratch.'
 
 function subcmd_create() {
-    _cluster_confirm "Create cluster"
+    _prompt_to_confirm
 
     if _cluster_exists; then
         _error "Cluster already exists."
@@ -579,6 +586,10 @@ function subcmd_reset() {
 subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
 
 function subcmd_obliterate_state() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
     _info "Deleting all Canton Network Namespaces..."
     kubectl delete Namespace -l cnjClusterName=${GCP_CLUSTER_NAME}
 
@@ -624,7 +635,7 @@ function subcmd_ciapply() {
 subcommand_whitelist[delete]='Delete all cluster resources.'
 
 function subcmd_delete() {
-    _cluster_confirm "Delete cluster"
+    _prompt_to_confirm
     _cluster_must_exist
 
     if gcloud dns record-sets delete \
@@ -890,7 +901,7 @@ subcommand_whitelist[papply]="Apply the current Pulumi configuration"
 
 function subcmd_papply() {
     _production_gate
-    _cluster_confirm "Apply Pulumi configuration"
+    _prompt_to_confirm
     _cluster_must_exist
 
     IMAGE_TAG=${SOURCE_IMAGE_TAG}
@@ -910,7 +921,31 @@ function subcmd_papply() {
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
-    subcmd_pulumi up -c "IMAGE_TAG=${IMAGE_TAG}" --yes
+    subcmd_pulumi up -c "IMAGE_TAG=${IMAGE_TAG}" --yes --show-sames
+}
+
+###
+
+subcommand_whitelist[pdown]="Take the current Pulumi configuration down"
+
+function subcmd_pdown() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi down --yes
+}
+
+###
+
+subcommand_whitelist[prefresh]="Refresh the Pulumi resources in the stack"
+
+function subcmd_prefresh() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi refresh --yes
 }
 
 ################################
