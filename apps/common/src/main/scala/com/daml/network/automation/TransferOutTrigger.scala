@@ -65,7 +65,7 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
                 target = targetDomainId,
               ),
             )
-          } yield show"Submitting transfer out of $cid from ${sourceDomainId} to ${targetDomainId}"
+          } yield show"Submitted transfer out of $cid from ${sourceDomainId} to ${targetDomainId}"
 
     } yield TaskSuccess(outcome)
 }

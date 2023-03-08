@@ -594,6 +594,13 @@ class CoinLedgerConnection(
             submitter,
             command,
           )
+          .andThen { _ =>
+            // TODO(#2864) Consider removing this log once we no longer needs this
+            // for synchronization.
+            logger.info(
+              s"Submitted transfer to ledger, waiting for completion: commandId: $commandId"
+            )
+          }
       )
     )
 
@@ -614,32 +621,15 @@ class CoinLedgerConnection(
   )(implicit
       traceContext: TraceContext
   ): Sink[LedgerClient.CompletionStreamResponse, Future[LedgerClient.Completion]] = {
-    import io.grpc.Status.{DEADLINE_EXCEEDED, OK, UNAVAILABLE}
-    import concurrent.duration.*
-    // TODO (#3001) increase timeout
-    val howLongToWait = timeouts.shutdownShort.asFiniteApproximation - 500.millis
+    import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
+    val howLongToWait = timeouts.network.asFiniteApproximation
     Flow[LedgerClient.CompletionStreamResponse]
       .completionTimeout(howLongToWait)
-      .recover { case te: concurrent.TimeoutException =>
-        val ex = DEADLINE_EXCEEDED
+      .mapError { case te: concurrent.TimeoutException =>
+        DEADLINE_EXCEEDED
           .withCause(te)
           .augmentDescription(s"timeout while awaiting completion of transfer $commandId")
           .asRuntimeException()
-        // TODO (#3001) mapError to ex instead of logging and faking success
-        if (retryProvider.isShuttingDown)
-          logger.info(
-            s"Ignoring that transfer $commandId did not deliver a completion in $howLongToWait, as we are shutting down",
-            ex,
-          )
-        else
-          logger.warn(
-            s"transfer $commandId did not deliver a completion in $howLongToWait, possibly due to duplicate submission; assuming success",
-            ex,
-          )
-        // fake a success
-        LedgerClient.CompletionStreamResponse(
-          Seq(LedgerClient.Completion(applicationId, commandId, commandId, OK, Seq.empty))
-        )
       }
       .collect(
         Function unlift { csr =>

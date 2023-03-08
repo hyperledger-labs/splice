@@ -98,7 +98,9 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
       // advance time manually after the transfer out has been submitted.
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         act,
-        forExactly(numTransfers, _)(_.message should include("Submitting transfer out")),
+        forExactly(numTransfers, _)(
+          _.message should include("Submitted transfer to ledger, waiting for completion")
+        ),
       )
       advanceTime(Duration.ofSeconds(5))
     } else {
