@@ -48,6 +48,7 @@ in pkgs.mkShell {
     hub # Github CLI for todo checker
     jq
     jsonnet
+    k9s
     kubectl
     kubernetes-helm
     lnav
