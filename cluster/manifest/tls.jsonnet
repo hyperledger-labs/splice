@@ -1,24 +1,24 @@
-local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) = {
+local issuer(config) = {
   deploymentObjects: [
     {
       apiVersion: "cert-manager.io/v1",
       kind: "Issuer",
       metadata: {
-        name: issuerRef,
+        name: config.tls.issuerName,
       },
       spec: {
         acme: {
-          server: issuerServer,
+          server: config.tls.issuerServer,
           email: "team-canton-network@digitalasset.com",
           privateKeySecretRef: {
-            name: issuerRef + "-acme-account",
+            name: config.tls.issuerName + "-acme-account",
           },
           solvers: [{
             dns01: {
               cloudDNS: {
-                project: cloudDnsProject,
+                project: config.gcpDnsProject,
                 serviceAccountSecretRef: {
-                  name: cloudDnsServiceAccount,
+                  name: config.gcpDnsSASecret,
                   key: "key.json",
                 },
               },
@@ -30,21 +30,21 @@ local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) =
   ],
 };
 
-local certificate(issuerRef, tlsCertSecret, clusterName, clusterDnsName) = {
+local certificate(config, tlsCertSecret) = {
   deploymentObjects: [
     {
       apiVersion: "cert-manager.io/v1",
       kind: "Certificate",
       metadata: {
-        name: clusterName + "-certificate",
+        name: config.clusterName + "-certificate",
         namespace: "default",
       },
       spec: {
         secretName: tlsCertSecret,
         issuerRef: {
-          name: issuerRef,
+          name: config.tls.issuerName,
         },
-        dnsNames: [clusterDnsName, "*." + clusterDnsName, "*.validator1." + clusterDnsName, "*.splitwell." + clusterDnsName],
+        dnsNames: [config.clusterDnsName, "*." + config.clusterDnsName, "*.validator1." + config.clusterDnsName, "*.splitwell." + config.clusterDnsName],
       },
     },
   ],

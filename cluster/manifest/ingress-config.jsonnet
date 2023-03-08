@@ -52,8 +52,8 @@ local deployments(config, deployments) =
       tlsCertSecret=tlsCertSecret
     ),
     externalService(config, externalProxyPorts),
-    tls.issuer(config.tls.issuerName, config.tls.issuerServer, config.gcpDnsProject, config.gcpDnsSASecret),
-    tls.certificate(config.tls.issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
+    tls.issuer(config),
+    tls.certificate(config, tlsCertSecret),
   ];
 
 {
