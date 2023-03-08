@@ -37,8 +37,10 @@ class SvAutomationService(
     ) {
 
   registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
   if (config.automation.enableUnclaimedRewardExpiration) {

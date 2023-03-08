@@ -247,7 +247,7 @@ trait TimeTestUtil extends CoinTestCommon {
 
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(duration))(
-      s"waiting for open and issuing round automation (should create OpenMiningRound ${highestOpen + 1}, should advance IssuingMiningRounds ${previousIssuingRounds}",
+      s"waiting for open and issuing round automation (should create OpenMiningRound ${highestOpen + 1}, should advance IssuingMiningRounds $previousIssuingRounds",
       _ =>
         eventually(5.seconds) {
 

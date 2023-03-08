@@ -1,5 +1,8 @@
 package com.daml.network.sv.util
 
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.util.Contract
+
 import java.security.{KeyFactory, SecureRandom, Signature}
 import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
@@ -62,5 +65,11 @@ object SvUtil {
     } catch {
       case e: Exception => Left(s"could not parse private key: ${e.getMessage()}")
     }
+  }
+
+  def requiredNumConfirmations(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
+    val memberNum = svcRules.payload.members.size
+    // as per `SvcRules` / `summarizeConsortium`
+    (memberNum - 1) / 3 + 1
   }
 }

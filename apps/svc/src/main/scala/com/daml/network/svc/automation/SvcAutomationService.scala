@@ -36,7 +36,6 @@ class SvcAutomationService(
     ) {
 
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, store, connection))
-  registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, store, connection))
   registerTrigger(
     new ArchiveClosedMiningRoundsTrigger(
       triggerContext,

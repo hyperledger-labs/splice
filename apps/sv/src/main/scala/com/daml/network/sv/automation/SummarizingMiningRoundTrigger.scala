@@ -1,10 +1,17 @@
-package com.daml.network.svc.automation
+package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.svc.store.SvcStore
+import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_MiningRound_StartIssuing}
+import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
+import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
+import com.daml.network.environment.{CoinLedgerConnection, DedupOffset}
+import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -13,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
-    store: SvcStore,
+    store: SvSvcStore,
     connection: CoinLedgerConnection,
 )(implicit
     ec: ExecutionContext,
@@ -28,6 +35,21 @@ class SummarizingMiningRoundTrigger(
       cc.round.SummarizingMiningRound.COMPANION,
     ) {
 
+  private def coinRulesStartIssuingAction(
+      coinRulesCid: CoinRules.ContractId,
+      miningRoundCid: SummarizingMiningRound.ContractId,
+      summary: OpenMiningRoundSummary,
+  ): ActionRequiringConfirmation =
+    new ARC_CoinRules(
+      coinRulesCid,
+      new CRARC_MiningRound_StartIssuing(
+        new CoinRules_MiningRound_StartIssuing(
+          miningRoundCid,
+          summary,
+        )
+      ),
+    )
+
   override def completeTask(
       summarizingRound: Contract[
         cc.round.SummarizingMiningRound.ContractId,
@@ -37,17 +59,48 @@ class SummarizingMiningRoundTrigger(
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       rewards <- queryRewards(summarizingRound.payload.round.number)
+      svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      cmd = coinRules.contractId
-        .exerciseCoinRules_MiningRound_StartIssuing(
-          summarizingRound.contractId,
-          rewards.summary,
-        )
-      cid <-
-        connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
-    } yield TaskSuccess(
-      s"completed summarizing mining round with ${rewards.summary}, and created issuing mining round with cid ${cid.exerciseResult}"
-    )
+      action = coinRulesStartIssuingAction(
+        coinRules.contractId,
+        summarizingRound.contractId,
+        rewards.summary,
+      )
+      queryResult <- store.lookupConfirmationByActionWithOffset(action)
+      cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
+        store.key.svParty.toProtoPrimitive,
+        action,
+      )
+      taskOutcome <- queryResult match {
+        case QueryResult(_, Some(_)) =>
+          Future.successful(
+            TaskSuccess(
+              s"skipping as confirmation from ${store.key.svParty} is already created for such action"
+            )
+          )
+        case QueryResult(offset, None) =>
+          connection
+            .submitWithResult(
+              actAs = Seq(store.key.svParty),
+              readAs = Seq(store.key.svcParty),
+              update = cmd,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.directory.createMiningRoundStartIssuingConfirmation",
+                Seq(store.key.svParty, store.key.svcParty),
+                summarizingRound.contractId.contractId,
+              ),
+              deduplicationConfig = DedupOffset(
+                offset = offset
+              ),
+              domainId = domainId,
+            )
+            .map { cid =>
+              TaskSuccess(
+                s"created confirmation for summarizing mining round with ${rewards.summary}"
+              )
+            }
+      }
+    } yield taskOutcome
   }
 
   /** The rewards issued for a given round.

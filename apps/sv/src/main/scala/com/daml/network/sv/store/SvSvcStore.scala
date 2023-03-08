@@ -2,6 +2,7 @@ package com.daml.network.sv.store
 
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
@@ -131,6 +132,15 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
       : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
     listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
 
+  def listConfirmations(
+      action: cn.svcrules.ActionRequiringConfirmation
+  ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
+    for {
+      acs <- defaultAcs
+      confirmations <- acs.listContracts(cn.svcrules.Confirmation.COMPANION)
+    } yield confirmations.filter(_.payload.action.toValue == action.toValue)
+  }
+
   def listAppRewardCoupons(
       round: Long,
       limit: Option[Long] = None,
@@ -205,6 +215,18 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
       rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
     } yield rounds.sortBy(_.payload.round.number).headOption
 
+  def lookupConfirmationByActionWithOffset(
+      action: ActionRequiringConfirmation
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]]
+  ] = {
+    defaultAcs.flatMap(
+      _.findContractWithOffset(cn.svcrules.Confirmation.COMPANION)(
+        _.payload.action.toValue == action.toValue
+      )
+    )
+  }
+
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
@@ -251,6 +273,7 @@ object SvSvcStore {
       svcParty,
       Map(
         mkFilter(cn.svcrules.AgreedCoinPrice.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv
@@ -259,8 +282,11 @@ object SvSvcStore {
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),

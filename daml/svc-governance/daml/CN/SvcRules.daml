@@ -17,6 +17,10 @@ import CC.ValidatorLicense
 -- Types
 ---------
 
+-- | Every action that requires confirmations must be inherently one-shot.
+-- Each action must not be executable more than once.
+-- An action that violates this rule could be executed twice by a malicious leader or
+-- as the result of a race condition.
 data ActionRequiringConfirmation
   = ARC_SvcRules with
       svcAction : SvcRules_ActionRequiringConfirmation
@@ -411,6 +415,8 @@ summarizeConsortium c = ConsortiumSummary with
   where
     numMembers = Map.size c.members
 
+-- | Execute an action which requires certain number of confirmations from SVs.
+-- Each confirmed action can at most be executed once.
 executeActionRequiringConfirmation: ContractId SvcRules -> ActionRequiringConfirmation -> Update ()
 executeActionRequiringConfirmation svcRulesCid act = case act of
   ARC_CoinRules with .. ->
