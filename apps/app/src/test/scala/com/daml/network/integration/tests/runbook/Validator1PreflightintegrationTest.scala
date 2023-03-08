@@ -1,53 +1,33 @@
 package com.daml.network.integration.tests.runbook
 
-import better.files.*
 import com.daml.network.LiveDevNetTest
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
   Auth0User,
-  CantonProcessTestUtil,
+  DirectoryFrontendTestUtil,
   SplitwellFrontendTestUtil,
   WalletFrontendTestUtil,
-  WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.topology.PartyId
-import monocle.macros.syntax.lens.*
 
-import java.net.URI
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import scala.collection.mutable
 import scala.concurrent.duration.*
-import scala.util.Using
 import com.daml.network.util.FrontendLoginUtil
 
-/** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
-  * This test also doubles as the pre-flight validator test.
+/** Preflight test running against validator1.
   */
-class PreflightIntegrationTest
-    extends FrontendIntegrationTest("alice-selfhosted", "alice-validator1", "bob-validator1")
-    with HasConsoleScriptRunner
-    with CantonProcessTestUtil
+class Validator1PreflightIntegrationTest
+    extends FrontendIntegrationTest("alice-validator1", "bob-validator1")
     with FrontendLoginUtil
-    with WalletTestUtil
+    with DirectoryFrontendTestUtil
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
-  val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
-  val validatorPath: File = examplesPath / "validator"
-
-  val resourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
-
-  val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
-
-  // We cache this because we only need it for one test case
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  var validatorOnboardingSecret: Option[String] = None
+  private val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 
   override def beforeEach() = {
     super.beforeEach();
@@ -75,24 +55,7 @@ class PreflightIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
-      .fromFiles(
-        this.getClass.getSimpleName,
-        validatorPath / "validator.conf",
-        validatorPath / "validator-onboarding-nosecret.conf",
-      )
-      // clearing default config transforms because they have settings
-      // we don't want such as adjusting daml names or triggering automation every second
-      .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
-      .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
-      )
-      // Disable autostart, because our apps require the participant to be connected to a domain
-      // when the app starts. The apps are started manually in `validator-participant.sc` below.
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
-      .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
+    CoinEnvironmentDefinition.empty(this.getClass.getSimpleName)
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
@@ -250,133 +213,6 @@ class PreflightIntegrationTest
         "alice.cns",
       )
     }
-  }
-
-  private def allocateDirectoryEntry(
-      directoryUiLogin: () => Unit,
-      entryName: String,
-  )(implicit
-      webDrive: WebDriverType
-  ) = {
-    directoryUiLogin()
-
-    waitForQuery(id("entry-name-field"))
-
-    click on "entry-name-field"
-    textField("entry-name-field").value = entryName
-
-    click on "request-entry-with-sub-button"
-
-    eventually() {
-      findAll(className("sub-requests-table-row")) should have size 1
-    }
-  }
-
-  def reserveDirectoryNameFor(directoryUiLogin: () => Unit, entryName: String)(implicit
-      webDrive: WebDriverType
-  ): String = {
-    clue(s"Reserving directory name: ${entryName}") {
-      allocateDirectoryEntry(directoryUiLogin, entryName)
-
-      // user is redirected to their wallet...
-      eventually() {
-        findAll(className("sub-request-accept-button")) should have size 1
-      }
-      click on className("sub-request-accept-button")
-
-      // And then back to directory, where they are already logged in
-      eventually(scaled(10 seconds)) {
-        findAll(className("entries-table-row")) should have size 1
-      }
-      val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
-        row
-      }
-      val name = row.childElement(className("entries-table-name"))
-      name.text should be(entryName)
-      entryName
-    }
-  }
-
-  "run through runbook with self-hosted validator" taggedAs LiveDevNetTest in { implicit env =>
-    // Start Canton as a separate process. We do that here rather than in the env setup
-    // because it is only needed for this one test.
-    val cantonArgs = Seq(
-      "-c",
-      (validatorPath / "validator-participant.conf").toString,
-      "-C",
-      "canton.participants.validatorParticipant.ledger-api.port=6001",
-      "-C",
-      "canton.participants.validatorParticipant.admin-api.port=6002",
-      "--bootstrap",
-      (validatorPath / "validator-participant.sc").toString,
-    )
-    Using.resource(startCanton(cantonArgs)) { process =>
-      runScript(validatorPath / "validator.sc")(env.environment)
-      runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
-
-      v("validatorApp").remoteParticipant.dars
-        .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
-
-      val walletUiPort = 3000
-      val directoryUiPort = 3001
-
-      // Generate new random CNS names to avoid conflicts between multiple preflight check runs
-      val id = (new scala.util.Random).nextInt().toHexString
-      val cnsName = s"alice+${id}.cns"
-
-      withFrontEnd("alice-selfhosted") { implicit webDriver =>
-        login(walletUiPort, "alice")
-        tapAndListCoins(100)
-        reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
-        // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
-        go to "about:blank"
-        eventually() {
-          pageTitle shouldBe ""
-        }
-      }
-      // Stop nodes before Canton is shutdown
-      env.coinNodes.local.foreach(_.stop())
-    }
-  }
-
-  private def insertValidatorOnboardingSecret(conf: CNNodeConfig): CNNodeConfig = {
-
-    conf.validatorApps.size shouldBe 1
-
-    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
-      val oc = vc.onboarding.value
-
-      // obtain an onboarding secret
-      val secret = validatorOnboardingSecret match {
-        case Some(s) => s
-        case None => {
-          val s = prepareValidatorOnboarding(oc.remoteSv.adminApi.url)
-          validatorOnboardingSecret = Some(s)
-          s
-        }
-      }
-      // insert it
-      vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
-    })(conf)
-  }
-
-  // We invoke the API via a basic HTTP request, just like we expect runbook users to do for now.
-  private def prepareValidatorOnboarding(url: String): String = {
-    val client = HttpClient
-      .newBuilder()
-      .connectTimeout(java.time.Duration.ofSeconds(20))
-      .build()
-
-    val request = HttpRequest
-      .newBuilder()
-      .uri(URI.create(url + "/admin/validator/onboarding/prepare"))
-      .header("content-type", "application/json")
-      .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
-      .build();
-
-    val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-    val secret = (io.circe.parser.parse(response.body).value \\ "secret" head).asString.value
-    secret
   }
 
   private def auth0Login(user: Auth0User, url: String, completedWhen: () => Boolean)(implicit

@@ -226,6 +226,9 @@ object CoinEnvironmentDefinition {
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
 
+  def empty(testName: String): CoinEnvironmentDefinition =
+    CoinEnvironmentDefinition(CNNodeConfig.empty, context = testName)
+
   def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
 }

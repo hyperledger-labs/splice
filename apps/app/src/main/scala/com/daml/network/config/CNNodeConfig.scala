@@ -409,6 +409,8 @@ case class CNNodeConfig(
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object CNNodeConfig {
 
+  lazy val empty = CNNodeConfig()
+
   private val logger: Logger = LoggerFactory.getLogger(classOf[CNNodeConfig])
   private val elc = ErrorLoggingContext(
     TracedLogger(logger),
