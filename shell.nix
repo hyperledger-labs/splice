@@ -22,6 +22,7 @@ let
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox ];
 in pkgs.mkShell {
+  PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
   shellHook = ''
     # TODO(#1836) Remove this once we no longer inject our auth service.
