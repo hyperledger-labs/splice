@@ -54,56 +54,6 @@ local deployments(config) = [
       { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
     ]
   ),
-  c.deployment(
-    config,
-    "domain",
-    [
-      {
-        name: "swd-pub-api",
-        port: 5008,
-        externalPort: 5108,
-      },
-      {
-        name: "swd-adm-api",
-        port: 5009,
-        externalPort: 5109,
-      },
-      {
-        name: "swd-metrics",
-        port: 10013,
-        externalPort: 10413,
-      },
-    ],
-    image="canton-domain",
-    namespace="splitwell",
-    ext={
-      readinessProbe: {
-        tcpSocket: {
-          port: "swd-pub-api",
-        },
-      },
-      livenessProbe: {
-        tcpSocket: {
-          port: "swd-pub-api",
-        },
-        failureThreshold: 5,
-        periodSeconds: 10,
-      },
-      startupProbe: {
-        tcpSocket: {
-          port: "swd-pub-api",
-        },
-        failureThreshold: 20,
-        periodSeconds: 10,
-      },
-    },
-    cpuRequest=config.domainCpu,
-    memoryLimitMiB=config.domainMemoryMib,
-    extraEnvVars=[
-      { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
-    ]
-  ),
-
   c.deployment(config, "participant", [
     {
       name: "svcp-adm-api",
