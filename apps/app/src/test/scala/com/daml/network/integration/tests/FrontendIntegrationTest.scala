@@ -65,7 +65,9 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     // We need to start the web frontends afterwards because selenium
     // insists on automatically selecting free ports and those may
     // collide with the ports used by our own services.
-    startWebDrivers(env.executionContext)
+    if (autostartWebDrivers) {
+      startWebDrivers(env.executionContext)
+    }
     env
   }
 
@@ -84,7 +86,9 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
 
   override def provideEnvironment = {
     val env = super.provideEnvironment
-    startWebDrivers(env.executionContext)
+    if (autostartWebDrivers) {
+      startWebDrivers(env.executionContext)
+    }
     env
   }
 
@@ -95,6 +99,8 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
 }
 
 trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatchers {
+
+  protected lazy val autostartWebDrivers: Boolean = true
 
   import FrontendIntegrationTest.NavigationInfo
 
@@ -108,62 +114,70 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
 
+  protected def startWebDriver(name: String) = {
+    if (!frontendNames.contains(name)) {
+      throw new IllegalArgumentException(s"$name was not in defined frontends $frontendNames")
+    }
+    val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
+    logger.info(s"Starting web-frontend")
+    val browserLogFile =
+      Paths
+        .get(
+          "log",
+          s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
+        )
+        .toFile
+    val (webDriver, biDi) = eventually() {
+      val driver =
+        Try {
+          val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
+          new FirefoxDriver(builder.build(), options)
+        }.toEither.valueOr { e =>
+          logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
+          fail()
+        }
+      val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
+        logger.info(s"Failed to get BiDi connection to web driver. The error was $e")
+        driver.quit()
+        fail()
+      }
+      (driver, bidi)
+    }
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+    webDrivers += (name -> webDriver)
+    biDi.addListener[LogEntry](
+      Log.entryAdded(),
+      logEntry => {
+        logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
+          val msg = consoleLogEntry.getText
+          consoleLogEntry.getLevel match {
+            case LogLevel.DEBUG => logger.debug(msg)
+            case LogLevel.INFO => logger.info(msg)
+            case LogLevel.WARNING => logger.warn(msg)
+            case LogLevel.ERROR => logger.error(msg)
+          }
+        }
+      },
+    );
+    val JSON = new Json()
+    biDi.addListener[NavigationInfo](
+      new Event[NavigationInfo](
+        "browsingContext.domContentLoaded",
+        params => {
+          val reader = new StringReader(JSON.toJson(params))
+          val input = JSON.newInput(reader)
+          NavigationInfo.fromJson(input)
+        },
+      ),
+      navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
+    );
+  }
+
   protected def startWebDrivers(implicit ec: ExecutionContext) =
     // We start all browsers in parallel, for faster test init.
     frontendNames.toList.parTraverse { name =>
       Future {
-        val browserLogFile =
-          Paths
-            .get(
-              "log",
-              s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
-            )
-            .toFile
-        val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
-        val (webDriver, biDi) = eventually() {
-          val driver =
-            Try {
-              val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
-              new FirefoxDriver(builder.build(), options)
-            }.toEither.valueOr { e =>
-              logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
-              fail()
-            }
-          val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
-            logger.info(s"Failed to get BiDi connection to web driver. The error was $e")
-            driver.quit()
-            fail()
-          }
-          (driver, bidi)
-        }
-        webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
-        webDrivers += (name -> webDriver)
-        biDi.addListener[LogEntry](
-          Log.entryAdded(),
-          logEntry => {
-            logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
-              val msg = consoleLogEntry.getText
-              consoleLogEntry.getLevel match {
-                case LogLevel.DEBUG => logger.debug(msg)
-                case LogLevel.INFO => logger.info(msg)
-                case LogLevel.WARNING => logger.warn(msg)
-                case LogLevel.ERROR => logger.error(msg)
-              }
-            }
-          },
-        );
-        val JSON = new Json()
-        biDi.addListener[NavigationInfo](
-          new Event[NavigationInfo](
-            "browsingContext.domContentLoaded",
-            params => {
-              val reader = new StringReader(JSON.toJson(params))
-              val input = JSON.newInput(reader)
-              NavigationInfo.fromJson(input)
-            },
-          ),
-          navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
-        );
+        startWebDriver(name)
       }
     }.futureValue
 

@@ -31,6 +31,10 @@ class SelfHostedPreflightIntegrationTest
     with WalletFrontendTestUtil
     with DirectoryFrontendTestUtil {
 
+  // We need to delay this until we started the validator. Otherwise we might
+  // end up with port collisions.
+  override lazy val autostartWebDrivers = false
+
   private val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   private val validatorPath: File = examplesPath / "validator"
 
@@ -85,6 +89,8 @@ class SelfHostedPreflightIntegrationTest
       // Generate new random CNS names to avoid conflicts between multiple preflight check runs
       val id = (new scala.util.Random).nextInt().toHexString
       val cnsName = s"alice+${id}.cns"
+
+      startWebDriver("alice-selfhosted")
 
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         login(walletUiPort, "alice")
