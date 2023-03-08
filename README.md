@@ -329,6 +329,10 @@ The applications are configured using [HOCON](https://github.com/lightbend/confi
 Run `./scripts/print-config.sh FILE` in order to retrieve a canonical form of a given
 config file, with includes and substitutions resolved and comments stripped.
 
+**NOTE:** Although in some cases, the use of system props may work, only environment variables are fully supported
+across the stack. As a result, please ensure that you use environment variables for all overrides.
+
+
 ### Daml Numerics
 
 To represent Daml `Numeric`s for any user facing APIs (console commands), we use `scala.math.BigDecimal`s.
