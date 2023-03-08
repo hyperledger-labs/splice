@@ -642,9 +642,7 @@ object LedgerClient {
   ) {
     def matchesSubmission(applicationId: String, commandId: String, submissionId: String): Boolean =
       this.applicationId == applicationId &&
-        // TODO (#3002) transfer completions currently set literal "command-id";
-        // https://github.com/DACH-NY/canton/issues/11732
-        (this.commandId == commandId || this.commandId == "command-id") &&
+        this.commandId == commandId &&
         this.submissionId == submissionId
   }
 
