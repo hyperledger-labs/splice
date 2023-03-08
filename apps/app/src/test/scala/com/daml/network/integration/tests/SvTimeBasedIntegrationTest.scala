@@ -665,7 +665,7 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
     )(
       "Wait for all reward coupons to be created",
       _ => {
-        advanceTime(Duration.ofSeconds(1))
+        advanceTimeByPollingInterval(sv1)
         getNumRewardCoupons(round) should be(numRewards + 8) // 4 app rewards + 4 validator
       },
     )
@@ -676,7 +676,7 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
     )(
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
-        advanceTime(Duration.ofSeconds(1))
+        advanceTimeByPollingInterval(sv1)
         getNumRewardCoupons(round) should be(0)
         scan
           .getClosedRounds()

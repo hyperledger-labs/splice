@@ -14,7 +14,7 @@ case class SvcAppBackendConfig(
     ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     domains: SvcDomainConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     // TODO(M3-07): use price from SvcRules
     // TODO(M3-46): remove entirely once mining rounds automations moves into SvApp
     coinPrice: BigDecimal = 1.0,

@@ -183,7 +183,7 @@ class WalletTimeBasedIntegrationTest
         },
         clue("Cancel subscriptions to avoid affecting other test cases") {
           // to trigger a payment->idle state transition if needed
-          advanceTime(Duration.ofSeconds(1))
+          advanceTimeByPollingInterval(aliceWalletBackend)
           cancelAllSubscriptions(aliceWallet)
         },
       ) {

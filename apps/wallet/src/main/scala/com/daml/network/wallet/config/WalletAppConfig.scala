@@ -26,7 +26,7 @@ case class WalletAppBackendConfig(
     validator: WalletRemoteValidatorAppConfig,
     validatorAuth: AuthTokenSourceConfig,
     auth: AuthConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     treasury: TreasuryConfig = TreasuryConfig(),
     domains: WalletDomainConfig,
 ) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.

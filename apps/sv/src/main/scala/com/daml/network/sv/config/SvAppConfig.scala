@@ -68,7 +68,7 @@ case class LocalSvAppConfig(
     ledgerApiUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteSvc: SvcAppClientConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     isDevNet: Boolean = false,
     // TODO(#2241): consider renaming this to `expectedValidatorOnboardings` once naming has stabilized

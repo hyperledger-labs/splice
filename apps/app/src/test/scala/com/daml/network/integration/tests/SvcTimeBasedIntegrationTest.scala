@@ -14,7 +14,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class SvcTimeBasedIntegrationTest
@@ -66,7 +65,7 @@ class SvcTimeBasedIntegrationTest
     )(
       "Wait for the unclaimed rewards to get merged automagically",
       _ => {
-        advanceTime(Duration.ofSeconds(1))
+        advanceTimeByPollingInterval(svc)
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )

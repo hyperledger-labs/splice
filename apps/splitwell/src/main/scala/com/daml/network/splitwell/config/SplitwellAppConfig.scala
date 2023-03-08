@@ -32,7 +32,7 @@ case class SplitwellAppBackendConfig(
     providerUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     domains: SplitwellDomainConfig,
 ) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {

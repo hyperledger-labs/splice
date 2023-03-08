@@ -29,6 +29,7 @@ abstract class LocalCNNodeConfig extends LocalNodeConfig {
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
   def remoteParticipant: CoinRemoteParticipantConfig
+  def automation: AutomationConfig
 }
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use

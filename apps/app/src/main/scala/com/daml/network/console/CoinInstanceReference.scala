@@ -3,7 +3,7 @@ package com.daml.network.console
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.config.{CoinHttpClientConfig, LocalCNNodeConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.digitalasset.canton.config.{NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.commands.{
@@ -109,6 +109,8 @@ trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
 }
 
 trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference {
+  override def config: LocalCNNodeConfig
+
   @Help.Summary("Start node and wait for initialization to complete")
   def startSync(): Unit = {
     this.start()

@@ -51,7 +51,7 @@ case class ValidatorAppBackendConfig(
     appInstances: Map[String, AppInstance],
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],
 ) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.

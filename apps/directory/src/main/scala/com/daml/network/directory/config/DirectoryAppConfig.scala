@@ -17,7 +17,7 @@ case class LocalDirectoryAppConfig(
     ledgerApiUser: String,
     override val remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
-    automation: AutomationConfig = AutomationConfig(),
+    override val automation: AutomationConfig = AutomationConfig(),
     domains: DirectoryDomainConfig,
 ) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "directory"

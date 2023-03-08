@@ -11,8 +11,6 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil, SplitwellTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.time.Duration
-
 class SplitwellTimeBasedIntegrationTest
     extends CoinIntegrationTest
     with WalletTestUtil
@@ -129,7 +127,7 @@ class SplitwellTimeBasedIntegrationTest
       providerSplitwellBackend.start()
     }
     eventually() {
-      advanceTime(Duration.ofSeconds(1))
+      advanceTimeByPollingInterval(providerSplitwellBackend)
       aliceSplitwell.listBalanceUpdates(key) should have size 2
     }
     aliceSplitwell.listBalances(key) shouldBe Seq(bobUserParty -> 0).toMap

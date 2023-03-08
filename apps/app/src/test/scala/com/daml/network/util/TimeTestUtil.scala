@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
+  LocalCoinAppReference,
   ScanAppBackendReference,
   WalletAppBackendReference,
   WalletAppClientReference,
@@ -301,6 +302,12 @@ trait TimeTestUtil extends CoinTestCommon {
       advanceTime(Duration.between(now, earliestOpen))
     }
   }
+
+  def advanceTimeByPollingInterval(appRef: LocalCoinAppReference)(implicit
+      env: CoinTestConsoleEnvironment
+  ) = advanceTime(
+    appRef.config.automation.pollingInterval.duration
+  )
 
   def getSortedOpenMiningRounds(
       remoteParticipant: CoinRemoteParticipantReference,

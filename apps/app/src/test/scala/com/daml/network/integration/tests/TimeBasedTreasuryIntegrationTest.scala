@@ -248,7 +248,7 @@ class TimeBasedTreasuryIntegrationTest
           eventually() {
             aliceValidatorWallet.list().coins should have length 1
           }
-          advanceTime(Duration.ofMinutes(1))
+          advanceTimeByPollingInterval(aliceWalletBackend)
         },
         entries => {
           forAtLeast(
