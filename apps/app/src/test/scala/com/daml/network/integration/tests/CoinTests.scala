@@ -116,12 +116,16 @@ object CoinTests {
         ref: SplitwellAppClientReference
     ): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
-      val newLedgerApiConfig = ref.config.ledgerApi
-        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
+      val newLedgerApiConfig = ref.config.remoteParticipant.ledgerApi
+        .copy(authConfig =
+          updateUser(ref.config.remoteParticipant.ledgerApi.authConfig, newLedgerApiUser)
+        )
+      val newRemoteParticipant = ref.config.remoteParticipant.copy(ledgerApi = newLedgerApiConfig)
       new SplitwellAppClientReference(
         ref.coinConsoleEnvironment,
         ref.name,
-        config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
+        config = ref.config
+          .copy(ledgerApiUser = newLedgerApiUser, remoteParticipant = newRemoteParticipant),
       )
     }
 

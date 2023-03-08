@@ -3,7 +3,6 @@ package com.daml.network.splitwell.config
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.config.{
   AutomationConfig,
-  CoinLedgerApiClientConfig,
   CoinRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
@@ -46,7 +45,7 @@ case class SplitwellAppClientConfig(
     // Admin API for reads.
     adminApi: ClientConfig,
     // Ledger API for writes.
-    ledgerApi: CoinLedgerApiClientConfig,
+    remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     ledgerApiUser: String,
 ) extends RemoteCNNodeConfig {

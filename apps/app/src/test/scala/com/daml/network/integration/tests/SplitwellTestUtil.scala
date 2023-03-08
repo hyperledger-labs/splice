@@ -37,7 +37,7 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
       (bobSplitwell, bobUserParty),
       (charlieSplitwell, charlieUserParty),
     ).foreach { case (splitwell, party) =>
-      splitwell.createInstallRequest()
+      splitwell.createInstallRequests()
       splitwell.ledgerApi.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
     }

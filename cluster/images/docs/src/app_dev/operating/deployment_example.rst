@@ -93,7 +93,7 @@ To verify that you setup everything correctly, create an install
 request for ``alice`` followed by creating a group and listing your
 groups: ::
 
-  @ aliceSplitwell.createInstallRequest()
+  @ aliceSplitwell.createInstallRequests()
 
   @ aliceSplitwell.requestGroup("mygroup")
 
@@ -172,7 +172,7 @@ single-domain case as well which allows you to interact through
 
 To validate that the setup works correctly, try creating a group: ::
 
-  @ aliceSplitwell.createInstallRequest()
+  @ aliceSplitwell.createInstallRequests()
 
   @ aliceSplitwell.requestGroup("mygroup")
 

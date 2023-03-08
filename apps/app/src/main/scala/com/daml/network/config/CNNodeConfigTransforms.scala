@@ -351,7 +351,7 @@ object CNNodeConfigTransforms {
 
   def bumpRemoteSplitwellPortsBy(bump: Int): CNNodeConfigTransform = {
     updateAllRemoteSplitwellAppConfigs_(
-      _.focus(_.ledgerApi).modify(portTransform(bump, _))
+      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
     )
   }
 
@@ -441,7 +441,7 @@ object CNNodeConfigTransforms {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
       updateAllRemoteSplitwellAppConfigs_(c => {
-        c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))

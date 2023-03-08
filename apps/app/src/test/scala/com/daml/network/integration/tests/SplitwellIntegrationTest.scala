@@ -44,7 +44,7 @@ class SplitwellIntegrationTest
 
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
-        aliceSplitwell.createInstallRequest()
+        aliceSplitwell.createInstallRequests()
         aliceSplitwell.ledgerApi.ledger_api_extensions.acs
           .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
 
@@ -133,7 +133,7 @@ class SplitwellIntegrationTest
 
     "domain disconnect" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
-      aliceSplitwell.createInstallRequest()
+      aliceSplitwell.createInstallRequests()
       aliceSplitwell.ledgerApi.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
       actAndCheck("alice creates group1", aliceSplitwell.requestGroup("group1"))(
