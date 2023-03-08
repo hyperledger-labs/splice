@@ -802,15 +802,10 @@ function subcmd_update_secrets() {
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
   )
 
-  # TODO(#3145) retire sv-app-X secrets in a week or two, after everything is migrated
   for i in \
     "cn-app-wallet-ledger-api-auth wallet validator1" \
     "cn-app-validator-ledger-api-auth validator validator1" \
     "cn-app-svc-ledger-api-auth svc svc" \
-    "cn-app-sv-ledger-api-auth sv1 sv-app-1" \
-    "cn-app-sv-ledger-api-auth sv2 sv-app-2" \
-    "cn-app-sv-ledger-api-auth sv3 sv-app-3" \
-    "cn-app-sv-ledger-api-auth sv4 sv-app-4" \
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
     "cn-app-sv-ledger-api-auth sv2 sv-2" \
     "cn-app-sv-ledger-api-auth sv3 sv-3" \
