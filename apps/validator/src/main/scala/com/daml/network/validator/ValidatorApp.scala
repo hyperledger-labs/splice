@@ -1,5 +1,6 @@
 package com.daml.network.validator
 
+import akka.http.scaladsl.server.Directives.*
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import cats.implicits.*
@@ -18,6 +19,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
+import com.daml.network.validator.admin.http.HttpValidatorAdminHandler
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
@@ -39,6 +41,8 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
+import akka.http.scaladsl.server.directives.BasicDirectives
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -61,7 +65,8 @@ class ValidatorApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
-    ) {
+    )
+    with BasicDirectives {
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
@@ -273,16 +278,33 @@ class ValidatorApp(
         loggerFactory,
       )
 
+      adminHandler = new HttpValidatorAdminHandler(
+        ledgerClient,
+        store,
+        validatorUserName = config.ledgerApiUser,
+        walletServiceUser = walletServiceUser,
+        domainId = domainId,
+        retryProvider = retryProvider,
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            ValidatorResource.routes(
-              handler,
-              AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+            concat(
+              ValidatorResource.routes(
+                handler,
+                AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+              ),
+              ValidatorAdminResource.routes(
+                adminHandler,
+                _ => provide(()),
+              ),
             )
           }
         }
       }
+
       httpConfig = config.adminApi.clientConfig.copy(
         port = config.adminApi.port + 1000
       )
@@ -295,6 +317,7 @@ class ValidatorApp(
         .bind(
           routes
         )
+
     } yield {
       ValidatorApp.State(
         storage,

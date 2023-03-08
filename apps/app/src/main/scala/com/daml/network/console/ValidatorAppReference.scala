@@ -4,7 +4,10 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
-import com.daml.network.validator.admin.api.client.commands.HttpValidatorAppClient
+import com.daml.network.validator.admin.api.client.commands.{
+  HttpValidatorAppClient,
+  HttpValidatorAdminAppClient,
+}
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
@@ -40,7 +43,7 @@ abstract class ValidatorAppReference(
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.OnboardUser(user)
+        HttpValidatorAdminAppClient.OnboardUser(user)
       )
     }
   }
@@ -62,7 +65,7 @@ abstract class ValidatorAppReference(
   def listUsers(): Seq[String] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.ListUsers
+        HttpValidatorAdminAppClient.ListUsers
       )
     }
   }
@@ -74,7 +77,7 @@ abstract class ValidatorAppReference(
   def offboardUser(username: String) = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.OffboardUser(username)
+        HttpValidatorAdminAppClient.OffboardUser(username)
       )
     }
   }

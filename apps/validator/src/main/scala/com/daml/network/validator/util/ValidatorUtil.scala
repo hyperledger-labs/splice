@@ -118,5 +118,4 @@ private[validator] object ValidatorUtil {
       )
     } yield userPartyId
   }
-
 }

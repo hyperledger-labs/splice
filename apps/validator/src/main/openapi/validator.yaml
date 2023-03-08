@@ -34,10 +34,11 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RegistrationResponse"
-  /users:
+
+  /admin/users:
     post:
       tags: [validator]
-      x-jvm-package: validator
+      x-jvm-package: validatorAdmin
       operationId: "onboardUser"
       requestBody:
         required: true
@@ -52,9 +53,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/OnboardUserResponse"
+
     get:
       tags: [validator]
-      x-jvm-package: validator
+      x-jvm-package: validatorAdmin
       operationId: "listUsers"
       responses:
         "200":
@@ -64,10 +66,10 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListUsersResponse"
 
-  /users/offboard:
+  /admin/users/offboard:
     post:
       tags: [validator]
-      x-jvm-package: validator
+      x-jvm-package: validatorAdmin
       operationId: "offboardUser"
       parameters:
         - in: query
