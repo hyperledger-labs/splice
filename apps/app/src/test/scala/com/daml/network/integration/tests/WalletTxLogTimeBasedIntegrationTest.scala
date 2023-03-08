@@ -226,7 +226,7 @@ class WalletTxLogTimeBasedIntegrationTest
       )
     }
 
-    "handle collected transfer offers" in { implicit env =>
+    "handle completed transfer offers" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
 
@@ -248,14 +248,17 @@ class WalletTxLogTimeBasedIntegrationTest
           ),
         )("Bob sees transfer offer", _ => bobWallet.listTransferOffers() should have length 1)
 
+      val previousQuantity = aliceWallet.balance().unlockedQty
+
       actAndCheck("Bob accepts transfer offer", bobWallet.acceptTransferOffer(offerCid))(
         "Alice does not see transfer offer anymore",
         _ => aliceWallet.listTransferOffers() shouldBe empty,
       )
 
-      clue("Wait until Bobs wallet collects the transfer") {
+      clue("Wait until Alice's wallet automation transfers") {
         eventually() {
           bobWallet.balance().unlockedQty should be > BigDecimal(0)
+          aliceWallet.balance().unlockedQty should be < (previousQuantity - transferAmount)
         }
       }
 
