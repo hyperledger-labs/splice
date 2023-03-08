@@ -674,12 +674,42 @@ function subcmd_ipaddr() {
 
 ###
 
+subcommand_whitelist[start_frontends]='Run the self-hosted frontends for the preflight test'
+
+function subcmd_start_frontends() {
+    _log "Starting frontends needed for preflight check..."
+
+    (cd ${REPO_ROOT} && \
+         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global ./start-frontends.sh -d -p)
+}
+
+###
+
 subcommand_whitelist[preflight]='Run the runbook preflight test against the cluster'
 
 function subcmd_preflight() {
     _log "Starting preflight"
 
+    set +e
+    tmux has-session -t cn-frontends
+    local tmux_session_check=$?
+    set -e
+
+    if [ $tmux_session_check -eq 0 ]; then
+        _error "CN Frontends are already running. Please run \`stop-frontends.sh\` from the root and try again."
+    else
+        subcmd_start_frontends
+    fi;
+
+    set +e
     subcmd_sbt_for_preflight "apps-app/testOnly *PreflightIntegrationTest"
+    local test_result=$?
+    set -e
+
+    _log "Stopping frontends..."
+    cd ${REPO_ROOT} && ./stop-frontends.sh
+
+    return $test_result
 }
 
 ###

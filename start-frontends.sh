@@ -159,6 +159,7 @@ if [ $use_preflight_frontends -eq 0 ]; then
 else
   if [ "$enable_test_auth" == "true" ]; then
     start_preflight_frontends
+    echo $NETWORK_APPS_ADDRESS > start-frontends-network-address
   else
     echo "enable_test_auth was set to false, -p is incompatible with -a"
     exit 1

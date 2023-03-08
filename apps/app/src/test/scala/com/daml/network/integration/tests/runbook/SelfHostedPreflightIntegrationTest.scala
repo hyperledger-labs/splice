@@ -76,6 +76,9 @@ class SelfHostedPreflightIntegrationTest
       "--bootstrap",
       (validatorPath / "validator-participant.sc").toString,
     )
+
+    checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
+
     Using.resource(startCanton(cantonArgs)) { process =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
@@ -145,5 +148,13 @@ class SelfHostedPreflightIntegrationTest
     val response = client.send(request, HttpResponse.BodyHandlers.ofString())
     val secret = (io.circe.parser.parse(response.body).value \\ "secret" head).asString.value
     secret
+  }
+
+  private def checkFrontendsNetworkAppsAddress(networkAppsAddress: String): Unit = {
+    clue(s"Checking frontends match given network apps address: ${networkAppsAddress}") {
+      eventually() {
+        "start-frontends-network-address".toFile.lines.headOption shouldBe Some(networkAppsAddress)
+      }
+    }
   }
 }

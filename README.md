@@ -656,15 +656,16 @@ export AUTH0_MANAGEMENT_API_CLIENT_SECRET=…
 The preflight check runs an integration test where a local validator
 connects to a global canton network. To run the check against a
 cluster (see section `GCE Clusters`), change into the cluster's
-deployment directory and run `cncluster preflight`:
+deployment directory, and run `cncluster preflight`:
 
 ```
 cd cluster/deployment/devnet
 cncluster preflight
 ```
 
-Note that the preflight check will fail if your branch is sufficiently divergent from the main branch
-(in particular, if you made any changes to the Daml model).
+Note:
+- The preflight command automatically starts & stops the self-hosted frontends needed for `SelfHostedPreflightIntegrationTest`.
+- The preflight check will fail if your branch is sufficiently divergent from the main branch (in particular, if you made any changes to the Daml model).
 
 You can also launch an SBT shell that is configured to run the
 preflight checks. This is useful if you want to iterate more quickly
@@ -673,9 +674,12 @@ preflight check:
 
 ```
 cd cluster/deployment/devnet
+cncluster start_frontends # optional: sbt_for_preflight will not automatically manage the self-hosted frontends
 cncluster sbt_for_preflight
 sbt:coin> testOnly *Preflight* -- -z validator1 # only run the tests against validator1
 ```
+
+After the test, you have to manually stop the frontends using the typical `stop-frontends.sh` script in the repo root.
 
 #### Configure Auth0 Environment
 

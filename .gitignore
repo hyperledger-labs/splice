@@ -29,6 +29,7 @@ target
 canton.ports
 canton-simtime.ports
 canton-release
+start-frontends-network-address
 .disable-unused-warnings
 todo-out
 temp/
