@@ -23,6 +23,7 @@ import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 import com.daml.network.util.WalletTestUtil
 import scala.concurrent.Future
+import scala.util.Try
 
 class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
@@ -258,7 +259,11 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       aliceValidatorClient.onboardUser(aliceWallet.config.ledgerApiUser),
     )(
       "Alice should have retained her coin",
-      aliceParty => checkWallet(aliceParty, aliceWallet, Seq((100.0, 100.0))),
+      aliceParty => {
+        val balance = Try(loggerFactory.suppressErrors((aliceWallet.balance())))
+          .getOrElse(fail(s"Could not get balance for alice"))
+        balance.unlockedQty should be(100.0)
+      },
     )
 
     implicit val ec = env.executionContext
