@@ -8,8 +8,7 @@ const FeaturedAppRight: React.FC<{ partyId: string }> = ({ partyId }) => {
   const [featured, setFeatured] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     const getFeatured = async () => {
-      const value = await scanClient.lookupFeaturedAppRight(partyId);
-      const featured = value.featuredAppRight;
+      const featured = await scanClient.lookupFeaturedAppRight(partyId);
       setFeatured(!!featured); // HTTP api might return null
     };
     getFeatured();

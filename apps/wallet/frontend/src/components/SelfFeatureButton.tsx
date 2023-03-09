@@ -15,8 +15,7 @@ const SelfFeatureButton: React.FC = () => {
   useEffect(() => {
     const getFeatured = async () => {
       if (primaryPartyId !== undefined) {
-        const value = await scanClient.lookupFeaturedAppRight(primaryPartyId);
-        const featured = value.featuredAppRight;
+        const featured = await scanClient.lookupFeaturedAppRight(primaryPartyId);
         setFeatured(!!featured); // HTTP api might return null
       }
     };

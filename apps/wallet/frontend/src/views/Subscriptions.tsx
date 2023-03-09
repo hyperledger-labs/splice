@@ -1,4 +1,10 @@
-import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
+import {
+  Contract,
+  DirectoryEntry,
+  IntervalDisplay,
+  sameContracts,
+  useInterval,
+} from 'common-frontend';
 import React, { useCallback, useState } from 'react';
 
 import {
@@ -14,18 +20,17 @@ import {
 
 import * as damlTypes from '@daml/types';
 import {
-  SubscriptionRequest as damlSubscriptionRequest,
   Subscription,
+  SubscriptionRequest as damlSubscriptionRequest,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import { PaymentAmountDisplay } from '../components/AmountDisplay';
-import { IntervalDisplay } from '../components/IntervalDisplay';
 import SubscriptionRequestsTable from '../components/SubscriptionRequestsTable';
 import Timestamp from '../components/Timestamp';
 import {
-  useWalletClient,
-  SubscriptionTuple,
   SubscriptionState,
+  SubscriptionTuple,
+  useWalletClient,
 } from '../contexts/WalletServiceContext';
 
 const Subscriptions: React.FC = () => {

@@ -10,4 +10,4 @@ const IntervalDisplay: React.FC<IntervalDisplayProps> = (props: IntervalDisplayP
   <>{microsecondsToInterval(props.microseconds)}</>
 );
 
-export { IntervalDisplay };
+export default IntervalDisplay;

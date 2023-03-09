@@ -94,5 +94,6 @@ class WalletNewFrontendIntegrationTest
         }
       }
     }
+
   }
 }

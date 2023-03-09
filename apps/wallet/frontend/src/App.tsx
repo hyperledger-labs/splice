@@ -1,5 +1,4 @@
 import {
-  Contract,
   DirectoryEntry,
   ErrorBoundary,
   FeaturedAppRight,
@@ -17,7 +16,6 @@ import {
   Route,
   RouterProvider,
 } from 'react-router-dom';
-import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi/dist/models/GetOpenAndIssuingMiningRoundsRequest';
 
 import {
   Alert,
@@ -30,8 +28,6 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-
-import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 
 import './App.css';
 import SelfFeatureButton from './components/SelfFeatureButton';
@@ -102,26 +98,9 @@ const Content = () => {
   const scanClient = useScanClient();
 
   const fetchCoinPrice = useCallback(async () => {
-    const request: GetOpenAndIssuingMiningRoundsRequest = {
-      cachedOpenMiningRoundContractIds: [],
-      cachedIssuingRoundContractIds: [],
-    };
-    const getOpenAndIssuingMiningRounds = await scanClient.getOpenAndIssuingMiningRounds(request);
-
-    const omr = getOpenAndIssuingMiningRounds.openMiningRounds;
-    const openOpenRounds = Object.values(omr)
-      .map(mybCached => Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound))
-      .filter(omr => Date.parse(omr.payload.opensAt) <= Date.now());
-    if (openOpenRounds.length > 0) {
-      const latestOpenRound = openOpenRounds.reduce((prevOmr, currentOmr) =>
-        prevOmr.payload.round.number > currentOmr.payload.round.number ? prevOmr : currentOmr
-      );
-      const newCoinPrice = new Decimal(latestOpenRound.payload.coinPrice);
-      // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
-      setCoinPrice(prevCoinPrice =>
-        prevCoinPrice?.equals(newCoinPrice) ? prevCoinPrice : newCoinPrice
-      );
-    }
+    const coinPrice = await scanClient.getCoinPrice();
+    // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
+    setCoinPrice(prevCoinPrice => (prevCoinPrice?.equals(coinPrice) ? prevCoinPrice : coinPrice));
   }, [scanClient]);
 
   useInterval(fetchCoinPrice, 2000);

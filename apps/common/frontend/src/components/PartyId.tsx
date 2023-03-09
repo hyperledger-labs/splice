@@ -12,18 +12,13 @@ const PartyId: React.FC<{ partyId: string; noCopy?: boolean }> = ({ partyId, noC
           style={{
             display: 'inline-flex',
             maxWidth: '300px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            fontWeight: 'lighter',
           }}
+          className="party-id"
         >
-          <div
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              fontWeight: 'lighter',
-            }}
-            className="party-id"
-          >
-            {partyId}
-          </div>
+          {partyId}
         </div>
       </Tooltip>
       {!noCopy && (

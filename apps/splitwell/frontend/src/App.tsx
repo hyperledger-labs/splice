@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [svc, setSvc] = useState<string | undefined>();
   useEffect(() => {
     const fetchSvc = async () => {
-      const svcPartyId = await scanClient.getSvcPartyId().then(r => r.svcPartyId);
+      const svcPartyId = await scanClient.getSvcPartyId();
       setSvc(svcPartyId);
     };
     fetchSvc();

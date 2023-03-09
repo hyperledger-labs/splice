@@ -50,7 +50,12 @@ const Header: React.FC<HeaderProps> = props => {
       </Typography>
       <Stack direction="row" spacing={4} alignItems="center">
         {navLinks.map((navLink, index) => (
-          <NavLink key={index} to={navLink.path} style={p => applyNavStyle(p.isActive)}>
+          <NavLink
+            key={index}
+            id={`navlink-${navLink.path}`}
+            to={navLink.path}
+            style={p => applyNavStyle(p.isActive)}
+          >
             {navLink.name}
           </NavLink>
         ))}

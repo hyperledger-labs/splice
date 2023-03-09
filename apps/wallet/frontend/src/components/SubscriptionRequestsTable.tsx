@@ -1,4 +1,4 @@
-import { Contract, DirectoryEntry } from 'common-frontend';
+import { Contract, DirectoryEntry, IntervalDisplay } from 'common-frontend';
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,7 +8,6 @@ import { SubscriptionRequest as DamlSubscriptionRequest } from '@daml.js/wallet-
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { PaymentAmountDisplay } from './AmountDisplay';
-import { IntervalDisplay } from './IntervalDisplay';
 
 interface SubscriptionsProps {
   requests: Contract<DamlSubscriptionRequest>[];

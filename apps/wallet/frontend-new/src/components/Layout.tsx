@@ -1,15 +1,12 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { Contract, useScanClient } from 'common-frontend';
+import { useScanClient } from 'common-frontend';
 import { useInterval } from 'common-frontend/lib/utils/hooks';
 import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
-import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
-
-import { OpenMiningRound } from '@daml.js/canton-coin-0.1.0/lib/CC/Round';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { GetBalanceResponse, WalletBalance } from '../models/models';
@@ -24,10 +21,8 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const currentUser = 'alice.cns';
 
   const walletClient = useWalletClient();
-  const scanClient = useScanClient();
 
   const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: '', totalUSD: '' });
-  const [coinPrice, setCoinPrice] = useState<Decimal>(new Decimal(0));
 
   const toWalletBalance = (b: GetBalanceResponse, coinPrice: Decimal): WalletBalance => {
     const locked = new BigNumber(b.effectiveLockedQty);
@@ -40,30 +35,19 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     };
   };
 
+  // TODO (#3332): remove and fetch from context once it's refactored
+  const scanClient = useScanClient();
+  const [coinPrice, setCoinPrice] = useState<Decimal>(new Decimal(0));
+  const fetchCoinPrice = useCallback(async () => {
+    const coinPrice = await scanClient.getCoinPrice();
+    // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
+    setCoinPrice(prevCoinPrice => (prevCoinPrice?.equals(coinPrice) ? prevCoinPrice : coinPrice));
+  }, [scanClient]);
+
   const fetchBalance = useCallback(async () => {
     const balResponse = await walletClient.getBalance();
     setWalletBalance(toWalletBalance(balResponse, coinPrice));
   }, [coinPrice, walletClient]);
-
-  const fetchCoinPrice = useCallback(async () => {
-    const request: GetOpenAndIssuingMiningRoundsRequest = {
-      cachedOpenMiningRoundContractIds: [],
-      cachedIssuingRoundContractIds: [],
-    };
-    const getOpenAndIssuingMiningRounds = await scanClient.getOpenAndIssuingMiningRounds(request);
-
-    const omr = getOpenAndIssuingMiningRounds.openMiningRounds;
-    const openOpenRounds = Object.values(omr)
-      .map(mybCached => Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound))
-      .filter(omr => Date.parse(omr.payload.opensAt) <= Date.now());
-    if (openOpenRounds.length > 0) {
-      const latestOpenRound = openOpenRounds.reduce((prevOmr, currentOmr) =>
-        prevOmr.payload.round.number > currentOmr.payload.round.number ? prevOmr : currentOmr
-      );
-      const newCoinPrice = new Decimal(latestOpenRound.payload.coinPrice);
-      setCoinPrice(newCoinPrice);
-    }
-  }, [scanClient]);
 
   useInterval(fetchBalance, 1000);
   useInterval(fetchCoinPrice, 1000);
