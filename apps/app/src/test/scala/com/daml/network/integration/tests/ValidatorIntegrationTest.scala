@@ -22,6 +22,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 import com.daml.network.util.WalletTestUtil
+import scala.concurrent.Future
 
 class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
@@ -204,6 +205,23 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       },
     )
 
+    val numTestUsers = 30
+    val prefix = "test-user"
+    val testUsers = Range(0, numTestUsers).map(i => s"${prefix}-${i}")
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      testUsers.foreach(aliceValidatorClient.onboardUser(_)),
+      entries => {
+        forAtLeast(numTestUsers, entries)(
+          _.message should include(
+            s"Completed processing with outcome: onboarded wallet end-user '${prefix}"
+          )
+        )
+      },
+    )
+
+    aliceWallet.tap(100.0)
+
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       actAndCheck(
         "Offboard a user",
@@ -214,9 +232,8 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
           // Wait for the user to no longer be listed in the validator's users list, but this
           // does not yet guarantee their wallet services have been closed.
           val usernames = aliceValidatorClient.listUsers()
-          usernames should contain theSameElementsAs Seq(
-            aliceValidator.config.validatorWalletUser.value
-          )
+          usernames should contain theSameElementsAs (testUsers ++
+            Seq(aliceValidator.config.validatorWalletUser.value))
         },
       ),
       entries => {
@@ -229,15 +246,38 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       },
     )
 
-    clue("Offboarding again - should fail") {
+    clue("Offboarding alice again - should fail") {
       assertThrowsAndLogsCommandFailures(
-        aliceValidator.offboardUser(aliceWallet.config.ledgerApiUser),
+        aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
         _.errorMessage should include("No install contract found for user"),
       )
     }
 
-  // TODO(#3230): offboarding multiple users together was tested manually for now, but should be more thoroughly tested here
-  // TODO(#3230): support onboarding the user again
+    actAndCheck(
+      "Onboarding alice back",
+      aliceValidatorClient.onboardUser(aliceWallet.config.ledgerApiUser),
+    )(
+      "Alice should have retained her coin",
+      aliceParty => checkWallet(aliceParty, aliceWallet, Seq((100.0, 100.0))),
+    )
+
+    implicit val ec = env.executionContext
+    clue("Offboarding many users in parallel") {
+      // Note that there's two sources of parallelism here - we submit many requests in parallel
+      // (hence the use of Futures here), and also the wallet automation will pick up
+      // several offboarding requests in parallel.
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        testUsers.map(user => Future { aliceValidatorClient.offboardUser(user) }),
+        entries => {
+          forAtLeast(numTestUsers, entries)(
+            _.message should (include(
+              s"offboarded user ${prefix}"
+            ) and endWith("from wallet"))
+          )
+        },
+      )
+    }
+
   }
 
   "stop an uninitialized validator" in { implicit env =>
