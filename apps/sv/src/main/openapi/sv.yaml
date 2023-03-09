@@ -67,6 +67,32 @@ paths:
             text/plain:
               schema:
                 type: string
+  /onboard/sv:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSv"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -143,14 +169,13 @@ components:
           type: string
         secret:
           type: string
+
+    OnboardSvRequest:
       type: object
       required:
-      - party_id
-      - secret
+      - token
       properties:
-        party_id:
-          type: string
-        secret:
+        token:
           type: string
 
     GetDebugInfoResponse:

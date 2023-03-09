@@ -13,7 +13,10 @@ import java.util.Base64
 
 object SvUtil {
 
-  def keyPairMatches(publicKeyBase64: String, privateKeyBase64: String): Either[String, Unit] = {
+  def keyPairMatches(
+      publicKeyBase64: String,
+      privateKeyBase64: String,
+  ): Either[String, ECPrivateKey] = {
 
     for {
       publicKey <- parsePublicKey(publicKeyBase64)
@@ -40,7 +43,7 @@ object SvUtil {
           Left("public and private keys don't match")
         }
       }
-    } yield (())
+    } yield privateKey
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

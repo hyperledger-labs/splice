@@ -6,15 +6,16 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.HttpSvHandler
 import com.daml.network.sv.automation.SvAutomationService
 import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CoinUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{HasHealth, UploadablePackage}
@@ -29,8 +30,10 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -104,15 +107,25 @@ class SvApp(
             joinConsortium(svPartyId),
             logger,
           )
-        case SvBootstrapConfig.JoinWithKey(_, _, publicKey, privateKey) =>
+        case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
           SvUtil.keyPairMatches(publicKey, privateKey) match {
-            case Right(()) => {
-              logger.info("Joining via SVC as joining with key is not implemented yet.")
-              retryProvider.retryForAutomation(
-                "join existing SV consortium",
-                joinConsortium(svPartyId),
-                logger,
-              )
+            case Right(privateKey_) => {
+              for {
+                _ <- requestOnboarding(
+                  remoteSv.adminApi,
+                  name,
+                  svPartyId,
+                  publicKey,
+                  svcPartyId,
+                  privateKey_,
+                )
+                _ = logger.info("Joining via SVC as joining with key is not fully implemented yet.")
+                _ <- retryProvider.retryForAutomation(
+                  "join existing SV consortium",
+                  joinConsortium(svPartyId),
+                  logger,
+                )
+              } yield ()
             }
             case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
           }
@@ -297,6 +310,40 @@ class SvApp(
       _ <- ledgerConnection.revokeUserRights(config.ledgerApiUser, Seq(svcParty), Seq.empty)
     } yield ()
 
+  private def requestOnboarding(
+      sponsorConfig: CoinHttpClientConfig,
+      name: String,
+      partyId: PartyId,
+      publicKey: String,
+      svcPartyId: PartyId,
+      privateKey: ECPrivateKey,
+  ): Future[Unit] = {
+    SvOnboardingToken(name, publicKey, partyId, svcPartyId).signAndEncode(privateKey) match {
+      case Right(token) => {
+        logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
+        retryProvider.retryForAutomation(
+          "request onboarding", {
+            val svConnection = new SvConnection(
+              sponsorConfig,
+              coinAppParameters.processingTimeouts,
+              loggerFactory,
+            )
+            svConnection
+              .onboardSv(token)
+              .andThen(_ => svConnection.close())
+          },
+          logger,
+        )
+      }
+      case Left(error) =>
+        Future.failed(
+          Status.INTERNAL
+            .withDescription(s"Could not create onboarding token: $error")
+            .asRuntimeException()
+        )
+    }
+  }
+
   private def joinConsortium(svPartyId: PartyId): Future[Unit] = {
     val svcConnection = new SvcConnection(
       config.remoteSvc.clientAdminApi,
@@ -440,7 +487,7 @@ object SvApp {
       (clock.now + expiresIn).toInstant,
     ).create.commands.asScala.toSeq
     for {
-      res <- svStore.lookupUsedSecret(secret).flatMap {
+      res <- svStore.lookupUsedSecretWithOffset(secret).flatMap {
         case QueryResult(_, Some(usedSecret)) => {
           val validator = usedSecret.payload.validator
           Future.successful(
@@ -498,14 +545,14 @@ object SvApp {
       case Left(error) => Future.successful(Left(error))
       case Right(_) =>
         for {
-          res <- svStore.lookupApprovedSvIdentityByKeyWithOffset(key).flatMap {
+          res <- svStore.lookupApprovedSvIdentityByNameWithOffset(name).flatMap {
             case QueryResult(_, Some(id)) => {
               Future.successful(
-                Left(if (id.payload.candidateName == name) {
+                Left(if (id.payload.candidateKey == key) {
                   s"The SV identitiy ($name:$key) is already approved."
                 } else {
-                  s"Tried to approve SV identity ($name:$key), but key $key " +
-                    s"is already approved for SV identity (${id.payload.candidateName},$key)."
+                  s"Tried to approve SV identity ($name:$key), but name $name " +
+                    s"is already approved with key ${id.payload.candidateKey}."
                 })
               )
             }

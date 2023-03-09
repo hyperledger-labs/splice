@@ -2,8 +2,9 @@ package com.daml.network.sv.store
 
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
 import com.daml.network.store.AcsStore.QueryResult
@@ -227,6 +228,15 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
     )
   }
 
+  def lookupSvOnboardingByTokenWithOffset(
+      token: String
+  ): Future[
+    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+  ] =
+    defaultAcs.flatMap(
+      _.findContractWithOffset(so.SvOnboarding.COMPANION)(co => co.payload.token == token)
+    )
+
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
@@ -278,6 +288,7 @@ object SvSvcStore {
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv
         ),
+        mkFilter(so.SvOnboarding.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),

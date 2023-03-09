@@ -1,11 +1,12 @@
 package com.daml.network.sv.admin.http
 
-import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.codegen.java.cn
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
@@ -83,23 +84,22 @@ class HttpSvHandler(
       respond: v0.SvResource.OnboardValidatorResponse.type
   )(body: definitions.OnboardValidatorRequest): Future[v0.SvResource.OnboardValidatorResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      // TODO(M3-46) Add check to avoid that a validator can get onboarded twice
       PartyId.fromProtoPrimitive(body.partyId) match {
         case Right(partyId) =>
-          svStore.lookupValidatorOnboardingBySecretWithOffset(body.secret).flatMap {
-            case QueryResult(_, None) =>
+          svStore.lookupValidatorOnboardingBySecret(body.secret).flatMap {
+            case None =>
               svStore.lookupUsedSecret(body.secret).map {
-                case QueryResult(_, Some(_)) =>
+                case Some(_) =>
                   v0.SvResource
                     .OnboardValidatorResponseUnauthorized(s"Secret has already been used.")
-                case QueryResult(_, None) =>
+                case None =>
                   v0.SvResource.OnboardValidatorResponseUnauthorized("Unknown secret.")
               }
-            case QueryResult(_, Some(vo)) =>
+            case Some(vo) =>
               for {
                 // We retry here because this mutates the CoinRules and rounds contracts,
                 // which can lead to races.
-                _ <- retryProvider.retryForAutomation(
+                _ <- retryProvider.retryForClientCalls(
                   "onboard validator via SvcRules",
                   onboardValidator(partyId, body.secret, vo),
                   logger,
@@ -108,6 +108,44 @@ class HttpSvHandler(
           }
         case Left(error) =>
           Future.successful(v0.SvResource.OnboardValidatorResponseBadRequest(error))
+      }
+    }
+
+  def onboardSv(
+      respond: v0.SvResource.OnboardSvResponse.type
+  )(body: definitions.OnboardSvRequest): Future[v0.SvResource.OnboardSvResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvOnboardingToken.verifyAndDecode(body.token) match {
+        case Right(token) =>
+          svStore.lookupApprovedSvIdentityByName(token.candidateName).flatMap {
+            case Some(approvedSv) =>
+              if (token.candidateKey != approvedSv.payload.candidateKey) {
+                Future.successful(
+                  v0.SvResource
+                    .OnboardSvResponseUnauthorized("Candidate key doesn't match approved key.")
+                )
+              } else if (token.svcParty != svcParty) {
+                Future.successful(v0.SvResource.OnboardSvResponseBadRequest("Wrong SVC party."))
+              } else {
+                // We retry here because the SvcRules can change while attempting this.
+                for {
+                  _ <- retryProvider.retryForClientCalls(
+                    "start SV onboarding via SvcRules",
+                    startSvOnboarding(token.candidateName, token.candidateParty, body.token),
+                    logger,
+                  )
+                } yield v0.SvResource.OnboardSvResponseOK
+              }
+            case None =>
+              Future.successful(
+                v0.SvResource
+                  .OnboardSvResponseUnauthorized("No matching approved SV identity found.")
+              )
+          }
+        case Left(error) =>
+          Future.successful(
+            v0.SvResource.OnboardSvResponseBadRequest(s"Could not vefify and decode token: $error")
+          )
       }
     }
 
@@ -176,20 +214,14 @@ class HttpSvHandler(
         cn.validatoronboarding.ValidatorOnboarding,
       ],
   ): Future[Unit] =
+    // TODO(#2241) Add check to ensure that a validator can't get onboarded twice
     for {
-      acs <- svcStore.acs(globalDomain)
-      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
-      issuingMiningRounds <- acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
-      coinRules <- svcStore.getCoinRules()
       svcRules <- svcStore.getSvcRules()
       cmds = (
         svcRules.contractId
           .exerciseSvcRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
-            coinRules.contractId,
-            openMiningRounds.map(_.contractId).asJava,
-            issuingMiningRounds.map(_.contractId).asJava,
           )
           .commands
           .asScala ++ validatorOnboarding.contractId
@@ -205,4 +237,44 @@ class HttpSvHandler(
         globalDomain,
       )
     } yield ()
+
+  private def startSvOnboarding(
+      candidateName: String,
+      candidateParty: PartyId,
+      token: String,
+  ): Future[Unit] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        svcRules <- svcStore.getSvcRules()
+        lookup <- svcStore.lookupSvOnboardingByTokenWithOffset(token)
+        _ <- lookup match {
+          case QueryResult(_, Some(_)) =>
+            logger.info("An SV onboarding contract for this token already exists.")
+            Future.successful(())
+          case QueryResult(off, None) => {
+            val cmd = (
+              svcRules.contractId
+                .exerciseSvcRules_StartSvOnboarding(
+                  candidateName,
+                  candidateParty.toProtoPrimitive,
+                  token,
+                  svParty.toProtoPrimitive,
+                )
+            )
+            ledgerConnection.submitCommands(
+              actAs = Seq(svParty),
+              readAs = Seq(svcParty),
+              commands = cmd.commands.asScala.toSeq,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.sv.startSvOnboarding",
+                Seq(svParty),
+                s"$token",
+              ),
+              deduplicationOffset = off,
+              domainId = globalDomain,
+            )
+          }
+        }
+      } yield ()
+    }
 }

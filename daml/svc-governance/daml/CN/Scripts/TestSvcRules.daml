@@ -20,6 +20,7 @@ import CC.Schedule
 import CC.Scripts.Util
 import CN.SvcRules
 import CN.SvcBootstrap
+import CN.SvOnboarding
 import CC.ValidatorLicense
 
 import CC.Scripts.Parameters
@@ -142,6 +143,34 @@ testOnboardValidator = do
   pure ()
 
 
+testOnboardSv : Script ()
+testOnboardSv = do
+  (app, svc, (_, sv2, _, _)) <- initConsortium
+  -- we now have a consortium with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- an onboarding contract for svX has been created
+  [(_, svOnboarding)] <- query @SvOnboarding svc
+  svOnboarding === SvOnboarding with
+    candidateName = "svX"
+    candidateParty = svX
+    token
+    sponsor = sv2
+    svc
+
+  -- TODO(#3111) Extend to full flow, with confirmations
+  pure ()
+
+
 -- Utils
 --------
 
@@ -203,11 +232,8 @@ svSubmits app sv mkCommands = do
 
 onboardValidator : CCApp -> Party -> Party -> Script ()
 onboardValidator app sponsor validator = do
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
-  openRounds <- query @OpenMiningRound app.svc
-  issuingRounds <- query @IssuingMiningRound app.svc
   svSubmits app sponsor $ \cid -> exerciseCmd cid $
-    SvcRules_OnboardValidator sponsor validator coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
+    SvcRules_OnboardValidator sponsor validator
   pure ()
 
 

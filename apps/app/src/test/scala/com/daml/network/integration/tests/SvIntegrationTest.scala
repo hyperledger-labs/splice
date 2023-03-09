@@ -7,7 +7,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -211,31 +211,50 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
   }
 
-  "SV onboarding tokens are built and validated correctly" in { _ =>
-    // random values for test
-    val candidateParty = PartyId
-      .fromProtoPrimitive(
-        "svX::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
+  "SVs create SvOnboarding contracts when legitimately requested to do so" in { implicit env =>
+    initSvc()
+    val sv1Party = sv1.getDebugInfo().svParty
+    val sv4Party = sv4.getDebugInfo().svParty
+    val token = clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1.") {
+      // The onboarding is requested by SV4 during SvApp init.
+      inside(
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty)
+      ) {
+        case Seq(svOnboarding) => {
+          svOnboarding.data.candidateName shouldBe "sv4"
+          svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
+          svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
+          svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
+          // if this check fails:
+          // make sure that the values (especially the key) are in sync with sv1's and sv4's config files
+          SvOnboardingToken
+            .verifyAndDecode(svOnboarding.data.token)
+            .value shouldBe SvOnboardingToken(
+            "sv4",
+            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==",
+            sv4Party,
+            svcParty,
+          )
+          svOnboarding.data.token
+        }
+      }
+    }
+    clue("Attempting to start an onboarding multiple times has no effect.") {
+      sv1.onboardSv(token)
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
+    }
+    clue(
+      "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
+    ) {
+      assertThrowsAndLogsCommandFailures(
+        sv2.onboardSv(token),
+        _.errorMessage should include("No matching approved SV identity found."),
       )
-      .value
-    val svcParty = PartyId
-      .fromProtoPrimitive(
-        "svc::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
-      )
-      .value
-
-    // keys generated using scripts/generate-sv-keys.sc
-    val publicKey =
-      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+U0mKc9YlTZFESl0A4tac6fhxFfXflo6lkNUhLMvgal0054Lm4mOsqQOigpIroALXha4u25bZ7PDvT32cZx/9g=="
-    val privateKey =
-      "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCCOrvvs/R+VKFZ/eET1CkgwY15apSI7FSWngvEs44+xiQ=="
-
-    val token = SvOnboardingToken("SvX", publicKey, candidateParty, svcParty)
-
-    val encodedToken = token.signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value
-    val decodedToken = SvOnboardingToken.verifyAndDecode(encodedToken).value
-
-    decodedToken should equal(token)
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
+    }
   }
 
   def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =

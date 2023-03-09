@@ -104,6 +104,26 @@ object HttpSvAppClient {
     }
   }
 
+  case class OnboardSv(token: String) extends BaseCommand[http.OnboardSvResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardSvResponse] =
+      client.onboardSv(
+        body = definitions.OnboardSvRequest(token),
+        headers = headers,
+      )
+
+    override def handleResponse(response: http.OnboardSvResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Unit] = response match {
+      case http.OnboardSvResponse.OK => Right(())
+      case http.OnboardSvResponse.BadRequest(e) => Left(e)
+      case http.OnboardSvResponse.Unauthorized(e) => Left(e)
+    }
+  }
+
   case class DevNetOnboardValidatorPrepare()
       extends BaseCommand[http.DevNetOnboardValidatorPrepareResponse, String] {
 

@@ -13,6 +13,7 @@ import CC.Round
 import CC.API.V1.Round (Round(..))
 
 import CC.ValidatorLicense
+import CN.SvOnboarding
 
 -- Types
 ---------
@@ -287,16 +288,25 @@ template SvcRules with
       with
         sponsor : Party
         validator : Party
-        coinRules : ContractId CoinRules
-        openRounds : [ContractId OpenMiningRound]
-        issuingRounds : [ContractId IssuingMiningRound]
       controller sponsor
       do
         require "Sponsor is a consortium member" (sponsor `Map.member` members)
-        -- TODO(M3-46): sponsor<->candidate relationship must be recorded somewhere
-        rules <- fetch coinRules
-        require "SVC of CoinRules matches" (rules.svc == svc)
         create ValidatorLicense with ..
+
+
+    -- SV onboarding
+    ----------------
+
+    nonconsuming choice SvcRules_StartSvOnboarding : ContractId SvOnboarding
+      with
+        candidateName : Text
+        candidateParty : Party
+        token : Text
+        sponsor : Party
+      controller sponsor
+      do
+        require "Sponsor is a consortium member" (sponsor `Map.member` members)
+        create SvOnboarding with ..
 
 
     -- Coin management driven directly by the leader

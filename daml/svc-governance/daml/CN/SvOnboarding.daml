@@ -9,3 +9,16 @@ template ApprovedSvIdentity with
     candidateKey : Text         -- ^ Public key of the SV candidate.
   where
     signatory approvingSv
+
+-- | Template used by the SV consortium to keep track of the onboarding of an SV candidate.
+-- The existence of this contract triggers SV automation that creates confirmation contracts for
+-- the candidate if the token is a valid `SvOnboardingToken` and matches an `ApprovedSvIdentity`.
+template SvOnboarding with
+    candidateName : Text        -- ^ Human-readable name of the SV candidate. Must match the one in `ApprovedSvIdentity`!
+    candidateParty : Party      -- ^ PartyId of the candidate's SV party.
+    token : Text                -- ^ An encoded and signed `SvOnboardingToken` that confirms the candidate's identity.
+    sponsor : Party             -- ^ The established SV node that created this contract.
+    svc: Party
+  where
+    signatory svc
+    observer candidateParty

@@ -33,4 +33,17 @@ final class SvConnection(
       config.url,
       HttpSvAppClient.OnboardValidator(validator, secret),
     )
+
+  /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
+    */
+  def onboardSv(token: String)(implicit
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Unit] =
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.OnboardSv(token),
+    )
 }

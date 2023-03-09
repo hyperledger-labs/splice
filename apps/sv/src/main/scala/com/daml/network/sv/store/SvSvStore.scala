@@ -32,7 +32,14 @@ trait SvSvStore extends CoinAppStoreWithoutHistory {
       )
     )
 
-  def lookupUsedSecret(
+  def lookupValidatorOnboardingBySecret(
+      secret: String
+  ): Future[
+    Option[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]
+  ] =
+    lookupValidatorOnboardingBySecretWithOffset(secret).map(_.value)
+
+  def lookupUsedSecretWithOffset(
       secret: String
   ): Future[
     QueryResult[Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]]
@@ -41,20 +48,32 @@ trait SvSvStore extends CoinAppStoreWithoutHistory {
       _.findContractWithOffset(vo.UsedSecret.COMPANION)(co => co.payload.secret == secret)
     )
 
+  def lookupUsedSecret(
+      secret: String
+  ): Future[
+    Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]
+  ] =
+    lookupUsedSecretWithOffset(secret).map(_.value)
+
   def listValidatorOnboardings()
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     defaultAcs.flatMap(_.listContracts(vo.ValidatorOnboarding.COMPANION))
 
-  def lookupApprovedSvIdentityByKeyWithOffset(
-      secret: String
+  def lookupApprovedSvIdentityByNameWithOffset(
+      name: String
   ): Future[
     QueryResult[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]]
   ] =
     defaultAcs.flatMap(
       _.findContractWithOffset(so.ApprovedSvIdentity.COMPANION)(co =>
-        co.payload.candidateKey == key
+        co.payload.candidateName == name
       )
     )
+
+  def lookupApprovedSvIdentityByName(
+      name: String
+  ): Future[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]] =
+    lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
 
   def key: SvStore.Key
 }
