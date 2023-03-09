@@ -583,6 +583,14 @@ commands:
             chmod +x route
             ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
       - run:
+          name: Define local hostname
+          command: |
+              # Some CircleCI machine failed to resolve local hostname to 127.0.0.1.
+              # Giving "sudo: unable to resolve host ip-172-28-55-xx" for sudo commands
+              # This (hacky) step should fix the issue (copied from https://circleci.com/developer/orbs/orb/kindred/kin-l2tp-vpn)
+              hostname=$(cat /etc/hostname)
+              grep -qxF "127.0.0.1 ${hostname}" /etc/hosts || echo "127.0.0.1 ${hostname}" | sudo tee -a /etc/hosts
+      - run:
           name: Verify VPN connection
           command: |
             set +e
@@ -606,7 +614,6 @@ commands:
             # We want to activate the VPN only for our k8s admin API
             # and for the k8s egress. Therefore, we drop the default route.
             sudo ip route del default table 220
-
   # This is separate from setup_vpn since we need to interleave the step that sets up
   # nix for this to work
   setup_vpn_routes:
