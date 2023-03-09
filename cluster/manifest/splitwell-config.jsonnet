@@ -134,9 +134,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[
-    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
-  ]),
+  ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
 
   c.deployment(config, "wallet-new-web-ui", [
     {
@@ -144,9 +142,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-new-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[
-    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL" },
-  ]),
+  ], image="wallet-new-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
 
   c.deployment(config, "splitwell-app", [
     {

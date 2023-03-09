@@ -61,6 +61,32 @@ local appUserNameEnvBinding(appName, varBaseName=appName) =
 
 local appUserNameEnvBindings(appNames) = std.flatMap(appUserNameEnvBinding, appNames);
 
+local appUiAuthEnvBinding(appName, varBaseName=appName) =
+  local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_UI_AUTH";
+  local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_UI_AUTH", "_", "-"));
+  [
+    {
+      name: name + "_CLIENT_ID",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "client-id",
+          optional: false,
+        },
+      },
+    },
+    {
+      name: name + "_URL",
+      valueFrom: {
+        secretKeyRef: {
+          name: secret,
+          key: "url",
+          optional: false,
+        },
+      },
+    },
+  ];
+
 local appAuthEnvBinding(fixedTokens, appName, varBaseName=appName) =
   local name = "CN_APP_" + std.asciiUpper(varBaseName) + "_LEDGER_API_AUTH";
   local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
@@ -346,6 +372,7 @@ local namespace(name, config) = {
   appAuthEnvBinding:: appAuthEnvBinding,
   appUserNameEnvBinding:: appUserNameEnvBinding,
   appUserNameEnvBindings:: appUserNameEnvBindings,
+  appUiAuthEnvBinding:: appUiAuthEnvBinding,
   cluster:: cluster,
   deployment:: deployment,
   externalPort:: externalPort,

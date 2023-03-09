@@ -8,8 +8,8 @@ const cluster = hostParts.slice(-4).join(".");
 window.canton_network_config = {
   auth: {
     algorithm: "rs-256",
-    authority: "https://canton-network-dev.us.auth0.com",
-    client_id: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
+    authority: "${CN_APP_SPLITWELL_UI_AUTH_URL}",
+    client_id: "${CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID}",
     token_audience: "https://canton.network.global",
     token_scope: "daml_ledger_api",
   },
@@ -37,7 +37,8 @@ window.canton_network_config = {
     },
     participantAdmin: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      grpcUrl: "https://" + window.location.hostname + "/api/v0/participant-admin",
-    }
+      grpcUrl:
+        "https://" + window.location.hostname + "/api/v0/participant-admin",
+    },
   },
 };

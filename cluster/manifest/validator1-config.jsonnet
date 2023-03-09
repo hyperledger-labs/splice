@@ -78,9 +78,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=[
-    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
-  ]),
+  ], image="wallet-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
 
   c.deployment(config, "wallet-new-web-ui", [
     {
@@ -88,9 +86,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-new-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=[
-    { name: "CN_APP_WALLET_UI_AUTH_CLIENT_ID", value: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK" },
-  ]),
+  ], image="wallet-new-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
 
   c.deployment(config, "directory-web-ui", [
     {
@@ -98,7 +94,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="validator1-directory-web-ui", namespace="validator1", cpuRequest=0.5),
+  ], image="validator1-directory-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("directory")),
 
   c.deployment(config, "splitwell-web-ui", [
     {
@@ -106,7 +102,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="validator1-splitwell-web-ui", namespace="validator1", cpuRequest=0.5),
+  ], image="validator1-splitwell-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("splitwell")),
 ];
 
 {

@@ -774,6 +774,23 @@ function subcmd_wait() {
 
 subcommand_whitelist[update_secrets]='Update Auth0 Kubernetes Secrets'
 
+AUTH_BASE_URL='https://canton-network-dev.us.auth0.com'
+
+function _set_auth0_ui_secret() {
+    SECRET_NAME=$1
+    CLIENT_ID=$2
+    NAMESPACE=$3
+
+    # Delete secret if it exists, easier than editing existing secrets
+    if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} > /dev/null 2>&1; then
+        kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
+    fi
+
+    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+      --from-literal=url="${AUTH_BASE_URL}" \
+      --from-literal=client-id="${CLIENT_ID}"
+}
+
 function _set_auth0_secret() {
   SECRET_NAME=$1
   CLIENT_ID=$2
@@ -783,8 +800,7 @@ function _set_auth0_secret() {
   _log "Setting secret $SECRET_NAME ($NAMESPACE)"
 
   USER_NAME="${CLIENT_ID}@clients"
-
-  WELL_KNOWN_URL='https://canton-network-dev.us.auth0.com/.well-known/openid-configuration'
+  WELL_KNOWN_URL="${AUTH_BASE_URL}/.well-known/openid-configuration"
 
   # Delete secret if it exists, easier than editing existing secrets
   if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} > /dev/null 2>&1; then
@@ -859,6 +875,11 @@ function subcmd_update_secrets() {
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
   )
 
+  local -Ar namespaceToUiClientId=(
+    [validator1]='5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK'
+    [splitwell]='eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL'
+  )
+
   for i in \
     "cn-app-wallet-ledger-api-auth wallet validator1" \
     "cn-app-validator-ledger-api-auth validator validator1" \
@@ -883,6 +904,17 @@ function subcmd_update_secrets() {
   do
       client_id="${appToClientId[$i]}"
       _set_auth0_api_user "$i" svc "$client_id"
+  done
+
+  for i in \
+    "cn-app-wallet-ui-auth validator1" \
+    "cn-app-directory-ui-auth validator1" \
+    "cn-app-splitwell-ui-auth validator1" \
+    "cn-app-wallet-ui-auth splitwell"
+  do
+    set -- $i
+    client_id="${namespaceToUiClientId[$2]}"
+    _set_auth0_ui_secret "$1" "$client_id" "$2"
   done
 }
 

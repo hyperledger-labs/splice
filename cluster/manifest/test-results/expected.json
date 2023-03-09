@@ -2545,7 +2545,23 @@
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
-                              "value": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
@@ -2640,7 +2656,23 @@
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
-                              "value": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-new-web-ui:tag",
@@ -2732,6 +2764,26 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-directory-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-directory-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
@@ -2823,6 +2875,26 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-splitwell-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWELL_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-splitwell-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-splitwell-web-ui:tag",
@@ -3720,7 +3792,23 @@
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
-                              "value": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL"
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
@@ -3815,7 +3903,23 @@
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
-                              "value": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL"
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-new-web-ui:tag",
