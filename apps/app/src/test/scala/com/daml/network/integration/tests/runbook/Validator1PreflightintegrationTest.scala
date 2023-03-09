@@ -62,7 +62,7 @@ class Validator1PreflightIntegrationTest
   }
 
   private def limitValidator1Users() = {
-    val env = provideEnvironment
+    val env = createEnvironment()
     val validator1Client = env.validators.remote.find(_.name == "validator1").value
     val users = validator1Client.listUsers()
     val validatorWalletUser =
@@ -85,6 +85,7 @@ class Validator1PreflightIntegrationTest
     } else {
       logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
     }
+    destroyEnvironment(env)
   }
 
   override def environmentDefinition
