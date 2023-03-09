@@ -21,14 +21,6 @@ SOURCE_IMAGE_TAG=$(version-gen)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
-if [[ "$GCP_CLUSTER_BASENAME" = "staging" ]]; then
-    export CNCLUSTER_FIXED_TOKENS=1
-fi
-
-if [[ "$GCP_CLUSTER_BASENAME" = "devnet" ]]; then
-    export CNCLUSTER_TICK_DURATION=30s
-fi
-
 ################################
 ### Utilities
 ################################
