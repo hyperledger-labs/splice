@@ -10,11 +10,12 @@ import com.daml.network.console.{
   SvcAppBackendReference,
   SvcAppClientReference,
   ValidatorAppBackendReference,
-  WalletAppBackendReference,
   WalletAppClientReference,
+  WalletAppBackendReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.console.ValidatorAppClientReference
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
@@ -68,6 +69,11 @@ trait CommonCoinAppInstanceReferences {
   def aliceValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "aliceValidator"
   )
+
+  def aliceValidatorClient(implicit env: CoinTestConsoleEnvironment): ValidatorAppClientReference =
+    vc(
+      "aliceValidatorClient"
+    )
 
   def bobWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
     "bobWalletBackend"
@@ -181,6 +187,11 @@ trait CommonCoinAppInstanceReferences {
     env.validators.local
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
+
+  def vc(name: String)(implicit env: CoinTestConsoleEnvironment): ValidatorAppClientReference =
+    env.validators.remote
+      .find(_.name == name)
+      .getOrElse(sys.error(s"validator client [$name] not configured"))
 
   def rdp(
       name: String

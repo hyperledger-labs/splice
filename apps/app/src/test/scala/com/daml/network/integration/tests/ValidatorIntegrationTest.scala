@@ -196,7 +196,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidator))(
       "Wait for user to be listed",
       _ => {
-        val usernames = aliceValidator.listUsers()
+        val usernames = aliceValidatorClient.listUsers()
         usernames should contain theSameElementsAs Seq(
           aliceWallet.config.ledgerApiUser,
           aliceValidator.config.validatorWalletUser.value,
@@ -207,13 +207,13 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       actAndCheck(
         "Offboard a user",
-        aliceValidator.offboardUser(aliceWallet.config.ledgerApiUser),
+        aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
       )(
         "Wait for the validator to report the user offboarded",
         _ => {
           // Wait for the user to no longer be listed in the validator's users list, but this
           // does not yet guarantee their wallet services have been closed.
-          val usernames = aliceValidator.listUsers()
+          val usernames = aliceValidatorClient.listUsers()
           usernames should contain theSameElementsAs Seq(
             aliceValidator.config.validatorWalletUser.value
           )
