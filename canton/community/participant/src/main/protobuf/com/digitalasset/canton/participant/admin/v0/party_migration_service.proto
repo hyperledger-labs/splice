@@ -1,0 +1,37 @@
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package com.digitalasset.canton.participant.admin.v0;
+
+import "google/protobuf/timestamp.proto";
+
+// Moving ACS from one participant to another
+service PartyMigrationService {
+    // get contracts for a party
+    rpc DownloadAcsSnapshot (DownloadAcsSnapshotRequest) returns (DownloadAcsSnapshotResponse);
+
+    // upload contracts for a party
+    rpc UploadAcsSnapshot (UploadAcsSnapshotRequest) returns (UploadAcsSnapshotResponse);
+}
+
+message DownloadAcsSnapshotRequest {
+    repeated string parties = 1;
+    string filter_domain_id = 2; // optional; exact match if set
+    google.protobuf.Timestamp timestamp = 3; // optional; take acs state for this timestamp
+    string protocol_version = 4; // optional; version of serialization to use
+}
+
+message DownloadAcsSnapshotResponse {
+    map <string, int64> domain_contract_count = 1;
+    bytes acs_snapshot = 2;
+}
+
+message UploadAcsSnapshotRequest {
+    bytes acs_snapshot = 1;
+}
+
+message UploadAcsSnapshotResponse {
+
+}

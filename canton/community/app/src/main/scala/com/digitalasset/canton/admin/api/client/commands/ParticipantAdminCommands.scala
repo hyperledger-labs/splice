@@ -19,6 +19,7 @@ import com.digitalasset.canton.participant.admin.v0.DomainConnectivityServiceGrp
 import com.digitalasset.canton.participant.admin.v0.EnterpriseParticipantReplicationServiceGrpc.EnterpriseParticipantReplicationServiceStub
 import com.digitalasset.canton.participant.admin.v0.InspectionServiceGrpc.InspectionServiceStub
 import com.digitalasset.canton.participant.admin.v0.PackageServiceGrpc.PackageServiceStub
+import com.digitalasset.canton.participant.admin.v0.PartyMigrationServiceGrpc.PartyMigrationServiceStub
 import com.digitalasset.canton.participant.admin.v0.PartyNameManagementServiceGrpc.PartyNameManagementServiceStub
 import com.digitalasset.canton.participant.admin.v0.PingServiceGrpc.PingServiceStub
 import com.digitalasset.canton.participant.admin.v0.PruningServiceGrpc.PruningServiceStub
@@ -32,7 +33,9 @@ import com.digitalasset.canton.serialization.ProtoConverter.InstantConverter
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DomainAlias, LedgerParticipantId, LedgerTransactionId}
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.timestamp.Timestamp
 import io.grpc.ManagedChannel
@@ -401,6 +404,70 @@ object ParticipantAdminCommands {
 
     }
 
+  }
+
+  object PartyMigration {
+
+    final case class DownloadAcsSnapshot(
+        parties: Set[PartyId],
+        filterDomainId: String,
+        timestamp: Option[Instant],
+        protocolVersion: Option[ProtocolVersion],
+    ) extends GrpcAdminCommand[
+          DownloadAcsSnapshotRequest,
+          DownloadAcsSnapshotResponse,
+          (Map[DomainId, Long], ByteString),
+        ] {
+
+      override type Svc = PartyMigrationServiceStub
+      override def createService(channel: ManagedChannel): PartyMigrationServiceStub =
+        PartyMigrationServiceGrpc.stub(channel)
+      override def createRequest(): Either[String, DownloadAcsSnapshotRequest] = {
+        Right(
+          DownloadAcsSnapshotRequest(
+            parties.map(_.toLf).toSeq,
+            filterDomainId,
+            timestamp.map(Timestamp.apply),
+            protocolVersion.map(_.toString).getOrElse(""),
+          )
+        )
+      }
+      override def submitRequest(
+          service: PartyMigrationServiceStub,
+          request: DownloadAcsSnapshotRequest,
+      ): Future[DownloadAcsSnapshotResponse] = {
+        service.downloadAcsSnapshot(request)
+      }
+      override def handleResponse(
+          response: DownloadAcsSnapshotResponse
+      ): Either[String, (Map[DomainId, Long], ByteString)] = {
+        response.domainContractCount
+          .map { case (k, v) => DomainId.fromString(k).map((_, v)) }
+          .toSeq
+          .sequence
+          .map { counts => (counts.toMap, response.acsSnapshot) }
+      }
+    }
+
+    final case class UploadAcsSnapshot(acsSnapshot: ByteString, batchSize: PositiveInt)
+        extends GrpcAdminCommand[UploadAcsSnapshotRequest, UploadAcsSnapshotResponse, Unit] {
+
+      override type Svc = PartyMigrationServiceStub
+      override def createService(channel: ManagedChannel): PartyMigrationServiceStub =
+        PartyMigrationServiceGrpc.stub(channel)
+      override def createRequest(): Either[String, UploadAcsSnapshotRequest] = {
+        Right(UploadAcsSnapshotRequest(acsSnapshot))
+      }
+      override def submitRequest(
+          service: PartyMigrationServiceStub,
+          request: UploadAcsSnapshotRequest,
+      ): Future[UploadAcsSnapshotResponse] = {
+        service.uploadAcsSnapshot(request)
+      }
+      override def handleResponse(response: UploadAcsSnapshotResponse): Either[String, Unit] = {
+        Right(())
+      }
+    }
   }
 
   object Ping {
