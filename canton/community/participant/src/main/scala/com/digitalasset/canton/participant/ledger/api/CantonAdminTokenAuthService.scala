@@ -42,28 +42,8 @@ class CantonAdminTokenAuthService(adminToken: CantonAdminToken, parent: Seq[Auth
         if (parent.isEmpty) wildcard
         else
           decodeMetadataParent(headers)
-            .thenApply(stripParticipantId)
       )
   }
-
-  // TODO(#1836) Remove this temporary workaround
-  // Our auth0 config cannot handle the dynamic participant ids but it mandates an audience.
-  // So we set the audience to a fixed value which makes token decoding happy
-  // and then remove it from the claims which means validation against the participant id will be skipped.
-  private def stripParticipantId(claimSet: ClaimSet): ClaimSet =
-    claimSet match {
-      case _: ClaimSet.Claims =>
-        sys.error("Not supported")
-      case claims: ClaimSet.AuthenticatedUser =>
-        claims.copy(participantId = stripParticipantIdIfMatches(claims.participantId))
-      case _ => claimSet
-    }
-
-  private def stripParticipantIdIfMatches(participantId: Option[String]): Option[String] =
-    participantId.flatMap {
-      case "https://canton.network.global" => None
-      case i => Some(i)
-    }
 
   private val wildcard = CompletableFuture.completedFuture(ClaimSet.Claims.Wildcard: ClaimSet)
   private val deny = CompletableFuture.completedFuture(ClaimSet.Unauthenticated: ClaimSet)

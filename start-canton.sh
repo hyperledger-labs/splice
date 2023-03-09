@@ -65,15 +65,6 @@ rm -f canton.tokens canton-simtime.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade_simtime"
 
-# TODO(#1836) Avoid having to inject our patched auth service.
-sbt --batch canton-community-participant/compile
-# We only want one file in the classpath so create a separate directory rather than
-# pointing directly to the SBT output dir.
-rm -rf canton-classpath
-mkdir -p canton-classpath/com/digitalasset/canton/participant/ledger/api
-cp ./canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class \
-   ./canton-classpath/com/digitalasset/canton/participant/ledger/api
-
 function tmux_cmd() {
   local title=$1
   local cmd=$2

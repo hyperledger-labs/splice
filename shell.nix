@@ -24,10 +24,6 @@ let
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-  shellHook = ''
-    # TODO(#1836) Remove this once we no longer inject our auth service.
-    export CLASSPATH=""
-  '';
   packages = with pkgs; [
 
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.

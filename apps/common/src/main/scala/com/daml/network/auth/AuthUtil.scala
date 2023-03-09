@@ -52,6 +52,7 @@ object AuthUtil {
         .create()
         .withSubject(user)
         .withClaim("scope", "daml_ledger_api")
+        .withAudience(testAudience)
         .sign(Algorithm.HMAC256(secret))
     }
   }

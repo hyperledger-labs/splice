@@ -7,12 +7,6 @@ RUN apt-get update \
    && apt-get clean \
    && rm -rf /var/cache/apt/archives
 
-# Add our custom classpath
-RUN mkdir /canton-classpath
-WORKDIR /canton-classpath
-ADD target/canton-classpath .
-ENV CLASSPATH=/canton-classpath
-
 # create and switch to a working directory
 RUN mkdir /app
 WORKDIR /app
