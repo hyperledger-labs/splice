@@ -30,11 +30,7 @@ template CheckError
 
 testTransferExceedsMaxInputs: Script ()
 testTransferExceedsMaxInputs = do
-    app <- setupApp
-    validator <- setupValidator app "validator"
-    alice <- setupUser app "alice" validator
-    bob <- setupUser app "bob" validator
-    charlie <- setupUser app "charlie" validator
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     inputCoins <- forA [1..101] $ \_ -> do
       coin <- tap app alice 1.0
       pure $ API.InputCoin $ toInterfaceContractId coin
@@ -54,11 +50,7 @@ testTransferExceedsMaxInputs = do
 
 testTransferExceedsMaxOutputs: Script ()
 testTransferExceedsMaxOutputs = do
-    app <- setupApp
-    validator <- setupValidator app "validator"
-    alice <- setupUser app "alice" validator
-    bob <- setupUser app "bob" validator
-    charlie <- setupUser app "charlie" validator
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     coin <- tap app alice 100.0
     let outputCoin = API.TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0
         outputCoins = map (const outputCoin) [1..101]
@@ -112,11 +104,7 @@ testTransferExceedsMaxLockHolders = do
 
 testTransferExceedsMaxPayloadLength: Script ()
 testTransferExceedsMaxPayloadLength = do
-    app <- setupApp
-    validator <- setupValidator app "validator"
-    alice <- setupUser app "alice" validator
-    bob <- setupUser app "bob" validator
-    charlie <- setupUser app "charlie" validator
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     coin <- tap app alice 100.0
     context <- getPaymentTransferContext app alice
     let payloadOfLength33 = "testing123testing123testing123456"

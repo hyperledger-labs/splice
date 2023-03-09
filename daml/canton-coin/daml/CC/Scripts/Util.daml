@@ -95,6 +95,35 @@ setupUser app name validator = do
   tap app u 1.0
   return u
 
+setupSelfHostedUser: CCApp -> Text -> Script (CCUser, Party)
+setupSelfHostedUser app name = do
+  validator <- setupValidator app (name <> "_validator")
+  user <- setupUser app name validator
+  return (user, validator)
+
+data DefaultAppWithUsers = DefaultAppWithUsers with
+    app: CCApp
+    alice: CCUser
+    aliceValidator : Party
+    bob: CCUser
+    charlie: CCUser
+    bobValidator: Party
+    provider1: CCUser
+    provider1Validator: Party
+    provider2: CCUser
+    provider2Validator: Party
+  deriving (Show, Eq, Ord)
+
+setupDefaultAppWithUsers: Script DefaultAppWithUsers
+setupDefaultAppWithUsers = do
+  app <- setupApp
+  (alice, aliceValidator) <- setupSelfHostedUser app "alice"
+  (bob, bobValidator) <- setupSelfHostedUser app "bob"
+  charlie <- setupUser app "charlie" bobValidator
+  (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
+  (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
+  return DefaultAppWithUsers with ..
+
 -- dummy argument to avoid running this script by default.
 getAllValidatorRights : CCApp -> Script [ValidatorRight]
 getAllValidatorRights _app = do
