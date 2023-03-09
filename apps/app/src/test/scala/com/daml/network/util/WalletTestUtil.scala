@@ -10,7 +10,6 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -448,16 +447,5 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         commands = state.create.commands.asScala.toSeq,
       )
     }
-  }
-
-  def cancelAllSubscriptions(wallet: WalletAppClientReference) = eventually() {
-    wallet
-      .listSubscriptions()
-      .map(sub =>
-        wallet.cancelSubscription(inside(sub.state) {
-          case HttpWalletAppClient.SubscriptionIdleState(c) => c.contractId
-        })
-      )
-    wallet.listSubscriptions() shouldBe empty
   }
 }

@@ -20,6 +20,7 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.annotation.nowarn
@@ -362,5 +363,38 @@ trait TimeTestUtil extends CoinTestCommon {
       )
     }
     configSchedule
+  }
+
+  def cancelAllSubscriptions(
+      walletClient: WalletAppClientReference,
+      walletBackend: LocalCoinAppReference,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Assertion = {
+    clue("Cancel subscription to avoid affecting other test cases") {
+      eventually() {
+        // Trigger a payment->idle state transition if needed
+        // Done inside the eventually as it can go both ways: trigger a make payment or completing a payment.
+        // This assumes that our subscriptions use payment intervals that are much longer than the triggers' polling interval.
+        advanceTimeByPollingInterval(walletBackend)
+        // Cancel all subscriptions that are currently idle
+        walletClient
+          .listSubscriptions()
+          .foreach(subscription =>
+            subscription.state match {
+              case HttpWalletAppClient.SubscriptionIdleState(c) =>
+                try {
+                  walletClient.cancelSubscription(c.contractId)
+                } catch {
+                  case ex: CommandFailure =>
+                    logger.debug("Ignoring failed attempt to cancel subscription", ex)
+                }
+              case state =>
+                logger.debug(s"Skipping cancellation of non-idle subscription in state: $state")
+            }
+          )
+        walletClient.listSubscriptions() shouldBe empty
+      }
+    }
   }
 }

@@ -181,11 +181,7 @@ class WalletTimeBasedIntegrationTest
             advanceTimeToRoundOpen
           }
         },
-        clue("Cancel subscriptions to avoid affecting other test cases") {
-          // to trigger a payment->idle state transition if needed
-          advanceTimeByPollingInterval(aliceWalletBackend)
-          cancelAllSubscriptions(aliceWallet)
-        },
+        cancelAllSubscriptions(aliceWallet, aliceWalletBackend),
       ) {
         bracket(
           clue("Stopping directory backend so that payments aren't collected.") {
@@ -556,9 +552,7 @@ class WalletTimeBasedIntegrationTest
           aliceWallet.tap(50.0)
           aliceWallet.acceptSubscriptionRequest(subReqId)
         },
-        clue("Cancel subscription to avoid affecting other test cases") {
-          cancelAllSubscriptions(aliceWallet)
-        },
+        cancelAllSubscriptions(aliceWallet, aliceWalletBackend),
       ) {
         clue("Getting Alice's new entry") {
           def tryGetEntry() =
