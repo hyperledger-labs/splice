@@ -49,13 +49,50 @@ class Validator1PreflightIntegrationTest
   }
 
   override def afterEach() = {
-    super.afterEach();
-    auth0Users.values.map(user => retryAuth0Calls(user.close))
+    try super.afterEach()
+    finally auth0Users.values.map(user => retryAuth0Calls(user.close))
+  }
+
+  override def beforeAll() = {
+    super.beforeAll()
+    // Offboard some users if we have too many, to make sure validator1 does not hit the limit of around 200.
+    // Note that the actual offboarding will actually happen by wallet automation in the background,
+    // and we are not waiting for it here, so it is expected to be happening in parallel to the actual tests
+    limitValidator1Users()
+  }
+
+  private def limitValidator1Users() = {
+    val env = provideEnvironment
+    val validator1Client = env.validators.remote.find(_.name == "validator1").value
+    val users = validator1Client.listUsers()
+    val validatorWalletUser =
+      "auth0|63e3d75ff4114d87a2c1e4f5" // TODO(tech-debt): consider de-hardcoding this
+    val targetNumber = 80 // TODO(tech-debt): consider de-hardcoding this
+    val offboardThreshold = 100 // TODO(tech-debt): consider de-hardcoding this
+    if (users.length > offboardThreshold) {
+      logger.info(
+        s"Validator1 has ${users.length} users, offboarding some to get below ${targetNumber}"
+      )
+      users
+        .filter(_ != validatorWalletUser)
+        .take(users.length - targetNumber)
+        .foreach { user =>
+          {
+            logger.debug(s"Offboarding user: ${user}")
+            validator1Client.offboardUser(user)
+          }
+        }
+    } else {
+      logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
+    }
   }
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.empty(this.getClass.getSimpleName)
+    CoinEnvironmentDefinition.preflightTopology(
+      this.getClass.getSimpleName(),
+      sys.env("NETWORK_APPS_ADDRESS"),
+    )
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch

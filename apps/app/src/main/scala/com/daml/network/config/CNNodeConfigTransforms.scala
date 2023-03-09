@@ -28,6 +28,7 @@ import monocle.macros.syntax.lens.*
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
+import com.daml.network.validator.config.ValidatorAppClientConfig
 
 object CNNodeConfigTransforms {
 
@@ -253,6 +254,19 @@ object CNNodeConfigTransforms {
       update: ValidatorAppBackendConfig => ValidatorAppBackendConfig
   ): CNNodeConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
+
+  def updateAllValidatorClientConfigs(
+      update: (String, ValidatorAppClientConfig) => ValidatorAppClientConfig
+  ): CNNodeConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.validatorAppClients)
+        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+
+  def updateAllValidatorClientConfigs_(
+      update: ValidatorAppClientConfig => ValidatorAppClientConfig
+  ): CNNodeConfigTransform =
+    updateAllValidatorClientConfigs((_, config) => update(config))
 
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
