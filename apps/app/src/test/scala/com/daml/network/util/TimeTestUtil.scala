@@ -105,7 +105,8 @@ trait TimeTestUtil extends CoinTestCommon {
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
-    val tc = scan.getTransferContextWithInstances(getLedgerTime)
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
     remoteParticipant.ledger_api_extensions.commands.submitWithResult(
@@ -147,7 +148,8 @@ trait TimeTestUtil extends CoinTestCommon {
       env: CoinTestConsoleEnvironment
   ) = {
     val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    val tc = scan.getTransferContextWithInstances(getLedgerTime)
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     remoteParticipant.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
