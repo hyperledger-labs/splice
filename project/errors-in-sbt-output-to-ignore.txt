@@ -83,6 +83,7 @@ c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
 WARN  c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
 ledger subscription for admin service .* has completed with error
 io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
+ERROR.*INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
 
 # TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
 .*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
