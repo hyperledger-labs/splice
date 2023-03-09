@@ -115,23 +115,38 @@ class WalletTxLogIntegrationTest
         aliceWallet.tap(30.0)
       }
 
-      clue("Create, accept, and collect self-payment request") {
-        val (deliveryOfferCid, reqCid, _) = createSelfPaymentRequest(
+      val ((deliveryOfferCid, reqCid, _), _) = actAndCheck(
+        "Alice creates self-payment request",
+        createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
-        )
-        actAndCheck("Alice accepts payment request", aliceWallet.acceptAppPaymentRequest(reqCid))(
-          "Payment request disappears from list",
-          _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
-        )
+        ),
+      )(
+        "Alice sees the self-payment request",
+        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+      )
+
+      actAndCheck(
+        "Alice accepts the self-payment request",
+        aliceWallet.acceptAppPaymentRequest(reqCid),
+      )(
+        "Payment request disappears from list",
+        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+      )
+
+      actAndCheck(
+        "Alice collects self-payment request",
         collectAcceptedAppPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           deliveryOfferCid,
-        )
-      }
+        ),
+      )(
+        "Accepted app payment disappears",
+        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+      )
 
       checkTxHistory(
         aliceWallet,
@@ -183,23 +198,38 @@ class WalletTxLogIntegrationTest
         aliceWallet.tap(30.0)
       }
 
-      clue("Create accept, and reject self-payment request") {
-        val (deliveryOfferCid, reqCid, _) = createSelfPaymentRequest(
+      val ((deliveryOfferCid, reqCid, _), _) = actAndCheck(
+        "Alice creates self-payment request",
+        createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
-        )
-        actAndCheck("Alice accepts payment request", aliceWallet.acceptAppPaymentRequest(reqCid))(
-          "Payment request disappears from list",
-          _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
-        )
+        ),
+      )(
+        "Alice sees the self-payment request",
+        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+      )
+
+      actAndCheck(
+        "Alice accepts the self-payment request",
+        aliceWallet.acceptAppPaymentRequest(reqCid),
+      )(
+        "Payment request disappears from list",
+        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+      )
+
+      actAndCheck(
+        "Alice rejects the self-payment request",
         rejectAcceptedAppPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           deliveryOfferCid,
-        )
-      }
+        ),
+      )(
+        "Accepted app payment disappears",
+        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+      )
 
       checkTxHistory(
         aliceWallet,
