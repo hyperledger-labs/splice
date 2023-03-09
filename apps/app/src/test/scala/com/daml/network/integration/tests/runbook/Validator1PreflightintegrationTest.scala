@@ -4,7 +4,7 @@ import com.daml.network.LiveDevNetTest
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.integration.tests.FrontendIntegrationTest
+import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{
   Auth0User,
   DirectoryFrontendTestUtil,
@@ -21,7 +21,7 @@ import com.daml.network.util.FrontendLoginUtil
 /** Preflight test running against validator1.
   */
 class Validator1PreflightIntegrationTest
-    extends FrontendIntegrationTest("alice-validator1", "bob-validator1")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice-validator1", "bob-validator1")
     with FrontendLoginUtil
     with DirectoryFrontendTestUtil
     with WalletFrontendTestUtil
@@ -62,7 +62,7 @@ class Validator1PreflightIntegrationTest
   }
 
   private def limitValidator1Users() = {
-    val env = createEnvironment()
+    val env = provideEnvironment
     val validator1Client = env.validators.remote.find(_.name == "validator1").value
     val users = validator1Client.listUsers()
     val validatorWalletUser =
@@ -85,7 +85,6 @@ class Validator1PreflightIntegrationTest
     } else {
       logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
     }
-    destroyEnvironment(env)
   }
 
   override def environmentDefinition
