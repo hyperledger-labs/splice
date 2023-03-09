@@ -23,7 +23,7 @@ mkdir -p "$BASE_TARGET_DIRECTORY"
 echo "Saving all artifacts to $BASE_TARGET_DIRECTORY"
 
 ARTIFACTS_URL=https://circleci.com/api/v1.1/project/$CI_VCSTYPE/$CI_ORGNAME/$CI_PROJECT/$CI_BUILD_NUM/artifacts?circle-token=$CIRCLE_TOKEN
-curl $ARTIFACTS_URL -s | grep -o 'https://[^"]*' > "$BASE_TARGET_DIRECTORY/artifacts.txt"
+curl -sSLf --show-error $ARTIFACTS_URL | grep -o 'https://[^"]*' > "$BASE_TARGET_DIRECTORY/artifacts.txt"
 
 while read p; do
   if [[ $p =~ ".log.gz" ]] || [[ $p =~ ".clog.gz" ]]; then
@@ -37,12 +37,12 @@ while read p; do
     FILE_NAME="$(echo $p | sed -e 's?.*\/??')"
     TARGET_PATH="$TARGET_DIRECTORY/$FILE_NAME"
     echo "Downloading artifact $p to $TARGET_PATH"
-    curl -sSL -o "$TARGET_PATH" "$p?circle-token=$CIRCLE_TOKEN"
-    gzip -f -d "$TARGET_PATH"
+    curl -sSLf -o "$TARGET_PATH" "$p?circle-token=$CIRCLE_TOKEN"
   else
     echo "Not downloading $p, as it is not a log file"
   fi
 done <"$BASE_TARGET_DIRECTORY/artifacts.txt"
 
-echo "Done. Logs have been downloaded to the following directory:"
-echo "$BASE_TARGET_DIRECTORY"
+echo ""
+echo "Done. You can now inspect the logs using:"
+echo "lnav $BASE_TARGET_DIRECTORY/*"
