@@ -43,6 +43,7 @@ import org.typelevel.discipline.Laws
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 trait ScalaFuturesWithPatience extends ScalaFutures {
@@ -183,6 +184,21 @@ trait BaseTest
       Threading.sleep(pollIntervalMs)
     }
     testCode
+  }
+
+  /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
+    */
+  def eventuallySucceeds[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T): T = {
+    eventually(timeUntilSuccess, maxPollInterval) {
+      try {
+        loggerFactory.suppressErrors(testCode)
+      } catch {
+        case NonFatal(e) => fail(e)
+      }
+    }
   }
 
   def eventually[T](

@@ -8,7 +8,6 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import monocle.macros.syntax.lens.*
 
 class ConnectivityIntegrationTest extends CoinIntegrationTest {
 
@@ -16,10 +15,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      // We manually start apps so we disable the default setup
-      // that blocks on all apps being initialized.
-      .withNoSetup()
+      .withManualStart
 
   private val toxiproxy = new UseToxiproxy()
   registerPlugin(toxiproxy)

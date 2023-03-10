@@ -17,11 +17,11 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
-import com.daml.network.util.WalletTestUtil
+
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -31,15 +31,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      // We manually start apps so we disable the default setup
-      // that blocks on all apps being initialized.
-      .withNoSetup()
-
-  def initSvc()(implicit env: CoinTestConsoleEnvironment) = {
-    env.appsHostedBySvc.local.foreach(_.start())
-    env.appsHostedBySvc.local.foreach(_.waitForInitialization())
-  }
+      .withManualStart
 
   "start and restart cleanly" in { implicit env =>
     initSvc()

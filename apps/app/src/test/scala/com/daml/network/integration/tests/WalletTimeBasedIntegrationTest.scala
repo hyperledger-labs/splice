@@ -1,24 +1,22 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.tests.CoinTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
-import CoinTests.BracketSynchronous.*
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import monocle.macros.syntax.lens.*
 
 import java.time.Duration
 import java.util.UUID
-import com.daml.network.config.CNNodeConfigTransforms
-import monocle.macros.syntax.lens.*
-import com.daml.network.util.SplitwellTestUtil
-import scala.util.Try
 
 class WalletTimeBasedIntegrationTest
     extends CoinIntegrationTestWithSharedEnvironment
@@ -555,9 +553,9 @@ class WalletTimeBasedIntegrationTest
         cancelAllSubscriptions(aliceWallet, aliceWalletBackend),
       ) {
         clue("Getting Alice's new entry") {
-          def tryGetEntry() =
-            Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
-          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+          eventuallySucceeds() {
+            directory.lookupEntryByName(testEntryName)
+          }
         }
 
         clue("Wait for reward coupons to be issued") {

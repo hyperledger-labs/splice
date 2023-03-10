@@ -2,8 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 
-import scala.util.Try
-
 class WalletFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
@@ -87,10 +85,9 @@ class WalletFrontendIntegrationTest
       )
       val _ = aliceWallet.acceptSubscriptionRequest(subscriptionRequest.contractId)
 
-      def tryGetEntry() =
-        Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
-
-      eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
+      eventuallySucceeds() {
+        directory.lookupEntryByName(entryName)
+      }
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)

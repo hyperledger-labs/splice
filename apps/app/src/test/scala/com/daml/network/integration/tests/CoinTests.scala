@@ -42,6 +42,11 @@ object CoinTests {
       CoinEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
 
+    protected def initSvc()(implicit env: CoinTestConsoleEnvironment): Unit = {
+      env.appsHostedBySvc.local.foreach(_.start())
+      env.appsHostedBySvc.local.foreach(_.waitForInitialization())
+    }
+
   }
 
   trait CoinIntegrationTestWithSharedEnvironment

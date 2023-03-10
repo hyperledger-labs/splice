@@ -40,8 +40,13 @@ case class CoinEnvironmentDefinition(
     ) {
   override val configTransforms = configTransformsWithContext(context)
 
-  def withManualStart: CoinEnvironmentDefinition =
-    copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
+  def withManualStart: CoinEnvironmentDefinition = {
+    this
+      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      // We manually start apps so we disable the default setup
+      // that blocks on all apps being initialized.
+      .copy(setup = _ => ())
+  }
 
   def withAllocatedSvcAndSvUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
@@ -126,9 +131,8 @@ case class CoinEnvironmentDefinition(
       setup(env)
     })
 
-  /** Remove any previously registered setup */
-  def withNoSetup(): CoinEnvironmentDefinition =
-    copy(setup = _ => ())
+  def withCoinPrice(price: BigDecimal): CoinEnvironmentDefinition =
+    addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
   def clearConfigTransforms(): CoinEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.console.{
   RemoteDirectoryAppReference,
   ValidatorAppBackendReference,
@@ -25,7 +25,6 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
 
 class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
@@ -284,12 +283,10 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
           ),
         )
 
-        // Check who won
-        def tryGetEntry() =
-          Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+        val entry = eventuallySucceeds() {
+          directory.lookupEntryByName(testEntryName)
+        }
 
-        val entry =
-          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
         val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.payload.user)
         logger.info(s"And the winner is ... *drumroll* ... : $winnerUserParty")
 

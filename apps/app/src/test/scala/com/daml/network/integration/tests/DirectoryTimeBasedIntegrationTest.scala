@@ -1,22 +1,21 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.tests.CoinTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import CoinTests.BracketSynchronous.*
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import scala.util.{Success, Try}
 
 class DirectoryTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -35,9 +34,6 @@ class DirectoryTimeBasedIntegrationTest
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         bobValidator.remoteParticipant.dars.upload(directoryDarPath)
       })
-
-  def tryGetEntry(entryName: String)(implicit env: CoinTestConsoleEnvironment) =
-    Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
 
   "Directory service" should {
     "archive expired directory entries also when running on simtime" in { implicit env =>
@@ -85,8 +81,8 @@ class DirectoryTimeBasedIntegrationTest
           aliceWallet.acceptSubscriptionRequest(subReqId)
         }
         val entry = clue("Getting Alice's new entry") {
-          eventually()(
-            tryGetEntry(testEntryName).getOrElse(fail(s"Could not get entry $testEntryName"))
+          eventuallySucceeds()(
+            directory.lookupEntryByName(testEntryName)
           )
         }
         clue("Checking payload of new entry") {
@@ -186,10 +182,8 @@ class DirectoryTimeBasedIntegrationTest
 
         advanceRoundsByOneTick
       }
-      val entry = eventually() {
-        inside(tryGetEntry(testEntryName)) { case Success(e) =>
-          e
-        }
+      val entry = eventuallySucceeds() {
+        directory.lookupEntryByName(testEntryName)
       }
       // to avoid automation triggering before the round change
       bracket(directory.stop(), directory.startSync()) {
@@ -207,10 +201,9 @@ class DirectoryTimeBasedIntegrationTest
         }
         advanceRoundsByOneTick
       }
-      eventually() {
-        inside(tryGetEntry(testEntryName)) { case Success(e) =>
-          e.payload.expiresAt shouldBe entry.payload.expiresAt.plus(90, ChronoUnit.DAYS)
-        }
+      eventuallySucceeds() {
+        val e = directory.lookupEntryByName(testEntryName)
+        e.payload.expiresAt shouldBe entry.payload.expiresAt.plus(90, ChronoUnit.DAYS)
       }
     }
   }

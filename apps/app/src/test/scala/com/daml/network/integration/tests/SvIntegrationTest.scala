@@ -11,7 +11,6 @@ import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import monocle.macros.syntax.lens.*
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -25,15 +24,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      // We manually start apps so we disable the default setup
-      // that blocks on all apps being initialized.
-      .withNoSetup()
-
-  def initSvc()(implicit env: CoinTestConsoleEnvironment) = {
-    env.appsHostedBySvc.local.foreach(_.start())
-    env.appsHostedBySvc.local.foreach(_.waitForInitialization())
-  }
+      .withManualStart
 
   "start and restart cleanly" in { implicit env =>
     initSvc()

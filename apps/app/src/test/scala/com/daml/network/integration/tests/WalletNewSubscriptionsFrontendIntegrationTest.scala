@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
@@ -26,7 +25,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(2)(conf))
+      .withCoinPrice(2)
 
   "A wallet UI" should {
 
