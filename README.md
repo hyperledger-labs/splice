@@ -702,7 +702,7 @@ If you have never used `lnav` to inspect Canton logs, then we recommend:
    The command will print the location where the log format is installed globally (most likely `~/.lnav/formats/installed/canton_logstash_json.json` or `~/.config/lnav/formats/installed/canton_logstash_json.json`)
    and enable auto-detection of the Canton log format in future `lnav` sessions.
 2. To automatically keep the format definition up to date, delete the file installed above and create a symlink instead,
-   using `ln -s $PWD/canton/canton-json.lnav.json <LNAV_CONFIG_DIR>/canton_logstash_json.json` where `LNAV_CONFIG_DIR` is the
+   using `ln -s $PWD/canton/canton-json.lnav.json <LNAV_CONFIG_DIR>/formats/installed/canton_logstash_json.json` where `LNAV_CONFIG_DIR` is the
    path containing lnav configuration files (read the output of `lnav --help` to determine that path).
 3. Type `lnav log/canton_network_test.clog` to inspect the test logs.
 4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
