@@ -139,64 +139,54 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     // is potentially racy (possible to circumvent this by being clever, but we chose the simple solution for now)
   }
 
-  def createSelfPaymentRequest(
+  /** Collects an accepted app payment request without doing anything useful in return. */
+  def collectAcceptedAppPaymentRequest(
       remoteParticipant: CoinRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
+      acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
       env: CoinTestConsoleEnvironment
-  ): (
-      testWalletCodegen.TestDeliveryOffer.ContractId,
-      paymentCodegen.AppPaymentRequest.ContractId,
-      paymentCodegen.AppPaymentRequest,
-  ) = {
+  ): Unit = {
     val now = env.environment.clock.now
-    val referenceId = clue(s"Create test delivery offer for $userParty") {
-      val result =
-        remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-          userId = userId,
-          actAs = Seq(userParty),
-          readAs = Seq.empty,
-          update = new testWalletCodegen.TestDeliveryOffer(
-            scan.getSvcPartyId().toProtoPrimitive,
-            userParty.toProtoPrimitive,
-            "description",
-          ).create,
-          domainId = domainId,
-        )
-      testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
-    }
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty),
+      readAs = Seq(),
+      update = acceptedPayment.exerciseAcceptedAppPayment_Collect(
+        appTc
+      ),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
 
-    val (reqCid, reqC) = clue(s"Create payment request for $userParty to self") {
-      val reqC = new paymentCodegen.AppPaymentRequest(
-        userParty.toProtoPrimitive,
-        Seq(
-          new paymentCodegen.ReceiverAmount(
-            userParty.toProtoPrimitive,
-            new paymentCodegen.PaymentAmount(
-              BigDecimal(10).bigDecimal.setScale(10),
-              paymentCodegen.Currency.CC,
-            ),
-          )
-        ).asJava,
-        userParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        now.plus(Duration.ofMinutes(1)).toInstant,
-        referenceId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
-      )
-      val result = remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-        userId = userId,
-        actAs = Seq(userParty),
-        readAs = Seq.empty,
-        update = reqC.create,
-        domainId = domainId,
-      )
-      val cid = paymentCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
-      (cid, reqC)
-    }
-
-    (referenceId, reqCid, reqC)
+  /** Rejects an accepted app payment request. */
+  def rejectAcceptedAppPaymentRequest(
+      remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty),
+      readAs = Seq(),
+      update = acceptedPayment.exerciseAcceptedAppPayment_Reject(appTc),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
   }
 
   private val directoryDarPath =
@@ -259,181 +249,243 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def createTestDeliveryOffer(
-      aliceUserParty: PartyId
-  )(implicit env: CoinTestConsoleEnvironment) = {
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      domainId: Option[DomainId] = None,
+  )(implicit env: CoinTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
     val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
       scan.getSvcPartyId().toProtoPrimitive,
-      aliceUserParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
       "description",
     )
     clue("Create delivery offer") {
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        Seq(aliceUserParty),
-        optTimeout = None,
-        commands = deliveryOffer.create.commands.asScala.toSeq,
+      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = deliveryOffer.create,
+        domainId = domainId,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(
-          aliceUserParty,
-          _.data == deliveryOffer,
-        )
-        .id
+      testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
     }
   }
 
+  def paymentAmount(
+      amount: BigDecimal,
+      currency: paymentCodegen.Currency,
+  ) =
+    new paymentCodegen.PaymentAmount(
+      amount.bigDecimal,
+      currency,
+    )
+
   def receiverAmount(
       receiverParty: PartyId,
-      amount: Int,
+      amount: BigDecimal,
       currency: paymentCodegen.Currency,
   ) =
     new paymentCodegen.ReceiverAmount(
       receiverParty.toProtoPrimitive,
       new paymentCodegen.PaymentAmount(
-        BigDecimal(amount).bigDecimal,
+        amount.bigDecimal,
         currency,
       ),
     )
 
   def createPaymentRequest(
-      aliceUserParty: PartyId,
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
-  )(implicit env: CoinTestConsoleEnvironment) = {
-    val deliveryOfferId = createTestDeliveryOffer(aliceUserParty)
+      expirationTime: Duration = Duration.ofMinutes(5),
+      domainId: Option[DomainId] = None,
+  )(implicit env: CoinTestConsoleEnvironment): (
+      testWalletCodegen.TestDeliveryOffer.ContractId,
+      paymentCodegen.AppPaymentRequest.ContractId,
+      paymentCodegen.AppPaymentRequest,
+  ) = {
+    val deliveryOfferId =
+      createTestDeliveryOffer(remoteParticipantWithAdminToken, userId, userParty)
 
-    clue("Create a payment request") {
-      val paymentRequest = new paymentCodegen.AppPaymentRequest(
-        aliceUserParty.toProtoPrimitive,
-        receiverAmounts.asJava,
-        aliceUserParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        Instant.now().plus(5, ChronoUnit.MINUTES), // expires in 5 min
-        deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
+    val now = env.environment.clock.now
+
+    val paymentRequest = new paymentCodegen.AppPaymentRequest(
+      userParty.toProtoPrimitive,
+      receiverAmounts.asJava,
+      userParty.toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      now.plus(expirationTime).toInstant,
+      deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
+    )
+
+    val requestCid = clue("Create a payment request") {
+      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = paymentRequest.create,
+        domainId = domainId,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        Seq(aliceUserParty),
-        optTimeout = None,
-        commands = paymentRequest.create.commands.asScala.toSeq,
-      )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(paymentCodegen.AppPaymentRequest.COMPANION)(aliceUserParty)
-        .id
+      paymentCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
     }
+
+    (deliveryOfferId, requestCid, paymentRequest)
   }
 
   def createSelfPaymentRequest(
-      aliceUserParty: PartyId,
-      amount: Int,
-      currency: paymentCodegen.Currency,
-  )(implicit env: CoinTestConsoleEnvironment) = {
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      amount: BigDecimal = defaultPaymentAmount.amount,
+      currency: paymentCodegen.Currency = defaultPaymentAmount.currency,
+      expirationTime: Duration = Duration.ofMinutes(5),
+      domainId: Option[DomainId] = None,
+  )(implicit env: CoinTestConsoleEnvironment): (
+      testWalletCodegen.TestDeliveryOffer.ContractId,
+      paymentCodegen.AppPaymentRequest.ContractId,
+      paymentCodegen.AppPaymentRequest,
+  ) = {
     val receiverAmounts = Seq(
-      receiverAmount(aliceUserParty, amount, currency)
+      receiverAmount(userParty, amount, currency)
     )
 
-    createPaymentRequest(aliceUserParty, receiverAmounts)
+    createPaymentRequest(
+      remoteParticipantWithAdminToken,
+      userId,
+      userParty,
+      receiverAmounts,
+      expirationTime,
+      domainId,
+    )
   }
 
   private val defaultSubscriptionAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
     paymentCodegen.Currency.CC,
   )
+  private val defaultSubscriptionInterval = Duration.ofMinutes(10)
+  private val defaultSubscriptionDuration = Duration.ofMinutes(60)
+  private val defaultPaymentAmount = new paymentCodegen.PaymentAmount(
+    BigDecimal(10).bigDecimal.setScale(10),
+    paymentCodegen.Currency.CC,
+  )
 
-  protected def createSelfSubscriptionContext(aliceUserParty: PartyId)(implicit
+  protected def createSelfSubscriptionContext(
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      domainId: Option[DomainId] = None,
+  )(implicit
       env: CoinTestConsoleEnvironment
   ): testSubsCodegen.TestSubscriptionContext.ContractId = {
     val context = new testSubsCodegen.TestSubscriptionContext(
       scan.getSvcPartyId().toProtoPrimitive,
-      aliceUserParty.toProtoPrimitive,
-      aliceUserParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
       "description",
     )
     clue("Create a subscription context") {
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        Seq(aliceUserParty),
-        optTimeout = None,
-        commands = context.create.commands.asScala.toSeq,
+      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = context.create,
+        domainId = domainId,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(
-          aliceUserParty,
-          _.data == context,
-        )
-        .id
+      testSubsCodegen.TestSubscriptionContext.COMPANION.toContractId(result.contractId)
     }
   }
 
   private def createSelfSubscriptionData(
       contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
-      aliceUserParty: PartyId,
-      nextPaymentDueAt: Instant,
+      userParty: PartyId,
+      paymentInterval: Duration,
+      paymentDuration: Duration,
       amount: paymentCodegen.PaymentAmount,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
     val subscription = new subsCodegen.Subscription(
-      aliceUserParty.toProtoPrimitive,
-      aliceUserParty.toProtoPrimitive,
-      aliceUserParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
+      userParty.toProtoPrimitive,
       svcParty.toProtoPrimitive,
       contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
     )
     val payData = new subsCodegen.SubscriptionPayData(
       amount,
-      new RelTime(60 * 60 * 1000000L),
-      new RelTime(10 * 60 * 1000000L),
+      new RelTime(paymentInterval.toMillis * 1000L),
+      new RelTime(paymentDuration.toMillis * 1000L),
     )
     (subscription, payData)
   }
 
   protected def createSelfSubscriptionRequest(
-      aliceUserParty: PartyId,
-      nextPaymentDueAt: Instant,
-      amount: paymentCodegen.PaymentAmount,
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
+      paymentInterval: Duration = defaultSubscriptionInterval,
+      paymentDuration: Duration = defaultSubscriptionDuration,
+      domainId: Option[DomainId] = None,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
-    val contextId = createSelfSubscriptionContext(aliceUserParty)
+    val contextId =
+      createSelfSubscriptionContext(remoteParticipantWithAdminToken, userId, userParty, domainId)
     val (subscription, payData) =
-      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, amount)
+      createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
+    val subscriptionRequest = new subsCodegen.SubscriptionRequest(
+      subscription,
+      payData,
+    )
     clue("Create subscription request") {
-      val subscriptionRequest = new subsCodegen.SubscriptionRequest(
-        subscription,
-        payData,
-      )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        actAs = Seq(aliceUserParty),
-        optTimeout = None,
-        commands = subscriptionRequest.create.commands.asScala.toSeq,
+      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = subscriptionRequest.create,
+        domainId = domainId,
       )
     }
+    subscriptionRequest
   }
 
   protected def createSelfSubscription(
-      aliceUserParty: PartyId,
-      nextPaymentDueAt: Instant,
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
+      paymentInterval: Duration = defaultSubscriptionInterval,
+      paymentDuration: Duration = defaultSubscriptionDuration,
+      domainId: Option[DomainId] = None,
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
-    val contextId = createSelfSubscriptionContext(aliceUserParty)
+    val contextId =
+      createSelfSubscriptionContext(remoteParticipantWithAdminToken, userId, userParty)
     val (subscriptionData, payData) =
-      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, amount)
+      createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
     val subscriptionId = clue("Create a subscription") {
       val subscription = new subsCodegen.Subscription(
-        aliceUserParty.toProtoPrimitive,
-        aliceUserParty.toProtoPrimitive,
-        aliceUserParty.toProtoPrimitive,
+        userParty.toProtoPrimitive,
+        userParty.toProtoPrimitive,
+        userParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        Seq(aliceUserParty),
-        optTimeout = None,
-        commands = subscription.create.commands.asScala.toSeq,
+      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = subscription.create,
+        domainId = domainId,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(subsCodegen.Subscription.COMPANION)(aliceUserParty, _.data == subscription)
-        .id
+      subsCodegen.Subscription.COMPANION.toContractId(result.contractId)
     }
+    val nextPaymentDueAt =
+      env.environment.clock.now.addMicros(payData.paymentInterval.microseconds).toInstant
     clue("Create a subscription idle state") {
       val state = new subsCodegen.SubscriptionIdleState(
         subscriptionId,
@@ -441,10 +493,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
         payData,
         nextPaymentDueAt,
       )
-      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        actAs = Seq(aliceUserParty),
-        optTimeout = None,
-        commands = state.create.commands.asScala.toSeq,
+      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = state.create,
+        domainId = domainId,
       )
     }
   }

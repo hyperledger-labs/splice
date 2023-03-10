@@ -224,6 +224,7 @@ class WalletTimeBasedIntegrationTest
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
+          expirationTime = Duration.ofMinutes(1),
         ),
       )(
         "Check that we can see the created payment request",

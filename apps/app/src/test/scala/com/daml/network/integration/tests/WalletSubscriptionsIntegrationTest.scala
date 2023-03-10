@@ -1,20 +1,11 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
-import com.daml.network.codegen.java.cn.wallet.{
-  payment as walletCodegen,
-  subscriptions as subsCodegen,
-}
-import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTestWithSharedEnvironment,
-  CoinTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
 
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class WalletSubscriptionsIntegrationTest
@@ -27,7 +18,11 @@ class WalletSubscriptionsIntegrationTest
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
-      val request = createSelfSubscriptionRequest(aliceUserParty);
+      val request = createSelfSubscriptionRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
+        aliceUserParty,
+      );
 
       val requestId = clue("List subscription requests to find out request ID") {
         eventually() {
@@ -60,7 +55,13 @@ class WalletSubscriptionsIntegrationTest
 
         val (request, requestId) = actAndCheck(
           "Create self-subscription request",
-          createSelfSubscriptionRequest(aliceUserParty),
+          createSelfSubscriptionRequest(
+            aliceWalletBackend.remoteParticipantWithAdminToken,
+            aliceWallet.config.ledgerApiUser,
+            aliceUserParty,
+            paymentInterval = Duration.ofMinutes(10),
+            paymentDuration = Duration.ofMinutes(10),
+          ),
         )(
           "the created subscription request is listed correctly",
           request =>
@@ -155,55 +156,5 @@ class WalletSubscriptionsIntegrationTest
           aliceWallet.cancelSubscription(subscriptionStateId2),
         )("no more subscriptions exist", _ => aliceWallet.listSubscriptions() shouldBe empty)
       }
-
-    def createSelfSubscriptionRequest(aliceUserParty: PartyId)(implicit
-        env: CoinTestConsoleEnvironment
-    ): subsCodegen.SubscriptionRequest = {
-      val contextId = clue("Create a subscription context") {
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            Seq(aliceUserParty),
-            optTimeout = None,
-            commands = new testSubsCodegen.TestSubscriptionContext(
-              scan.getSvcPartyId().toProtoPrimitive,
-              aliceUserParty.toProtoPrimitive,
-              aliceUserParty.toProtoPrimitive,
-              "description",
-            ).create.commands.asScala.toSeq,
-          )
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(aliceUserParty)
-          .id
-      }
-      clue("Create a subscription request to self") {
-        val subscriptionData = new subsCodegen.Subscription(
-          aliceUserParty.toProtoPrimitive,
-          aliceUserParty.toProtoPrimitive,
-          aliceUserParty.toProtoPrimitive,
-          svcParty.toProtoPrimitive,
-          contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
-        )
-        val payData = new subsCodegen.SubscriptionPayData(
-          new walletCodegen.PaymentAmount(
-            BigDecimal(10).bigDecimal.setScale(10),
-            walletCodegen.Currency.CC,
-          ),
-          new RelTime(60 * 60 * 1000000L),
-          new RelTime(60 * 60 * 1000000L),
-        ) // paymentDuration == paymenInterval, so we can make a second payment immediately,
-        // without having to mess with time
-        val request = new subsCodegen.SubscriptionRequest(
-          subscriptionData,
-          payData,
-        )
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            actAs = Seq(aliceUserParty),
-            optTimeout = None,
-            commands = request.create.commands.asScala.toSeq,
-          )
-        request
-      }
-    }
   }
 }

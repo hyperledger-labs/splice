@@ -769,6 +769,8 @@ object CoinLedgerConnection {
     }
   }
 
+  // Note: currently it is not possible to directly specify the target domain on command submissions.
+  // Instead, Canton looks at the workflow ID field, and interprets it as the target domain if it starts with "domain-id:"
   def domainIdToWorkflowId(id: DomainId): String =
     s"domain-id:${id.toProtoPrimitive}"
 

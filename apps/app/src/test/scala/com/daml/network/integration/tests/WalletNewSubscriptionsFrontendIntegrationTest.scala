@@ -12,7 +12,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.time.{Instant, LocalDate, ZoneOffset}
+import java.time.{Duration, LocalDate}
 
 class WalletNewSubscriptionsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -39,20 +39,19 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       // TODO: (#3065) when the FE can accept subscriptions, use that instead of "auto-accepting" here
       createDirectoryEntry(alicePartyId, aliceDirectory, aliceEntryName, aliceWallet)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
-      val aDate = LocalDate.of(2050, 7, 3)
+      val aDate = LocalDate.now().plusDays(1)
       createSelfSubscription(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceDamlUser,
         alicePartyId,
-        aDate.atTime(12, 12).toInstant(ZoneOffset.UTC),
-        amount = new paymentCodegen.PaymentAmount(
-          BigDecimal(42.0).bigDecimal,
-          paymentCodegen.Currency.CC,
-        ),
+        paymentAmount(42.0, paymentCodegen.Currency.CC),
+        paymentInterval = Duration.ofDays(1),
       )
 
       def matchSecondSubscription(row: Element) = matchSubscription(row)(
         expectedReceiver = expectedCns(alicePartyId, aliceEntryName),
         expectedProvider = expectedCns(alicePartyId, aliceEntryName),
-        expectedPrice = "42 CC per 1 hr",
+        expectedPrice = "42 CC per 1 day",
         expectedCoinPrice = "84 USD @ 0.5CC/USD",
         expectedPaymentDate = s"${aDate.getMonthValue}/${aDate.getDayOfMonth}/${aDate.getYear}",
         expectedButtonEnabled = true,
@@ -103,7 +102,11 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidator)
       aliceWallet.tap(50) // she'll need this for MakePayment to happen (but not collection)
       clue("Create subscription, the payment on which won't be collected") {
-        createSelfSubscription(alicePartyId, nextPaymentDueAt = Instant.now())
+        createSelfSubscription(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceDamlUser,
+          alicePartyId,
+        )
       }
 
       withFrontEnd("alice") { implicit webDriver =>

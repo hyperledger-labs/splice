@@ -16,7 +16,13 @@ class WalletPaymentFrontendIntegrationTest
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+      createSelfPaymentRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
+        aliceUserParty,
+        42,
+        paymentCodegen.Currency.CC,
+      )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
@@ -39,7 +45,13 @@ class WalletPaymentFrontendIntegrationTest
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.ledgerApiUser,
+          aliceUserParty,
+          42,
+          paymentCodegen.Currency.CC,
+        )
 
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
@@ -67,7 +79,13 @@ class WalletPaymentFrontendIntegrationTest
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.USD)
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.ledgerApiUser,
+          aliceUserParty,
+          42,
+          paymentCodegen.Currency.USD,
+        )
 
         withFrontEnd("alice") { implicit webDriver =>
           browseToPaymentRequests(aliceDamlUser)
@@ -96,6 +114,8 @@ class WalletPaymentFrontendIntegrationTest
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
       createPaymentRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
         aliceUserParty,
         Seq(
           receiverAmount(aliceUserParty, 22, paymentCodegen.Currency.CC),
@@ -120,7 +140,13 @@ class WalletPaymentFrontendIntegrationTest
       val aliceDirectoryName = perTestCaseName("alice.cns")
       val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
       createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
-      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+      createSelfPaymentRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
+        aliceUserParty,
+        42,
+        paymentCodegen.Currency.CC,
+      )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)

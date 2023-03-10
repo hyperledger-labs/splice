@@ -26,6 +26,8 @@ class WalletCoinPriceFrontendIntegrationTest
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
       createPaymentRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
         aliceUserParty,
         Seq(
           receiverAmount(aliceUserParty, 22, paymentCodegen.Currency.CC),

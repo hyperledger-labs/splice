@@ -5,8 +5,6 @@ import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
@@ -19,7 +17,7 @@ import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestCon
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import java.time.Duration
@@ -94,75 +92,6 @@ trait TimeTestUtil extends CoinTestCommon {
         }
       }
     }
-  }
-
-  /** Rejects an accepted app payment request. */
-  def rejectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userId: String,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-      domainId: Option[DomainId] = None,
-  )(implicit
-      env: CoinTestConsoleEnvironment
-  ) = {
-    val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
-    val appTc = tc.toUnfeaturedAppTransferContext()
-    val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(userParty),
-      readAs = Seq(),
-      update = payment.id.exerciseAcceptedAppPayment_Reject(appTc),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
-    )
-  }
-
-  private def findAcceptedAppPaymentRequests(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-  ) = {
-    remoteParticipant.ledger_api_extensions.acs
-      .filterJava(paymentCodegen.AcceptedAppPayment.COMPANION)(
-        userParty,
-        (c: paymentCodegen.AcceptedAppPayment.Contract) =>
-          c.data.deliveryOffer.contractId == deliveryOffer.contractId,
-      )
-      .headOption
-      .getOrElse(
-        sys.error(s"No accepted app payment request found with delivery offer ${deliveryOffer}")
-      )
-  }
-
-  /** Collects an accepted app payment request without doing anything useful in return. */
-  def collectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
-      userId: String,
-      userParty: PartyId,
-      deliveryOffer: testWalletCodegen.TestDeliveryOffer.ContractId,
-      domainId: Option[DomainId] = None,
-  )(implicit
-      env: CoinTestConsoleEnvironment
-  ) = {
-    val payment = findAcceptedAppPaymentRequests(remoteParticipant, userParty, deliveryOffer)
-    val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
-    val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(userParty),
-      readAs = Seq(),
-      update = payment.id.exerciseAcceptedAppPayment_Collect(
-        appTc
-      ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
-    )
   }
 
   def lockCoins(

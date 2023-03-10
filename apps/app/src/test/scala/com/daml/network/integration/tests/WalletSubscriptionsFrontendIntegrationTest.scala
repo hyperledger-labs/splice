@@ -3,8 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import java.time.Duration
 
 class WalletSubscriptionsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -70,7 +69,13 @@ class WalletSubscriptionsFrontendIntegrationTest
           }
         }
         clue("Create second subscription, the payment on which won't be collected") {
-          createSelfSubscription(aliceUserParty, nextPaymentDueAt = Instant.now())
+          createSelfSubscription(
+            aliceWalletBackend.remoteParticipantWithAdminToken,
+            aliceWallet.config.ledgerApiUser,
+            aliceUserParty,
+            paymentInterval = Duration.ofMinutes(10),
+            paymentDuration = Duration.ofMinutes(10),
+          )
         }
         clue(
           "Wait until the wallet backend triggers the next subscription payment, then " +
@@ -137,14 +142,27 @@ class WalletSubscriptionsFrontendIntegrationTest
         BigDecimal(42.0).bigDecimal,
         paymentCodegen.Currency.USD,
       )
-      val dueAt = Instant.now().plus(1, ChronoUnit.DAYS)
-      createSelfSubscription(aliceUserParty, nextPaymentDueAt = dueAt, amount = usdAmount)
-      createSelfSubscriptionRequest(
+      createSelfSubscription(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
         aliceUserParty,
-        nextPaymentDueAt = dueAt,
+        paymentInterval = Duration.ofDays(1),
         amount = usdAmount,
       )
-      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+      createSelfSubscriptionRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
+        aliceUserParty,
+        paymentInterval = Duration.ofDays(1),
+        amount = usdAmount,
+      )
+      createSelfPaymentRequest(
+        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceWallet.config.ledgerApiUser,
+        aliceUserParty,
+        42,
+        paymentCodegen.Currency.CC,
+      )
       withFrontEnd("alice") { implicit webDriver =>
         browseToSubscriptions(aliceDamlUser)
         clue("Check that the subscription request displays the currency") {
