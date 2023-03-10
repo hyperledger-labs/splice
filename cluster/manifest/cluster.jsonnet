@@ -337,21 +337,6 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
     ],
   };
 
-local jsonFileConfigMap(config, name) = {
-  deploymentObjects: [
-    {
-      apiVersion: "v1",
-      kind: "ConfigMap",
-      metadata: {
-        name: name,
-      },
-      data: {
-        version: config.imageTag,
-      },
-    },
-  ],
-};
-
 local cluster(config, deployments) = objects(flatten(deployments));
 
 local namespace(name, config) = {
@@ -377,7 +362,6 @@ local namespace(name, config) = {
   deployment:: deployment,
   externalPort:: externalPort,
   flatten:: flatten,
-  jsonFileConfigMap:: jsonFileConfigMap,
   namespace:: namespace,
   standardLabels:: standardLabels,
 }

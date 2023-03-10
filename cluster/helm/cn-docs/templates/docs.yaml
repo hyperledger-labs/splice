@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: docs
-          image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/docs:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/docs:{{ .Values.cluster.imageTag }}"
           imagePullPolicy: "Always"
           ports:
             - name: http
@@ -85,7 +85,7 @@ spec:
     spec:
       containers:
         - name: gcs-proxy
-          image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/gcs-proxy:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/gcs-proxy:{{ .Values.cluster.imageTag }}"
           imagePullPolicy: "Always"
           ports:
             - name: http

@@ -1,7 +1,4 @@
-cluster:
-  name: cn-sqlscratchnet
-  region: "us-central1"
-  repoName: "da-cn-images/cn-images"
+imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
 bootstrapType: join-via-svc-app
 service:
   apiPort: 5014

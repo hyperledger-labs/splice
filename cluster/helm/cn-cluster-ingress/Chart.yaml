@@ -1,6 +1,6 @@
 apiVersion: v2
-name: cn-validator
-description: Canton Network Validator
+name: cn-cluster-ingress
+description: Canton Network Cluster Ingress
 type: application
 
 version: 0.1.0

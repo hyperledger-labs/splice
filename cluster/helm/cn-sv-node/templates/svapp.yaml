@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: sv-app
-          image: "{{ .Values.cluster.region }}-docker.pkg.dev/{{ .Values.cluster.repoName }}/sv-app:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/sv-app:{{ .Values.cluster.imageTag }}"
           imagePullPolicy: "Always"
           env:
             - name: "JAVA_TOOL_OPTIONS"

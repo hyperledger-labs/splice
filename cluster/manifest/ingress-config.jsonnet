@@ -33,6 +33,21 @@ local externalService(config, ports) = {
   ],
 };
 
+local clusterVersionConfigMap(config, name) = {
+  deploymentObjects: [
+    {
+      apiVersion: "v1",
+      kind: "ConfigMap",
+      metadata: {
+        name: name,
+      },
+      data: {
+        version: config.imageTag,
+      },
+    },
+  ],
+};
+
 local deployments(config, deployments) =
   local allPorts = c.flatten(std.map(function(i) i.ports, c.flatten(deployments)));
   local nonInternalPorts = std.filter(function(port) !std.get(port, "internalOnly", false),
@@ -42,7 +57,7 @@ local deployments(config, deployments) =
   local tlsCertSecret = config.clusterName + "-tls";
 
   [
-    c.jsonFileConfigMap(config, "cluster-manifest"),
+    clusterVersionConfigMap(config, "cluster-manifest"),
     c.deployment(
       config,
       "external-proxy",

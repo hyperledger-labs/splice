@@ -577,6 +577,14 @@ function subcmd_reset() {
 
 subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
 
+function _delete_cert_manager_objects() {
+    if objects=$(kubectl get $2 -n $1| grep cert-manager | gawk '{ print $1 }'); then
+        kubectl delete $2 -n $1 ${objects}
+    else
+        _info "No cert-manager objects of type $2 found in namespace $1."
+    fi
+}
+
 function subcmd_obliterate_state() {
     _production_gate
     _prompt_to_confirm
@@ -584,9 +592,6 @@ function subcmd_obliterate_state() {
 
     _info "Deleting all Canton Network Namespaces..."
     kubectl delete Namespace -l cnjClusterName=${GCP_CLUSTER_NAME}
-
-    _info "Full delete.... deleting cert-manager..."
-    kubectl delete Namespace cert-manager
 
     _info "Full delete... deleting default namespace deployments..."
     kubectl delete Deployment -l cnjClusterName=${GCP_CLUSTER_NAME}
@@ -596,9 +601,25 @@ function subcmd_obliterate_state() {
 
     # Delete the external service manually, since it does not have
     # the CNJ prefix cluster name label.
-    kubectl delete Service external
+    kubectl delete Service external --ignore-not-found=true
 
-    _info "Complete"
+    _info "Full delete.... deleting cert-manager..."
+    kubectl delete Namespace cert-manager --ignore-not-found=true
+
+    _info "Deleting cert-manager toplevel objects..."
+    # These are not in the cert-manager namespace and are therefore
+    # not deleted by the namespace delete.
+    _delete_cert_manager_objects kube-system Role
+    _delete_cert_manager_objects kube-system RoleBinding
+    _delete_cert_manager_objects default ClusterRole
+    _delete_cert_manager_objects default ClusterRoleBinding
+    _delete_cert_manager_objects default MutatingWebhookConfiguration
+    _delete_cert_manager_objects default ValidatingWebhookConfiguration
+
+    kubectl delete Issuer letsencrypt-production --ignore-not-found=true
+    kubectl delete Certificate cn-${GCP_CLUSTER_BASENAME}net-certificate --ignore-not-found=true
+
+    _info "Cluster state obliterated"
 }
 
 ###
@@ -975,7 +996,18 @@ function subcmd_papply() {
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
-    subcmd_pulumi up -c "IMAGE_TAG=${IMAGE_TAG}" --yes --show-sames
+    # Use the existing secret to populate the secret needed in the
+    # ingress namespace. Eventually, the secret management will be
+    # done in Pulumi.
+    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
+                     | jq -r '.data["key.json"]')
+
+    subcmd_pulumi up --yes --show-sames \
+                  -c "IMAGE_TAG=${IMAGE_TAG}" \
+                  -c "CLUSTER_IP=$(_cluster_ip)" \
+                  -c "CLUSTER_DNS_NAME=${CLUSTER_DNS_NAME}" \
+                  -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
+                  -c "DNS_SA_KEY=${dns_sa_key}"
 }
 
 ###

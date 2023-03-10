@@ -20,13 +20,16 @@ function loadYamlFromFile(path: PathLike): any {
   return load(fs.readFileSync(path, "utf-8"));
 }
 
-const IMAGE_TAG = config.require("IMAGE_TAG");
+function loadJsonFromFile(path: PathLike): any {
+  // eslint-disable-line @typescript-eslint/no-explicit-any
+  return JSON.parse(fs.readFileSync(path, "utf-8"));
+}
 
 const nodes = ["sv-1", "sv-2", "sv-3", "sv-4"];
 
 const appToClientId = {
-  wallet: "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
-  validator: "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+  "wallet": "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
+  "validator": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
   "sv-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
   "sv-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
   "sv-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
@@ -80,19 +83,25 @@ function getAuth0(): Promise<Auth0SecretMap> {
     });
 }
 
-function chartValues(chartPath: string, overrides: any = {}): any {
-  const CHART_DEFAULT_VALUES = loadYamlFromFile(
+function cnChartValues(chartPath: string, overrideValues: any = {}): any {
+  const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
   );
 
+  const basename = config.require("CLUSTER_BASENAME");
+
   return _.merge(
-    CHART_DEFAULT_VALUES,
+    chartDefaultValues,
     {
       cluster: {
-        imageTag: IMAGE_TAG,
+        basename,
+        name: `cn-${basename}net`,
+        imageTag: config.require("IMAGE_TAG"),
+        ipAddress: config.require("CLUSTER_IP"),
+        dnsName: config.require("CLUSTER_DNS_NAME"),
       },
     },
-    overrides
+    overrideValues
   );
 }
 
@@ -136,7 +145,7 @@ function installSvNodes() {
         name: "sv-app",
         namespace: namespace.metadata.name,
         chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
-        values: chartValues("cn-sv-node", {
+        values: cnChartValues("cn-sv-node", {
           bootstrapType:
             nodename === "sv-1" ? "found-consortium" : "join-via-svc-app",
         }),
@@ -163,7 +172,7 @@ function installDocs() {
       name: "docs",
       namespace: namespaceName,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-docs/",
-      values: chartValues("cn-docs"),
+      values: cnChartValues("cn-docs"),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
@@ -192,7 +201,7 @@ function installValidator() {
       name: "validator",
       namespace: namespace.metadata.name,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-validator/",
-      values: chartValues("cn-validator"),
+      values: cnChartValues("cn-validator"),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
@@ -201,6 +210,73 @@ function installValidator() {
   );
 }
 
-installSvNodes();
+function installCertManager(): k8s.helm.v3.Release {
+    const namespace = new k8s.core.v1.Namespace("cert-manager", {
+        metadata: {
+            name: "cert-manager"
+        }
+    });
+
+    return new k8s.helm.v3.Release(
+        "cert-manager",
+        {
+            name: "cert-manager",
+            namespace: namespace.metadata.name,
+            chart: "cert-manager",
+            version: "1.11.0",
+            repositoryOpts: {
+                repo: "https://charts.jetstack.io",
+            },
+            timeout: GLOBAL_TIMEOUT_SEC,
+        },
+        {
+            dependsOn: namespace
+        }
+    );
+}
+
+function installClusterIngress() {
+    const certManager = installCertManager();
+
+    const namespace = new k8s.core.v1.Namespace("cluster-ingress", {
+        metadata: {
+            name: "cluster-ingress"
+        }
+    });
+
+    const dnsSaKey = new k8s.core.v1.Secret(
+        "clouddns-dns01-solver-svc-acct",
+        {
+            metadata: {
+                name: "clouddns-dns01-solver-svc-acct",
+                namespace: namespace.metadata.name,
+            },
+            type: "Opaque",
+            data: {
+                "key.json": config.require("DNS_SA_KEY")
+            }
+        },
+        {
+            dependsOn: namespace
+        });
+
+    new k8s.helm.v3.Release(
+        "cluster-ingress",
+        {
+            name: "cluster-ingress",
+            namespace: namespace.metadata.name,
+            chart: process.env.REPO_ROOT + "/cluster/helm/cn-cluster-ingress/",
+            values: cnChartValues("cn-cluster-ingress"),
+            timeout: GLOBAL_TIMEOUT_SEC,
+        },
+        {
+            dependsOn: [ certManager, namespace, dnsSaKey ]
+        }
+    );
+}
+
+installClusterIngress()
 installDocs();
-installValidator();
+
+// installSvNodes();
+// installValidator();

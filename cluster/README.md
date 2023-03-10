@@ -836,8 +836,10 @@ chart based deployment strategy that's managed using Pulumi
 scripts. While this work is not complete, the beginnings of it are
 already committed and are available as a prototype for testing.
 
-The current Pulumi deployment is capable of managing the four SV app
-nodes. Instructions for use are as follows:
+The current Pulumi deployment is in an interim state, and can manage
+the cluster ingress and documentation server. Note that in the
+short-run, you'll need to manually reduce the number of endpoints
+expected in `external-proxy` for that service to correctly boot.
 
 1. Start with a working cluster and change to its deployment directory.
 1. Delete the existing cluster resources: `cncluster obliterate_state`.
