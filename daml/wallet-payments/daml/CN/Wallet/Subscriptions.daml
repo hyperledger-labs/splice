@@ -93,7 +93,7 @@ data SubscriptionPayData = SubscriptionPayData
 -- for ensure assertions
 payDataIsValid: SubscriptionPayData -> Bool
 payDataIsValid payData =
-  payData.paymentAmount.amount > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit 
+  payData.paymentAmount.amount > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit
 
 
 -- | A request for establishing a subscription.
@@ -303,6 +303,8 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   let SubscriptionPayData { paymentAmount; .. } = payData
 
   contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
+  require "Round is set to expire in the future" (now < contextRound.targetClosesAt)
+
   targetAmount <- paymentAmountToCC svc subscriptionData.sender contextRound paymentAmount
 
   outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
