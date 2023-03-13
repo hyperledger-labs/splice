@@ -110,7 +110,7 @@ trait TimeTestUtil extends CoinTestCommon {
       val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
 
       val expiredAt = coinEnv.environment.clock.now.add(expiredDuration)
-      val expirationOpt = Proto.decode(Proto.Timestamp)(expiredAt.underlying.micros)
+      val expirationOpt = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros)
 
       (coinOpt, expirationOpt) match {
         case (Some(coin), Right(expiration)) => {

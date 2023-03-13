@@ -35,7 +35,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.{CoinUtil, Contract, Proto}
+import com.daml.network.util.{CoinUtil, Contract, Codec}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.wallet.store.UserWalletStore
@@ -262,7 +262,7 @@ class HttpWalletHandler(
             installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
           )
         )(user, _.exerciseResult, dislosedContracts = Seq(coinRules.toDisclosedContract))
-      } yield d0.SelfGrantFeaturedAppRightResponse(Proto.encodeContractId(result))
+      } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
 
   override def acceptTransferOffer(respond: r0.AcceptTransferOfferResponse.type)(
@@ -271,7 +271,7 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
-          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
             contractId
           )
         Future.successful(
@@ -281,7 +281,7 @@ class HttpWalletHandler(
         )
       })(
         user,
-        cid => d0.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+        cid => d0.AcceptTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult)),
       )
     }
 
@@ -291,7 +291,7 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
-          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
             contractId
           )
         Future.successful(
@@ -311,7 +311,7 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
-          Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
             contractId
           )
         Future.successful(
@@ -329,7 +329,7 @@ class HttpWalletHandler(
       respond: r0.AcceptAppPaymentRequestResponse.type
   )(contractId: String)(user: String): Future[r0.AcceptAppPaymentRequestResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
-      val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
+      val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
       )
       exerciseWalletCoinAction(
@@ -338,7 +338,7 @@ class HttpWalletHandler(
         (outcome: COO_AcceptedAppPayment) =>
           r0.AcceptAppPaymentRequestResponse.OK(
             d0.AcceptAppPaymentRequestResponse(
-              Proto.encodeContractId(outcome.contractIdValue)
+              Codec.encodeContractId(outcome.contractIdValue)
             )
           ),
       )
@@ -349,7 +349,7 @@ class HttpWalletHandler(
   )(contractId: String)(user: String): Future[r0.RejectAppPaymentRequestResponse] =
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
-        val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
+        val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
           contractId
         )
         Future.successful(
@@ -365,7 +365,7 @@ class HttpWalletHandler(
   )(contractId: String)(user: String): Future[r0.AcceptSubscriptionRequestResponse] =
     withNewTrace(workflowId) { implicit traceContext => span =>
       val requestCid =
-        Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
+        Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
         )
       exerciseWalletCoinAction(
@@ -373,7 +373,7 @@ class HttpWalletHandler(
         user,
         (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
           d0.AcceptSubscriptionRequestResponse(
-            Proto.encodeContractId(outcome.contractIdValue)
+            Codec.encodeContractId(outcome.contractIdValue)
           ),
       )
     }
@@ -384,7 +384,7 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
-          Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
+          Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
             contractId
           )
         Future.successful(
@@ -400,7 +400,7 @@ class HttpWalletHandler(
   )(contractId: String)(user: String): Future[r0.RejectSubscriptionRequestResponse] =
     withNewTrace(workflowId) { traceContext => span =>
       exerciseWalletAction((installCid, _) => {
-        val requestCid = Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
+        val requestCid = Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
         )
         Future.successful(
@@ -434,9 +434,9 @@ class HttpWalletHandler(
 
         d0.GetBalanceResponse(
           currentRound,
-          Proto.encode(unlockedQty),
-          Proto.encode(lockedQty),
-          Proto.encode(unlockedHoldingFees),
+          Codec.encode(unlockedQty),
+          Codec.encode(lockedQty),
+          Codec.encode(unlockedHoldingFees),
         )
       }
     }
@@ -448,9 +448,9 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { traceContext => span =>
       val sender = getUserWallet(user).store.key.endUserParty
       exerciseWalletAction((installCid, _) => {
-        val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-        val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
-        val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
+        val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
+        val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+        val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
         Future.successful(
           installCid.exerciseWalletAppInstall_CreateTransferOffer(
             receiver.toProtoPrimitive,
@@ -463,7 +463,7 @@ class HttpWalletHandler(
         user,
         cid =>
           r0.CreateTransferOfferResponse.OK(
-            d0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult))
+            d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
           ),
         dedup = Some(
           (
@@ -471,7 +471,7 @@ class HttpWalletHandler(
               "com.daml.network.wallet.createTransferOffer",
               Seq(
                 sender,
-                Proto.tryDecode(Proto.Party)(request.receiverPartyId),
+                Codec.tryDecode(Codec.Party)(request.receiverPartyId),
               ),
               request.idempotencyKey,
             ),
@@ -489,7 +489,7 @@ class HttpWalletHandler(
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
       user: String
   ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
-    val amount = Proto.tryDecode(Proto.JavaBigDecimal)(request.amount)
+    val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
     (for {
       userStore <- getUserStore(user)
       result <- exerciseWalletCoinAction(
@@ -498,7 +498,7 @@ class HttpWalletHandler(
         ),
         user,
         (outcome: coinoperationoutcome.COO_Tap) =>
-          d0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
+          d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
       )
     } yield result)
   }
@@ -552,8 +552,8 @@ class HttpWalletHandler(
     d0.CoinPosition(
       coin.toJson,
       round,
-      Proto.encode(CoinUtil.holdingFee(coin.payload, round)),
-      Proto.encode(CoinUtil.currentAmount(coin.payload, round)),
+      Codec.encode(CoinUtil.holdingFee(coin.payload, round)),
+      Codec.encode(CoinUtil.currentAmount(coin.payload, round)),
     )
   }
 
@@ -564,8 +564,8 @@ class HttpWalletHandler(
     d0.CoinPosition(
       lockedCoin.toJson,
       round,
-      Proto.encode(CoinUtil.holdingFee(lockedCoin.payload.coin, round)),
-      Proto.encode(CoinUtil.currentAmount(lockedCoin.payload.coin, round)),
+      Codec.encode(CoinUtil.holdingFee(lockedCoin.payload.coin, round)),
+      Codec.encode(CoinUtil.currentAmount(lockedCoin.payload.coin, round)),
     )
 
   private[this] def getUserWallet(user: String): UserWalletService =

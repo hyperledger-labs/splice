@@ -19,7 +19,7 @@ import com.daml.network.svc.v0.{
   WithdrawFeaturedAppRightRequest,
 }
 import com.daml.network.svc.v0
-import com.daml.network.util.Proto
+import com.daml.network.util.Codec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
@@ -49,7 +49,7 @@ class GrpcSvcAppService(
       Future.successful(
         v0.GetDebugInfoResponse(
           svcUser = svcUserName,
-          svcPartyId = Proto.encode(store.svcParty),
+          svcPartyId = Codec.encode(store.svcParty),
         )
       )
     }
@@ -87,7 +87,7 @@ class GrpcSvcAppService(
               )
             )
         }
-      } yield GrantFeaturedAppRightResponse(Proto.encodeContractId(result.contractId))
+      } yield GrantFeaturedAppRightResponse(Codec.encodeContractId(result.contractId))
     }
 
   /** Withdraw a featured app right from an app provider, with a textual reasoning

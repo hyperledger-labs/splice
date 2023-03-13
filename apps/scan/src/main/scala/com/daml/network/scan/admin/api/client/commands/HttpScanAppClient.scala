@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.http.v0.{definitions, scan as http}
-import com.daml.network.util.{Contract, Proto, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
@@ -50,8 +50,7 @@ object HttpScanAppClient {
     ): Either[String, PartyId] =
       response match {
         case http.GetSvcPartyIdResponse.OK(response) =>
-          // TODO(#2739)
-          PartyId.fromProtoPrimitive(response.svcPartyId)
+          Codec.decode(Codec.Party)(response.svcPartyId)
       }
   }
 
@@ -283,8 +282,8 @@ object HttpScanAppClient {
       response match {
         case http.GetTotalCoinBalanceResponse.OK(response) =>
           for {
-            unlocked <- Proto.decode(Proto.BigDecimal)(response.totalUnlockedBalance)
-            locked <- Proto.decode(Proto.BigDecimal)(response.totalLockedBalance)
+            unlocked <- Codec.decode(Codec.BigDecimal)(response.totalUnlockedBalance)
+            locked <- Codec.decode(Codec.BigDecimal)(response.totalLockedBalance)
           } yield {
             TotalBalances(
               totalUnlocked = unlocked,

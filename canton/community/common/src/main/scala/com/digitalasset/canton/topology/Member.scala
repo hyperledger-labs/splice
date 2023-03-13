@@ -338,6 +338,8 @@ object PartyId {
   def tryFromProtoPrimitive(str: String): PartyId = PartyId(
     UniqueIdentifier.tryFromProtoPrimitive(str)
   )
+  def fromString(str: String): Either[String, PartyId] =
+    UniqueIdentifier.fromProtoPrimitive_(str).map(PartyId(_))
 
   def fromProtoPrimitive(str: String): Either[String, PartyId] =
     UniqueIdentifier.fromProtoPrimitive_(str).map(PartyId(_))

@@ -6,7 +6,7 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.http.v0.validatorAdmin as http
-import com.daml.network.util.TemplateJsonDecoder
+import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,7 +39,7 @@ object HttpValidatorAdminAppClient {
     ): Either[String, PartyId] = {
       response match {
         case http.OnboardUserResponse.OK(response) =>
-          PartyId.fromProtoPrimitive(response.partyId)
+          Codec.decode(Codec.Party)(response.partyId)
       }
     }
   }

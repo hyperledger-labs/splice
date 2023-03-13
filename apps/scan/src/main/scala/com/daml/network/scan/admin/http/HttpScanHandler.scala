@@ -11,7 +11,7 @@ import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{Contract, ContractMetadataUtil, Proto}
+import com.daml.network.util.{Contract, ContractMetadataUtil, Codec}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -192,8 +192,8 @@ class HttpScanHandler(
         (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
       } yield {
         definitions.GetTotalCoinBalanceResponse(
-          Proto.encode(totalCoins),
-          Proto.encode(totalLockedCoins),
+          Codec.encode(totalCoins),
+          Codec.encode(totalLockedCoins),
         )
       }
     }

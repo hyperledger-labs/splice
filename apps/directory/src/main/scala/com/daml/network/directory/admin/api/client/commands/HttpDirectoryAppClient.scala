@@ -7,7 +7,7 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.http.v0.directory as http
-import com.daml.network.util.{Contract, Proto, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -117,7 +117,7 @@ object HttpDirectoryAppClient {
         response: http.GetProviderPartyIdResponse
     )(implicit decoder: TemplateJsonDecoder): Either[String, PartyId] = response match {
       case http.GetProviderPartyIdResponse.OK(response) =>
-        Proto.decode(Proto.Party)(response.providerPartyId)
+        Codec.decode(Codec.Party)(response.providerPartyId)
     }
   }
 }

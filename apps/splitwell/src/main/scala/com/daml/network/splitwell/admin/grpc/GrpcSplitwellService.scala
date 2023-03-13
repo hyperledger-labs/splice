@@ -8,7 +8,7 @@ import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClie
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc
-import com.daml.network.util.Proto
+import com.daml.network.util.Codec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -45,7 +45,7 @@ class GrpcSplitwellService(
       request: v0.ListGroupsRequest
   ): Future[v0.ListGroupsResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
       for {
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
         acs <- store.acs(splitwellDomains.preferred)
@@ -64,7 +64,7 @@ class GrpcSplitwellService(
       request: v0.ListGroupInvitesRequest
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
       for {
         acs <- store.acs(splitwellDomains.preferred)
         groupInvites <- acs.listContracts(splitwellCodegen.GroupInvite.COMPANION)
@@ -81,7 +81,7 @@ class GrpcSplitwellService(
       request: v0.ListAcceptedGroupInvitesRequest
   ): Future[v0.ListAcceptedGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
       for {
         acs <- store.acs(splitwellDomains.preferred)
         acceptedGroupInvites <- acs.listContracts(splitwellCodegen.AcceptedGroupInvite.COMPANION)
@@ -102,7 +102,7 @@ class GrpcSplitwellService(
       request: v0.ListBalanceUpdatesRequest
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
       for {
         acs <- store.acs(splitwellDomains.preferred)
         balanceUpdates <- acs.listContracts(splitwellCodegen.BalanceUpdate.COMPANION)
@@ -128,7 +128,7 @@ class GrpcSplitwellService(
       request: v0.ListBalancesRequest
   ): Future[v0.ListBalancesResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
       val javaUserParty = userParty.toProtoPrimitive
       for {
         acs <- store.acs(splitwellDomains.preferred)
@@ -198,13 +198,13 @@ class GrpcSplitwellService(
 
         val balances: Map[String, BigDecimal] =
           filtered.foldLeft(Map.empty[String, BigDecimal])(combine)
-        v0.ListBalancesResponse(balances.map { case (k, v) => k -> Proto.encode(v) })
+        v0.ListBalancesResponse(balances.map { case (k, v) => k -> Codec.encode(v) })
       }
     }
 
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
-      Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
+      Future.successful(v0.GetProviderPartyIdResponse(Codec.encode(providerParty)))
     }
 
   override def getSplitwellDomainIds(request: Empty): Future[v0.GetSplitwellDomainIdsResponse] =

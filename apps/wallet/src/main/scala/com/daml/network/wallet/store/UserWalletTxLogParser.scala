@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.history.{CoinArchive, CoinCreate, Tap, Transfer}
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Proto}
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Codec}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -117,10 +117,10 @@ object UserWalletTxLogParser {
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
           provider = Some(provider),
-          sender = Some(httpDef.PartyAndAmount(sender._1, Proto.encode(sender._2))),
+          sender = Some(httpDef.PartyAndAmount(sender._1, Codec.encode(sender._2))),
           receivers =
-            Some(receivers.map(r => httpDef.PartyAndAmount(r._1, Proto.encode(r._2))).toVector),
-          holdingFees = Some(Proto.encode(senderHoldingFees)),
+            Some(receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector),
+          holdingFees = Some(Codec.encode(senderHoldingFees)),
         )
     }
     object Transfer {
@@ -143,7 +143,7 @@ object UserWalletTxLogParser {
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
           provider = None,
           sender = None,
-          receivers = Some(Vector(httpDef.PartyAndAmount(receiver, Proto.encode(amount)))),
+          receivers = Some(Vector(httpDef.PartyAndAmount(receiver, Codec.encode(amount)))),
           holdingFees = None,
         )
     }
@@ -166,7 +166,7 @@ object UserWalletTxLogParser {
             indexRecord = indexRecord,
             date = item.date.toInstant,
             receiver = receiverAndAmount.party,
-            amount = Proto.tryDecode(Proto.BigDecimal)(receiverAndAmount.amount),
+            amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
           )
         case Transfer.transaction_type =>
           val indexRecord = TxLogIndexRecord(
@@ -176,13 +176,13 @@ object UserWalletTxLogParser {
           for {
             provider <- item.provider.toRight("Provider missing")
             sender <- item.sender.toRight("Sender missing")
-            senderAmount <- Proto.decode(Proto.BigDecimal)(sender.amount)
+            senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
             receivers <- item.receivers.toRight("Receivers missing")
             receivers <- receivers.traverse(r =>
-              Proto.decode(Proto.BigDecimal)(r.amount).map(amount => r.party -> amount)
+              Codec.decode(Codec.BigDecimal)(r.amount).map(amount => r.party -> amount)
             )
             holdingFees <- item.holdingFees.toRight("Holding fees missing")
-            senderHoldingFees <- Proto.decode(Proto.BigDecimal)(holdingFees)
+            senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
           } yield TxLogEntry.Transfer(
             indexRecord = indexRecord,
             date = item.date.toInstant,

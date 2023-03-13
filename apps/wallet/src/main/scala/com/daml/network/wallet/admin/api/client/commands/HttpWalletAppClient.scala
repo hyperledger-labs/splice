@@ -16,7 +16,7 @@ import com.daml.network.http.v0.wallet as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.{Contract, Codec}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
@@ -135,8 +135,8 @@ object HttpWalletAppClient {
                 .fromJson(coinCodegen.Coin.COMPANION)(position.contract)
                 .leftMap(_.toString)
 
-              accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(position.accruedHoldingFee)
-              effectiveAmount <- Proto.decode(Proto.BigDecimal)(position.effectiveAmount)
+              accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(position.accruedHoldingFee)
+              effectiveAmount <- Codec.decode(Codec.BigDecimal)(position.effectiveAmount)
             } yield {
               new CoinPosition(
                 contract,
@@ -152,8 +152,8 @@ object HttpWalletAppClient {
                 .fromJson(coinCodegen.LockedCoin.COMPANION)(lockedPosition.contract)
                 .leftMap(_.toString)
 
-              accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(lockedPosition.accruedHoldingFee)
-              effectiveAmount <- Proto.decode(Proto.BigDecimal)(lockedPosition.effectiveAmount)
+              accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(lockedPosition.accruedHoldingFee)
+              effectiveAmount <- Codec.decode(Codec.BigDecimal)(lockedPosition.effectiveAmount)
             } yield {
               LockedCoinPosition(
                 contract,
@@ -180,7 +180,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.TapResponse] =
-      client.tap(definitions.TapRequest(Proto.encode(amount)), headers = headers)
+      client.tap(definitions.TapRequest(Codec.encode(amount)), headers = headers)
 
     override def handleResponse(
         response: http.TapResponse
@@ -189,7 +189,7 @@ object HttpWalletAppClient {
     ): Either[String, coinCodegen.Coin.ContractId] = {
       response match {
         case http.TapResponse.OK(response) =>
-          Proto.decodeJavaContractId(coinCodegen.Coin.COMPANION)(response.contractId)
+          Codec.decodeJavaContractId(coinCodegen.Coin.COMPANION)(response.contractId)
         case http.TapResponse.NotFound(ErrorResponse(err)) => Left(err)
         case http.TapResponse.BadRequest(ErrorResponse(err)) => Left(err)
         case http.TapResponse.TooManyRequests(ErrorResponse(err)) => Left(err)
@@ -223,7 +223,7 @@ object HttpWalletAppClient {
     ): Either[String, coinCodegen.FeaturedAppRight.ContractId] = {
       response match {
         case http.SelfGrantFeatureAppRightResponse.OK(response) =>
-          Proto.decodeJavaContractId(coinCodegen.FeaturedAppRight.COMPANION)(response.contractId)
+          Codec.decodeJavaContractId(coinCodegen.FeaturedAppRight.COMPANION)(response.contractId)
         case http.SelfGrantFeatureAppRightResponse.NotFound(ErrorResponse(error)) =>
           Left(error)
         case http.SelfGrantFeatureAppRightResponse.InternalServerError(ErrorResponse(errorMsg)) =>
@@ -251,9 +251,9 @@ object HttpWalletAppClient {
       response match {
         case http.GetBalanceResponse.OK(response) =>
           for {
-            effectiveUnlockedQty <- Proto.decode(Proto.BigDecimal)(response.effectiveUnlockedQty)
-            effectiveLockedQty <- Proto.decode(Proto.BigDecimal)(response.effectiveLockedQty)
-            totalHoldingFees <- Proto.decode(Proto.BigDecimal)(response.totalHoldingFees)
+            effectiveUnlockedQty <- Codec.decode(Codec.BigDecimal)(response.effectiveUnlockedQty)
+            effectiveLockedQty <- Codec.decode(Codec.BigDecimal)(response.effectiveLockedQty)
+            totalHoldingFees <- Codec.decode(Codec.BigDecimal)(response.totalHoldingFees)
           } yield {
             Balance(
               response.round,
@@ -311,7 +311,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptAppPaymentRequestResponse] =
-      client.acceptAppPaymentRequest(Proto.encodeContractId(requestId), headers = headers)
+      client.acceptAppPaymentRequest(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.AcceptAppPaymentRequestResponse
@@ -320,7 +320,7 @@ object HttpWalletAppClient {
     ): Either[String, walletCodegen.AcceptedAppPayment.ContractId] = {
       response match {
         case http.AcceptAppPaymentRequestResponse.OK(response) =>
-          Proto.decodeJavaContractId(walletCodegen.AcceptedAppPayment.COMPANION)(
+          Codec.decodeJavaContractId(walletCodegen.AcceptedAppPayment.COMPANION)(
             response.acceptedPaymentContractId
           )
         case http.AcceptAppPaymentRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
@@ -345,7 +345,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAppPaymentRequestResponse] =
-      client.rejectAppPaymentRequest(Proto.encodeContractId(requestId), headers = headers)
+      client.rejectAppPaymentRequest(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.RejectAppPaymentRequestResponse
@@ -530,7 +530,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptSubscriptionRequestResponse] =
-      client.acceptSubscriptionRequest(Proto.encodeContractId(requestId), headers = headers)
+      client.acceptSubscriptionRequest(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.AcceptSubscriptionRequestResponse
@@ -539,7 +539,7 @@ object HttpWalletAppClient {
     ): Either[String, subsCodegen.SubscriptionInitialPayment.ContractId] = {
       response match {
         case http.AcceptSubscriptionRequestResponse.OK(response) =>
-          Proto.decodeJavaContractId(subsCodegen.SubscriptionInitialPayment.COMPANION)(
+          Codec.decodeJavaContractId(subsCodegen.SubscriptionInitialPayment.COMPANION)(
             response.initialPaymentContractId
           )
         case http.AcceptSubscriptionRequestResponse.NotFound(ErrorResponse(error)) =>
@@ -566,7 +566,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectSubscriptionRequestResponse] =
-      client.rejectSubscriptionRequest(Proto.encodeContractId(requestId), headers = headers)
+      client.rejectSubscriptionRequest(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.RejectSubscriptionRequestResponse
@@ -594,7 +594,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.CancelSubscriptionRequestResponse] =
-      client.cancelSubscriptionRequest(Proto.encodeContractId(stateId), headers = headers)
+      client.cancelSubscriptionRequest(Codec.encodeContractId(stateId), headers = headers)
 
     override def handleResponse(
         response: http.CancelSubscriptionRequestResponse
@@ -625,10 +625,10 @@ object HttpWalletAppClient {
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateTransferOfferResponse] = {
       val request = definitions.CreateTransferOfferRequest(
-        Proto.encode(receiver),
-        Proto.encode(amount),
+        Codec.encode(receiver),
+        Codec.encode(amount),
         description,
-        Proto.encode(expiresAt),
+        Codec.encode(expiresAt),
         idempotencyKey,
       )
 
@@ -642,7 +642,7 @@ object HttpWalletAppClient {
     ): Either[String, transferOfferCodegen.TransferOffer.ContractId] = {
       response match {
         case http.CreateTransferOfferResponse.OK(response) =>
-          Proto.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
+          Codec.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
             response.offerContractId
           )
         case http.CreateTransferOfferResponse.Conflict => Err.CreateTransferOfferResponse.Conflict
@@ -698,7 +698,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcceptTransferOfferResponse] =
-      client.acceptTransferOffer(Proto.encodeContractId(requestId), headers = headers)
+      client.acceptTransferOffer(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.AcceptTransferOfferResponse
@@ -707,7 +707,7 @@ object HttpWalletAppClient {
     ): Either[String, transferOfferCodegen.AcceptedTransferOffer.ContractId] = {
       response match {
         case http.AcceptTransferOfferResponse.OK(response) =>
-          Proto.decodeJavaContractId(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(
+          Codec.decodeJavaContractId(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(
             response.acceptedOfferContractId
           )
         case http.AcceptTransferOfferResponse.NotFound(ErrorResponse(error)) =>
@@ -764,7 +764,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectTransferOfferResponse] =
-      client.rejectTransferOffer(Proto.encodeContractId(requestId), headers = headers)
+      client.rejectTransferOffer(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.RejectTransferOfferResponse
@@ -790,7 +790,7 @@ object HttpWalletAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.WithdrawTransferOfferResponse] =
-      client.withdrawTransferOffer(Proto.encodeContractId(requestId), headers = headers)
+      client.withdrawTransferOffer(Codec.encodeContractId(requestId), headers = headers)
 
     override def handleResponse(
         response: http.WithdrawTransferOfferResponse

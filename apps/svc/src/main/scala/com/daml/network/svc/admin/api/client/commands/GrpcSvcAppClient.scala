@@ -15,7 +15,7 @@ import com.daml.network.svc.v0.{
   SetConfigScheduleRequest,
   WithdrawFeaturedAppRightRequest,
 }
-import com.daml.network.util.Proto
+import com.daml.network.util.Codec
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -49,7 +49,7 @@ object GrpcSvcAppClient {
     override def handleResponse(
         response: GetDebugInfoResponse
     ): Either[String, DebugInfo] =
-      Proto.decode(Proto.Party)(response.svcPartyId).map { svc =>
+      Codec.decode(Codec.Party)(response.svcPartyId).map { svc =>
         DebugInfo(
           svcUser = response.svcUser,
           svcParty = svc,
@@ -70,13 +70,13 @@ object GrpcSvcAppClient {
     ): Future[GrantFeaturedAppRightResponse] = service.grantFeaturedAppRight(request)
 
     override def createRequest(): Either[String, GrantFeaturedAppRightRequest] = Right(
-      GrantFeaturedAppRightRequest(Proto.encode(provider))
+      GrantFeaturedAppRightRequest(Codec.encode(provider))
     )
 
     override def handleResponse(
         response: GrantFeaturedAppRightResponse
     ): Either[String, FeaturedAppRight.ContractId] =
-      Proto.decodeJavaContractId(FeaturedAppRight.COMPANION)(response.featuredAppRightContractId)
+      Codec.decodeJavaContractId(FeaturedAppRight.COMPANION)(response.featuredAppRightContractId)
   }
 
   case class WithdrawFeaturedAppRight(provider: PartyId)
@@ -92,7 +92,7 @@ object GrpcSvcAppClient {
     ): Future[Empty] = service.withdrawFeaturedAppRight(request)
 
     override def createRequest(): Either[String, WithdrawFeaturedAppRightRequest] = Right(
-      WithdrawFeaturedAppRightRequest(Proto.encode(provider))
+      WithdrawFeaturedAppRightRequest(Codec.encode(provider))
     )
 
     /** Handle the response the service has provided
@@ -114,7 +114,7 @@ object GrpcSvcAppClient {
     ): Future[Empty] = service.joinConsortium(request)
 
     override def createRequest(): Either[String, JoinConsortiumRequest] = Right(
-      JoinConsortiumRequest(Proto.encode(svParty))
+      JoinConsortiumRequest(Codec.encode(svParty))
     )
 
     /** Handle the response the service has provided

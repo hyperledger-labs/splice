@@ -1,10 +1,10 @@
 package com.daml.network.splitwell.admin.api.client.commands
 
 import cats.implicits.*
-import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
+import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.{Contract, Codec, CodecCompanion}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
@@ -18,7 +18,7 @@ object GrpcSplitwellAppClient {
   case class SplitwellContext(
       partyId: PartyId
   ) {
-    def toProtoV0: v0.SplitwellContext = v0.SplitwellContext(Proto.encode(partyId))
+    def toProtoV0: v0.SplitwellContext = v0.SplitwellContext(Codec.encode(partyId))
   }
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
@@ -32,7 +32,7 @@ object GrpcSplitwellAppClient {
       provider: PartyId,
       id: String,
   ) {
-    def toProtoV0: v0.GroupKey = v0.GroupKey(Proto.encode(owner), Proto.encode(provider), id)
+    def toProtoV0: v0.GroupKey = v0.GroupKey(Codec.encode(owner), Codec.encode(provider), id)
     def toPrim: splitwellCodegen.GroupKey = new splitwellCodegen.GroupKey(
       owner.toProtoPrimitive,
       provider.toProtoPrimitive,
@@ -156,8 +156,8 @@ object GrpcSplitwellAppClient {
       response.balances.toList
         .traverse { case (k, v) =>
           for {
-            k <- Proto.decode(Proto.Party)(k)
-            v <- Proto.decode(Proto.BigDecimal)(v)
+            k <- Codec.decode(Codec.Party)(k)
+            v <- Codec.decode(Codec.BigDecimal)(v)
           } yield k -> v
         }
         .map(_.toMap)
@@ -177,13 +177,20 @@ object GrpcSplitwellAppClient {
     override def handleResponse(
         response: v0.GetProviderPartyIdResponse
     ): Either[String, PartyId] =
-      Proto.decode(Proto.Party)(response.partyId)
+      Codec.decode(Codec.Party)(response.partyId)
   }
 
   case class SplitwellDomains(
       preferred: DomainId,
       others: Seq[DomainId],
   )
+  object DomainIdCompanion extends CodecCompanion[DomainId] {
+    type Enc = String
+    def instance = new Codec[DomainId, String] {
+      def encode(d: DomainId) = d.toProtoPrimitive
+      def decode(e: String) = DomainId.fromString(e)
+    }
+  }
 
   case class GetSplitwellDomainIds(
   ) extends BaseCommand[Empty, v0.GetSplitwellDomainIdsResponse, SplitwellDomains] {
@@ -199,8 +206,8 @@ object GrpcSplitwellAppClient {
         response: v0.GetSplitwellDomainIdsResponse
     ): Either[String, SplitwellDomains] =
       for {
-        preferred <- Proto.decode(Proto.DomainId)(response.preferredDomainId)
-        others <- response.otherDomainIds.traverse(id => Proto.decode(Proto.DomainId)(id))
+        preferred <- Codec.decode(DomainIdCompanion)(response.preferredDomainId)
+        others <- response.otherDomainIds.traverse(id => Codec.decode(DomainIdCompanion)(id))
       } yield SplitwellDomains(preferred, others)
   }
 }
