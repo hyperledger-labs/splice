@@ -395,9 +395,6 @@ commands:
       gce_authenticate:
         type: boolean
         default: false
-      auth0_authenticate:
-        type: boolean
-        default: false
       cluster:
         type: enum
         enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet", "none"]
@@ -423,11 +420,6 @@ commands:
             fi
             if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
-            fi
-
-
-            if [[ << parameters.auth0_authenticate >> == true ]]; then
-              ADDITIONAL_NIX_ARGS+=" --keep AUTH0_MANAGEMENT_API_TOKEN"
             fi
 
             nix-shell shell.nix \
@@ -1069,7 +1061,7 @@ jobs:
           cmd_name: Refresh auth0 tokens
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          auth0_authenticate: true
+          additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
           cmd: |
             set -eou pipefail
             cncluster activate
