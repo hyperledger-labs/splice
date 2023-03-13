@@ -45,6 +45,8 @@ trait CommonCoinAppInstanceReferences {
 
   def sv4(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
 
+  def sv5(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv5")
+
   def scan(implicit env: CoinTestConsoleEnvironment): ScanAppBackendReference =
     env.scans.local.headOption.getOrElse(
       sys.error(

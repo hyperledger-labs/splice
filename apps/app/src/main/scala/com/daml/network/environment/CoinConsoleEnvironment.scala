@@ -121,13 +121,14 @@ class CoinConsoleEnvironment(
   lazy val appsHostedBySvc = NodeReferences(
     mergeLocalCoinInstances(
       svcOpt.toList,
-      svs.local,
+      // SV5 is not hosted by the SVC
+      svs.local.filter(sv => sv.name != "sv5"),
       scans.local,
       directories.local,
     ),
     mergeRemoteCoinInstances(
       remoteSvcOpt.toList,
-      svs.remote,
+      svs.remote.filter(sv => sv.name != "sv5"),
       scans.remote,
       directories.remote,
     ),
