@@ -15,6 +15,8 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
   }
 
   protected def loginOnCurrentPage(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+    // We reuse frontends across tests so we might need to log out first.
+    find(id("logout-button")).foreach(click on _)
     click on "user-id-field"
     textField("user-id-field").value = ledgerApiUser
     click on "login-button"
@@ -30,7 +32,6 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
       _ => userIsLoggedIn(),
     )
   }
-
   protected def userIsLoggedIn()(implicit webDriver: WebDriver) = {
     waitForQuery(id("logged-in-user"))
   }

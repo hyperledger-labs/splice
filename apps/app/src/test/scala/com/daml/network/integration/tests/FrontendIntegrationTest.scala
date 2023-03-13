@@ -20,6 +20,7 @@ import org.openqa.selenium.{
   TakesScreenshot,
   WebDriver,
 }
+import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.{MatchResult, Matcher}
@@ -84,17 +85,22 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
     extends CoinIntegrationTestWithSharedEnvironment
     with FrontendTestCommon {
 
-  override def provideEnvironment = {
-    val env = super.provideEnvironment
+  override def beforeAll() = {
+    super.beforeAll()
     if (autostartWebDrivers) {
-      startWebDrivers(env.executionContext)
+      startWebDrivers(provideEnvironment.executionContext)
     }
-    env
   }
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
-    stopWebDrivers(env.executionContext)
+    clearWebDrivers(provideEnvironment.executionContext)
     super.testFinished(env)
+  }
+
+  override def afterAll(): Unit = {
+    try {
+      stopWebDrivers(provideEnvironment.executionContext)
+    } finally super.afterAll()
   }
 }
 
@@ -106,10 +112,10 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
 
   val frontendNames: Seq[String] = Seq()
 
-  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
+  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor with WebStorage
 
   val options: FirefoxOptions =
-    new FirefoxOptions().addArguments("-headless").setLogLevel(FirefoxDriverLogLevel.DEBUG)
+    new FirefoxOptions().setLogLevel(FirefoxDriverLogLevel.DEBUG).addArguments("-headless")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
@@ -173,21 +179,42 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     );
   }
 
-  protected def startWebDrivers(implicit ec: ExecutionContext) =
+  protected def startWebDrivers(implicit ec: ExecutionContext) = {
+    logger.info("Starting web drivers")
     // We start all browsers in parallel, for faster test init.
     frontendNames.toList.parTraverse { name =>
       Future {
         startWebDriver(name)
       }
     }.futureValue
+    logger.info("Started web drivers")
+  }
 
-  protected def stopWebDrivers(implicit ec: ExecutionContext) =
+  protected def stopWebDrivers(implicit ec: ExecutionContext) = {
+    logger.info("Stopping web drivers")
     // We process all browsers in parallel, for faster test termination.
     webDrivers.values.toList.parTraverse { webDriver =>
       Future {
         webDriver.quit()
       }
     }.futureValue
+    logger.info("Stopped web drivers")
+  }
+
+  protected def clearWebDrivers(implicit ec: ExecutionContext) = {
+    logger.info("Clearing web drivers")
+    webDrivers.values.toList.parTraverse { implicit webDriver =>
+      Future {
+        // Reset session storage so we see the login window again.
+        // You cannot reset session storage of about:blank so
+        // we exclude this.
+        if (currentUrl != "about:blank") {
+          webDriver.getSessionStorage().clear()
+        }
+      }
+    }.futureValue
+    logger.info("Cleared web drivers")
+  }
 
   def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A =
     f(
