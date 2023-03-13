@@ -6,10 +6,10 @@ import com.auth0.exception.Auth0Exception
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
+  LedgerApiExtensions,
   RemoteDirectoryAppReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
-  LedgerApiExtensions,
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -20,8 +20,11 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.BeforeAndAfterEach
+
 import scala.language.implicitConversions
 import java.time.Duration
+import scala.concurrent.duration.*
+import scala.util.control.NonFatal
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -186,6 +189,21 @@ object CoinTests {
             val y = checkFun(x)
             (x, y)
           }
+        }
+      }
+    }
+
+    /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
+      */
+    def eventuallySucceeds[T](
+        timeUntilSuccess: FiniteDuration = 20.seconds,
+        maxPollInterval: FiniteDuration = 5.seconds,
+    )(testCode: => T): T = {
+      eventually(timeUntilSuccess, maxPollInterval) {
+        try {
+          loggerFactory.suppressErrors(testCode)
+        } catch {
+          case NonFatal(e) => fail(e)
         }
       }
     }
