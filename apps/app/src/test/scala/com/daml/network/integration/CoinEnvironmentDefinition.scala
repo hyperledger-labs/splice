@@ -214,14 +214,8 @@ object CoinEnvironmentDefinition {
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
 
-  def preflightTopology(testName: String, networkAppsAddress: String): CoinEnvironmentDefinition = {
+  def preflightTopology(testName: String): CoinEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)
-      .addConfigTransform((_, conf) =>
-        CNNodeConfigTransforms.updateAllValidatorClientConfigs_(
-          _.focus(_.adminApi.url)
-            .modify(_.replace("${NETWORK_APPS_ADDRESS}", networkAppsAddress))
-        )(conf)
-      )
   }
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =

@@ -90,8 +90,7 @@ class Validator1PreflightIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.preflightTopology(
-      this.getClass.getSimpleName(),
-      sys.env("NETWORK_APPS_ADDRESS"),
+      this.getClass.getSimpleName()
     )
 
   // when running locally, these tests may fail if the CC DAR deployed to DevNet

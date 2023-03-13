@@ -16,8 +16,7 @@ class SvcPreflightIntegrationTest extends CoinIntegrationTestWithSharedEnvironme
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.preflightTopology(
-      this.getClass.getSimpleName(),
-      sys.env("NETWORK_APPS_ADDRESS"),
+      this.getClass.getSimpleName()
     )
 
   "all SVs are online and reachable via HTTP" taggedAs LiveDevNetTest in { implicit env =>
