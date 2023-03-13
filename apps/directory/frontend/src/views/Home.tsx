@@ -5,7 +5,7 @@ import {
   usePrimaryParty,
   useUserState,
 } from 'common-frontend';
-import { PromiseDirectoryApi } from 'directory-openapi/dist/types/PromiseAPI';
+import { DirectoryClient } from 'common-frontend/lib/contexts/DirectoryServiceContext';
 import { useEffect, useState } from 'react';
 
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
@@ -18,7 +18,7 @@ import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 
-export function useProviderParty(directoryClient: PromiseDirectoryApi): string | undefined {
+export function useProviderParty(directoryClient: DirectoryClient): string | undefined {
   const [providerPartyId, setProviderPartyId] = useState<string | undefined>();
 
   useEffect(() => {

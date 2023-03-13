@@ -63,6 +63,47 @@ class WalletNewFrontendIntegrationTest
       }
     }
 
+    "show user details after login" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val entryName = perTestCaseName("alice.cns")
+
+      onboardWalletUser(aliceWallet, aliceValidator)
+
+      createDirectoryEntry(
+        aliceParty,
+        aliceDirectory,
+        entryName,
+        aliceWallet,
+      )
+
+      eventuallySucceeds() {
+        directory.lookupEntryByName(entryName)
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        eventually() {
+          val loggedInUser = find(id("logged-in-user")).value.text.trim
+          loggedInUser shouldBe entryName
+        }
+      }
+    }
+
+    "show no user details after login if user has no cns entry" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+
+      onboardWalletUser(aliceWallet, aliceValidator)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        eventually() {
+          val loggedInUser = find(id("logged-in-user")).value.text.trim
+          loggedInUser shouldBe ""
+        }
+      }
+    }
+
     "show balances after login" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
@@ -76,6 +117,7 @@ class WalletNewFrontendIntegrationTest
         scan,
         Duration.ofDays(1),
       )
+
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
 
