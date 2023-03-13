@@ -36,6 +36,7 @@ import org.openqa.selenium.firefox.GeckoDriverService
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 
@@ -210,6 +211,7 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
         // we exclude this.
         if (currentUrl != "about:blank") {
           webDriver.getSessionStorage().clear()
+          webDriver.getSessionStorage().keySet.asScala shouldBe empty
         }
       }
     }.futureValue
