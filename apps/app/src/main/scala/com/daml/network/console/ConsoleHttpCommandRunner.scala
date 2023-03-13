@@ -88,7 +88,7 @@ class ConsoleHttpCommandRunner(
           s"Running on ${instanceName} command ${command} against ${clientConfig}"
         )(
           httpRunner
-            .run(instanceName, host, command, headers)
+            .run(host, command, headers)
             .value
         )
       apiResult.toResult

@@ -57,9 +57,7 @@ class SplitwellAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
-      metrics.grpcMetrics,
       configuredOpenTelemetry,
-      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -91,7 +89,6 @@ object SplitwellAppBootstrap {
       splitwellConfig: SplitwellAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       splitwellMetrics: SplitwellAppMetrics,
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,

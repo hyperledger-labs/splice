@@ -140,7 +140,7 @@ object CNNodeConfigTransforms {
     * collide, and adds a suffix to Daml user names that is specific to a given test
     * context.
     */
-  def defaults(testContextNameSuffix: String): Seq[CNNodeConfigTransform] = {
+  def defaults(): Seq[CNNodeConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
       ensureNovelDamlNames(),
@@ -472,11 +472,9 @@ object CNNodeConfigTransforms {
     )
   }
 
-  def useSelfSignedTokensForWalletValidatorApiAuth(
-      secret: String
-  ): CNNodeConfigTransform = {
+  def useSelfSignedTokensForWalletValidatorApiAuth(secret: String): CNNodeConfigTransform = {
     updateAllWalletAppBackendConfigs_(c => {
-      val userToken = AuthUtil.testToken(AuthUtil.testAudience, c.serviceUser)
+      val userToken = AuthUtil.testToken(AuthUtil.testAudience, c.serviceUser, secret)
       c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
     })
   }

@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
-import com.daml.network.environment.{CoinLedgerConnection, DedupOffset}
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
@@ -17,6 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -80,21 +81,19 @@ class SummarizingMiningRoundTrigger(
           )
         case QueryResult(offset, None) =>
           connection
-            .submitWithResult(
+            .submitCommands(
               actAs = Seq(store.key.svParty),
               readAs = Seq(store.key.svcParty),
-              update = cmd,
+              commands = cmd.commands.asScala.toSeq,
               commandId = CoinLedgerConnection.CommandId(
                 "com.daml.network.directory.createMiningRoundStartIssuingConfirmation",
                 Seq(store.key.svParty, store.key.svcParty),
                 summarizingRound.contractId.contractId,
               ),
-              deduplicationConfig = DedupOffset(
-                offset = offset
-              ),
+              deduplicationOffset = offset,
               domainId = domainId,
             )
-            .map { cid =>
+            .map { _ =>
               TaskSuccess(
                 s"created confirmation for summarizing mining round with ${rewards.summary}"
               )

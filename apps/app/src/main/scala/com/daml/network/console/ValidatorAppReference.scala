@@ -97,6 +97,7 @@ final class ValidatorAppBackendReference(
       AuthUtil.testToken(
         audience = AuthUtil.testAudience,
         user = config.ledgerApiUser,
+        secret = AuthUtil.testSecret,
       )
     )
   }
@@ -120,7 +121,6 @@ final class ValidatorAppBackendReference(
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`",
-      name,
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
@@ -129,7 +129,6 @@ final class ValidatorAppBackendReference(
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 

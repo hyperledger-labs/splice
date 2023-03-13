@@ -56,9 +56,7 @@ class DirectoryAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
-      metrics.grpcMetrics,
       configuredOpenTelemetry,
-      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -72,7 +70,6 @@ class DirectoryAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           futureSupervisor,
         )
       )
@@ -90,7 +87,6 @@ object DirectoryAppBootstrap {
       directoryConfig: LocalDirectoryAppConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       directoryMetrics: DirectoryAppMetrics,
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,

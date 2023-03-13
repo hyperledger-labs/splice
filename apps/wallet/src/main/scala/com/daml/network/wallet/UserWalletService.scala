@@ -51,7 +51,6 @@ class UserWalletService(
       storage,
       globalDomain,
       loggerFactory,
-      timeouts,
       futureSupervisor,
       connection,
       retryProvider,

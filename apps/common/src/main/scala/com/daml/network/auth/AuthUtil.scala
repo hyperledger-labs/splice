@@ -23,8 +23,9 @@ object AuthUtil {
   def testToken(
       audience: String,
       user: String,
+      secret: String,
   ): String = {
-    testTokenSecret(audience, user, testSecret)
+    testTokenSecret(audience, user, secret)
   }
 
   def testTokenSecret(audience: String, user: String, secret: String): String = {
@@ -58,6 +59,6 @@ object AuthUtil {
   }
 
   def main(args: Array[String]): Unit = {
-    println(testToken(args(0), args(1)))
+    println(testToken(args(0), args(1), testSecret))
   }
 }

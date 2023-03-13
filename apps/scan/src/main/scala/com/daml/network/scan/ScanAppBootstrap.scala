@@ -57,9 +57,7 @@ class ScanAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
-      metrics.grpcMetrics,
       configuredOpenTelemetry,
-      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -73,7 +71,6 @@ class ScanAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           futureSupervisor,
         )
       )
@@ -91,7 +88,6 @@ object ScanAppBootstrap {
       scanConfig: ScanAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       scanMetrics: ScanAppMetrics,
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,

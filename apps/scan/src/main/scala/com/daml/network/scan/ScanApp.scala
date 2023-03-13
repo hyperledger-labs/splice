@@ -17,7 +17,6 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -43,7 +42,6 @@ class ScanApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    adminServerRegistry: CantonMutableHandlerRegistry,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -70,7 +68,6 @@ class ScanApp(
       automation = new ScanAutomationService(
         config.automation,
         clock,
-        svcParty,
         ledgerClient,
         participantAdminConnection,
         retryProvider,
@@ -82,10 +79,7 @@ class ScanApp(
       _ <- store.acs(domainId).flatMap(_.signalWhenIngestedOrShutdown(OpenMiningRound.COMPANION))
 
       handler = new HttpScanHandler(
-        ledgerClient,
         store,
-        clock,
-        retryProvider,
         loggerFactory,
       )
 

@@ -301,7 +301,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       templateCompanion: TemplateCompanion[TCid, T]
   )(implicit tc: TraceContext): Future[Unit] = {
     requireInScope(templateCompanion)
-    val signal = nextActiveContract(Contract.fromCreatedEvent(templateCompanion), 0).map(ssss => ())
+    val signal = nextActiveContract(Contract.fromCreatedEvent(templateCompanion), 0).map(_ => ())
     retryProvider
       .waitUnlessShutdown(signal)
       .onShutdown(

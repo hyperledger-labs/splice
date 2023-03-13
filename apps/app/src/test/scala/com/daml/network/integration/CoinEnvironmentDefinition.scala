@@ -29,8 +29,8 @@ case class CoinEnvironmentDefinition(
     val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
-    val configTransformsWithContext: (String => Seq[CNNodeConfig => CNNodeConfig]) =
-      CNNodeConfigTransforms.defaults(_),
+    val configTransformsWithContext: (String => Seq[CNNodeConfig => CNNodeConfig]) = (_: String) =>
+      CNNodeConfigTransforms.defaults(),
 ) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
       baseConfig,
       testingConfig,

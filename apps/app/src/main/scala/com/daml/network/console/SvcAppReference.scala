@@ -78,7 +78,6 @@ class SvcAppBackendReference(
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
-      name,
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
@@ -87,7 +86,6 @@ class SvcAppBackendReference(
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 

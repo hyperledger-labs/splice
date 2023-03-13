@@ -23,7 +23,7 @@ class HttpDirectoryHandler(
   override def listEntries(
       respond: v0.DirectoryResource.ListEntriesResponse.type
   )(namePrefix: Option[String], pageSize: Int): Future[v0.DirectoryResource.ListEntriesResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => span =>
+    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       for { entries <- store.listEntries(namePrefix.getOrElse(""), pageSize) } yield definitions
         .ListEntriesResponse(entries.map(_.toJson).toVector)
     }
@@ -31,7 +31,7 @@ class HttpDirectoryHandler(
   override def lookupEntryByParty(
       respond: v0.DirectoryResource.LookupEntryByPartyResponse.type
   )(party: String): Future[v0.DirectoryResource.LookupEntryByPartyResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => span =>
+    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       for {
         entry <- store.lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
       } yield entry.fold(
@@ -46,7 +46,7 @@ class HttpDirectoryHandler(
   override def lookupEntryByName(
       respond: v0.DirectoryResource.LookupEntryByNameResponse.type
   )(name: String): Future[v0.DirectoryResource.LookupEntryByNameResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => span =>
+    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       for {
         entry <- store.lookupEntryByName(name)
       } yield entry.fold(
@@ -62,7 +62,7 @@ class HttpDirectoryHandler(
   override def getProviderPartyId(
       respond: v0.DirectoryResource.GetProviderPartyIdResponse.type
   )(): Future[v0.DirectoryResource.GetProviderPartyIdResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => span =>
+    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       Future.successful(
         v0.DirectoryResource.GetProviderPartyIdResponse.OK(
           definitions.GetProviderPartyIdResponse(

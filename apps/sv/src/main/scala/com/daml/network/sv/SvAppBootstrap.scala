@@ -58,9 +58,7 @@ class SvAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
-      metrics.grpcMetrics,
       configuredOpenTelemetry,
-      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -74,7 +72,6 @@ class SvAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           futureSupervisor,
         )
       )

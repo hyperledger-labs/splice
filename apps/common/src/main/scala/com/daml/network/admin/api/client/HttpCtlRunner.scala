@@ -22,7 +22,6 @@ class HttpCtlRunner(
 ) extends NamedLogging {
 
   def run[Res, Result](
-      instanceName: String,
       host: String,
       command: HttpCommand[Res, Result],
       headers: List[HttpHeader],

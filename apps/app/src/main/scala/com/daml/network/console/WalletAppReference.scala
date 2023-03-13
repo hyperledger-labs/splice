@@ -351,7 +351,6 @@ class WalletAppBackendReference(
     new CoinRemoteParticipantReference(
       coinConsoleEnvironment,
       s"remote participant for `$name``",
-      name,
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
@@ -360,7 +359,6 @@ class WalletAppBackendReference(
     new CoinRemoteParticipantReference(
       coinConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 
@@ -385,6 +383,7 @@ final class WalletAppClientReference(
       AuthUtil.testToken(
         audience = AuthUtil.testAudience,
         user = config.ledgerApiUser,
+        secret = AuthUtil.testSecret,
       )
     )
   }

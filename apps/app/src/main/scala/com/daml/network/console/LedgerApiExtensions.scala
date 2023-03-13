@@ -203,7 +203,7 @@ trait LedgerApiExtensions {
             T <: javaapi.data.Template,
         ](companion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
             partyId: PartyId,
-            predicate: TC => Boolean = (x: TC) => true,
+            predicate: TC => Boolean = (_: TC) => true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
         ): TC = {
           val result = new AtomicReference[Option[TC]](None)
@@ -237,7 +237,7 @@ trait LedgerApiExtensions {
             T <: javaapi.data.Template,
         ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
             partyId: PartyId,
-            predicate: TC => Boolean = (x: TC) => true,
+            predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
           val javaTemplateId = templateCompanion.TEMPLATE_ID
           val templateId = P.TemplateId(

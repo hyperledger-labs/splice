@@ -149,7 +149,6 @@ class WalletApp(
         clock,
         scanConnection,
         loggerFactory,
-        retryProvider,
       )
       routes = cors(
         CorsSettings(ac).withAllowedMethods(

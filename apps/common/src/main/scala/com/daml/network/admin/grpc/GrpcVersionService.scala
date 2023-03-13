@@ -19,7 +19,7 @@ class GrpcVersionService(
     with NamedLogging {
 
   override def getVersion(request: Empty): Future[v0.GetVersionResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { _ => span =>
+    withSpanFromGrpcContext("GrpcWalletService") { _ => _ =>
       Future(
         v0.GetVersionResponse(
           version = BuildInfo.compiledVersion,

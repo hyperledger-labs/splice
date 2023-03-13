@@ -79,7 +79,7 @@ class SelfHostedPreflightIntegrationTest
 
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 
-    Using.resource(startCanton(cantonArgs)) { process =>
+    Using.resource(startCanton(cantonArgs)) { _ =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 

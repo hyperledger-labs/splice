@@ -21,7 +21,6 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{
   CoinLedgerClient,
   CoinLedgerConnection,
-  CoinRetries,
   DedupConfig,
   DedupDuration,
 }
@@ -55,7 +54,6 @@ class HttpWalletHandler(
     clock: Clock,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
-    retryProvider: CoinRetries,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -72,7 +70,7 @@ class HttpWalletHandler(
 
   override def list(respond: r0.ListResponse.type)()(
       user: String
-  ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
+  ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     for {
       userStore <- getUserStore(user)
       currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
@@ -159,7 +157,7 @@ class HttpWalletHandler(
   override def listSubscriptions(respond: v0.WalletResource.ListSubscriptionsResponse.type)()(
       user: String
   ): Future[v0.WalletResource.ListSubscriptionsResponse] = withNewTrace(workflowId) {
-    implicit traceContext => span =>
+    implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
         acs <- userStore.defaultAcs
@@ -206,7 +204,7 @@ class HttpWalletHandler(
   override def listValidatorRewardCoupons(
       respond: v0.WalletResource.ListValidatorRewardCouponsResponse.type
   )()(user: String): Future[v0.WalletResource.ListValidatorRewardCouponsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
@@ -224,7 +222,7 @@ class HttpWalletHandler(
   )(
       request: d0.ListTransactionsRequest
   )(user: String): Future[r0.ListTransactionsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
         beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
@@ -241,7 +239,7 @@ class HttpWalletHandler(
       user: String,
       mkResponse: Vector[d0.Contract] => ResponseT,
   ): Future[ResponseT] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
         acs <- userStore.defaultAcs
@@ -254,7 +252,7 @@ class HttpWalletHandler(
   )(request: Option[Json])(
       user: String
   ): Future[r0.SelfGrantFeatureAppRightResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         coinRules <- scanConnection.getCoinRules()
         result <- exerciseWalletAction((installCid, _) =>
@@ -268,7 +266,7 @@ class HttpWalletHandler(
   override def acceptTransferOffer(respond: r0.AcceptTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.AcceptTransferOfferResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -288,7 +286,7 @@ class HttpWalletHandler(
   override def rejectTransferOffer(respond: r0.RejectTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.RejectTransferOfferResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -308,7 +306,7 @@ class HttpWalletHandler(
   override def withdrawTransferOffer(respond: r0.WithdrawTransferOfferResponse.type)(
       contractId: String
   )(user: String): Future[r0.WithdrawTransferOfferResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
@@ -328,7 +326,7 @@ class HttpWalletHandler(
   override def acceptAppPaymentRequest(
       respond: r0.AcceptAppPaymentRequestResponse.type
   )(contractId: String)(user: String): Future[r0.AcceptAppPaymentRequestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
       )
@@ -347,7 +345,7 @@ class HttpWalletHandler(
   override def rejectAppPaymentRequest(
       respond: r0.RejectAppPaymentRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectAppPaymentRequestResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction((installCid, _) => {
         val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
           contractId
@@ -363,7 +361,7 @@ class HttpWalletHandler(
   override def acceptSubscriptionRequest(
       respond: r0.AcceptSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.AcceptSubscriptionRequestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       val requestCid =
         Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
@@ -381,7 +379,7 @@ class HttpWalletHandler(
   override def cancelSubscriptionRequest(
       respond: r0.CancelSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.CancelSubscriptionRequestResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
@@ -398,7 +396,7 @@ class HttpWalletHandler(
   override def rejectSubscriptionRequest(
       respond: r0.RejectSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.RejectSubscriptionRequestResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       exerciseWalletAction((installCid, _) => {
         val requestCid = Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
@@ -445,7 +443,7 @@ class HttpWalletHandler(
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest
   )(user: String): Future[r0.CreateTransferOfferResponse] =
-    withNewTrace(workflowId) { traceContext => span =>
+    withNewTrace(workflowId) { _ => _ =>
       val sender = getUserWallet(user).store.key.endUserParty
       exerciseWalletAction((installCid, _) => {
         val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
@@ -488,10 +486,9 @@ class HttpWalletHandler(
 
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
       user: String
-  ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => span =>
+  ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
     (for {
-      userStore <- getUserStore(user)
       result <- exerciseWalletCoinAction(
         new coinoperation.CO_Tap(
           amount
@@ -525,7 +522,7 @@ class HttpWalletHandler(
   override def cancelFeaturedAppRights(
       respond: r0.CancelFeaturedAppRightsResponse.type
   )()(user: String): Future[r0.CancelFeaturedAppRightsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
         featuredAppRight <- userStore.lookupFeaturedAppRight()

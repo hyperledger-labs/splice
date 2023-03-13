@@ -113,7 +113,7 @@ class WalletIntegrationTest
         val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(50)
         val requestIds =
-          (1 to 3).map(i =>
+          (1 to 3).map(_ =>
             createSelfPaymentRequest(
               aliceValidator.remoteParticipantWithAdminToken,
               aliceWallet.config.ledgerApiUser,

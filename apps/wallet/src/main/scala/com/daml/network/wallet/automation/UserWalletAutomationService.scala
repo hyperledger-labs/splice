@@ -58,7 +58,7 @@ class UserWalletAutomationService(
   )
   if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
     registerTrigger(
-      new CollectRewardsAndMergeCoinsTrigger(triggerContext, store, treasury)
+      new CollectRewardsAndMergeCoinsTrigger(triggerContext, treasury)
     )
   }
   registerTrigger(

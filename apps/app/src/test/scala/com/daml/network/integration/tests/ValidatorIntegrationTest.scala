@@ -251,7 +251,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       aliceValidatorClient.onboardUser(aliceWallet.config.ledgerApiUser),
     )(
       "Alice should have retained her coin",
-      aliceParty => {
+      _ => {
         val balance = Try(loggerFactory.suppressErrors((aliceWallet.balance())))
           .getOrElse(fail(s"Could not get balance for alice"))
         balance.unlockedQty should be(100.0)

@@ -135,7 +135,7 @@ class SvIntegrationTest extends CoinIntegrationTest {
       sv.onboardValidator(candidate, secret),
     )(
       "the candidate's secret is marked as used",
-      Unit => {
+      _ => {
         inside(
           svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)

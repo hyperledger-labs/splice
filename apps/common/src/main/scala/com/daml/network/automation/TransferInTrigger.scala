@@ -30,7 +30,6 @@ class TransferInTrigger(
 ) extends OnReadyForTransferInTrigger(
       store,
       domainId,
-      partyId,
     ) {
 
   override protected def completeTask(

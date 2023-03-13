@@ -155,7 +155,6 @@ final class ScanAppBackendReference(
     new CoinRemoteParticipantReference(
       coinConsoleEnvironment,
       s"remote participant for `$name``",
-      name,
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
@@ -164,7 +163,6 @@ final class ScanAppBackendReference(
     new CoinRemoteParticipantReference(
       coinConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 }

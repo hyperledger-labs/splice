@@ -124,6 +124,5 @@ trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference
 class CoinRemoteParticipantReference(
     consoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-    appName: String,
     override val config: RemoteParticipantConfig,
 ) extends RemoteParticipantReference(consoleEnvironment, name) {}

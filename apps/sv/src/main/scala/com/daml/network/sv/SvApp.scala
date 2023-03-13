@@ -24,7 +24,6 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -45,7 +44,6 @@ class SvApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    adminServerRegistry: CantonMutableHandlerRegistry,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,

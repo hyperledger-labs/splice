@@ -21,6 +21,7 @@ import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.BeforeAndAfterEach
 
+import scala.annotation.nowarn
 import scala.language.implicitConversions
 import java.time.Duration
 import scala.concurrent.duration.*
@@ -67,6 +68,7 @@ object CoinTests {
     // We append this to configured Daml user names for isolation across test cases.
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     @volatile
+    @nowarn("cat=unused-params")
     private var testCaseId: Int = 0
 
     override def beforeEach(): Unit = {
@@ -265,6 +267,7 @@ object CoinTests {
       *  }
       * }}}
       */
+    @nowarn("cat=unused-params")
     def bracket[T](acquire: Any, release: => Any)(body: => T): T =
       try body
       finally release

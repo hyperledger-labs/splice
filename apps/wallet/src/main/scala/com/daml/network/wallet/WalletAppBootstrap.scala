@@ -57,9 +57,7 @@ class WalletAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
-      metrics.grpcMetrics,
       configuredOpenTelemetry,
-      metrics.healthMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -92,7 +90,6 @@ object WalletAppBootstrap {
       walletConfig: WalletAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
-      testingTimeService: TestingTimeService,
       walletMetrics: WalletAppMetrics,
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,

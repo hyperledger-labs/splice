@@ -55,7 +55,7 @@ class HttpValidatorAdminHandler(
       respond: v0.ValidatorAdminResource.OffboardUserResponse.type
   )(username: String)(fake: Unit): Future[
     v0.ValidatorAdminResource.OffboardUserResponse
-  ] = withNewTrace(workflowId) { implicit traceContext => span =>
+  ] = withNewTrace(workflowId) { implicit traceContext => _ =>
     offboardUser(username)
       .map(_ => v0.ValidatorAdminResource.OffboardUserResponse.OK)
       .recover({

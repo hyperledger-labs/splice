@@ -23,7 +23,6 @@ trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
       receiver: String,
       receiverPartyId: PartyId,
       quantity: Double,
-      complete: Boolean = true,
   )(implicit
       webDriver: WebDriverType
   ) = {

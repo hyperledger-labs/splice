@@ -25,7 +25,6 @@ import com.daml.network.util.{CoinUtil, Contract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
@@ -224,7 +223,6 @@ object UserWalletStore {
       storage: Storage,
       globalDomain: DomainAlias,
       loggerFactory: NamedLoggerFactory,
-      timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       connection: CoinLedgerConnection,
       retryProvider: CoinRetries,
@@ -237,7 +235,6 @@ object UserWalletStore {
           key,
           globalDomain,
           loggerFactory,
-          timeouts,
           futureSupervisor,
           connection,
           retryProvider,

@@ -309,7 +309,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     val requestBuilder = PartyManagementServiceOuterClass.AllocatePartyRequest
       .newBuilder()
     hint.foreach(requestBuilder.setPartyIdHint(_))
-    hint.foreach(requestBuilder.setDisplayName(_))
+    displayName.foreach(requestBuilder.setDisplayName(_))
     wrapFuture(partyManagementServiceStub.allocateParty(requestBuilder.build, _))
       .map(_.getPartyDetails.getParty)
   }

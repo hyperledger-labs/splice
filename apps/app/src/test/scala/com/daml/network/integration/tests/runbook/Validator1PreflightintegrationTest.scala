@@ -200,7 +200,6 @@ class Validator1PreflightIntegrationTest
         aliceUserPartyId,
         PartyId.tryFromProtoPrimitive(aliceUserPartyId),
         50,
-        complete = false,
       )
 
       // Bob is redirected to wallet ..

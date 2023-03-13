@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 import com.daml.network.environment.LedgerClient
 import akka.stream.scaladsl.{Keep, Sink, Source}
@@ -319,7 +319,6 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
 abstract class OnReadyForTransferInTrigger(
     store: CoinAppStore[_, _],
     domainId: DomainId,
-    party: PartyId,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

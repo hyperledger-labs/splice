@@ -3,7 +3,6 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.network.CoinNodeMetrics
 import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
@@ -28,7 +27,6 @@ import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import com.daml.metrics.HealthMetrics
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ScheduledExecutorService
@@ -89,9 +87,7 @@ abstract class CoinNodeBootstrapBase[
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
-    grpcMetrics: GrpcServerMetrics,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
-    healthMetrics: HealthMetrics,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
     implicit val scheduler: ScheduledExecutorService,

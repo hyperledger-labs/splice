@@ -127,7 +127,6 @@ class ValidatorApp(
   }
 
   private def ensureOnboarded(
-      connection: CoinLedgerConnection,
       store: ValidatorStore,
       validatorParty: PartyId,
       onboardingConfig: Option[ValidatorOnboardingConfig],
@@ -141,7 +140,7 @@ class ValidatorApp(
           case Some(oc) =>
             for {
               _ <- requestOnboarding(oc.remoteSv.adminApi, validatorParty, oc.secret)
-              _ <- waitForValidatorLicense(connection, store)
+              _ <- waitForValidatorLicense(store)
             } yield ()
           case None => sys.error("Not onboarded but no onboarding config found; exiting.")
         }
@@ -149,8 +148,7 @@ class ValidatorApp(
   }
 
   private def waitForValidatorLicense(
-      connection: CoinLedgerConnection,
-      store: ValidatorStore,
+      store: ValidatorStore
   ): Future[Unit] = {
     logger.info("Waiting for ValidatorLicense contract to become visible")
     retryProvider.retryForAutomation(
@@ -262,7 +260,7 @@ class ValidatorApp(
         retryProvider,
         logger,
       )
-      _ <- ensureOnboarded(connection, store, validatorParty, config.onboarding)
+      _ <- ensureOnboarded(store, validatorParty, config.onboarding)
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

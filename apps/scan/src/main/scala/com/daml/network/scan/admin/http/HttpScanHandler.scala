@@ -6,14 +6,12 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{Contract, ContractMetadataUtil, Codec}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -21,10 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpScanHandler(
-    ledgerClient: CoinLedgerClient,
     store: ScanStore,
-    clock: Clock,
-    retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -37,7 +32,7 @@ class HttpScanHandler(
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
   )(): Future[v0.ScanResource.GetSvcPartyIdResponse] =
-    withNewTrace(workflowId) { _ => span =>
+    withNewTrace(workflowId) { _ => _ =>
       Future.successful(definitions.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
     }
 
@@ -46,7 +41,7 @@ class HttpScanHandler(
   )(
       body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
   ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         acs <- store.defaultAcs
         issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
@@ -119,7 +114,7 @@ class HttpScanHandler(
   )(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
   ): Future[v0.ScanResource.GetCoinRulesResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         coinRulesO <- store.lookupCoinRules()
         coinRules = coinRulesO.getOrElse(
@@ -146,7 +141,7 @@ class HttpScanHandler(
   def getClosedRounds(
       response: v0.ScanResource.GetClosedRoundsResponse.type
   )(): Future[v0.ScanResource.GetClosedRoundsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         acs <- store.defaultAcs
         rounds <- acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
@@ -159,7 +154,7 @@ class HttpScanHandler(
   def listFeaturedAppRights(
       response: v0.ScanResource.ListFeaturedAppRightsResponse.type
   )(): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         acs <- store.defaultAcs
         apps <- acs.listContracts(coinCodegen.FeaturedAppRight.COMPANION)
@@ -173,7 +168,7 @@ class HttpScanHandler(
   )(providerPartyId: String): Future[
     com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse
   ] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         acs <- store.defaultAcs
         right <- acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
@@ -187,7 +182,7 @@ class HttpScanHandler(
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
   )(): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
-    withNewTrace(workflowId) { _ => span =>
+    withNewTrace(workflowId) { _ => _ =>
       for {
         (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
       } yield {
