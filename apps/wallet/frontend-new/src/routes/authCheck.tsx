@@ -17,12 +17,12 @@ interface AuthCheckProps {
 
 const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => {
   const { isAuthenticated, onboardedStatus, updateStatus } = useUserState();
-  const walletService = useWalletClient();
+  const { userStatus } = useWalletClient();
   useEffect(() => {
-    if (onboardedStatus === OnboardedStatus.Loading) {
-      walletService.userStatus().then(status => updateStatus(status));
+    if (onboardedStatus === OnboardedStatus.Loading && isAuthenticated) {
+      userStatus().then(status => updateStatus(status));
     }
-  });
+  }, [isAuthenticated, onboardedStatus, userStatus, updateStatus]);
 
   if (isAuthenticated) {
     if (onboardedStatus === OnboardedStatus.Onboarded) {
