@@ -121,7 +121,7 @@ class SplitwellFrontendIntegrationTest
         click on className("settle-my-debts-link")
 
         // Bob is redirected to wallet ..
-        loginOnCurrentPage(bobDamlUser)
+        loginOnCurrentPage(3001, bobDamlUser)
 
         click on className("accept-button")
 
@@ -197,7 +197,7 @@ class SplitwellFrontendIntegrationTest
         enterSplitwellPayment(aliceEntryName, aliceUserParty, 500)
 
         // Bob is redirected to wallet ..
-        loginOnCurrentPage(bobDamlUser)
+        loginOnCurrentPage(3001, bobDamlUser)
 
         click on className("accept-button")
 

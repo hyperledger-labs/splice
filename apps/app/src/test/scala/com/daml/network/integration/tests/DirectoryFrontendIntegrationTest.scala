@@ -41,7 +41,7 @@ class DirectoryFrontendIntegrationTest
         click on "request-entry-with-sub-button"
 
         // Alice is redirected to wallet...
-        loginOnCurrentPage(aliceDamlUser)
+        loginOnCurrentPage(3000, aliceDamlUser)
         click on className("sub-request-accept-button")
 
         // And then back to directory, where she is already logged in

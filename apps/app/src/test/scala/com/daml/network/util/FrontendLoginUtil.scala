@@ -11,10 +11,15 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
   protected def login(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     go to s"http://localhost:$port"
     waitForQuery(id("user-id-field"))
-    loginOnCurrentPage(ledgerApiUser)
+    loginOnCurrentPage(port, ledgerApiUser)
   }
 
-  protected def loginOnCurrentPage(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+  protected def loginOnCurrentPage(port: Int, ledgerApiUser: String)(implicit
+      webDriver: WebDriver
+  ) = {
+    eventually() {
+      currentUrl should startWith(s"http://localhost:$port")
+    }
     // We reuse frontends across tests so we might need to log out first.
     find(id("logout-button")).foreach(click on _)
     click on "user-id-field"

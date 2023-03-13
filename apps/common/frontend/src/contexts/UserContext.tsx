@@ -152,6 +152,7 @@ export const UserProvider: React.FC<{
         loginWithSst,
         loginWithOidc,
         logout: () => {
+          console.debug('Logout initiated');
           setUserId(undefined);
           setPrimaryPartyId(undefined);
           setUserAccessToken(undefined);
@@ -163,6 +164,7 @@ export const UserProvider: React.FC<{
           if (authMethod === 'sst' || testAuthConf) {
             window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
           }
+          console.debug('Logout completed');
         },
       }}
     >

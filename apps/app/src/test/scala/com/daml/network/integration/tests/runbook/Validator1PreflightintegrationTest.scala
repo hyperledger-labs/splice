@@ -256,6 +256,9 @@ class Validator1PreflightIntegrationTest
   ) = {
     clue(s"Auth0 user login as: ${user.id} (${user.email})") {
       go to url
+      eventually() {
+        currentUrl should startWith(url)
+      }
       // We reuse frontends across tests so we might need to log out first.
       find(id("logout-button")).foreach(click on _)
       click on "oidc-login-button"
