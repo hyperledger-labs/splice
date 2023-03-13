@@ -25,19 +25,44 @@ class InMemoryTransferStoreTest extends StoreTest {
   "InMemoryTransferStore" should {
     "stream transfers and report stale transfers" in {
       val transfers = new AtomicReference(Seq.empty[Transfer[TransferEvent.Out]])
+      val transfersDummy2 = new AtomicReference(Seq.empty[Transfer[TransferEvent.Out]])
       for {
         store <- mkStore()
         streamF = store
-          .streamReadyForTransferIn()
+          .streamReadyForTransferIn(dummyDomain)
           .take(2)
           .runForeach(transfer => transfers.updateAndGet(_.appended(transfer)))
+        streamFDummy2 = store
+          .streamReadyForTransferIn(dummy2Domain)
+          .take(1)
+          .runForeach(transfer => transfersDummy2.updateAndGet(_.appended(transfer)))
+
         t0Out = mkTransfer(
           "0",
           toTransferOutEvent(
-            coupon1.contractId
+            coupon1.contractId,
+            transferOutId = "0",
+            dummy2Domain,
+            dummyDomain,
           ),
         )
-        t0In = mkTransfer("1", toTransferInEvent(coupon1))
+
+        tDummy2Out = mkTransfer(
+          "0",
+          toTransferOutEvent(
+            coupon1.contractId,
+            "0",
+            dummyDomain,
+            dummy2Domain,
+          ),
+        )
+
+        _ <- store.ingestionSink.ingestTransferOut(tDummy2Out)
+
+        t0In = mkTransfer(
+          "1",
+          toTransferInEvent(coupon1, transferOutId = "0", dummy2Domain, dummyDomain),
+        )
         _ <- store.ingestionSink.ingestTransferOut(t0Out)
         r <- store.isReadyForTransferIn(t0Out)
         _ = r shouldBe true
@@ -49,10 +74,11 @@ class InMemoryTransferStoreTest extends StoreTest {
         t1Out = mkTransfer(
           "2",
           toTransferOutEvent(
-            coupon2.contractId
+            coupon2.contractId,
+            transferOutId = "2",
           ),
         )
-        t1In = mkTransfer("3", toTransferInEvent(coupon2))
+        t1In = mkTransfer("3", toTransferInEvent(coupon2, transferOutId = "2"))
         // Ingest transfer in first
         _ <- store.ingestionSink.ingestTransferIn(t1In)
         r <- store.isReadyForTransferIn(t1Out)
@@ -65,13 +91,16 @@ class InMemoryTransferStoreTest extends StoreTest {
         t2Out = mkTransfer(
           "3",
           toTransferOutEvent(
-            coupon3.contractId
+            coupon3.contractId,
+            transferOutId = "3",
           ),
         )
         _ <- store.ingestionSink.ingestTransferOut(t2Out)
         _ <- streamF
+        _ <- streamFDummy2
       } yield {
         transfers.get() shouldBe Seq(t0Out, t2Out)
+        transfersDummy2.get() shouldBe Seq(tDummy2Out)
       }
     }
   }

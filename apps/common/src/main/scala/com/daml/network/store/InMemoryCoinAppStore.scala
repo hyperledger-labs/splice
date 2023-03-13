@@ -21,6 +21,9 @@ abstract class InMemoryCoinAppStore[
 
   private[network] override type PerDomainStore = InMemoryCoinAppStore.PerDomainStore[TXI, TXE]
 
+  val transferStore: InMemoryTransferStore =
+    new InMemoryTransferStore(loggerFactory, acsContractFilter.ingestionFilter.primaryParty)
+
   protected[this] override def newPerDomainStore(
       domain: DomainId,
       perDomainLoggerFactory: NamedLoggerFactory,
@@ -33,8 +36,7 @@ abstract class InMemoryCoinAppStore[
         futureSupervisor = futureSupervisor,
         retryProvider = retryProvider,
         logAllStateUpdates = false,
-      ),
-      new InMemoryTransferStore(loggerFactory, acsContractFilter.ingestionFilter.primaryParty),
+      )
     )
 
   private[network] override def storesIngestionSink(stores: PerDomainStore) =
@@ -43,8 +45,6 @@ abstract class InMemoryCoinAppStore[
   override protected[this] def storeAcs(store: PerDomainStore) = store.acsWithTxLog
 
   override protected[this] def storeTxLog(store: PerDomainStore) = store.acsWithTxLog
-
-  override protected[this] def storeTransfer(store: PerDomainStore) = store.transfers
 
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 
@@ -55,8 +55,7 @@ abstract class InMemoryCoinAppStore[
 
 object InMemoryCoinAppStore {
   class PerDomainStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
-      val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE],
-      val transfers: InMemoryTransferStore,
+      val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE]
   )
 }
 

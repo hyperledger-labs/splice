@@ -46,8 +46,12 @@ class InMemoryTransferStore(
     }
   }
 
-  override def streamReadyForTransferIn(): Source[Transfer[TransferEvent.Out], NotUsed] =
-    Source.unfoldAsync(0: Long)(eventNumber => nextReadyForTransferIn(eventNumber).map(Some(_)))
+  override def streamReadyForTransferIn(
+      domainId: DomainId
+  ): Source[Transfer[TransferEvent.Out], NotUsed] =
+    Source
+      .unfoldAsync(0: Long)(eventNumber => nextReadyForTransferIn(eventNumber).map(Some(_)))
+      .filter(ev => ev.event.target == domainId)
 
   private def nextReadyForTransferIn(
       startingFromIncl: Long

@@ -3,12 +3,13 @@ package com.daml.network.store
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
-/** A per-domain store that stores all in-flight transfers targeted at store’s domain.
+/** A multi-domain store that stores all in-flight transfers based on ingesting updates from
+  *  all connected domains.
   */
 abstract class TransferStore extends AutoCloseable {
 
@@ -16,7 +17,7 @@ abstract class TransferStore extends AutoCloseable {
     * The only guarantee provided is that a transfer out that does not get transferred in
     * will eventually appear on the stream.
     */
-  def streamReadyForTransferIn(): Source[Transfer[TransferEvent.Out], NotUsed]
+  def streamReadyForTransferIn(domainId: DomainId): Source[Transfer[TransferEvent.Out], NotUsed]
 
   /** Returns true if the transfer out event can still potentially be transferred in.
     * Intended to be used as a staleness check for the results of `streamReadyForTransferIn`.

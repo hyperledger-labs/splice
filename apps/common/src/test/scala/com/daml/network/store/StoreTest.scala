@@ -149,24 +149,34 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val dummyDomain = DomainId.tryFromString("dummy::domain")
 
+  protected val dummy2Domain = DomainId.tryFromString("dummy2::domain")
+
   protected val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
-  protected def toTransferOutEvent(contractId: ContractId[_]): TransferEvent.Out =
+  protected def toTransferOutEvent(
+      contractId: ContractId[_],
+      transferOutId: String,
+      source: DomainId = dummyDomain,
+      target: DomainId = dummyDomain,
+  ): TransferEvent.Out =
     TransferEvent.Out(
-      transferOutId = "",
+      transferOutId = transferOutId,
       submitter = userParty(1),
       contractId = contractId,
-      source = dummyDomain,
-      target = dummyDomain,
+      source = source,
+      target = target,
     )
 
   protected def toTransferInEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
+      contract: Contract[TCid, T],
+      transferOutId: String,
+      source: DomainId = dummyDomain,
+      target: DomainId = dummyDomain,
   ): TransferEvent.In = TransferEvent.In(
-    transferOutId = "",
+    transferOutId = transferOutId,
     submitter = userParty(1),
-    source = dummyDomain,
-    target = dummyDomain,
+    source = source,
+    target = target,
     createdEvent = toCreatedEvent(contract),
   )
 

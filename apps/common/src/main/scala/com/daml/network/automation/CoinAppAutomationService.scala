@@ -62,7 +62,7 @@ abstract class CoinAppAutomationService(
   ) =
     new TransferIngestionService(
       store.getClass.getSimpleName,
-      store.transferStore,
+      store.transferStore.ingestionSink,
       domain,
       connection,
       perDomainTriggerContext.retryProvider,

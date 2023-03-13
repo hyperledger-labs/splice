@@ -251,13 +251,13 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
         result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
         _ = result shouldBe appRewardCoupons
         transferOuts = result.zipWithIndex.map { case (contract, i) =>
-          mkTransfer(s"016$i", toTransferOutEvent(contract.contractId))
+          mkTransfer(s"016$i", toTransferOutEvent(contract.contractId, "16"))
         }
         _ <- transferOuts.toList.traverse_(store.ingestionSink.ingestTransfer(_))
         result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
         _ = result shouldBe empty
         transferIns = appRewardCoupons.zipWithIndex.map { case (contract, i) =>
-          mkTransfer(s"017$i", toTransferInEvent(contract))
+          mkTransfer(s"017$i", toTransferInEvent(contract, "17"))
         }
         _ <- transferIns.toList.traverse_(store.ingestionSink.ingestTransfer(_))
         result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)

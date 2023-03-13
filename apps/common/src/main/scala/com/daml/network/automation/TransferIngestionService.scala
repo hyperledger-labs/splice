@@ -18,7 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferIngestionService(
     ingestionTargetName: String,
-    getTransferStore: DomainId => Future[TransferStore],
+    ingestionSink: TransferStore.IngestionSink,
     domain: DomainId,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
@@ -34,30 +34,27 @@ class TransferIngestionService(
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription[?]] = for {
-    transfers <- getTransferStore(domain)
-  } yield connection.subscribeAsync(
-    this.getClass.getSimpleName,
-    loggerFactory,
-    // TODO(#2729) Stop streaming from ledger begin here.
-    LedgerOffset.LedgerBegin.getInstance,
-    transfers.ingestionSink.ingestionFilter,
-    domain,
-  ) {
-    case TransactionTreeUpdate(_) => Future.unit
-    case TransferUpdate(transfer) =>
-      transfer.event match {
-        case out: TransferEvent.Out =>
-          getTransferStore(out.target).flatMap(
-            _.ingestionSink.ingestTransferOut(transfer.copy(event = out))
-          )
-        case in: TransferEvent.In =>
-          require(in.target == domain)
-          getTransferStore(domain).flatMap(
-            _.ingestionSink.ingestTransferIn(transfer.copy(event = in))
-          )
+  ): Future[CoinLedgerSubscription[?]] =
+    Future.successful {
+      connection.subscribeAsync(
+        this.getClass.getSimpleName,
+        loggerFactory,
+        // TODO(#2729) Stop streaming from ledger begin here.
+        LedgerOffset.LedgerBegin.getInstance,
+        ingestionSink.ingestionFilter,
+        domain,
+      ) {
+        case TransactionTreeUpdate(_) => Future.unit
+        case TransferUpdate(transfer) =>
+          transfer.event match {
+            case out: TransferEvent.Out =>
+              ingestionSink.ingestTransferOut(transfer.copy(event = out))
+            case in: TransferEvent.In =>
+              require(in.target == domain)
+              ingestionSink.ingestTransferIn(transfer.copy(event = in))
+          }
       }
-  }
+    }
 
   // Kick-off the ingestion
   startIngestion()
