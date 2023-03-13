@@ -4824,7 +4824,12 @@
                "cluster.network.global",
                "*.cluster.network.global",
                "*.validator1.cluster.network.global",
-               "*.splitwell.cluster.network.global"
+               "*.splitwell.cluster.network.global",
+               "*.svc.cluster.network.global",
+               "*.sv-1.svc.cluster.network.global",
+               "*.sv-2.svc.cluster.network.global",
+               "*.sv-3.svc.cluster.network.global",
+               "*.sv-4.svc.cluster.network.global"
             ],
             "issuerRef": {
                "name": "letsencrypt-production"

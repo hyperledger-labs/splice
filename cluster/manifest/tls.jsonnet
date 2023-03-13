@@ -44,7 +44,17 @@ local certificate(config, tlsCertSecret) = {
         issuerRef: {
           name: config.tls.issuerName,
         },
-        dnsNames: [config.clusterDnsName, "*." + config.clusterDnsName, "*.validator1." + config.clusterDnsName, "*.splitwell." + config.clusterDnsName],
+        dnsNames: [
+          config.clusterDnsName,
+          "*." + config.clusterDnsName,
+          "*.validator1." + config.clusterDnsName,
+          "*.splitwell." + config.clusterDnsName,
+          "*.svc." + config.clusterDnsName,
+          "*.sv-1.svc." + config.clusterDnsName,
+          "*.sv-2.svc." + config.clusterDnsName,
+          "*.sv-3.svc." + config.clusterDnsName,
+          "*.sv-4.svc." + config.clusterDnsName,
+        ],
       },
     },
   ],
