@@ -43,7 +43,7 @@ class SplitwellInstallRequestTrigger(
     val provider = store.providerParty
     for {
       domainId <- store.domains.getDomainId(splitwellDomain)
-      queryResult <- store.lookupInstallWithOffset(user)
+      queryResult <- store.lookupInstallWithOffset(domainId, user)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
           logger.info(s"Rejecting duplicate install request from user party $user")
@@ -63,6 +63,7 @@ class SplitwellInstallRequestTrigger(
               commandId = CoinLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createSplitwellInstall",
                 Seq(provider, user),
+                domainId.toProtoPrimitive,
               ),
               deduplicationOffset = off,
               domainId = domainId,

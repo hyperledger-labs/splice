@@ -10,7 +10,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,20 +24,16 @@ trait SplitwellStore extends CoinAppStoreWithoutHistory {
   override final def defaultAcsDomain = domainConfig.splitwell.preferred
 
   def lookupInstallWithOffset(
-      user: PartyId
+      domainId: DomainId,
+      user: PartyId,
   ): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]]] =
-    defaultAcs.flatMap(
+    acs(domainId).flatMap(
       _.findContractWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
         co.payload.user == user.toProtoPrimitive
       )
     )
-
-  def lookupInstall(user: PartyId): Future[Option[
-    Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
-  ]] =
-    lookupInstallWithOffset(user).map(_.value)
 
   def lookupGroupWithOffset(
       owner: PartyId,
