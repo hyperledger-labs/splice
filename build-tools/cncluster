@@ -74,6 +74,18 @@ function _nat_config() {
             --format 'value(name)'
 }
 
+function _needs_auth0_management_api_creds() {
+    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
+      exit 1
+    fi
+
+    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
+      exit 1
+    fi
+}
+
 function _cluster_apply() {
     IMAGE_TAG=$1
 
@@ -730,15 +742,7 @@ function subcmd_preflight() {
 subcommand_whitelist[sbt_for_preflight]='Runs Sbt, as if for the runbook preflight test.'
 
 function subcmd_sbt_for_preflight() {
-    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
-        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
-      exit 1
-    fi
-
-    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
-      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
-      exit 1
-    fi
+    _needs_auth0_management_api_creds
 
     (cd ${REPO_ROOT} && \
          DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
@@ -871,6 +875,7 @@ function _set_auth0_api_user() {
 }
 
 function subcmd_update_secrets() {
+  _needs_auth0_management_api_creds
 
   _log "Fetching token for management API from auth0"
 
