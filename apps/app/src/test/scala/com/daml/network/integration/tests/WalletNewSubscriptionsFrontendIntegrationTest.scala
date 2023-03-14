@@ -128,12 +128,13 @@ class WalletNewSubscriptionsFrontendIntegrationTest
     "allow accepting subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-      val expectedDirName = createDirectoryEntryForDirectoryItself
-      aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
+      val aliceEntryName1 = perTestCaseName("alice.cns")
+      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName1, aliceWallet)
 
       val directoryParty = createDirectoryEntryForDirectoryItself
       val directoryPaymentDue = LocalDate.now().plusDays(90)
-      val (_, subCid) = requestDirectoryEntry(aliceUserParty, aliceDirectory, expectedDirName)
+      val newlyPurchasedName = perTestCaseName("new.cns")
+      val (_, subCid) = requestDirectoryEntry(aliceUserParty, aliceDirectory, newlyPurchasedName)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -144,9 +145,14 @@ class WalletNewSubscriptionsFrontendIntegrationTest
         )(
           "She sees the data of the subscription request",
           _ => {
+            find(className("payment-current-user"))
+              .valueOrFail("Current user is not shown")
+              .text should matchText(aliceEntryName1)
+
             find(className("available-balance"))
               .valueOrFail("Balance is not shown")
-              .text should matchText("Total Available Balance: 50 CC / 100 USD")
+              // from the original `createDirectoryEntry`
+              .text should matchText("Total Available Balance: 4.4475 CC / 8.895 USD")
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
@@ -172,10 +178,10 @@ class WalletNewSubscriptionsFrontendIntegrationTest
             click on "navlink-subscriptions"
           },
         )(
-          "Alice sees the subscription in the list",
+          "Alice sees the new subscription in the list",
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
-            subscriptionRows should have size 1
+            subscriptionRows should have size 2 // from createDirectoryEntry and just-accepted requestDirectoryEntry
             matchSubscription(subscriptionRows.head)(
               expectedReceiver = directoryParty,
               expectedProvider = directoryParty,

@@ -8,11 +8,10 @@ import { Box, Stack, Toolbar, Typography } from '@mui/material';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletBalance } from '../models/models';
+import CurrentUser from './CurrentUser';
 import Loading from './Loading';
 
 const PaymentHeader: React.FC = () => {
-  const cns = 'alice.cns';
-
   const walletClient = useWalletClient();
 
   const coinPrice = useCoinPrice();
@@ -37,8 +36,10 @@ const PaymentHeader: React.FC = () => {
           Canton Coin Wallet
         </Typography>
         <Stack spacing={2} alignItems="center">
-          <Typography>
-            <b>{cns}</b>
+          <Typography className="payment-current-user">
+            <b>
+              <CurrentUser />
+            </b>
           </Typography>
           <Typography className="available-balance">
             Total Available Balance:{' '}

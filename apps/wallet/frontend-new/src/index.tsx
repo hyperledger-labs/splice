@@ -17,6 +17,7 @@ import {
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import { CoinPriceProvider } from './contexts/CoinPriceContext';
+import { CurrentUserProvider } from './contexts/CurrentUserContext';
 import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
@@ -51,9 +52,11 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           <WalletClientProvider url={config.services.wallet.grpcUrl}>
             <DirectoryClientProvider url={config.services.directory.grpcUrl}>
               <ScanClientProvider url={config.services.scan.grpcUrl}>
-                <CoinPriceProvider>
-                  <ThemeProvider theme={theme}>{children}</ThemeProvider>
-                </CoinPriceProvider>
+                <CurrentUserProvider>
+                  <CoinPriceProvider>
+                    <ThemeProvider theme={theme}>{children}</ThemeProvider>
+                  </CoinPriceProvider>
+                </CurrentUserProvider>
               </ScanClientProvider>
             </DirectoryClientProvider>
           </WalletClientProvider>

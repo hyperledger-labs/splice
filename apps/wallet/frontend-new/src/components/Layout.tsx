@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { useDirectoryClient, useUserState } from 'common-frontend';
 import { useInterval } from 'common-frontend/lib/utils/hooks';
 import { Decimal } from 'decimal.js';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
@@ -20,11 +19,8 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const walletClient = useWalletClient();
-  const directoryClient = useDirectoryClient();
 
-  const [currentUser, setCurrentUser] = useState<string | undefined>(undefined);
   const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: new Decimal(0) });
-  const { primaryPartyId } = useUserState();
 
   const coinPrice = useCoinPrice();
 
@@ -32,18 +28,6 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     const balance = await walletClient.getBalance();
     setWalletBalance(balance);
   }, [walletClient]);
-
-  useEffect(() => {
-    const fetchEntry = async (partyId: string) => {
-      const entry = await directoryClient.lookupEntryByParty(partyId);
-      if (entry !== undefined) {
-        setCurrentUser(entry.name);
-      }
-    };
-    if (primaryPartyId !== undefined) {
-      fetchEntry(primaryPartyId);
-    }
-  }, [primaryPartyId, directoryClient]);
 
   // refresh data every second
   useInterval(fetchBalance, 1000);
@@ -55,7 +39,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
-        <Header currentUser={currentUser ?? ''} />
+        <Header />
       </Container>
 
       <Container maxWidth="md">

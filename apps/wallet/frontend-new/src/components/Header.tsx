@@ -7,11 +7,9 @@ import { Button, Divider, Stack, Toolbar } from '@mui/material';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
-interface HeaderProps {
-  currentUser: string;
-}
+import CurrentUser from './CurrentUser';
 
-const Header: React.FC<HeaderProps> = props => {
+const Header: React.FC = () => {
   const navLinks = [
     { name: 'Transactions', path: 'transactions' },
     { name: 'Transfer', path: 'transfer' },
@@ -61,7 +59,9 @@ const Header: React.FC<HeaderProps> = props => {
         ))}
       </Stack>
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Typography id="logged-in-user">{props.currentUser}</Typography>
+        <Typography id="logged-in-user">
+          <CurrentUser />
+        </Typography>
         <Divider orientation="vertical" variant="middle" flexItem />
         <Button id="logout-button" onClick={logout} color="inherit">
           <Stack direction="row" alignItems="center">
