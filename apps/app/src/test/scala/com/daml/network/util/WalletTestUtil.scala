@@ -189,6 +189,110 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     )
   }
 
+  /** Collects an accepted subscription payment request without doing anything useful in return. */
+  def collectAcceptedSubscriptionRequest(
+      remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      sender: PartyId,
+      acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty, sender),
+      readAs = Seq(),
+      update = acceptedPayment.exerciseSubscriptionInitialPayment_Collect(
+        appTc
+      ),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
+
+  def rejectAcceptedSubscriptionRequest(
+      remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty),
+      readAs = Seq(),
+      update = acceptedPayment.exerciseSubscriptionInitialPayment_Reject(
+        appTc
+      ),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
+
+  /** Collects an accepted app payment request without doing anything useful in return. */
+  def collectSubscriptionPayment(
+      remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      senderParty: PartyId,
+      payment: subsCodegen.SubscriptionPayment.ContractId,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty, senderParty),
+      readAs = Seq(),
+      update = payment.exerciseSubscriptionPayment_Collect(
+        appTc
+      ),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
+
+  def rejectSubscriptionPayment(
+      remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      payment: subsCodegen.SubscriptionPayment.ContractId,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+    val appTc = tc.toUnfeaturedAppTransferContext()
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(userParty),
+      readAs = Seq(),
+      update = payment.exerciseSubscriptionPayment_Reject(
+        appTc
+      ),
+      domainId = domainId,
+      disclosedContracts =
+        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
+
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
@@ -371,10 +475,11 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     paymentCodegen.Currency.CC,
   )
 
-  protected def createSelfSubscriptionContext(
+  protected def createSubscriptionContext(
       remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
+      serviceParty: PartyId,
       domainId: Option[DomainId] = None,
   )(implicit
       env: CoinTestConsoleEnvironment
@@ -382,19 +487,45 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     val context = new testSubsCodegen.TestSubscriptionContext(
       scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
-      userParty.toProtoPrimitive,
+      serviceParty.toProtoPrimitive,
       "description",
     )
     clue("Create a subscription context") {
       val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
-        actAs = Seq(userParty),
+        actAs = Seq(userParty, serviceParty).distinct,
         readAs = Seq.empty,
         update = context.create,
         domainId = domainId,
       )
       testSubsCodegen.TestSubscriptionContext.COMPANION.toContractId(result.contractId)
     }
+  }
+
+  private def createSubscriptionData(
+      contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
+      userParty: PartyId,
+      receiverParty: PartyId,
+      providerParty: PartyId,
+      paymentInterval: Duration,
+      paymentDuration: Duration,
+      amount: paymentCodegen.PaymentAmount,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val subscription = new subsCodegen.Subscription(
+      userParty.toProtoPrimitive,
+      receiverParty.toProtoPrimitive,
+      providerParty.toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+    )
+    val payData = new subsCodegen.SubscriptionPayData(
+      amount,
+      new RelTime(paymentInterval.toMillis * 1000L),
+      new RelTime(paymentDuration.toMillis * 1000L),
+    )
+    (subscription, payData)
   }
 
   private def createSelfSubscriptionData(
@@ -406,19 +537,63 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   )(implicit
       env: CoinTestConsoleEnvironment
   ) = {
-    val subscription = new subsCodegen.Subscription(
-      userParty.toProtoPrimitive,
-      userParty.toProtoPrimitive,
-      userParty.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
-      contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
-    )
-    val payData = new subsCodegen.SubscriptionPayData(
+    createSubscriptionData(
+      contextId,
+      userParty,
+      userParty,
+      userParty,
+      paymentInterval,
+      paymentDuration,
       amount,
-      new RelTime(paymentInterval.toMillis * 1000L),
-      new RelTime(paymentDuration.toMillis * 1000L),
     )
-    (subscription, payData)
+  }
+
+  /** Note: all of the sender, receiver, and provider parties must be on the same participant */
+  protected def createSubscriptionRequest(
+      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      userId: String,
+      userParty: PartyId,
+      receiverParty: PartyId,
+      providerParty: PartyId,
+      amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
+      paymentInterval: Duration = defaultSubscriptionInterval,
+      paymentDuration: Duration = defaultSubscriptionDuration,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val contextId =
+      createSubscriptionContext(
+        remoteParticipantWithAdminToken,
+        userId,
+        userParty,
+        receiverParty,
+        domainId,
+      )
+    val (subscription, payData) =
+      createSubscriptionData(
+        contextId,
+        userParty,
+        receiverParty,
+        providerParty,
+        paymentInterval,
+        paymentDuration,
+        amount,
+      )
+    val subscriptionRequest = new subsCodegen.SubscriptionRequest(
+      subscription,
+      payData,
+    )
+    clue("Create subscription request") {
+      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty, receiverParty, providerParty).distinct,
+        readAs = Seq.empty,
+        update = subscriptionRequest.create,
+        domainId = domainId,
+      )
+    }
+    subscriptionRequest
   }
 
   protected def createSelfSubscriptionRequest(
@@ -433,7 +608,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       env: CoinTestConsoleEnvironment
   ) = {
     val contextId =
-      createSelfSubscriptionContext(remoteParticipantWithAdminToken, userId, userParty, domainId)
+      createSubscriptionContext(
+        remoteParticipantWithAdminToken,
+        userId,
+        userParty,
+        userParty,
+        domainId,
+      )
     val (subscription, payData) =
       createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
     val subscriptionRequest = new subsCodegen.SubscriptionRequest(
@@ -464,7 +645,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       env: CoinTestConsoleEnvironment
   ) = {
     val contextId =
-      createSelfSubscriptionContext(remoteParticipantWithAdminToken, userId, userParty)
+      createSubscriptionContext(
+        remoteParticipantWithAdminToken,
+        userId,
+        userParty,
+        userParty,
+        domainId,
+      )
     val (subscriptionData, payData) =
       createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
     val subscriptionId = clue("Create a subscription") {

@@ -6,6 +6,7 @@ import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
@@ -456,6 +457,389 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         charlieWallet,
         Seq(checkTransfer),
+      )
+    }
+
+    "handle collected subscription payments" in { implicit env =>
+      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val charlieUserId = charlieWallet.config.ledgerApiUser
+
+      // Note: using Alice and Charlie because manually creating subscriptions requires both
+      // the sender and the receiver to be hosted on the same participant.
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+
+      val subscriptionPrice = 42.0
+
+      clue("Alice taps some coins") {
+        aliceWallet.tap(100.0)
+      }
+
+      val (_, request) = actAndCheck(
+        "Create subscription request (Alice subscribing to Charlie's service)",
+        createSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceUserId,
+          aliceUserParty,
+          charlieUserParty,
+          charlieUserParty,
+          paymentAmount(subscriptionPrice, walletCodegen.Currency.CC),
+          paymentInterval = Duration.ofMinutes(60),
+          paymentDuration = Duration.ofMinutes(60),
+        ),
+      )(
+        "Request appears in Alices' wallet",
+        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+      )
+
+      val (initialPaymentCid, _) = actAndCheck(
+        "Alice accepts the request",
+        aliceWallet.acceptSubscriptionRequest(request.contractId),
+      )(
+        "Request disappears from Alice's list",
+        _ => {
+          aliceWallet.listSubscriptionRequests() shouldBe empty
+        },
+      )
+
+      actAndCheck(
+        "Charlie collects the initial payment",
+        collectAcceptedSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          charlieUserId,
+          charlieUserParty,
+          aliceUserParty,
+          initialPaymentCid,
+        ),
+      )(
+        "Charlie's balance reflects the collected payment",
+        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(40),
+      )
+
+      // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
+      val paymentCid = clue("Alice's automation triggers the second payment") {
+        eventually() {
+          inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
+            sub.main.payload should equal(request.payload.subscriptionData)
+            inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
+              state.payload.subscription shouldBe sub.main.contractId
+              state.payload.payData should equal(request.payload.payData)
+              state.contractId
+            }
+          }
+        }
+      }
+
+      actAndCheck(
+        "Charlie collects the second payment",
+        collectSubscriptionPayment(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          charlieUserId,
+          charlieUserParty,
+          aliceUserParty,
+          paymentCid,
+        ),
+      )(
+        "Charlie's balance reflects the collected payment",
+        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(80),
+      )
+
+      // All parties see the same representation of the transfer
+      val checkSubscriptionPaymentTransfer: CheckTxHistoryFn = {
+        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          // This is the actual payment, transferring the unlocked coin to
+          // the receivers
+          inside(logEntry.sender) { case (sender, amount) =>
+            sender shouldBe aliceUserParty.toProtoPrimitive
+            amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          }
+
+          inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+            receiver shouldBe charlieUserParty.toProtoPrimitive
+            amount should beWithin(subscriptionPrice - smallAmount, subscriptionPrice)
+          }
+
+          logEntry.senderHoldingFees shouldBe BigDecimal(0)
+      }
+
+      checkTxHistory(
+        aliceWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount shouldBe 100.0
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // First part of collecting the payment: Unlocking the 42CC locked coin.
+            // Note: this and the next entry should really be merged in the history.
+            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          },
+          checkSubscriptionPaymentTransfer,
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // First part of collecting the payment: Unlocking the 42CC locked coin.
+            // Note: this and the next entry should really be merged in the history.
+            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          },
+          checkSubscriptionPaymentTransfer,
+        ),
+      )
+
+      checkTxHistory(
+        charlieWallet,
+        Seq(checkSubscriptionPaymentTransfer, checkSubscriptionPaymentTransfer),
+      )
+    }
+
+    "handle rejected subscription initial payments" in { implicit env =>
+      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val charlieUserId = charlieWallet.config.ledgerApiUser
+
+      // Note: using Alice and Charlie because manually creating subscriptions requires both
+      // the sender and the receiver to be hosted on the same participant.
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+
+      val subscriptionPrice = 42.0
+
+      clue("Alice taps some coins") {
+        aliceWallet.tap(100.0)
+      }
+
+      val (_, request) = actAndCheck(
+        "Create subscription request (Alice subscribing to Charlie's service)",
+        createSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceUserId,
+          aliceUserParty,
+          charlieUserParty,
+          charlieUserParty,
+          paymentAmount(subscriptionPrice, walletCodegen.Currency.CC),
+          paymentInterval = Duration.ofMinutes(60),
+          paymentDuration = Duration.ofMinutes(60),
+        ),
+      )(
+        "Request appears in Alices' wallet",
+        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+      )
+
+      val (initialPaymentCid, _) = actAndCheck(
+        "Alice accepts the request",
+        aliceWallet.acceptSubscriptionRequest(request.contractId),
+      )(
+        "Request disappears from Alice's list",
+        _ => {
+          charlieWallet.listSubscriptionInitialPayments()
+          aliceWallet.listSubscriptionRequests() shouldBe empty
+        },
+      )
+
+      actAndCheck(
+        "Charlie rejects the initial payment",
+        rejectAcceptedSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          charlieUserId,
+          charlieUserParty,
+          initialPaymentCid,
+        ),
+      )(
+        "Alice's balance reflects the returned locked coin",
+        _ => aliceWallet.balance().unlockedQty should be > BigDecimal(100 - smallAmount),
+      )
+
+      checkTxHistory(
+        aliceWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount shouldBe 100.0
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // Rejecting the accepted subscription request returned the 42CC locked coin.
+            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          },
+        ),
+      )
+
+      checkTxHistory(
+        charlieWallet,
+        Seq.empty,
+      )
+    }
+
+    "handle rejected subscription payments" in { implicit env =>
+      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val charlieUserId = charlieWallet.config.ledgerApiUser
+
+      // Note: using Alice and Charlie because manually creating subscriptions requires both
+      // the sender and the receiver to be hosted on the same participant.
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+
+      val subscriptionPrice = 42.0
+
+      clue("Alice taps some coins") {
+        aliceWallet.tap(100.0)
+      }
+
+      val (_, request) = actAndCheck(
+        "Create subscription request (Alice subscribing to Charlie's service)",
+        createSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceUserId,
+          aliceUserParty,
+          charlieUserParty,
+          charlieUserParty,
+          paymentAmount(subscriptionPrice, walletCodegen.Currency.CC),
+          paymentInterval = Duration.ofMinutes(60),
+          paymentDuration = Duration.ofMinutes(60),
+        ),
+      )(
+        "Request appears in Alices' wallet",
+        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+      )
+
+      val (initialPaymentCid, _) = actAndCheck(
+        "Alice accepts the request",
+        aliceWallet.acceptSubscriptionRequest(request.contractId),
+      )(
+        "Request disappears from Alice's list",
+        _ => {
+          aliceWallet.listSubscriptionRequests() shouldBe empty
+        },
+      )
+
+      actAndCheck(
+        "Charlie collects the initial payment",
+        collectAcceptedSubscriptionRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          charlieUserId,
+          charlieUserParty,
+          aliceUserParty,
+          initialPaymentCid,
+        ),
+      )(
+        "Charlie's balance reflects the collected payment",
+        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(40),
+      )
+
+      // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
+      val paymentCid = clue("Alice's automation triggers the second payment") {
+        eventually() {
+          inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
+            sub.main.payload should equal(request.payload.subscriptionData)
+            inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
+              state.payload.subscription shouldBe sub.main.contractId
+              state.payload.payData should equal(request.payload.payData)
+              state.contractId
+            }
+          }
+        }
+      }
+
+      actAndCheck(
+        "Charlie rejects the second payment",
+        rejectSubscriptionPayment(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          charlieUserId,
+          charlieUserParty,
+          paymentCid,
+        ),
+      )(
+        "Alice's balance reflects the returned locked coin",
+        _ =>
+          aliceWallet.balance().unlockedQty should be > BigDecimal(
+            100 - subscriptionPrice - smallAmount
+          ),
+      )
+
+      // All parties see the same representation of the transfer
+      val checkSubscriptionPaymentTransfer: CheckTxHistoryFn = {
+        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          // This is the actual payment, transferring the unlocked coin to
+          // the receivers
+          inside(logEntry.sender) { case (sender, amount) =>
+            sender shouldBe aliceUserParty.toProtoPrimitive
+            amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          }
+
+          inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+            receiver shouldBe charlieUserParty.toProtoPrimitive
+            amount should beWithin(subscriptionPrice - smallAmount, subscriptionPrice)
+          }
+
+          logEntry.senderHoldingFees shouldBe BigDecimal(0)
+      }
+
+      checkTxHistory(
+        aliceWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount shouldBe 100.0
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // First part of collecting the payment: Unlocking the 42CC locked coin.
+            // Note: this and the next entry should really be merged in the history.
+            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          },
+          checkSubscriptionPaymentTransfer,
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // Rejecting the second payment returned the 42CC locked coin.
+            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+          },
+        ),
+      )
+
+      checkTxHistory(
+        charlieWallet,
+        Seq(checkSubscriptionPaymentTransfer),
       )
     }
   }
