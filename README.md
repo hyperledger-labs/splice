@@ -884,12 +884,23 @@ and go through the same steps.
 
 ### GCP Token in the cluster DNS challenge
 
-cert-manager on the cluster uses gcloud to solve the DNS challenge. It therefore needs the latest gcloud credentials. These are stored in a secret clouddns-dns01-solver-svc-acct. To refresh that secret:
+cert-manager on the cluster uses gcloud to solve the DNS challenge. It therefore needs the latest gcloud credentials. These are stored in a secret clouddns-dns01-solver-svc-acct.
+You can view the keys currently in use at https://console.cloud.google.com/iam-admin/serviceaccounts/details/111557570113518692244/keys?project=da-gcp-canton-domain.
+
+To see which key is used for a given cluster, go to the cluster directory and run this command:
+
 ```
-gcloud iam service-accounts keys create /tmp/key.json --iam-account dns01-solver@da-gcp-canton-domain.iam.gserviceaccount.com
-kubectl delete secret clouddns-dns01-solver-svc-acct
-kubectl create secret generic clouddns-dns01-solver-svc-acct --from-file=key.json=/tmp/key.json
-rm /tmp/key.json
+cncluster get_dns01_key_id
+```
+
+The resulting key id matches the one you see in gcloud console.
+
+To update the secret, run this command. Afterwards, you can delete the
+old key from the gcloud console. Note that at any point in time, there
+can only be 10 keys. Otherwis you will see `precondition failed` errors.
+
+```
+cncluster update_dns01_secret
 ```
 
 ### Github Tokens

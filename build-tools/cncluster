@@ -436,6 +436,34 @@ function subcmd_set_machine_type() {
 
 ###
 
+subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
+
+function subcmd_get_dns01_key_id() {
+    kubectl get secret $GCP_DNS_SA_SECRET -o jsonpath='{.data.key\.json}' | base64 -d | jq -r '.private_key_id'
+}
+
+subcommand_whitelist[update_dns01_secret]='Update the gcloud service account key used for letsencrypt dns challenges.'
+
+function subcmd_update_dns01_secret() {
+    IAM_ACCOUNT=dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
+    KEYS=$(gcloud iam service-accounts keys list --iam-account $IAM_ACCOUNT --format json | jq -c '.[]')
+    if [[ $(wc -l <<< $KEYS) -gt 9 ]]; then
+        echo "Reached maximum number of service account keys, delete some keys through the gcloud console before proceeding."
+        echo "Check using `cncluster get_dns01_key_id` that the keys you delete are not in use on any cluster."
+        exit 1
+    fi
+    if kubectl get secret $GCP_DNS_SA_SECRET > /dev/null 2>&1; then
+      kubectl delete secret $GCP_DNS_SA_SECRET
+    fi
+    # This can fail with a precondition error on an attempt to create
+    # keys beyond the tenth.
+    gcloud iam service-accounts keys create /tmp/key.json \
+           --iam-account $IAM_ACCOUNT
+    kubectl create secret generic $GCP_DNS_SA_SECRET \
+            --from-file=key.json=/tmp/key.json
+    rm /tmp/key.json
+}
+
 subcommand_whitelist[create]='Create a cluster from scratch.'
 
 function subcmd_create() {
@@ -477,6 +505,8 @@ function subcmd_create() {
             _log "Default firewalls already removed and do not need to be deleted."
         fi
     fi
+
+    subcmd_update_dns01_secret
 
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(#1447)
