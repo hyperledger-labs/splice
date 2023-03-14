@@ -1,7 +1,7 @@
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
 import { useDirectoryClient, useUserState } from 'common-frontend';
 import { useInterval } from 'common-frontend/lib/utils/hooks';
+import { Decimal } from 'decimal.js';
 import { useCallback, useEffect, useState } from 'react';
 
 import { Box } from '@mui/material';
@@ -9,9 +9,10 @@ import Container from '@mui/material/Container';
 
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { GetBalanceResponse, WalletBalance } from '../models/models';
+import { WalletBalance } from '../models/models';
 import Header from './Header';
 import Hero from './Hero';
+import Loading from './Loading';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,28 +23,15 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const directoryClient = useDirectoryClient();
 
   const [currentUser, setCurrentUser] = useState<string | undefined>(undefined);
-  const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: '', totalUSD: '' });
+  const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: new Decimal(0) });
   const { primaryPartyId } = useUserState();
-
-  const toWalletBalance = (b: GetBalanceResponse, coinPrice: BigNumber): WalletBalance => {
-    const locked = new BigNumber(b.effectiveLockedQty);
-    const unlocked = new BigNumber(b.effectiveUnlockedQty);
-    const fees = new BigNumber(b.totalHoldingFees);
-    const totalCC = locked.plus(unlocked).plus(fees).toString();
-    return {
-      totalCC: totalCC,
-      totalUSD: coinPrice.times(totalCC).toString(),
-    };
-  };
 
   const coinPrice = useCoinPrice();
 
   const fetchBalance = useCallback(async () => {
-    if (coinPrice) {
-      const balResponse = await walletClient.getBalance();
-      setWalletBalance(toWalletBalance(balResponse, coinPrice));
-    }
-  }, [coinPrice, walletClient]);
+    const balance = await walletClient.getBalance();
+    setWalletBalance(balance);
+  }, [walletClient]);
 
   useEffect(() => {
     const fetchEntry = async (partyId: string) => {
@@ -60,6 +48,10 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   // refresh data every second
   useInterval(fetchBalance, 1000);
 
+  if (!coinPrice) {
+    return <Loading />;
+  }
+
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
@@ -67,7 +59,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
       </Container>
 
       <Container maxWidth="md">
-        <Hero balance={walletBalance} />
+        <Hero balance={walletBalance} coinPrice={coinPrice} />
       </Container>
 
       <Box bgcolor="colors.neutral.25" sx={{ flex: 1 }}>

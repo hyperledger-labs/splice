@@ -1,4 +1,5 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import { AmountDisplay } from 'common-frontend';
 
 import { Stack } from '@mui/material';
@@ -8,6 +9,7 @@ import { WalletBalance } from '../models/models';
 
 interface HeroProps {
   balance: WalletBalance;
+  coinPrice: BigNumber;
 }
 
 const Hero: React.FC<HeroProps> = props => {
@@ -16,10 +18,13 @@ const Hero: React.FC<HeroProps> = props => {
       <Stack direction="column" spacing={1}>
         <Typography variant="h6">Total Available Balance</Typography>
         <Typography id="wallet-balance-cc" variant="h4">
-          <AmountDisplay amount={props.balance.totalCC} />
+          <AmountDisplay amount={props.balance.totalCC.toString()} />
         </Typography>
         <Typography id="wallet-balance-usd" variant="caption">
-          <AmountDisplay amount={props.balance.totalUSD} currency="USD" />
+          <AmountDisplay
+            amount={props.balance.totalCC.mul(props.coinPrice.toString()).toString()}
+            currency="USD"
+          />
         </Typography>
         <Typography variant="caption">
           Reflects unlocked coin, rewards earned and holding fees

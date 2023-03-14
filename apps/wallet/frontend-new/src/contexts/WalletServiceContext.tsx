@@ -1,33 +1,32 @@
-import { Contract, UserStatusResponse } from 'common-frontend';
-import { useUserState } from 'common-frontend';
+import { Contract, UserStatusResponse, useUserState } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useContext, useMemo } from 'react';
 import {
-  Middleware,
   createConfiguration,
-  WalletApi,
-  ServerConfiguration,
+  Middleware,
   RequestContext,
   ResponseContext,
+  ServerConfiguration,
+  WalletApi,
 } from 'wallet-openapi';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import {
-  SubscriptionRequest,
   Subscription,
   SubscriptionIdleState,
   SubscriptionPayment,
+  SubscriptionRequest,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 import {
-  GetBalanceResponse,
   ListAcceptedTransferOffersResponse,
   ListAppPaymentRequestsResponse,
   ListResponse,
   ListSubscriptionRequestsResponse,
   ListSubscriptionsResponse,
   ListTransferOffersResponse,
+  WalletBalance,
 } from '../models/models';
 import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
@@ -40,7 +39,7 @@ export interface WalletProps {
 export interface WalletClient {
   tap: (amount: string) => Promise<void>;
   list: () => Promise<ListResponse>;
-  getBalance: () => Promise<GetBalanceResponse>;
+  getBalance: () => Promise<WalletBalance>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
@@ -96,13 +95,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const request = { amount: amount };
         await walletClient.tap(request);
       },
-      getBalance: async (): Promise<GetBalanceResponse> => {
+      getBalance: async (): Promise<WalletBalance> => {
         const balance = await walletClient.getBalance();
+        const locked = new Decimal(balance.effectiveLockedQty);
+        const unlocked = new Decimal(balance.effectiveUnlockedQty);
+        const fees = new Decimal(balance.totalHoldingFees);
+        const totalCC = locked.plus(unlocked).plus(fees);
         return {
-          round: balance.round,
-          effectiveUnlockedQty: balance.effectiveUnlockedQty,
-          effectiveLockedQty: balance.effectiveLockedQty,
-          totalHoldingFees: balance.totalHoldingFees,
+          totalCC,
         };
       },
       createTransferOffer: async (

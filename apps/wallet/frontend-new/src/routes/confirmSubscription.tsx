@@ -1,13 +1,41 @@
-import { AmountDisplay } from 'common-frontend';
-import React from 'react';
+import BigNumber from 'bignumber.js';
+import { AmountDisplay, Contract, DirectoryEntry, IntervalDisplay } from 'common-frontend';
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 
+import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { ContractId } from '@daml/types';
+
+import Loading from '../components/Loading';
 import PaymentHeader from '../components/PaymentHeader';
-import { WalletSubscription } from '../models/models';
+import { useCoinPrice } from '../contexts/CoinPriceContext';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
-  const via = 'credap.cns';
+  const { cid } = useParams();
+  const { listSubscriptionRequests } = useWalletClient();
+
+  const [subscriptionRequest, setSubscriptionRequest] =
+    useState<Contract<damlSubscriptionRequest>>();
+  useEffect(() => {
+    const fetchSubscriptionRequest = async () => {
+      const { subscriptionRequestsList } = await listSubscriptionRequests();
+      const req = subscriptionRequestsList.find(c => c.contractId === cid);
+      if (!req) {
+        throw new Error('Subscription request contract not found');
+      }
+      setSubscriptionRequest(req);
+    };
+    fetchSubscriptionRequest();
+  }, [cid, listSubscriptionRequests]);
+
+  if (!subscriptionRequest) {
+    return <Loading />;
+  }
+
   return (
     <Stack minHeight="100vh">
       <PaymentHeader />
@@ -15,10 +43,16 @@ export const ConfirmSubscription: React.FC = () => {
         <Container maxWidth="md">
           <Stack alignItems="center" paddingTop={4} spacing={4}>
             <Stack alignItems="center" spacing={1}>
-              <Typography variant="h5">Confirm Subscription</Typography>
-              <Typography variant="body2">via {via}</Typography>
+              <Stack alignItems="center" direction="row" spacing={1}>
+                <Typography variant="h5">Confirm Subscription to </Typography>
+                <DirectoryEntry partyId={subscriptionRequest.payload.subscriptionData.receiver} />
+              </Stack>
+              <Stack alignItems="center" direction="row" spacing={1}>
+                <Typography variant="body2">via </Typography>
+                <DirectoryEntry partyId={subscriptionRequest.payload.subscriptionData.provider} />
+              </Stack>
             </Stack>
-            <SubscriptionContainer />
+            <SubscriptionContainer subscription={subscriptionRequest} />
           </Stack>
         </Container>
       </Box>
@@ -28,41 +62,70 @@ export const ConfirmSubscription: React.FC = () => {
 
 export default ConfirmSubscription;
 
-const SubscriptionContainer: React.FC = () => {
-  const subscription: WalletSubscription = {
-    provider: { description: 'Canton Name Service', cns: 'alice.cns' },
-    price: { amount: '8.0', currency: 'CC', perPeriod: '30 days' },
-    nextPaymentDue: '22-02-2023',
-  };
-  const exchangeRateUSDToCC = 10; // 1 USD = 10 CC
-  const usd = 0.8;
+const SubscriptionContainer: React.FC<{ subscription: Contract<damlSubscriptionRequest> }> = ({
+  subscription,
+}) => {
+  const coinPrice = useCoinPrice();
+
+  if (!coinPrice) {
+    return <Loading />;
+  }
+
+  const payData = subscription.payload.payData;
+  const amount = new BigNumber(payData.paymentAmount.amount);
+  const currency = payData.paymentAmount.currency;
+  const converted = convertCurrency(amount, currency, coinPrice);
+
   return (
     <Container maxWidth="xl">
       <Box bgcolor="colors.neutral.20" border={1} borderColor="colors.neutral.30">
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Stack alignItems="center">
             <Typography variant="body1">Description</Typography>
-            <Typography variant="h6">"{subscription.provider.description}"</Typography>
+            {/*TODO (#3304): use proper description */}
+            <Typography variant="h6" className="sub-request-description">
+              SOME DESCRIPTION
+            </Typography>
           </Stack>
           <Typography variant="body1">Subscription Details</Typography>
           <Stack alignItems="center">
-            <Typography variant="h6">
-              <AmountDisplay amount={subscription.price.amount} currency={'CC'} /> every 30 days
+            <Typography variant="h6" className="sub-request-price">
+              <AmountDisplay amount={amount.toString()} currency={currency} /> per{' '}
+              <IntervalDisplay microseconds={payData.paymentInterval.microseconds} />
             </Typography>
-            <Typography variant="body2">
-              <AmountDisplay amount={usd.toString()} currency={'USD'} /> @{' '}
-              <AmountDisplay amount={exchangeRateUSDToCC.toString()} currency={'CC'} />
-              /USD
+            <Typography variant="body2" className="sub-request-price-converted">
+              <AmountDisplay amount={converted.amount.toString()} currency={converted.currency} /> @{' '}
+              <AmountDisplay amount={coinPrice.toString()} currency={currency} />/
+              {converted.currency}
             </Typography>
           </Stack>
           <Stack alignItems="center">
             <Typography variant="body2">The first payment will be deducted immediately.</Typography>
           </Stack>
-          <Button variant="pill" size="large">
-            Confirm Subscription
-          </Button>
+          <ConfirmSubscriptionButton cid={subscription.contractId} />
         </Stack>
       </Box>
     </Container>
+  );
+};
+
+const ConfirmSubscriptionButton: React.FC<{ cid: ContractId<damlSubscriptionRequest> }> = ({
+  cid,
+}) => {
+  const { acceptSubscriptionRequest } = useWalletClient();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
+
+  const onAccept = async () => {
+    await acceptSubscriptionRequest(cid);
+    if (redirect) {
+      window.location.assign(redirect);
+    }
+  };
+
+  return (
+    <Button variant="pill" size="large" onClick={onAccept} className="sub-request-accept-button">
+      Confirm Subscription
+    </Button>
   );
 };

@@ -37,6 +37,7 @@ import Loading from '../components/Loading';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { SubscriptionState, SubscriptionTuple } from '../models/models';
+import { convertCurrency } from '../utils/currencyConversion';
 
 const Subscriptions: React.FC = () => {
   const { listSubscriptions, cancelSubscription } = useWalletClient();
@@ -165,22 +166,7 @@ const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
   const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
   const perPeriod = payData.paymentInterval;
-
-  // TODO: (#3065) or (#3064) - factor out if they're the same
-  let converted;
-  if (currency === 'CC') {
-    converted = {
-      amount: amount.times(coinPrice),
-      currency: 'USD',
-      coinPriceToShow: new BigNumber(1).div(coinPrice),
-    };
-  } else {
-    converted = {
-      amount: amount.div(coinPrice),
-      currency: 'CC',
-      coinPriceToShow: coinPrice, // already in USD/CC
-    };
-  }
+  const converted = convertCurrency(amount, currency, coinPrice);
 
   return (
     <Stack>

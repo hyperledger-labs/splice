@@ -36,7 +36,6 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
       val directoryParty = createDirectoryEntryForDirectoryItself
-      // TODO: (#3065) when the FE can accept subscriptions, use that instead of "auto-accepting" here
       createDirectoryEntry(alicePartyId, aliceDirectory, aliceEntryName, aliceWallet)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
@@ -123,6 +122,72 @@ class WalletNewSubscriptionsFrontendIntegrationTest
             cancelIsEnabled(subscriptionRows.head, expectedButtonEnabled = false)
           },
         )
+      }
+    }
+
+    "allow accepting subscriptions" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val expectedDirName = createDirectoryEntryForDirectoryItself
+      aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
+
+      val directoryParty = createDirectoryEntryForDirectoryItself
+      val directoryPaymentDue = LocalDate.now().plusDays(90)
+      val (_, subCid) = requestDirectoryEntry(aliceUserParty, aliceDirectory, expectedDirName)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        actAndCheck(
+          "Alice goes to the confirm-subscription page", {
+            go to s"http://localhost:$aliceWalletNewPort/confirm-subscription/${subCid.contractId}"
+            loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+          },
+        )(
+          "She sees the data of the subscription request",
+          _ => {
+            find(className("available-balance"))
+              .valueOrFail("Balance is not shown")
+              .text should matchText("Total Available Balance: 50 CC / 100 USD")
+
+            find(className("sub-request-description"))
+              .valueOrFail("Description is not shown")
+              .text should matchText("SOME DESCRIPTION") // TODO (#3304): use actual description
+
+            find(className("sub-request-price"))
+              .valueOrFail("Price is not shown")
+              .text should matchText("1 USD per 90 days")
+
+            find(className("sub-request-price-converted"))
+              .valueOrFail("Price conversion is not shown")
+              .text should matchText("0.5 CC @ 2 USD/CC")
+          },
+        )
+
+        clue("Alice accepts the subscription") {
+          click on className("sub-request-accept-button")
+        }
+
+        actAndCheck(
+          "Alice sees the subscription in the list", {
+            go to s"http://localhost:$aliceWalletNewPort" // already logged in
+            click on "navlink-subscriptions"
+          },
+        )(
+          "Alice sees the subscription in the list",
+          _ => {
+            val subscriptionRows = findAll(className("subscription-row")).toSeq
+            subscriptionRows should have size 1
+            matchSubscription(subscriptionRows.head)(
+              expectedReceiver = directoryParty,
+              expectedProvider = directoryParty,
+              expectedPrice = "1 USD per 90 days",
+              expectedCoinPrice = "0.5 CC @ 2USD/CC",
+              expectedPaymentDate =
+                s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
+              expectedButtonEnabled = true,
+            )
+          },
+        )
+
       }
     }
 

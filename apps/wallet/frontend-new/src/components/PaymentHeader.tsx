@@ -1,12 +1,35 @@
 import * as React from 'react';
-import { AmountDisplay } from 'common-frontend';
+import { AmountDisplay, useInterval } from 'common-frontend';
+import { Decimal } from 'decimal.js';
+import { useCallback, useState } from 'react';
 
 import { Box, Stack, Toolbar, Typography } from '@mui/material';
 
+import { useCoinPrice } from '../contexts/CoinPriceContext';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { WalletBalance } from '../models/models';
+import Loading from './Loading';
+
 const PaymentHeader: React.FC = () => {
   const cns = 'alice.cns';
-  const balanceCC = 150;
-  const balanceUsd = 1800;
+
+  const walletClient = useWalletClient();
+
+  const coinPrice = useCoinPrice();
+
+  const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: new Decimal(0) });
+
+  const fetchBalance = useCallback(async () => {
+    const balance = await walletClient.getBalance();
+    setWalletBalance(balance);
+  }, [walletClient]);
+
+  useInterval(fetchBalance, 1000);
+
+  if (!coinPrice) {
+    return <Loading />;
+  }
+
   return (
     <Box bgcolor="colors.neutral.20">
       <Toolbar sx={{ padding: 2 }}>
@@ -17,9 +40,13 @@ const PaymentHeader: React.FC = () => {
           <Typography>
             <b>{cns}</b>
           </Typography>
-          <Typography>
-            Total Available Balance: <AmountDisplay amount={balanceCC.toString()} currency="CC" /> /{' '}
-            <AmountDisplay amount={balanceUsd.toString()} currency="USD" />
+          <Typography className="available-balance">
+            Total Available Balance:{' '}
+            <AmountDisplay amount={walletBalance.totalCC.toString()} currency="CC" /> /{' '}
+            <AmountDisplay
+              amount={walletBalance.totalCC.mul(coinPrice.toString()).toString()}
+              currency="USD"
+            />
           </Typography>
         </Stack>
         {/*Empty element to align the other two to left and center*/}
