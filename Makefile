@@ -8,14 +8,18 @@ current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 
+canton-coin-dar := ${REPO_ROOT}/daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar
 directory-service-dar := ${REPO_ROOT}/daml/directory-service/.daml/dist/directory-service-0.1.0.dar
-splitwell-dar := ${REPO_ROOT}/daml/splitwell/.daml/dist/splitwell-0.1.0.dar
+wallet-payments-dar := ${REPO_ROOT}/daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
 
 .PHONY: build
 build: $(app-bundle) cluster/pulumi/install ## Build the Canton Coin app bundle and ensure the Pulumi script is ready to run.
 
-$(app-bundle) $(directory-service-dar) $(splitwell-service-dar) &:
+$(app-bundle): $(canton-coin-dar) $(directory-service-dar) $(wallet-payments-dar)
 	sbt --batch bundle
+
+$(canton-coin-dar) $(directory-service-dar) $(wallet-payments-dar) &:
+	sbt --batch canton-coin-daml/damlBuild wallet-payments-daml/damlBuild directory-daml/damlBuild
 
 .PHONY: clean
 clean: images/clean cluster/pulumi/clean
