@@ -35,7 +35,7 @@ local deployments(num, config) =
           value: if num == 1 then "found-consortium" else "join-via-svc-app",
         },
       ] + (
-        if config.tickDuration != null then [{ name: "CN_APP_SV_INITIAL_TICK_DURATION", value: config.tickDuration }] else []
+        if (config.tickDuration != null && num == 1) then [{ name: "CN_APP_SV_INITIAL_TICK_DURATION", value: config.tickDuration }] else []
       ),
       namespace=namespace
     ),
