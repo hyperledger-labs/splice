@@ -98,7 +98,8 @@ const Content = () => {
   const scanClient = useScanClient();
 
   const fetchCoinPrice = useCallback(async () => {
-    const coinPrice = await scanClient.getCoinPrice();
+    const coinPriceBD = await scanClient.getCoinPrice();
+    const coinPrice = new Decimal(coinPriceBD.toString());
     // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
     setCoinPrice(prevCoinPrice => (prevCoinPrice?.equals(coinPrice) ? prevCoinPrice : coinPrice));
   }, [scanClient]);

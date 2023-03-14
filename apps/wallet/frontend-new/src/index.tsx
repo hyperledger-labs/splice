@@ -16,6 +16,7 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
+import { CoinPriceProvider } from './contexts/CoinPriceContext';
 import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
@@ -42,23 +43,31 @@ const router = createBrowserRouter(
   )
 );
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
+const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  return (
     <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
         <ValidatorClientProvider url={config.services.validator.grpcUrl}>
           <WalletClientProvider url={config.services.wallet.grpcUrl}>
             <DirectoryClientProvider url={config.services.directory.grpcUrl}>
               <ScanClientProvider url={config.services.scan.grpcUrl}>
-                <ThemeProvider theme={theme}>
-                  <CssBaseline />
-                  <RouterProvider router={router} />
-                </ThemeProvider>
+                <CoinPriceProvider>
+                  <ThemeProvider theme={theme}>{children}</ThemeProvider>
+                </CoinPriceProvider>
               </ScanClientProvider>
             </DirectoryClientProvider>
           </WalletClientProvider>
         </ValidatorClientProvider>
       </UserProvider>
     </AuthProvider>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <Providers>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </Providers>
   </React.StrictMode>
 );

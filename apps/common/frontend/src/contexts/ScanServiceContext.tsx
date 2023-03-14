@@ -1,5 +1,5 @@
 import * as openapi from 'scan-openapi';
-import { Decimal } from 'decimal.js';
+import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
@@ -19,7 +19,7 @@ export interface ScanClient {
   /**
    * Expressed as USD/CC
    */
-  getCoinPrice: () => Promise<Decimal>;
+  getCoinPrice: () => Promise<BigNumber>;
   lookupFeaturedAppRight: (partyId: Party) => Promise<Contract<FeaturedAppRight> | undefined>;
   getSvcPartyId: () => Promise<string>;
 }
@@ -50,9 +50,9 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
           const latestOpenRound = openOpenRounds.reduce((prevOmr, currentOmr) =>
             prevOmr.payload.round.number > currentOmr.payload.round.number ? prevOmr : currentOmr
           );
-          return new Decimal(latestOpenRound.payload.coinPrice);
+          return new BigNumber(latestOpenRound.payload.coinPrice);
         } else {
-          return new Decimal(0);
+          return new BigNumber(0);
         }
       },
       lookupFeaturedAppRight: async (partyId: Party) => {

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   Contract,
@@ -6,12 +7,10 @@ import {
   IntervalDisplay,
   sameContracts,
   useInterval,
-  useScanClient,
 } from 'common-frontend';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';
-import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
 import {
@@ -34,6 +33,8 @@ import {
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
+import Loading from '../components/Loading';
+import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { SubscriptionState, SubscriptionTuple } from '../models/models';
 
@@ -50,16 +51,11 @@ const Subscriptions: React.FC = () => {
 
   useInterval(fetchSubscriptions, 500);
 
-  // TODO (#3332): remove and fetch from context once it's refactored
-  const scanClient = useScanClient();
-  const [coinPrice, setCoinPrice] = useState<Decimal>(new Decimal(0));
-  const fetchCoinPrice = useCallback(async () => {
-    const coinPrice = await scanClient.getCoinPrice();
-    // avoid unnecessary re-renders everytime the coin price is fetched but does not change.
-    setCoinPrice(prevCoinPrice => (prevCoinPrice?.equals(coinPrice) ? prevCoinPrice : coinPrice));
-  }, [scanClient]);
+  const coinPrice = useCoinPrice();
 
-  useInterval(fetchCoinPrice, 1000);
+  if (!coinPrice) {
+    return <Loading />;
+  }
 
   return (
     <Stack marginY={10} spacing={2}>
@@ -106,7 +102,7 @@ interface SubscriptionRowProps {
   subscription: Contract<Subscription>;
   state: SubscriptionState;
   cancelSubscription: () => void;
-  coinPrice: Decimal;
+  coinPrice: BigNumber;
 }
 const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   subscription,
@@ -163,10 +159,10 @@ const Provider: React.FC<{ provider: Party }> = ({ provider }) => {
 
 interface PriceProps {
   payData: SubscriptionPayData;
-  coinPrice: Decimal;
+  coinPrice: BigNumber;
 }
 const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
-  const amount = new Decimal(payData.paymentAmount.amount);
+  const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
   const perPeriod = payData.paymentInterval;
 
@@ -174,9 +170,9 @@ const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
   let converted;
   if (currency === 'CC') {
     converted = {
-      amount: amount.mul(coinPrice),
+      amount: amount.times(coinPrice),
       currency: 'USD',
-      coinPriceToShow: new Decimal(1).div(coinPrice),
+      coinPriceToShow: new BigNumber(1).div(coinPrice),
     };
   } else {
     converted = {
