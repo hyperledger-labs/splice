@@ -396,7 +396,7 @@ function subcmd_gcloud_logs() {
 
     _cluster_must_exist
 
-    LOGFILE=$(mktemp cnlogXXXXXXX.clog)
+    LOGFILE=$(mktemp "$namespace"-"$app"-XXXX.clog)
     echo "Writing log to $LOGFILE"
 
     gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter" \

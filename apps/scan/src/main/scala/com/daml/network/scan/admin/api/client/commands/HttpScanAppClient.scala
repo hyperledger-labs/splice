@@ -55,8 +55,8 @@ object HttpScanAppClient {
   }
 
   /** Very similar to the AppTransferContext we use in Daml, except
-    * (1) this class has contract instances attributes, not just interface-contract id attributes.
-    * (2) this class has no featuredAppRight attribute.
+    * (1) this class has contract instances, not just (interface) contract-ids of the respective Daml contracts.
+    * (2) this class has no featuredAppRight contract.
     */
   case class TransferContextWithInstances(
       coinRules: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],

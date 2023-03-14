@@ -160,7 +160,8 @@ final class ScanConnection(
     if (cache.cacheValidUntil.exists(validUntil => now.isBefore(validUntil))) {
       val rounds = cache.getRoundTuple
       logger.info(
-        s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following rounds: $rounds."
+        s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following issuing rounds: ${rounds._1
+            .map(_.payload.round.number)}, and following open rounds: ${rounds._2.map(_.payload.round.number)}."
       )
       Future.successful(rounds)
     } else {

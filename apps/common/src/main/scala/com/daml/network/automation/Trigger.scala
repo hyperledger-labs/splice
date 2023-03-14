@@ -118,6 +118,9 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
                 case Success(true) =>
                   Success(TaskStale)
                 case Success(false) =>
+                  logger.debug(
+                    s"Task that failed with following exception is not stale: ${ex.getLocalizedMessage} "
+                  )
                   Failure(ex)
                 case Failure(staleCheckEx) =>
                   logger.info("Encountered exception when checking task staleness", staleCheckEx)
