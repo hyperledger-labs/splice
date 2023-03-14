@@ -2,6 +2,7 @@ package com.daml.network.integration
 
 import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
   CoinEnvironmentFactory,
@@ -9,6 +10,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.sv.config.SvBootstrapConfig
+import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.EnvironmentFactory
@@ -97,17 +99,7 @@ case class CoinEnvironmentDefinition(
       import env.*
       this.preSetup(env)
       validators.local.foreach(validator => {
-        val validatorParty =
-          validator.remoteParticipantWithAdminToken.ledger_api.parties
-            .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
-            .party
-        validator.remoteParticipantWithAdminToken.ledger_api.users.create(
-          id = validator.config.ledgerApiUser,
-          actAs = Set(validatorParty),
-          primaryParty = Some(validatorParty),
-          readAs = Set.empty,
-          participantAdmin = true,
-        )
+        CoinEnvironmentDefinition.withAllocatedValidator(validator)
       })
     })
 
@@ -239,4 +231,18 @@ object CoinEnvironmentDefinition {
 
   def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
+
+  def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
+    val validatorParty =
+      validator.remoteParticipantWithAdminToken.ledger_api.parties
+        .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
+        .party
+    validator.remoteParticipantWithAdminToken.ledger_api.users.create(
+      id = validator.config.ledgerApiUser,
+      actAs = Set(validatorParty),
+      primaryParty = Some(validatorParty),
+      readAs = Set.empty,
+      participantAdmin = true,
+    )
+  }
 }

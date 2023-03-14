@@ -55,6 +55,8 @@ rm -f canton.tokens canton-simtime.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade"
 
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "self_hosted_participant"
+
 # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
