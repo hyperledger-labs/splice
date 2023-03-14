@@ -18,9 +18,9 @@ root.render(
   <React.StrictMode>
     <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-        <SplitwellClientProvider url={config.services.splitwell.grpcUrl}>
-          <DirectoryClientProvider url={config.services.directory.grpcUrl}>
-            <ScanClientProvider url={config.services.scan.grpcUrl}>
+        <SplitwellClientProvider url={config.services.splitwell.url}>
+          <DirectoryClientProvider url={config.services.directory.url}>
+            <ScanClientProvider url={config.services.scan.url}>
               <App />
             </ScanClientProvider>
           </DirectoryClientProvider>

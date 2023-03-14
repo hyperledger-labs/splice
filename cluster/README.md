@@ -832,7 +832,7 @@ cncluster update_secrets
 ## Pulumi and Helm
 
 Canton Network is currently deployed by applying a manifest generated
-using Jsonnet to a GKE cluster via `kubectl apply`. To accomodate
+using Jsonnet to a GKE cluster via `kubectl apply`. To accommodate
 packaging needs for our customers, we are switching over to a Helm
 chart based deployment strategy that's managed using Pulumi
 scripts. While this work is not complete, the beginnings of it are
@@ -873,7 +873,7 @@ within a Kubernetes cluster.  The configuration of a Canton Network
 cluster is defined in terms of a manifest we generate by a [Jsonnet](http://jsonnet.org)
 script: [`canton-network-config.jsonnet`](/cluster/manifest/canton-network-config.jsonnet).
 
-This produces a manifest that describes all of the objects necessary
+This produces a manifest that describes all the objects necessary
 to run the Canton Network specific parts of our clusters.
 
 To simplify tracking of changes and make it easier to reliably refactor

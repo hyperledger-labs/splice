@@ -21,7 +21,8 @@ images := \
 	docs \
 	external-proxy \
 	gcs-proxy \
-	envoy-proxy
+	envoy-proxy \
+	json-api
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app

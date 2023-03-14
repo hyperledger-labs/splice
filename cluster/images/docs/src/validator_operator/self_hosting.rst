@@ -201,6 +201,10 @@ First - you will need to upload the directory's dar file to your validator's par
 
   validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
 
+The directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run: ::
+
+  daml json-api --config examples/validator/json-api-app.conf
+
 Before you can use the directory UI, you need to configure the URL of the directory backend similar to
 how you configured the wallet UI earlier. For that,
 open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:

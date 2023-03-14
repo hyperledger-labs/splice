@@ -144,11 +144,11 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ userId, svc, ledgerApiToken }) => {
   return (
     <SplitwellLedgerApiClientProvider
-      url={config.services.ledgerApi.grpcUrl}
+      url={config.services.ledgerApi.url}
       userId={userId}
       token={ledgerApiToken}
     >
-      <DomainConnectivityClientProvider url={config.services.participantAdmin.grpcUrl}>
+      <DomainConnectivityClientProvider url={config.services.participantAdmin.url}>
         <HomeWithContext userId={userId} svc={svc} />
       </DomainConnectivityClientProvider>
     </SplitwellLedgerApiClientProvider>

@@ -16,23 +16,23 @@ window.canton_network_config = {
   services: {
     splitwell: {
       // URL of the gRPC-Web envoy proxy, proxying to the splitwell gRPC API
-      grpcUrl: 'http://localhost:6113',
+      url: 'http://localhost:6113',
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      grpcUrl: 'http://localhost:6201',
+      url: 'http://localhost:6201',
     },
     directory: {
       // URL of the directory HTTP API
-      grpcUrl: 'http://localhost:6110',
+      url: 'http://localhost:6110',
     },
     scan: {
       // URL of the scan app HTTP API
-      grpcUrl: 'http://localhost:6012',
+      url: 'http://localhost:6012',
     },
     participantAdmin: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s participant's admin API
-      grpcUrl: 'http://localhost:6202',
+      url: 'http://localhost:6202',
     }
   },
 };
