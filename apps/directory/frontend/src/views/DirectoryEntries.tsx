@@ -5,14 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@m
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import { useDirectoryLedgerApiClient } from '../contexts/DirectoryLedgerApiContext';
 
 const DirectoryEntries: React.FC<{ primaryParty: string; provider: string }> = ({
   primaryParty,
   provider,
 }) => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useDirectoryLedgerApiClient();
   const fetchDirectoryEntries = useCallback(async () => {
     const current = await ledgerApiClient.queryOwnedDirectoryEntries(primaryParty, provider);
     setDirectoryEntries(prev => (sameContracts(prev, current) ? prev : current));

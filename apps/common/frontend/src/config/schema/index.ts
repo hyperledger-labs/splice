@@ -11,4 +11,3 @@ export const baseConfigSchema = z.object({
 
 export * from './auth';
 export * from './service';
-export * from './directory';

@@ -2078,10 +2078,6 @@
                            {
                               "containerPort": 10013,
                               "name": "val1-metrics"
-                           },
-                           {
-                              "containerPort": 7575,
-                              "name": "json-api"
                            }
                         ],
                         "resources": {
@@ -2160,25 +2156,6 @@
                               "memory": "256Mi"
                            }
                         }
-                     },
-                     {
-                        "image": "region-docker.pkg.dev/project/repo/json-api:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "json-api",
-                        "ports": [
-                           {
-                              "containerPort": 7575,
-                              "name": "http"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "512Mi"
-                           },
-                           "requests": {
-                              "memory": "512Mi"
-                           }
-                        }
                      }
                   ],
                   "volumes": [ ]
@@ -2212,11 +2189,6 @@
                {
                   "name": "val1-metrics",
                   "port": 10013,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "json-api",
-                  "port": 7575,
                   "protocol": "TCP"
                },
                {
@@ -4320,10 +4292,6 @@
                               "name": "val1-metrics"
                            },
                            {
-                              "containerPort": 7575,
-                              "name": "json-api"
-                           },
-                           {
                               "containerPort": 6101,
                               "name": "val1-lg-api-gw"
                            },
@@ -4545,11 +4513,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "json-api",
-                  "port": 7575,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "val1-lg-api-gw",
                   "port": 6101,
                   "protocol": "TCP"
@@ -4751,11 +4714,6 @@
                {
                   "name": "val1-metrics",
                   "port": 10113,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "json-api",
-                  "port": 7575,
                   "protocol": "TCP"
                },
                {

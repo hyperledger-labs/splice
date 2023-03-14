@@ -15,19 +15,19 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the envoy proxy, proxying to the wallet app HTTP API
-      url: "https://" + window.location.hostname + "/api/v0/wallet",
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
     },
     validator: {
       // URL of the envoy proxy, proxying to the validator app HTTP API
-      url: "https://" + window.location.hostname + "/api/v0/validator",
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/validator",
     },
     directory: {
       // URL of the directory backend.
-      url: `https://directory.${cluster}`,
+      grpcUrl: `https://directory.${cluster}`,
     },
     scan: {
       // URL of the scan app's HTTP API
-      url: `https://scan.${cluster}`,
+      grpcUrl: `https://scan.${cluster}`,
     },
   },
 };

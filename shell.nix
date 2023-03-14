@@ -5,14 +5,13 @@ let
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
   # To work around this we fetch some packages via rosetta.
   x86Pkgs = if builtins.currentSystem == "aarch64-darwin" then import ./nix/default.nix { system = "x86_64-darwin"; } else pkgs;
-  sources = builtins.fromJSON (builtins.readFile ./nix/canton-sources.json);
 
   daml_pbs = stdenv.mkDerivation rec {
     name = "daml-protobufs";
-    sdk_version = sources.daml_version;
+    sdk_version = "2.6.0-snapshot.20230210.11415.0.5c00481a";
     src = fetchzip {
       url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/protobufs-${sdk_version}.zip";
-      sha256="sha256-H14XLnmYDdCk5xZDnbsHHNBajDXyOsDx4uJaF+nobok=";
+      sha256="sha256:H14XLnmYDdCk5xZDnbsHHNBajDXyOsDx4uJaF+nobok=";
     };
     installPhase = ''
       mkdir -p $out/protos-${sdk_version}
@@ -46,7 +45,6 @@ in pkgs.mkShell {
     hub # Github CLI for todo checker
     jq
     jsonnet
-    jsonapi
     k9s
     kubectl
     kubernetes-helm

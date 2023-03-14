@@ -2,6 +2,7 @@ import {
   Contract,
   DirectoryClientProvider,
   useDirectoryClient,
+  usePrimaryParty,
   useUserState,
 } from 'common-frontend';
 import { DirectoryClient } from 'common-frontend/lib/contexts/DirectoryServiceContext';
@@ -10,10 +11,9 @@ import { useEffect, useState } from 'react';
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
 
 import {
-  LedgerApiClient,
-  LedgerApiClientProvider,
-  useLedgerApiClient,
-} from '../contexts/LedgerApiContext';
+  DirectoryLedgerApiClientProvider,
+  useDirectoryLedgerApiClient,
+} from '../contexts/DirectoryLedgerApiContext';
 import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
@@ -37,31 +37,10 @@ export function useProviderParty(directoryClient: DirectoryClient): string | und
   return providerPartyId;
 }
 
-export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | undefined {
-  const [primaryParty, setPrimaryParty] = useState<string>();
-
-  useEffect(() => {
-    const fetchPrimaryParty = async () => {
-      try {
-        setPrimaryParty(await ledgerApiClient.getPrimaryParty());
-      } catch (err) {
-        console.error('Error finding primary party for user', err);
-        console.error(JSON.stringify(err));
-        throw new Error(
-          'Error finding primary party for user, please confirm user onboarded to this participant.'
-        );
-      }
-    };
-    fetchPrimaryParty();
-  }, [ledgerApiClient]);
-
-  return primaryParty;
-}
-
 const Home: React.FC = () => {
   const { updateStatus } = useUserState();
   const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useDirectoryLedgerApiClient();
   const directoryClient = useDirectoryClient();
 
   const primaryPartyId = usePrimaryParty(ledgerApiClient);
@@ -130,15 +109,15 @@ const Home: React.FC = () => {
 const HomeWithContexts: React.FC = () => {
   const { userAccessToken, userId } = useUserState();
   return (
-    <LedgerApiClientProvider
-      jsonApiUrl={config.services.directory.jsonApiUrl}
+    <DirectoryLedgerApiClientProvider
+      url={config.services.ledgerApi.grpcUrl}
       userId={userId!}
       token={userAccessToken!}
     >
-      <DirectoryClientProvider url={config.services.directory.url}>
+      <DirectoryClientProvider url={config.services.directory.grpcUrl}>
         <Home />
       </DirectoryClientProvider>
-    </LedgerApiClientProvider>
+    </DirectoryLedgerApiClientProvider>
   );
 };
 

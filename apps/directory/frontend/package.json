@@ -50,7 +50,6 @@
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.4.3",
     "@trivago/prettier-plugin-sort-imports": "^3.3.0",
-    "http-proxy-middleware": "^1.0.4",
     "@types/google-protobuf": "^3.15.6",
     "@types/jest": "^29.2.0",
     "@types/node": "^18.11.0",

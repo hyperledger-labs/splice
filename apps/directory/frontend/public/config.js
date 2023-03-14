@@ -18,14 +18,17 @@ window.canton_network_config = {
   services: {
     // BEGIN_DIRECTORY_CONFIG
     directory: {
-      jsonApiUrl: "http://" + window.location.hostname + "/api/json-api/",
-      // URL of the directory backend
+      // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://directory.TARGET_CLUSTER.network.canton.global',
+      grpcUrl: 'https://directory.TARGET_CLUSTER.network.canton.global',
     },
     // END_DIRECTORY_CONFIG
+    ledgerApi: {
+      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
+      grpcUrl: 'http://localhost:6201',
+    },
     wallet: {
-      url: 'http://localhost:6004',
+      grpcUrl: 'http://localhost:6004',
       // URL of the web-ui, used to forward payment workflows to wallet
       uiUrl: 'http://localhost:3000',
     },

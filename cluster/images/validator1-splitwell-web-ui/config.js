@@ -16,28 +16,28 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      url: "https://" + window.location.hostname + "/api/v0/wallet",
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
       uiUrl: window.location.origin.replace("splitwell", "wallet"),
     },
     splitwell: {
       // URL of the gRPC-Web envoy proxy, proxying the splitwell gRPC API
-      url: `https://splitwell.${cluster}`,
+      grpcUrl: `https://splitwell.${cluster}`,
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      url: "https://" + window.location.hostname + "/api/v0/ledger-api",
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/ledger-api",
     },
     directory: {
       // URL of the directory backend. Note that this is not (yet) exposed over TLS.
-      url: `https://directory.${cluster}`,
+      grpcUrl: `https://directory.${cluster}`,
     },
     scan: {
       // URL of the scan app's HTTP API
-      url: `https://scan.${cluster}`,
+      grpcUrl: `https://scan.${cluster}`,
     },
     participantAdmin: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      url:
+      grpcUrl:
         "https://" + window.location.hostname + "/api/v0/participant-admin",
     },
   },

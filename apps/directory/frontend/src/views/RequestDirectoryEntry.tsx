@@ -5,7 +5,7 @@ import { FormGroup, TextField, Typography } from '@mui/material';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import { useDirectoryLedgerApiClient } from '../contexts/DirectoryLedgerApiContext';
 import { config } from '../utils';
 
 const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }> = ({
@@ -13,7 +13,7 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
   provider,
 }) => {
   const [entryName, setEntryName] = useState<string>('');
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useDirectoryLedgerApiClient();
 
   const requestEntry = async () => {
     const directoryInstall = await ledgerApiClient.queryDirectoryInstall(primaryParty, provider);
