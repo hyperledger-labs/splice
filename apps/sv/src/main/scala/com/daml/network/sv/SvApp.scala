@@ -206,7 +206,7 @@ class SvApp(
     for {
       _ <- uploadDars(ledgerConnection)
       _ <- retryProvider.retryForAutomation(
-        "boostrapping SVC",
+        "bootstrapping SVC",
         bootstrapSvc(foundingConfig, svcStore, ledgerConnection, globalDomain),
         logger,
       )

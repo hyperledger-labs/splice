@@ -158,8 +158,11 @@ final class ScanConnection(
     val now = clock.now
     val cache = cachedRounds.get()
     if (cache.cacheValidUntil.exists(validUntil => now.isBefore(validUntil))) {
-      logger.debug(s"Using the client-cache to load the current round information.")
-      Future.successful(cache.getRoundTuple)
+      val rounds = cache.getRoundTuple
+      logger.info(
+        s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following rounds: $rounds."
+      )
+      Future.successful(rounds)
     } else {
       logger.debug(
         s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
@@ -174,13 +177,14 @@ final class ScanConnection(
         )
 
       } yield {
-        cachedRounds.set(
-          CachedMiningRounds(
-            Some(now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))),
-            openRounds,
-            issuingRounds,
-          )
+        val newValidUntil = now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))
+        val newRoundsCache = CachedMiningRounds(
+          Some(newValidUntil),
+          openRounds,
+          issuingRounds,
         )
+        logger.info(s"New rounds-cache is $newRoundsCache.")
+        cachedRounds.set(newRoundsCache)
         cachedRounds.get().getRoundTuple
       }
     }

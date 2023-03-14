@@ -2,6 +2,8 @@
 {-# OPTIONS -Wno-unused-matches #-}
 module CC.API.V1.Round where
 
+import DA.Time
+
 newtype Round = Round with number : Int
   deriving (Eq, Ord, Show)
 
@@ -11,6 +13,7 @@ data OpenMiningRoundView = OpenMiningRoundView with
   coinPrice : Decimal
   opensAt : Time
   targetClosesAt : Time
+  tickDuration : RelTime
 
 interface OpenMiningRound where
   viewtype OpenMiningRoundView

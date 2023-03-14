@@ -4,6 +4,7 @@ module CN.Wallet.Payment where
 
 import DA.Action
 import DA.List (dedupSort)
+import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
@@ -89,7 +90,7 @@ template AppPaymentRequest
          void $ fetch deliveryOffer
 
          contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
-         require "Round is set to expire in the future" (now < contextRound.targetClosesAt)
+         require ("Round is set to expire in the future (now=" <> show now <> ", targetClosesAt=" <> show contextRound.targetClosesAt <> ")") (now < contextRound.targetClosesAt)
 
          -- Convert from USD to CC amounts
          ccReceiverAmounts <- forA receiverAmounts $ \rq ->
@@ -97,6 +98,10 @@ template AppPaymentRequest
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
          outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
+
+         -- We know that the contextRound (=latest Round) won't be archived before 
+         -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger. 
+         let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt 
 
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
@@ -110,7 +115,7 @@ template AppPaymentRequest
                     amount = sum outputFees + sum (map (.ccAmount) ccReceiverAmounts)
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
-                      expiresAt = contextRound.targetClosesAt
+                      expiresAt = expiresAt
                     receiverFeeRatio = 0.0
                 ]
               payload = "lock payment"

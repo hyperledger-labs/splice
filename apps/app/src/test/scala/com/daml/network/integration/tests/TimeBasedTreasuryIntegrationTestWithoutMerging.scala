@@ -431,7 +431,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               entries,
             )(
               _.message should include regex (
-                s"Using the client-cache to load the current round information"
+                s"Using the client-cache"
               )
             )
           },
