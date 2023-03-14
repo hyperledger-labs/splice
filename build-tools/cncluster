@@ -390,9 +390,9 @@ function subcmd_gcloud_logs() {
         _error "No filter specified. See https://cloud.google.com/logging/docs/view/logging-query-language for docs on the query language."
     fi
 
-    namespace=$1
-    app=$2
-    filter=$3
+    namespace="$1"
+    app="$2"
+    filter="$3"
 
     _cluster_must_exist
 
@@ -1089,4 +1089,4 @@ if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
     _error  "Unknown subcommand: ${SUBCOMMAND_NAME}"
 fi
 
-subcmd_${SUBCOMMAND_NAME} $@
+subcmd_${SUBCOMMAND_NAME} "$@"
