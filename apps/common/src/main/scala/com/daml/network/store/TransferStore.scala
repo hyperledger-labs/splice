@@ -17,12 +17,12 @@ abstract class TransferStore extends AutoCloseable {
     * The only guarantee provided is that a transfer out that does not get transferred in
     * will eventually appear on the stream.
     */
-  def streamReadyForTransferIn(domainId: DomainId): Source[Transfer[TransferEvent.Out], NotUsed]
+  def streamReadyForTransferIn(domainId: DomainId): Source[TransferEvent.Out, NotUsed]
 
   /** Returns true if the transfer out event can still potentially be transferred in.
     * Intended to be used as a staleness check for the results of `streamReadyForTransferIn`.
     */
-  def isReadyForTransferIn(out: Transfer[TransferEvent.Out]): Future[Boolean]
+  def isReadyForTransferIn(out: TransferEvent.Out): Future[Boolean]
 
   def ingestionSink: TransferStore.IngestionSink
 }
@@ -32,18 +32,8 @@ object TransferStore {
   trait IngestionSink {
     def ingestionFilter: PartyId
 
-    /** Ingest a transfer in event with target = store's domain.
-      * This event has been observed on the target domain.
-      */
-    def ingestTransferIn(
-        event: Transfer[TransferEvent.In]
-    )(implicit traceContext: TraceContext): Future[Unit]
-
-    /** Ingest a transfer out event with target = store's domain.
-      * This event has been observed on the source domain.
-      */
-    def ingestTransferOut(
-        event: Transfer[TransferEvent.Out]
+    def ingestTransfer(
+        event: Transfer[TransferEvent]
     )(implicit traceContext: TraceContext): Future[Unit]
   }
 }

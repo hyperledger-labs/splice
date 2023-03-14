@@ -33,26 +33,24 @@ class TransferInTrigger(
     ) {
 
   override protected def completeTask(
-      transferOut: LedgerClient.GetTreeUpdatesResponse.Transfer[
-        LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-      ]
+      transferOut: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       outcome <-
-        if (partyId == transferOut.event.submitter) {
+        if (partyId == transferOut.submitter) {
           for {
             _ <- connection.submitTransferAndWaitNoDedup(
               submitter = partyId,
               command = LedgerClient.TransferCommand.In(
-                transferOutId = transferOut.event.transferOutId,
-                source = transferOut.event.source,
-                target = transferOut.event.target,
+                transferOutId = transferOut.transferOutId,
+                source = transferOut.source,
+                target = transferOut.target,
               ),
             )
-          } yield show"Initiated transfer in of ${transferOut.event.contractId.contractId} from ${transferOut.event.source} to ${transferOut.event.target}"
+          } yield show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
         } else {
           Future.successful(
-            show"Ignoring tranfer out of ${transferOut.event.contractId.contractId}, not initiated by our party"
+            show"Ignoring tranfer out of ${transferOut.contractId.contractId}, not initiated by our party"
           )
         }
     } yield TaskSuccess(outcome)

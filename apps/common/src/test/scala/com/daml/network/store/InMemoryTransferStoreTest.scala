@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import akka.actor.ActorSystem
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.TransferEvent
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
@@ -24,8 +24,8 @@ class InMemoryTransferStoreTest extends StoreTest {
 
   "InMemoryTransferStore" should {
     "stream transfers and report stale transfers" in {
-      val transfers = new AtomicReference(Seq.empty[Transfer[TransferEvent.Out]])
-      val transfersDummy2 = new AtomicReference(Seq.empty[Transfer[TransferEvent.Out]])
+      val transfers = new AtomicReference(Seq.empty[TransferEvent.Out])
+      val transfersDummy2 = new AtomicReference(Seq.empty[TransferEvent.Out])
       for {
         store <- mkStore()
         streamF = store
@@ -57,18 +57,18 @@ class InMemoryTransferStoreTest extends StoreTest {
           ),
         )
 
-        _ <- store.ingestionSink.ingestTransferOut(tDummy2Out)
+        _ <- store.ingestionSink.ingestTransfer(tDummy2Out)
 
         t0In = mkTransfer(
           "1",
           toTransferInEvent(coupon1, transferOutId = "0", dummy2Domain, dummyDomain),
         )
-        _ <- store.ingestionSink.ingestTransferOut(t0Out)
-        r <- store.isReadyForTransferIn(t0Out)
+        _ <- store.ingestionSink.ingestTransfer(t0Out)
+        r <- store.isReadyForTransferIn(t0Out.event)
         _ = r shouldBe true
         // Ingest transfer in, transfer out should be marked as no longer ready for transfer in
-        _ <- store.ingestionSink.ingestTransferIn(t0In)
-        r <- store.isReadyForTransferIn(t0Out)
+        _ <- store.ingestionSink.ingestTransfer(t0In)
+        r <- store.isReadyForTransferIn(t0Out.event)
         _ = r shouldBe false
 
         t1Out = mkTransfer(
@@ -80,12 +80,12 @@ class InMemoryTransferStoreTest extends StoreTest {
         )
         t1In = mkTransfer("3", toTransferInEvent(coupon2, transferOutId = "2"))
         // Ingest transfer in first
-        _ <- store.ingestionSink.ingestTransferIn(t1In)
-        r <- store.isReadyForTransferIn(t1Out)
+        _ <- store.ingestionSink.ingestTransfer(t1In)
+        r <- store.isReadyForTransferIn(t1Out.event)
         _ = r shouldBe false
         // Now ingest transfer out, no event will be emitted
-        _ <- store.ingestionSink.ingestTransferOut(t1Out)
-        r <- store.isReadyForTransferIn(t1Out)
+        _ <- store.ingestionSink.ingestTransfer(t1Out)
+        r <- store.isReadyForTransferIn(t1Out.event)
         _ = r shouldBe false
         // Ingest another transfer out to make sure that we really saw no event for t1
         t2Out = mkTransfer(
@@ -95,12 +95,12 @@ class InMemoryTransferStoreTest extends StoreTest {
             transferOutId = "3",
           ),
         )
-        _ <- store.ingestionSink.ingestTransferOut(t2Out)
+        _ <- store.ingestionSink.ingestTransfer(t2Out)
         _ <- streamF
         _ <- streamFDummy2
       } yield {
-        transfers.get() shouldBe Seq(t0Out, t2Out)
-        transfersDummy2.get() shouldBe Seq(tDummy2Out)
+        transfers.get() shouldBe Seq(t0Out, t2Out).map(_.event)
+        transfersDummy2.get() shouldBe Seq(tDummy2Out).map(_.event)
       }
     }
   }

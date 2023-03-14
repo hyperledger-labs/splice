@@ -323,18 +323,14 @@ abstract class OnReadyForTransferInTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.Transfer[
-      LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-    ]] {
+) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out] {
 
-  override protected val source: Source[LedgerClient.GetTreeUpdatesResponse.Transfer[
-    LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-  ], NotUsed] = store.transferStore.streamReadyForTransferIn(domainId)
+  override protected val source
+      : Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] =
+    store.transferStore.streamReadyForTransferIn(domainId)
 
   override final protected def isStaleTask(
-      task: LedgerClient.GetTreeUpdatesResponse.Transfer[
-        LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-      ]
+      task: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
   )(implicit tc: TraceContext): Future[Boolean] =
     store.transferStore.isReadyForTransferIn(task).map(!_)
 

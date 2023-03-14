@@ -3,7 +3,6 @@ package com.daml.network.automation
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
-  TransferEvent,
   TransferUpdate,
   TransactionTreeUpdate,
 }
@@ -45,14 +44,7 @@ class TransferIngestionService(
         domain,
       ) {
         case TransactionTreeUpdate(_) => Future.unit
-        case TransferUpdate(transfer) =>
-          transfer.event match {
-            case out: TransferEvent.Out =>
-              ingestionSink.ingestTransferOut(transfer.copy(event = out))
-            case in: TransferEvent.In =>
-              require(in.target == domain)
-              ingestionSink.ingestTransferIn(transfer.copy(event = in))
-          }
+        case TransferUpdate(transfer) => ingestionSink.ingestTransfer(transfer)
       }
     }
 
