@@ -496,7 +496,7 @@ class WalletTxLogIntegrationTest
       )(
         "All parties see new balances",
         _ => {
-          aliceWallet.balance().unlockedQty should be < BigDecimal(100.0)
+          aliceWallet.listAcceptedAppPayments() shouldBe empty
           bobWallet.balance().unlockedQty should be > BigDecimal(0.0)
           charlieWallet.balance().unlockedQty should be > BigDecimal(0.0)
         },
