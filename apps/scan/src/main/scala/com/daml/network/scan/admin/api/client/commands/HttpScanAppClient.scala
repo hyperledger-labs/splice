@@ -292,4 +292,66 @@ object HttpScanAppClient {
           }
       }
   }
+
+  final case class RateStep(
+      amount: BigDecimal,
+      rate: BigDecimal,
+  )
+  final case class SteppedRate(
+      initial: BigDecimal,
+      steps: Seq[RateStep],
+  )
+  final case class CoinConfig(
+      coinCreateFee: BigDecimal,
+      holdingFee: BigDecimal,
+      lockHolderFee: BigDecimal,
+      transferFee: SteppedRate,
+  )
+  case class GetCoinConfigForRound(round: Long)
+      extends BaseCommand[http.GetCoinConfigForRoundResponse, CoinConfig] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinConfigForRoundResponse] =
+      client.getCoinConfigForRound(round, headers)
+
+    private def decodeStep(step: definitions.RateStep): Either[String, RateStep] =
+      for {
+        amount <- Codec.decode(Codec.BigDecimal)(step.amount)
+        rate <- Codec.decode(Codec.BigDecimal)(step.rate)
+      } yield RateStep(amount, rate)
+
+    private def decodeTransferFeeSteps(
+        tf: Seq[definitions.RateStep]
+    ): Either[String, Seq[RateStep]] =
+      tf.map(decodeStep(_)).sequence
+
+    override def handleResponse(response: http.GetCoinConfigForRoundResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, CoinConfig] =
+      response match {
+        case http.GetCoinConfigForRoundResponse.OK(response) =>
+          for {
+            coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
+            holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
+            lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
+            initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
+            steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
+          } yield {
+            CoinConfig(
+              coinCreateFee = coinCreate,
+              holdingFee = holding,
+              lockHolderFee = lockHolder,
+              transferFee = SteppedRate(
+                initial = initial,
+                steps = steps,
+              ),
+            )
+          }
+        case http.GetCoinConfigForRoundResponse.NotFound(value) =>
+          Left(value.error)
+      }
+
+  }
 }

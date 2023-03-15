@@ -125,6 +125,14 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTotalCoinBalance)
     }
+
+  @Help.Summary("Get the Canton Coin config parameters for a given round")
+  def getCoinConfigForRound(
+      round: Long
+  ): HttpScanAppClient.CoinConfig =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetCoinConfigForRound(round))
+    }
 }
 
 final class ScanAppBackendReference(

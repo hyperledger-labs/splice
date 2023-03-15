@@ -123,4 +123,11 @@ trait CoinAppStoreWithHistory[
 
   protected final lazy val defaultTxLogReader: Future[TxLogStore.Reader[TXI, TXE]] =
     domains.signalWhenConnected(defaultAcsDomain).flatMap(txLogReader(_))
+
+  /** Provides access to the tx log directly, not through the reader.
+    *  This should be used when all necessary data is readily available in the
+    *  tx Index Records, thus no re-reading from the ledger is required.
+    */
+  protected final lazy val defaultTxLog: Future[TxLogStore[TXI, TXE]] =
+    domains.signalWhenConnected(defaultAcsDomain).flatMap(txLog(_))
 }

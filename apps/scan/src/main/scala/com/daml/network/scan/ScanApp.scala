@@ -63,7 +63,15 @@ class ScanApp(
   ): Future[ScanApp.State] =
     for {
       store <- Future.successful(
-        ScanStore(svcParty, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
+        ScanStore(
+          svcParty,
+          storage,
+          config.domains,
+          loggerFactory,
+          futureSupervisor,
+          ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
+          retryProvider,
+        )
       )
       automation = new ScanAutomationService(
         config.automation,

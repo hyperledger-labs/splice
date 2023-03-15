@@ -26,6 +26,7 @@ import scala.language.implicitConversions
 import java.time.Duration
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
+import com.daml.network.util.CoinUtil
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -167,10 +168,12 @@ object CoinTests {
     protected def mkCoinConfig(
         tickDuration: NonNegativeFiniteDuration = defaultTickDuration,
         maxNumInputs: Int = 100,
+        holdingFee: BigDecimal = CoinUtil.defaultHoldingFee.rate,
     ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
       defaultCoinConfig(
         tickDuration,
         maxNumInputs,
+        holdingFee,
       )
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {

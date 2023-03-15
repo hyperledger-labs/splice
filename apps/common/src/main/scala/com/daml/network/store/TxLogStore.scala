@@ -31,6 +31,13 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
       ec: ExecutionContext
   ): Future[Seq[TXI]]
 
+  /** Gets an entry that satisfies a given query.
+    * Throws [[Status.NOT_FOUND]] if no such entry exists.
+    */
+  def getTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+      ec: ExecutionContext
+  ): Future[TXI]
+
   /** List all events that come after the given event id up to the set limit.
     * Excludes the event with the given id.
     */
@@ -111,6 +118,13 @@ object TxLogStore {
       indices <- txLogStore.getTxLogIndicesByOffset(offset, limit)
       entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
     } yield entries
+
+    def getTxLogEntry(
+        query: (TXI) => Boolean = (_: TXI) => true
+    )(implicit ec: ExecutionContext, tc: TraceContext): Future[TXE] = for {
+      index <- txLogStore.getTxLogIndex(query)
+      entry <- loadTxLogEntry(index)
+    } yield entry
 
     def getTxLogAfterEventId(beginAfterEventId: String, limit: Int)(implicit
         ec: ExecutionContext,

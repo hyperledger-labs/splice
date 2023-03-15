@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinRetries
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory, StoreWithOpenMiningRounds}
+import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory, StoreWithOpenMiningRounds}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,9 +12,15 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.environment.CoinLedgerConnection
+import com.digitalasset.canton.tracing.TraceContext
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRounds {
+trait ScanStore
+    extends CoinAppStoreWithHistory[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
+    with StoreWithOpenMiningRounds {
+
+  override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -27,6 +33,10 @@ trait ScanStore extends CoinAppStoreWithoutHistory with StoreWithOpenMiningRound
     defaultAcs.flatMap(_.findContract(cc.coin.CoinRules.COMPANION)(_ => true))
 
   def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)]
+
+  def getCoinConfigForRound(round: Long)(implicit
+      tc: TraceContext
+  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]
 }
 
 object ScanStore {
@@ -36,6 +46,7 @@ object ScanStore {
       domainConfig: ScanDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
+      connection: CoinLedgerConnection,
       retryProvider: CoinRetries,
   )(implicit
       ec: ExecutionContext
@@ -47,6 +58,7 @@ object ScanStore {
           domainConfig,
           loggerFactory,
           futureSupervisor,
+          connection,
           retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")

@@ -17,6 +17,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import io.grpc.StatusRuntimeException
 
 class HttpScanHandler(
     store: ScanStore,
@@ -192,4 +193,33 @@ class HttpScanHandler(
         )
       }
     }
+
+  def getCoinConfigForRound(
+      response: v0.ScanResource.GetCoinConfigForRoundResponse.type
+  )(round: Long): Future[v0.ScanResource.GetCoinConfigForRoundResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      store
+        .getCoinConfigForRound(round)
+        .map(cfg =>
+          v0.ScanResource.GetCoinConfigForRoundResponse.OK(
+            definitions.GetCoinConfigForRoundResponse(
+              Codec.encode(cfg.coinCreateFee),
+              Codec.encode(cfg.holdingFee),
+              Codec.encode(cfg.lockHolderFee),
+              definitions.SteppedRate(
+                Codec.encode(cfg.initialTransferFee),
+                cfg.transferFeeSteps
+                  .map((step) => definitions.RateStep(Codec.encode(step._1), Codec.encode(step._2)))
+                  .toVector,
+              ),
+            )
+          )
+        )
+        .recover({
+          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+            v0.ScanResource.GetCoinConfigForRoundResponse
+              .NotFound(definitions.ErrorResponse(s"Round ${round} not found"))
+        })
+    }
+
 }

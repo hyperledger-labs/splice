@@ -30,6 +30,7 @@ import monocle.macros.syntax.lens.*
 import scala.collection.immutable.SortedMap
 import scala.collection.{immutable, mutable}
 import scala.concurrent.*
+import io.grpc.Status
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
@@ -340,6 +341,18 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       ec: ExecutionContext
   ): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.dropWhile(_.eventId != beginAfterEventId).slice(1, 1 + limit))
+
+  def getTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+      ec: ExecutionContext
+  ): Future[TXI] =
+    Future.successful(
+      stateVar.txLog
+        .filter(query)
+        .headOption
+        .getOrElse(
+          throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
+        )
+    )
 
   override def close(): Unit = ()
 }

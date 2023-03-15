@@ -132,20 +132,37 @@ object CoinUtil {
       ).asJava,
     )
 
+  val defaultCreateFee = new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal)
+
+  val defaultTransferFee = new cc.fees.SteppedRate(
+    BigDecimal(0.01).bigDecimal,
+    Seq(
+      new Tuple2(BigDecimal(100.0).bigDecimal, BigDecimal(0.001).bigDecimal),
+      new Tuple2(BigDecimal(1000.0).bigDecimal, BigDecimal(0.0001).bigDecimal),
+      new Tuple2(BigDecimal(1000000.0).bigDecimal, BigDecimal(0.00001).bigDecimal),
+    ).asJava,
+  )
+
+  val defaultLockHolderFee = new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal)
+
+  // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
+
   def defaultCoinConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
+      holdingFee: BigDecimal = defaultHoldingFee.rate,
   ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
-    defaultCoinConfig(initialTickDuration, initialMaxNumInputs),
+    defaultCoinConfig(initialTickDuration, initialMaxNumInputs, holdingFee),
     List.empty[Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]].asJava,
   )
 
   def defaultCoinConfig(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
+      holdingFee: BigDecimal,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
     // transferConfig
-    defaultTransferConfig(initialMaxNumInputs),
+    defaultTransferConfig(initialMaxNumInputs, holdingFee),
 
     // issuance curve from whitepaper
     defaultIssuanceCurve,
@@ -155,33 +172,27 @@ object CoinUtil {
   )
 
   def defaultTransferConfig(
-      initialMaxNumInputs: Int
+      initialMaxNumInputs: Int,
+      holdingFee: BigDecimal,
   ): cc.coinconfig.TransferConfig[cc.coinconfig.USD] = new cc.coinconfig.TransferConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
-    new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal),
+    defaultCreateFee,
 
     // Fee for keeping a coin around.
     // This is roughly equivalent to 1$/360 days but expressed as rounds
     // with one day corresponding to 24*60/2.5 rounds, i.e., one round
     // every 2.5 minutes.
     // Incentivizes users to actively merge their coins.
-    defaultHoldingFee,
+    new cc.fees.RatePerRound(holdingFee.bigDecimal),
 
     // Fee for transferring some amount of coin to a new owner.
-    new cc.fees.SteppedRate(
-      BigDecimal(0.01).bigDecimal,
-      Seq(
-        new Tuple2(BigDecimal(100.0).bigDecimal, BigDecimal(0.001).bigDecimal),
-        new Tuple2(BigDecimal(1000.0).bigDecimal, BigDecimal(0.0001).bigDecimal),
-        new Tuple2(BigDecimal(1000000.0).bigDecimal, BigDecimal(0.00001).bigDecimal),
-      ).asJava,
-    ),
+    defaultTransferFee,
 
     // Fee per lock holder.
     // Chosen to match the update fee to cover the cost of informing lock-holders about
     // actions on the locked coin.
-    new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal),
+    defaultLockHolderFee,
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.

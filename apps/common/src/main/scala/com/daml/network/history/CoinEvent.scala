@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, CoinRules, CoinRules_DevNet_Tap}
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 
 case class Transfer(
@@ -61,6 +62,20 @@ object CoinCreate {
   type T = Coin
   type ContractType = Contract[TCid, T]
   val companion = Coin.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+// TODO(#2930): This is not really a Coin event - consider either renaming the file, or splitting it into different ones based on event "types"
+object OpenMiningRoundCreate {
+  type TCid = OpenMiningRound.ContractId
+  type T = OpenMiningRound
+  type ContractType = Contract[TCid, T]
+  val companion = OpenMiningRound.COMPANION
 
   def unapply(
       event: CreatedEvent

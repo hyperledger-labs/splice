@@ -95,7 +95,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-  /total-coin-balance:
+  /api/v0/total-coin-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -107,6 +107,32 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetTotalCoinBalanceResponse"
+  /api/v0/coin-config-for-round:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getCoinConfigForRound"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -176,4 +202,42 @@ components:
         total_unlocked_balance:
           type: string
         total_locked_balance:
+          type: string
+    GetCoinConfigForRoundResponse:
+      type: object
+      required: ["coin_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
+      properties:
+        coin_create_fee:
+          type: string
+        holding_fee:
+          type: string
+        lock_holder_fee:
+          type: string
+        transfer_fee:
+          $ref: "#/components/schemas/SteppedRate"
+    SteppedRate:
+      type: object
+      required: ["initial", "steps"]
+      properties:
+        initial:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/RateStep"
+    RateStep:
+      type: object
+      required: ["amount", "rate"]
+      properties:
+        amount:
+          type: string
+        rate:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
           type: string
