@@ -1,9 +1,10 @@
-import { AuthProvider, UserProvider } from 'common-frontend';
+import { AuthProvider, theme, UserProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
+import { ThemeProvider, CssBaseline } from '@mui/material';
+
 import App from './App';
-import './index.css';
 import reportWebVitals from './reportWebVitals';
 import { config } from './utils';
 
@@ -11,11 +12,14 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     {
-      <AuthProvider authConf={config.auth}>
-        <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-          <App />
-        </UserProvider>
-      </AuthProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider authConf={config.auth}>
+          <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+            <App />
+          </UserProvider>
+        </AuthProvider>
+      </ThemeProvider>
     }
   </React.StrictMode>
 );

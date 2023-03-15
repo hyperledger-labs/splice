@@ -1,4 +1,4 @@
-import { Button, ButtonProps } from '@mui/material';
+import { Button, ButtonProps, Typography } from '@mui/material';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment/module';
 import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions/module';
@@ -11,17 +11,21 @@ interface Props<T> extends ButtonProps {
 }
 
 const WalletButton = <T,>(props: Props<T>, walletPage: string) => {
+  const { text, createPaymentRequest, walletPath, ...buttonProps } = props;
+
   const onClick = async () => {
-    const cid = await props.createPaymentRequest();
+    const cid = await createPaymentRequest();
     const here = window.location.origin.toString();
     window.location.assign(
-      `${props.walletPath}/${walletPage}/${cid}/?redirect=${encodeURIComponent(here)}`
+      `${walletPath}/${walletPage}/${cid}/?redirect=${encodeURIComponent(here)}`
     );
   };
 
   return (
-    <Button className={props.className} id={props.id} onClick={onClick}>
-      {props.text}
+    <Button {...buttonProps} onClick={onClick}>
+      <Typography variant="body1" textTransform="none">
+        {text}
+      </Typography>
     </Button>
   );
 };

@@ -1,10 +1,11 @@
 import { SubscriptionButton } from 'common-frontend/lib/components/WalletButtons';
 import { useState } from 'react';
 
-import { FormGroup, TextField, Typography } from '@mui/material';
+import { FormGroup, Typography } from '@mui/material';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 
+import Searchbar from '../components/Searchbar';
 import { useDirectoryLedgerApiClient } from '../contexts/DirectoryLedgerApiContext';
 import { config } from '../utils';
 
@@ -34,18 +35,18 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
 
   return (
     <div>
-      <Typography variant="h6">Request New Directory Entry</Typography>
+      <Typography variant="body1">Register your name in the Canton Network</Typography>
+      <Typography variant="h1">Search for the name you’d like to register</Typography>
       <FormGroup row>
-        <TextField
-          label="Name"
+        <Searchbar
           value={entryName}
           onChange={event => setEntryName(event.target.value)}
           id="entry-name-field"
-        ></TextField>
+        />
         <SubscriptionButton
-          variant="contained"
+          variant="pill"
           id="request-entry-with-sub-button"
-          text="Request entry"
+          text="Search"
           createPaymentRequest={requestEntry}
           walletPath={config.services.wallet.uiUrl}
         />
