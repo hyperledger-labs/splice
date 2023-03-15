@@ -24,16 +24,19 @@ class WalletTxLogIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
-  // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
-  // We disable the automation for this suite.
   override def environmentDefinition: CoinEnvironmentDefinition = {
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
+      // We disable the automation for this suite.
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
         )(config)
       )
+      // Set a non-unit coin price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(0.75)(config))
+      // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
         bobValidator.remoteParticipant.dars.upload(splitwellDarPath)
@@ -141,7 +144,7 @@ class WalletTxLogIntegrationTest
         collectAcceptedAppPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
-          aliceUserParty,
+          Seq(aliceUserParty),
           acceptedPaymentCid,
         ),
       )(
@@ -173,7 +176,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // First part of collecting the payment: Unlocking the 10CC locked coin.
-            // Note: this and the next entry should really be merged in the history.
+            // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
@@ -257,6 +260,102 @@ class WalletTxLogIntegrationTest
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // Rejecting the accepted self-payment request returned the 10CC locked coin.
             logEntry.amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
+          },
+        ),
+      )
+    }
+
+    "handle mixed currency payment requests" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
+      val coinPrice = scan.getLatestOpenMiningRound(env.environment.clock.now).payload.coinPrice
+      assert(coinPrice.compareTo(BigDecimal(1.0)) != 0, "Test is more useful if CC != USD")
+
+      val transferAmountCC = 22.0
+      val transferAmountUSD = 20.0
+      val transferAmountUSDinCC = transferAmountUSD / coinPrice.doubleValue()
+      val transferAmountTotalCC = transferAmountCC + transferAmountUSDinCC
+
+      clue("Tap to get some coins") {
+        aliceWallet.tap(100.0)
+      }
+
+      val ((_, reqCid, _), _) = actAndCheck(
+        "Alice creates payment request",
+        createPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.ledgerApiUser,
+          aliceUserParty,
+          Seq(
+            receiverAmount(charlieUserParty, transferAmountCC, walletCodegen.Currency.CC),
+            receiverAmount(aliceValidatorUserParty, transferAmountUSD, walletCodegen.Currency.USD),
+          ),
+        ),
+      )(
+        "Alice sees the payment request",
+        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+      )
+
+      val (acceptedPaymentCid, _) = actAndCheck(
+        "Alice accepts the payment request",
+        aliceWallet.acceptAppPaymentRequest(reqCid),
+      )(
+        "Payment request disappears from list",
+        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+      )
+
+      actAndCheck(
+        "Receivers collect the payment request",
+        collectAcceptedAppPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.ledgerApiUser,
+          Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
+          acceptedPaymentCid,
+        ),
+      )(
+        "Accepted app payment disappears",
+        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+      )
+
+      checkTxHistory(
+        aliceWallet,
+        Seq(
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount shouldBe 100.0
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Accepting the payment request created a locked coin,
+            // leading to a net loss because of transfer fees.
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(transferAmountTotalCC, transferAmountTotalCC + smallAmount)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            // First part of collecting the payment: Unlocking the locked coin.
+            // TODO(#3486) - this and the next entry should be merged
+            logEntry.amount should beWithin(
+              transferAmountTotalCC,
+              transferAmountTotalCC + smallAmount,
+            )
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Second part of collecting the payment: Transferring the coin to the receivers
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(transferAmountTotalCC, transferAmountTotalCC + smallAmount)
+            }
+            inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
+              receiver1 shouldBe charlieUserParty.toProtoPrimitive
+              amount1 should beWithin(transferAmountCC - smallAmount, transferAmountCC)
+
+              receiver2 shouldBe aliceValidatorUserParty.toProtoPrimitive
+              amount2 should beWithin(transferAmountUSDinCC - smallAmount, transferAmountUSDinCC)
+            }
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
         ),
       )
@@ -442,7 +541,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // First part of collecting the payment: Unlocking the 50CC locked coin.
-            // Note: this and the next entry should really be merged in the history.
+            // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(50, 50 + smallAmount)
           },
           checkTransfer,
@@ -580,7 +679,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // Note: this and the next entry should really be merged in the history.
+            // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,
@@ -596,7 +695,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // Note: this and the next entry should really be merged in the history.
+            // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,
@@ -816,7 +915,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // Note: this and the next entry should really be merged in the history.
+            // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,

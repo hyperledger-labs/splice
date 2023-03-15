@@ -143,7 +143,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   def collectAcceptedAppPaymentRequest(
       remoteParticipant: CoinRemoteParticipantReference,
       userId: String,
-      userParty: PartyId,
+      signatories: Seq[PartyId],
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
@@ -154,7 +154,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     val appTc = tc.toUnfeaturedAppTransferContext()
     remoteParticipant.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
-      actAs = Seq(userParty),
+      actAs = signatories,
       readAs = Seq(),
       update = acceptedPayment.exerciseAcceptedAppPayment_Collect(
         appTc
@@ -423,10 +423,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
     )
 
+    val signatories =
+      Seq(userParty) ++ receiverAmounts.map(a => PartyId.tryFromProtoPrimitive(a.receiver))
+
     val requestCid = clue("Create a payment request") {
       val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
-        actAs = Seq(userParty),
+        actAs = signatories.distinct,
         readAs = Seq.empty,
         update = paymentRequest.create,
         domainId = domainId,
