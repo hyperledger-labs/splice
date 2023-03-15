@@ -35,9 +35,10 @@ abstract class CoinAppAutomationService(
       perDomainTriggerContext: TriggerContext,
   ) = {
     val stores = store.installNewPerDomainStore(domain, perDomainTriggerContext.loggerFactory)
-    val ingestionService = new AcsIngestionService(
+    val ingestionService = new UpdateIngestionService(
       store.getClass.getSimpleName,
       store.storesIngestionSink(stores),
+      store.transferStore.ingestionSink,
       domain,
       connection,
       perDomainTriggerContext.retryProvider,
@@ -55,21 +56,6 @@ abstract class CoinAppAutomationService(
     }
   }
 
-  def newTransferIngestionService(
-      store: CoinAppStore[?, ?],
-      domain: DomainId,
-      perDomainTriggerContext: TriggerContext,
-  ) =
-    new TransferIngestionService(
-      store.getClass.getSimpleName,
-      store.transferStore.ingestionSink,
-      domain,
-      connection,
-      perDomainTriggerContext.retryProvider,
-      perDomainTriggerContext.loggerFactory,
-      perDomainTriggerContext.timeouts,
-    )
-
   stores.values.foreach(store => {
     registerTrigger(
       new DomainIngestionService(
@@ -82,10 +68,7 @@ abstract class CoinAppAutomationService(
       triggerContext,
       store.domains,
       DomainOrchestrator.multipleServices(
-        Seq(
-          (da, triggerContext) => registerDomainAcs(store, da.domainId, triggerContext),
-          (da, triggerContext) => newTransferIngestionService(store, da.domainId, triggerContext),
-        ),
+        Seq((da, triggerContext) => registerDomainAcs(store, da.domainId, triggerContext)),
         loggerFactory,
       ),
     )

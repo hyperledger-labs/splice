@@ -1,6 +1,10 @@
 package com.daml.network.store
 
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  TreeUpdate,
+  Transfer,
+  TransferEvent,
+}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -33,6 +37,11 @@ object TransferStore {
     def getLastIngestedOffset(domain: DomainId): Future[Option[String]]
 
     def ingestionFilter: PartyId
+
+    def ingestUpdate(
+        domainId: DomainId,
+        update: TreeUpdate,
+    )(implicit traceContext: TraceContext): Future[Unit]
 
     def ingestTransfer(
         event: Transfer[TransferEvent]

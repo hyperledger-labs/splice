@@ -77,7 +77,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                 })
               })
             },
-            // couple the lifecycle of retrying to the lifecycle of the AcsIngestionService
+            // couple the lifecycle of retrying to the lifecycle of the UpdateIngestionService
             logger,
             // also retry on the INTERNAL error above
             additionalCodes = Seq(Status.Code.INTERNAL),

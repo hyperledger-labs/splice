@@ -96,6 +96,9 @@ class CoinLedgerConnection(
     result
   }
 
+  def ledgerEnd(domain: DomainId): Future[LedgerOffset] =
+    client.ledgerEnd(domain)
+
   def submitCommandsNoDedup(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
@@ -249,30 +252,32 @@ class CoinLedgerConnection(
   def activeContractsWithOffset(
       domain: DomainId,
       filter: IngestionFilter,
+      offsetO: Option[LedgerOffset] = None,
   ): Future[(Seq[CreatedEvent], LedgerOffset)] =
-    client.ledgerEnd(domain).flatMap {
-      case lb: LedgerOffset.LedgerBegin => Future.successful((Seq.empty, lb))
-      case simulatedAcsEnd =>
-        val req = LedgerClient.GetUpdatesRequest(
-          LedgerOffset.LedgerBegin.getInstance,
-          Some(simulatedAcsEnd),
-          filter.primaryParty,
-          domain,
-        )
-        val filterCreates = interpretCreateFilter(filter)
-        val mapCe = client
-          .updates(req)
-          .via(treesAsTransactions)
-          .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
-            val (creates, archives) = tx.events.partitionMap {
-              case AcsEvent.Created(ce) => Left((ce.getContractId, ce))
-              case AcsEvent.Archived(cid) => Right(cid)
-            }
-            val tpIdFilteredCreates = creates.view filter { case (_, ce) => filterCreates(ce) }
-            cidCe ++ tpIdFilteredCreates -- archives
-          })
-        mapCe.map(m => (m.values.toSeq, simulatedAcsEnd))
-    }
+    for {
+      offset <- offsetO match {
+        case None => client.ledgerEnd(domain)
+        case Some(o) => Future.successful(o)
+      }
+      req = LedgerClient.GetUpdatesRequest(
+        LedgerOffset.LedgerBegin.getInstance,
+        Some(offset),
+        filter.primaryParty,
+        domain,
+      )
+      filterCreates = interpretCreateFilter(filter)
+      acsMap <- client
+        .updates(req)
+        .via(treesAsTransactions)
+        .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
+          val (creates, archives) = tx.events.partitionMap {
+            case AcsEvent.Created(ce) => Left((ce.getContractId, ce))
+            case AcsEvent.Archived(cid) => Right(cid)
+          }
+          val tpIdFilteredCreates = creates.view filter { case (_, ce) => filterCreates(ce) }
+          cidCe ++ tpIdFilteredCreates -- archives
+        })
+    } yield (acsMap.values.toSeq, offset)
 
   private def interpretCreateFilter(filter: IngestionFilter): CreatedEvent => Boolean = {
     val IngestionFilter(primaryParty, templateIds, interfaceIds) = filter
@@ -301,8 +306,9 @@ class CoinLedgerConnection(
   def activeContracts(
       domain: DomainId,
       filter: IngestionFilter,
+      offset: Option[LedgerOffset] = None,
   ): Future[Seq[CreatedEvent]] =
-    activeContractsWithOffset(domain, filter).map(_._1)
+    activeContractsWithOffset(domain, filter, offset).map(_._1)
 
   def activeContracts[TCid <: ContractId[T], T <: Template](
       domain: DomainId,
@@ -311,17 +317,18 @@ class CoinLedgerConnection(
   ): Future[Seq[Contract[TCid, T]]] =
     activeContractsWithOffset(domain, party, companion).map(_._1)
 
-  def getInFlightTransfersWithOffset(
+  def getInFlightTransfers(
       source: DomainId,
       party: PartyId,
-  ): Future[(Seq[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out], LedgerOffset.Absolute)] =
+      offset: Option[LedgerOffset.Absolute],
+  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out]] =
     client
       .getInFlightTransfers(
         Seq(party),
         source,
-        None,
+        offset,
       )
-      .map(r => (r.transferOuts, r.offset))
+      .map(_.transferOuts)
 
   // TODO (#2706)
   // This is a hacked up wrapper that transforms transaction trees into flat transactions.
@@ -341,12 +348,13 @@ class CoinLedgerConnection(
       clientName: String,
       baseLoggerFactory: NamedLoggerFactory,
       beginOffset: LedgerOffset,
+      endOffset: Option[LedgerOffset],
       party: PartyId,
       domain: DomainId,
   )(mapOperator: Flow[TreeUpdate, Any, _]): CoinLedgerSubscription[?] = {
     new CoinLedgerSubscription(
       client.updates(
-        LedgerClient.GetUpdatesRequest(beginOffset, None, party, domain)
+        LedgerClient.GetUpdatesRequest(beginOffset, endOffset, party, domain)
       ),
       Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
       timeouts,
@@ -400,10 +408,11 @@ class CoinLedgerConnection(
       clientName: String,
       baseLoggerFactory: NamedLoggerFactory,
       beginOffset: LedgerOffset,
+      endOffset: Option[LedgerOffset] = None,
       filter: PartyId,
       domain: DomainId,
   )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription[?] =
-    subscription(clientName, baseLoggerFactory, beginOffset, filter, domain)({
+    subscription(clientName, baseLoggerFactory, beginOffset, endOffset, filter, domain)({
       Flow[TreeUpdate].mapAsync(1)(f)
     })
 

@@ -2,7 +2,13 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  TreeUpdate,
+  TransactionTreeUpdate,
+  Transfer,
+  TransferEvent,
+  TransferUpdate,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -81,13 +87,34 @@ class InMemoryTransferStore(
     }
 
   override val ingestionSink: TransferStore.IngestionSink = new TransferStore.IngestionSink {
-    override def ingestTransfer(
+    override def ingestUpdate(
+        domainId: DomainId,
+        update: TreeUpdate,
+    )(implicit traceContext: TraceContext): Future[Unit] =
+      update match {
+        case TransferUpdate(transfer) =>
+          ingestTransfer(transfer)
+        case TransactionTreeUpdate(tree) =>
+          ingestOffsetUpdate(domainId, tree.getOffset)
+      }
+
+    def ingestTransfer(
         transfer: Transfer[TransferEvent]
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestTransfer(transfer)
       ).map { case (summary, offsetChanged) =>
         logger.debug(show"Ingested transfer: $summary")
+        offsetChanged.success(())
+      }
+
+    private def ingestOffsetUpdate(domainId: DomainId, offset: String)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] =
+      updateState(
+        _.ingestOffsetUpdate(domainId, offset)
+      ).map { offsetChanged =>
+        logger.debug(show"Ingested offset for domain $domainId: $offset")
         offsetChanged.success(())
       }
 
@@ -174,6 +201,15 @@ object InMemoryTransferStore {
         (summary, offsetChanged),
       )
     }
+
+    def ingestOffsetUpdate(domainId: DomainId, offset: String) =
+      (
+        this.copy(
+          offsets = offsets + (domainId -> offset),
+          offsetChanged = Promise(),
+        ),
+        offsetChanged,
+      )
 
     def ingestInFlightTransfers(
         observedOn: DomainId,
