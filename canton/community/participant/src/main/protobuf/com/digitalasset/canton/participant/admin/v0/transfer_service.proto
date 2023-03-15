@@ -28,6 +28,7 @@ message AdminTransferOutRequest {
     string application_id = 5;
     string submission_id = 6; // optional
     string workflow_id = 7; // optional
+    string command_id = 8; // optional
 }
 
 message AdminTransferOutResponse {
@@ -41,6 +42,7 @@ message AdminTransferInRequest {
     string application_id = 4;
     string submission_id = 5; // optional
     string workflow_id = 6; // optional
+    string command_id = 7; // optional
 }
 
 message AdminTransferInResponse {

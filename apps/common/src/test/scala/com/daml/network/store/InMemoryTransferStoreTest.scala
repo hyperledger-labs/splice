@@ -103,5 +103,26 @@ class InMemoryTransferStoreTest extends StoreTest {
         transfersDummy2.get() shouldBe Seq(tDummy2Out).map(_.event)
       }
     }
+
+    "can remove completed transfer out events" in {
+      for {
+        store <- mkStore()
+        t0Out = mkTransfer(
+          "0",
+          toTransferOutEvent(
+            coupon1.contractId,
+            transferOutId = "0",
+            dummy2Domain,
+            dummyDomain,
+          ),
+        )
+        _ <- store.ingestionSink.ingestTransfer(t0Out)
+        r <- store.isReadyForTransferIn(t0Out.event)
+        _ = r shouldBe true
+        _ <- store.ingestionSink.removeCompletedTransferOut(t0Out.event)
+        r <- store.isReadyForTransferIn(t0Out.event)
+        _ = r shouldBe false
+      } yield succeed
+    }
   }
 }

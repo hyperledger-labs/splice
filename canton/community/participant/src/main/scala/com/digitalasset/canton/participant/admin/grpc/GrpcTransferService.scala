@@ -37,6 +37,7 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationIdP,
       submissionIdP,
       workflowIdP,
+      _,
     ) = request
     val res = for {
       sourceDomain <- mapErr(DomainAlias.create(sourceDomainP))
@@ -77,6 +78,7 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationIdP,
       submissionIdP,
       workflowIdP,
+      _,
     ) = request
     val res = for {
       targetDomain <- mapErr(DomainAlias.create(targetDomainP))

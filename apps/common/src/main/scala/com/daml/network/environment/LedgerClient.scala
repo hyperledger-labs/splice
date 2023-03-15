@@ -34,6 +34,7 @@ import com.digitalasset.canton.research.participant.multidomain.{
   transfer as xfr,
   transfer_command as xfrcmd,
   transfer_submission_service as xfrsvc,
+  state_snapshot_service as snapshotsvc,
   update_service as upsvc,
 }
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -98,6 +99,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   private val multidomainCompletionServiceStub
       : mdcpl.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
     withCredentials(mdcpl.CommandCompletionServiceGrpc.stub(channel), token)
+  private val stateSnapshotServiceStub
+      : snapshotsvc.StateSnapshotServiceGrpc.StateSnapshotServiceStub =
+    withCredentials(snapshotsvc.StateSnapshotServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -393,6 +397,21 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       ),
       multidomainCompletionServiceStub.completionStream,
     ) map CompletionStreamResponse.fromProto
+
+  def getInFlightTransfers(
+      parties: Seq[PartyId],
+      source: DomainId,
+      offset: Option[LedgerOffset.Absolute],
+  ): Future[LedgerClient.GetInFlightTransfersResponse] = {
+    val req = snapshotsvc.GetInFlightTransfersRequest(
+      sourceDomainId = source.toProtoPrimitive,
+      validAtOffset = offset.fold("")(_.getOffset),
+      stakeholders = parties.map(_.toProtoPrimitive),
+    )
+    stateSnapshotServiceStub
+      .getInFlightTransfers(req)
+      .map(LedgerClient.GetInFlightTransfersResponse.fromProto)
+  }
 }
 
 object LedgerClient {
@@ -418,6 +437,21 @@ object LedgerClient {
         )
       )
     }
+  }
+
+  final case class GetInFlightTransfersResponse(
+      offset: LedgerOffset.Absolute,
+      transferOuts: Seq[GetTreeUpdatesResponse.TransferEvent.Out],
+  )
+
+  object GetInFlightTransfersResponse {
+    private[LedgerClient] def fromProto(
+        proto: snapshotsvc.GetInFlightTransfersResponse
+    ): GetInFlightTransfersResponse =
+      GetInFlightTransfersResponse(
+        new LedgerOffset.Absolute(proto.offset),
+        proto.transferOuts.map(GetTreeUpdatesResponse.TransferEvent.Out.fromProto(_)),
+      )
   }
 
   final case class GetUpdatesRequest(

@@ -30,10 +30,25 @@ abstract class TransferStore extends AutoCloseable {
 object TransferStore {
 
   trait IngestionSink {
+    def getLastIngestedOffset(domain: DomainId): Future[Option[String]]
+
     def ingestionFilter: PartyId
 
     def ingestTransfer(
         event: Transfer[TransferEvent]
+    )(implicit traceContext: TraceContext): Future[Unit]
+
+    def ingestInFlightTransfers(
+        observedOn: DomainId,
+        transfers: Seq[TransferEvent.Out],
+    )(implicit traceContext: TraceContext): Future[Unit]
+
+    def switchToIngestingUpdates(domainId: DomainId, offset: String)(implicit
+        traceContext: TraceContext
+    ): Future[Unit]
+
+    def removeCompletedTransferOut(
+        event: TransferEvent.Out
     )(implicit traceContext: TraceContext): Future[Unit]
   }
 }

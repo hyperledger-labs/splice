@@ -311,6 +311,18 @@ class CoinLedgerConnection(
   ): Future[Seq[Contract[TCid, T]]] =
     activeContractsWithOffset(domain, party, companion).map(_._1)
 
+  def getInFlightTransfersWithOffset(
+      source: DomainId,
+      party: PartyId,
+  ): Future[(Seq[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out], LedgerOffset.Absolute)] =
+    client
+      .getInFlightTransfers(
+        Seq(party),
+        source,
+        None,
+      )
+      .map(r => (r.transferOuts, r.offset))
+
   // TODO (#2706)
   // This is a hacked up wrapper that transforms transaction trees into flat transactions.
   // This is required because the update service initially only exposes transaction trees.

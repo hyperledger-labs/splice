@@ -72,6 +72,7 @@ import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{DiscardOps, DomainAlias, LedgerParticipantId}
 
 import java.time.Instant
+import java.util.UUID
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration.Duration
 
@@ -1480,6 +1481,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
               applicationId = applicationId,
               submissionId = submissionId,
               workflowId = workflowId,
+              commandId = UUID.randomUUID().toString,
             )
         )
       })
@@ -1511,6 +1513,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
               applicationId,
               submissionId,
               workflowId,
+              commandId = UUID.randomUUID().toString,
             )
         )
       })

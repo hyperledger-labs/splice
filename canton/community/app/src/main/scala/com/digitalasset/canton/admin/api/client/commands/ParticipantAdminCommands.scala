@@ -746,6 +746,7 @@ object ParticipantAdminCommands {
         applicationId: LedgerParticipantId,
         submissionId: String,
         workflowId: String,
+        commandId: String,
     ) extends Base[AdminTransferOutRequest, AdminTransferOutResponse, TransferId] {
       override def createRequest(): Either[String, AdminTransferOutRequest] =
         Right(
@@ -757,6 +758,7 @@ object ParticipantAdminCommands {
             applicationId = applicationId,
             submissionId = submissionId,
             workflowId = workflowId,
+            commandId = commandId,
           )
         )
 
@@ -781,6 +783,7 @@ object ParticipantAdminCommands {
         applicationId: LedgerParticipantId,
         submissionId: String,
         workflowId: String,
+        commandId: String,
     ) extends Base[AdminTransferInRequest, AdminTransferInResponse, Unit] {
 
       override def createRequest(): Either[String, AdminTransferInRequest] =
@@ -792,6 +795,7 @@ object ParticipantAdminCommands {
             applicationId = applicationId,
             submissionId = submissionId,
             workflowId = workflowId,
+            commandId = commandId,
           )
         )
 

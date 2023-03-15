@@ -1,5 +1,8 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.error.ErrorCodeUtils
+import com.daml.error.ErrorCategory
+import com.daml.error.utils.ErrorDetails
 import com.daml.network.store.CoinAppStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
@@ -13,6 +16,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,19 +43,54 @@ class TransferInTrigger(
       outcome <-
         if (partyId == transferOut.submitter) {
           for {
-            _ <- connection.submitTransferAndWaitNoDedup(
-              submitter = partyId,
-              command = LedgerClient.TransferCommand.In(
-                transferOutId = transferOut.transferOutId,
-                source = transferOut.source,
-                target = transferOut.target,
-              ),
-            )
-          } yield show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
+            msg <- connection
+              .submitTransferAndWaitNoDedup(
+                submitter = partyId,
+                command = LedgerClient.TransferCommand.In(
+                  transferOutId = transferOut.transferOutId,
+                  source = transferOut.source,
+                  target = transferOut.target,
+                ),
+              )
+              .map(_ =>
+                show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
+              )
+              .recoverWith { case TransferInTrigger.TransferCompletedException(_) =>
+                store.transferStore.ingestionSink
+                  .removeCompletedTransferOut(transferOut)
+                  .map(_ =>
+                    show"Transfer in for ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target} failed because the transfer was already completed, removed from transfer store"
+                  )
+              }
+          } yield msg
         } else {
           Future.successful(
             show"Ignoring tranfer out of ${transferOut.contractId.contractId}, not initiated by our party"
           )
         }
     } yield TaskSuccess(outcome)
+}
+
+object TransferInTrigger {
+  object TransferCompletedException {
+    def unapply(ex: Throwable): Option[StatusRuntimeException] =
+      ex match {
+        case statusEx: StatusRuntimeException =>
+          val errorCategory: Option[ErrorCategory] =
+            ErrorCodeUtils.errorCategoryFromString(statusEx.getStatus.getDescription)
+          val errorDetails = ErrorDetails.from(statusEx)
+          val isTransferCompletedEx =
+            errorCategory == Some(ErrorCategory.InvalidGivenCurrentSystemStateOther)
+              && errorDetails.exists {
+                case ErrorDetails.ErrorInfoDetail(errorCode, metadata) =>
+                  errorCode == "TRANSFER_COMMAND_VALIDATION" &&
+                  metadata.get("error").exists(_.contains("transfer already completed"))
+                case _: ErrorDetails.ResourceInfoDetail | _: ErrorDetails.RetryInfoDetail |
+                    _: ErrorDetails.RequestInfoDetail =>
+                  false
+              }
+          Option.when(isTransferCompletedEx)(statusEx)
+        case _ => None
+      }
+  }
 }
