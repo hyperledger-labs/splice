@@ -9,6 +9,6 @@ $(dir)/clean:
 
 
 .PHONY: $(dir)/format
-$(dir)/format:
+$(dir)/format: $(dir)/install
 	cd $(@D) && npm run format:fix
 

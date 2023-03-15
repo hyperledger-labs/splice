@@ -1,34 +1,10 @@
-images := \
-	canton \
-	canton-participant \
-	canton-domain \
-	\
-	cn-app \
-	sv-app \
-	svc-app \
-	scan-app \
-	scan-web-ui \
-	directory-app \
-	wallet-app \
-	wallet-new-web-ui \
-	wallet-web-ui \
-	validator-app \
-	splitwell-app \
-	\
-	validator1-directory-web-ui \
-	validator1-splitwell-web-ui \
-	\
-	docs \
-	external-proxy \
-	gcs-proxy \
-	envoy-proxy
-
-canton-image := cluster/images/canton
-cn-image := cluster/images/cn-app
-
-$(foreach image,$(images),$(eval include cluster/images/$(image)/Makefile))
 include cluster/manifest/Makefile
 include cluster/pulumi/Makefile
+include cluster/images/Makefile
+
+#########
+# Toplevel targets
+#########
 
 .PHONY: docker-build
 docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
@@ -42,37 +18,16 @@ docker-push-force: $(foreach image,$(images),cluster/images/$(image)/docker-push
 .PHONY: docker-check
 docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 
-.PHONY: images/clean
-images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)
+.PHONY: cluster/images/clean
+cluster/images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)
 
 .PHONY: force-update-version
 
-# You cannot define implicit phony targets
-# so instead we define the phony targets in here.
-define DEFINE_PHONY_RULES =
-prefix := cluster/images/$(1)
+.PHONY: cluster/build
+cluster/build: cluster/pulumi/install
 
-# Stop make from deleting version files to get working caching.
-.NOTINTERMEDIATE: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-local-image-tag)
+.PHONY: cluster/format
+cluster/format: cluster/pulumi/format
 
-.PHONY: $$(prefix)/docker-push-force
-$$(prefix)/docker-push-force: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-build)
-	cd $$(@D) && docker-push $$$$(cat $$(abspath $$<)) --force
-
-.PHONY: $$(prefix)/docker-build
-
-$$(prefix)/docker-build: $$(prefix)/$(docker-build)
-
-.PHONY: $$(prefix)/docker-push
-$$(prefix)/docker-push: $$(prefix)/$(docker-push)
-
-.PHONY: $$(prefix)/docker-check
-$$(prefix)/docker-check: $$(prefix)/$(docker-image-tag)
-	docker-check $$$$(cat $$(abspath $$<))
-
-.PHONY: $$(prefix)/clean
-$$(prefix)/clean:
-	-rm -vfr $$(@D)/target
-endef
-
-$(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
+.PHONY: cluster/clean
+cluster/clean: cluster/pulumi/clean cluster/images/clean

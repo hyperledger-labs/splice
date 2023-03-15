@@ -135,7 +135,7 @@ function cnChartValues(chartPath: string, overrideValues: any = {}): any {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         imageTag: config.require("IMAGE_TAG"),
-        ipAddress: clusterIp.then(addr => addr.address),
+        ipAddress: clusterIp.then((addr) => addr.address),
         dnsName: config.require("CLUSTER_DNS_NAME"),
       },
     },

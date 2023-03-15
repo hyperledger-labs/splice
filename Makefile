@@ -13,7 +13,7 @@ directory-service-dar := ${REPO_ROOT}/daml/directory-service/.daml/dist/director
 wallet-payments-dar := ${REPO_ROOT}/daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
 
 .PHONY: build
-build: $(app-bundle) cluster/pulumi/install ## Build the Canton Coin app bundle and ensure the Pulumi script is ready to run.
+build: $(app-bundle) cluster/build ## Build the Canton Coin app bundle and ensure cluster scripts are ready to run.
 
 $(app-bundle): $(canton-coin-dar) $(directory-service-dar) $(wallet-payments-dar)
 	sbt --batch bundle
@@ -22,20 +22,19 @@ $(canton-coin-dar) $(directory-service-dar) $(wallet-payments-dar) &:
 	sbt --batch canton-coin-daml/damlBuild wallet-payments-daml/damlBuild directory-daml/damlBuild
 
 .PHONY: clean
-clean: images/clean cluster/pulumi/clean
+clean: cluster/clean
 	rm -rf apps/app/target/release
 
 .PHONY: clean-all
-clean-all: clean	## Completely clean all local build state, including model codegen.
+clean-all: clean ## Completely clean all local build state, including model codegen.
 	sbt --batch clean-cn
 
 .PHONY: format
-format:	cluster/pulumi/format ## Automatically reformat and apply scalaFix to source code
+format:	cluster/format ## Automatically reformat and apply scalaFix to source code
 	sbt --batch formatFix
 
 .PHONY: help
 help:	## Show list of available make targets
 	@LC_ALL=C $(MAKE) -pRrq -f Makefile : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
 
-include cluster/images/common.mk
 include cluster/Makefile
