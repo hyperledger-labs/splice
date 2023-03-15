@@ -28,7 +28,7 @@ spec:
               name: cn-app-validator-ledger-api-auth
               optional: false
         - name: CANTON_PARTICIPANT_POSTGRES_SERVER
-          value: postgres
+          value: {{ .Values.postgres }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: val1_participant
         - name: CANTON_PARTICIPANT_USERS

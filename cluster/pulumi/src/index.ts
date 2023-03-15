@@ -1,3 +1,4 @@
+import * as postgres from "./postgres";
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 import * as gcp from "@pulumi/gcp";
@@ -7,6 +8,8 @@ import * as fs from "fs";
 import { PathLike } from "fs";
 
 import { load } from "js-yaml";
+
+const postgres_validator1_ip = postgres.createDatabase("validator1");
 
 const GLOBAL_TIMEOUT_SEC = 300;
 
@@ -208,7 +211,9 @@ function installValidator() {
       name: "validator",
       namespace: namespace.metadata.name,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-validator/",
-      values: cnChartValues("cn-validator"),
+      values: cnChartValues("cn-validator", {
+        postgres: postgres_validator1_ip,
+      }),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
