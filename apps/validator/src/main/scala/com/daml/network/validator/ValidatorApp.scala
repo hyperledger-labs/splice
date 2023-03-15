@@ -68,6 +68,24 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
+  private def getSvcPartyId(ledgerClient: CoinLedgerClient): Future[PartyId] = {
+    // Via scan
+    val scanConnection = new ScanConnection(
+      ledgerClient,
+      config.remoteScan,
+      clock,
+      coinAppParameters.processingTimeouts,
+      loggerFactory,
+    )
+    retryProvider
+      .retryForAutomation(
+        "getSvcPartyId",
+        scanConnection.getSvcPartyId(),
+        logger,
+      )
+      .andThen(_ => scanConnection.close())
+  }
+
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
     for {
@@ -196,22 +214,8 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
-      scanConnection <-
-        Future.successful(
-          new ScanConnection(
-            ledgerClient,
-            config.remoteScan,
-            clock,
-            coinAppParameters.processingTimeouts,
-            loggerFactory,
-          )
-        )
+      svcParty <- getSvcPartyId(ledgerClient)
       connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      svcParty <- retryProvider.retryForAutomation(
-        "getSvcPartyId",
-        scanConnection.getSvcPartyId(),
-        logger,
-      )
       (walletServiceParty, walletServiceUser) <- setupWallet(connection)
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
@@ -321,7 +325,6 @@ class ValidatorApp(
         storage,
         store,
         automation,
-        scanConnection,
         binding,
         timeouts,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
@@ -339,7 +342,6 @@ object ValidatorApp {
       storage: Storage,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
-      scanConnection: ScanConnection,
       binding: Http.ServerBinding,
       timeouts: ProcessingTimeout,
       logger: TracedLogger,
@@ -357,7 +359,6 @@ object ValidatorApp {
         ),
         automation,
         store,
-        scanConnection,
         storage,
       )(logger)
   }

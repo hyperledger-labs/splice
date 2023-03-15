@@ -279,12 +279,10 @@ class ValidatorIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   "stop an uninitialized validator" in { implicit env =>
     // No svc initialized, so the validator will not succeed in initialization,
-    // but the test will terminate and close it before any initialization timeout
+    // but we terminate it before any initialization timeout.
     aliceValidator.start()
+    aliceValidator.stop()
+    // If the validator's shutdown left a dirty state this will throw an ERROR.
+    initSvc()
   }
-
-  // TODO(#3272): Adding a test here (e.g. by uncommenting the following) throws an ERROR "Channel ManagedChannelImpl{logId=2370, target=0.0.0.0:5012} was not shutdown properly"
-  // "this fails" in { implicit env =>
-  //   initSvc()
-  // }
 }
