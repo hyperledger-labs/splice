@@ -36,6 +36,9 @@ class SummarizingMiningRoundTrigger(
       cc.round.SummarizingMiningRound.COMPANION,
     ) {
 
+  private val svParty = store.key.svParty
+  private val svcParty = store.key.svcParty
+
   private def coinRulesStartIssuingAction(
       coinRulesCid: CoinRules.ContractId,
       miningRoundCid: SummarizingMiningRound.ContractId,
@@ -67,27 +70,27 @@ class SummarizingMiningRoundTrigger(
         summarizingRound.contractId,
         rewards.summary,
       )
-      queryResult <- store.lookupConfirmationByActionWithOffset(action)
+      queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
-        store.key.svParty.toProtoPrimitive,
+        svParty.toProtoPrimitive,
         action,
       )
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
           Future.successful(
             TaskSuccess(
-              s"skipping as confirmation from ${store.key.svParty} is already created for such action"
+              s"skipping as confirmation from ${svParty} is already created for such action"
             )
           )
         case QueryResult(offset, None) =>
           connection
             .submitCommands(
-              actAs = Seq(store.key.svParty),
-              readAs = Seq(store.key.svcParty),
+              actAs = Seq(svParty),
+              readAs = Seq(svcParty),
               commands = cmd.commands.asScala.toSeq,
               commandId = CoinLedgerConnection.CommandId(
-                "com.daml.network.directory.createMiningRoundStartIssuingConfirmation",
-                Seq(store.key.svParty, store.key.svcParty),
+                "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
+                Seq(svParty, svcParty),
                 summarizingRound.contractId.contractId,
               ),
               deduplicationOffset = offset,

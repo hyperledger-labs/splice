@@ -24,7 +24,7 @@ object ExpectedOnboardingConfig {
 
 case class ApprovedSvIdentityConfig(
     name: String,
-    key: String,
+    publicKey: String,
 )
 
 sealed trait SvBootstrapConfig {

@@ -29,7 +29,7 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.security.interfaces.ECPrivateKey
@@ -96,38 +96,7 @@ class SvApp(
       _ <- waitForDomainConnection(svStore.domains, config.domains.global)
       globalDomain <- waitForDomainConnection(svcStore.domains, config.domains.global)
       ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      _ <- config.bootstrap match {
-        case foundingConfig: SvBootstrapConfig.FoundConsortium =>
-          foundConsortium(foundingConfig, svcStore, ledgerConnection, globalDomain)
-        case _: SvBootstrapConfig.JoinViaSvcApp =>
-          retryProvider.retryForAutomation(
-            "join existing SV consortium",
-            joinConsortium(svPartyId),
-            logger,
-          )
-        case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
-          SvUtil.keyPairMatches(publicKey, privateKey) match {
-            case Right(privateKey_) => {
-              for {
-                _ <- requestOnboarding(
-                  remoteSv.adminApi,
-                  name,
-                  svPartyId,
-                  publicKey,
-                  svcPartyId,
-                  privateKey_,
-                )
-                _ = logger.info("Joining via SVC as joining with key is not fully implemented yet.")
-                _ <- retryProvider.retryForAutomation(
-                  "join existing SV consortium",
-                  joinConsortium(svPartyId),
-                  logger,
-                )
-              } yield ()
-            }
-            case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
-          }
-      }
+      _ <- ensureBootstrapped(ledgerConnection, svcStore, globalDomain)
       _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
       _ <- approveConfiguredSvIdentities(svStore, ledgerConnection, globalDomain)
       isDevNet <- retryProvider.retryForAutomation(
@@ -195,6 +164,91 @@ class SvApp(
       .getDebugInfo()
       .map(_.svcParty)
       .andThen(_ => svcConnection.close())
+  }
+
+  private def ensureBootstrapped(
+      ledgerConnection: CoinLedgerConnection,
+      svcStore: SvSvcStore,
+      globalDomain: DomainId,
+  ): Future[Unit] = {
+    for {
+      svcRules <- svcStore.lookupSvcRules()
+      bootstrapped = svcRules
+        .map(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
+        .getOrElse(false)
+      _ <-
+        if (bootstrapped) {
+          logger.info(
+            "We can see the SvcRules and are listed as an SVC member => already bootstrapped."
+          )
+          Future.successful(())
+        } else {
+          startBootstrapping(ledgerConnection, svcStore, globalDomain)
+        }
+      _ <- waitForSvcMembership(svcStore)
+    } yield ()
+  }
+
+  private def startBootstrapping(
+      ledgerConnection: CoinLedgerConnection,
+      svcStore: SvSvcStore,
+      globalDomain: DomainId,
+  ): Future[Unit] = {
+    for {
+      _ <- config.bootstrap match {
+        case foundingConfig: SvBootstrapConfig.FoundConsortium =>
+          foundConsortium(foundingConfig, svcStore, ledgerConnection, globalDomain)
+        case _: SvBootstrapConfig.JoinViaSvcApp =>
+          retryProvider.retryForAutomation(
+            "join existing SV consortium",
+            joinConsortium(svcStore.key.svParty),
+            logger,
+          )
+        case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
+          SvUtil.keyPairMatches(publicKey, privateKey) match {
+            case Right(privateKey_) =>
+              requestOnboarding(
+                remoteSv.adminApi,
+                name,
+                svcStore.key.svParty,
+                publicKey,
+                svcStore.key.svcParty,
+                privateKey_,
+              )
+            case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
+          }
+        // TODO(#2241) throw an error here if bootstrap config is not set (once it becomes optional)
+        // case None => sys.error("Not bootstrapped but no bootstrap config found; exiting.")
+      }
+    } yield ()
+  }
+
+  private def waitForSvcMembership(svcStore: SvSvcStore): Future[Unit] = {
+    logger.info("Waiting for SvcRules to become visible and list us as a member")
+    retryProvider.retryForAutomation(
+      "Wait for SVC membership",
+      for {
+        svcRules <- svcStore.lookupSvcRules()
+        _ <- svcRules match {
+          case Some(c) =>
+            if (c.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)) {
+              logger.info("SvcRules found and we are member, done waiting")
+              Future.successful(())
+            } else {
+              throw new StatusRuntimeException(
+                Status.FAILED_PRECONDITION.withDescription(
+                  s"SvcRules found but we are not a member"
+                )
+              )
+            }
+          case None =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(s"SvcRules contract not found yet")
+            )
+        }
+      } yield (),
+      logger,
+    )
   }
 
   private def foundConsortium(
@@ -406,7 +460,9 @@ class SvApp(
       ledgerConnection: CoinLedgerConnection,
       globalDomain: DomainId,
   ): Future[List[Unit]] = {
-    if (config.approvedSvIdentities.map(_.key).toSet.size != config.approvedSvIdentities.size) {
+    if (
+      config.approvedSvIdentities.map(_.publicKey).toSet.size != config.approvedSvIdentities.size
+    ) {
       sys.error("Approved SV keys must be unique! Check your SV app config.")
     }
     if (config.approvedSvIdentities.map(_.name).toSet.size != config.approvedSvIdentities.size) {
@@ -416,7 +472,7 @@ class SvApp(
       config.approvedSvIdentities.map(c =>
         approveConfiguredSvIdentity(
           c.name,
-          c.key,
+          c.publicKey,
           svStore,
           ledgerConnection,
           globalDomain,
@@ -577,6 +633,32 @@ object SvApp {
           }
         } yield res
     }
+  }
+
+  private[sv] def isApprovedSvIdentity(
+      candidateName: String,
+      candidateParty: PartyId,
+      rawToken: String,
+      svStore: SvSvStore,
+  )(implicit ec: ExecutionContext): Future[Either[String, PartyId]] = {
+    svStore
+      .lookupApprovedSvIdentityByName(candidateName)
+      .map(approvedSvO =>
+        for {
+          approvedSv <- approvedSvO.toRight("no matching approved SV identity found")
+          token <- SvOnboardingToken.verifyAndDecode(rawToken)
+          _ <-
+            if (token.candidateName == candidateName) Right(())
+            else Left("provided candidate name doesn't match name in token")
+          _ <-
+            if (token.candidateKey == approvedSv.payload.candidateKey) Right(())
+            else Left("candidate key doesn't match approved key")
+          _ <-
+            if (token.candidateParty == candidateParty) Right(())
+            else Left("provided party name doesn't match party in token")
+          _ <- if (token.svcParty == svStore.key.svcParty) Right(()) else Left("wrong svc party")
+        } yield token.candidateParty
+      )
   }
 
   val coinPackage: UploadablePackage = new UploadablePackage {

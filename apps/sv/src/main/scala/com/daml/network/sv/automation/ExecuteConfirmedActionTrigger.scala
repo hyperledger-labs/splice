@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
@@ -112,8 +113,16 @@ class ExecuteConfirmedActionTrigger(
                 show"coin rules $action is not yet supported"
               )
           }
-        case _: ARC_SvcRules =>
-          throw new UnsupportedOperationException("action of ARC_SvcRules is not yet supported")
+        case arcSvcRules: ARC_SvcRules =>
+          arcSvcRules.svcAction match {
+            case addMemberAction: SRARC_AddMember =>
+              val newMember = addMemberAction.svcRules_AddMemberValue.newMember
+              store.getSvcRules().map(_.payload.members.containsKey(newMember))
+            case action =>
+              throw new UnsupportedOperationException(
+                show"svc rules $action is not yet supported"
+              )
+          }
         case _ =>
           throw new UnsupportedOperationException("unsupported action")
       }

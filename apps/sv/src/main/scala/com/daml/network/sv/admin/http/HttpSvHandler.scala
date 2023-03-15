@@ -116,17 +116,22 @@ class HttpSvHandler(
   )(body: definitions.OnboardSvRequest): Future[v0.SvResource.OnboardSvResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
+        case Left(error) =>
+          Future.successful(
+            v0.SvResource.OnboardSvResponseBadRequest(s"Could not vefify and decode token: $error")
+          )
         case Right(token) =>
-          svStore.lookupApprovedSvIdentityByName(token.candidateName).flatMap {
-            case Some(approvedSv) =>
-              if (token.candidateKey != approvedSv.payload.candidateKey) {
+          SvApp
+            .isApprovedSvIdentity(token.candidateName, token.candidateParty, body.token, svStore)
+            .flatMap {
+              case Left(reason) =>
                 Future.successful(
                   v0.SvResource
-                    .OnboardSvResponseUnauthorized("Candidate key doesn't match approved key.")
+                    .OnboardSvResponseUnauthorized(
+                      s"Could not authorize onboarding request because of reason: $reason"
+                    )
                 )
-              } else if (token.svcParty != svcParty) {
-                Future.successful(v0.SvResource.OnboardSvResponseBadRequest("Wrong SVC party."))
-              } else {
+              case Right(_) =>
                 // We retry here because the SvcRules can change while attempting this.
                 for {
                   _ <- retryProvider.retryForClientCalls(
@@ -135,17 +140,7 @@ class HttpSvHandler(
                     logger,
                   )
                 } yield v0.SvResource.OnboardSvResponseOK
-              }
-            case None =>
-              Future.successful(
-                v0.SvResource
-                  .OnboardSvResponseUnauthorized("No matching approved SV identity found.")
-              )
-          }
-        case Left(error) =>
-          Future.successful(
-            v0.SvResource.OnboardSvResponseBadRequest(s"Could not vefify and decode token: $error")
-          )
+            }
       }
     }
 

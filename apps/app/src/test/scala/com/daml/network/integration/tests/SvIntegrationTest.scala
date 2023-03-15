@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import com.daml.network.console.LocalCoinAppReference
 
 class SvIntegrationTest extends CoinIntegrationTest {
 
@@ -212,36 +213,64 @@ class SvIntegrationTest extends CoinIntegrationTest {
     }
   }
 
-  "SVs create SvOnboarding contracts when legitimately requested to do so" in { implicit env =>
-    initSvc()
-    val sv1Party = sv1.getDebugInfo().svParty
-    val sv4Party = sv4.getDebugInfo().svParty
-    val token = clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1.") {
-      // The onboarding is requested by SV4 during SvApp init.
-      inside(
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty)
-      ) {
-        case Seq(svOnboarding) => {
-          svOnboarding.data.candidateName shouldBe "sv4"
-          svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
-          svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
-          svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
-          // if this check fails:
-          // make sure that the values (especially the key) are in sync with sv1's and sv4's config files
-          SvOnboardingToken
-            .verifyAndDecode(svOnboarding.data.token)
-            .value shouldBe SvOnboardingToken(
-            "sv4",
-            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==",
-            sv4Party,
-            svcParty,
-          )
-          svOnboarding.data.token
-        }
-      }
+  "SVs can onboard new SVs" in { implicit env =>
+    clue("Initialize SVC with 3 SVs") {
+      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(_.start())
+      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(
+        _.waitForInitialization()
+      )
+      getSvcRules().data.members should have size 3
     }
-    clue("Attempting to start an onboarding multiple times has no effect.") {
+    clue(
+      "Add a phantom SV and stop SV2 so that SV4 can't gather enough confirmations just yet"
+    ) {
+      addPhantomSv()
+      sv2.stop()
+      getSvcRules().data.members should have size 4
+      // We now need 2 confirmations to execute an action, but only sv1 is
+      // active and sv3 hasn't approved sv4.
+    }
+    clue("SV4 starts") {
+      sv4.start()
+    }
+    val sv1Party = sv1.getDebugInfo().svParty
+    // We are not using sv4.getDebugInfo() to get sv4's party id
+    // because the SvApp is not completely initialized yet and hence the http service is not available.
+    val sv4Party = svc.remoteParticipant.ledger_api.users
+      .get(sv4.config.ledgerApiUser)
+      .primaryParty
+      .map(PartyId.fromLfParty(_))
+      .value
+      .value
+
+    val token = clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
+      eventually()(
+        // The onboarding is requested by SV4 during SvApp init.
+        inside(
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty)
+        ) {
+          case Seq(svOnboarding) => {
+            svOnboarding.data.candidateName shouldBe "sv4"
+            svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
+            svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
+            svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
+            // if this check fails:
+            // make sure that the values (especially the key) are in sync with sv1's and sv4's config files
+            SvOnboardingToken
+              .verifyAndDecode(svOnboarding.data.token)
+              .value shouldBe SvOnboardingToken(
+              "sv4",
+              "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==",
+              sv4Party,
+              svcParty,
+            )
+            svOnboarding.data.token
+          }
+        }
+      )
+    }
+    clue("Attempting to start an onboarding multiple times has no effect") {
       sv1.onboardSv(token)
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
@@ -250,12 +279,23 @@ class SvIntegrationTest extends CoinIntegrationTest {
       "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
     ) {
       assertThrowsAndLogsCommandFailures(
-        sv2.onboardSv(token),
-        _.errorMessage should include("No matching approved SV identity found."),
+        sv3.onboardSv(token),
+        _.errorMessage should include("no matching approved SV identity found"),
       )
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
     }
+    clue("All online and approving SVs confirm SV4's onboarding") {
+      eventually() {
+        // TODO(#3369) consider making this check a bit nicer and more precise
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
+          .filter(_.data.action.toValue.getConstructor() == "ARC_SvcRules") should have length 1
+      }
+      getSvcRules().data.members.keySet should not contain sv4Party.toProtoPrimitive
+    }
+    actAndCheck("SV2 comes back online", sv2.start())(
+      "SV4's onboarding gathers suffcient confirmations and is completed",
+      _ => getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive),
+    )
   }
 
   "The SVC party can be setup on the SV5 participant" in { implicit env =>
@@ -473,4 +513,28 @@ class SvIntegrationTest extends CoinIntegrationTest {
       foundCoinRules should have length 1
       foundCoinRules.head
     }
+
+  def addPhantomSv()(implicit env: CoinTestConsoleEnvironment) = {
+    // random value for test
+    val svXParty = PartyId
+      .fromProtoPrimitive(
+        "svX::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
+      )
+      .value
+    actAndCheck(
+      "Add the phantom SV \"svX\"",
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+        actAs = Seq(svcParty),
+        optTimeout = None,
+        commands = getSvcRules().id
+          .exerciseSvcRules_AddMember(svXParty.toProtoPrimitive, "addPhantomSv")
+          .commands
+          .asScala
+          .toSeq,
+      ),
+    )(
+      "SvX is a member of the SvcRules",
+      _ => getSvcRules().data.members should contain key svXParty.toProtoPrimitive,
+    )
+  }
 }

@@ -145,7 +145,7 @@ testOnboardValidator = do
 
 testOnboardSv : Script ()
 testOnboardSv = do
-  (app, svc, (_, sv2, _, _)) <- initConsortium
+  (app, svc, (_, sv2, sv3, _)) <- initConsortium
   -- we now have a consortium with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -167,7 +167,21 @@ testOnboardSv = do
     sponsor = sv2
     svc
 
-  -- TODO(#3111) Extend to full flow, with confirmations
+  -- svX collects two confirmations which is enough to onboard him (2 = f + 1)
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+          newMember = svX
+          reason = "because"
+  executeAllConfirmedActions app
+
+  -- svX is now an SVC member
+  [(_, svcRules)] <- query @SvcRules svc
+  assert (svX `elem` Map.keys svcRules.members)
+
   pure ()
 
 

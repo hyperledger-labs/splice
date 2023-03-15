@@ -217,13 +217,14 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
     } yield rounds.sortBy(_.payload.round.number).headOption
 
   def lookupConfirmationByActionWithOffset(
-      action: ActionRequiringConfirmation
+      confirmer: PartyId,
+      action: ActionRequiringConfirmation,
   ): Future[
     QueryResult[Option[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]]
   ] = {
     defaultAcs.flatMap(
-      _.findContractWithOffset(cn.svcrules.Confirmation.COMPANION)(
-        _.payload.action.toValue == action.toValue
+      _.findContractWithOffset(cn.svcrules.Confirmation.COMPANION)(co =>
+        co.payload.confirmer == confirmer.toProtoPrimitive && co.payload.action.toValue == action.toValue
       )
     )
   }
