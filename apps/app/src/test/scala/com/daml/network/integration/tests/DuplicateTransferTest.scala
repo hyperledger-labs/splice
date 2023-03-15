@@ -17,10 +17,15 @@ import scala.util.Using
 
 class DuplicateTransferTest extends CoinIntegrationTest with WalletTestUtil {
 
+  private val darPath = "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
+
   override def environmentDefinition =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
+      .withAdditionalSetup(implicit env => {
+        aliceValidator.remoteParticipant.dars.upload(darPath)
+      })
 
   val globalDomain = DomainAlias.tryCreate("global")
   val splitwellDomain = DomainAlias.tryCreate("splitwell")
