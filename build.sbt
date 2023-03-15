@@ -706,12 +706,12 @@ cleanCnDars := {
 lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")
 checkErrors := {
   import scala.sys.process._
-  Seq("log/canton_network_test.clog", "log/canton.clog", "log/canton-simtime.clog").foreach { log =>
+  Seq("canton_network_test", "canton", "canton-simtime").foreach { log =>
     val res =
       Seq(
         ".circleci/canton-scripts/check-logs.sh",
-        log,
-        "project/errors-in-log-to-ignore.txt",
+        s"log/${log}.clog",
+        s"project/errors-in-${log}-log-to-ignore.txt",
       ).!
     if (res != 0) {
       sys.error(s"$log contains problems.")

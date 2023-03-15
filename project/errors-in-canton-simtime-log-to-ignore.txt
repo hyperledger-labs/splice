@@ -1,4 +1,4 @@
-# Patterns of entries to be ignored when checking log files (sbt checkErrors).
+# Patterns of entries to be ignored when checking the canton-simtime log file (sbt checkErrors).
 # As the Canton log appenders emit errors/warnings to stdout, the patterns listed here will also be applied when checking the sbt output.
 # Patterns must be both
 # - PCRE regular expressions (see https://regex101.com) and

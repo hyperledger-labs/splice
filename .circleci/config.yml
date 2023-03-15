@@ -358,7 +358,7 @@ commands:
                 <<# parameters.fail_on_error_in_output >>
                 # Check and report whether sbt has output errors
                 # Need to also apply ignore rules for the log, as errors in the log are emitted to stdout by default.
-                .circleci/canton-scripts/check-sbt-output.sh "sbt_output" "project/errors-in-sbt-output-to-ignore.txt" "project/errors-in-log-to-ignore.txt"
+                .circleci/canton-scripts/check-sbt-output.sh "sbt_output" "project/errors-in-sbt-output-to-ignore.txt" "project/errors-in-canton-log-to-ignore.txt" "project/errors-in-canton-simtime-log-to-ignore.txt" "project/errors-in-canton_network_test-log-to-ignore.txt"
                 <</ parameters.fail_on_error_in_output >>
             }
             << parameters.pre_sbt_cmd >>
