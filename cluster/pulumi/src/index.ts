@@ -40,13 +40,15 @@ function loadJsonFromFile(path: PathLike): any {
 const nodes = ["sv-1", "sv-2", "sv-3", "sv-4"];
 
 const appToClientId = {
-  "wallet": "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
-  "validator": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+  wallet: "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
+  validator: "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
   "sv-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
   "sv-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
   "sv-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
   "sv-4": "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN",
 } as { [key: string]: string };
+
+/// Auth0
 
 const WELL_KNOWN_URL =
   "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration";
@@ -95,6 +97,32 @@ function getAuth0(): Promise<Auth0SecretMap> {
     });
 }
 
+const auth0Secrets = getAuth0();
+
+function installAuth0Secret(
+  ns: k8s.core.v1.Namespace,
+  secretApp: string,
+  nodename: string
+): k8s.core.v1.Secret {
+  return new k8s.core.v1.Secret(
+    "auth0-secret-" + nodename,
+    {
+      metadata: {
+        name: "cn-app-" + secretApp + "-ledger-api-auth",
+        namespace: ns.metadata.name,
+      },
+      stringData: auth0Secrets.then(
+        (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
+      ),
+    },
+    {
+      dependsOn: ns,
+    }
+  );
+}
+
+/// Chart Values
+
 function cnChartValues(chartPath: string, overrideValues: any = {}): any {
   const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
@@ -115,45 +143,27 @@ function cnChartValues(chartPath: string, overrideValues: any = {}): any {
   );
 }
 
-const auth0Secrets = getAuth0();
-
-function installAuth0Secret(
-  namespace: k8s.core.v1.Namespace,
-  secretApp: string,
-  nodename: string
-): k8s.core.v1.Secret {
-  return new k8s.core.v1.Secret(
-    "auth0-secret-" + nodename,
-    {
-      metadata: {
-        name: "cn-app-" + secretApp + "-ledger-api-auth",
-        namespace: namespace.metadata.name,
-      },
-      stringData: auth0Secrets.then(
-        (all: Auth0SecretMap) => all.get(appToClientId[nodename]) || {}
-      ),
+function exactNamespace(name: string): k8s.core.v1.Namespace {
+  // Namespace with a fully specified name, exactly as it will
+  // appear within Kubernetes. (No Pulumi suffix.)
+  return new k8s.core.v1.Namespace(name, {
+    metadata: {
+      name,
     },
-    {
-      dependsOn: namespace,
-    }
-  );
+  });
 }
 
 function installSvNodes() {
   nodes.forEach((nodename: string) => {
-    const namespace = new k8s.core.v1.Namespace(nodename, {
-      metadata: {
-        name: nodename,
-      },
-    });
+    const ns = exactNamespace(nodename);
 
-    const auth0Secret = installAuth0Secret(namespace, "sv", nodename);
+    const auth0Secret = installAuth0Secret(ns, "sv", nodename);
 
     new k8s.helm.v3.Release(
       nodename,
       {
         name: "sv-app",
-        namespace: namespace.metadata.name,
+        namespace: ns.metadata.name,
         chart: process.env.REPO_ROOT + "/cluster/helm/cn-sv-node/",
         values: cnChartValues("cn-sv-node", {
           bootstrapType:
@@ -162,54 +172,64 @@ function installSvNodes() {
         timeout: GLOBAL_TIMEOUT_SEC,
       },
       {
-        dependsOn: [namespace, auth0Secret],
+        dependsOn: [ns, auth0Secret],
       }
     );
   });
 }
 
 function installDocs() {
-  const namespace = new k8s.core.v1.Namespace("docs", {
-    metadata: {
-      name: "docs",
-    },
-  });
-  const namespaceName = namespace.metadata.name;
+  const ns = exactNamespace("docs");
+
+  const nsName = ns.metadata.name;
 
   new k8s.helm.v3.Release(
     "docs",
     {
       name: "docs",
-      namespace: namespaceName,
+      namespace: nsName,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-docs/",
       values: cnChartValues("cn-docs"),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
-      dependsOn: [namespace],
+      dependsOn: [ns],
+    }
+  );
+}
+
+function installPostgres(
+  ns: k8s.core.v1.Namespace,
+  name: string
+): k8s.helm.v3.Release {
+  return new k8s.helm.v3.Release(
+    name,
+    {
+      name: name,
+      namespace: ns.metadata.name,
+      chart: process.env.REPO_ROOT + "/cluster/helm/cn-postgres/",
+      values: cnChartValues("cn-postgres"),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn: ns,
     }
   );
 }
 
 function installValidator() {
-  const namespace = new k8s.core.v1.Namespace("validator", {
-    metadata: {
-      name: "validator",
-    },
-  });
+  const ns = exactNamespace("validator");
 
-  const auth0ValidatorSecret = installAuth0Secret(
-    namespace,
-    "validator",
-    "validator"
-  );
-  const auth0WalletSecret = installAuth0Secret(namespace, "wallet", "wallet");
+  const postgres = installPostgres(ns, "postgres");
+
+  const auth0ValidatorSecret = installAuth0Secret(ns, "validator", "validator");
+  const auth0WalletSecret = installAuth0Secret(ns, "wallet", "wallet");
 
   new k8s.helm.v3.Release(
     "validator",
     {
       name: "validator",
-      namespace: namespace.metadata.name,
+      namespace: ns.metadata.name,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-validator/",
       values: cnChartValues("cn-validator", {
         postgres: postgres_validator1_ip,
@@ -217,78 +237,71 @@ function installValidator() {
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
-      dependsOn: [auth0ValidatorSecret, auth0WalletSecret, namespace],
+      dependsOn: [ns, postgres, auth0ValidatorSecret, auth0WalletSecret],
     }
   );
 }
 
 function installCertManager(): k8s.helm.v3.Release {
-    const namespace = new k8s.core.v1.Namespace("cert-manager", {
-        metadata: {
-            name: "cert-manager"
-        }
-    });
+  const ns = exactNamespace("cert-manager");
 
-    return new k8s.helm.v3.Release(
-        "cert-manager",
-        {
-            name: "cert-manager",
-            namespace: namespace.metadata.name,
-            chart: "cert-manager",
-            version: "1.11.0",
-            repositoryOpts: {
-                repo: "https://charts.jetstack.io",
-            },
-            timeout: GLOBAL_TIMEOUT_SEC,
-        },
-        {
-            dependsOn: namespace
-        }
-    );
+  return new k8s.helm.v3.Release(
+    "cert-manager",
+    {
+      name: "cert-manager",
+      namespace: ns.metadata.name,
+      chart: "cert-manager",
+      version: "1.11.0",
+      repositoryOpts: {
+        repo: "https://charts.jetstack.io",
+      },
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn: ns,
+    }
+  );
 }
 
 function installClusterIngress() {
-    const certManager = installCertManager();
+  const certManager = installCertManager();
 
-    const namespace = new k8s.core.v1.Namespace("cluster-ingress", {
-        metadata: {
-            name: "cluster-ingress"
-        }
-    });
+  const ns = exactNamespace("cluster-ingress");
 
-    const dnsSaKey = new k8s.core.v1.Secret(
-        "clouddns-dns01-solver-svc-acct",
-        {
-            metadata: {
-                name: "clouddns-dns01-solver-svc-acct",
-                namespace: namespace.metadata.name,
-            },
-            type: "Opaque",
-            data: {
-                "key.json": config.require("DNS_SA_KEY")
-            }
-        },
-        {
-            dependsOn: namespace
-        });
+  const dnsSaKey = new k8s.core.v1.Secret(
+    "clouddns-dns01-solver-svc-acct",
+    {
+      metadata: {
+        name: "clouddns-dns01-solver-svc-acct",
+        namespace: ns.metadata.name,
+      },
+      type: "Opaque",
+      data: {
+        "key.json": config.require("DNS_SA_KEY"),
+      },
+    },
+    {
+      dependsOn: ns,
+    }
+  );
 
-    new k8s.helm.v3.Release(
-        "cluster-ingress",
-        {
-            name: "cluster-ingress",
-            namespace: namespace.metadata.name,
-            chart: process.env.REPO_ROOT + "/cluster/helm/cn-cluster-ingress/",
-            values: cnChartValues("cn-cluster-ingress"),
-            timeout: GLOBAL_TIMEOUT_SEC,
-        },
-        {
-            dependsOn: [ certManager, namespace, dnsSaKey ]
-        }
-    );
+  new k8s.helm.v3.Release(
+    "cluster-ingress",
+    {
+      name: "cluster-ingress",
+      namespace: ns.metadata.name,
+      chart: process.env.REPO_ROOT + "/cluster/helm/cn-cluster-ingress/",
+      values: cnChartValues("cn-cluster-ingress"),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn: [certManager, ns, dnsSaKey],
+    }
+  );
 }
 
-installClusterIngress()
-installDocs();
+//installClusterIngress()
+//installDocs();
+//installSvNodes();
 
-// installSvNodes();
-// installValidator();
+installValidator();
