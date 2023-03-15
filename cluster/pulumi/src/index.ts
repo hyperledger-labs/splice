@@ -1,5 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
+import * as gcp from "@pulumi/gcp";
 
 import * as _ from "lodash";
 import * as fs from "fs";
@@ -10,6 +11,14 @@ import { load } from "js-yaml";
 const GLOBAL_TIMEOUT_SEC = 300;
 
 const config = new pulumi.Config();
+
+const CLUSTER_BASENAME = config.require("CLUSTER_BASENAME");
+const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
+
+// retrieve existing cluster IP, not managed with Pulumi yet
+export const clusterIp = gcp.compute.getAddress({
+  name: CLUSTER_NAME + "-ip",
+});
 
 // There are a few instances where this pulls data from the outside
 // world. To avoid fully declaring these external data types, these are
@@ -88,16 +97,14 @@ function cnChartValues(chartPath: string, overrideValues: any = {}): any {
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
   );
 
-  const basename = config.require("CLUSTER_BASENAME");
-
   return _.merge(
     chartDefaultValues,
     {
       cluster: {
-        basename,
-        name: `cn-${basename}net`,
+        basename: CLUSTER_BASENAME,
+        name: CLUSTER_NAME,
         imageTag: config.require("IMAGE_TAG"),
-        ipAddress: config.require("CLUSTER_IP"),
+        ipAddress: clusterIp.then(addr => addr.address),
         dnsName: config.require("CLUSTER_DNS_NAME"),
       },
     },
