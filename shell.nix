@@ -20,7 +20,7 @@ let
   };
 
   # No macOS support for firefox
-  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox ];
+  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox iproute2 ];
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -43,7 +43,6 @@ in pkgs.mkShell {
     grpcurl
     haskellPackages.daml2ts
     hub # Github CLI for todo checker
-    iproute2
     jq
     jsonnet
     k9s
