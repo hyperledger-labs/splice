@@ -2,7 +2,19 @@ openapi: 3.0.0
 info:
   title: Common schemas for CN API definitions
   version: 0.0.1
-paths: {}
+paths:
+  /status:
+    get:
+      tags: [common]
+      x-jvm-package: commonAdmin
+      operationId: "getHealthStatus"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NodeStatus"
 components:
   schemas:
     ContractMetadata:
@@ -29,20 +41,27 @@ components:
         payload:
           type: object
         metadata:
-          $ref: '#/components/schemas/ContractMetadata'
+          $ref: "#/components/schemas/ContractMetadata"
         create_arguments_blob:
           type: string # base-16 encoded.
-      required: ["template_id", "contract_id", "payload", "metadata", "create_arguments_blob"]
+      required:
+        [
+          "template_id",
+          "contract_id",
+          "payload",
+          "metadata",
+          "create_arguments_blob",
+        ]
     ContractId:
       type: string
     # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
     # matches the contract the server would respond with, the server responds with an empty contract property to indicate
     # that the client's cache is correct.
     MaybeCachedContract:
-          type: object
-          properties:
-            contract:
-              $ref: '#/components/schemas/Contract'
+      type: object
+      properties:
+        contract:
+          $ref: "#/components/schemas/Contract"
     # A map from 'active-contract-id' -> 'MaybeCachedContract'.
     # At the moment this type is used to let clients know which mining rounds they already have cached,
     # which mining rounds they should add to their cache and which they should remove from their cache
@@ -50,4 +69,41 @@ components:
     MaybeCachedContractMap:
       type: object
       additionalProperties:
-        $ref: '#/components/schemas/MaybeCachedContract'
+        $ref: "#/components/schemas/MaybeCachedContract"
+    # Status definition for health endpoint
+    Status:
+      type: object
+      required:
+        - "id"
+        - "uptime"
+        - "ports"
+        - "active"
+      properties:
+        id:
+          type: string
+        uptime:
+          type: string
+        ports:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        extra:
+          type: string
+          format: binary
+        active:
+          type: boolean
+    # NotInitialized definition for health endpoint
+    NotInitialized:
+      type: object
+      required: ["active"]
+      properties:
+        active:
+          type: boolean
+    NodeStatus:
+      type: object
+      properties:
+        not_initialized:
+          $ref: "#/components/schemas/NotInitialized"
+        success:
+          $ref: "#/components/schemas/Status"

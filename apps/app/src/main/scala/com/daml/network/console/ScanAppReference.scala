@@ -6,7 +6,8 @@ import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.admin.api.client.commands.{HttpScanAppClient}
+import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CoinUtil, Contract}
@@ -16,6 +17,10 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.console.ConsoleMacros
+import com.daml.network.environment.CoinNodeStatus
+import scala.util.Try
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -133,6 +138,30 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCoinConfigForRound(round))
     }
+
+  // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
+  @Help.Summary("Health and diagnostic related commands (HTTP)")
+  @Help.Group("HTTP Health")
+  def httpHealth = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAdminAppClient.GetHealthStatus[CoinNodeStatus](CoinNodeStatus.fromJsonV0)
+      )
+    }
+  }
+
+  // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
+  override def waitForInitialization(
+      timeout: NonNegativeDuration = coinConsoleEnvironment.commandTimeouts.bounded
+  ): Unit =
+    ConsoleMacros.utils.retry_until_true(timeout)(
+      // The outer Try ensures we keep retrying if the status endpoint isn't up yet (e.g. slow app initialization)
+      // TODO(#3467) see if we still need this after this is fixed
+      Try(
+        httpHealth.successOption
+          .map(_.active)
+      ).toOption.flatten.getOrElse(false)
+    )
 }
 
 final class ScanAppBackendReference(

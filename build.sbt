@@ -204,11 +204,16 @@ lazy val `apps-common` =
       buildInfoObject := "BuildInfo",
       Compile / guardrailTasks :=
         List(
-          ScalaModels(
+          ScalaServer(
             new File("apps/common/src/main/openapi/common.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
-          )
+          ),
+          ScalaClient(
+            new File("apps/common/src/main/openapi/common.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
         ),
     )
 

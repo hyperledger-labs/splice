@@ -2,6 +2,7 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
@@ -29,6 +30,10 @@ import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.http.v0.scan.ScanResource
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.admin.http.HttpAdminHandler
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.daml.network.environment.CoinNodeStatus
 
 /** Class representing a Scan app instance.
   *
@@ -60,7 +65,7 @@ class ScanApp(
       ledgerClient: CoinLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       svcParty: PartyId,
-  ): Future[ScanApp.State] =
+  ): Future[ScanApp.State] = {
     for {
       store <- Future.successful(
         ScanStore(
@@ -91,11 +96,21 @@ class ScanApp(
         loggerFactory,
       )
 
+      // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
+      adminHandler = new HttpAdminHandler[CoinNodeStatus](
+        status
+          .map(CoinNodeStatus.fromNodeStatus)
+          .map(NodeStatus.Success(_)),
+        status => status.toJsonV0,
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            ScanResource.routes(
-              handler
+            concat(
+              ScanResource.routes(handler),
+              CommonAdminResource.routes(adminHandler),
             )
           }
         }
@@ -123,7 +138,7 @@ class ScanApp(
         timeouts,
       )
     }
-
+  }
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)

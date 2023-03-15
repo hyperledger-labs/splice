@@ -5,6 +5,8 @@ info:
 tags:
   - name: scan
 paths:
+  /status:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
   /api/v0/svc-party-id:
     get:
       tags: [scan]
@@ -151,7 +153,11 @@ components:
             "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
     GetOpenAndIssuingMiningRoundsRequest:
       type: object
-      required: ["cached_open_mining_round_contract_ids", "cached_issuing_round_contract_ids"]
+      required:
+        [
+          "cached_open_mining_round_contract_ids",
+          "cached_issuing_round_contract_ids",
+        ]
       properties:
         cached_open_mining_round_contract_ids:
           type: array
@@ -163,7 +169,12 @@ components:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
     GetOpenAndIssuingMiningRoundsResponse:
       type: object
-      required: ["open_mining_rounds", "issuing_mining_rounds", "time_to_live_in_microseconds"]
+      required:
+        [
+          "open_mining_rounds",
+          "issuing_mining_rounds",
+          "time_to_live_in_microseconds",
+        ]
       properties:
         time_to_live_in_microseconds:
           type: integer
@@ -205,7 +216,8 @@ components:
           type: string
     GetCoinConfigForRoundResponse:
       type: object
-      required: ["coin_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
+      required:
+        ["coin_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
       properties:
         coin_create_fee:
           type: string
