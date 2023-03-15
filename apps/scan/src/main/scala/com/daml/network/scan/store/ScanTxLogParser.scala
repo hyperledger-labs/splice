@@ -5,6 +5,7 @@ import com.daml.network.store.TxLogStore
 import com.daml.network.history.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.daml.network.util.CoinUtil.dollarsToCC
 
 import cats.Monoid
 import cats.syntax.foldable.*
@@ -132,12 +133,13 @@ object ScanTxLogParser {
           eventId = event.getEventId(),
           round = round.payload.round.number,
         ),
-        coinCreateFee = config.createFee.fee.divide(coinPrice),
-        holdingFee = config.holdingFee.rate.divide(coinPrice),
-        lockHolderFee = config.lockHolderFee.fee.divide(coinPrice),
+        coinCreateFee = dollarsToCC(config.createFee.fee, coinPrice),
+        holdingFee = dollarsToCC(config.holdingFee.rate, coinPrice),
+        lockHolderFee = dollarsToCC(config.lockHolderFee.fee, coinPrice),
         initialTransferFee = config.transferFee.initialRate,
-        transferFeeSteps =
-          config.transferFee.steps.asScala.toSeq.map(step => (step._1.divide(coinPrice), step._2)),
+        transferFeeSteps = config.transferFee.steps.asScala.toSeq.map(step =>
+          (dollarsToCC(step._1, coinPrice), step._2)
+        ),
       )
 
       State(

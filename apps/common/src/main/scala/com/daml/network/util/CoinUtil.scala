@@ -4,6 +4,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
+import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
@@ -242,4 +243,17 @@ object CoinUtil {
 
   def relTimeToDuration(dt: RelTime): Duration =
     Duration.ofNanos(dt.microseconds * 1000)
+
+  /** Converts the given amount of USD to an amount of CC, at the given coin price.
+    * Uses the same semantics for numerical division as Daml.
+    */
+  def dollarsToCC(
+      usd: java.math.BigDecimal,
+      coinPrice: java.math.BigDecimal,
+  ): java.math.BigDecimal = {
+    val scale = Numeric.Scale.assertFromInt(10)
+    val usdN = Numeric.assertFromBigDecimal(scale, usd)
+    val coinPriceN = Numeric.assertFromBigDecimal(scale, coinPrice)
+    com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, coinPriceN))
+  }
 }
