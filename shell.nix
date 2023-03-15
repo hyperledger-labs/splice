@@ -43,6 +43,7 @@ in pkgs.mkShell {
     grpcurl
     haskellPackages.daml2ts
     hub # Github CLI for todo checker
+    iproute2
     jq
     jsonnet
     k9s
