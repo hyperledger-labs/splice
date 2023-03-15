@@ -27,6 +27,7 @@ import java.time.Duration
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import com.daml.network.util.CoinUtil
+import com.daml.network.integration.plugins.WaitForPorts
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -41,6 +42,10 @@ object CoinTests {
       with IsolatedCoinEnvironments
       with CoinTestCommon
       with LedgerApiExtensions {
+
+    protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
+
+    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -60,6 +65,10 @@ object CoinTests {
       with BeforeAndAfterEach
       with CoinTestCommon
       with LedgerApiExtensions {
+
+    protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
+
+    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =

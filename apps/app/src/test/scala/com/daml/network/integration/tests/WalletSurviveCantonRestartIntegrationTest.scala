@@ -37,6 +37,11 @@ class WalletSurviveCantonRestartIntegrationTest
     "canton.participants.validatorParticipant.admin-api.port=7202",
   )
 
+  override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
+    ("ParticipantLedgerApi", 7201),
+    ("ParticipantAdminApi", 7202),
+  )
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] = {
     CoinEnvironmentDefinition

@@ -42,6 +42,11 @@ class SelfHostedPreflightIntegrationTest
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var validatorOnboardingSecret: Option[String] = None
 
+  override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
+    ("ParticipantLedgerApi", 6001),
+    ("ParticipantAdminApi", 6002),
+  )
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition

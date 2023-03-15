@@ -22,6 +22,9 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
+import org.scalatest.matchers.should.Matchers
+import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.SuppressingLogger
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CoinEnvironmentDefinition(
@@ -39,7 +42,10 @@ case class CoinEnvironmentDefinition(
       List(preSetup, setup),
       teardown,
       configTransformsWithContext(context),
-    ) {
+    )
+    with Matchers
+    with NamedLogging {
+  override def loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   override val configTransforms = configTransformsWithContext(context)
 
   def withManualStart: CoinEnvironmentDefinition = {

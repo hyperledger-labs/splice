@@ -33,12 +33,19 @@ class LocalRunbookIntegrationTest
   val svAppsPath: File = svNodePath / "sv-apps"
   val scanAppPath: File = svNodePath / "scan-app"
 
+  override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
+    ("ParticipantLedgerApi", 7001),
+    ("ParticipantAdminApi", 7002),
+  )
+
   var cantonProcess: Option[CantonProcess] = None
-  override def provideEnvironment = {
-    // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
-    // Note that system properties can only be used in tests at this point.
-    System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
-    System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
+
+  // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
+  // Note that system properties can only be used in tests at this point.
+  System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
+  System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
+
+  private def setupAndStartCanton() = {
     // We merge the bootstrap we need for the SVC & the domain
     // with the bootstrap for the validator so we
     // don't need to start two Canton instances.
@@ -103,7 +110,6 @@ class LocalRunbookIntegrationTest
       ("DOMAIN_URL", "http://localhost:9008"),
     )
     cantonProcess = Some(process)
-    super.provideEnvironment
   }
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
@@ -137,6 +143,7 @@ class LocalRunbookIntegrationTest
       )
       .addConfigTransforms((_, conf) => expectValidatorOnboarding(conf, "validatorsecret"))
       .withThisSetup(env => {
+        setupAndStartCanton()
         env.appsHostedBySvc.local.foreach(_.start())
         env.appsHostedBySvc.local.foreach(_.waitForInitialization())
       })
