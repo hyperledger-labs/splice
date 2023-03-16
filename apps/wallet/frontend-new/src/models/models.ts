@@ -15,7 +15,7 @@ import {
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 
 export interface WalletBalance {
-  totalCC: Decimal;
+  availableCC: Decimal;
 }
 
 export interface Transaction {

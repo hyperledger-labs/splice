@@ -1,21 +1,79 @@
-import { AmountDisplay } from 'common-frontend';
-import React from 'react';
+import BigNumber from 'bignumber.js';
+import { AmountDisplay, Contract, DirectoryEntry } from 'common-frontend';
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ArrowOutward } from '@mui/icons-material';
 import { Box, Button, Container, Stack, styled, Typography } from '@mui/material';
 
+import {
+  AppPaymentRequest,
+  PaymentAmount,
+} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { ContractId } from '@daml/types';
+
+import Loading from '../components/Loading';
 import PaymentHeader from '../components/PaymentHeader';
+import { useCoinPrice } from '../contexts/CoinPriceContext';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
+  const { listAppPaymentRequests } = useWalletClient();
+  const { cid } = useParams();
+  const [appPayment, setAppPayment] = useState<Contract<AppPaymentRequest>>();
+
+  // TODO (#3333): react-query already does retries
+  useEffect(() => {
+    let timer: NodeJS.Timeout | undefined;
+    const fetchAppPayment = async (n: number) => {
+      // TODO (#3433): single fetch instead of linear search
+      const { paymentRequestsList } = await listAppPaymentRequests();
+      const req = paymentRequestsList.find(c => c.contractId === cid);
+      if (req) {
+        console.debug('Payment request found');
+        setAppPayment(req);
+      } else if (n < 0) {
+        throw new Error('Payment request not found, retries exceeded giving up...');
+      } else {
+        console.debug('Payment request not found, trying again...');
+        timer = setTimeout(fetchAppPayment, 500, n - 1);
+      }
+    };
+    fetchAppPayment(30);
+
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [cid, listAppPaymentRequests]);
+
+  const coinPrice = useCoinPrice();
+
+  if (!appPayment || !coinPrice) {
+    return <Loading />;
+  }
+
+  const { payload } = appPayment;
+  // TODO (#3485): handle multiple recipients
   return (
-    <Box display="flex" flexDirection="column" minHeight="100vh">
+    <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
       <PaymentHeader />
       <Box bgcolor="colors.neutral.25" flex={1}>
         <Container maxWidth="sm">
           <Stack alignItems="center" paddingTop={4} spacing={4}>
-            <RecipientInfo />
-            <PaymentDescription />
-            <PaymentContainer />
+            <RecipientInfo
+              amount={payload.receiverAmounts[0].amount}
+              receiver={payload.receiverAmounts[0].receiver}
+              provider={payload.provider}
+            />
+            {/* TODO (#3483): use actual description */}
+            <PaymentDescription description="Payment Desc." />
+            <PaymentContainer
+              contractId={appPayment.contractId}
+              amount={payload.receiverAmounts[0].amount}
+              fee={new BigNumber(0)} // TODO (#3492): compute actual fee
+              coinPrice={coinPrice}
+            />
           </Stack>
         </Container>
       </Box>
@@ -25,66 +83,108 @@ export const ConfirmPayment: React.FC = () => {
 
 export default ConfirmPayment;
 
-const RecipientInfo: React.FC = () => {
-  const amount = 8.0;
-  const recipient = 'credap-payments.cns';
-  const via = 'credap.cns';
+interface RecipientInfoProps {
+  amount: PaymentAmount;
+  receiver: string;
+  provider: string;
+}
+const RecipientInfo: React.FC<RecipientInfoProps> = ({ amount, receiver, provider }) => {
   return (
     <Stack alignItems="center" spacing={1}>
       <SendPaymentIcon />
-      <Typography variant="h5">
-        Send {amount} CC to <b>{recipient}</b>
-      </Typography>
-      <Typography variant="body2">via {via}</Typography>
+      <H5WithDirectoryEntry className="payment-amount-receiver">
+        Send <AmountDisplay amount={amount.amount} currency={amount.currency} /> to{' '}
+        <b>
+          <DirectoryEntry partyId={receiver} />
+        </b>
+      </H5WithDirectoryEntry>
+      <Body2WithDirectoryEntry className="payment-provider">
+        via <DirectoryEntry partyId={provider} />
+      </Body2WithDirectoryEntry>
     </Stack>
   );
 };
+
+// TODO (#3503): refactor into DirectoryEntry
+const H5WithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.h5 }));
+const Body2WithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.body2 }));
 
 const SendPaymentIcon = styled(ArrowOutward)({
   border: '1px solid #fff',
   borderRadius: '50%',
 });
 
-const PaymentDescription: React.FC = () => {
-  const description = 'Trading credential for Alain Trading';
+interface PaymentDescriptionProps {
+  description: string;
+}
+const PaymentDescription: React.FC<PaymentDescriptionProps> = ({ description }) => {
   return (
     <Stack alignItems="center">
       <Typography variant="body1">Description:</Typography>
-      <Typography variant="body1">&quot;{description}&quot;</Typography>
+      <Typography variant="body1" className="payment-description">
+        &quot;{description}&quot;
+      </Typography>
     </Stack>
   );
 };
 
-const PaymentContainer: React.FC = () => {
-  const amount = 8.0;
-  const fee = 1.8;
-  const usd = 130.12;
-  const isFirstPaymentToRecipient = true;
+interface PaymentContainerProps {
+  contractId: ContractId<AppPaymentRequest>;
+  amount: PaymentAmount;
+  fee: BigNumber;
+  coinPrice: BigNumber;
+}
+const PaymentContainer: React.FC<PaymentContainerProps> = ({
+  contractId,
+  amount,
+  fee,
+  coinPrice,
+}) => {
+  const converted = convertCurrency(new BigNumber(amount.amount), amount.currency, coinPrice);
+  const ccAmount = amount.currency === 'CC' ? new BigNumber(amount.amount) : converted.amount;
+
+  const totalCC = ccAmount.plus(fee);
+  const totalUSD = totalCC.times(coinPrice);
+
   return (
     <Container>
       <Box bgcolor="colors.neutral.20" border={1} borderColor="colors.neutral.30">
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
-            <Typography variant="h5">
-              <AmountDisplay amount={(amount + fee).toString()} currency={'CC'} />
+            <Typography variant="h5" className="payment-total-cc">
+              <AmountDisplay amount={totalCC.toString()} currency={'CC'} />
             </Typography>
-            <Typography variant="body2">
-              <AmountDisplay amount={amount.toString()} currency={'CC'} /> +{' '}
+            <Typography variant="body2" className="payment-compute">
+              <AmountDisplay amount={ccAmount.toString()} currency={'CC'} /> +{' '}
               <AmountDisplay amount={fee.toString()} currency={'CC'} /> fee /{' '}
-              <AmountDisplay amount={usd.toString()} currency={'USD'} />
+              <AmountDisplay amount={totalUSD.toString()} currency={'USD'} />
             </Typography>
           </Stack>
-          <Button variant="pill" size="large">
-            Send Payment
-          </Button>
-          {isFirstPaymentToRecipient && (
-            <Typography variant="caption">
-              {"You're sending a payment to this recipient for the first time."}
-            </Typography>
-          )}
+          <ConfirmPaymentButton contractId={contractId} />
         </Stack>
       </Box>
     </Container>
+  );
+};
+
+const ConfirmPaymentButton: React.FC<{ contractId: ContractId<AppPaymentRequest> }> = ({
+  contractId,
+}) => {
+  const { acceptAppPaymentRequest } = useWalletClient();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
+
+  const onAccept = async () => {
+    await acceptAppPaymentRequest(contractId);
+    if (redirect) {
+      window.location.assign(redirect);
+    }
+  };
+
+  return (
+    <Button variant="pill" size="large" onClick={onAccept} className="payment-accept">
+      Send Payment
+    </Button>
   );
 };

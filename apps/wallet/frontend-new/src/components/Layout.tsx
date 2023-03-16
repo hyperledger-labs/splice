@@ -20,7 +20,9 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const walletClient = useWalletClient();
 
-  const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: new Decimal(0) });
+  const [walletBalance, setWalletBalance] = useState<WalletBalance>({
+    availableCC: new Decimal(0),
+  });
 
   const coinPrice = useCoinPrice();
 

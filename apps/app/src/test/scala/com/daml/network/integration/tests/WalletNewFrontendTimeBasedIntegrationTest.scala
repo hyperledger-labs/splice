@@ -130,8 +130,8 @@ class WalletNewFrontendTimeBasedIntegrationTest
           val cc = BigDecimal(ccText.split(" ").head)
           val usd = BigDecimal(usdText.split(" ").head)
 
-          assertInRange(cc, (BigDecimal(1.9), BigDecimal(2)))
-          assertInRange(usd, (BigDecimal(3.9), BigDecimal(4)))
+          assertInRange(cc, (BigDecimal(0.9), BigDecimal(1)))
+          assertInRange(usd, (BigDecimal(1.9), BigDecimal(2)))
         }
       }
     }

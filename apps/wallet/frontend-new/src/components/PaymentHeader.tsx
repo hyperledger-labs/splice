@@ -16,7 +16,9 @@ const PaymentHeader: React.FC = () => {
 
   const coinPrice = useCoinPrice();
 
-  const [walletBalance, setWalletBalance] = useState<WalletBalance>({ totalCC: new Decimal(0) });
+  const [walletBalance, setWalletBalance] = useState<WalletBalance>({
+    availableCC: new Decimal(0),
+  });
 
   const fetchBalance = useCallback(async () => {
     const balance = await walletClient.getBalance();
@@ -43,9 +45,9 @@ const PaymentHeader: React.FC = () => {
           </Typography>
           <Typography className="available-balance">
             Total Available Balance:{' '}
-            <AmountDisplay amount={walletBalance.totalCC.toString()} currency="CC" /> /{' '}
+            <AmountDisplay amount={walletBalance.availableCC.toString()} currency="CC" /> /{' '}
             <AmountDisplay
-              amount={walletBalance.totalCC.mul(coinPrice.toString()).toString()}
+              amount={walletBalance.availableCC.mul(coinPrice.toString()).toString()}
               currency="USD"
             />
           </Typography>

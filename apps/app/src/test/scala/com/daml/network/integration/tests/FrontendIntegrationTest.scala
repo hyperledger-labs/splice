@@ -211,7 +211,9 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
         // we exclude this.
         if (currentUrl != "about:blank") {
           webDriver.getSessionStorage().clear()
-          webDriver.getSessionStorage().keySet.asScala shouldBe empty
+          eventually() {
+            webDriver.getSessionStorage().keySet.asScala shouldBe empty
+          }
         }
       }
     }.futureValue

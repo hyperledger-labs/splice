@@ -18,11 +18,11 @@ const Hero: React.FC<HeroProps> = props => {
       <Stack direction="column" spacing={1}>
         <Typography variant="h6">Total Available Balance</Typography>
         <Typography id="wallet-balance-cc" variant="h4">
-          <AmountDisplay amount={props.balance.totalCC.toString()} />
+          <AmountDisplay amount={props.balance.availableCC.toString()} />
         </Typography>
         <Typography id="wallet-balance-usd" variant="caption">
           <AmountDisplay
-            amount={props.balance.totalCC.mul(props.coinPrice.toString()).toString()}
+            amount={props.balance.availableCC.mul(props.coinPrice.toString()).toString()}
             currency="USD"
           />
         </Typography>

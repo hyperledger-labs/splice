@@ -97,12 +97,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       getBalance: async (): Promise<WalletBalance> => {
         const balance = await walletClient.getBalance();
-        const locked = new Decimal(balance.effectiveLockedQty);
-        const unlocked = new Decimal(balance.effectiveUnlockedQty);
-        const fees = new Decimal(balance.totalHoldingFees);
-        const totalCC = locked.plus(unlocked).plus(fees);
         return {
-          totalCC,
+          availableCC: new Decimal(balance.effectiveUnlockedQty),
         };
       },
       createTransferOffer: async (
