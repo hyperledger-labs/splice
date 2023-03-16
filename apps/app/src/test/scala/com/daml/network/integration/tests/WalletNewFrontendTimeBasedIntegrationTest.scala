@@ -13,7 +13,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 
-class WalletNewFrontendIntegrationTest
+class WalletNewFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil

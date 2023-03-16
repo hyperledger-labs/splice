@@ -776,14 +776,42 @@ printTests := {
   import java.io._
   println("Appending full class names of tests to the file `test-full-class-names.log`.")
   val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
-  val tests =
+  val pwSimTime = new PrintWriter(new FileWriter(s"test-full-class-names-sim-time.log", true))
+
+  def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
+  def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def printTestNames(
+      testSet: String,
+      testNames: Seq[String],
+      writer: PrintWriter,
+      predicate: String => Boolean,
+  ): Unit = {
+    println(s"There are ${testNames.length} $testSet.")
+    testNames.filter(predicate).sorted.foreach { testName =>
+      writer.println(testName)
+    }
+  }
+
+  val allTestNames =
     definedTests
       .all(ScopeFilter(inAggregates(root), inConfigurations(Test)))
       .value
       .flatten
-  println(s"There are ${tests.length} tests.")
-  tests.sortBy(_.name).foreach { test =>
-    pw.println(test.name)
-  }
+      .map(_.name)
+
+  printTestNames(
+    "tests with wall clock time",
+    allTestNames,
+    pw,
+    t => !isTimeBasedTest(t) && !isPreflightIntegrationTest(t),
+  )
+  printTestNames(
+    "tests with simulated time",
+    allTestNames,
+    pwSimTime,
+    t => isTimeBasedTest(t) && !isPreflightIntegrationTest(t),
+  )
+
   pw.close()
+  pwSimTime.close()
 }

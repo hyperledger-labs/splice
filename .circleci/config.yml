@@ -512,6 +512,9 @@ commands:
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
     description: split tests for parallel execution
+    parameters:
+      test_names_file:
+        type: string
     steps:
       - execute_sbt_command:
           cmd: printTests
@@ -528,7 +531,7 @@ commands:
               sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
             fi
             echo "[split tests]"
-            splitted=$(cat test-full-class-names.log | circleci tests split --split-by=timings --timings-type=classname)
+            splitted=$(cat << parameters.test_names_file >> | circleci tests split --split-by=timings --timings-type=classname)
             tests=$(echo $splitted | tr '\n' ' ')
             count=$(echo $tests | wc -w)
             echo "We are running $count tests in this batch:"
@@ -540,6 +543,23 @@ commands:
           name: Upload list of tests executed in this run (as empty files)
           path: tests
           destination: _tests # the _ is so this appears on top in the artifacts list
+
+  run_splitted_scala_tests:
+    description: run splitted scala tests
+    parameters:
+      start_canton_options:
+        type: string
+    steps:
+      - execute_sbt_command:
+          # run all tests except the live cluster ones
+          pre_sbt_cmd: ./start-canton.sh << parameters.start_canton_options >> && ./start-frontends.sh -d && $(top -b -o %MEM -c -w 256 > log/memory &)
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
+          post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
+          # it is in our best interest for our tests to be faster than this,
+          # but failing CI because of slow tests is also not very nice
+          timeout: "15m"
 
   setup_vpn:
     steps:
@@ -782,30 +802,31 @@ jobs:
           POSTGRES_INITDB_ARGS: -A scram-sha-256
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
+    parameters:
+      test_names_file:
+        type: string
+      start_canton_options:
+        type: string
+      parallelism:
+        type: integer
     resource_class: 2xlarge+
     environment:
       <<: *env
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
-    parallelism: 8
+    parallelism: << parameters.parallelism >>
     steps:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
-      - split_tests_for_parallel_run
-      - execute_sbt_command:
-          # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh -d -p external && ./start-frontends.sh -d && $(top -b -o %MEM -c -w 256 > log/memory &)
-          cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
-          post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
-          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
-          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
-          # it is in our best interest for our tests to be faster than this,
-          # but failing CI because of slow tests is also not very nice
-          timeout: "15m"
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - run_splitted_scala_tests:
+          # run in detached mode, with external postgres and only start either wall clock or sim time instance
+          start_canton_options: << parameters.start_canton_options >>
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
 
@@ -1099,9 +1120,23 @@ workflows:
     - scala_test:
         <<: *notify-fail
         context:
-            - artifactory
-            - datadog
-            - slack-context
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test wall clock time"
+        test_names_file: "test-full-class-names.log"
+        start_canton_options: "-d -p external -w"
+        parallelism: 8
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test sim time"
+        test_names_file: "test-full-class-names-sim-time.log"
+        start_canton_options: "-d -p external -s"
+        parallelism: 4
     - bundle:
         <<: *notify-fail
         context:

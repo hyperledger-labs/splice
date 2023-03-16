@@ -11,7 +11,7 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class WalletCoinPriceIntegrationTest
+class WalletCoinPriceTimeBasedIntegrationTest
     extends CoinIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {

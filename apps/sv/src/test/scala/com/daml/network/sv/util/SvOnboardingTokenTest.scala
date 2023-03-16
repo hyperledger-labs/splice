@@ -1,4 +1,5 @@
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+package com.daml.network.sv.util
+
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.wordspec.AsyncWordSpec
