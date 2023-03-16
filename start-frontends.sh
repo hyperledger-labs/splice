@@ -71,6 +71,18 @@ function start_frontend() {
     npm start 2>&1 | tee -a $log_file" C-m
 }
 
+function start_json_api() {
+  local ledger_api_port=$1
+  local extra_args=$2
+  local log_file="${LOG_DIR}/participant-json-api.log"
+  local conf="--log-encoder json --log-level DEBUG --ledger-host localhost --ledger-port $ledger_api_port --address 0.0.0.0 --http-port 7575 $extra_args";
+
+  tmux_cmd "json-api" "alice" ":"
+
+  tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
+    "json-api $conf  2>&1 | tee -a $log_file" C-m
+}
+
 function usage() {
   echo "Usage: ./start-frontends.sh <flags>"
   echo "Flags:"
@@ -145,13 +157,15 @@ function start_local_frontends() {
   start_frontend   splitwell 3005 charlie "alice" $enable_test_auth
   start_frontend   scan      3006 scan    "scan"  "false"           "none"
   start_frontend   wallet    3007 alice   "alice" $enable_test_auth "rs-256" "http://localhost" "frontend-new"
+  start_json_api 5201 "--allow-insecure-tokens"
 }
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test
 function start_preflight_frontends() {
   # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
   start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
-  start_frontend   directory 3001 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+  start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+  start_json_api ${JSON_LEDGER_API_PORT} ""
 }
 
 if [ $use_preflight_frontends -eq 0 ]; then
@@ -160,6 +174,7 @@ else
   if [ "$enable_test_auth" == "true" ]; then
     start_preflight_frontends
     echo $NETWORK_APPS_ADDRESS > start-frontends-network-address
+    echo $JSON_LEDGER_API_PORT > start-frontends-http-ledger-api-port
   else
     echo "enable_test_auth was set to false, -p is incompatible with -a"
     exit 1

@@ -81,7 +81,7 @@ class SelfHostedPreflightIntegrationTest
       "--bootstrap",
       (validatorPath / "validator-participant.sc").toString,
     )
-
+    checkFrontendsJsonLedgerApiPort("6001")
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 
     Using.resource(startCanton(cantonArgs)) { _ =>
@@ -92,7 +92,7 @@ class SelfHostedPreflightIntegrationTest
         .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 
       val walletUiPort = 3000
-      val directoryUiPort = 3001
+      val directoryUiPort = 3004
 
       // Generate new random CNS names to avoid conflicts between multiple preflight check runs
       val id = (new scala.util.Random).nextInt().toHexString
@@ -159,6 +159,16 @@ class SelfHostedPreflightIntegrationTest
     clue(s"Checking frontends match given network apps address: ${networkAppsAddress}") {
       eventually() {
         "start-frontends-network-address".toFile.lines.headOption shouldBe Some(networkAppsAddress)
+      }
+    }
+  }
+
+  private def checkFrontendsJsonLedgerApiPort(jsonLedgerApiPort: String): Unit = {
+    clue(s"Checking frontends match given json ledger api port: ${jsonLedgerApiPort}") {
+      eventually() {
+        "start-frontends-http-ledger-api-port".toFile.lines.headOption shouldBe Some(
+          jsonLedgerApiPort
+        )
       }
     }
   }

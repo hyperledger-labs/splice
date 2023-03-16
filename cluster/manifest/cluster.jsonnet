@@ -212,8 +212,25 @@ local envoyConfig(config, proxyPort) =
     ],
   };
 
+local jsonApiConfig(config) =
+  {
+    name: "json-api",
+    image: imageName(config, "json-api"),
+    imagePullPolicy: "Always",
+    resources: {
+      requests: {
+        memory: "512Mi",
+      },
+      limits: {
+        memory: "512Mi",
+      },
+    },
+    ports: [{ name: "http", containerPort: 7575 }],
+  };
+
+
 // `image` defaults to `name`
-local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =
+local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, jsonApi=null, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =
 
   local proxyPorts =
     if proxyToGrpcWeb == null then []
@@ -288,7 +305,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                                          },
                                        ]),
                 } + ext,
-              ] + [envoyConfig(config, port) for port in proxyPorts],
+              ] + [envoyConfig(config, port) for port in proxyPorts] + (if jsonApi != null then [jsonApi] else []),
               volumes: (if mountConfig == null then [] else [
                           {
                             name: name + "-config-vol",
@@ -362,6 +379,7 @@ local namespace(name, config) = {
   deployment:: deployment,
   externalPort:: externalPort,
   flatten:: flatten,
+  jsonApiConfig:: jsonApiConfig,
   namespace:: namespace,
   standardLabels:: standardLabels,
 }

@@ -10,6 +10,7 @@ in (import src) ({
     sbt = super.sbt.override { jre = super.openjdk11; };
     lnav = super.callPackage ./lnav.nix {};
     canton = super.callPackage ./canton.nix {};
+    jsonapi = super.callPackage ./jsonapi.nix {};
     haskellPackages = super.haskellPackages.override {
       overrides = hsSelf: hsSuper: {
         data-diverse = super.haskell.lib.unmarkBroken (super.haskell.lib.dontCheck hsSuper.data-diverse);

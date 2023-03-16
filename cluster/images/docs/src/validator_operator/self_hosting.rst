@@ -156,19 +156,7 @@ Hosting the Wallet Web UI
 -------------------------
 
 The Wallet Web UI is distributed as static files that connect to the
-wallet backend that we started in the previous section via `gRPC-Web
-<https://github.com/grpc/grpc-web>`_. We use `envoy
-<https://www.envoyproxy.io/>`_ as a proxy that translates between gRPC
-and gRPC-Web.
-
-First,
-`install envoy <https://www.envoyproxy.io/docs/envoy/latest/start/install>`_
-following the instructions for your operating system.
-
-Next, start the envoy proxy. This proxies the wallet gRPC API on port
-5004 to a gRPC-Web API on port 6004. Open a new terminal and run: ::
-
-  envoy -c examples/validator/envoy.yaml
+wallet backend that we started in the previous section. 
 
 Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
 For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
@@ -200,6 +188,10 @@ In order to use it in your self-hosted validator, you will need to serve one mor
 First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
 
   validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
+
+The directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run: ::
+
+  daml json-api --config examples/validator/json-api-app.conf
 
 Before you can use the directory UI, you need to configure the URL of the directory backend similar to
 how you configured the wallet UI earlier. For that,

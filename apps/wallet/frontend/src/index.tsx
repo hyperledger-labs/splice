@@ -15,10 +15,10 @@ root.render(
   <React.StrictMode>
     <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        <WalletClientProvider url={config.services.wallet.grpcUrl}>
-          <ValidatorClientProvider url={config.services.validator.grpcUrl}>
-            <DirectoryClientProvider url={config.services.directory.grpcUrl}>
-              <ScanClientProvider url={config.services.scan.grpcUrl}>
+        <WalletClientProvider url={config.services.wallet.url}>
+          <ValidatorClientProvider url={config.services.validator.url}>
+            <DirectoryClientProvider url={config.services.directory.url}>
+              <ScanClientProvider url={config.services.scan.url}>
                 <App />
               </ScanClientProvider>
             </DirectoryClientProvider>

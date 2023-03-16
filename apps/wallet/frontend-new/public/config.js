@@ -16,22 +16,22 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the wallet app HTTP API
-      grpcUrl: 'http://localhost:6004',
+      url: 'http://localhost:6004',
     },
     validator: {
       // URL of the validator app HTTP API
-      grpcUrl: 'http://localhost:6003',
+      url: 'http://localhost:6003',
     },
     // BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     directory: {
       // URL of the directory backend.
       // Edit this to the cluster you're trying to connect on.
-      grpcUrl: 'https://directory.TARGET_CLUSTER.network.canton.global',
+      url: 'https://directory.TARGET_CLUSTER.network.canton.global',
     },
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.
-      grpcUrl: 'https://scan.TARGET_CLUSTER.network.canton.global',
+      url: 'https://scan.TARGET_CLUSTER.network.canton.global',
     },
     // END_WALLET_CLUSTER_BACKEND_CONFIG
   },

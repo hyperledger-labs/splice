@@ -48,10 +48,10 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        <ValidatorClientProvider url={config.services.validator.grpcUrl}>
-          <WalletClientProvider url={config.services.wallet.grpcUrl}>
-            <DirectoryClientProvider url={config.services.directory.grpcUrl}>
-              <ScanClientProvider url={config.services.scan.grpcUrl}>
+        <ValidatorClientProvider url={config.services.validator.url}>
+          <WalletClientProvider url={config.services.wallet.url}>
+            <DirectoryClientProvider url={config.services.directory.url}>
+              <ScanClientProvider url={config.services.scan.url}>
                 <CurrentUserProvider>
                   <CoinPriceProvider>
                     <ThemeProvider theme={theme}>{children}</ThemeProvider>

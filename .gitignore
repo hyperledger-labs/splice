@@ -30,6 +30,7 @@ canton.ports
 canton-simtime.ports
 canton-release
 start-frontends-network-address
+start-frontends-http-ledger-api-port
 .disable-unused-warnings
 todo-out
 temp/
@@ -50,3 +51,4 @@ canton-simtime.tokens
 canton-classpath
 openapi-ts-client
 /cluster/manifest/test-results/actual.json
+

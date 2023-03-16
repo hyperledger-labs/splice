@@ -16,15 +16,16 @@ window.canton_network_config = {
   services: {
     directory: {
       // URL of the directory backend.
-      grpcUrl: `https://directory.${cluster}`,
+      url: `https://directory.${cluster}`,
+      jsonApiUrl: "https://" + window.location.hostname + "/api/json-api/",
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      grpcUrl: "https://" + window.location.hostname + "/api/v0/ledger-api",
+      url: "https://" + window.location.hostname + "/api/v0/ledger-api",
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
+      url: "https://" + window.location.hostname + "/api/v0/wallet",
       uiUrl: window.location.origin.replace("directory", "wallet"),
     },
   },

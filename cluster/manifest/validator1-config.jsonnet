@@ -5,41 +5,55 @@ local c = import "./cluster.jsonnet";
 local deployments(config) = [
   c.namespace("validator1", config),
   postgres.database("postgres", config, namespace="validator1"),
-  c.deployment(config, "participant", [
-    {
-      name: "val1-adm-api",
-      port: 5002,
-      externalPort: 5102,
-    },
-    {
-      name: "val1-lg-api",
-      port: 5001,
-      externalPort: 5101,
-    },
-    {
-      name: "val1-metrics",
-      port: 10013,
-      externalPort: 10113,
-    },
-  ], image="canton-participant", namespace="validator1", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["val1-lg-api", "val1-adm-api"], extraEnvVars=c.appUserNameEnvBinding("validator") + [
-    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
-    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", json: [
-      {
-        name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "validator1_validator_service_user" },
-        actAs: [{ fromUser: "self" }],
-        readAs: [],
-        admin: true,
-      },
-    ] },
-    { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
-      {
-        alias: "splitwell",
-        url: "http://domain.splitwell:5008",
-      },
-    ] },
-  ]),
+  c.deployment(config,
+               "participant",
+               [
+                 {
+                   name: "val1-adm-api",
+                   port: 5002,
+                   externalPort: 5102,
+                 },
+                 {
+                   name: "val1-lg-api",
+                   port: 5001,
+                   externalPort: 5101,
+                 },
+                 {
+                   name: "val1-metrics",
+                   port: 10013,
+                   externalPort: 10113,
+                 },
+                 {
+                   name: "json-api",
+                   port: 7575,
+                   externalPort: 7575,
+                 },
+               ],
+               image="canton-participant",
+               namespace="validator1",
+               cpuRequest=config.participantCpu,
+               memoryLimitMiB=config.participantMemoryMib,
+               jsonApi=c.jsonApiConfig(config),
+               proxyToGrpcWeb=["val1-lg-api", "val1-adm-api"],
+               extraEnvVars=c.appUserNameEnvBinding("validator") + [
+                 { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+                 { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
+                 { name: "CANTON_PARTICIPANT_USERS", json: [
+                   {
+                     name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+                     primaryParty: { allocate: "validator1_validator_service_user" },
+                     actAs: [{ fromUser: "self" }],
+                     readAs: [],
+                     admin: true,
+                   },
+                 ] },
+                 { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
+                   {
+                     alias: "splitwell",
+                     url: "http://domain.splitwell:5008",
+                   },
+                 ] },
+               ]),
 
   c.deployment(config,
                "validator-app",
