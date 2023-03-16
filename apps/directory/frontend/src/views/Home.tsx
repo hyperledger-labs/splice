@@ -18,6 +18,41 @@ import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 
+// TODO(#3550) Factor out retry functionality.
+const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const retry = async <T,>(
+  maxRetries: number,
+  retryDelay: number,
+  task: () => Promise<T>
+): Promise<T> => {
+  let retries = 0;
+  let error;
+  while (retries < maxRetries) {
+    if (retries > 0) {
+      console.debug('Retrying now...');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: { type: 'success'; value: T } | { type: 'retryable'; error: any } = await task()
+      .then<{ type: 'success'; value: T }>(r => {
+        return { type: 'success', value: r };
+      })
+      .catch(e => ({ type: 'retryable', error: e }));
+    switch (response.type) {
+      case 'retryable':
+        console.debug(`Found retryable error, retrying after ${retryDelay}ms...`);
+        error = response.error;
+        retries++;
+        await sleep(retryDelay);
+        break;
+      case 'success':
+        return response.value;
+    }
+  }
+  console.debug('Exceeded retries, giving up...');
+  throw error;
+};
+
 export function useProviderParty(directoryClient: DirectoryClient): string | undefined {
   const [providerPartyId, setProviderPartyId] = useState<string | undefined>();
 
@@ -43,7 +78,7 @@ export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | unde
   useEffect(() => {
     const fetchPrimaryParty = async () => {
       try {
-        setPrimaryParty(await ledgerApiClient.getPrimaryParty());
+        setPrimaryParty(await retry(30, 1000, () => ledgerApiClient.getPrimaryParty()));
       } catch (err) {
         console.error('Error finding primary party for user', err);
         console.error(JSON.stringify(err));

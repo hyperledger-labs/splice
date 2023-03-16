@@ -1168,30 +1168,30 @@ workflows:
           <<: *main-branch-never
           type: approval
       # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: scratchnet
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
+      # - docker_images_push:
+      #     <<: *main-branch-never
+      #     context:
+      #       - artifactory
+      #       - slack-context
+      #     requires:
+      #       - hold
+      # - deployment_test:
+      #     <<: *main-branch-never
+      #     context:
+      #       - artifactory
+      #       - slack-context
+      #     requires:
+      #       - hold
+      # - deploy_cluster:
+      #     <<: *main-branch-never
+      #     context:
+      #       - artifactory
+      #       - slack-context
+      #     cluster: scratchnet
+      #     requires:
+      #       - hold
+      #       - deployment_test
+      #       - docker_images_push
       - preflight_check:
           <<: *main-branch-never
           cluster: scratchnet
@@ -1201,9 +1201,9 @@ workflows:
             - slack-context
           requires:
             - hold
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+#            - deployment_test
+#            - docker_images_push
+#            - deploy_cluster
 
   deploy_scratchnet_B:
     when:
