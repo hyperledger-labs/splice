@@ -1,6 +1,6 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import { AmountDisplay, useInterval } from 'common-frontend';
-import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
 import { Box, Stack, Toolbar, Typography } from '@mui/material';
@@ -17,7 +17,7 @@ const PaymentHeader: React.FC = () => {
   const coinPrice = useCoinPrice();
 
   const [walletBalance, setWalletBalance] = useState<WalletBalance>({
-    availableCC: new Decimal(0),
+    availableCC: new BigNumber(0),
   });
 
   const fetchBalance = useCallback(async () => {
@@ -47,7 +47,7 @@ const PaymentHeader: React.FC = () => {
             Total Available Balance:{' '}
             <AmountDisplay amount={walletBalance.availableCC.toString()} currency="CC" /> /{' '}
             <AmountDisplay
-              amount={walletBalance.availableCC.mul(coinPrice.toString()).toString()}
+              amount={walletBalance.availableCC.times(coinPrice).toString()}
               currency="USD"
             />
           </Typography>

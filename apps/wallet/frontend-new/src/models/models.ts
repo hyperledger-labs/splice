@@ -1,9 +1,9 @@
+import BigNumber from 'bignumber.js';
 import { Contract } from 'common-frontend';
 import {
   AcceptedTransferOffer,
   TransferOffer,
 } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
-import { Decimal } from 'decimal.js';
 import { CoinPosition } from 'wallet-openapi';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
@@ -15,7 +15,7 @@ import {
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 
 export interface WalletBalance {
-  availableCC: Decimal;
+  availableCC: BigNumber;
 }
 
 export interface Transaction {

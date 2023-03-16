@@ -1,6 +1,6 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import { useInterval } from 'common-frontend/lib/utils/hooks';
-import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
 import { Box } from '@mui/material';
@@ -21,7 +21,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const walletClient = useWalletClient();
 
   const [walletBalance, setWalletBalance] = useState<WalletBalance>({
-    availableCC: new Decimal(0),
+    availableCC: new BigNumber(0),
   });
 
   const coinPrice = useCoinPrice();

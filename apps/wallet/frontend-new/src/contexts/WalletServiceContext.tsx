@@ -1,5 +1,5 @@
+import BigNumber from 'bignumber.js';
 import { Contract, UserStatusResponse, useUserState } from 'common-frontend';
-import { Decimal } from 'decimal.js';
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,
@@ -43,7 +43,7 @@ export interface WalletClient {
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
-    amount: Decimal,
+    amount: BigNumber,
     description: string,
     expiresAt: Date,
     idempotencyKey: string
@@ -98,7 +98,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       getBalance: async (): Promise<WalletBalance> => {
         const balance = await walletClient.getBalance();
         return {
-          availableCC: new Decimal(balance.effectiveUnlockedQty),
+          availableCC: new BigNumber(balance.effectiveUnlockedQty),
         };
       },
       createTransferOffer: async (
@@ -110,7 +110,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       ) => {
         const request = {
           receiverPartyId: receiverPartyId,
-          amount: amount.isInt() ? amount.toFixed(1) : amount.toString(),
+          amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
           description: description,
           expiresAt: expiresAt.getTime() * 1000,
           idempotencyKey: idempotencyKey,

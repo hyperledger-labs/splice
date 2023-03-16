@@ -22,7 +22,7 @@ const Hero: React.FC<HeroProps> = props => {
         </Typography>
         <Typography id="wallet-balance-usd" variant="caption">
           <AmountDisplay
-            amount={props.balance.availableCC.mul(props.coinPrice.toString()).toString()}
+            amount={props.balance.availableCC.times(props.coinPrice).toString()}
             currency="USD"
           />
         </Typography>
