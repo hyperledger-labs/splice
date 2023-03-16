@@ -167,6 +167,29 @@ function _cluster_show() {
     _log ""
 }
 
+
+
+### Cluster manageent
+
+
+function _current_lockholder() {
+    kubectl get secret cluster-lock -o jsonpath={'.data.lockholder'} 2>/dev/null | base64 --decode
+}
+
+function _assert_lock() {
+    if [ -z "${SHARED_CLUSTER:-}" ]; then
+        return
+    fi
+
+    if lockholder=$(_current_lockholder); then
+        if [ "${lockholder}" != "$(whoami)" ]; then
+            _error "Cluster already locked by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked. (See: https://github.com/DACH-NY/the-real-canton-coin#deploy-a-build-to-a-cluster))"
+    fi
+}
+
 ################################
 ### Commands
 ################################
@@ -182,6 +205,10 @@ declare -A subcommand_whitelist
 
 function _prompt_to_confirm() {
     _cluster_show
+
+    if [ "${1-}" != "--no-lock" ]; then
+        _assert_lock
+    fi
 
     if [ -z "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
         if [ -n "${CNCLUSTER_AUTOCONFIRM-}" ] ; then
@@ -467,7 +494,7 @@ function subcmd_update_dns01_secret() {
 subcommand_whitelist[create]='Create a cluster from scratch.'
 
 function subcmd_create() {
-    _prompt_to_confirm
+    _prompt_to_confirm --no-lock
 
     if _cluster_exists; then
         _error "Cluster already exists."
@@ -1071,6 +1098,59 @@ function subcmd_prefresh() {
     _cluster_must_exist
 
     subcmd_pulumi refresh --yes
+}
+
+###
+
+subcommand_whitelist[lock]="Attempt to claim the lock on a cluster."
+
+function subcmd_lock() {
+    if lockholder=$(_current_lockholder); then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Cluster is already locked to you."
+        else
+            _error "Cluster already locked by: ${lockholder}"
+        fi
+    else
+        kubectl create secret generic cluster-lock --from-literal=lockholder=$(whoami) > /dev/null
+        _info "Cluster lock claimed successfully."
+    fi
+}
+
+###
+
+subcommand_whitelist[unlock]="Release the lock on a cluster"
+
+function subcmd_unlock() {
+    _assert_lock
+
+    if lockholder=$(_current_lockholder); then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            kubectl delete secret cluster-lock > /dev/null
+            _info "Cluster lock successfully released."
+
+            _info "(Don't forget to reset the cluster with 'cncluster reset')"
+        else
+            _error "You cannot unlock cluster locked by: ${lockholder}"
+        fi
+    else
+        _info "Cluster not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[unlock_force]="Forcibly release the lock on a cluster."
+
+function subcmd_unlock_force() {
+    _prompt_to_confirm --no-lock
+
+    if lockholder=$(_current_lockholder); then
+        kubectl delete secret cluster-lock > /dev/null
+        _warning "Cluster forcibly unlocked, please let former lockholder know: ${lockholder}"
+    else
+        _info "Cluster was not locked."
+    fi
 }
 
 ################################
