@@ -36,11 +36,8 @@ MIN_LOG_LEVEL_WARNING="\"level\":\"WARN\"|\"level\":\"ERROR\""
 # Reads ignore patterns from stdin (one pattern per line).
 # Outputs log entries matching an ignore pattern.
 read_ignored_entries() {
-  set +o pipefail # rg returns 1 if there were not matches
   rg -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
-    rg -e "$MIN_LOG_LEVEL_WARNING" |
-    # replaces [canton-env-execution-context-123] with [⋮]
-    sed "s/ \\[.*\\] / [⋮] /"
+    rg -e "$MIN_LOG_LEVEL_WARNING" || true
 }
 
 # Read ignored entries
@@ -52,11 +49,9 @@ read_ignored_entries |
 
 # this differs from `read_ignored_entries` by one `-v`
 find_errors() {
-  set +o pipefail # rg returns 1 if there were not matches
+  # rg returns 1 if there were not matches so we add the || true
   rg -v -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
-    rg -e "$MIN_LOG_LEVEL_WARNING" |
-    # replaces [canton-env-execution-context-123] with [⋮]
-    sed "s/ \\[.*\\] / [⋮] /"
+    rg -e "$MIN_LOG_LEVEL_WARNING" || true
 }
 
 # Find the errors
