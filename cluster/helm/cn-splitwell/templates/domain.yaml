@@ -21,7 +21,7 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: -Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4
         - name: CANTON_DOMAIN_POSTGRES_SERVER
-          value: postgres
+          value: {{ .Values.postgres }}
         image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         livenessProbe:

@@ -12,13 +12,14 @@ const privateNetwork = gcp.compute.Network.get(
   pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
 );
 
-export function installCloudPostgres(
+function installCloudPostgres(
   xns: ExactNamespace,
   name: String
 ): pulumi.Output<String> {
-  const pgSvc = new gcp.sql.DatabaseInstance(`postgres-${name}`, {
+  const logicalName = xns.logicalName + "-" + name;
+  const pgSvc = new gcp.sql.DatabaseInstance(logicalName, {
     databaseVersion: "POSTGRES_14",
-    deletionProtection: true,
+    deletionProtection: false,
     region: "us-central1",
     settings: {
       backupConfiguration: {
@@ -38,15 +39,19 @@ export function installCloudPostgres(
     },
   });
 
-  const db = new gcp.sql.Database(`cantonnet-${name}`, {
+  const db = new gcp.sql.Database(`db-${logicalName}`, {
     instance: pgSvc.name,
     name: "cantonnet",
+  }, {
+      dependsOn: pgSvc
   });
 
-  const users = new gcp.sql.User(`user-${name}`, {
+  const users = new gcp.sql.User(`user-${logicalName}`, {
     instance: pgSvc.name,
     name: "cnadmin",
     password: "cnadmin",
+  }, {
+      dependsOn: pgSvc
   });
 
   return pgSvc.privateIpAddress;
@@ -54,7 +59,7 @@ export function installCloudPostgres(
 
 /// Database
 
-export function installCNPostgres(
+function installCNPostgres(
   xns: ExactNamespace,
   name: string
 ): pulumi.Output<string> {
@@ -73,4 +78,19 @@ export function installCNPostgres(
   );
 
   return pg.id.apply((_) => `${name}.${xns.logicalName}.svc.cluster.local`);
+}
+
+// toplevel
+
+const ENABLE_CLOUD_SQL = false;
+
+export function installPostgres(
+  xns: ExactNamespace,
+  name: string
+): pulumi.Output<String> {
+    if (ENABLE_CLOUD_SQL) {
+        return installCloudPostgres(xns, name);
+    } else {
+        return installCNPostgres(xns, name);
+    }
 }

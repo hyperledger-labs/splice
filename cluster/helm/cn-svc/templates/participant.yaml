@@ -67,7 +67,7 @@ spec:
               name: cn-app-directory-ledger-api-auth
               optional: false
         - name: CANTON_PARTICIPANT_POSTGRES_SERVER
-          value: postgres
+          value:  {{ .Values.postgres }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: cn_participant
         - name: CANTON_PARTICIPANT_USERS

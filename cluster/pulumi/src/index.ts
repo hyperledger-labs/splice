@@ -159,7 +159,7 @@ function installAuth0UISecret(
 function installSVC(): k8s.helm.v3.Release {
   const xns = exactNamespace("svc");
 
-  const postgresDb = postgres.installCNPostgres(xns, "postgres");
+  const postgresDb = postgres.installPostgres(xns, "postgres");
 
   const dependsOn = [
     xns.ns,
@@ -178,7 +178,9 @@ function installSVC(): k8s.helm.v3.Release {
       name: "svc",
       namespace: xns.ns.metadata.name,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-svc/",
-      values: cnChartValues("cn-svc"),
+      values: cnChartValues("cn-svc", {
+        postgres: postgresDb,
+      }),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
@@ -218,9 +220,7 @@ function installValidator(
 ): k8s.helm.v3.Release {
   const xns = exactNamespace(name);
 
-  // const postgresDb = postgres.installCloudPostgres(xns, "validator1");
-
-  const postgresDb = postgres.installCNPostgres(xns, "postgres");
+  const postgresDb = postgres.installPostgres(xns, "postgres");
 
   const dependsOn = [
     svc,
@@ -253,7 +253,7 @@ function installValidator(
 function installSplitwell(svc: k8s.helm.v3.Release): k8s.helm.v3.Release {
   const xns = exactNamespace("splitwell");
 
-  const postgresDb = postgres.installCNPostgres(xns, "postgres");
+  const postgresDb = postgres.installPostgres(xns, "postgres");
 
   const dependsOn = [
     xns.ns,
@@ -270,7 +270,9 @@ function installSplitwell(svc: k8s.helm.v3.Release): k8s.helm.v3.Release {
       name: "splitwell",
       namespace: xns.ns.metadata.name,
       chart: process.env.REPO_ROOT + "/cluster/helm/cn-splitwell/",
-      values: cnChartValues("cn-splitwell"),
+      values: cnChartValues("cn-splitwell", {
+        postgres: postgresDb,
+      }),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
