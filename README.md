@@ -179,6 +179,11 @@ Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In 
 
 This Section gives an overview of common sbt commands.
 More commands can be found in build.sbt and BuildCommon.scala.
+To run these commands, enter the `sbt` shell by running `sbt` in the repo root.
+
+Alternatively, you can execute the commands outside the shell by running `sbt '<command>'`.
+Note that the entire command must be quoted in this case, especially if it has spaces or special characters
+(like the `testOnly` examples in the Test section below).
 
 - `clean`: deletes all generated files (in the target directory)
 - `clean-cn`: like clean but only for our own apps not for the Canton fork
@@ -582,11 +587,16 @@ with the running Canton instance so try restarting.
 ERROR c.d.n.e.CoinLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
-NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"), install ncurses and setup terminfo:
+NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
+put this command into ~/.tmux.conf or ~/.config/tmux/tmux.conf (for version 3.1 and later):
 
-    brew install ncurses
-    /usr/local/opt/ncurses/bin/infocmp tmux-256color > ~/tmux-256color.info
-    tic -xe tmux-256color ~/tmux-256color.info
+```
+set-option default-terminal "screen-256color"
+```
+
+This is sufficient for most cases. If you insist on using `tmux-256color` instead of switching to `screen-256color`,
+you will need to install ncurses and setup terminfo following the instructions [here](https://gist.github.com/bbqtd/a4ac060d6f6b9ea6fe3aabe735aa9d95).
+
 
 ### Managing Frontends for Tests
 
