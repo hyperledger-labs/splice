@@ -17,11 +17,36 @@ const config = new pulumi.Config();
 
 const CLUSTER_BASENAME = config.require("CLUSTER_BASENAME");
 const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
+const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
 // retrieve existing cluster IP, not managed with Pulumi yet
-export const clusterIp = gcp.compute.getAddress({
+const clusterAddress = gcp.compute.getAddressOutput({
   name: CLUSTER_NAME + "-ip",
 });
+
+const clusterIp = pulumi.interpolate`${clusterAddress.address}`;
+
+function configureDNS() {
+  return [
+    new gcp.dns.RecordSet(CLUSTER_DNS_NAME, {
+      name: CLUSTER_DNS_NAME + ".",
+      ttl: 60,
+      type: "A",
+      project: "da-gcp-canton-domain",
+      managedZone: "canton-global",
+      rrdatas: [clusterIp],
+    }),
+
+    new gcp.dns.RecordSet(CLUSTER_DNS_NAME + "-subdomains", {
+      name: `*.${CLUSTER_DNS_NAME}.`,
+      ttl: 60,
+      type: "A",
+      project: "da-gcp-canton-domain",
+      managedZone: "canton-global",
+      rrdatas: [clusterIp],
+    })
+  ];
+}
 
 // There are a few instances where this pulls data from the outside
 // world. To avoid fully declaring these external data types, these are
@@ -135,8 +160,8 @@ function cnChartValues(chartPath: string, overrideValues: any = {}): any {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         imageTag: config.require("IMAGE_TAG"),
-        ipAddress: clusterIp.then((addr) => addr.address),
-        dnsName: config.require("CLUSTER_DNS_NAME"),
+        ipAddress: clusterIp,
+        dnsName: CLUSTER_DNS_NAME,
       },
     },
     overrideValues
@@ -300,6 +325,7 @@ function installClusterIngress() {
   );
 }
 
+//configureDNS();
 //installClusterIngress()
 //installDocs();
 //installSvNodes();
