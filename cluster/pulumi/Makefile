@@ -7,8 +7,6 @@ $(dir)/install: $(dir)/package.json
 $(dir)/clean:
 	cd $(@D) && rm -rfv node_modules install
 
-
 .PHONY: $(dir)/format
 $(dir)/format: $(dir)/install
 	cd $(@D) && npm run format:fix
-

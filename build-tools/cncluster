@@ -956,6 +956,9 @@ function subcmd_update_secrets() {
     set -- $i
     client_id="${appToClientId[$2]}"
     secret=$(echo $all | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
+
+    # SECRET_NAME, CLIENT_ID,  CLIENT_SECRET, NAMESPACE=$4
+
     _set_auth0_secret $1 "$client_id" $secret "$3"
   done
 

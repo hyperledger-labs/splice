@@ -1,5 +1,8 @@
 import * as pulumi from "@pulumi/pulumi";
+import * as k8s from "@pulumi/kubernetes";
 import * as gcp from "@pulumi/gcp";
+
+import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from "./utils";
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -9,7 +12,10 @@ const privateNetwork = gcp.compute.Network.get(
   pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
 );
 
-export function createDatabase(name: String): pulumi.Output<String> {
+export function installCloudPostgres(
+  xns: ExactNamespace,
+  name: String
+): pulumi.Output<String> {
   const pgSvc = new gcp.sql.DatabaseInstance(`postgres-${name}`, {
     databaseVersion: "POSTGRES_14",
     deletionProtection: true,
@@ -44,4 +50,27 @@ export function createDatabase(name: String): pulumi.Output<String> {
   });
 
   return pgSvc.privateIpAddress;
+}
+
+/// Database
+
+export function installCNPostgres(
+  xns: ExactNamespace,
+  name: string
+): pulumi.Output<string> {
+  const pg = new k8s.helm.v3.Release(
+    xns.logicalName + "-" + name,
+    {
+      name: name,
+      namespace: xns.ns.metadata.name,
+      chart: process.env.REPO_ROOT + "/cluster/helm/cn-postgres/",
+      values: cnChartValues("cn-postgres"),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn: xns.ns,
+    }
+  );
+
+  return pg.id.apply((_) => `${name}.${xns.logicalName}.svc.cluster.local`);
 }

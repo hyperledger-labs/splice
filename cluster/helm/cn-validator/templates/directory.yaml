@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: directory-web-ui
+  name: directory-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: directory-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: directory-web-ui
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_DIRECTORY_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-directory-ui-auth
+              optional: false
+        - name: CN_APP_DIRECTORY_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-directory-ui-auth
+              optional: false
+        image: "{{ .Values.imageRepo }}/validator1-directory-web-ui:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: directory-web-ui
+        ports:
+        - containerPort: 80
+          name: val1-dir-ui
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    clusterName: cn-stagingnet
+  name: directory-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: directory-web-ui
+  ports:
+  - name: val1-dir-ui
+    port: 80
+    protocol: TCP
+    targetPort: 80

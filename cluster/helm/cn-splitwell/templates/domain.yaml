@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: domain
+  name: domain
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: domain
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: domain
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4
+        - name: CANTON_DOMAIN_POSTGRES_SERVER
+          value: postgres
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: swd-pub-api
+          timeoutSeconds: 1
+        name: domain
+        ports:
+        - containerPort: 5008
+          name: swd-pub-api
+          protocol: TCP
+        - containerPort: 5009
+          name: swd-adm-api
+          protocol: TCP
+        - containerPort: 10013
+          name: swd-metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: swd-pub-api
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 4Gi
+        startupProbe:
+          failureThreshold: 20
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: swd-pub-api
+          timeoutSeconds: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: domain
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: domain
+  ports:
+  - name: swd-pub-api
+    port: 5008
+    protocol: TCP
+    targetPort: 5008
+  - name: swd-adm-api
+    port: 5009
+    protocol: TCP
+    targetPort: 5009
+  - name: swd-metrics
+    port: 10013
+    protocol: TCP
+    targetPort: 10013

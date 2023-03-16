@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: participant
+  name: participant
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: participant
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: participant
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-validator-ledger-api-auth
+              optional: false
+        - name: CANTON_PARTICIPANT_POSTGRES_SERVER
+          value: postgres
+        - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
+          value: splitwell_participant
+        - name: CANTON_PARTICIPANT_USERS
+          value: '[{"actAs": [{"fromUser": "self"}], "admin": true, "name": {"env":
+            "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME"}, "primaryParty":
+            {"allocate": "splitwell_validator_service_user"}, "readAs": [ ]}]'
+        - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
+          value: '[{"alias": "splitwell", "url": "http://domain:5008"}]'
+        image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: participant
+        ports:
+        - containerPort: 5002
+          name: sw-adm-api
+          protocol: TCP
+        - containerPort: 5001
+          name: sw-lg-api
+          protocol: TCP
+        - containerPort: 10013
+          name: sw-metrics
+          protocol: TCP
+        resources:
+          limits:
+            memory: 32Gi
+          requests:
+            cpu: "1"
+            memory: 32Gi
+      - env:
+        - name: GRPC_ADDRESS
+          value: 127.0.0.1
+        - name: GRPC_PORT
+          value: "5001"
+        - name: GRPC_WEB_PORT
+          value: "6001"
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: envoy-proxy-sw-lg-api
+        ports:
+        - containerPort: 6001
+          name: sw-lg-api-gw
+          protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+      - env:
+        - name: GRPC_ADDRESS
+          value: 127.0.0.1
+        - name: GRPC_PORT
+          value: "5002"
+        - name: GRPC_WEB_PORT
+          value: "6002"
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: envoy-proxy-sw-adm-api
+        ports:
+        - containerPort: 6002
+          name: sw-adm-api-gw
+          protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: participant
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: participant
+  ports:
+  - name: sw-adm-api
+    port: 5002
+    protocol: TCP
+    targetPort: 5002
+  - name: sw-lg-api
+    port: 5001
+    protocol: TCP
+    targetPort: 5001
+  - name: sw-metrics
+    port: 10013
+    protocol: TCP
+    targetPort: 10013
+  - name: sw-lg-api-gw
+    port: 6001
+    protocol: TCP
+    targetPort: 6001
+  - name: sw-adm-api-gw
+    port: 6002
+    protocol: TCP
+    targetPort: 6002

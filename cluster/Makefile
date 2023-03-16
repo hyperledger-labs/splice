@@ -1,6 +1,7 @@
 include cluster/manifest/Makefile
-include cluster/pulumi/Makefile
 include cluster/images/Makefile
+include cluster/helm/Makefile
+include cluster/pulumi/Makefile
 
 #########
 # Toplevel targets
@@ -21,13 +22,13 @@ docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 .PHONY: cluster/images/clean
 cluster/images/clean: $(foreach image,$(images),cluster/images/$(image)/clean)
 
-.PHONY: force-update-version
-
 .PHONY: cluster/build
-cluster/build: cluster/pulumi/install
+cluster/build: cluster/pulumi/install cluster/helm/build
 
 .PHONY: cluster/format
 cluster/format: cluster/pulumi/format
 
 .PHONY: cluster/clean
-cluster/clean: cluster/pulumi/clean cluster/images/clean
+cluster/clean: cluster/images/clean cluster/pulumi/clean cluster/helm/clean
+
+.PHONY: force-update-version

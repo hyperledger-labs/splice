@@ -1,0 +1,82 @@
+import * as pulumi from "@pulumi/pulumi";
+import * as k8s from "@pulumi/kubernetes";
+import * as gcp from "@pulumi/gcp";
+
+import { load } from "js-yaml";
+
+import * as fs from "fs";
+import { PathLike } from "fs";
+
+import * as _ from "lodash";
+
+export const config = new pulumi.Config();
+
+export const GLOBAL_TIMEOUT_SEC = 300;
+
+export const CLUSTER_BASENAME = config.require("CLUSTER_BASENAME");
+export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
+
+// retrieve existing cluster IP, not managed with Pulumi yet
+export const clusterIp = gcp.compute.getAddress({
+  name: CLUSTER_NAME + "-ip",
+});
+
+/// Kubernetes Namespace
+
+// There is no way to read the logical name off a Namespace.  Exactly
+// specified nNamespaces are therefore returned as a tuple with the
+// logical name, to allow it to be used to ensure distinct Pulumi
+// logical names when creating objects of the same name in different
+// Kubernetes namespaces.
+//
+// See: https://github.com/pulumi/pulumi/issues/5234
+export interface ExactNamespace {
+  ns: k8s.core.v1.Namespace;
+  logicalName: string;
+}
+
+export function exactNamespace(name: string): ExactNamespace {
+  // Namespace with a fully specified name, exactly as it will
+  // appear within Kubernetes. (No Pulumi suffix.)
+  const ns = new k8s.core.v1.Namespace(name, {
+    metadata: {
+      name,
+    },
+  });
+
+  return { ns, logicalName: name };
+}
+
+/// Chart Values
+
+// There are a few instances where this pulls data from the outside
+// world. To avoid fully declaring these external data types, these are
+// modeled as 'any', with the any warning disabled.
+
+function loadYamlFromFile(path: PathLike): any {
+  // eslint-disable-line @typescript-eslint/no-explicit-any
+  return load(fs.readFileSync(path, "utf-8"));
+}
+
+export function cnChartValues(
+  chartPath: string,
+  overrideValues: any = {}
+): any {
+  const chartDefaultValues = loadYamlFromFile(
+    process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
+  );
+
+  return _.merge(
+    chartDefaultValues,
+    {
+      cluster: {
+        basename: CLUSTER_BASENAME,
+        name: CLUSTER_NAME,
+        imageTag: config.require("IMAGE_TAG"),
+        ipAddress: clusterIp.then((addr) => addr.address),
+        dnsName: config.require("CLUSTER_DNS_NAME"),
+      },
+    },
+    overrideValues
+  );
+}

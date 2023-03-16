@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: splitwell-app
+  name: splitwell-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: splitwell-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: splitwell-app
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        {{- include "cn-util-lib.auth0-env-vars" "splitwell" | indent 8}}
+        image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: splitwell-app
+        ports:
+        - containerPort: 5213
+          name: sw-api
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: "1"
+            memory: 1536Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      - env:
+        - name: GRPC_ADDRESS
+          value: 127.0.0.1
+        - name: GRPC_PORT
+          value: "5213"
+        - name: GRPC_WEB_PORT
+          value: "6213"
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: envoy-proxy-sw-api
+        ports:
+        - containerPort: 6213
+          name: sw-api-gw
+          protocol: TCP
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splitwell-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: splitwell-app
+  ports:
+  - name: sw-api
+    port: 5213
+    protocol: TCP
+    targetPort: 5213
+  - name: sw-api-gw
+    port: 6213
+    protocol: TCP
+    targetPort: 6213

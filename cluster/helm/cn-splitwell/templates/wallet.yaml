@@ -1,0 +1,207 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wallet-app
+  name: wallet-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: wallet-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wallet-app
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_WALLET_LEDGER_API_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-wallet-ledger-api-auth
+              optional: false
+        - name: CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-wallet-ledger-api-auth
+              optional: false
+        - name: CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client-secret
+              name: cn-app-wallet-ledger-api-auth
+              optional: false
+        - name: CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-wallet-ledger-api-auth
+              optional: false
+        - name: CN_APP_WALLET_PARTICIPANT_ADDRESS
+          value: participant
+        - name: CN_APP_WALLET_VALIDATOR_ADDRESS
+          value: validator-app
+        - name: CN_APP_WALLET_VALIDATOR_GRPC_PORT
+          value: "5203"
+        image: "{{ .Values.imageRepo }}/wallet-app:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: wallet-app
+        ports:
+        - containerPort: 6004
+          name: sw-wal-http
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: "1"
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallet-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: wallet-app
+  ports:
+  - name: sw-wal-http
+    port: 6004
+    protocol: TCP
+    targetPort: 6004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wallet-new-web-ui
+  name: wallet-new-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallet-new-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wallet-new-web-ui
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_WALLET_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-wallet-ui-auth
+              optional: false
+        - name: CN_APP_WALLET_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-wallet-ui-auth
+              optional: false
+        image: "{{ .Values.imageRepo }}/wallet-new-web-ui:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: wallet-new-web-ui
+        ports:
+        - containerPort: 80
+          name: sw-wal-new-ui
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallet-new-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: wallet-new-web-ui
+  ports:
+  - name: sw-wal-new-ui
+    port: 80
+    protocol: TCP
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wallet-web-ui
+  name: wallet-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallet-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wallet-web-ui
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        - name: CN_APP_WALLET_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-wallet-ui-auth
+              optional: false
+        - name: CN_APP_WALLET_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-wallet-ui-auth
+              optional: false
+        image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: wallet-web-ui
+        ports:
+        - containerPort: 80
+          name: sw-wal-ui
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallet-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: wallet-web-ui
+  ports:
+  - name: sw-wal-ui
+    port: 80
+    protocol: TCP
+    targetPort: 80

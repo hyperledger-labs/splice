@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: validator-app
-  namespace: {{ .Release.Namespace }}
   labels:
     app: validator-app
+  name: validator-app
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -18,28 +18,37 @@ spec:
         app: validator-app
     spec:
       containers:
-      - name: validator-app
-        image: "{{ .Values.imageRepo }}/validator-app:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        env:
+      - env:
         - name: JAVA_TOOL_OPTIONS
           value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
         {{- include "cn-util-lib.auth0-env-vars" "validator" | indent 8}}
+        - name: CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME
+          valueFrom:
+            secretKeyRef:
+              key: ledger-api-user
+              name: cn-app-splitwell-ledger-api-auth
+              optional: false
         - name: CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME
           valueFrom:
             secretKeyRef:
               key: ledger-api-user
               name: cn-app-wallet-ledger-api-auth
               optional: false
-        - name: CN_APP_VALIDATOR_WALLET_USER_NAME
-          value: auth0|63e3d75ff4114d87a2c1e4f5
-        - name: CN_APP_DARS
-          value: '["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]'
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
           value: participant
+        - name: ADDITIONAL_CONFIG
+          value: |
+            canton.validator-apps.validator_backend.app-instances.splitwise = {
+              service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}
+              wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}
+              dars = ["coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
+            }
+        image: "{{ .Values.imageRepo }}/validator-app:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        name: validator-app
         ports:
         - containerPort: 6003
-          name: val1-val-http
+          name: sw-val-http
           protocol: TCP
         resources:
           limits:
@@ -47,6 +56,8 @@ spec:
           requests:
             cpu: "1"
             memory: 1536Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
 ---
 apiVersion: v1
 kind: Service
@@ -57,7 +68,7 @@ spec:
   selector:
     app: validator-app
   ports:
-  - name: val1-val-http
+  - name: sw-val-http
     port: 6003
     protocol: TCP
     targetPort: 6003

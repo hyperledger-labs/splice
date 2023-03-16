@@ -1,6 +1,6 @@
 apiVersion: v2
-name: cn-sv-node
-description: Canton Network Supervalidator Node
+name: cn-svc
+description: Canton Network SVC simulator
 type: application
 
 version: 0.1.0

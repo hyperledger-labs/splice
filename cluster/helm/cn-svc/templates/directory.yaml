@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: directory-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: directory-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: directory-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: directory-app
+    spec:
+      containers:
+      - name: directory-app
+        image: "{{ .Values.imageRepo }}/directory-app:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+        {{- include "cn-util-lib.auth0-env-vars" "directory" | indent 8}}
+        ports:
+        - containerPort: 5010
+          name: dir-api
+          protocol: TCP
+        - containerPort: 6010
+          name: dir-http-api
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: "1"
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: directory-app
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: directory-app
+  ports:
+  - name: dir-api
+    port: 5010
+    protocol: TCP
+    targetPort: 5010
+  - name: dir-http-api
+    port: 6010
+    protocol: TCP
+    targetPort: 6010

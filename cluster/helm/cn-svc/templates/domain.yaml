@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: global-domain
+  name: global-domain
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: global-domain
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: global-domain
+    spec:
+      containers:
+      - name: global-domain
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4
+        - name: CANTON_DOMAIN_POSTGRES_SERVER
+          value: postgres
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5008
+          name: cd-pub-api
+          protocol: TCP
+        - containerPort: 5009
+          name: cd-adm-api
+          protocol: TCP
+        - containerPort: 10013
+          name: cd-metrics
+          protocol: TCP
+        resources:
+          limits:
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 4Gi
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+        startupProbe:
+          failureThreshold: 20
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: global-domain
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: global-domain
+  ports:
+  - name: cd-pub-api
+    port: 5008
+    protocol: TCP
+    targetPort: 5008
+  - name: cd-adm-api
+    port: 5009
+    protocol: TCP
+    targetPort: 5009
+  - name: cd-metrics
+    port: 10013
+    protocol: TCP
+    targetPort: 10013

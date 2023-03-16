@@ -1,6 +1,6 @@
 apiVersion: v2
-name: cn-sv-node
-description: Canton Network Supervalidator Node
+name: cn-splitwell
+description: Canton Network Splitwell
 type: application
 
 version: 0.1.0
