@@ -623,7 +623,8 @@ data TransferContextSummary = TransferContextSummary with
 
 data TransferInputsSummary = TransferInputsSummary with
     totalCoinAmount : Decimal
-    totalRewardAmount : Decimal
+    totalAppRewardAmount : Decimal
+    totalValidatorRewardAmount : Decimal
     totalHoldingFees : Decimal
   deriving (Eq, Show)
 
@@ -695,7 +696,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
   where
     initialSummary = TransferInputsSummary with
       totalCoinAmount = 0.0
-      totalRewardAmount = 0.0
+      totalAppRewardAmount = 0.0
+      totalValidatorRewardAmount = 0.0
       totalHoldingFees = 0.0
 
     summarizeAndConsumeInput round s (API.InputCoin coinCid) = do
@@ -710,7 +712,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
           holdingFee = coin.amount.initialAmount - amount
       return TransferInputsSummary with
         totalCoinAmount = s.totalCoinAmount + coin.amount.initialAmount
-        totalRewardAmount = s.totalRewardAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
 
     summarizeAndConsumeInput _round s (API.InputAppRewardCoupon couponCid) = do
@@ -727,7 +730,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
             | otherwise = miningRound.issuancePerUnfeaturedAppRewardCoupon
       return TransferInputsSummary with
         totalCoinAmount = s.totalCoinAmount
-        totalRewardAmount = s.totalRewardAmount + coupon.amount * issuancePerCoupon
+        totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees
 
     summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
@@ -746,7 +750,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
       miningRound <- getIssuingMiningRound csum coupon.round
       return TransferInputsSummary with
         totalCoinAmount = s.totalCoinAmount
-        totalRewardAmount = s.totalRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
 
 preprocessOutputs : TransferConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
@@ -791,13 +796,14 @@ summarizeTransfer transferConfigCC inp preprocessedOutputs = do
     outputFees = map (.outputFee) preprocessedOutputs
     totalOutputAmount = sum $ map (.amount) preprocessedOutputs
     leftOverAmount =
-      inp.totalCoinAmount + inp.totalRewardAmount
+      inp.totalCoinAmount + inp.totalAppRewardAmount + inp.totalValidatorRewardAmount
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
 
     summary = API.TransferSummary with
       inputCoinAmount = inp.totalCoinAmount
-      inputRewardAmount = inp.totalRewardAmount
+      inputAppRewardAmount = inp.totalAppRewardAmount
+      inputValidatorRewardAmount = inp.totalValidatorRewardAmount
       holdingFees = inp.totalHoldingFees
       outputFees
       senderChangeFee

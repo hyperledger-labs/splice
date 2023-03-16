@@ -148,7 +148,8 @@ data TransferResult
 --
 -- All amounts are denominated in CC.
 data TransferSummary = TransferSummary with
-    inputRewardAmount : Decimal -- ^ Total amount of rewards input into this transfer.
+    inputAppRewardAmount : Decimal -- ^ Total amount of app rewards input into this transfer.
+    inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards input into this transfer.
     inputCoinAmount : Decimal -- ^ Total input amount of coin input into this transfer, before deducting holding fees.
     holdingFees : Decimal -- ^ Holding fees paid by the sender on their input coins.
     outputFees : [Decimal] -- ^ Fees paid for the individual output coins in the order they were specified.

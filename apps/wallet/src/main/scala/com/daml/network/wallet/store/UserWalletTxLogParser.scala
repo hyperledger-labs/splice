@@ -341,7 +341,9 @@ object UserWalletTxLogParser {
     val sender = arg.transfer.sender
 
     // Input coins and rewards, excluding holding fees
-    val netInput = BigDecimal(res.summary.inputRewardAmount)
+    val netInput = BigDecimal(res.summary.inputAppRewardAmount) + BigDecimal(
+      res.summary.inputValidatorRewardAmount
+    )
       + res.summary.inputCoinAmount - res.summary.holdingFees
 
     // Output coins going back to the sender, after deducting transfer fees
