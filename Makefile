@@ -37,4 +37,4 @@ format:	cluster/format ## Automatically reformat and apply scalaFix to source co
 help:	## Show list of available make targets
 	@LC_ALL=C $(MAKE) -pRrq -f Makefile : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
 
-include cluster/Makefile
+include cluster/local.mk

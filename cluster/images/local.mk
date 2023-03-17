@@ -51,7 +51,7 @@ docker-image-tag := target/image-tag
 define DEFINE_PHONY_RULES =
 prefix := cluster/images/$(1)
 
-include cluster/images/$(1)/Makefile
+include cluster/images/$(1)/local.mk
 
 # Stop make from deleting version files to get working caching.
 .NOTINTERMEDIATE: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-local-image-tag)

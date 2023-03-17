@@ -658,9 +658,9 @@ cncluster activate
        Each component defines its own docker image.
     1. If you need to add a new component:
         1. Add a new folder to `./cluster/images`
-           1. Make sure the new folder contains a Dockerfile and a Makefile that depends on `common.mk`.
+           1. Make sure the new folder contains a Dockerfile and a `local.mk` file.
               When in doubt, start by duplicating an existing component.
-        2. Edit `./Makefile`, adding the component at the end of the existing list of components
+        2. Edit `cluster/images/local.mk`, adding the component at the end of the existing list of components
            1. Note that the order matters, if the image of your component depends on the image of another component,
               your component must be listed after the dependency.
         1. Edit `./cluster/manifest/canton-network-config.jsonnet`, adding the new component to the `cantonNetwork()` function

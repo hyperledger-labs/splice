@@ -1,7 +1,7 @@
-include cluster/manifest/Makefile
-include cluster/images/Makefile
-include cluster/helm/Makefile
-include cluster/pulumi/Makefile
+include cluster/manifest/local.mk
+include cluster/images/local.mk
+include cluster/helm/local.mk
+include cluster/pulumi/local.mk
 
 #########
 # Toplevel targets
