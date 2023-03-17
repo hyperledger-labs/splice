@@ -31,10 +31,10 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
       ec: ExecutionContext
   ): Future[Seq[TXI]]
 
-  /** Gets an entry that satisfies a given query.
+  /** Gets the latest entry that satisfies a given query.
     * Throws [[Status.NOT_FOUND]] if no such entry exists.
     */
-  def getTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+  def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI]
 
@@ -119,10 +119,10 @@ object TxLogStore {
       entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
     } yield entries
 
-    def getTxLogEntry(
+    def getLatestTxLogEntry(
         query: (TXI) => Boolean = (_: TXI) => true
     )(implicit ec: ExecutionContext, tc: TraceContext): Future[TXE] = for {
-      index <- txLogStore.getTxLogIndex(query)
+      index <- txLogStore.getLatestTxLogIndex(query)
       entry <- loadTxLogEntry(index)
     } yield entry
 

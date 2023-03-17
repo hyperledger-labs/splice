@@ -342,13 +342,13 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
   ): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.dropWhile(_.eventId != beginAfterEventId).slice(1, 1 + limit))
 
-  def getTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+  def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI] =
     Future.successful(
       stateVar.txLog
         .filter(query)
-        .headOption
+        .lastOption
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
         )

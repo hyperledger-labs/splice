@@ -134,6 +134,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v0/get-round-of-latest-data:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getRoundOfLatestData"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -245,6 +263,13 @@ components:
           type: string
         rate:
           type: string
+    GetRoundOfLatestDataResponse:
+      type: object
+      required: ["round"]
+      properties:
+        round:
+          type: integer
+          format: int64
 
     ErrorResponse:
       type: object

@@ -352,6 +352,25 @@ object HttpScanAppClient {
         case http.GetCoinConfigForRoundResponse.NotFound(value) =>
           Left(value.error)
       }
+  }
+
+  case class GetRoundOfLatestData() extends BaseCommand[http.GetRoundOfLatestDataResponse, Long] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetRoundOfLatestDataResponse] =
+      client.getRoundOfLatestData(headers)
+
+    override def handleResponse(
+        response: http.GetRoundOfLatestDataResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Long] =
+      response match {
+        case http.GetRoundOfLatestDataResponse.OK(response) =>
+          Right(response.round)
+        case http.GetRoundOfLatestDataResponse.NotFound(value) =>
+          Left(value.error)
+      }
 
   }
 }

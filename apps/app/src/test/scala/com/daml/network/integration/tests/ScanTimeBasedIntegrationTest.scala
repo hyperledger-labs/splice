@@ -117,5 +117,19 @@ class ScanTimeBasedIntegrationTest
       // appended to the scan tx log. Once there's a proper API for the leaderboard, we'll add a check here
       p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
     })
+    clue("No aggregate round data should be available yet")({
+      assertThrowsAndLogsCommandFailures(
+        scan.getRoundOfLatestData(),
+        _.errorMessage should include("No data has been made available yet"),
+      )
+    })
+    actAndCheck("Advance one more tick for round 0 to close", advanceRoundsByOneTick)(
+      "Latest round with data should be updated",
+      _ =>
+        eventuallySucceeds() {
+          val round = scan.getRoundOfLatestData()
+          round should be(0)
+        },
+    )
   }
 }

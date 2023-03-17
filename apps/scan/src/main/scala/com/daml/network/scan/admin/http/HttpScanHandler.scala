@@ -222,4 +222,22 @@ class HttpScanHandler(
         })
     }
 
+  def getRoundOfLatestData(
+      response: v0.ScanResource.GetRoundOfLatestDataResponse.type
+  )(): Future[v0.ScanResource.GetRoundOfLatestDataResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      store
+        .getRoundOfLatestData()
+        .map(round =>
+          v0.ScanResource.GetRoundOfLatestDataResponse.OK(
+            definitions.GetRoundOfLatestDataResponse(round)
+          )
+        )
+        .recover({
+          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+            v0.ScanResource.GetRoundOfLatestDataResponse
+              .NotFound(definitions.ErrorResponse("No data has been made available yet"))
+        })
+    }
+
 }

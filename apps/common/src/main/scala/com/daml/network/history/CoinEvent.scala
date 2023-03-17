@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, CoinRules, CoinRules_DevNet_Tap}
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.cc.round.{OpenMiningRound, ClosedMiningRound}
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 
 case class Transfer(
@@ -76,6 +76,19 @@ object OpenMiningRoundCreate {
   type T = OpenMiningRound
   type ContractType = Contract[TCid, T]
   val companion = OpenMiningRound.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+object ClosedMiningRoundCreate {
+  type TCid = ClosedMiningRound.ContractId
+  type T = ClosedMiningRound
+  type ContractType = Contract[TCid, T]
+  val companion = ClosedMiningRound.COMPANION
 
   def unapply(
       event: CreatedEvent

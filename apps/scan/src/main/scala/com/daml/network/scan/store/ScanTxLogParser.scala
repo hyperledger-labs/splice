@@ -9,7 +9,6 @@ import com.daml.network.util.CoinUtil.dollarsToCC
 
 import cats.Monoid
 import cats.syntax.foldable.*
-import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.TreeEvent
@@ -41,6 +40,9 @@ class ScanTxLogParser(
         created match {
           case OpenMiningRoundCreate(round) =>
             State.fromOpenMiningRoundCreate(tree, root, round)
+          case ClosedMiningRoundCreate(round) => {
+            State.fromClosedMiningRoundCreate(tree, root, round)
+          }
           case _ => State.empty
         }
 
@@ -68,21 +70,20 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
-  // TODO(#2930) we expect these arguments to be used fairly soon, when querying the log across all entry types,
-  // so for now just ask the compiler nicely to not warn about them.
-  @nowarn("cat=unused")
-  abstract class TxLogIndexRecord(
-      offset: String,
-      eventId: String,
-      round: Long,
-  ) extends TxLogStore.IndexRecord {}
+  trait TxLogIndexRecord extends TxLogStore.IndexRecord { def round: Long }
 
   object TxLogIndexRecord {
     final case class OpenMiningRoundIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
-    ) extends TxLogIndexRecord(offset, eventId, round) {}
+    ) extends TxLogIndexRecord
+
+    final case class ClosedMiningRoundIndexRecord(
+        offset: String,
+        eventId: String,
+        round: Long,
+    ) extends TxLogIndexRecord
 
     final case class AppRewardIndexRecord(
         offset: String,
@@ -90,7 +91,7 @@ object ScanTxLogParser {
         round: Long,
         party: String,
         amount: BigDecimal,
-    ) extends TxLogIndexRecord(offset, eventId, round) {}
+    ) extends TxLogIndexRecord
 
     final case class ValidatorRewardIndexRecord(
         offset: String,
@@ -98,7 +99,7 @@ object ScanTxLogParser {
         round: Long,
         party: String,
         amount: BigDecimal,
-    ) extends TxLogIndexRecord(offset, eventId, round) {}
+    ) extends TxLogIndexRecord
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
@@ -207,6 +208,24 @@ object ScanTxLogParser {
         transferFeeSteps = config.transferFee.steps.asScala.toSeq.map(step =>
           (dollarsToCC(step._1, coinPrice), step._2)
         ),
+      )
+
+      State(
+        entries = immutable.Queue(newEntry)
+      )
+    }
+
+    def fromClosedMiningRoundCreate(
+        tx: TransactionTree,
+        event: TreeEvent,
+        round: ClosedMiningRoundCreate.ContractType,
+    ): State = {
+      val newEntry = TxLogEntry.EmptyTxLogEntry(
+        indexRecord = TxLogIndexRecord.ClosedMiningRoundIndexRecord(
+          offset = tx.getOffset,
+          eventId = event.getEventId(),
+          round = round.payload.round.number,
+        )
       )
 
       State(

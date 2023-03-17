@@ -37,6 +37,8 @@ trait ScanStore
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]
+
+  def getRoundOfLatestData()(implicit tc: TraceContext): Future[Long]
 }
 
 object ScanStore {

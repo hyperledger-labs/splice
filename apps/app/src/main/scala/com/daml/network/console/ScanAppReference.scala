@@ -139,6 +139,12 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetCoinConfigForRound(round))
     }
 
+  @Help.Summary("Get the latest round number for which aggregated data is available")
+  def getRoundOfLatestData(): Long =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRoundOfLatestData())
+    }
+
   // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")

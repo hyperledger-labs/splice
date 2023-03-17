@@ -53,7 +53,7 @@ class InMemoryScanStore(
   )(implicit tc: TraceContext): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = {
     for {
       reader <- defaultTxLogReader
-      roundConfig <- reader.getTxLogEntry((indexRecord) =>
+      roundConfig <- reader.getLatestTxLogEntry((indexRecord) =>
         indexRecord match {
           case roundConfig: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord =>
             roundConfig.round == round
@@ -66,6 +66,23 @@ class InMemoryScanStore(
         case _ =>
           throw Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
       }
+    }
+  }
+
+  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[Long] = {
+    // TODO(#2930): For now, this is simply the latest closed mining round, since we are computing everything on-demand
+    // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
+    // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
+    for {
+      log <- defaultTxLog
+      round <- log.getLatestTxLogIndex((indexRecord) =>
+        indexRecord match {
+          case _: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord => true
+          case _ => false
+        }
+      )
+    } yield {
+      round.round
     }
   }
 
