@@ -47,6 +47,7 @@ ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when
 
 # TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
 .*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
+.*ErrorBoundary caught an unhandled promise rejection AbortError: Aborted.*
 
 # TODO(#3186) This works around issues in simtime where in-flight requests
 # end up timing out when we concurrently advance time.
