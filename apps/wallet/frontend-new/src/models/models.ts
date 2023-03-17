@@ -14,6 +14,8 @@ import {
   SubscriptionRequest,
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 
+import { ConvertedCurrency } from '../utils/currencyConversion';
+
 export interface WalletBalance {
   availableCC: BigNumber;
 }
@@ -29,11 +31,11 @@ export interface Transaction {
 }
 
 export interface WalletTransferOffer {
-  totalCCAmount: string;
-  totalUSDAmount: string;
+  ccAmount: string;
+  usdAmount: string;
   conversionRate: string;
+  convertedCurrency: ConvertedCurrency;
   senderId: string;
-  providerId: string;
   expiry: string;
 }
 

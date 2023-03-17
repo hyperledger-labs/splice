@@ -1,44 +1,69 @@
 import * as React from 'react';
-import { AmountDisplay } from 'common-frontend';
+import BigNumber from 'bignumber.js';
+import { AmountDisplay, Contract, DirectoryEntry, useInterval } from 'common-frontend';
+import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
+import DateDisplay from 'common-frontend/lib/components/DateDisplay';
+import { useCallback, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
+import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+
+import { useCoinPrice } from '../contexts/CoinPriceContext';
+import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletTransferOffer } from '../models/models';
+import { convertCurrency } from '../utils/currencyConversion';
+import Loading from './Loading';
 
 export const TransferOffers: React.FC = () => {
-  const offers: WalletTransferOffer[] = [
-    {
-      totalCCAmount: '31',
-      totalUSDAmount: '372',
-      conversionRate: '12',
-      senderId: 'KeyKay',
-      providerId: 'Splitwise',
-      expiry: 'Expires Feb 05, 2023',
+  const { listTransferOffers } = useWalletClient();
+  const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
+  const coinPrice = useCoinPrice();
+
+  const toWalletTransferOffer = useCallback(
+    async (
+      offerList: Contract<TransferOffer>[],
+      coinPrice: BigNumber
+    ): Promise<WalletTransferOffer[]> => {
+      return offerList.map(offer => {
+        return {
+          ccAmount: offer.payload.amount.amount,
+          usdAmount: coinPrice ? coinPrice.times(offer.payload.amount.amount).toString() : '...',
+          conversionRate: coinPrice ? coinPrice?.toString() : '...',
+          convertedCurrency: convertCurrency(
+            BigNumber(offer.payload.amount.amount),
+            Currency.CC,
+            coinPrice
+          ),
+          senderId: offer.payload.sender,
+          expiry: offer.payload.expiresAt,
+        };
+      });
     },
-    {
-      totalCCAmount: '10',
-      totalUSDAmount: '120',
-      conversionRate: '12',
-      senderId: 'KeyKay',
-      providerId: 'Splitwise',
-      expiry: 'Expires Mar 06, 2023',
-    },
-    {
-      totalCCAmount: '25',
-      totalUSDAmount: '300',
-      conversionRate: '12',
-      senderId: 'KeyKay',
-      providerId: 'Splitwise',
-      expiry: 'Expires Apr 07, 2023',
-    },
-  ];
+    []
+  );
+
+  const fetchTransferOffers = useCallback(async () => {
+    if (coinPrice) {
+      const { offersList } = await listTransferOffers();
+      let walletTransferOffers = await toWalletTransferOffer(offersList, coinPrice);
+      setOffers(walletTransferOffers);
+    }
+  }, [coinPrice, listTransferOffers, toWalletTransferOffer]);
+
+  // TODO(#3434) remove magic interval
+  useInterval(fetchTransferOffers, 500);
+
+  if (!coinPrice) {
+    return <Loading />;
+  }
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
-        Action needed <Chip label="8" color="success" />
+        Action needed <Chip label={offers.length} color="success" />
       </Typography>
       {offers.map((offer, index) => (
         <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} />
@@ -54,7 +79,7 @@ interface TransferOfferProps {
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const offer = props.transferOffer;
   return (
-    <Card variant="outlined">
+    <Card className="transfer-offer" variant="outlined">
       <CardContent
         sx={{
           display: 'flex',
@@ -66,17 +91,21 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <Typography variant="h5">{offer.senderId}</Typography>
-            <Typography variant="caption">via {offer.providerId}</Typography>
+            <DirectoryEntry partyId={offer.senderId} classNames={'transfer-offer-sender'} />
           </Stack>
         </Stack>
         <Stack direction="column" alignItems="flex-end">
-          <Typography>
-            + <AmountDisplay amount={offer.totalCCAmount} />
+          <Typography className="transfer-offer-cc-amount">
+            + <AmountDisplay amount={offer.ccAmount} />
           </Typography>
-          <Typography>
-            <AmountDisplay amount={offer.totalUSDAmount} currency={'USD'} /> @{' '}
-            {offer.conversionRate} CC/USD
+          <Typography className="transfer-offer-usd-amount-rate">
+            <>
+              <AmountDisplay
+                amount={offer.convertedCurrency.amount.toString()}
+                currency={offer.convertedCurrency.currency}
+              />{' '}
+              @ {offer.convertedCurrency.coinPriceToShow.toString()} CC/USD
+            </>
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={2}>
@@ -86,8 +115,10 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           <Button variant="pill" color="warning" size="small">
             Reject
           </Button>
-          <Typography variant="caption">{offer.expiry}</Typography>
         </Stack>
+        <Typography variant="caption" className="transfer-offer-expiry">
+          Expires <DateDisplay datetime={offer.expiry} />
+        </Typography>
       </CardContent>
     </Card>
   );

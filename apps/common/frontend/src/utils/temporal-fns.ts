@@ -15,3 +15,24 @@ export const microsecondsToInterval: (microseconds: string) => string = (microse
   const secs = s > 0 ? s + (s === 1 ? ' sec' : ' secs') : '';
   return days + hours + mins + secs;
 };
+
+export interface FormattedDateTime {
+  date: string;
+  time: string;
+}
+
+export const formatDatetime: (datetime: string) => FormattedDateTime = (datetime: string) => {
+  const dateObj = new Date(datetime);
+  return {
+    date: dateObj.toLocaleDateString('en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }),
+    time: dateObj.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }),
+  };
+};

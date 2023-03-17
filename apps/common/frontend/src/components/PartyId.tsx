@@ -2,7 +2,11 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
-const PartyId: React.FC<{ partyId: string; noCopy?: boolean }> = ({ partyId, noCopy }) => {
+const PartyId: React.FC<{ partyId: string; noCopy?: boolean; classNames?: string }> = ({
+  partyId,
+  noCopy,
+  classNames,
+}) => {
   const handleClick = () => navigator.clipboard.writeText(partyId);
 
   return (
@@ -11,12 +15,12 @@ const PartyId: React.FC<{ partyId: string; noCopy?: boolean }> = ({ partyId, noC
         <div
           style={{
             display: 'inline-flex',
-            maxWidth: '300px',
+            maxWidth: '160px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             fontWeight: 'lighter',
           }}
-          className="party-id"
+          className={`party-id ${classNames}`}
         >
           {partyId}
         </div>
