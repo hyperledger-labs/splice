@@ -42,30 +42,49 @@ final class DomainOrchestrator private (
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private[this] var services: Map[DomainId, (TriggerContext, Svc)] = Map.empty
+  private[this] var servicesVar: Map[DomainId, (TriggerContext, Svc)] = Map.empty
+
+  // Note that we close the retry providers at the beginning of initiating shutdown to quickly signal shutdown,
+  // while we close the services one after the other on .close()
+  private def closeRetryProviders(): Unit =
+    Lifecycle.close(servicesVar.values.map(_._1.retryProvider).toSeq *)(logger)
+
+  private def closeServices(): Unit = Lifecycle.close(servicesVar.values.map(_._2).toSeq *)(logger)
 
   triggerContext.retryProvider.runOnShutdown(new RunOnShutdown {
     override def name = s"shutdown per domain retry providers"
     // this is not perfectly precise, but CoinRetries.close is idempotent
     override def done = false
-    override def run() =
-      services.values.foreach { case (ctx, _) =>
-        ctx.retryProvider.close()
-      }
+    override def run() = closeRetryProviders()
   })(TraceContext.empty)
 
   private def updateServices[T](
       f: Map[DomainId, (TriggerContext, Svc)] => (Map[DomainId, (TriggerContext, Svc)], T)
-  ): Future[T] =
-    Future {
-      blocking {
-        synchronized {
-          val (servicesNew, result) = f(services)
-          services = servicesNew
-          result
+  ): FutureUnlessShutdown[T] =
+    FutureUnlessShutdown(Future {
+      if (triggerContext.retryProvider.isShuttingDown) {
+        // Avoid allocating new services when we are shutting down.
+        UnlessShutdown.AbortedDueToShutdown
+      } else
+        blocking {
+          synchronized {
+            val (servicesNew, result) = f(servicesVar)
+            servicesVar = servicesNew
+            // Shutdown might have been initiated concurrently with our change to the service map
+            if (triggerContext.retryProvider.isShuttingDown) {
+              val msg =
+                "Detected race between update of services and shutdown: closing all services again to be on the safe side."
+              logger.debug(msg)(TraceContext.empty)
+              // This must be within the 'synchronized' block to ensure we are reading the right state of the 'servicesVar'
+              closeRetryProviders()
+              closeServices()
+              UnlessShutdown.AbortedDueToShutdown
+            } else {
+              UnlessShutdown.Outcome(result)
+            }
+          }
         }
-      }
-    }
+    })
 
   override protected val source: Source[DomainStore.DomainConnectionEvent, NotUsed] =
     domainStore.streamEvents()
@@ -97,6 +116,10 @@ final class DomainOrchestrator private (
               )))
             (newServices, TaskSuccess(show"Started new service for ${event.domainId}"))
           }
+        ).onShutdown(
+          TaskSuccess(
+            show"Skipped or aborted starting a new service for ${event.domainId}, as we are shutting down."
+          )
         )
       case event: DomainStore.DomainRemoved =>
         updateServices(services =>
@@ -112,20 +135,17 @@ final class DomainOrchestrator private (
               val newServices = services - event.domainId
               (newServices, TaskSuccess(show"Stopped service for ${event.domainId}"))
           }
-        )
+        ).onShutdown(TaskSuccess(show"Stopped service for ${event.domainId} during shutdown"))
     }
 
   // We can always start & shutdown services so we don’t need to worry about task staleness here.
   protected def isStaleTask(task: DomainStore.DomainConnectionEvent)(implicit tc: TraceContext) =
     Future.successful(false)
 
-  override def isHealthy: Boolean = services.values.forall(_._2.isHealthy)
+  override def isHealthy: Boolean = servicesVar.values.forall(_._2.isHealthy)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    SyncCloseable(
-      "Per-domain services",
-      Lifecycle.close(services.values.map(_._2).toSeq: _*)(logger),
-    ) +: super.closeAsync()
+    SyncCloseable("Per-domain services", closeServices()) +: super.closeAsync()
 }
 
 object DomainOrchestrator {
