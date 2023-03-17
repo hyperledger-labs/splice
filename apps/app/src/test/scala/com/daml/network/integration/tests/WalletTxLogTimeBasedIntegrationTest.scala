@@ -32,8 +32,7 @@ class WalletTxLogTimeBasedIntegrationTest
   "A wallet" should {
 
     "handle rewards" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWallet)
       waitForWalletUser(bobValidatorWallet)
 

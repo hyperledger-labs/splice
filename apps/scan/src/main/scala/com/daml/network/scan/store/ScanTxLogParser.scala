@@ -9,9 +9,11 @@ import com.daml.network.util.CoinUtil.dollarsToCC
 
 import cats.Monoid
 import cats.syntax.foldable.*
+import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.TreeEvent
+import com.daml.network.util.ExerciseNode
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -26,9 +28,14 @@ class ScanTxLogParser(
   private def parseTree(tree: TransactionTree, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
+    // TODO(#2930) add more checks on the nodes, at least that the svc party is correct
     root match {
       case exercised: ExercisedEvent =>
-        parseTrees(tree, exercised.getChildEventIds.asScala.toList)
+        exercised match {
+          case Transfer(node) =>
+            State.fromTransfer(tree, root, node)
+          case _ => parseTrees(tree, exercised.getChildEventIds.asScala.toList)
+        }
 
       case created: CreatedEvent =>
         created match {
@@ -61,12 +68,13 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
+  // TODO(#2930) we expect these arguments to be used fairly soon, when querying the log across all entry types,
+  // so for now just ask the compiler nicely to not warn about them.
+  @nowarn("cat=unused")
   abstract class TxLogIndexRecord(
-      // TODO(#2930) Will be used fairly soon, but for now these throw an unused warning so commented out:
-
-      // offset: String,
-      // eventId: String,
-      // round: Long,
+      offset: String,
+      eventId: String,
+      round: Long,
   ) extends TxLogStore.IndexRecord {}
 
   object TxLogIndexRecord {
@@ -74,18 +82,30 @@ object ScanTxLogParser {
         offset: String,
         eventId: String,
         round: Long,
-    ) extends TxLogIndexRecord( /*offset, eventId, round*/ ) {}
-    object OpenMiningRound {
-      val transaction_type = "open_mining_round"
-    }
+    ) extends TxLogIndexRecord(offset, eventId, round) {}
+
+    final case class AppRewardIndexRecord(
+        offset: String,
+        eventId: String,
+        round: Long,
+        party: String,
+        amount: BigDecimal,
+    ) extends TxLogIndexRecord(offset, eventId, round) {}
+
+    final case class ValidatorRewardIndexRecord(
+        offset: String,
+        eventId: String,
+        round: Long,
+        party: String,
+        amount: BigDecimal,
+    ) extends TxLogIndexRecord(offset, eventId, round) {}
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
 
   object TxLogEntry {
 
-    final case class EmptyTxLogEntry(indexRecord: TxLogIndexRecord)
-        extends TxLogStore.Entry[TxLogIndexRecord] {}
+    final case class EmptyTxLogEntry(indexRecord: TxLogIndexRecord) extends TxLogEntry {}
 
     final case class OpenMiningRoundLogEntry(
         indexRecord: TxLogIndexRecord,
@@ -118,6 +138,53 @@ object ScanTxLogParser {
       override val empty = State(immutable.Queue.empty)
       override def combine(a: State, b: State) =
         a.appended(b)
+    }
+
+    def fromTransfer(
+        tx: TransactionTree,
+        event: TreeEvent,
+        node: ExerciseNode[Transfer.Arg, Transfer.Res],
+    ): State = {
+      val appRewards = node.result.value.summary.inputAppRewardAmount
+      val validatorRewards = node.result.value.summary.inputValidatorRewardAmount
+      val party = node.argument.value.transfer.sender
+      val round = node.result.value.round
+
+      val appRewardEntry =
+        if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
+          val entry =
+            TxLogEntry.EmptyTxLogEntry(
+              indexRecord = TxLogIndexRecord.AppRewardIndexRecord(
+                offset = tx.getOffset(),
+                eventId = event.getEventId(),
+                round = round.number,
+                party = party,
+                amount = appRewards,
+              )
+            )
+          State(immutable.Queue(entry))
+        } else {
+          State.empty
+        }
+
+      val validatorRewardEntry =
+        if (validatorRewards.compareTo(BigDecimal(0.0)) > 0) {
+          val entry =
+            TxLogEntry.EmptyTxLogEntry(
+              indexRecord = TxLogIndexRecord.ValidatorRewardIndexRecord(
+                offset = tx.getOffset(),
+                eventId = event.getEventId(),
+                round = round.number,
+                party = party,
+                amount = validatorRewards,
+              )
+            )
+          State(immutable.Queue(entry))
+        } else {
+          State.empty
+        }
+
+      State.empty.appended(appRewardEntry).appended(validatorRewardEntry)
     }
 
     def fromOpenMiningRoundCreate(

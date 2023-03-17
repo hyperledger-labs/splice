@@ -10,6 +10,8 @@ import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CoinUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import scala.jdk.CollectionConverters.*
+import com.daml.network.config.CNNodeConfigTransforms
+import monocle.macros.syntax.lens.*
 
 class ScanTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -20,6 +22,13 @@ class ScanTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
+      // We disable the automation for this suite.
+      .addConfigTransform((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
+        )(config)
+      )
 
   "report correct reference data" in { implicit env =>
     scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 1
@@ -80,5 +89,33 @@ class ScanTimeBasedIntegrationTest
         scan.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
       }
     }
+  }
+
+  "support app and validator leaderboards" in { implicit env =>
+    val (_, bobUserParty) = onboardAliceAndBob()
+
+    clue("Tap to get some coins") {
+      aliceWallet.tap(100.0)
+      aliceValidatorWallet.tap(100.0)
+    }
+
+    clue("Transfer some CC, to generate reward coupons")(
+      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 40.0)
+    )
+    clue("Advance 3 ticks for the coupons to be collectable")({
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+      advanceRoundsByOneTick
+    })
+    clue("Alice uses her app rewards when transfering CC")(
+      // TODO(#3469): for now we just inspected the log manually to see that the correct entries are
+      // appended to the scan tx log. Once there's a proper API for the leaderboard, we'll add a check here
+      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 10.0)
+    )
+    clue("Alice's validator uses their validator reward when transfering CC")({
+      // TODO(#3469): for now we just inspected the log manually to see that the correct entries are
+      // appended to the scan tx log. Once there's a proper API for the leaderboard, we'll add a check here
+      p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
+    })
   }
 }
