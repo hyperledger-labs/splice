@@ -250,10 +250,21 @@ trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatch
     }
   }
 
-  protected def waitForQuery(query: Query)(implicit webDriver: WebDriver): Unit =
-    eventually() {
-      find(query).valueOrFail(s"Could not find $query")
+  protected def waitForQuery(query: Query, timeUntilSuccess: Option[FiniteDuration] = None)(implicit
+      webDriver: WebDriver
+  ): Unit = {
+    timeUntilSuccess match {
+      case None =>
+        eventually() {
+          find(query).valueOrFail(s"Could not find $query")
+        }
+      case Some(timeUntilSuccess) =>
+        eventually(timeUntilSuccess) {
+          find(query).valueOrFail(s"Could not find $query")
+        }
     }
+
+  }
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
     find(id("error")).value.text should include(err)

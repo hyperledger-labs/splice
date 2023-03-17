@@ -62,7 +62,9 @@ const retrySubmit = async <T,>(
       });
     switch (response.type) {
       case 'retryable':
-        console.debug(`Found retryable error, retrying after ${retryDelay}ms...`);
+        console.debug(
+          `Found retryable error ${JSON.stringify(error)}, retrying after ${retryDelay}ms...`
+        );
         error = response.error;
         retries++;
         await sleep(retryDelay);

@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.integration.tests.CoinTests.CoinTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
+import scala.concurrent.duration.*
 
 trait DirectoryFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
   this: CommonCoinAppInstanceReferences & FrontendTestCommon =>
@@ -14,7 +15,9 @@ trait DirectoryFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
   ) = {
     directoryUiLogin()
 
-    waitForQuery(id("entry-name-field"))
+    // 30 seconds waiting here as in some tests we observed 20 seconds not being enough, due to needing to
+    // wait on the JSON API.
+    waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(30.seconds))
 
     click on "entry-name-field"
     textField("entry-name-field").value = entryName
