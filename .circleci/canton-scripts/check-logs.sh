@@ -42,6 +42,9 @@ read_ignored_entries() {
 
 # Read ignored entries
 read_ignored_entries |
+  # We print the ignored entries as part of our sbt run, and we don't want them to trigger the sbt output checker.
+  # We thus add this suffix which is ignored by default in the sbt output checker.
+  sed 's/$/ (ignore this line in check-sbt-output.sh)/' |
   # Output ignored entries, succeeding in any case
   output_problems "ignored entries" "$LOGFILE" "0"
 

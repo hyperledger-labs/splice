@@ -11,13 +11,7 @@ SBT_OUTPUT_FILE="$1"
 # and our preflight checks can lead to mismatches in arguments on the call-site
 # and the actual files available in the checkout as of which the preflight check
 # runs; see #3528.
-FILES_WITH_IGNORE_PATTERNS=(\
-  "project/errors-in-sbt-output-to-ignore.txt" \
-  "project/errors-in-canton-log-to-ignore.txt" \
-  "project/errors-in-canton-simtime-log-to-ignore.txt" \
-  "project/errors-in-canton_network_test-log-to-ignore.txt")
-
-
+FILES_WITH_IGNORE_PATTERNS=("project/errors-in-sbt-output-to-ignore.txt")
 
 # Get the full path to the .circleci directory
 SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"

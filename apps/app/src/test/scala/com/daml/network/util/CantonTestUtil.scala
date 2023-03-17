@@ -29,8 +29,12 @@ trait CantonProcessTestUtil {
     Seq(
       "canton",
       "daemon",
+      "--log-level-stdout",
+      "OFF",
+      "--log-encoder",
+      "json",
       "--log-file-name",
-      "log/standalone-canton.log",
+      "log/canton-standalone.clog",
     )
 
   protected def startCanton(

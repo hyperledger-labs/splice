@@ -42,17 +42,6 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 # Coursier noise
 .*no longer exists at.*
 
-# grpc "Half-closed without a request" grpc shutdown flake - might be when client hangs up before server response? https://github.com/grpc/grpc-java/issues/4890
-# reported by daml-repo ErrorInterceptor/ErrorListener added with daml 2.0.0-snapshot.20211220
-# Can probably be removed once https://github.com/digital-asset/daml/issues/13413 is fixed.
-io\.grpc\.Status\.asRuntimeException
-c.*\.d.*\.p.*\.a.*\.e.*\.ErrorInterceptor
-c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
-
-# Ignore generic http 400/500 response errors as they are often benign.
-# TODO (#1734): consider implementing a more fine-granular ignore
-.*Http response at 400 or 500 level.*
-
 # sbt 1.4 onwards logs GC warnings
 .*\[.*warn.*\].* of the last .* were spent in garbage collection\.
 
@@ -78,14 +67,8 @@ c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
 ^.\[31mWarning:.\[0m$
 .*contained different content than was expected.*
 
-# TODO(#2375) Remove this once we can ignore those
-# shutdown issues more granularly.
-WARN  c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
-ledger subscription for admin service .* has completed with error
-io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
-ERROR.*INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
-
-# TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
-.*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
+# This suffix is used to mark ignored errors reported by check-logs.sh as part of our sbt build.
+# Without that we'd have to ignore all errors from specific logs when checking the sbt output.
+\(ignore this line in check-sbt-output\.sh\)$
 
 # Make sure to have a trailing newline

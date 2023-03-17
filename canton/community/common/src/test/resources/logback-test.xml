@@ -8,7 +8,11 @@
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder"/>
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>WARN</level>
+        <!-- For some reason our test setup depends on the STDOUT logger being defined. Without it the FILE logger
+             below does not log anything. We thus just turn the log level to OFF here to make
+             check-sbt-output.sh check for unexpected build problems only (see #3535).
+         -->
+      <level>OFF</level>
     </filter>
   </appender>
 
