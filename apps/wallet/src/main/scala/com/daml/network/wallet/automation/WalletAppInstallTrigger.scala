@@ -6,6 +6,7 @@ import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, T
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.util.Contract
 import com.daml.network.wallet.UserWalletManager
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -37,12 +38,16 @@ class WalletAppInstallTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     Future {
       val endUserName = install.payload.endUserName
-      if (walletManager.getOrCreateUserWallet(install))
-        TaskSuccess(s"onboarded wallet end-user '$endUserName'")
-      else {
-        logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
-        TaskSuccess(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
+      walletManager.getOrCreateUserWallet(install) match {
+        case UnlessShutdown.AbortedDueToShutdown =>
+          TaskSuccess(
+            s"skipped or aborted onboarding wallet end-user '$endUserName', as we are shutting down."
+          )
+        case UnlessShutdown.Outcome(true) =>
+          TaskSuccess(s"onboarded wallet end-user '$endUserName'")
+        case UnlessShutdown.Outcome(false) =>
+          logger.warn(s"Unexpected duplicate on-boarding of wallet end-user '$endUserName'")
+          TaskSuccess(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
       }
     }
-
 }

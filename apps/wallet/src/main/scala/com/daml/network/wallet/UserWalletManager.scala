@@ -19,6 +19,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
@@ -81,42 +82,59 @@ class UserWalletManager(
     */
   final def getOrCreateUserWallet(
       install: Contract[WalletAppInstall.ContractId, WalletAppInstall]
-  ): Boolean = {
-    val endUserName = install.payload.endUserName
-    val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
-    val key =
-      UserWalletStore.Key(
-        svcParty = store.key.svcParty,
-        store.key.walletServiceParty,
-        store.key.validatorParty,
-        endUserName,
-        endUserParty,
+  ): UnlessShutdown[Boolean] = {
+    if (retryProvider.isShuttingDown) {
+      UnlessShutdown.AbortedDueToShutdown
+    } else {
+      val endUserName = install.payload.endUserName
+      val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
+      val key =
+        UserWalletStore.Key(
+          svcParty = store.key.svcParty,
+          store.key.walletServiceParty,
+          store.key.validatorParty,
+          endUserName,
+          endUserParty,
+        )
+      // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
+      // without the entire node going down.
+      val userRetryProvider = CoinRetries(loggerFactory, retryProvider.timeouts)
+      val walletService = new UserWalletService(
+        ledgerClient,
+        globalDomain,
+        key,
+        this,
+        automationConfig,
+        clock,
+        treasuryConfig,
+        storage,
+        userRetryProvider,
+        loggerFactory,
+        scanConnection,
+        timeouts,
+        futureSupervisor,
       )
-    // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
-    // without the entire node going down.
-    val userRetryProvider = CoinRetries(loggerFactory, retryProvider.timeouts)
-    val walletService = new UserWalletService(
-      ledgerClient,
-      globalDomain,
-      key,
-      this,
-      automationConfig,
-      clock,
-      treasuryConfig,
-      storage,
-      userRetryProvider,
-      loggerFactory,
-      scanConnection,
-      timeouts,
-      futureSupervisor,
-    )
 
-    endUserWalletsMap
-      .putIfAbsent(endUserName, (userRetryProvider, walletService))
-      .fold(true)(_ => {
+      val wasUserAdded = endUserWalletsMap
+        .putIfAbsent(endUserName, (userRetryProvider, walletService))
+        .fold(true)(_ => {
+          // User was already there, close the newly created wallet.
+          userRetryProvider.close()
+          walletService.close()
+          false
+        })
+      // There might have been a concurrent call to .close() that missed the above addition of this user
+      if (retryProvider.isShuttingDown) {
+        logger.debug(
+          show"Detected race between adding wallet for user ${endUserName.singleQuoted} and shutdown: closing wallet."
+        )(TraceContext.empty)
+        userRetryProvider.close()
         walletService.close()
-        false
-      })
+        UnlessShutdown.AbortedDueToShutdown
+      } else {
+        UnlessShutdown.Outcome(wasUserAdded)
+      }
+    }
   }
 
   def offboardUser(username: String): Unit = {
