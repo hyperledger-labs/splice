@@ -35,6 +35,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 
 class SvApp(
     override val name: InstanceName,
@@ -117,10 +118,15 @@ class SvApp(
         loggerFactory,
       )
       routes = cors() {
-        SvResource.routes(
-          handler
-          // TODO(M3-46) add client authentication via `AuthExtractor`
-        )
+        newTraceContext { traceContext =>
+          requestLogger(traceContext) {
+            SvResource.routes(
+              handler
+              // TODO(M3-46) add client authentication via `AuthExtractor`
+            )
+          }
+        }
+
       }
       httpConfig = config.adminApi.clientConfig.copy(
         // TODO(#2019) Remove once we disabled Canton's `CommunityAdminServer`.
