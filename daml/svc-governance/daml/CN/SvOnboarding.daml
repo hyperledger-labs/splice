@@ -1,5 +1,7 @@
 module CN.SvOnboarding where
 
+import CN.Util.Assert
+
 -- | Template used by a ("approving") SV node to "approve" a not-yet-onboarded ("candidate") SV,
 -- in the sense that once the candidate authenticates via providing a signature that matches the
 -- registered key the approver will actively confirm the candidate's onboarding.
@@ -19,6 +21,15 @@ template SvOnboarding with
     token : Text                -- ^ An encoded and signed `SvOnboardingToken` that confirms the candidate's identity.
     sponsor : Party             -- ^ The established SV node that created this contract.
     svc: Party
+    expiresAt : Time            -- ^ When this contract can be archived even if the onboarding did not succeed.
   where
     signatory svc
     observer candidateParty
+
+    -- Archive if we are past the `expiresAt`.
+    choice SvOnboarding_Expire: ()
+      controller svc
+      do
+        now <- getTime
+        require "Onboarding has expired" (now >= expiresAt)
+        pure ()

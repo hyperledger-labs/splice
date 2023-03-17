@@ -1,6 +1,7 @@
 package com.daml.network.sv.util
 
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.util.Contract
 
 import java.security.{KeyFactory, SecureRandom, Signature}
@@ -10,8 +11,14 @@ import java.security.spec.EncodedKeySpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
+import java.util.concurrent.TimeUnit
 
 object SvUtil {
+
+  def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
+    10, // numUnclaimedRewardsThreshold
+    new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
+  )
 
   def keyPairMatches(
       publicKeyBase64: String,

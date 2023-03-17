@@ -1,13 +1,14 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.console.LocalCoinAppReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -15,7 +16,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.CoinUtil.defaultIssuanceCurve
-import com.daml.network.util.{Contract, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{Contract, SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
@@ -28,12 +29,17 @@ import java.time.{Duration, Instant}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil with TimeTestUtil {
+class SvTimeBasedIntegrationTest
+    extends CoinIntegrationTest
+    with SvTestUtil
+    with WalletTestUtil
+    with TimeTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .withManualStart
       .addConfigTransforms(
         (_, config) => {
           // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
@@ -51,6 +57,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
       )
 
   "round management" in { implicit env =>
+    initSvc()
+
     // Sync with background automation that onboards validator.
     eventually()({
       val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
@@ -136,6 +144,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
+    initSvc()
+
     val doubledTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(300))
     svcClient.setConfigSchedule(
       createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(doubledTickDuration)))
@@ -227,6 +237,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
+    initSvc()
+
     val reducedTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(75))
     svcClient.setConfigSchedule(
       createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(reducedTickDuration)))
@@ -391,6 +403,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "round management with very tightly scheduled config" in { implicit env =>
+    initSvc()
+
     val config101 = mkCoinConfig(defaultTickDuration, 101)
     val config102 = mkCoinConfig(defaultTickDuration, 102)
 
@@ -455,6 +469,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "SVs collect SvcReward and SvReward automatically" in { implicit env =>
+    initSvc()
+
     eventually() {
       val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
       rounds should have size 3
@@ -532,6 +548,8 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
   }
 
   "calculation of issuance per coin" in { implicit env =>
+    initSvc()
+
     // 3 unfeatured app rewards & 3 featured app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
     val rewards = Seq(
@@ -649,6 +667,11 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
           )
           .length
     }
+    initSvc()
+    Seq(aliceValidator, bobValidator).foreach(_.start())
+    Seq(aliceValidator, bobValidator).foreach(_.waitForInitialization())
+    Seq(aliceWalletBackend, bobWalletBackend).foreach(_.start())
+    Seq(aliceWalletBackend, bobWalletBackend).foreach(_.waitForInitialization())
 
     val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
@@ -686,6 +709,43 @@ class SvTimeBasedIntegrationTest extends CoinIntegrationTest with WalletTestUtil
           .getClosedRounds()
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
       },
+    )
+  }
+
+  "expire stale `SvOnboarding` contracts" in { implicit env =>
+    clue("Initialize SVC with 3 SVs") {
+      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(_.start())
+      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(
+        _.waitForInitialization()
+      )
+      getSvcRules().data.members should have size 3
+    }
+    clue(
+      "Add a phantom SV and stop SV2 so that SV4 can't gather enough confirmations just yet"
+    ) {
+      addPhantomSv()
+      sv2.stop()
+      getSvcRules().data.members should have size 4
+      // We now need 2 confirmations to execute an action, but only sv1 is
+      // active and sv3 hasn't approved sv4.
+    }
+    clue("SV4 starts") {
+      sv4.start()
+    }
+    clue("An `SvOnboarding` contract is created") {
+      eventually()(
+        // The onboarding is requested by SV4 during SvApp init.
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
+      )
+    }
+    actAndCheck("No onboarding happens for a long time", advanceTime(Duration.ofHours(25)))(
+      "The `SvOnboarding` contract expires and is archived",
+      _ =>
+        eventually()(
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) shouldBe empty
+        ),
     )
   }
 

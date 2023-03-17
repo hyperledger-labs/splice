@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.console.CoinRemoteParticipantReference
+import com.daml.network.console.{CoinRemoteParticipantReference, LocalCoinAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.sv.util.SvOnboardingToken
+import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -21,9 +22,8 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import com.daml.network.console.LocalCoinAppReference
 
-class SvIntegrationTest extends CoinIntegrationTest {
+class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
@@ -498,14 +498,6 @@ class SvIntegrationTest extends CoinIntegrationTest {
       .sortBy(_.data.amount.initialAmount)
   }
 
-  def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
-    clue("There is exactly one SvcRules contract") {
-      val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-      foundSvcRules should have length 1
-      foundSvcRules.head
-    }
-
   def getCoinRules()(implicit env: CoinTestConsoleEnvironment) =
     clue("There is exactly one CoinRules contract") {
       val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
@@ -513,28 +505,4 @@ class SvIntegrationTest extends CoinIntegrationTest {
       foundCoinRules should have length 1
       foundCoinRules.head
     }
-
-  def addPhantomSv()(implicit env: CoinTestConsoleEnvironment) = {
-    // random value for test
-    val svXParty = PartyId
-      .fromProtoPrimitive(
-        "svX::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
-      )
-      .value
-    actAndCheck(
-      "Add the phantom SV \"svX\"",
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-        actAs = Seq(svcParty),
-        optTimeout = None,
-        commands = getSvcRules().id
-          .exerciseSvcRules_AddMember(svXParty.toProtoPrimitive, "addPhantomSv")
-          .commands
-          .asScala
-          .toSeq,
-      ),
-    )(
-      "SvX is a member of the SvcRules",
-      _ => getSvcRules().data.members should contain key svXParty.toProtoPrimitive,
-    )
-  }
 }

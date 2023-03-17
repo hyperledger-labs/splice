@@ -309,9 +309,7 @@ class SvApp(
                       foundingConfig.initialMaxNumInputs,
                     ),
                     foundingConfig.initialCoinPrice.bigDecimal,
-                    new cn.svcrules.SvcRulesConfig(
-                      10
-                    ), // TODO(M3-46) handle default config values better
+                    SvUtil.defaultSvcRulesConfig(),
                     defaultEnabledChoices,
                     config.isDevNet,
                   ).createAnd

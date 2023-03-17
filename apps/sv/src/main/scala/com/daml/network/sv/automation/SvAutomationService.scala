@@ -40,6 +40,7 @@ class SvAutomationService(
   registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new ExpiredSvOnboardingTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvOnboardingTrigger(triggerContext, svcStore, svStore, connection))
   registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))

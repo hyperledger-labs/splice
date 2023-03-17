@@ -238,6 +238,11 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
       _.findContractWithOffset(so.SvOnboarding.COMPANION)(co => co.payload.token == token)
     )
 
+  def listExpiredSvOnboardings: ListExpiredContracts[so.SvOnboarding.ContractId, so.SvOnboarding] =
+    AcsStore.listExpiredFromPayloadExpiry(defaultAcs, so.SvOnboarding.COMPANION)(
+      _.expiresAt
+    )
+
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>

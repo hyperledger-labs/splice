@@ -5,6 +5,7 @@ import DA.Foldable (forA_)
 import DA.List as List
 import qualified DA.Map as Map
 import qualified DA.Set as Set
+import DA.Time
 
 -- TODO(tech-debt) factor this one out of CC into its own library
 import CN.Util.Assert
@@ -128,6 +129,7 @@ template AgreedCoinPrice
 -- TODO(M3-46): support changing the config
 data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
+    svOnboardingTimeout : RelTime -- ^ The time after contracts representing an incomplete onboarding are archived.
   deriving (Eq, Show)
 
 -- SV Consortium rules
@@ -306,8 +308,16 @@ template SvcRules with
       controller sponsor
       do
         require "Sponsor is a consortium member" (sponsor `Map.member` members)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svOnboardingTimeout
         create SvOnboarding with ..
 
+    nonconsuming choice SvcRules_ExpireSvOnboarding : ()
+      with
+        cid: ContractId SvOnboarding
+      controller leader
+      do
+        exercise cid SvOnboarding_Expire
 
     -- Coin management driven directly by the leader
     --------------------------------------------------

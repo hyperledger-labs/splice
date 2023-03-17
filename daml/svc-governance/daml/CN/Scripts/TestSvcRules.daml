@@ -143,8 +143,8 @@ testOnboardValidator = do
   pure ()
 
 
-testOnboardSv : Script ()
-testOnboardSv = do
+testSvOnboarding : Script ()
+testSvOnboarding = do
   (app, svc, (_, sv2, sv3, _)) <- initConsortium
   -- we now have a consortium with BFT for f = 1
 
@@ -166,6 +166,7 @@ testOnboardSv = do
     token
     sponsor = sv2
     svc
+    expiresAt = svOnboarding.expiresAt
 
   -- svX collects two confirmations which is enough to onboard him (2 = f + 1)
   [(svcRulesCid, _)] <- query @SvcRules svc
@@ -185,6 +186,32 @@ testOnboardSv = do
   pure ()
 
 
+testSvOnboardingExpiry : Script ()
+testSvOnboardingExpiry = do
+  (app, _, (_, sv2, _, _)) <- initConsortium
+  -- we now have a consortium with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- leader tries to expire the onboarding, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboarding svOnboardingCid
+
+  -- wait for the onboarding to expire
+  passTime (hours 25)
+
+  -- leader expires the onboarding
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboarding svOnboardingCid
+
 -- Utils
 --------
 
@@ -197,9 +224,10 @@ initConsortium = do
   -- TODO(M3-46): make this a real consortium party
   svc <- allocateParty "svc"
 
-  -- have mallory bootstrap the consortium
-  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5
+  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5, svOnboardingTimeout = hours 24
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
+
+  -- have mallory bootstrap the consortium
   submit svc $ createAndExerciseCmd
     (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet = True)
     SvcBootstrap_Bootstrap
@@ -238,6 +266,11 @@ leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
 leaderSubmits app mkCommands = do
   [(consortiumCid, consortium)] <- query @SvcRules app.svc
   submitMulti [consortium.leader] [app.svc] $ mkCommands consortiumCid
+
+leaderSubmitsMustFail : CCApp -> (ContractId SvcRules -> Commands a) -> Script ()
+leaderSubmitsMustFail app mkCommands = do
+  [(consortiumCid, consortium)] <- query @SvcRules app.svc
+  submitMultiMustFail [consortium.leader] [app.svc] $ mkCommands consortiumCid
 
 svSubmits : CCApp -> Party -> (ContractId SvcRules -> Commands a) -> Script a
 svSubmits app sv mkCommands = do
