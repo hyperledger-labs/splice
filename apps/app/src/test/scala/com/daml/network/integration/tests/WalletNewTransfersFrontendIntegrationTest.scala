@@ -7,8 +7,8 @@ import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.time.{LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, ZoneOffset}
 import java.util.UUID
 
 class WalletNewTransfersFrontendIntegrationTest
@@ -19,7 +19,7 @@ class WalletNewTransfersFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .withCoinPrice(2)
 
   "A wallet UI" should {
