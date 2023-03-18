@@ -114,6 +114,7 @@ class SvApp(
         svcStore,
         isDevNet,
         clock,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
       )

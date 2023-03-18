@@ -10,11 +10,19 @@ import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.digitalasset.canton.topology.transaction.{
+  ParticipantPermission,
+  RequestSide,
+  TopologyChangeOp,
+}
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.security.SecureRandom
+import java.time.Instant
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -27,6 +35,7 @@ class HttpSvHandler(
     svcStore: SvSvcStore,
     isDevNet: Boolean,
     clock: Clock,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -272,4 +281,69 @@ class HttpSvHandler(
         }
       } yield ()
     }
+
+  override def onboardSvPartyMigration(respond: v0.SvResource.OnboardSvPartyMigrationResponse.type)(
+      body: definitions.OnboardSvPartyMigrationRequest
+  ): Future[v0.SvResource.OnboardSvPartyMigrationResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      ParticipantId
+        .fromProtoPrimitive(body.participantId, "")
+        .fold(
+          err =>
+            Future
+              .successful(v0.SvResource.OnboardSvPartyMigrationResponse.BadRequest(err.message)),
+          participantId =>
+            for {
+              authorizedAt <- authorizeSvcPartyToParticipantUntilCompletion(participantId)
+              acsBytes <- participantAdminConnection.downloadAcsSnapshot(
+                Set(svcParty),
+                filterDomainId = globalDomain.toProtoPrimitive,
+                timestamp = Some(authorizedAt),
+              )
+              // TODO(M3-57) consider if a more space-efficient encoding is necessary
+              encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
+            } yield definitions.OnboardSvPartyMigrationResponse(encoded),
+        )
+    }
+
+  private def authorizeSvcPartyToParticipantUntilCompletion(
+      participantId: ParticipantId
+  )(implicit traceContext: TraceContext): Future[Instant] = for {
+    _ <- participantAdminConnection
+      .authorizePartyToParticipant(
+        TopologyChangeOp.Add,
+        svcParty,
+        participantId,
+        RequestSide.From,
+        ParticipantPermission.Observation,
+      )
+
+    // retry until the authorization can be seen from PartyToParticipantMappings
+    authorizedAt <- retryProvider.retryForClientCalls(
+      "wait for authorization to complete", {
+        participantAdminConnection
+          .listPartyToParticipantMappings(
+            filterStore = globalDomain.toProtoPrimitive,
+            operation = Some(TopologyChangeOp.Add),
+            filterParty = svcParty.toProtoPrimitive,
+            filterParticipant = participantId.uid.id.unwrap,
+            filterRequestSide = Some(RequestSide.From),
+            filterPermission = Some(ParticipantPermission.Observation),
+          )
+          .map {
+            case Seq(mapping) =>
+              mapping.context.validFrom
+            case Seq() =>
+              throw new StatusRuntimeException(
+                Status.NOT_FOUND.withDescription("Authorization is still in progress")
+              )
+            case _ =>
+              throw new StatusRuntimeException(
+                Status.INTERNAL.withDescription("Unexpected number of mappings")
+              )
+          }
+      },
+      logger,
+    )
+  } yield authorizedAt
 }

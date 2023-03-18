@@ -93,6 +93,37 @@ paths:
             text/plain:
               schema:
                 type: string
+  /onboard/sv/party-migration:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv
+      operationId: "onboardSvPartyMigration"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvPartyMigrationRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationResponse"
+        "400":
+          description: bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+        # TODO (#3429) use this
+        "401":
+          description: unauthorized
+          content:
+            text/plain:
+              schema:
+                type: string
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -176,6 +207,22 @@ components:
       - token
       properties:
         token:
+          type: string
+
+    OnboardSvPartyMigrationRequest:
+      type: object
+      required:
+        - participant_id
+      properties:
+        participant_id:
+          type: string
+
+    OnboardSvPartyMigrationResponse:
+      type: object
+      required:
+        - acs_snapshot
+      properties:
+        acs_snapshot:
           type: string
 
     GetDebugInfoResponse:

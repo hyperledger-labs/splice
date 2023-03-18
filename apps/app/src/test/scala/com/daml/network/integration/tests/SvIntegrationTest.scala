@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import com.google.protobuf.ByteString
 
 class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
 
@@ -347,49 +348,31 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
     }
 
     val acsBytes = clue(
-      "svcParticipant approves hosting of SVC party and exports ACS"
+      "authorize hosting of SVC party in other sv5 participant and exports ACS"
     ) {
-      // Approve hosting of the svcParty on the sv5 participant from the svcParticipant side
-      svcParticipant.topology.party_to_participant_mappings.authorize(
-        TopologyChangeOp.Add,
-        svcParty,
-        sv5Participant.id,
-        RequestSide.From,
-        ParticipantPermission.Observation,
-      )
 
       createCoinOwnBySvc(svcParticipant, 3.0)
 
-      // Wait for the authorization to be reflected in the party to participant mappings
-      // Determine timestamp as-of which the party was added
-      val addedPartyAt = eventually() {
+      val acsSnapshotBytes = sv1.onboardSvPartyMigration(sv5Participant.id)
+
+      createCoinOwnBySvc(svcParticipant, 4.0)
+
+      eventually() {
         val mappings = svcParticipant.topology.party_to_participant_mappings
           .list(
+            operation = Some(TopologyChangeOp.Add),
             filterStore = globalDomainId.toProtoPrimitive,
             filterParty = svcPartyStr,
             filterParticipant = sv5Participant.id.uid.id.unwrap,
             filterRequestSide = Some(RequestSide.From),
             filterPermission = Some(ParticipantPermission.Observation),
           )
-        inside(mappings) { case Seq(partyToParticipant) =>
-          partyToParticipant.context.validFrom
-        }
+        mappings should have size 1
       }
-
-      createCoinOwnBySvc(svcParticipant, 4.0)
-
-      logger.info(s"Added party on sv5Participant as of $addedPartyAt")
-
-      // Export ACS as of that time
-      val (_, bytes) = svcParticipant.parties.migration.downloadAcsSnapshot(
-        Set(svcParty),
-        filterDomainId = globalDomainId.toProtoPrimitive,
-        timestamp = Some(addedPartyAt),
-      )
 
       createCoinOwnBySvc(svcParticipant, 5.0)
 
-      bytes
+      ByteString.copyFrom(acsSnapshotBytes.asByteBuffer)
     }
 
     clue("Import the ACS on sv5Participant and reconnect sv5Participant") {
@@ -407,7 +390,6 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
       createCoinOwnBySvc(svcParticipant, 6.0)
 
       // sv5Participant should see the same acs as svcParty
-      // compare both acs without comparing eventIds and metadata as they will be different.
       eventually() {
         val coinFromSv5Participant = getCoins(sv5Participant, svcParty)
         val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)

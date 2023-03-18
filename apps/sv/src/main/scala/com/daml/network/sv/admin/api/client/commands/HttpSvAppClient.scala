@@ -1,7 +1,8 @@
 package com.daml.network.sv.admin.api.client.commands
 
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
-import akka.stream.{Materializer}
+import akka.stream.Materializer
+import akka.util.ByteString
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -11,8 +12,9 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
 
@@ -178,6 +180,34 @@ object HttpSvAppClient {
             new CoinRules.ContractId(coinRulesContractId),
             new SvcRules.ContractId(svcRulesContractId),
           )
+      }
+    }
+  }
+
+  case class OnboardSvPartyMigration(participantId: ParticipantId)
+      extends BaseCommand[http.OnboardSvPartyMigrationResponse, ByteString] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardSvPartyMigrationResponse] =
+      client.onboardSvPartyMigration(
+        body = definitions.OnboardSvPartyMigrationRequest(participantId.toProtoPrimitive),
+        headers = headers,
+      )
+
+    override def handleResponse(
+        response: http.OnboardSvPartyMigrationResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, ByteString] = {
+      response match {
+        case http.OnboardSvPartyMigrationResponse.OK(
+              definitions.OnboardSvPartyMigrationResponse(encodedAcsSnapshot)
+            ) =>
+          Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
+        case http.OnboardSvPartyMigrationResponse.BadRequest(e) => Left(e)
+        case http.OnboardSvPartyMigrationResponse.Unauthorized(e) => Left(e)
       }
     }
   }

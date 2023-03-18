@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.util.ByteString
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
@@ -8,7 +9,7 @@ import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -38,6 +39,11 @@ abstract class SvAppReference(
   def getDebugInfo(): HttpSvAppClient.DebugInfo =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.GetDebugInfo)
+    }
+
+  def onboardSvPartyMigration(participantId: ParticipantId): ByteString =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.OnboardSvPartyMigration(participantId))
     }
 }
 

@@ -7,7 +7,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.CoinAppStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, DomainId}
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
