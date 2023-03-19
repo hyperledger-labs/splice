@@ -14,6 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.Succeeded
 
 import scala.util.Using
+import scala.concurrent.duration._
 
 class WalletSurviveCantonRestartIntegrationTest
     extends CoinIntegrationTest
@@ -61,7 +62,7 @@ class WalletSurviveCantonRestartIntegrationTest
       aliceWalletBackend.start()
 
       Using.resource(startCanton(cantonArgs)) { _ =>
-        eventuallySucceeds() {
+        eventuallySucceeds(timeUntilSuccess = 40.seconds) {
           aliceWalletBackend.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
         }
@@ -75,7 +76,7 @@ class WalletSurviveCantonRestartIntegrationTest
       }
 
       Using.resource(startCanton(cantonArgs)) { _ =>
-        eventuallySucceeds() {
+        eventuallySucceeds(timeUntilSuccess = 40.seconds) {
           aliceWallet.tap(2)
         }
         aliceWallet.list()
