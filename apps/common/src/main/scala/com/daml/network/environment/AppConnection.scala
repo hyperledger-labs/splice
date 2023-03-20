@@ -18,51 +18,22 @@ import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.environment.CoinRetries
 
-/** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
-  */
-abstract class AppConnection(
-    config: ClientConfig,
+abstract class BaseAppConnection(
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContextExecutor)
-    extends FlagCloseableAsync
+) extends FlagCloseableAsync
     with NamedLogging {
-  private val channel = new CloseableChannel(
-    ClientChannelBuilder.createChannelToTrustedServer(config),
-    logger,
-    s"$serviceName connection",
-  )
-  checkVersionCompatibility()
 
-  private def checkVersionCompatibility() = {
-    val _ = for {
-      versionInfo <- getAppVersionInfo()(TraceContext.empty)
-    } yield {
-      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
-      val myVersion = BuildInfo.compiledVersion
-      if (versionInfo.version != myVersion) {
-        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
-        logger.error(
-          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
-        )(TraceContext.empty)
-      } else {
-        logger.debug(
-          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
-        )(
-          TraceContext.empty
-        )
-      }
-    }
-  }
+  protected def checkVersionCompatibility(): Future[Unit];
 
   def serviceName: String
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    SyncCloseable("channel", channel.close())
-  )
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq()
 
-  private def toFuture[T](e: Either[String, T]): Future[T] =
+  protected def toFuture[T](e: Either[String, T]): Future[T] =
     e.fold(
       err => Future.failed(new StatusRuntimeException(Status.INTERNAL.withDescription(err))),
       Future.successful,
@@ -82,11 +53,66 @@ abstract class AppConnection(
     for {
       response <- EitherTUtil.toFuture(command.submitRequest(client, headers).leftMap[Throwable] {
         case Left(throwable) => throwable
-        case Right(response) => new AppConnection.UnexpectedHttpResponse(response)
+        case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
       })
       result <- toFuture(command.handleResponse(response))
     } yield result
   }
+}
+
+object BaseAppConnection {
+  final class UnexpectedHttpResponse(response: HttpResponse)
+      extends Throwable(s"Unexpected Http Response: $response")
+}
+
+/** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
+  */
+abstract class AppConnection(
+    config: ClientConfig,
+    override val timeouts: ProcessingTimeout,
+    override val loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContextExecutor)
+    extends BaseAppConnection(timeouts, loggerFactory)
+    with FlagCloseableAsync
+    with NamedLogging {
+  private val channel = new CloseableChannel(
+    ClientChannelBuilder.createChannelToTrustedServer(config),
+    logger,
+    s"$serviceName connection",
+  )
+  runVersionCompatCheck()
+
+  private def runVersionCompatCheck() = {
+    val _ = for {
+      // TODO(#3597) -- add retries here
+      _ <- checkVersionCompatibility()
+    } yield {}
+  }
+
+  override def checkVersionCompatibility() = {
+    for {
+      versionInfo <- getAppVersionInfo()(TraceContext.empty)
+    } yield {
+      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
+      val myVersion = BuildInfo.compiledVersion
+      if (versionInfo.version != myVersion) {
+        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
+        logger.error(
+          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
+        )(TraceContext.empty)
+      } else {
+        logger.debug(
+          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
+        )(
+          TraceContext.empty
+        )
+      }
+    }
+  }
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
+    SyncCloseable("channel", channel.close())
+  )
 
   // This adapted from GrpcCtlRunner but keeps the actual grpc exception
   // instead of turning everything into a String.
@@ -117,7 +143,49 @@ abstract class AppConnection(
     runCmd(GrpcVersionClient.GetVersion())
 }
 
-object AppConnection {
-  final class UnexpectedHttpResponse(response: HttpResponse)
-      extends Throwable(s"Unexpected Http Response: $response")
+/** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
+  */
+abstract class HttpAppConnection(
+    config: CoinHttpClientConfig,
+    retryProvider: CoinRetries,
+    override val timeouts: ProcessingTimeout,
+    override val loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
+    templateDecoder: TemplateJsonDecoder,
+    httpClient: HttpRequest => Future[HttpResponse],
+) extends BaseAppConnection(timeouts, loggerFactory)
+    with FlagCloseableAsync
+    with NamedLogging {
+
+  private def getHttpAppVersionInfo(scanAddress: String): Future[HttpAdminAppClient.VersionInfo] = {
+    retryProvider.retryForAutomation(
+      "get version",
+      runHttpCmd(scanAddress, HttpAdminAppClient.GetVersion(), List()),
+      logger,
+    )
+  }
+
+  override def checkVersionCompatibility(): Future[Unit] = {
+    for {
+      versionInfo <- getHttpAppVersionInfo(config.url)
+    } yield {
+      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
+      val myVersion = BuildInfo.compiledVersion
+      if (versionInfo.version != myVersion) {
+        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
+        logger.error(
+          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
+        )(TraceContext.empty)
+      } else {
+        logger.debug(
+          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
+        )(
+          TraceContext.empty
+        )
+      }
+    }
+  }
 }

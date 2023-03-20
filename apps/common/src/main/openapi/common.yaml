@@ -15,6 +15,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/NodeStatus"
+  /version:
+    get:
+      tags: [common]
+      x-jvm-package: commonAdmin
+      operationId: "getVersion"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Version"
 components:
   schemas:
     ContractMetadata:
@@ -107,3 +119,12 @@ components:
           $ref: "#/components/schemas/NotInitialized"
         success:
           $ref: "#/components/schemas/Status"
+    Version:
+      type: object
+      required: ["version", "commit_ts"]
+      properties:
+        version:
+          type: string
+        commit_ts:
+          type: string
+          format: date-time

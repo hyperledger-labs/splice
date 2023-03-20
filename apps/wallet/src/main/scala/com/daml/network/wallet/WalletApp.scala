@@ -67,15 +67,14 @@ class WalletApp(
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {
     for {
-      scanConnection <- Future {
-        new ScanConnection(
-          ledgerClient,
-          config.remoteScan,
-          clock,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
-      }
+      scanConnection <- ScanConnection(
+        ledgerClient,
+        config.remoteScan,
+        clock,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      )
       validatorAuthToken <- AuthTokenSource.fromConfig(config.validatorAuth, loggerFactory).getToken
       validatorConnection <- Future {
         new ValidatorConnection(

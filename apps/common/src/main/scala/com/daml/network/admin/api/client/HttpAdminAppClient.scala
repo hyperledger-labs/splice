@@ -9,6 +9,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import cats.data.EitherT
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
+import java.time.OffsetDateTime
 
 object HttpAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -46,5 +47,23 @@ object HttpAdminAppClient {
         }
       }
     }
+  }
+
+  case class VersionInfo(version: String, commitTs: OffsetDateTime)
+
+  case class GetVersion() extends BaseCommand[http.GetVersionResponse, VersionInfo] {
+    override def submitRequest(
+        client: http.CommonAdminClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetVersionResponse] =
+      client.getVersion(headers)
+
+    override def handleResponse(
+        response: http.GetVersionResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, VersionInfo] =
+      response match {
+        case http.GetVersionResponse.OK(response) =>
+          Right(VersionInfo(response.version, response.commitTs))
+      }
   }
 }

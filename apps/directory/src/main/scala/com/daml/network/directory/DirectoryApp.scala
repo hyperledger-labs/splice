@@ -66,14 +66,13 @@ class DirectoryApp(
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
-      scanConnection <- Future.successful(
-        new ScanConnection(
-          ledgerClient,
-          config.remoteScan,
-          clock,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
+      scanConnection <- ScanConnection(
+        ledgerClient,
+        config.remoteScan,
+        clock,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
       )
       svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",

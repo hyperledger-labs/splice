@@ -5,7 +5,7 @@ import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
-import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.admin.api.client.BaseAppConnection
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
@@ -334,7 +334,7 @@ object CoinRetries {
         logger.info(msg)
         TransientErrorKind
       case Failure(
-            ex: AppConnection.UnexpectedHttpResponse
+            ex: BaseAppConnection.UnexpectedHttpResponse
           ) =>
         // TODO (tech-debt) Revisit whether we can provide more useful info here.
         val msg =

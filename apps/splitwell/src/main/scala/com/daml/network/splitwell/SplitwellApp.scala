@@ -65,11 +65,12 @@ class SplitwellApp(
     store <- Future.successful(
       SplitwellStore(party, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
     )
-    scanConnection =
-      new ScanConnection(
+    scanConnection <-
+      ScanConnection(
         ledgerClient,
         config.remoteScan,
         clock,
+        retryProvider,
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )

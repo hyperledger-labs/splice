@@ -3,7 +3,6 @@ package com.daml.network.scan.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -26,6 +25,8 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
+import com.daml.network.admin.api.client.HttpAppConnection
+import com.daml.network.environment.CoinRetries
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -34,13 +35,16 @@ final class ScanConnection(
     coinLedgerClient: CoinLedgerClient,
     config: ScanAppClientConfig,
     clock: Clock,
+    retryProvider: CoinRetries,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends AppConnection(config.adminApi.clientConfig, timeouts, loggerFactory) {
+) extends HttpAppConnection(config.adminApi, retryProvider, timeouts, loggerFactory) {
 
   // register the callback to potentially invalidate the CoinRules cache.
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
@@ -255,6 +259,27 @@ final class ScanConnection(
 }
 
 object ScanConnection {
+  def apply(
+      coinLedgerClient: CoinLedgerClient,
+      config: ScanAppClientConfig,
+      clock: Clock,
+      retryProvider: CoinRetries,
+      timeouts: ProcessingTimeout,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+  ): Future[ScanConnection] = {
+    val sc =
+      new ScanConnection(coinLedgerClient, config, clock, retryProvider, timeouts, loggerFactory)
+
+    for {
+      _ <- sc.checkVersionCompatibility()
+    } yield sc
+  }
 
   private case class CachedCoinRules(
       cacheValidUntil: CantonTimestamp,

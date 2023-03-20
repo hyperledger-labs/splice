@@ -7,6 +7,8 @@ tags:
 paths:
   /status:
     $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
   /api/v0/svc-party-id:
     get:
       tags: [scan]

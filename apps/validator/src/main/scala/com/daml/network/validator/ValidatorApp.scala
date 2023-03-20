@@ -70,20 +70,25 @@ class ValidatorApp(
 
   private def getSvcPartyId(ledgerClient: CoinLedgerClient): Future[PartyId] = {
     // Via scan
-    val scanConnection = new ScanConnection(
-      ledgerClient,
-      config.remoteScan,
-      clock,
-      coinAppParameters.processingTimeouts,
-      loggerFactory,
-    )
-    retryProvider
-      .retryForAutomation(
-        "getSvcPartyId",
-        scanConnection.getSvcPartyId(),
-        logger,
+    for {
+      scanConnection <- ScanConnection(
+        ledgerClient,
+        config.remoteScan,
+        clock,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
       )
-      .andThen(_ => scanConnection.close())
+
+      partyId <- retryProvider
+        .retryForAutomation(
+          "getSvcPartyId",
+          scanConnection.getSvcPartyId(),
+          logger,
+        )
+        .andThen(_ => scanConnection.close())
+
+    } yield partyId
   }
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {

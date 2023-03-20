@@ -8,6 +8,9 @@ import com.digitalasset.canton.health.admin.{data}
 
 import scala.concurrent.{ExecutionContext, Future}
 
+import com.daml.network.environment.BuildInfo
+import java.time.{OffsetDateTime, Instant, ZoneOffset}
+
 class HttpAdminHandler[S <: data.NodeStatus.Status](
     status: => Future[data.NodeStatus[S]],
     serialize: S => definitions.Status,
@@ -38,4 +41,21 @@ class HttpAdminHandler[S <: data.NodeStatus.Status](
       }
       .map(respond.OK(_))
   }
+
+  override def getVersion(
+      respond: v0.CommonAdminResource.GetVersionResponse.type
+  )(): Future[v0.CommonAdminResource.GetVersionResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      Future(
+        respond.OK(
+          definitions.Version(
+            version = BuildInfo.compiledVersion,
+            commitTs = OffsetDateTime.ofInstant(
+              Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong),
+              ZoneOffset.UTC,
+            ),
+          )
+        )
+      )
+    }
 }
