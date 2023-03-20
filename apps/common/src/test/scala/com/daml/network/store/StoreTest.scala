@@ -36,6 +36,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def appRewardCoupon(
       round: Int,
       provider: PartyId,
+      featured: Boolean = false,
   ): Contract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
     Contract(
       identifier = directoryCodegen.AppRewardCoupon.TEMPLATE_ID,
@@ -43,7 +44,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       payload = new directoryCodegen.AppRewardCoupon(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
-        false,
+        featured,
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),
