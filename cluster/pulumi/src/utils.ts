@@ -80,3 +80,25 @@ export function cnChartValues(
     overrideValues
   );
 }
+
+export function installCNHelmChart(
+  xns: ExactNamespace,
+  name: string,
+  chartName: string,
+  values: { [key: string]: any },
+  dependsOn: any = []
+): k8s.helm.v3.Release {
+  return new k8s.helm.v3.Release(
+    name,
+    {
+      name,
+      namespace: xns.ns.metadata.name,
+      chart: process.env.REPO_ROOT + "/cluster/helm/" + chartName + "/",
+      values: cnChartValues(chartName, values),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn,
+    }
+  );
+}

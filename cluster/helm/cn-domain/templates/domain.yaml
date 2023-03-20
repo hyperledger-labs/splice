@@ -2,85 +2,87 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: domain
-  name: domain
+    app: {{ .Values.domainServiceName }}
+  name: {{ .Values.domainServiceName }}
   namespace: {{ .Release.Namespace }}
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: domain
+      app: {{ .Values.domainServiceName }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: domain
+        app: {{ .Values.domainServiceName }}
     spec:
       containers:
-      - env:
+      - name: {{ .Values.domainServiceName }}
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
+        env:
         - name: JAVA_TOOL_OPTIONS
           value: -Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4
         - name: CANTON_DOMAIN_POSTGRES_SERVER
           value: {{ .Values.postgres }}
-        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
-        livenessProbe:
-          failureThreshold: 5
-          periodSeconds: 10
-          successThreshold: 1
-          tcpSocket:
-            port: swd-pub-api
-          timeoutSeconds: 1
-        name: domain
         ports:
         - containerPort: 5008
-          name: swd-pub-api
+          name: cd-pub-api
           protocol: TCP
         - containerPort: 5009
-          name: swd-adm-api
+          name: cd-adm-api
           protocol: TCP
         - containerPort: 10013
-          name: swd-metrics
+          name: cd-metrics
           protocol: TCP
-        readinessProbe:
-          failureThreshold: 3
-          periodSeconds: 10
-          successThreshold: 1
-          tcpSocket:
-            port: swd-pub-api
-          timeoutSeconds: 1
         resources:
           limits:
             memory: 4Gi
           requests:
             cpu: "1"
             memory: 4Gi
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cd-pub-api
+          timeoutSeconds: 1
         startupProbe:
           failureThreshold: 20
           periodSeconds: 10
           successThreshold: 1
           tcpSocket:
-            port: swd-pub-api
+            port: cd-pub-api
           timeoutSeconds: 1
+      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: domain
+  name: {{ .Values.domainServiceName }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: domain
+    app: {{ .Values.domainServiceName }}
   ports:
-  - name: swd-pub-api
+  - name: cd-pub-api
     port: 5008
     protocol: TCP
     targetPort: 5008
-  - name: swd-adm-api
+  - name: cd-adm-api
     port: 5009
     protocol: TCP
     targetPort: 5009
-  - name: swd-metrics
+  - name: cd-metrics
     port: 10013
     protocol: TCP
     targetPort: 10013

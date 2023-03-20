@@ -1,6 +1,7 @@
 charts := \
 	cn-cluster-ingress \
 	cn-docs \
+	cn-domain \
 	cn-postgres \
 	cn-splitwell \
 	cn-sv-node \
