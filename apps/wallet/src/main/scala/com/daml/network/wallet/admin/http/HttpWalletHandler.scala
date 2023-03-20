@@ -179,7 +179,7 @@ class HttpWalletHandler(
         v0.WalletResource.ListSubscriptionsResponseOK(
           d0.ListSubscriptionsResponse(
             (for {
-              (mainId, state) <- idleStates ++ payments
+              (mainId, state) <- (idleStates ++ payments).distinctBy(_._1)
               main <- mainMap.get(mainId)
             } yield {
               d0.Subscription(main, state)
