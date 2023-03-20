@@ -39,6 +39,14 @@ trait ScanStore
   ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]
 
   def getRoundOfLatestData()(implicit tc: TraceContext): Future[Long]
+
+  def verifyDataExistsForEndOfRound(
+      asOfEndOfRound: Long
+  )(implicit tc: TraceContext): Future[Unit]
+
+  def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]]
 }
 
 object ScanStore {

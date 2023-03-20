@@ -145,6 +145,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetRoundOfLatestData())
     }
 
+  @Help.Summary(
+    "Get a list of top-earning app providers, and the total earned app rewards for each"
+  )
+  def getTopProvidersByAppRewards(round: Long, limit: Int): Seq[(PartyId, BigDecimal)] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.getTopProvidersByAppRewards(round, limit))
+    }
+
   // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")

@@ -13,6 +13,9 @@ import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.TreeEvent
 import com.daml.network.util.ExerciseNode
+import com.digitalasset.canton.topology.PartyId
+import com.daml.network.util.Codec
+import io.grpc.Status
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -89,7 +92,7 @@ object ScanTxLogParser {
         offset: String,
         eventId: String,
         round: Long,
-        party: String,
+        party: PartyId,
         amount: BigDecimal,
     ) extends TxLogIndexRecord
 
@@ -97,7 +100,7 @@ object ScanTxLogParser {
         offset: String,
         eventId: String,
         round: Long,
-        party: String,
+        party: PartyId,
         amount: BigDecimal,
     ) extends TxLogIndexRecord
   }
@@ -148,7 +151,13 @@ object ScanTxLogParser {
     ): State = {
       val appRewards = node.result.value.summary.inputAppRewardAmount
       val validatorRewards = node.result.value.summary.inputValidatorRewardAmount
-      val party = node.argument.value.transfer.sender
+      val party = Codec
+        .decode(Codec.Party)(node.argument.value.transfer.sender)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(s"Cannot decode party ID ${node.argument.value.transfer.sender}")
+            .asRuntimeException()
+        )
       val round = node.result.value.round
 
       val appRewardEntry =

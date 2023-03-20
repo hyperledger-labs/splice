@@ -373,4 +373,32 @@ object HttpScanAppClient {
       }
 
   }
+
+  private def decodePartiesAndRewards(
+      response: definitions.GetTopProvidersByAppRewardsResponse
+  ): Either[String, Seq[(PartyId, BigDecimal)]] =
+    response.providersAndRewards.traverse(par =>
+      for {
+        p <- Codec.decode(Codec.Party)(par.provider)
+        r <- Codec.decode(Codec.BigDecimal)(par.rewards)
+      } yield (p, r)
+    )
+
+  case class getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)
+      extends BaseCommand[http.GetTopProvidersByAppRewardsResponse, Seq[(PartyId, BigDecimal)]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTopProvidersByAppRewardsResponse] =
+      client.getTopProvidersByAppRewards(asOfEndOfRound, limit, headers)
+
+    override def handleResponse(response: http.GetTopProvidersByAppRewardsResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Seq[(PartyId, BigDecimal)]] = response match {
+      case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
+        decodePartiesAndRewards(response)
+      case http.GetTopProvidersByAppRewardsResponse.NotFound(value) =>
+        Left(value.error)
+    }
+  }
 }

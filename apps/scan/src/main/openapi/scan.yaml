@@ -154,6 +154,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v0/top-providers-by-app-rewards:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopProvidersByAppRewards"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -272,6 +303,22 @@ components:
         round:
           type: integer
           format: int64
+    GetTopProvidersByAppRewardsResponse:
+      type: object
+      required: ["providersAndRewards"]
+      properties:
+        providersAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    PartyAndRewards:
+      type: object
+      required: ["provider", "rewards"]
+      properties:
+        provider:
+          type: string
+        rewards:
+          type: string
 
     ErrorResponse:
       type: object

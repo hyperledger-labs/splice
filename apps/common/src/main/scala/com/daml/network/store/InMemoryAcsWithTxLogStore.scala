@@ -354,6 +354,11 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
         )
     )
 
+  def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]] =
+    Future.successful(stateVar.txLog.filter(filter))
+
   override def close(): Unit = ()
 }
 

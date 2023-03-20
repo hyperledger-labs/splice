@@ -44,6 +44,14 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   def getTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[Seq[TXI]]
+
+  /** List all events that satisfy a given filter. Currently assumes the filter is selective enough for
+    * the returned list to not be too long, i.e. does not support limiting the size of the response or pagination.
+    * Note: This is a placeholder for fast iteration, that will probably need to be replaced with a more scalable API.
+    */
+  def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]]
 }
 
 object TxLogStore {

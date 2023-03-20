@@ -13,6 +13,10 @@ import scala.concurrent.*
 import com.daml.network.environment.CoinLedgerConnection
 import io.grpc.Status
 import com.digitalasset.canton.tracing.TraceContext
+import scala.collection.immutable.Map
+import cats.implicits.*
+import cats.kernel.Monoid
+import com.daml.network.store.TxLogStore
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
@@ -85,6 +89,68 @@ class InMemoryScanStore(
       round.round
     }
   }
+
+  override def verifyDataExistsForEndOfRound(
+      asOfEndOfRound: Long
+  )(implicit tc: TraceContext): Future[Unit] = {
+    if (asOfEndOfRound < 0) {
+      throw Status.OUT_OF_RANGE
+        .withDescription("Round numbers cannot be negative")
+        .asRuntimeException()
+    }
+    // TODO(#2930): For now, we support querying data for any round up to the latest closed one. This should
+    // be revisited once we add some backfilling (historical or ACS-based) in the scan bootstrap.
+    getRoundOfLatestData().flatMap(latestRound =>
+      if (asOfEndOfRound > latestRound) {
+        Future.failed(
+          Status.NOT_FOUND
+            .withDescription(s"Data for round ${asOfEndOfRound} not yet computed")
+            .asRuntimeException()
+        )
+      } else {
+        Future.successful(())
+      }
+    )
+  }
+
+  private def sumAppRewardsCollectedInRound(
+      log: TxLogStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
+      round: Long,
+  ): Future[Map[PartyId, BigDecimal]] =
+    for {
+      ret <- log
+        .getTxLogIndicesByFilter(_ match {
+          case reward: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord
+              if reward.round == round =>
+            true
+          case _ => false
+        })
+        .map(rewards =>
+          rewards.foldLeft(Map[PartyId, BigDecimal]())((m, reward) =>
+            reward match {
+              case r: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord =>
+                m |+| Map((r.party -> r.amount))
+              case _ =>
+                throw Status.INTERNAL
+                  .withDescription("Unexpected log entry type")
+                  .asRuntimeException()
+            }
+          )
+        )
+    } yield ret
+
+  override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]] =
+    for {
+      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
+      log <- defaultTxLog
+      // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
+      // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
+      perRound <- (0L to asOfEndOfRound).toList.traverse(sumAppRewardsCollectedInRound(log, _))
+    } yield {
+      Monoid.combineAll(perRound).toSeq.sortWith(_._2 > _._2).slice(0, limit)
+    }
 
   override def close(): Unit = {
     super.close()

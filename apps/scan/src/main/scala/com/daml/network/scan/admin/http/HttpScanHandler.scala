@@ -240,4 +240,33 @@ class HttpScanHandler(
         })
     }
 
+  def getTopProvidersByAppRewards(
+      response: v0.ScanResource.GetTopProvidersByAppRewardsResponse.type
+  )(
+      asOfEndOfRound: Long,
+      limit: Int,
+  ): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      store
+        .getTopProvidersByAppRewards(asOfEndOfRound, limit)
+        .map(res =>
+          v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
+            definitions
+              .GetTopProvidersByAppRewardsResponse(
+                res
+                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                  .toVector
+              )
+          )
+        )
+        .recover({
+          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse
+              .NotFound(
+                definitions
+                  .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")
+              )
+        })
+    }
+
 }
