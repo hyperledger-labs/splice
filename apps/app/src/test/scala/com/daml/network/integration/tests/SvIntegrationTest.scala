@@ -44,6 +44,25 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
     sv1.startSync()
   }
 
+  // A test to make debugging bootstrap problems easier
+  "SV apps can start one by one" in { implicit env =>
+    clue("Starting SVC app and SV1 app") {
+      // TODO(#2130) don't start SVC app here once we don't use it anymore for getting the svcParty
+      svc.start()
+      sv1.startSync()
+      svc.waitForInitialization()
+    }
+    clue("Starting SV2 app") {
+      sv2.startSync()
+    }
+    clue("Starting SV3 app") {
+      sv3.startSync()
+    }
+    clue("Starting SV4 app") {
+      sv4.startSync()
+    }
+  }
+
   "The SVC is bootstrapped correctly" in { implicit env =>
     initSvc()
     val svcRules = clue("An SvcRules contract exists") { getSvcRules() }
@@ -222,12 +241,25 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
       )
       getSvcRules().data.members should have size 3
     }
-    clue(
-      "Add a phantom SV and stop SV2 so that SV4 can't gather enough confirmations just yet"
-    ) {
-      addPhantomSv()
+    clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
+      inside(
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv3.getDebugInfo().svParty)
+      ) {
+        case Seq(approvedSvId) => {
+          sv3.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+            sv3.config.ledgerApiUser,
+            actAs = Seq(sv3.getDebugInfo().svParty),
+            readAs = Seq.empty,
+            update = approvedSvId.id.exerciseArchive(
+              new com.daml.network.codegen.java.da.internal.template.Archive()
+            ),
+          )
+        }
+      }
+    }
+    clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
       sv2.stop()
-      getSvcRules().data.members should have size 4
       // We now need 2 confirmations to execute an action, but only sv1 is
       // active and sv3 hasn't approved sv4.
     }

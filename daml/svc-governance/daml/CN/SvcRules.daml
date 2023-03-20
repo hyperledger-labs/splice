@@ -53,8 +53,8 @@ data ConsortiumSummary = ConsortiumSummary with
     leader : Party
     numMembers : Int
     requiredNumConfirmations : Int
-    -- | The number of confirmations required for an off-ledger choice. Should be
-    -- set to maxNumFaultySVs + 1.
+    -- | The number of confirmations required for an off-ledger choice. We
+    -- currently recommend setting this to requiredNumVotes.
     requiredNumVotes : Int
     -- | The number of votes required for electing an automation leader. Given
     -- the assumption that any leader prioritized by an honest SV is a good leader,
@@ -430,7 +430,7 @@ summarizeConsortium : SvcRules -> ConsortiumSummary
 summarizeConsortium c = ConsortiumSummary with
     leader = c.leader
     numMembers
-    requiredNumConfirmations = (numMembers - 1) / 3 + 1
+    requiredNumConfirmations = 2 * (numMembers - 1) / 3 + 1
     requiredNumVotes = 2 * (numMembers - 1) / 3 + 1
   where
     numMembers = Map.size c.members

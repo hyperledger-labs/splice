@@ -13,6 +13,7 @@ import com.daml.network.sv.SvApp
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -61,10 +62,11 @@ class SvOnboardingTrigger(
       )
       .flatMap {
         case Left(reason) => {
-          Future.successful(
-            TaskSuccess(
-              s"skipping because could not match with an approved SV identity; reason: $reason"
-            )
+          // we fail so that the task is retried; it's possible that an approval happens eventually
+          Future.failed(
+            Status.NOT_FOUND
+              .withDescription(s"Could not match with an approved SV identity; reason: $reason")
+              .asRuntimeException()
           )
         }
         case Right(party) => {

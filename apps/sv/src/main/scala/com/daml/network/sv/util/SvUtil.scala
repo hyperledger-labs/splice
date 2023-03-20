@@ -80,6 +80,6 @@ object SvUtil {
   def requiredNumConfirmations(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
     val memberNum = svcRules.payload.members.size
     // as per `SvcRules` / `summarizeConsortium`
-    (memberNum - 1) / 3 + 1
+    2 * (memberNum - 1) / 3 + 1
   }
 }

@@ -67,7 +67,7 @@ testLeaderElection = do
 
   -- add a new SV member
   sv4 <- allocateParty "sv4"
-  forA_ [sv2, sv3] $ \sv ->
+  forA_ [sv1, sv2, sv3] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
@@ -79,7 +79,7 @@ testLeaderElection = do
 
   -- kick out mallory, now that we have enough members to then still tolerate a failure
   [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ [sv2, sv3] $ \sv ->
+  forA_ [sv2, sv3, sv4] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
@@ -145,7 +145,7 @@ testOnboardValidator = do
 
 testSvOnboarding : Script ()
 testSvOnboarding = do
-  (app, svc, (_, sv2, sv3, _)) <- initConsortium
+  (app, svc, (_, sv2, sv3, sv4)) <- initConsortium
   -- we now have a consortium with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -168,9 +168,9 @@ testSvOnboarding = do
     svc
     expiresAt = svOnboarding.expiresAt
 
-  -- svX collects two confirmations which is enough to onboard him (2 = f + 1)
+  -- svX collects three confirmations which is enough to onboard him
   [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ [sv2, sv3] $ \sv ->
+  forA_ [sv2, sv3, sv4] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with

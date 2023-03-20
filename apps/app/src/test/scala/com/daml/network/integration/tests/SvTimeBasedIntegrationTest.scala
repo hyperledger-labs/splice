@@ -721,13 +721,12 @@ class SvTimeBasedIntegrationTest
       getSvcRules().data.members should have size 3
     }
     clue(
-      "Add a phantom SV and stop SV2 so that SV4 can't gather enough confirmations just yet"
+      "Add a phantom SV and stop SV3 so that SV4 can't gather enough confirmations just yet"
     ) {
       addPhantomSv()
-      sv2.stop()
+      sv3.stop()
       getSvcRules().data.members should have size 4
-      // We now need 2 confirmations to execute an action, but only sv1 is
-      // active and sv3 hasn't approved sv4.
+      // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
     }
     clue("SV4 starts") {
       sv4.start()
