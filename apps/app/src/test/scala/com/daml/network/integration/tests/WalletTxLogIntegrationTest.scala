@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -229,10 +230,13 @@ class WalletTxLogIntegrationTest
       val coinPrice = scan.getLatestOpenMiningRound(env.environment.clock.now).payload.coinPrice
       assert(coinPrice.compareTo(BigDecimal(1.0)) != 0, "Test is more useful if CC != USD")
 
-      val transferAmountCC = 22.0
-      val transferAmountUSD = 20.0
-      val transferAmountUSDinCC = transferAmountUSD / coinPrice.doubleValue()
-      val transferAmountTotalCC = transferAmountCC + transferAmountUSDinCC
+      // Based on Numeric to make sure divisions match Decimal computation in Daml.
+      val transferAmountCC = Numeric.assertFromBigDecimal(scale, 22.0)
+      val transferAmountUSD = Numeric.assertFromBigDecimal(scale, 20.0)
+      val transferAmountUSDinCC = Numeric
+        .divide(scale, transferAmountUSD, Numeric.assertFromBigDecimal(scale, coinPrice))
+        .value
+      val transferAmountTotalCC = transferAmountCC.add(transferAmountUSDinCC)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(100.0)
@@ -286,7 +290,10 @@ class WalletTxLogIntegrationTest
             // leading to a net loss because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(transferAmountTotalCC, transferAmountTotalCC + smallAmount)
+              amount should beWithin(
+                BigDecimal(transferAmountTotalCC),
+                BigDecimal(transferAmountTotalCC) + smallAmount,
+              )
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -296,21 +303,24 @@ class WalletTxLogIntegrationTest
             // TODO(#3486) - this and the next entry should be merged
             logEntry.amount should beWithin(
               transferAmountTotalCC,
-              transferAmountTotalCC + smallAmount,
+              BigDecimal(transferAmountTotalCC) + smallAmount,
             )
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Second part of collecting the payment: Transferring the coin to the receivers
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(transferAmountTotalCC, transferAmountTotalCC + smallAmount)
+              amount should beWithin(
+                transferAmountTotalCC,
+                BigDecimal(transferAmountTotalCC) + smallAmount,
+              )
             }
             inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
               receiver1 shouldBe charlieUserParty.toProtoPrimitive
-              amount1 should beWithin(transferAmountCC - smallAmount, transferAmountCC)
+              amount1 should beWithin(BigDecimal(transferAmountCC) - smallAmount, transferAmountCC)
 
               receiver2 shouldBe aliceValidatorUserParty.toProtoPrimitive
-              amount2 should beWithin(transferAmountUSDinCC - smallAmount, transferAmountUSDinCC)
+              amount2 shouldBe BigDecimal(transferAmountUSDinCC)
             }
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
@@ -364,7 +374,7 @@ class WalletTxLogIntegrationTest
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
             receiver shouldBe bobUserParty.toProtoPrimitive
-            amount should beWithin(transferAmount - smallAmount, transferAmount)
+            amount shouldBe transferAmount
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -471,10 +481,10 @@ class WalletTxLogIntegrationTest
 
           inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
             receiver1 shouldBe bobUserParty.toProtoPrimitive
-            amount1 should beWithin(20 - smallAmount, 20)
+            amount1 shouldBe 20
 
             receiver2 shouldBe charlieUserParty.toProtoPrimitive
-            amount2 should beWithin(30 - smallAmount, 30)
+            amount2 shouldBe 30
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -612,7 +622,7 @@ class WalletTxLogIntegrationTest
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
             receiver shouldBe charlieUserParty.toProtoPrimitive
-            amount should beWithin(subscriptionPrice - smallAmount, subscriptionPrice)
+            amount shouldBe subscriptionPrice
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -718,7 +728,7 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice's balance reflects the returned locked coin",
-        _ => aliceWallet.balance().unlockedQty should be > BigDecimal(100 - smallAmount),
+        _ => aliceWallet.balance().unlockedQty should be > (BigDecimal(100) - smallAmount),
       )
 
       checkTxHistory(
@@ -759,7 +769,7 @@ class WalletTxLogIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
 
-      val subscriptionPrice = 42.0
+      val subscriptionPrice = BigDecimal(42.0)
 
       clue("Alice taps some coins") {
         aliceWallet.tap(100.0)
@@ -831,9 +841,9 @@ class WalletTxLogIntegrationTest
       )(
         "Alice's balance reflects the returned locked coin",
         _ =>
-          aliceWallet.balance().unlockedQty should be > BigDecimal(
-            100 - subscriptionPrice - smallAmount
-          ),
+          aliceWallet.balance().unlockedQty should be > (BigDecimal(
+            100
+          ) - subscriptionPrice - smallAmount),
       )
 
       // All parties see the same representation of the transfer
@@ -848,7 +858,7 @@ class WalletTxLogIntegrationTest
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
             receiver shouldBe charlieUserParty.toProtoPrimitive
-            amount should beWithin(subscriptionPrice - smallAmount, subscriptionPrice)
+            amount shouldBe subscriptionPrice
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)

@@ -398,8 +398,8 @@ object UserWalletTxLogParser {
           output = out,
           // TODO(#2843) Add detailed tests for the correctness of these fee computations, in particular, that we don't
           // need to force a scale here.
-          senderFee = BigDecimal(fee) * out.receiverFeeRatio,
-          receiverFee = BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio),
+          senderFee = BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio),
+          receiverFee = BigDecimal(fee) * out.receiverFeeRatio,
         )
       }
   }

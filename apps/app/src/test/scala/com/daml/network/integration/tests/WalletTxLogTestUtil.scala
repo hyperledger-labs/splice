@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.lf.data.Numeric
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.CoinTests.CoinTestCommon
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
@@ -9,13 +10,15 @@ import org.scalatest.Assertion
 trait WalletTxLogTestUtil extends CoinTestCommon with WalletTestUtil with TimeTestUtil {
 
   // Amount paid by `createSelfPaymentRequest()`
-  val selfPaymentAmount = 10.0
+  val selfPaymentAmount: BigDecimal = BigDecimal(10.0)
 
   // Upper bound for fees in any of the above transfers
-  val smallAmount = 1.0
+  val smallAmount: BigDecimal = BigDecimal(1.0)
 
-  def beWithin(lower: Double, upper: Double) =
-    be >= BigDecimal(lower) and be <= BigDecimal(upper)
+  val scale = Numeric.Scale.assertFromInt(10)
+
+  def beWithin(lower: BigDecimal, upper: BigDecimal) =
+    be >= lower and be <= upper
 
   type CheckTxHistoryFn = PartialFunction[UserWalletTxLogParser.TxLogEntry, Assertion]
 
