@@ -74,7 +74,7 @@ function start_frontend() {
 function start_json_api() {
   local ledger_api_port=$1
   local extra_args=$2
-  local log_file="${LOG_DIR}/participant-json-api.log"
+  local log_file="${LOG_DIR}/participant-json-api.clog" # TODO(#3600)
   local conf="--log-encoder json --log-level DEBUG --ledger-host localhost --ledger-port $ledger_api_port --address 0.0.0.0 --http-port 7575 $extra_args";
 
   tmux_cmd "json-api" "alice" ":"
@@ -166,7 +166,7 @@ function start_preflight_frontends() {
   # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
   start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
   start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
-  start_json_api ${PREFLIGHT_JSON_LEDGER_API_PORT} ""
+  start_json_api ${PREFLIGHT_JSON_LEDGER_API_PORT} "--allow-insecure-tokens"
 }
 
 if [ $use_preflight_frontends -eq 0 ]; then
