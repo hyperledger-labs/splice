@@ -97,15 +97,16 @@ class WalletNewTransfersFrontendIntegrationTest
       createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
 
       // transfer from bob to alice
-      bobWallet.createTransferOffer(
-        aliceUserParty,
-        transferAmount,
-        "Bob transferring to Alice",
-        transferExpiry,
-        UUID.randomUUID().toString,
-      )
-
-      aliceWallet.listTransferOffers().size shouldBe 1
+      actAndCheck(
+        "bob creates transfer offer",
+        bobWallet.createTransferOffer(
+          aliceUserParty,
+          transferAmount,
+          "Bob transferring to Alice",
+          transferExpiry,
+          UUID.randomUUID().toString,
+        ),
+      )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
@@ -148,15 +149,16 @@ class WalletNewTransfersFrontendIntegrationTest
       createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
 
       // transfer from bob to alice
-      bobWallet.createTransferOffer(
-        aliceUserParty,
-        transferAmount,
-        "Bob transferring to Alice",
-        transferExpiry,
-        UUID.randomUUID().toString,
-      )
-
-      aliceWallet.listTransferOffers().size shouldBe 1
+      actAndCheck(
+        " bob creates transfer offer",
+        bobWallet.createTransferOffer(
+          aliceUserParty,
+          transferAmount,
+          "Bob transferring to Alice",
+          transferExpiry,
+          UUID.randomUUID().toString,
+        ),
+      )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
