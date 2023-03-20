@@ -52,8 +52,8 @@ const Coins: React.FC = () => {
     setBalance(balance);
   }, [getBalance, setBalance]);
 
-  useInterval(fetchCoins, 500);
-  useInterval(fetchBalance, 500);
+  useInterval(fetchCoins);
+  useInterval(fetchBalance);
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);

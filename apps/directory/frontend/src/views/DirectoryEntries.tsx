@@ -17,7 +17,7 @@ const DirectoryEntries: React.FC<{ primaryParty: string; provider: string }> = (
     const current = await ledgerApiClient.queryOwnedDirectoryEntries(primaryParty, provider);
     setDirectoryEntries(prev => (sameContracts(prev, current) ? prev : current));
   }, [ledgerApiClient, primaryParty, provider]);
-  useInterval(fetchDirectoryEntries, 500);
+  useInterval(fetchDirectoryEntries);
 
   return (
     <div>

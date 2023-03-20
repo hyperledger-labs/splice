@@ -54,8 +54,7 @@ export const TransferOffers: React.FC = () => {
     }
   }, [coinPrice, listTransferOffers, toWalletTransferOffer]);
 
-  // TODO(#3434) remove magic interval
-  useInterval(fetchTransferOffers, 500);
+  useInterval(fetchTransferOffers);
 
   if (!coinPrice) {
     return <Loading />;

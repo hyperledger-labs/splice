@@ -50,7 +50,7 @@ const Subscriptions: React.FC = () => {
     );
   }, [listSubscriptions]);
 
-  useInterval(fetchSubscriptions, 500);
+  useInterval(fetchSubscriptions);
 
   const coinPrice = useCoinPrice();
 

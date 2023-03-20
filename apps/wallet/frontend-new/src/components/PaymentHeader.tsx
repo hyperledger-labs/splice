@@ -25,7 +25,7 @@ const PaymentHeader: React.FC = () => {
     setWalletBalance(balance);
   }, [walletClient]);
 
-  useInterval(fetchBalance, 1000);
+  useInterval(fetchBalance);
 
   if (!coinPrice) {
     return <Loading />;

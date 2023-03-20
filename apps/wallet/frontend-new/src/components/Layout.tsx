@@ -32,7 +32,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   }, [walletClient]);
 
   // refresh data every second
-  useInterval(fetchBalance, 1000);
+  useInterval(fetchBalance);
 
   if (!coinPrice) {
     return <Loading />;

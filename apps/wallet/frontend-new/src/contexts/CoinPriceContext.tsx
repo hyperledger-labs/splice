@@ -15,7 +15,7 @@ export const CoinPriceProvider: React.FC<React.PropsWithChildren> = ({ children 
     setCoinPrice(coinPrice);
   }, [getCoinPrice]);
 
-  useInterval(fetchCoinPrice, 2000); // TODO (#3434): factor out
+  useInterval(fetchCoinPrice);
 
   return <CoinPriceContext.Provider value={coinPrice}>{children}</CoinPriceContext.Provider>;
 };

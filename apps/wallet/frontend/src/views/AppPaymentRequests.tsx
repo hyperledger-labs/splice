@@ -27,7 +27,7 @@ const AppPaymentRequests: React.FC<AppPaymentRequestsProps> = ({ coinPrice }) =>
     };
     setAppPaymentRequests(prev => (sameContracts(filteredReqs(), prev) ? prev : filteredReqs()));
   }, [listAppPaymentRequests, setAppPaymentRequests, cid]);
-  useInterval(fetchAppPaymentRequests, 500);
+  useInterval(fetchAppPaymentRequests);
 
   return (
     <Stack spacing={2}>

@@ -104,7 +104,7 @@ const Content = () => {
     setCoinPrice(prevCoinPrice => (prevCoinPrice?.equals(coinPrice) ? prevCoinPrice : coinPrice));
   }, [scanClient]);
 
-  useInterval(fetchCoinPrice, 2000);
+  useInterval(fetchCoinPrice);
 
   const routes = createBrowserRouter(
     createRoutesFromElements(

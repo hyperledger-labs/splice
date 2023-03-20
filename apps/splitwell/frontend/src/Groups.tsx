@@ -95,7 +95,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId })
     });
     setBalances(prev => (balanceEqual(prev, balances) ? prev : balances));
   }, [splitwellClient, setBalances, group, party]);
-  useInterval(fetchBalances, 500);
+  useInterval(fetchBalances);
 
   const initiateSettleDebts = async () => {
     const amounts: ReceiverCCAmount[] = Array.from(balances)
@@ -176,7 +176,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
     const decoded = invites.map(c => Contract.decode(c, AcceptedGroupInvite));
     setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
   }, [group.payload.id.unpack, party, splitwellClient]);
-  useInterval(fetchAcceptedInvites, 500);
+  useInterval(fetchAcceptedInvites);
 
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
     await ledgerApiClient.joinGroup(party, provider, group.contractId, invite.contractId, domainId);
@@ -314,7 +314,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
     const decoded = balanceUpdates.reverse().map(c => Contract.decode(c, BalanceUpdate));
     setBalanceUpdates(prev => (sameContracts(decoded, prev) ? prev : decoded));
   }, [splitwellClient, group, party]);
-  useInterval(fetchBalanceUpdates, 500);
+  useInterval(fetchBalanceUpdates);
 
   const Update: React.FC<{ update: Contract<BalanceUpdate> }> = ({ update }) => {
     if (update.payload.update.tag === 'ExternalPayment') {
@@ -426,7 +426,7 @@ const Groups: React.FC<GroupsProps> = ({ party, provider, domainId }) => {
     setGroups(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [splitwellClient, party]);
 
-  useInterval(fetchGroups, 500);
+  useInterval(fetchGroups);
 
   return (
     <Stack spacing={2}>

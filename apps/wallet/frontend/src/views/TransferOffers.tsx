@@ -60,7 +60,7 @@ const TransferOffers: React.FC = () => {
     setOffers(offersList);
   }, [listTransferOffers, setOffers]);
 
-  useInterval(fetchTransferOffers, 500);
+  useInterval(fetchTransferOffers);
 
   const [acceptedOffers, setAcceptedOffers] = useState<Contract<AcceptedTransferOffer>[]>([]);
   const fetchAcceptedTransferOffers = useCallback(async () => {
@@ -68,7 +68,7 @@ const TransferOffers: React.FC = () => {
     setAcceptedOffers(acceptedOffersList);
   }, [listAcceptedTransferOffers, setAcceptedOffers]);
 
-  useInterval(fetchAcceptedTransferOffers, 500);
+  useInterval(fetchAcceptedTransferOffers);
 
   const [receiver, setReceiver] = useState<string>('');
   const [transferAmount, setTransferAmount] = useState<Decimal>(new Decimal(0.0));

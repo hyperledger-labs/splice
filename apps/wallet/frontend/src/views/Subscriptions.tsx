@@ -47,7 +47,7 @@ const Subscriptions: React.FC = () => {
     setSubscriptionRequests(prev => (sameContracts(filteredReqs(), prev) ? prev : filteredReqs()));
   }, [listSubscriptionRequests, setSubscriptionRequests]);
 
-  useInterval(fetchSubscriptionRequests, 500);
+  useInterval(fetchSubscriptionRequests);
 
   return (
     <Stack spacing={2}>
@@ -70,7 +70,7 @@ const SubscriptionsTable: React.FC = () => {
     );
   }, [listSubscriptions, setSubscriptionTuples]);
 
-  useInterval(fetchSubscriptions, 500);
+  useInterval(fetchSubscriptions);
 
   const onCancel = async (state: SubscriptionState) => {
     if (state.type !== 'idle') {

@@ -41,7 +41,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
     setGroupInvites(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [splitwellClient, party]);
 
-  useInterval(fetchInvites, 500);
+  useInterval(fetchInvites);
 
   const onJoinGroup = async () => {
     const inviteContract = Contract.decodeOpenAPI(JSON.parse(groupInvite), GroupInvite);
