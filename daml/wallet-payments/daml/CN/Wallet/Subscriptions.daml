@@ -302,17 +302,16 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentAmount; .. } = payData
 
-  
+
   contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
-  require ("Round is set to expire in the future (now=" <> show now <> ", targetClosesAt=" <> show contextRound.targetClosesAt <> ")") (now < contextRound.targetClosesAt)
 
   targetAmount <- paymentAmountToCC svc subscriptionData.sender contextRound paymentAmount
 
   outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
   let lockAmount = targetAmount + sum outputFees
-  -- We know that the contextRound (=latest Round) won't be archived before 
-  -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger. 
-  let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt 
+  -- We know that the contextRound (=latest Round) won't be archived before
+  -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
+  let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
 
 
   let transfer = Transfer with

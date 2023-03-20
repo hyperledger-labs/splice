@@ -90,7 +90,6 @@ template AppPaymentRequest
          void $ fetch deliveryOffer
 
          contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
-         require ("Round is set to expire in the future (now=" <> show now <> ", targetClosesAt=" <> show contextRound.targetClosesAt <> ")") (now < contextRound.targetClosesAt)
 
          -- Convert from USD to CC amounts
          ccReceiverAmounts <- forA receiverAmounts $ \rq ->
@@ -99,9 +98,9 @@ template AppPaymentRequest
 
          outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
 
-         -- We know that the contextRound (=latest Round) won't be archived before 
-         -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger. 
-         let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt 
+         -- We know that the contextRound (=latest Round) won't be archived before
+         -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
+         let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
 
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
