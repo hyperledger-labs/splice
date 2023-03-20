@@ -29,6 +29,7 @@ export const TransferOffers: React.FC = () => {
     ): Promise<WalletTransferOffer[]> => {
       return offerList.map(offer => {
         return {
+          contractId: offer.contractId,
           ccAmount: offer.payload.amount.amount,
           usdAmount: coinPrice ? coinPrice.times(offer.payload.amount.amount).toString() : '...',
           conversionRate: coinPrice ? coinPrice?.toString() : '...',
@@ -63,7 +64,8 @@ export const TransferOffers: React.FC = () => {
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
-        Action needed <Chip label={offers.length} color="success" />
+        Action needed{' '}
+        <Chip label={offers.length} color="success" className="transfer-offers-count" />
       </Typography>
       {offers.map((offer, index) => (
         <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} />
@@ -78,6 +80,8 @@ interface TransferOfferProps {
 
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const offer = props.transferOffer;
+  const { acceptTransferOffer, rejectTransferOffer } = useWalletClient();
+
   return (
     <Card className="transfer-offer" variant="outlined">
       <CardContent
@@ -109,10 +113,21 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Button variant="pill" size="small">
+          <Button
+            variant="pill"
+            size="small"
+            onClick={() => acceptTransferOffer(offer.contractId)}
+            className="transfer-offer-accept"
+          >
             Accept
           </Button>
-          <Button variant="pill" color="warning" size="small">
+          <Button
+            variant="pill"
+            color="warning"
+            size="small"
+            onClick={() => rejectTransferOffer(offer.contractId)}
+            className="transfer-offer-reject"
+          >
             Reject
           </Button>
         </Stack>

@@ -13,6 +13,7 @@ import {
   SubscriptionPayment,
   SubscriptionRequest,
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { ContractId } from '@daml/types';
 
 import { ConvertedCurrency } from '../utils/currencyConversion';
 
@@ -31,6 +32,7 @@ export interface Transaction {
 }
 
 export interface WalletTransferOffer {
+  contractId: ContractId<TransferOffer>;
   ccAmount: string;
   usdAmount: string;
   conversionRate: string;

@@ -3,6 +3,7 @@ package com.daml.network.util
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.cn.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
@@ -327,9 +328,10 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       directory: RemoteDirectoryAppReference,
       dirEntry: String,
       wallet: WalletAppClientReference,
-  ) = {
+      tapAmount: BigDecimal = 5.0,
+  ): SubscriptionInitialPayment.ContractId = {
     requestDirectoryEntry(userParty, directory, dirEntry)
-    wallet.tap(5.0)
+    wallet.tap(tapAmount)
     eventually() {
       wallet.listSubscriptionRequests() should have length 1
     }
