@@ -1,0 +1,14 @@
+# Extra patterns to ignore when using Canton with simtime
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+# This works around issues in simtime where in-flight requests
+# end up timing out when we concurrently advance time.
+The sequencer time.*has exceeded the max-sequencing-time of the send request
+Submission timed out at
+Rejected transaction due to a participant determined timeout
+Response message for request.*timed out at
+Sequencing result message timed out
+Late processing.*of batch
+The payload to event time bound.*has been been exceeded by payload time
+
+# Make sure to have a trailing newline

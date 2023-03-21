@@ -6,17 +6,21 @@
 # way is an understatement.
 ###############################################################################
 
-set -eo pipefail
+set -eou pipefail
 
 LOGFILE="$1"
-FILE_WITH_IGNORE_PATTERNS="$2"
+shift
+FILES_WITH_IGNORE_PATTERNS=("$@")
 
 # Succeed if logfile does not exist
 if [[ ! -f "$LOGFILE" ]]
 then
   echo "$LOGFILE does not exist."
   echo "Skipping log file check."
+  echo ""
   exit 0
+else
+  echo "Checking $LOGFILE while ignoring: ${FILES_WITH_IGNORE_PATTERNS[*]}"
 fi
 
 # Get the full path to the .circleci directory
@@ -26,7 +30,7 @@ SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 source "$SRCDIR"/io-utils.sh
 
 # Load ignore patterns for later use
-IGNORE_PATTERNS=$(remove_comment_and_blank_lines < "$FILE_WITH_IGNORE_PATTERNS")
+IGNORE_PATTERNS="$(cat ${FILES_WITH_IGNORE_PATTERNS[*]} | remove_comment_and_blank_lines)"
 
 # Keywords are based on `canton-json.lnav.json`
 MIN_LOG_LEVEL_WARNING="\"level\":\"WARN\"|\"level\":\"ERROR\""
@@ -91,3 +95,6 @@ find_secrets() {
 find_secrets |
   # Output unmasked secrets, failing if there are some
   output_problems "unmasked secrets" "$LOGFILE"
+
+# Give the next command some space
+echo ""

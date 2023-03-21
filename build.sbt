@@ -703,20 +703,45 @@ cleanCnDars := {
   runCommand(Seq("find", "daml", "-name", "*.dar", "-delete"), log)
 }
 
-lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")
+lazy val checkErrors = taskKey[Unit](
+  "Check test log and canton logs for errors and fail if there is one (works best if Canton is no longer running)"
+)
 checkErrors := {
   import scala.sys.process._
-  Seq("canton_network_test", "canton", "canton-simtime", "canton-standalone").foreach { log =>
-    val res =
+
+  def ignorePatternsFilename(patternsName: String): String =
+    s"project/ignore-patterns/$patternsName.ignore.txt"
+
+  def checkLogs(logFileName: String, ignorePatterns: Seq[String]): Unit = {
+    val ignorePatternsFilenames = ignorePatterns.map(ignorePatternsFilename)
+    val cmd =
       Seq(
         ".circleci/canton-scripts/check-logs.sh",
-        s"log/${log}.clog",
-        s"project/errors-in-${log}-log-to-ignore.txt",
-      ).!
-    if (res != 0) {
-      sys.error(s"$log contains problems.")
-    }
+        logFileName,
+      ) ++ ignorePatternsFilenames
+    cmd.!
   }
+
+  def splitAndCheckCantonLogFile(logName: String, usesSimtime: Boolean): Unit = {
+    val logFile = s"log/${logName}.clog"
+    val logFileBefore = s"log/${logName}_before_shutdown.clog"
+    val logFileAfter = s"log/${logName}_after_shutdown.clog"
+
+    // Note that this will split the given file and then delete it, so it is idempotent.
+    Seq(".circleci/canton-scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
+
+    val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
+    val beforeIgnorePatterns = Seq("canton_log") ++ simtimeIgnorePatterns
+    val afterIgnorePatterns = beforeIgnorePatterns ++ Seq("canton_log_shutdown_extra")
+
+    checkLogs(logFileBefore, beforeIgnorePatterns)
+    checkLogs(logFileAfter, afterIgnorePatterns)
+  }
+
+  splitAndCheckCantonLogFile("canton", usesSimtime = false)
+  splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
+  splitAndCheckCantonLogFile("canton-standalone", usesSimtime = false)
+  checkLogs("log/canton_network_test.clog", Seq("canton_network_test_log"))
 }
 
 lazy val `apps-app` =

@@ -1,4 +1,4 @@
-# Patterns of entries to be ignored when checking the canton log file (sbt checkErrors).
+# Patterns of entries to be ignored when checking the canton_network_test log file (sbt checkErrors).
 # As the Canton log appenders emit errors/warnings to stdout, the patterns listed here will also be applied when checking the sbt output.
 # Patterns must be both
 # - PCRE regular expressions (see https://regex101.com) and
@@ -14,15 +14,6 @@ LogReporter - Aborted test suite
 # This may sometimes lead to subsequent errors (e.g. api server fails to startup), but quite often it can simply be ignored.
 Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
 In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
-
-# Sometimes pops up in the Canton logs. This can happen
-# if the command submission tracker at some point times out but that’s perfectly fine.
-c.d.l.c.s.c.CommandTrackerFlow$ - Completion Stream failed with an error.
-
-# grpc "Half-closed without a request" grpc shutdown flake - might be when client hangs up before server response? https://github.com/grpc/grpc-java/issues/4890
-# reported by daml-repo ErrorInterceptor/ErrorListener added with daml 2.0.0-snapshot.20211220
-# Can probably be removed once https://github.com/digital-asset/daml/issues/13413 is fixed.
-INTERNAL: Half-closed without a request
 
 # Ignore generic http 400/500 response errors as they are often benign.
 # TODO (#1734): consider implementing a more fine-granular ignore
@@ -47,12 +38,6 @@ ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when
 
 # TODO(#2831) remove once the UI can better handle network disconnects/errors on its own
 .*ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted.*
-
-# TODO(#2375) Remove this once we can ignore those
-# shutdown issues more granularly.
-WARN  c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
-ledger subscription for admin service .* has completed with error
-io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
-ERROR.*INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
+.*ErrorBoundary caught an unhandled promise rejection AbortError: Aborted.*
 
 # Make sure to have a trailing newline
