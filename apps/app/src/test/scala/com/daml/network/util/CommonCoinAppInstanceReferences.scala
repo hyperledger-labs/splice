@@ -90,6 +90,11 @@ trait CommonCoinAppInstanceReferences {
     "bobWallet"
   )
 
+  // Note: this uses `wc` instead of `uwc` because we don't suffix the user names of SVs.
+  def sv1Wallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+    "sv1Wallet"
+  )
+
   def bobValidatorWallet(implicit
       env: CoinTestConsoleEnvironment
   ): WalletAppClientReference = wc(
@@ -102,6 +107,10 @@ trait CommonCoinAppInstanceReferences {
 
   def bobValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "bobValidator"
+  )
+
+  def sv1Validator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
+    "sv1Validator"
   )
 
   def splitwellValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =

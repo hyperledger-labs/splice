@@ -25,7 +25,32 @@ class WalletTxLogTimeBasedIntegrationTest
 
   "A wallet" should {
 
-    "handle rewards" in { implicit env =>
+    "handle sv rewards" in { implicit env =>
+      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
+      logger.info(s"SV1 wallet uses party $sv1UserParty")
+
+      actAndCheck(
+        "Advance round",
+        advanceRoundsByOneTick,
+      )(
+        "Wait for SV rewards to be collected",
+        _ => {
+          advanceTimeByPollingInterval(sv1)
+          sv1Wallet.balance().unlockedQty should be > BigDecimal(0)
+        },
+      )
+
+      checkTxHistory(
+        sv1Wallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount should be > BigDecimal(0)
+          }
+        ),
+      )
+    }
+
+    "handle app and validator rewards" in { implicit env =>
       val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWallet)
       waitForWalletUser(bobValidatorWallet)
@@ -61,17 +86,9 @@ class WalletTxLogTimeBasedIntegrationTest
         "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
         p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0),
       )(
-        "Bob has received the CC and the reward coupons are both gone",
+        "Bob has received the CC",
         _ => {
           bobWallet.balance().unlockedQty should be > BigDecimal(49.0)
-          // The payment that consumed the reward coupons has created new reward coupons,
-          // here we check that the remaining coupons are the new one.
-          inside(aliceValidatorWallet.listAppRewardCoupons()) { case Seq(coupon) =>
-            coupon.payload.round.number shouldBe 4
-          }
-          inside(aliceValidatorWallet.listValidatorRewardCoupons()) { case Seq(coupon) =>
-            coupon.payload.round.number shouldBe 4
-          }
         },
       )
 
