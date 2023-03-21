@@ -34,8 +34,6 @@ trait CoinAppStore[
 
   def txLog(domain: DomainId): Future[TxLogStore[TXI, TXE]]
 
-  def transferStore: TransferStore
-
   def domains: DomainStore
 
   def multiDomainAcsStore: MultiDomainAcsStore

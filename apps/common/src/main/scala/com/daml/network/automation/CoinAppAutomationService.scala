@@ -38,7 +38,6 @@ abstract class CoinAppAutomationService(
     val ingestionService = new LegacyUpdateIngestionService(
       store.getClass.getSimpleName,
       store.storesIngestionSink(stores),
-      store.transferStore.ingestionSink,
       domain,
       connection,
       perDomainTriggerContext.retryProvider,

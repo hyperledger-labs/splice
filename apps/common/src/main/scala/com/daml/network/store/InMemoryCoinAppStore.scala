@@ -21,9 +21,6 @@ abstract class InMemoryCoinAppStore[
 
   private[network] override type PerDomainStore = InMemoryCoinAppStore.PerDomainStore[TXI, TXE]
 
-  val transferStore: InMemoryTransferStore =
-    new InMemoryTransferStore(loggerFactory, acsContractFilter.ingestionFilter.primaryParty)
-
   val multiDomainAcsStore: InMemoryMultiDomainAcsStore =
     new InMemoryMultiDomainAcsStore(loggerFactory, acsContractFilter)
 
