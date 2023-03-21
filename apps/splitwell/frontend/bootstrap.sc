@@ -55,6 +55,9 @@ def ensureDirectoryEntry(
     case e: CommandFailure => {
       println(s"Requesting CNS name \"$name\" for user \"$user\".")
       directory.requestDirectoryEntry(name)
+      println("Waiting for wallet initialization to complete")
+      wallet.waitForInitialization()
+      println("Wallet initialization complete, tapping coin")
       wallet.tap(5.0)
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
       wallet.acceptSubscriptionRequest(wallet.listSubscriptionRequests()(0).contractId)
