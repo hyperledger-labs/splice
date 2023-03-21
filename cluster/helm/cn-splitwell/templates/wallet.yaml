@@ -22,30 +22,7 @@ spec:
       - env:
         - name: JAVA_TOOL_OPTIONS
           value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
-        - name: CN_APP_WALLET_LEDGER_API_AUTH_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: cn-app-wallet-ledger-api-auth
-              optional: false
-        - name: CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              key: client-id
-              name: cn-app-wallet-ledger-api-auth
-              optional: false
-        - name: CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: client-secret
-              name: cn-app-wallet-ledger-api-auth
-              optional: false
-        - name: CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME
-          valueFrom:
-            secretKeyRef:
-              key: ledger-api-user
-              name: cn-app-wallet-ledger-api-auth
-              optional: false
+        {{- include "cn-util-lib.auth0-env-vars" "wallet" | indent 8}}
         - name: CN_APP_WALLET_PARTICIPANT_ADDRESS
           value: participant
         - name: CN_APP_WALLET_VALIDATOR_ADDRESS
