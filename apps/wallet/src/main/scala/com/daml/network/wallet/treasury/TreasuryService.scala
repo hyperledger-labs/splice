@@ -97,33 +97,30 @@ class TreasuryService(
 
   private val queueTerminationResult: Promise[Done] = Promise()
 
-  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] =
-    withNewTrace(this.getClass.getSimpleName)(implicit tc =>
-      _ => {
-        val queue = Source
-          .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
-          .batch(treasuryConfig.batchSize.toLong, operation => CoinOperationBatch(operation))(
-            (batch, operation) => batch.addCOToBatch(operation)
-          )
-          // Execute the batches sequentially to avoid contention
-          .mapAsync(1)(executeBatchWithRetry)
-          .toMat(
-            Sink.onComplete(result0 => {
-              val result =
-                retryProvider
-                  .logTerminationAndRecoverOnShutdown("coin operation batch executor", logger)(
-                    result0
-                  )
-              val _ = queueTerminationResult.tryComplete(result)
-            })
-          )(Keep.left)
-          .run()
-        logger.debug(
-          show"Started coin operation operation batch executor with ${treasuryConfig.toString.unquoted}"
-        )
-        queue
-      }
-    )
+  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = {
+    val queue = Source
+      .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
+      .batch(treasuryConfig.batchSize.toLong, operation => CoinOperationBatch(operation))(
+        (batch, operation) => batch.addCOToBatch(operation)
+      )
+      // Execute the batches sequentially to avoid contention
+      .mapAsync(1)(executeBatchWithRetry)
+      .toMat(
+        Sink.onComplete(result0 => {
+          val result =
+            retryProvider
+              .logTerminationAndRecoverOnShutdown("coin operation batch executor", logger)(
+                result0
+              )(TraceContext.empty)
+          val _ = queueTerminationResult.tryComplete(result)
+        })
+      )(Keep.left)
+      .run()
+    logger.debug(
+      show"Started coin operation operation batch executor with ${treasuryConfig.toString.unquoted}"
+    )(TraceContext.empty)
+    queue
+  }
 
   retryProvider.runOnShutdown(new RunOnShutdown {
     override def name: String = s"terminate coin operation batch executor"
@@ -279,28 +276,28 @@ class TreasuryService(
     */
   private def executeBatchWithRetry(
       batch: CoinOperationBatch
-  )(implicit tc: TraceContext): Future[Done] = {
-    def completeWithFailure(
-        op: EnqueuedCoinOperation,
-        exception: installCodegen.CoinOperation => StatusRuntimeException,
-    ) =
-      // Need to use tryComplete as some of them might have been completed already due to being stale
-      op.outcomePromise.tryComplete(
-        Failure(
-          exception(op.operation)
-        )
-      )
-
-    def internal(op: installCodegen.CoinOperation) =
-      Status.INTERNAL
-        .withDescription(show"Unexpected coin operation execution failure of operation $op.")
-        .asRuntimeException()
-
+  ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
     withSpan("executeBatchWithRetry") { implicit tc => _ =>
+      def completeWithFailure(
+          op: EnqueuedCoinOperation,
+          exception: installCodegen.CoinOperation => StatusRuntimeException,
+      ) =
+        // Need to use tryComplete as some of them might have been completed already due to being stale
+        op.outcomePromise.tryComplete(
+          Failure(
+            exception(op.operation)
+          )
+        )
+
+      def internal(op: installCodegen.CoinOperation) =
+        Status.INTERNAL
+          .withDescription(show"Unexpected coin operation execution failure of operation $op.")
+          .asRuntimeException()
+
       retryProvider
         .retryForAutomation(
           "execute coin operation batch",
-          executeBatch(batch),
+          executeBatch(batch)(tc),
           logger,
         )
         .recover(ex => {
@@ -318,7 +315,7 @@ class TreasuryService(
           Done
         })
     }
-  }
+  })
 
   private def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean =
     outcome match {
@@ -397,7 +394,7 @@ class TreasuryService(
       batch: CoinOperationBatch,
       readAs: Set[PartyId],
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): Future[Done] = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing filtered batch $batch with inputs $inputs")
     for {
@@ -417,15 +414,16 @@ class TreasuryService(
       _ = batch.completeBatchOperations(outcomes)(logger, tc)
 
       // wait for store to ingest the new coin holdings *provided* they were updated
-      case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
-        // We must not wait in this case, as the store won't see that offset until the next action comes,
-        // as the transaction filter is in the way
-        // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
-        Future.unit
-      } else {
-        logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-        userStore.signalWhenIngestedOrShutdown(offset)
-      }
+      _ <-
+        if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+          // We must not wait in this case, as the store won't see that offset until the next action comes,
+          // as the transaction filter is in the way
+          // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+          Future.unit
+        } else {
+          logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+          userStore.signalWhenIngestedOrShutdown(offset)
+        }
     } yield Done
   }
 
