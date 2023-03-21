@@ -18,7 +18,7 @@ Additionally, you'll also need to enable the GCP DA Canton DevNet VPN. If you ca
 this documentation, you already enabled the VPN successfully.
 
 To run a participant node, download Canton research: |canton_research_download_link|. If you do not have access, please reach out to Digital Asset.
-Canton research is an in-development version of Canton research that will eventually turn into a new Canton release.
+Canton research is an in-development version of Canton that will eventually turn into a new Canton release.
 
 Please now extract Canton:
 
@@ -156,7 +156,7 @@ Hosting the Wallet Web UI
 -------------------------
 
 The Wallet Web UI is distributed as static files that connect to the
-wallet backend that we started in the previous section. 
+wallet backend that we started in the previous section.
 
 Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
 For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
@@ -213,6 +213,45 @@ You will be redirected to your wallet to confirm the Canton Coin payment for you
 Once confirmed, you will be redirected back to the directory UI, and should see your new entry listed.
 
 If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
+
+
+Running the Splitwell UI
+------------------------
+
+To use splitwell, you first need to connect your participant to the splitwell domain
+and upload the DAR.
+Go to the terminal you started Canton in and run:
+
+.. parsed-literal::
+
+   @ validatorParticipant.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
+   @ validatorParticipant.dars.upload("dars/splitwell-0.1.0.dar")
+
+The splitwell UI connects to the ledger API of your participant
+through `Envoy
+<https://www.envoyproxy.io/docs/envoy/latest/start/install>`_. Follow
+the installation instructions to install it on your machine.
+
+Once you completed the installation, open a new terminal and start it ::
+
+  envoy -c examples/validator/envoy.yaml
+
+As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| like you did earlier for the directory and wallet UIs:
+
+.. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
+    :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
+    :end-before: END_SPLITWELL_CLUSTER_BACKEND_CONFIG
+
+Finally, open another terminal and start the frontend: ::
+
+  cd web-uis/splitwell
+  php -S 127.0.0.1:3002
+
+
+You can now log in and start creating groups and split payments with
+other users on the Canton Network. Note that you need to onboard your
+user through the wallet first before you can use it in splitwell.
+
 
 Enabling Authentication
 -----------------------

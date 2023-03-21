@@ -14,25 +14,34 @@ window.canton_network_config = {
   //     token_scope: 'daml_ledger_api',
   //   },
   services: {
-    splitwell: {
-      // URL of the gRPC-Web envoy proxy, proxying to the splitwell gRPC API
-      url: 'http://localhost:6113',
+    wallet: {
+      url: "http://localhost:6004",
+      uiUrl: "http://localhost:3000",
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
       url: 'http://localhost:6201',
     },
-    directory: {
-      // URL of the directory HTTP API
-      url: 'http://localhost:6110',
-    },
-    scan: {
-      // URL of the scan app HTTP API
-      url: 'http://localhost:6012',
-    },
     participantAdmin: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s participant's admin API
       url: 'http://localhost:6202',
-    }
+    },
+    // BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
+    splitwell: {
+      // URL of the splitwell backend.
+      // Edit this to the cluster you're trying to connect on.
+      url: 'https://splitwell.TARGET_CLUSTER.network.canton.global',
+    },
+    directory: {
+      // URL of the directory backend.
+      // Edit this to the cluster you're trying to connect on.
+      url: 'https://directory.TARGET_CLUSTER.network.canton.global',
+    },
+    scan: {
+      // URL of scan backend.
+      // Edit this to the cluster you're trying to connect on.
+      url: 'https://scan.TARGET_CLUSTER.network.canton.global',
+    },
+    // END_SPLITWELL_CLUSTER_BACKEND_CONFIG
   },
 };
