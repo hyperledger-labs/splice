@@ -52,38 +52,25 @@ class WalletTxLogTimeBasedIntegrationTest
 
       clue("Everyone still has their reward coupons") {
         eventually() {
-          aliceWallet.listAppRewardCoupons() should have size 1
+          aliceValidatorWallet.listAppRewardCoupons() should have size 1
           aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
         }
       }
 
       actAndCheck(
-        "Alice transfers some CC to Bob (using her app reward)",
-        p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 10.0),
-      )(
-        "Bob has received the CC and the app reward coupon is gone",
-        _ => {
-          bobWallet.balance().unlockedQty should be > BigDecimal(49.0)
-          // The payment that consumed the app reward coupon has created a new app reward coupon,
-          // here we check that the remaining coupon is the new one.
-          inside(aliceWallet.listAppRewardCoupons()) { case Seq(coupon) =>
-            coupon.payload.round.number shouldBe 4
-          }
-        },
-      )
-
-      actAndCheck(
-        "Alice's validator transfers some CC to Bob (using their validator reward)",
+        "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
         p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0),
       )(
-        "Bob has received the CC and the validator reward coupon is gone",
+        "Bob has received the CC and the reward coupons are both gone",
         _ => {
-          bobWallet.balance().unlockedQty should be > BigDecimal(59.0)
-          // The validator reward coupon from round 1 was consumed for the above payment,
-          // but the two payments in round 4 have created two new reward coupons.
-          inside(aliceValidatorWallet.listValidatorRewardCoupons()) { case Seq(coupon1, coupon2) =>
-            coupon1.payload.round.number shouldBe 4
-            coupon2.payload.round.number shouldBe 4
+          bobWallet.balance().unlockedQty should be > BigDecimal(49.0)
+          // The payment that consumed the reward coupons has created new reward coupons,
+          // here we check that the remaining coupons are the new one.
+          inside(aliceValidatorWallet.listAppRewardCoupons()) { case Seq(coupon) =>
+            coupon.payload.round.number shouldBe 4
+          }
+          inside(aliceValidatorWallet.listValidatorRewardCoupons()) { case Seq(coupon) =>
+            coupon.payload.round.number shouldBe 4
           }
         },
       )
@@ -104,21 +91,8 @@ class WalletTxLogTimeBasedIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-            // Alice sending 10CC to Bob, using her app reward and her coin
-            // TODO(#3525): this transfer should show the app rewards used
-            inside(logEntry.sender) { case (sender, amount) =>
-              sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(10, 10 + smallAmount)
-            }
-            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-              receiver shouldBe bobUserParty.toProtoPrimitive
-              amount should beWithin(10 - smallAmount, 10)
-            }
-            logEntry.senderHoldingFees should be > BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-            // Alice's validator sending 10CC to Bob, using their validator reward and their coin
-            // TODO(#3525): this transfer should show the validator rewards used
+            // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
+            // TODO(#3525): this transfer should show the rewards used
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceValidator.getValidatorPartyId().toProtoPrimitive
               amount should beWithin(BigDecimal(10), 10 + smallAmount)

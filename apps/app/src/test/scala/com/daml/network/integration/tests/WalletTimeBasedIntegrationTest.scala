@@ -377,7 +377,7 @@ class WalletTimeBasedIntegrationTest
 
     "generate app rewards correctly" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      aliceValidatorWallet.selfGrantFeaturedAppRight()
+      grantFeaturedAppRight(aliceValidatorWallet)
       aliceWallet.tap(20.0)
 
       eventually() {
@@ -599,5 +599,25 @@ class WalletTimeBasedIntegrationTest
         )
       }
     }
+
+    "issue app rewards for direct transfers to validator party" in { implicit env =>
+      val (_, bobUserParty) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWallet)
+
+      val couponsBefore = aliceValidatorWallet.listAppRewardCoupons().length.toLong
+
+      clue("Tap to get some coins") {
+        aliceWallet.tap(500.0)
+      }
+
+      grantFeaturedAppRight(aliceValidatorWallet)
+      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 40.0)
+      eventually()({
+        bobWallet.balance().unlockedQty should not be (BigDecimal(0.0))
+        aliceValidatorWallet.listAppRewardCoupons() should have length (couponsBefore + 1)
+        aliceValidatorWallet.listAppRewardCoupons().lastOption.value.payload.featured shouldBe true
+      })
+    }
+
   }
 }

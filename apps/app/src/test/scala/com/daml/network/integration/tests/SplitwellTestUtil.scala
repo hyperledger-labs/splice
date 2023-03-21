@@ -65,20 +65,7 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
       "group1",
     )
 
-    actAndCheck(
-      "Self-grant a featured app right",
-      splitwellProviderWallet.selfGrantFeaturedAppRight(),
-    )(
-      "Wait for right to be ingested",
-      // We are waiting for scan to ingest the featured app right, and not through the provider's wallet,
-      // to make sure that this right will be used when collecting payments.
-      _ =>
-        scan
-          .lookupFeaturedAppRight(splitwellProviderParty)
-          .getOrElse(
-            fail("Scan did not ingest a featured app right contract for splitwell provider")
-          ),
-    )
+    grantFeaturedAppRight(splitwellProviderWallet)
 
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key, invite)
   }

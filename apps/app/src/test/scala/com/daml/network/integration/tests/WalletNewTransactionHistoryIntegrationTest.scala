@@ -31,6 +31,8 @@ class WalletNewTransactionHistoryIntegrationTest
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
+      waitForWalletUser(aliceValidatorWallet)
+      val aliceValidatorParty = aliceValidatorWallet.userStatus().party
 
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
       val charlieEntryName = perTestCaseName("charlie.cns")
@@ -112,7 +114,7 @@ class WalletNewTransactionHistoryIntegrationTest
               coinPrice = 2,
               expectedAction = "Received",
               expectedParty = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${expectedCns(charlieUserParty, charlieEntryName)}"
+                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
               ),
               expectedAmountCC = BigDecimal("1.07"),
             )
@@ -120,7 +122,7 @@ class WalletNewTransactionHistoryIntegrationTest
               coinPrice = 2,
               expectedAction = "Sent",
               expectedParty = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${expectedCns(aliceUserParty, aliceEntryName)}"
+                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
               ),
               expectedAmountCC = BigDecimal("-1.18"),
             )

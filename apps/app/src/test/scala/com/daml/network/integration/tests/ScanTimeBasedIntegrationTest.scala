@@ -10,6 +10,7 @@ import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CoinUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import scala.jdk.CollectionConverters.*
+import com.daml.network.util.Codec
 
 class ScanTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -94,6 +95,7 @@ class ScanTimeBasedIntegrationTest
       aliceWallet.tap(500.0)
       bobWallet.tap(500.0)
       aliceValidatorWallet.tap(100.0)
+      bobValidatorWallet.tap(100.0)
     }
 
     clue("Transfer some CC, to generate reward coupons")({
@@ -105,11 +107,7 @@ class ScanTimeBasedIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
     })
-    clue("Alice and Bob use their app rewards when transfering CC")({
-      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 10.0)
-      p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, aliceUserParty, 10.0)
-    })
-    clue("Alice's and Bob's validators use their validator reward when transfering CC")({
+    clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
       // TODO(#3469): for now we just inspected the log manually to see that the correct entries are
       // appended to the scan tx log. Once there's a proper API for the leaderboard, we'll add a check here
       p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
@@ -147,8 +145,14 @@ class ScanTimeBasedIntegrationTest
         val appLeaderboard = scan.getTopProvidersByAppRewards(4, 10)
         // TODO(#3469): slightly more extensive testing, and consider de-hard-coding the expected values below, and computing them from the defaults instead.
         appLeaderboard shouldBe Seq(
-          (bobUserParty, BigDecimal(0.6180000000)),
-          (aliceUserParty, BigDecimal(0.2580000000)),
+          (
+            Codec.decode(Codec.Party)(bobValidatorWallet.userStatus().party).value,
+            BigDecimal(0.6180000000),
+          ),
+          (
+            Codec.decode(Codec.Party)(aliceValidatorWallet.userStatus().party).value,
+            BigDecimal(0.2580000000),
+          ),
         )
       },
     )

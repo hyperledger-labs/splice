@@ -55,7 +55,8 @@ template AcceptedTransferOffer
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
-      controller sender
+        walletProvider : Party
+      controller sender, walletProvider
       do
         now <- getTime
         require "Offer has not expired" (now < expiresAt)
@@ -64,7 +65,8 @@ template AcceptedTransferOffer
         let
           transfer = API.Transfer with
             sender
-            provider = sender
+            -- The sender's wallet provider gets the app rewards
+            provider = walletProvider
             inputs = inputs
             outputs =
               [ API.TransferOutput with

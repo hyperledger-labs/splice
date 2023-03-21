@@ -29,9 +29,7 @@ executeCoinOperationRec : Party -> Party -> API.PaymentTransferContext -> [API.T
 executeCoinOperationRec endUserP validatorP context inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> handle AppPaymentRequest_Accept COO_AcceptedAppPayment cid
-    CO_CompleteAcceptedTransfer acceptedOffer -> do
-      resultE <- catchAll $ exercise acceptedOffer (AcceptedTransferOffer_Complete inputs context)
-      handleResult COO_CompleteAcceptedTransfer resultE
+    CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_MergeTransferInputs -> do

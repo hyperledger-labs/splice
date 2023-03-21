@@ -694,4 +694,23 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       )
     }
   }
+
+  protected def grantFeaturedAppRight(wallet: WalletAppClientReference)(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
+    actAndCheck(
+      "Self-grant a featured app right",
+      wallet.selfGrantFeaturedAppRight(),
+    )(
+      "Wait for right to be ingested",
+      _ => {
+        // Featured app rights are looked up either through scan (for 3rd party app transfers), and in the wallet
+        // store (to attach to wallet batch operations). We therefore wait for both to be ingested here.
+        scan.lookupFeaturedAppRight(party).value
+        wallet.userStatus().hasFeaturedAppRight shouldBe true
+      },
+    )
+
+  }
 }

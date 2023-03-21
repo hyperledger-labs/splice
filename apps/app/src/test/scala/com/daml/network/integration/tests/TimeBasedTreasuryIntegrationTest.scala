@@ -136,13 +136,15 @@ class TimeBasedTreasuryIntegrationTest
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
+    waitForWalletUser(aliceValidatorWallet)
+
     // create two coins in alice's wallet
     aliceWallet.tap(50)
     checkWallet(alice, aliceWallet, Seq(exactly(50)))
 
-    // run a transfer such that alice and her validator have some rewards
+    // run a transfer such that alice's validator has some rewards
     p2pTransfer(aliceWallet, bobWallet, bob, 40.0)
-    eventually()(aliceWallet.listAppRewardCoupons() should have size 1)
+    eventually()(aliceValidatorWallet.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
     aliceWallet.tap(50)
@@ -155,11 +157,14 @@ class TimeBasedTreasuryIntegrationTest
     // advance time such that issuing round 1 is open to rewards collection.
     advanceRoundsByOneTick
 
-    eventually()({ // rewards are automatically collected
-      aliceWallet.listAppRewardCoupons().filter(_.payload.round.number == 1) should have size 0
+    eventually()({
+      // app rewards are automatically collected
+      aliceValidatorWallet
+        .listAppRewardCoupons()
+        .filter(_.payload.round.number == 1) should have size 0
       // and coins are automatically merged.
       checkWallet(alice, aliceWallet, Seq((59, 61)))
-      // same for aliceValidator's wallet
+      // same for validator rewards
       aliceValidatorWallet
         .listValidatorRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
@@ -209,6 +214,7 @@ class TimeBasedTreasuryIntegrationTest
   "don't collect rewards if their collection is more expensive than they reward in coins" in {
     implicit env =>
       val (_, bob) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWallet)
 
       // giving alice 2 coins...
       aliceWallet.tap(1)
@@ -220,7 +226,7 @@ class TimeBasedTreasuryIntegrationTest
       // will result in alice validator's reward being small enough that its not worth it to collect the reward
       p2pTransfer(aliceWallet, bobWallet, bob, 0.00001)
       eventually() {
-        aliceWallet.listAppRewardCoupons() should have length 1
+        aliceValidatorWallet.listAppRewardCoupons() should have length 1
         aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
       }
 
