@@ -31,6 +31,12 @@ Version: |version_literal|
 
 .. toctree::
    :maxdepth: 2
+   :caption: Supervalidator Operators
+
+   sv_operator/bootstrap.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: DevNet Architecture
 
    devnet/index.rst

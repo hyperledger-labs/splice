@@ -5,6 +5,8 @@ Self-Hosted Validator
 
 These pages give a step-by-step guide how to deploy your own validator node to the Canton network.
 
+.. _validator_prerequisites:
+
 Prerequisites
 -------------
 
