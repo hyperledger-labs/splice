@@ -42,6 +42,7 @@ data CoinRules_ActionRequiringConfirmation
 data SvcRules_ActionRequiringConfirmation
   = SRARC_AddMember SvcRules_AddMember
   | SRARC_RemoveMember SvcRules_RemoveMember
+  | SRARC_ConfirmSv SvcRules_ConfirmSv
   deriving (Eq, Show)
 
 -- | Information about members relevant to consortium governance.
@@ -189,6 +190,20 @@ template SvcRules with
           members = Map.delete member members
           config
 
+    nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
+      with
+        sv : Party
+        svConfirmedCid : ContractId SvConfirmed
+      controller sv
+      do
+        svConfirmed <- fetch svConfirmedCid
+        archive svConfirmedCid
+        require "SVC matches" (svConfirmed.svc == svc)
+        require "SV matches" (svConfirmed.sv == sv)
+        exercise self SvcRules_AddMember with
+          newMember = svConfirmed.sv
+          reason = svConfirmed.reason
+
     -- Leader election
     ------------------
 
@@ -318,6 +333,17 @@ template SvcRules with
       controller leader
       do
         exercise cid SvOnboarding_Expire
+
+    nonconsuming choice SvcRules_ConfirmSv : ContractId SvConfirmed
+      with
+        newMember : Party
+        reason : Text
+      controller svc
+      do
+        create SvConfirmed with
+          svc
+          sv = newMember
+          reason
 
     -- Coin management driven directly by the leader
     --------------------------------------------------
@@ -449,6 +475,7 @@ executeActionRequiringConfirmation svcRulesCid act = case act of
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_ConfirmSv choiceArg -> void $ exercise svcRulesCid choiceArg
 
 
 -- Functions implementing instant-runoff voting

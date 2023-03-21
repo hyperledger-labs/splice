@@ -295,6 +295,7 @@ object SvSvcStore {
           co.payload.svc == svc && co.payload.sv == sv
         ),
         mkFilter(so.SvOnboarding.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(so.SvConfirmed.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),

@@ -27,9 +27,18 @@ template SvOnboarding with
     observer candidateParty
 
     -- Archive if we are past the `expiresAt`.
-    choice SvOnboarding_Expire: ()
+    choice SvOnboarding_Expire : ()
       controller svc
       do
         now <- getTime
         require "Onboarding has expired" (now >= expiresAt)
         pure ()
+
+-- | A confirmation for approval of a candidate SV
+template SvConfirmed with
+    svc : Party
+    sv : Party
+    reason : Text
+  where
+    signatory svc
+    observer sv

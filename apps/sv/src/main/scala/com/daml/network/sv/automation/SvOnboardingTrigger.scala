@@ -3,9 +3,9 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
-import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, SvcRules_AddMember}
+import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, SvcRules_ConfirmSv}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.environment.{CoinLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -39,12 +39,12 @@ class SvOnboardingTrigger(
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
 
-  private def svcRulesAddMemberAction(
-      member: PartyId,
+  private def svcRulesConfirmSvAction(
+      candidateParty: PartyId,
       // TODO(#3188) add name
       reason: String,
   ): ActionRequiringConfirmation = new ARC_SvcRules(
-    new SRARC_AddMember(new SvcRules_AddMember(member.toProtoPrimitive, reason))
+    new SRARC_ConfirmSv(new SvcRules_ConfirmSv(candidateParty.toProtoPrimitive, reason))
   )
 
   override def completeTask(
@@ -72,7 +72,7 @@ class SvOnboardingTrigger(
         case Right(party) => {
           confirm(party, svOnboarding.payload.token).map { _ =>
             TaskSuccess(
-              s"created confirmation for adding member ${svOnboarding.payload.candidateName} " +
+              s"created confirmation for confirming the candidate SV ${svOnboarding.payload.candidateName} " +
                 s"with party ID ${svOnboarding.payload.candidateParty}"
             )
           }
@@ -81,7 +81,7 @@ class SvOnboardingTrigger(
   }
 
   private def confirm(party: PartyId, reason: String): Future[Unit] = {
-    val action = svcRulesAddMemberAction(party, reason)
+    val action = svcRulesConfirmSvAction(party, reason)
     for {
       domainId <- svcStore.domains.signalWhenConnected(svcStore.defaultAcsDomain)
       svcRules <- svcStore.getSvcRules()
@@ -104,7 +104,7 @@ class SvOnboardingTrigger(
               readAs = Seq(svcParty),
               update = cmd,
               commandId = CoinLedgerConnection.CommandId(
-                "com.daml.network.sv.svOnboardingAddMemberConfirmation",
+                "com.daml.network.sv.svOnboardingConfirmSvConfirmation",
                 Seq(svParty, svcParty),
                 party.toProtoPrimitive,
               ),

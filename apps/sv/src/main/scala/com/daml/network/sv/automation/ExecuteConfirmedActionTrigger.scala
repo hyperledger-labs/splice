@@ -9,7 +9,8 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
+import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
@@ -115,9 +116,17 @@ class ExecuteConfirmedActionTrigger(
           }
         case arcSvcRules: ARC_SvcRules =>
           arcSvcRules.svcAction match {
-            case addMemberAction: SRARC_AddMember =>
-              val newMember = addMemberAction.svcRules_AddMemberValue.newMember
-              store.getSvcRules().map(_.payload.members.containsKey(newMember))
+            case confirmSvAction: SRARC_ConfirmSv =>
+              for {
+                isSvConfirmed <- acs
+                  .findContract(SvConfirmed.COMPANION)(c =>
+                    c.payload.svc == store.key.svcParty.toProtoPrimitive &&
+                      c.payload.sv == confirmSvAction.svcRules_ConfirmSvValue.newMember
+                  )
+                  .map(_.nonEmpty)
+                newMember = confirmSvAction.svcRules_ConfirmSvValue.newMember
+                isSvPartOfSvc <- store.getSvcRules().map(_.payload.members.containsKey(newMember))
+              } yield isSvConfirmed || isSvPartOfSvc
             case action =>
               throw new UnsupportedOperationException(
                 show"svc rules $action is not yet supported"

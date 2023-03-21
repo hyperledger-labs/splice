@@ -104,6 +104,7 @@ object SvSvStore {
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
         mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
         mkFilter(so.ApprovedSvIdentity.COMPANION)(co => co.payload.approvingSv == sv),
+        mkFilter(so.SvConfirmed.COMPANION)(co => co.payload.sv == sv),
       ),
     )
   }

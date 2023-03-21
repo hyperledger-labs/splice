@@ -174,12 +174,25 @@ testSvOnboarding = do
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
-        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+        svcAction = SRARC_ConfirmSv $ SvcRules_ConfirmSv with
           newMember = svX
           reason = "because"
   executeAllConfirmedActions app
 
-  -- svX is now an SVC member
+  -- svX is now a confirmed SV
+  [(svConfirmedCid, svConfirmed)] <- query @SvConfirmed svc
+  svConfirmed === SvConfirmed with
+    svc
+    sv = svX
+    reason = "because"
+
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  -- once svX becomes able to read as svc (e.g., after party migration to svX's participant), it completes the onboarding by adding itself to the SvcRules
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svConfirmedCid
+
   [(_, svcRules)] <- query @SvcRules svc
   assert (svX `elem` Map.keys svcRules.members)
 
