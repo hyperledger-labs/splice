@@ -47,6 +47,10 @@ trait ScanStore
   def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
+
+  def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]]
 }
 
 object ScanStore {

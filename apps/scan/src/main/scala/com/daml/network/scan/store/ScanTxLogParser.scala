@@ -88,13 +88,18 @@ object ScanTxLogParser {
         round: Long,
     ) extends TxLogIndexRecord
 
+    trait RewardIndexRecord extends TxLogIndexRecord {
+      def party: PartyId
+      def amount: BigDecimal
+    }
+
     final case class AppRewardIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends TxLogIndexRecord
+    ) extends RewardIndexRecord
 
     final case class ValidatorRewardIndexRecord(
         offset: String,
@@ -102,7 +107,7 @@ object ScanTxLogParser {
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends TxLogIndexRecord
+    ) extends RewardIndexRecord
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}

@@ -113,22 +113,23 @@ class InMemoryScanStore(
     )
   }
 
-  private def sumAppRewardsCollectedInRound(
+  private def sumRewardsCollectedInRound(
       log: TxLogStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
       round: Long,
-  ): Future[Map[PartyId, BigDecimal]] =
+      rewardTypeFilter: (ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord) => Boolean,
+  ) =
     for {
       ret <- log
         .getTxLogIndicesByFilter(_ match {
-          case reward: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord
-              if reward.round == round =>
+          case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord
+              if reward.round == round && rewardTypeFilter(reward) =>
             true
           case _ => false
         })
         .map(rewards =>
           rewards.foldLeft(Map[PartyId, BigDecimal]())((m, reward) =>
             reward match {
-              case r: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord =>
+              case r: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
                 m |+| Map((r.party -> r.amount))
               case _ =>
                 throw Status.INTERNAL
@@ -139,7 +140,11 @@ class InMemoryScanStore(
         )
     } yield ret
 
-  override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
+  private def getTopRewardRecipients(
+      asOfEndOfRound: Long,
+      limit: Int,
+      rewardTypeFilter: (ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord) => Boolean,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
     for {
@@ -147,10 +152,36 @@ class InMemoryScanStore(
       log <- defaultTxLog
       // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
       // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
-      perRound <- (0L to asOfEndOfRound).toList.traverse(sumAppRewardsCollectedInRound(log, _))
+      perRound <- (0L to asOfEndOfRound).toList.traverse(
+        sumRewardsCollectedInRound(log, _, rewardTypeFilter)
+      )
     } yield {
       Monoid.combineAll(perRound).toSeq.sortWith(_._2 > _._2).slice(0, limit)
     }
+
+  override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]] =
+    getTopRewardRecipients(
+      asOfEndOfRound,
+      limit,
+      (_ match {
+        case _: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord => true
+        case _ => false
+      }),
+    )
+
+  override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]] =
+    getTopRewardRecipients(
+      asOfEndOfRound,
+      limit,
+      (_ match {
+        case _: ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord => true
+        case _ => false
+      }),
+    )
 
   override def close(): Unit = {
     super.close()

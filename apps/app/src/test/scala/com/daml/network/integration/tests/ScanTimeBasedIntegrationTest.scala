@@ -9,8 +9,10 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CoinUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.console.WalletAppClientReference
 import scala.jdk.CollectionConverters.*
 import com.daml.network.util.Codec
+import com.digitalasset.canton.topology.PartyId
 
 class ScanTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -102,14 +104,19 @@ class ScanTimeBasedIntegrationTest
       p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 40.0)
       p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, aliceUserParty, 100.0)
     })
-    clue("Advance 3 ticks for the coupons to be collectable")({
+    clue(
+      "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
+    )({
       advanceRoundsByOneTick
+      grantFeaturedAppRight(aliceValidatorWallet)
+      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 41.0)
+      p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, aliceUserParty, 101.0)
+    })
+    clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsByOneTick
       advanceRoundsByOneTick
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
-      // TODO(#3469): for now we just inspected the log manually to see that the correct entries are
-      // appended to the scan tx log. Once there's a proper API for the leaderboard, we'll add a check here
       p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
       p2pTransferAndTriggerAutomation(bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
     })
@@ -127,31 +134,67 @@ class ScanTimeBasedIntegrationTest
           round should be(0)
         },
     )
-    clue("Data for a later round does not yet exist")(
+    clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
+      p2pTransferAndTriggerAutomation(aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
+      p2pTransferAndTriggerAutomation(bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
+    })
+
+    clue("Data for a later round does not yet exist")({
       assertThrowsAndLogsCommandFailures(
         scan.getTopProvidersByAppRewards(4, 10),
         _.errorMessage should include("Data for round 4 not yet computed"),
       )
-    )
+      assertThrowsAndLogsCommandFailures(
+        scan.getTopValidatorsByValidatorRewards(4, 10),
+        _.errorMessage should include("Data for round 4 not yet computed"),
+      )
+    })
+    def compareLeaderboard(
+        result: Seq[(PartyId, BigDecimal)],
+        expected: Seq[(WalletAppClientReference, BigDecimal)],
+    ) = {
+      result shouldBe expected.map((v) =>
+        (Codec.decode(Codec.Party)((v._1.userStatus().party)).value, v._2)
+      )
+    }
+
     actAndCheck(
-      "Advance four more rounds, for round 4 to close (where rewards were claimed)",
-      Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+      "Advance five more rounds, for rounds 4&5 to close (where rewards were collected)",
+      Range(0, 5).foreach(_ => advanceRoundsByOneTick),
     )(
-      "Test leaderboards",
+      "Test leaderboards for ends of rounds 4&5",
       _ => {
         eventually() {
-          scan.getRoundOfLatestData() should be(4)
+          scan.getRoundOfLatestData() should be(5)
         }
-        val appLeaderboard = scan.getTopProvidersByAppRewards(4, 10)
-        // TODO(#3469): slightly more extensive testing, and consider de-hard-coding the expected values below, and computing them from the defaults instead.
-        appLeaderboard shouldBe Seq(
-          (
-            Codec.decode(Codec.Party)(bobValidatorWallet.userStatus().party).value,
-            BigDecimal(0.6180000000),
+
+        // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
+        compareLeaderboard(
+          scan.getTopProvidersByAppRewards(4, 10),
+          Seq(
+            (bobValidatorWallet, BigDecimal(0.6180000000)),
+            (aliceValidatorWallet, BigDecimal(0.2580000000)),
           ),
-          (
-            Codec.decode(Codec.Party)(aliceValidatorWallet.userStatus().party).value,
-            BigDecimal(0.2580000000),
+        )
+        compareLeaderboard(
+          scan.getTopValidatorsByValidatorRewards(4, 10),
+          Seq(
+            (bobValidatorWallet, BigDecimal(0.2060000000)),
+            (aliceValidatorWallet, BigDecimal(0.0860000000)),
+          ),
+        )
+        compareLeaderboard(
+          scan.getTopProvidersByAppRewards(5, 10),
+          Seq(
+            (aliceValidatorWallet, BigDecimal(44.2580000000)),
+            (bobValidatorWallet, BigDecimal(1.2366000000)),
+          ),
+        )
+        compareLeaderboard(
+          scan.getTopValidatorsByValidatorRewards(5, 10),
+          Seq(
+            (bobValidatorWallet, BigDecimal(0.4122000000)),
+            (aliceValidatorWallet, BigDecimal(0.1740000000)),
           ),
         )
       },

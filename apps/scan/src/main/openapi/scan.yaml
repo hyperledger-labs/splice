@@ -185,6 +185,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v0/top-validators-by-validator-rewards:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorRewards"
+      parameters:
+        - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -308,6 +339,14 @@ components:
       required: ["providersAndRewards"]
       properties:
         providersAndRewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartyAndRewards"
+    GetTopValidatorsByValidatorRewardsResponse:
+      type: object
+      required: ["validatorsAndRewards"]
+      properties:
+        validatorsAndRewards:
           type: array
           items:
             $ref: "#/components/schemas/PartyAndRewards"

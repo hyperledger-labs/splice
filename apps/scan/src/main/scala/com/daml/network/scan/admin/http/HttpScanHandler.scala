@@ -216,6 +216,7 @@ class HttpScanHandler(
           )
         )
         .recover({
+          // TODO(#3641): refactor this repeated error handling
           case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
             v0.ScanResource.GetCoinConfigForRoundResponse
               .NotFound(definitions.ErrorResponse(s"Round ${round} not found"))
@@ -234,6 +235,7 @@ class HttpScanHandler(
           )
         )
         .recover({
+          // TODO(#3641): refactor this repeated error handling
           case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
             v0.ScanResource.GetRoundOfLatestDataResponse
               .NotFound(definitions.ErrorResponse("No data has been made available yet"))
@@ -260,8 +262,39 @@ class HttpScanHandler(
           )
         )
         .recover({
+          // TODO(#3641): refactor this repeated error handling
           case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
             v0.ScanResource.GetTopProvidersByAppRewardsResponse
+              .NotFound(
+                definitions
+                  .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")
+              )
+        })
+    }
+
+  def getTopValidatorsByValidatorRewards(
+      response: v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.type
+  )(
+      asOfEndOfRound: Long,
+      limit: Int,
+  ): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      store
+        .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
+        .map(res =>
+          v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
+            definitions
+              .GetTopValidatorsByValidatorRewardsResponse(
+                res
+                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                  .toVector
+              )
+          )
+        )
+        .recover({
+          // TODO(#3641): refactor this repeated error handling
+          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse
               .NotFound(
                 definitions
                   .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")

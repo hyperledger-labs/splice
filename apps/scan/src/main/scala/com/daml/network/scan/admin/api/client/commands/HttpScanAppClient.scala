@@ -375,9 +375,9 @@ object HttpScanAppClient {
   }
 
   private def decodePartiesAndRewards(
-      response: definitions.GetTopProvidersByAppRewardsResponse
+      partiesAndRewards: Vector[definitions.PartyAndRewards]
   ): Either[String, Seq[(PartyId, BigDecimal)]] =
-    response.providersAndRewards.traverse(par =>
+    partiesAndRewards.traverse(par =>
       for {
         p <- Codec.decode(Codec.Party)(par.provider)
         r <- Codec.decode(Codec.BigDecimal)(par.rewards)
@@ -396,8 +396,31 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Seq[(PartyId, BigDecimal)]] = response match {
       case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
-        decodePartiesAndRewards(response)
+        decodePartiesAndRewards(response.providersAndRewards)
       case http.GetTopProvidersByAppRewardsResponse.NotFound(value) =>
+        Left(value.error)
+    }
+  }
+
+  case class getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)
+      extends BaseCommand[http.GetTopValidatorsByValidatorRewardsResponse, Seq[
+        (PartyId, BigDecimal)
+      ]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetTopValidatorsByValidatorRewardsResponse] =
+      client.getTopValidatorsByValidatorRewards(asOfEndOfRound, limit, headers)
+
+    override def handleResponse(response: http.GetTopValidatorsByValidatorRewardsResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Seq[(PartyId, BigDecimal)]] = response match {
+      case http.GetTopValidatorsByValidatorRewardsResponse.OK(response) =>
+        decodePartiesAndRewards(response.validatorsAndRewards)
+      case http.GetTopValidatorsByValidatorRewardsResponse.NotFound(value) =>
         Left(value.error)
     }
   }
