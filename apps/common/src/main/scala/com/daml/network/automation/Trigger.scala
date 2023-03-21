@@ -12,7 +12,7 @@ import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
 import com.daml.ledger.javaapi.data.codegen.{InterfaceCompanion, ContractId, DamlRecord}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, CoinAppStore}
+import com.daml.network.store.{AcsStore, CoinAppStore, MultiDomainAcsStore}
 import com.daml.network.util.{HasHealth, Contract}
 import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -320,8 +320,7 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
 }
 
 abstract class OnReadyForTransferInTrigger(
-    store: CoinAppStore[_, _],
-    domainId: DomainId,
+    store: CoinAppStore[_, _]
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -330,12 +329,14 @@ abstract class OnReadyForTransferInTrigger(
 
   override protected val source
       : Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] =
-    store.transferStore.streamReadyForTransferIn(domainId)
+    store.multiDomainAcsStore.streamReadyForTransferIn()
 
   override final protected def isStaleTask(
       task: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
-  )(implicit tc: TraceContext): Future[Boolean] =
-    store.transferStore.isReadyForTransferIn(task).map(!_)
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    import MultiDomainAcsStore.TransferId
+    store.multiDomainAcsStore.isReadyForTransferIn(TransferId.fromTransferOut(task)).map(!_)
+  }
 
 }
 

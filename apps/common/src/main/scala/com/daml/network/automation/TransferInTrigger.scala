@@ -4,10 +4,11 @@ import com.digitalasset.canton.error.ErrorCodeUtils
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.network.store.CoinAppStore
+import com.daml.network.store.MultiDomainAcsStore.TransferId
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.daml.network.automation.{
   OnReadyForTransferInTrigger,
   TaskOutcome,
@@ -25,15 +26,13 @@ class TransferInTrigger(
     override protected val context: TriggerContext,
     store: CoinAppStore[_, _],
     connection: CoinLedgerConnection,
-    domainId: DomainId,
     partyId: PartyId,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends OnReadyForTransferInTrigger(
-      store,
-      domainId,
+      store
     ) {
 
   override protected def completeTask(
@@ -56,8 +55,11 @@ class TransferInTrigger(
                 show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
               )
               .recoverWith { case TransferInTrigger.TransferCompletedException(_) =>
-                store.transferStore.ingestionSink
-                  .removeCompletedTransferOut(transferOut)
+                store.multiDomainAcsStore.ingestionSink
+                  .removeTransferOutIfBootstrap(
+                    transferOut.contractId,
+                    TransferId.fromTransferOut(transferOut),
+                  )
                   .map(_ =>
                     show"Transfer in for ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target} failed because the transfer was already completed, removed from transfer store"
                   )

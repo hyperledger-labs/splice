@@ -7,7 +7,6 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
   CoinAppAutomationService,
   DomainOrchestrator,
-  Trigger,
   TransferInTrigger,
   TransferOutTrigger,
   TriggerContext,
@@ -65,17 +64,7 @@ class UserWalletAutomationService(
     new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
   )
 
-  def createTransferInTrigger(
-      domainAdded: DomainStore.DomainAdded,
-      triggerContext: TriggerContext,
-  ): Trigger =
-    new TransferInTrigger(
-      triggerContext,
-      store,
-      connection,
-      domainAdded.domainId,
-      store.key.endUserParty,
-    )
+  registerTrigger(new TransferInTrigger(triggerContext, store, connection, store.key.endUserParty))
 
   registerTrigger(
     DomainOrchestrator(
@@ -103,7 +92,6 @@ class UserWalletAutomationService(
               store.key.endUserParty,
               paymentCodegen.DeliveryOffer.INTERFACE,
             ),
-          createTransferInTrigger,
         ).map { createTrigger =>
           { case (domainAdded, triggerContext) =>
             val trigger = createTrigger(

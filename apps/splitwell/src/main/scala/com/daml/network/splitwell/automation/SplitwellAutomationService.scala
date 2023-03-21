@@ -97,17 +97,15 @@ class SplitwellAutomationService(
       store.providerParty,
       companion,
     )
-  def createTransferInTrigger(
-      domainAdded: DomainStore.DomainAdded,
-      triggerContext: TriggerContext,
-  ): Trigger =
+
+  registerTrigger(
     new TransferInTrigger(
       triggerContext,
       store,
       connection,
-      domainAdded.domainId,
       store.providerParty,
     )
+  )
 
   registerTrigger(
     DomainOrchestrator(
@@ -116,7 +114,6 @@ class SplitwellAutomationService(
       DomainOrchestrator.multipleServices(
         Seq(
           createTransferOutTrigger(splitwellCodegen.BalanceUpdate.COMPANION),
-          createTransferInTrigger,
           createAcceptedAppPaymentRequestTrigger,
           createSplitwellInstallRequestTrigger,
           createGroupRequestTrigger,
