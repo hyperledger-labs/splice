@@ -11,7 +11,10 @@
         "noFallthroughCasesInSwitch": true,
         "noImplicitReturns": true,
         "forceConsistentCasingInFileNames": true,
-      "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "lib": [
+          "es2021.string"
+        ],
     },
     "files": [
         "index.ts"

@@ -11,14 +11,16 @@
         "eslint": "^8.35.0",
         "eslint-config-prettier": "^8.6.0",
         "eslint-plugin-import": "^2.27.5",
-        "prettier": "^2.7.1"
+        "prettier": "^2.7.1",
+        "typescript": "^4.8.4"
     },
     "dependencies": {
         "@pulumi/gcp": "^6.0.0",
         "@pulumi/kubernetes": "^3.22.1",
         "@pulumi/pulumi": "^3.0.0",
         "js-yaml": "^4.1.0",
-        "lodash": "^4.17.21"
+        "lodash": "^4.17.21",
+        "node-fetch": "^2.6.1"
     },
     "scripts": {
         "fix": "npm run format:fix && npm run lint:fix",

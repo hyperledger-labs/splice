@@ -10,45 +10,36 @@ spec:
   selector:
     matchLabels:
       app: participant
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
         app: participant
     spec:
       containers:
-      - env:
-        - name: JAVA_TOOL_OPTIONS
-          value: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
-        - name: CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME
-          valueFrom:
-            secretKeyRef:
-              key: ledger-api-user
-              name: cn-app-validator-ledger-api-auth
-              optional: false
-        - name: CANTON_PARTICIPANT_POSTGRES_SERVER
-          value:  {{ .Values.postgres }}
-        - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
-          value: splitwell_participant
-        - name: CANTON_PARTICIPANT_USERS
-          value: '[{"actAs": [{"fromUser": "self"}], "admin": true, "name": {"env":
-            "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME"}, "primaryParty":
-            {"allocate": "splitwell_validator_service_user"}, "readAs": [ ]}]'
-        - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
-          value: '[{"alias": "splitwell", "url": "http://domain:5008"}]'
+      - name: participant
         image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
-        name: participant
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
+        - name: CANTON_PARTICIPANT_POSTGRES_SERVER
+          value: {{ .Values.postgres }}
+        - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
+          value: {{ .Values.postgresSchema }}
+        - name: CANTON_PARTICIPANT_USERS
+          value: {{ .Values.participantUsers | toJson }}
+        - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
+          value: {{ .Values.extraDomains | toJson }}
+        {{ .Values.extraEnvVars | toYaml | nindent 8 }}
         ports:
         - containerPort: 5002
-          name: sw-adm-api
+          name: lg-adm-api
           protocol: TCP
         - containerPort: 5001
-          name: sw-lg-api
+          name: lg-api
           protocol: TCP
         - containerPort: 10013
-          name: sw-metrics
+          name: metrics-api
           protocol: TCP
         resources:
           limits:
@@ -56,38 +47,38 @@ spec:
           requests:
             cpu: "1"
             memory: 32Gi
-      - env:
+      - name: envoy-proxy-lg-api
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        env:
         - name: GRPC_ADDRESS
           value: 127.0.0.1
         - name: GRPC_PORT
           value: "5001"
         - name: GRPC_WEB_PORT
           value: "6001"
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        name: envoy-proxy-sw-lg-api
         ports:
         - containerPort: 6001
-          name: sw-lg-api-gw
+          name: lg-api-gw
           protocol: TCP
         resources:
           limits:
             memory: 256Mi
           requests:
             memory: 256Mi
-      - env:
+      - name: envoy-proxy-lg-adm-api
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        env:
         - name: GRPC_ADDRESS
           value: 127.0.0.1
         - name: GRPC_PORT
           value: "5002"
         - name: GRPC_WEB_PORT
           value: "6002"
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        name: envoy-proxy-sw-adm-api
         ports:
         - containerPort: 6002
-          name: sw-adm-api-gw
+          name: lg-adm-api-gw
           protocol: TCP
         resources:
           limits:
@@ -104,23 +95,23 @@ spec:
   selector:
     app: participant
   ports:
-  - name: sw-adm-api
+  - name: lg-adm-api
     port: 5002
     protocol: TCP
     targetPort: 5002
-  - name: sw-lg-api
+  - name: lg-api
     port: 5001
     protocol: TCP
     targetPort: 5001
-  - name: sw-metrics
+  - name: metrics
     port: 10013
     protocol: TCP
     targetPort: 10013
-  - name: sw-lg-api-gw
+  - name: lg-api-gw
     port: 6001
     protocol: TCP
     targetPort: 6001
-  - name: sw-adm-api-gw
+  - name: lg-adm-api-gw
     port: 6002
     protocol: TCP
     targetPort: 6002

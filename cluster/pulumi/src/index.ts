@@ -36,12 +36,149 @@ function installDomain(
   );
 }
 
+function installParticipant(
+  xns: ExactNamespace,
+  name: string,
+  postgresDb: pulumi.Output<string>,
+  extraDomains: any,
+  participantUsers: any,
+  extraEnvVars: any
+): k8s.helm.v3.Release {
+  return installCNHelmChart(
+    xns,
+    "participant-" + xns.logicalName + "-" + name,
+    "cn-participant",
+    {
+      postgres: postgresDb,
+      postgresSchema: xns.logicalName + "_participant",
+      extraDomains: JSON.stringify(extraDomains),
+      participantUsers: JSON.stringify(participantUsers),
+      extraEnvVars,
+    }
+  );
+}
+
+function auth0UserNameEnvVar(name: string, secretName: any = null): any {
+    if (!secretName) {
+        secretName = name;
+    }
+
+  return {
+    name: `CN_APP_${name.toUpperCase()}_LEDGER_API_AUTH_USER_NAME`,
+    valueFrom: {
+      secretKeyRef: {
+        key: "ledger-api-user",
+        name: `cn-app-${secretName.toLowerCase().replaceAll("_", "-")}-ledger-api-auth`,
+        optional: false,
+      },
+    },
+  };
+}
+
+function svNodeParty(name: string): any {
+  return {
+    actAs: [
+      {
+        fromUser: "self",
+      },
+      {
+        fromUser: {
+          env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+        },
+      },
+    ],
+    admin: true,
+    name: {
+      env: `CN_APP_${name.toUpperCase()}_LEDGER_API_AUTH_USER_NAME`,
+    },
+    primaryParty: {
+      allocate: name,
+    },
+    readAs: [],
+  };
+}
+
 function installSVC(): k8s.helm.v3.Release {
   const xns = exactNamespace("svc");
 
   const postgresDb = postgres.installPostgres(xns, "postgres");
 
   const domain = installDomain(xns, "global-domain", postgresDb);
+
+  const participant = installParticipant(
+    xns,
+    "p",
+    postgresDb,
+    [],
+    [
+      {
+        actAs: [
+          {
+            fromUser: "self",
+          },
+        ],
+        admin: true,
+        name: {
+          env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+        },
+        primaryParty: {
+          allocate: "svc_party",
+        },
+        readAs: [],
+      },
+      {
+        actAs: [],
+        admin: false,
+        name: {
+          env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+        },
+        primaryParty: {
+          fromUser: {
+            env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+          },
+        },
+        readAs: [
+          {
+            fromUser: {
+              env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+            },
+          },
+        ],
+      },
+      {
+        actAs: [
+          {
+            fromUser: {
+              env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+            },
+          },
+        ],
+        admin: true,
+        name: {
+          env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+        },
+        primaryParty: {
+          fromUser: {
+            env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+          },
+        },
+        readAs: [],
+      },
+      svNodeParty("sv1"),
+      svNodeParty("sv2"),
+      svNodeParty("sv3"),
+      svNodeParty("sv4"),
+    ],
+    [
+      auth0UserNameEnvVar("sv1"),
+      auth0UserNameEnvVar("sv2"),
+      auth0UserNameEnvVar("sv3"),
+      auth0UserNameEnvVar("sv4"),
+      auth0UserNameEnvVar("svc"),
+      auth0UserNameEnvVar("scan"),
+      auth0UserNameEnvVar("directory"),
+    ]
+  );
 
   const dependsOn = [
     xns.ns,
@@ -92,6 +229,27 @@ function installValidator(
 
   const postgresDb = postgres.installPostgres(xns, "postgres");
 
+  const participant = installParticipant(
+    xns,
+    "p",
+    postgresDb,
+    [{ alias: "splitwell", url: "http://domain.splitwell:5008" }],
+    [
+      {
+        actAs: [{ fromUser: "self" }],
+        admin: true,
+        name: {
+          env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+        },
+        primaryParty: {
+          allocate: "validator1_validator_service_user",
+        },
+        readAs: [],
+      },
+    ],
+    [auth0UserNameEnvVar("validator")]
+  );
+
   const dependsOn = [
     svc,
     xns.ns,
@@ -120,6 +278,27 @@ function installSplitwell(svc: k8s.helm.v3.Release): k8s.helm.v3.Release {
   const postgresDb = postgres.installPostgres(xns, "postgres");
 
   const domain = installDomain(xns, "domain", postgresDb);
+
+  const participant = installParticipant(
+    xns,
+    "p",
+    postgresDb,
+    [{ alias: "splitwell", url: "http://domain.splitwell:5008" }],
+    [
+      {
+        actAs: [{ fromUser: "self" }],
+        admin: true,
+        name: {
+          env: "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+        },
+        primaryParty: {
+          allocate: "splitwell_validator_service_user",
+        },
+        readAs: [],
+      },
+    ],
+      [auth0UserNameEnvVar("splitwell_validator", "validator")]
+  );
 
   const dependsOn = [
     xns.ns,
@@ -221,7 +400,7 @@ function installCluster() {
   const validator = installValidator(svc, "validator1");
   const splitwell = installSplitwell(svc);
 
-  //const docs = installDocs();
+  const docs = installDocs();
   //installClusterIngress(certManager, validator, splitwell, docs);
 }
 

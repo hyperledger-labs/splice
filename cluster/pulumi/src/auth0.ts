@@ -1,5 +1,7 @@
 import * as k8s from "@pulumi/kubernetes";
 
+import fetch from "node-fetch";
+
 import { ExactNamespace } from "./utils";
 
 const appToClientId = {
@@ -51,7 +53,7 @@ function getAuth0(): Promise<Auth0SecretMap> {
 
       return response.json();
     })
-    .then((data) => {
+    .then((data: any) => {
       const secrets = new Map() as Auth0SecretMap;
 
       data.forEach((app: any) => {
