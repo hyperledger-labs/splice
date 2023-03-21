@@ -15,9 +15,8 @@ trait DirectoryFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
   ) = {
     directoryUiLogin()
 
-    // 30 seconds waiting here as in some tests we observed 20 seconds not being enough, due to needing to
-    // wait on the JSON API.
-    waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(50.seconds))
+    // 100 seconds waiting here because we need to wait on the JSON API being ready which is sloooow.
+    waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(100.seconds))
 
     click on "entry-name-field"
     textField("entry-name-field").value = entryName

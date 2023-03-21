@@ -80,7 +80,7 @@ export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | unde
   useEffect(() => {
     const fetchPrimaryParty = async () => {
       try {
-        setPrimaryParty(await retry(50, 1000, () => ledgerApiClient.getPrimaryParty()));
+        setPrimaryParty(await retry(100, 1000, () => ledgerApiClient.getPrimaryParty()));
       } catch (err) {
         console.error('Error finding primary party for user', err);
         console.error(JSON.stringify(err));
