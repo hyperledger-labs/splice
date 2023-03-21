@@ -1,21 +1,25 @@
 package com.daml.network.store
 
+import akka.actor.ActorSystem
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.TreeEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  TransferEvent,
   TransferUpdate,
   TransactionTreeUpdate,
 }
 import com.daml.network.util.Contract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.topology.DomainId
+import java.util.concurrent.atomic.AtomicReference
 
 class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
-  import MultiDomainAcsStore.{ContractState, ContractWithState}
-  import InMemoryMultiDomainAcsStore.TransferId
+  implicit val actorSystem: ActorSystem = ActorSystem("InMemoryMultiDomainAcsStoreTest")
+
+  import MultiDomainAcsStore.{ContractState, ContractWithState, TransferId}
 
   private var offsetCounter = 0
 
@@ -47,7 +51,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     new InMemoryMultiDomainAcsStore(
       loggerFactory,
       txFilter,
-    )
+    )(actorSystem.dispatcher)
 
   private def mkCreateTx[TCid <: ContractId[T], T](
       offset: String,
@@ -136,17 +140,16 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         ),
       )
 
-    def removeTransferOutIfBootstrap[TCid <: ContractId[T], T](
-        contractAndDomain: (Contract[TCid, T], DomainId),
+    def removeTransferOutIfBootstrap(
+        contractId: ContractId[_],
         transferId: String,
     )(implicit store: MultiDomainAcsStore) =
       store.ingestionSink.removeTransferOutIfBootstrap(
-        toTransferOutEvent(
-          contractAndDomain._1.contractId,
-          transferId,
+        contractId,
+        TransferId(
           domain,
-          contractAndDomain._2,
-        )
+          transferId,
+        ),
       )
   }
 
@@ -170,6 +173,13 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
   private def assertLookupNone(c: C)(implicit store: MultiDomainAcsStore) =
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
+
+  private def assertReadyForTransferIn(transferId: TransferId, expected: Boolean)(implicit
+      store: MultiDomainAcsStore
+  ) =
+    store.isReadyForTransferIn(transferId).map {
+      _ shouldBe expected
+    }
 
   private def assertTestState(
       contractLocationsById: Map[ContractId[_], NonEmpty[Map[DomainId, Long]]] = Map.empty,
@@ -429,7 +439,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         _ <- d2.switchToUpdates()
         _ <- assertList(c(1) -> Some(d2))
         // Automation calls this once transfer in fails.
-        _ <- d1.removeTransferOutIfBootstrap(c(1) -> d2, tf0)
+        _ <- d1.removeTransferOutIfBootstrap(c(1).contractId, tf0)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertTestState()
@@ -518,6 +528,64 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
           pendingTransfersById = Map(cFeatured(1).contractId -> NonEmpty(Set, TransferId(d1, tf0))),
           bootstrapTransferOutIds = Set(TransferId(d1, tf0)),
         )
+      } yield succeed
+    }
+    "stream transfers and report stale transfers" in {
+      implicit val store = mkStore()
+      val transfers = new AtomicReference(Seq.empty[TransferEvent.Out])
+      val streamF = store
+        .streamReadyForTransferIn()
+        .take(2)
+        .runForeach { transfer => transfers.updateAndGet(_.appended(transfer)) }
+      val tf0 = nextTransferId
+      val tf0Id = TransferId(d1, tf0)
+      val tf1 = nextTransferId
+      val tf1Id = TransferId(d2, tf1)
+      val tf2 = nextTransferId
+      val tf2Id = TransferId(d1, tf2)
+      for {
+        // in-flight transfer out
+        _ <- d1.acsAndTransferOuts(
+          transferOuts = Seq(
+            (c(1) -> d2, tf0)
+          )
+        )
+        _ <- d1.switchToUpdates()
+        _ = eventually()(transfers.get should have length 1)
+        _ <- d2.switchToUpdates()
+        _ <- d3.switchToUpdates()
+        _ <- assertReadyForTransferIn(tf0Id, true)
+        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- assertReadyForTransferIn(tf0Id, false)
+        // transfer out before transfer in
+        _ <- d2.transferOut(c(1) -> d1, tf1)
+        _ <- assertReadyForTransferIn(tf1Id, true)
+        _ = eventually()(transfers.get should have length 2)
+        _ <- d1.transferIn(c(1) -> d2, tf1)
+        _ <- assertReadyForTransferIn(tf1Id, false)
+        // transfer in before transfer out
+        _ <- d3.transferIn(c(1) -> d1, tf2)
+        _ <- assertReadyForTransferIn(tf2Id, false)
+        _ <- d1.transferOut(c(1) -> d3, tf2)
+        _ <- assertReadyForTransferIn(tf2Id, false)
+        _ <- streamF
+      } yield {
+        transfers.get().map(TransferId.fromTransferOut(_)) shouldBe Seq(tf0Id, tf1Id)
+      }
+    }
+    "remove completed transfer out events" in {
+      implicit val store = mkStore()
+      val tf0 = nextTransferId
+      val tf0Id = TransferId(d1, tf0)
+      for {
+        _ <- d1.acsAndTransferOuts(
+          transferOuts = Seq(
+            (c(1) -> d2, tf0)
+          )
+        )
+        _ <- assertReadyForTransferIn(tf0Id, true)
+        _ <- d1.removeTransferOutIfBootstrap(c(1).contractId, tf0)
+        _ <- assertReadyForTransferIn(tf0Id, false)
       } yield succeed
     }
   }

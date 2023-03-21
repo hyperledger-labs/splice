@@ -1,5 +1,7 @@
 package com.daml.network.store
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransactionTreeUpdate,
   Transfer,
@@ -29,8 +31,7 @@ class InMemoryMultiDomainAcsStore(
 ) extends MultiDomainAcsStore
     with NamedLogging {
 
-  import InMemoryMultiDomainAcsStore.TransferId
-  import MultiDomainAcsStore.{ContractState, ContractWithState}
+  import MultiDomainAcsStore.{ContractState, ContractWithState, TransferId}
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -124,10 +125,11 @@ class InMemoryMultiDomainAcsStore(
       }
 
     override def removeTransferOutIfBootstrap(
-        transfer: TransferEvent.Out
+        cid: ContractId[_],
+        transferId: TransferId,
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
-        _.removeTransferOutIfBootstrap(transfer)
+        _.removeTransferOutIfBootstrap(cid, transferId)
       ).map { summary =>
         logger.debug(show"Ingested removeTransferOutIfBootstrap: $summary")
       }
@@ -163,7 +165,7 @@ class InMemoryMultiDomainAcsStore(
       .toSeq
   }
 
-  def listContracts[TCid <: ContractId[T], T <: Template](
+  override def listContracts[TCid <: ContractId[T], T <: Template](
       templateCompanion: TemplateCompanion[TCid, T],
       filter: Contract[TCid, T] => Boolean,
       limit: Option[Long],
@@ -195,7 +197,7 @@ class InMemoryMultiDomainAcsStore(
     }
   }
 
-  def lookupContractById[TCid <: ContractId[T], T <: Template](
+  override def lookupContractById[TCid <: ContractId[T], T <: Template](
       templateCompanion: TemplateCompanion[TCid, T]
   )(id: ContractId[T]): Future[Option[ContractWithState[TCid, T]]] = {
     requireInScope(templateCompanion)
@@ -203,6 +205,29 @@ class InMemoryMultiDomainAcsStore(
       case (contract, state) => ContractWithState(contract, state)
     })
   }
+
+  override def streamReadyForTransferIn(
+  ): Source[TransferEvent.Out, NotUsed] =
+    Source
+      .unfoldAsync(0: Long)(eventNumber => nextReadyForTransferIn(eventNumber).map(Some(_)))
+
+  private def nextReadyForTransferIn(
+      startingFromIncl: Long
+  ): Future[(Long, TransferEvent.Out)] = {
+    val st = stateVar
+    val optEntry = st.transferOutEvents.minAfter(startingFromIncl)
+    optEntry match {
+      case None =>
+        st.offsetChanged.future.flatMap(_ => nextReadyForTransferIn(st.nextTransferOutEventNumber))
+      case Some((eventNumber, out)) => Future((eventNumber + 1, out))
+    }
+  }
+
+  override def isReadyForTransferIn(transfer: TransferId): Future[Boolean] =
+    Future {
+      val state = stateVar
+      state.transferOutEventsById.contains(transfer)
+    }
 
   /** Testing APIs
     */
@@ -222,16 +247,7 @@ class InMemoryMultiDomainAcsStore(
 
 object InMemoryMultiDomainAcsStore {
 
-  import MultiDomainAcsStore.ContractState
-
-  case class TransferId(source: DomainId, id: String)
-
-  object TransferId {
-    def fromTransferIn(in: TransferEvent.In) =
-      TransferId(in.source, in.transferOutId)
-    def fromTransferOut(out: TransferEvent.Out) =
-      TransferId(out.source, out.transferOutId)
-  }
+  import MultiDomainAcsStore.{ContractState, TransferId}
 
   private case class ContractLocation(
       contractId: ContractId[_],
@@ -495,9 +511,10 @@ object InMemoryMultiDomainAcsStore {
       )
     }
 
-    def removeTransferOutIfBootstrap(transfer: TransferEvent.Out): (State, IngestionSummary) = {
-      val transferId = TransferId.fromTransferOut(transfer)
-      val cid = transfer.contractId
+    def removeTransferOutIfBootstrap(
+        cid: ContractId[_],
+        transferId: TransferId,
+    ): (State, IngestionSummary) = {
       if (bootstrapTransferOutIds.contains(transferId)) {
         transferOutEventsById.get(transferId) match {
           case None =>
