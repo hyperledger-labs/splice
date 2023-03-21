@@ -25,21 +25,15 @@ class SvcTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransforms(
-        (_, config) => {
-          // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
-            _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
-          )(config)
-        },
-        (_, config) => {
-          // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
-          // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
-            _.focus(_.enableUnclaimedRewardExpiration).replace(true)
-          )(config)
-        },
-      )
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .addConfigTransforms((_, config) => {
+        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
+        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
+        )(config)
+      })
 
   "auto-merge unclaimed rewards" in { implicit env =>
     val threshold =

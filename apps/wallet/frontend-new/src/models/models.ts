@@ -13,7 +13,7 @@ import {
   SubscriptionPayment,
   SubscriptionRequest,
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
-import { ContractId } from '@daml/types';
+import { Party, ContractId } from '@daml/types';
 
 import { ConvertedCurrency } from '../utils/currencyConversion';
 
@@ -21,14 +21,34 @@ export interface WalletBalance {
   availableCC: BigNumber;
 }
 
-export interface Transaction {
-  action: string;
-  recipientId: string;
-  providerId: string;
-  totalCCAmount: string;
-  totalUSDAmount: string;
-  conversionRate: string;
-  date: string;
+export type Transaction = Transfer | BalanceChange | Automation;
+export interface Transfer {
+  id: string;
+  transactionType: 'transfer';
+  receivers: TransactionReceiver[]; // will be empty for e.g. mergers & self-transfers
+  senderId: Party;
+  providerId: Party;
+  senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
+  date: Date;
+}
+export interface BalanceChange {
+  id: string;
+  transactionType: 'balance_change';
+  receivers: TransactionReceiver[];
+  date: Date;
+}
+export interface Automation {
+  // receivers is effectively the current user
+  id: string;
+  transactionType: 'automation';
+  providerId: Party;
+  senderAmountCC: BigNumber;
+  date: Date;
+}
+
+export interface TransactionReceiver {
+  amount: BigNumber;
+  party: Party;
 }
 
 export interface WalletTransferOffer {

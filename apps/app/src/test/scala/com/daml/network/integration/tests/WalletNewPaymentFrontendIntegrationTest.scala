@@ -18,6 +18,7 @@ class WalletNewPaymentFrontendIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(2)
 
   "A wallet payments UI" should {
@@ -74,8 +75,9 @@ class WalletNewPaymentFrontendIntegrationTest
           )(
             "The payment is processed",
             _ => {
-              // TODO (#3062): check that it appears in the history
-              aliceWallet.listAcceptedAppPayments() should have size 1
+              val tx = findAll(className("tx-row")).toSeq.last
+
+              matchTransaction(tx)(2, "Automation", None, BigDecimal("-1.5"))
 
               matchBalance("2.885", "5.77")
             },
@@ -132,8 +134,9 @@ class WalletNewPaymentFrontendIntegrationTest
           )(
             "The payment is processed",
             _ => {
-              // TODO (#3062): check that it appears in the history
-              aliceWallet.listAcceptedAppPayments() should have size 1
+              val tx = findAll(className("tx-row")).toSeq.last
+
+              matchTransaction(tx)(2, "Automation", None, BigDecimal("-2.75"))
 
               matchBalance("1.6225", "3.245")
             },

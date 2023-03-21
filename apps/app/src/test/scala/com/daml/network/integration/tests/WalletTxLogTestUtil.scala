@@ -12,13 +12,7 @@ trait WalletTxLogTestUtil extends CoinTestCommon with WalletTestUtil with TimeTe
   // Amount paid by `createSelfPaymentRequest()`
   val selfPaymentAmount: BigDecimal = BigDecimal(10.0)
 
-  // Upper bound for fees in any of the above transfers
-  val smallAmount: BigDecimal = BigDecimal(1.0)
-
   val scale = Numeric.Scale.assertFromInt(10)
-
-  def beWithin(lower: BigDecimal, upper: BigDecimal) =
-    be >= lower and be <= upper
 
   type CheckTxHistoryFn = PartialFunction[UserWalletTxLogParser.TxLogEntry, Assertion]
 

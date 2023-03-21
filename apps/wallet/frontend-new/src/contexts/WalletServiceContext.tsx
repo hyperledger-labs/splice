@@ -3,6 +3,7 @@ import { Contract, UserStatusResponse, useUserState } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,
+  ListTransactionsRequest,
   Middleware,
   RequestContext,
   ResponseContext,
@@ -20,12 +21,16 @@ import {
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 import {
+  Automation,
+  BalanceChange,
   ListAcceptedTransferOffersResponse,
   ListAppPaymentRequestsResponse,
   ListResponse,
   ListSubscriptionRequestsResponse,
   ListSubscriptionsResponse,
   ListTransferOffersResponse,
+  Transaction,
+  Transfer,
   WalletBalance,
 } from '../models/models';
 import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
@@ -40,6 +45,7 @@ export interface WalletClient {
   tap: (amount: string) => Promise<void>;
   list: () => Promise<ListResponse>;
   getBalance: () => Promise<WalletBalance>;
+  listTransactions: (beginAfterId?: string) => Promise<Transaction[]>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
@@ -100,6 +106,56 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         return {
           availableCC: new BigNumber(balance.effectiveUnlockedQty),
         };
+      },
+      listTransactions: async (beginAfterId?: string): Promise<Transaction[]> => {
+        const request: ListTransactionsRequest = { pageSize: 10, beginAfterId };
+        const response = await walletClient.listTransactions(request);
+        return response.items.flatMap<Transaction>(item => {
+          const id = item.eventId;
+          const receivers = (item.receivers || []).map(r => ({
+            amount: new BigNumber(r.amount),
+            party: r.party,
+          }));
+          const date = item.date;
+
+          if (item.transactionType === 'balance_change') {
+            const balanceChange: BalanceChange = {
+              transactionType: 'balance_change',
+              id,
+              date,
+              receivers,
+            };
+            return [balanceChange];
+          } else if (item.transactionType === 'transfer') {
+            const isAutomation = receivers.length === 0;
+            if (isAutomation) {
+              // TODO (#3616): this should be properly returned by the BE
+              const automation: Automation = {
+                transactionType: 'automation',
+                id,
+                date,
+                providerId: item.provider!,
+                senderAmountCC: new BigNumber(item.sender!.amount),
+              };
+              return [automation];
+            } else {
+              const transfer: Transfer = {
+                transactionType: 'transfer',
+                id,
+                date,
+                receivers,
+                // sender and provider MUST be available for transfer
+                providerId: item.provider!,
+                senderId: item.sender!.party,
+                senderAmountCC: new BigNumber(item.sender!.amount),
+              };
+              return [transfer];
+            }
+          } else {
+            console.error('Unsupported transaction type.', item);
+            return [];
+          }
+        });
       },
       createTransferOffer: async (
         receiverPartyId,

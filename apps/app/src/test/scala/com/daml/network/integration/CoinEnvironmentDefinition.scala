@@ -129,6 +129,13 @@ case class CoinEnvironmentDefinition(
       setup(env)
     })
 
+  def withoutAutomaticRewardsCollectionAndCoinMerging: CoinEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllAutomationConfigs(
+        _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
+      )(config)
+    )
+
   def withCoinPrice(price: BigDecimal): CoinEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 

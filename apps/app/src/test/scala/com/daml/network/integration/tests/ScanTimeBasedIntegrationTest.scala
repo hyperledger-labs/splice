@@ -10,8 +10,6 @@ import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CoinUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import scala.jdk.CollectionConverters.*
-import com.daml.network.config.CNNodeConfigTransforms
-import monocle.macros.syntax.lens.*
 
 class ScanTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -24,11 +22,7 @@ class ScanTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
-        )(config)
-      )
+      .withoutAutomaticRewardsCollectionAndCoinMerging
 
   "report correct reference data" in { implicit env =>
     scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 1

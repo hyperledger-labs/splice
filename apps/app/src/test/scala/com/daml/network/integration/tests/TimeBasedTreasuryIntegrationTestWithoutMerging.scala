@@ -32,12 +32,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   override def environmentDefinition: CoinEnvironmentDefinition = {
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) =>
-        // for testing that input limits are respected.
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
-        )(config)
-      )
+      // for testing that input limits are respected.
+      .withoutAutomaticRewardsCollectionAndCoinMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
         CNNodeConfigTransforms

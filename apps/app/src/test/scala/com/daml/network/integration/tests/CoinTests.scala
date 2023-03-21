@@ -28,6 +28,7 @@ import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import com.daml.network.util.CoinUtil
 import com.daml.network.integration.plugins.WaitForPorts
+import org.scalatest.matchers.Matcher
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -188,6 +189,11 @@ object CoinTests {
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)
     }
+
+    // Upper bound for fees in any of the above transfers
+    val smallAmount: BigDecimal = BigDecimal(1.0)
+    def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
+      be >= lower and be <= upper
 
     /** A function abstracting the common pattern of acting and then waiting for the action to
       * eventually have its expected results.

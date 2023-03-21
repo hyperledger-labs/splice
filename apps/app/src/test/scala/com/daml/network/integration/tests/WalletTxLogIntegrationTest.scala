@@ -10,7 +10,6 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import monocle.macros.syntax.lens.*
 
 import java.time.Duration
 import java.util.UUID
@@ -29,11 +28,7 @@ class WalletTxLogIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
-        )(config)
-      )
+      .withoutAutomaticRewardsCollectionAndCoinMerging
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(0.75)(config))
       // Some tests use the splitwell app to generate multi-party payments

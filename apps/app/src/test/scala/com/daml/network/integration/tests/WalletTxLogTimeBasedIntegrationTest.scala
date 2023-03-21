@@ -1,13 +1,11 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
-import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 class WalletTxLogTimeBasedIntegrationTest
@@ -22,11 +20,7 @@ class WalletTxLogTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
-        )(config)
-      )
+      .withoutAutomaticRewardsCollectionAndCoinMerging
   }
 
   "A wallet" should {
