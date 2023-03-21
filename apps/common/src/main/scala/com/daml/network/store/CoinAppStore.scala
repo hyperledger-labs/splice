@@ -38,6 +38,8 @@ trait CoinAppStore[
 
   def domains: DomainStore
 
+  def multiDomainAcsStore: MultiDomainAcsStore
+
   /** Orchestrate store and an ingestion sink for a newly-discovered domain. */
   private[network] def installNewPerDomainStore(
       domain: DomainId,

@@ -2,12 +2,11 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
-import com.daml.network.store.{AcsStore, TransferStore}
+import com.daml.network.store.MultiDomainAcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,8 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class UpdateIngestionService(
     ingestionTargetName: String,
-    acsIngestionSink: AcsStore.IngestionSink,
-    transferIngestionSink: TransferStore.IngestionSink,
+    ingestionSink: MultiDomainAcsStore.IngestionSink,
     domain: DomainId,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
@@ -31,13 +29,7 @@ class UpdateIngestionService(
     tracer: Tracer,
 ) extends LedgerIngestionService {
 
-  private val acsFilter = acsIngestionSink.ingestionFilter
-  private val transferFilter = transferIngestionSink.ingestionFilter
-
-  require(
-    acsFilter.primaryParty == transferFilter,
-    "acs and transfer filter are for the same party",
-  )
+  private val filter = ingestionSink.ingestionFilter
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
@@ -46,96 +38,41 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[CoinLedgerSubscription[?]] =
     for {
-      lastIngestedAcsOffset <- acsIngestionSink.getLastIngestedOffset
-      lastIngestedTransferOffset <- transferIngestionSink.getLastIngestedOffset(domain)
-      subscribeFrom <- (lastIngestedAcsOffset, lastIngestedTransferOffset) match {
-        case (None, None) =>
+      lastIngestedOffset <- ingestionSink.getLastIngestedOffset(domain)
+      subscribeFrom <- lastIngestedOffset match {
+        case None =>
           for {
             offset <- connection.ledgerEnd(domain).map {
-              // Documented as always being aboslute
+              // Documented as always being absolute
               case absolute: LedgerOffset.Absolute => absolute.getOffset
               case _ => sys.error("expected absolute offset")
             }
-            _ <- ingestInFlight(offset)
-            _ <- ingestAcs(offset)
+            _ <- ingestAcsAndInFlight(offset)
           } yield offset
-        case (None, Some(offset)) =>
-          ingestAcs(offset).map(_ => offset)
-        case (Some(off), None) =>
-          val msg =
-            show"Invalid state: ACS for domain $domain caught up to offset $off but no offset in transfer store"
-          logger.error(msg)
-          Future.failed(new IllegalStateException(msg))
-        case (Some(acsOffset), Some(transferOffset)) =>
-          if (acsOffset > transferOffset) {
-            val msg =
-              show"Invalid state: ACS for domain $domain caught up to offset $acsOffset but transfer store only caught up to offset $transferOffset"
-            logger.error(msg)
-            Future.failed(new IllegalStateException(msg))
-          } else if (acsOffset < transferOffset) {
-            logger.info(
-              show"Catching up ACS for domain $domain from offset $acsOffset to $transferOffset"
-            )
-            catchupAcs(acsOffset, transferOffset).map { _ =>
-              logger.info(show"Completed ACS catchup for domain $domain to offset $transferOffset")
-              transferOffset
-            }
-          } else {
-            Future.successful(transferOffset)
-          }
+        case Some(offset) => Future.successful(offset)
       }
     } yield connection.subscribeAsync(
       this.getClass.getSimpleName,
       loggerFactory,
       new LedgerOffset.Absolute(subscribeFrom),
       None,
-      acsFilter.primaryParty,
+      filter.primaryParty,
       domain,
-    ) { update =>
-      for {
-        _ <- transferIngestionSink.ingestUpdate(domain, update)
-        _ <- acsIngestionSink.ingestUpdate(update)
-      } yield ()
-    }
+    ) { ingestionSink.ingestUpdate(domain, _) }
 
-  /** Ingests the ACS at the given offset */
-  private def ingestAcs(
+  private def ingestAcsAndInFlight(
       offset: String
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
-      evs <- connection.activeContracts(domain, acsFilter, Some(new LedgerOffset.Absolute(offset)))
-      _ <- acsIngestionSink.ingestActiveContracts(evs)
-      _ <- acsIngestionSink.switchToIngestingTransactions(offset)
-    } yield ()
-  }
-
-  private def catchupAcs(
-      startOffset: String,
-      endOffset: String,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    val subscription = connection.subscribeAsync(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      new LedgerOffset.Absolute(startOffset),
-      Some(new LedgerOffset.Absolute(endOffset)),
-      acsFilter.primaryParty,
-      domain,
-    )(acsIngestionSink.ingestUpdate(_))
-    subscription.completed.map(_ => ())
-  }
-
-  private def ingestInFlight(
-      offset: String
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
+      evs <- connection.activeContracts(domain, filter, Some(new LedgerOffset.Absolute(offset)))
       tfs <- connection.getInFlightTransfers(
         domain,
-        transferIngestionSink.ingestionFilter,
+        filter.primaryParty,
         Some(new LedgerOffset.Absolute(offset)),
       )
-      _ <- transferIngestionSink.ingestInFlightTransfers(domain, tfs)
-      _ <- transferIngestionSink.switchToIngestingUpdates(domain, offset)
+      _ <- ingestionSink.ingestAcsAndTransferOuts(domain, evs, tfs)
+      _ <- ingestionSink.switchToIngestingUpdates(domain, offset)
     } yield ()
   }
 
