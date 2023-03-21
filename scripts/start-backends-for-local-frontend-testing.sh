@@ -11,7 +11,7 @@ echo "If you wish to skip this step, comment out the corresponding line"
 sbt --batch bundle
 
 echo "Generating config file ${OUTPUT_CONFIG} with self-signed tokens"
-scala -classpath $BUNDLE/lib/coin-0.1.0-SNAPSHOT.jar ./scripts/transform-config.sc "useSelfSignedTokensForLedgerApiAuth" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
+scala -classpath $BUNDLE/lib/cn-node-0.1.0-SNAPSHOT.jar ./scripts/transform-config.sc "useSelfSignedTokensForLedgerApiAuth" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
 
 echo "Starting Canton Network apps for local frontend testing"
 coin --config ${OUTPUT_CONFIG} --bootstrap ./apps/splitwell/frontend/bootstrap.sc --log-level-canton=DEBUG --log-encoder json --log-file-name log/coin.clog

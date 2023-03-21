@@ -103,6 +103,6 @@ rst_prolog = """
 .. |version_literal| replace:: ``{version}``
 .. |canton_version| replace:: {canton_research_version}
 
-.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_coin-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
+.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_cn-node-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
 .. |canton_research_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-{canton_research_version}.tar.gz">Download Canton research</a>`
 """.format(version = os.getenv("VERSION"), canton_research_version = canton_research_version)

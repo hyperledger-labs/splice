@@ -16,5 +16,5 @@ if [[ $# -ne 1 ]]; then
       ) >&2
 else
     echo "Printing resolved config for \`$1'" >&2
-    scala -classpath "$BUNDLE/lib/coin-0.1.0-SNAPSHOT.jar" ./scripts/print-config.sc "$1"
+    scala -classpath "$BUNDLE/lib/cn-node-0.1.0-SNAPSHOT.jar" ./scripts/print-config.sc "$1"
 fi

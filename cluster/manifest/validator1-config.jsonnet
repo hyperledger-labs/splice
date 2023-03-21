@@ -69,7 +69,7 @@ local deployments(config) = [
                extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator") + c.appUserNameEnvBinding("wallet") +
                             [
                               { name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" },
-                              { name: "CN_APP_DARS", json: ["coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
+                              { name: "CN_APP_DARS", json: ["cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
                             ]),
 

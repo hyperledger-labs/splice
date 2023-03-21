@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eou pipefail
+set -eoux pipefail
 
 # This script is a simplified version of Canton's analogue create-bundle.sh script
 # Usage: `./create-bundle.sh [-c <directory-to-copy-to-release-bundle]* [-r <file-location> <file-name-and-location-in-release-bundle>]*
@@ -8,14 +8,14 @@ set -eou pipefail
 
 # The app "binary" is just a shell script that calls the main JAR
 function adjust_shellscript_binary() {
-  REPLACE_VERSION=$(echo "$JAR" | sed -E 's/.*coin-([^-]+)-.*/\1/')
+  REPLACE_VERSION=$(echo "$JAR" | sed -E 's/.*cn-node-([^-]+)-.*/\1/')
   REPLACE_REVISION=$(git rev-parse HEAD)
   REPLACE_JVM_OPTS="-XX:+CrashOnOutOfMemoryError"
   REPLACE_JAR="lib\/$JAR"
   REPLACE_MAIN_CLASS="$MAIN_CLASS"
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
-  for file in "bin/coin" # TODO(#161): Canton supports windows. Do we want that too? "bin/coin.bat"
+  for file in "bin/cn-node" # TODO(#161): Canton supports windows. Do we want that too? "bin/cn-node.bat"
   do
       cat "$RELEASE_DIR"/$file |
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
@@ -34,9 +34,9 @@ function adjust_shellscript_binary() {
 set -euo pipefail
 
 JARFILE=$1
-# e.g. coin-0.1.0-SNAPSHOT.jar
+# e.g. cn-node-0.1.0-SNAPSHOT.jar
 JAR=$(basename "$JARFILE")
-# e.g. coin-0.1.0-SNAPSHOT
+# e.g. cn-node-0.1.0-SNAPSHOT
 RELEASE=$(echo $JAR | sed -e 's/\.jar$//')
 
 RELEASES_DIR=$(dirname $JARFILE)/../release
@@ -134,8 +134,8 @@ zip -rq "${RELEASE}.zip" "$RELEASE"/* &
 wait
 
 # finally, add a stable link to the directory
-rm -f coin
-ln -s "$RELEASE" coin
+rm -f cn-node
+ln -s "$RELEASE" cn-node
 
 echo "Successfully created release bundle for release $RELEASE"
 echo "Folders with binaries: $RELEASE_DIR/bin"

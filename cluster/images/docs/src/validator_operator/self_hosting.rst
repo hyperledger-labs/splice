@@ -29,7 +29,7 @@ Please now extract Canton:
    tar xzvf canton-research-|canton_version|.tar.gz
 
 
-To obtain the Canton Coin network binary (required to run validator
+To obtain the Canton Network node binary (required to run validator
 and wallet apps), please download a release bundle here:
 |bundle_download_link|. (Source is available by cloning the
 `the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_
@@ -41,8 +41,8 @@ root directory. The commands will look similar to these:
 
 .. parsed-literal::
 
-  tar xzvf |version|\_coin-0.1.0-SNAPSHOT.tar.gz
-  cd coin-0.1.0-SNAPSHOT
+  tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+  cd cn-node-0.1.0-SNAPSHOT
 
 .. _validator_onboarding:
 
@@ -57,8 +57,8 @@ To operate a validator node you will need to:
 The Canton participant is responsible for hosting your Daml apps; i.e. interpreting Daml code, securing your data, and talking to the public canton network. It connects to the global canton domain `canton.global`. We provide a bootstrap script to handle these steps for you. You can refer to the `canton tutorial <https://docs.daml.com/canton/tutorials/getting_started.html>`_ for greater detail on what each step does.
 
 ..
-   We recommend respectively adding the paths to the Canton and Canton Coin network binaries from your release
-   bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
+   We recommend respectively adding the paths to the Canton and Canton Network node binaries from your release
+   bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/cn-node/bin/cn-node`) to your PATH as `canton` and `cn-node`.
    This is also the convention we will use in this tutorial.
 
 First off, you will need to start the validator participant and connect it to the domain: We assume here that
@@ -81,7 +81,7 @@ You can now start a console with the CN apps. Use the following command, making 
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 The `validator-onboarding.conf` enables the validator to request its onboarding from the sponsoring supervalidator.
 Upon verification of the onboarding secret, the sponsoring supervalidator issues a `ValidatorLicense` to the validator party and exposes a `CoinRules` contract to it.
@@ -354,7 +354,7 @@ NETWORK_AUTH_LEDGER_API_AUDIENCE      The audience you configured for the ``Daml
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
 
 Note that if your validator is not onboarded yet, you will need to extend this command with a `--config validator-onboarding.conf` as described in :ref:`validator_onboarding`.
 
@@ -432,7 +432,7 @@ NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to a
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
 
 7. Refresh your browser with the wallet UI, log out of any user you may be logged in as, and login again using the validator admin user defined above.
 

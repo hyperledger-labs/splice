@@ -6,7 +6,7 @@ SHELL=/usr/bin/env bash
 
 current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 
-app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
+app-bundle := ${REPO_ROOT}/apps/app/target/release/cn-node-0.1.0-SNAPSHOT.tar.gz
 
 canton-coin-dar := ${REPO_ROOT}/daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar
 directory-service-dar := ${REPO_ROOT}/daml/directory-service/.daml/dist/directory-service-0.1.0.dar

@@ -107,7 +107,7 @@ local deployments(config) = [
                                                                    canton.validator-apps.validator_backend.app-instances.splitwise = {
                                                                      service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}
                                                                      wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}
-                                                                     dars = ["coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
+                                                                     dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
                                                                    }
                                                                  |||,
                                                                },

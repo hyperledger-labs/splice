@@ -53,14 +53,14 @@ Request a validator onboarding secret...
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
 
 Now you can finally start the app backend. Splitwell is included as
 part of the standard release so it is started using the same binary.
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell.conf
 
 With the backend running, you can connect to it as a given user. Here,
 we reuse the participant and the users ``alice`` and ``bob`` created
@@ -87,7 +87,7 @@ earlier.
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-users.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-users.conf
 
 To verify that you setup everything correctly, create an install
 request for ``alice`` followed by creating a group and listing your
@@ -138,13 +138,13 @@ Next start up the validator:
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
 
 And now start the app backend. Note that this time, we are configuring it to operate on the domain we started earlier:
 
 .. parsed-literal::
 
-   NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global SPLITWELL_APP_DOMAIN=splitwell bin/coin --config examples/splitwell/splitwell.conf
+   NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global SPLITWELL_APP_DOMAIN=splitwell bin/cn-node --config examples/splitwell/splitwell.conf
 
 With the backend running, you can connect to it as a given user. Here,
 we reuse the participant and the users ``alice`` and ``bob`` created
@@ -168,7 +168,7 @@ single-domain case as well which allows you to interact through
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/coin --config examples/splitwell/splitwell-users.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-users.conf
 
 To validate that the setup works correctly, try creating a group: ::
 

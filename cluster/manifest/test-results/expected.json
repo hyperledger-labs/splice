@@ -2331,7 +2331,7 @@
                            },
                            {
                               "name": "CN_APP_DARS",
-                              "value": "[\"coin-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar\", \"coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]"
+                              "value": "[\"cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar\", \"cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS",
@@ -3582,7 +3582,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG",
-                              "value": "canton.validator-apps.validator_backend.app-instances.splitwise = {\n  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"coin-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]\n}\n"
+                              "value": "canton.validator-apps.validator_backend.app-instances.splitwise = {\n  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",

@@ -13,11 +13,11 @@ RUN mkdir /app
 WORKDIR /app
 
 # move tarball to a static name
-ADD target/coin-0.1.0-SNAPSHOT.tar.gz .
+ADD target/cn-node-0.1.0-SNAPSHOT.tar.gz .
 
 COPY empty.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sc /app/
 
-RUN ln -s coin-0.1.0-SNAPSHOT/bin/coin cn-image-bin
+RUN ln -s cn-node-0.1.0-SNAPSHOT/bin/cn-node cn-image-bin
 
-# point entrypoint to the coin executable
+# point entrypoint to the cn-node executable
 ENTRYPOINT /app/entrypoint.sh

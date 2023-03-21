@@ -788,8 +788,8 @@ lazy val `apps-app` =
       assembly / test := {}, // don't run tests during assembly
       // when building the fat jar, we need to properly merge our artefacts
       assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
-      assembly / mainClass := Some("com.daml.network.CoinApp"),
-      assembly / assemblyJarName := s"coin-${version.value}.jar",
+      assembly / mainClass := Some("com.daml.network.CNNodeApp"),
+      assembly / assemblyJarName := s"cn-node-${version.value}.jar",
     )
 
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
