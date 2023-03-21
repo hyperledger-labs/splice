@@ -19,11 +19,11 @@ class SvOnboardingTokenTest extends AsyncWordSpec with BaseTest {
       )
       .value
 
-    // keys generated using scripts/generate-sv-keys.sc
+    // keys generated using scripts/generate-sv-keys.sh
     val publicKey =
-      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+U0mKc9YlTZFESl0A4tac6fhxFfXflo6lkNUhLMvgal0054Lm4mOsqQOigpIroALXha4u25bZ7PDvT32cZx/9g=="
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmeNnFncZa2O0wNLaoq3KNrlF5GpbpF4ZfIXcvqPFxtSMm5rL3sxjf6NY1GnHncrT9MZgfWuU161Y2FM1pEZ1Zg=="
     val privateKey =
-      "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCCOrvvs/R+VKFZ/eET1CkgwY15apSI7FSWngvEs44+xiQ=="
+      "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgtYbz4yBUZofTNVGjwg+QR6M3Ku1LP7RZJAPfokjDbWWhRANCAASZ42cWdxlrY7TA0tqirco2uUXkalukXhl8hdy+o8XG1IybmsvezGN/o1jUacedytP0xmB9a5TXrVjYUzWkRnVm"
 
     val token = SvOnboardingToken("SvX", publicKey, candidateParty, svcParty)
 

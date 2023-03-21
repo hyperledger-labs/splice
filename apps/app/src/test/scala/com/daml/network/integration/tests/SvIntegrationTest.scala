@@ -227,7 +227,7 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
           // if this check fails:
           // make sure that the values (especially the key) are in sync with sv1's config file
           approvedSvId.data.candidateName shouldBe "sv4"
-          approvedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
+          approvedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
         }
       }
     }
@@ -294,7 +294,7 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
               .verifyAndDecode(svOnboarding.data.token)
               .value shouldBe SvOnboardingToken(
               "sv4",
-              "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==",
+              "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
               sv4Party,
               svcParty,
             )
