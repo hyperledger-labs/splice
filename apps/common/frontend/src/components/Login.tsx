@@ -1,16 +1,26 @@
+import * as React from 'react';
 import { useState } from 'react';
 
-import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
+import { Person } from '@mui/icons-material';
+import { Button, Divider, InputAdornment, OutlinedInput, Stack, Typography } from '@mui/material';
+import Container from '@mui/material/Container';
 
 import { isHs256UnsafeAuthConfig } from '../config';
 import { AuthConfig, TestAuthConfig } from '../config/schema';
 import { useUserState } from '../contexts';
+import { theme } from '../theme';
 
-const Login: React.FC<{
+interface LoginProps {
   title: string;
   authConfig: AuthConfig;
   testAuthConfig?: TestAuthConfig;
-}> = ({ title, authConfig, testAuthConfig }) => {
+}
+
+const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig }) => {
+  // We have some integration tests that do Auth0 login tests and others that do self-signed token login tests,
+  // but because we start the UIs outside sbt they have one static config.
+  // So for tests the UI must support both algorithms at the same time;
+  // for validator operator users, the algorithm choice should be mutually exclusive.
   const mainLoginPrompt = isHs256UnsafeAuthConfig(authConfig) ? (
     <SstLoginPrompt
       secret={authConfig.secret}
@@ -20,91 +30,105 @@ const Login: React.FC<{
   ) : (
     <OidcLoginPrompt />
   );
+
   const testLoginPrompt = testAuthConfig ? (
     <>
-      <Chip label="OR" sx={{ margin: '25px 0px' }} />
+      <Divider flexItem>OR</Divider>
       <SstLoginPrompt
-        title="Use Test Auth"
         secret={testAuthConfig.secret}
         audience={testAuthConfig.token_audience}
         scope={testAuthConfig.token_scope}
       />
     </>
   ) : undefined;
+
   return (
-    <Grid
-      height="100%"
-      container
-      spacing={0}
-      direction="column"
-      alignItems="center"
-      justifyContent="center"
-    >
-      <Typography variant="h4" sx={{ marginBottom: '15px' }}>
-        {title}
-      </Typography>
+    <Container maxWidth="xs">
+      <Stack alignItems="center" paddingTop={16} spacing={4}>
+        <Typography
+          variant="h5"
+          textTransform="uppercase"
+          fontFamily={theme.fonts.monospace.fontFamily}
+          fontWeight={theme.fonts.monospace.fontWeight}
+        >
+          {title}
+        </Typography>
 
-      {mainLoginPrompt}
+        {mainLoginPrompt}
 
-      {testLoginPrompt}
-    </Grid>
+        {testLoginPrompt}
+      </Stack>
+    </Container>
   );
 };
 
-function normalizeUserId(candidateId: string): string | undefined {
-  // Return a normalized user ID, only if a valid user ID exists.
-  const id = candidateId.trim();
+/**
+ * OIDC is for OpenIDConnect. This is what Auth0 (and providers like Google) use.
+ */
+const OidcLoginPrompt: React.FC = () => {
+  const { loginWithOidc } = useUserState();
+  return (
+    <Button id="oidc-login-button" variant="pill" fullWidth size="large" onClick={loginWithOidc}>
+      Log In with OAuth2
+    </Button>
+  );
+};
 
-  if (id.match(/^[a-zA-Z0-9@^$.!`\-#+'~_|:]{1,128}$/)) {
-    return id;
-  }
-}
-
-const SstLoginPrompt: React.FC<{
-  title?: string;
+interface SstLoginPromptProps {
   secret: string;
   audience: string;
   scope?: string;
-}> = ({ title, secret, audience, scope }) => {
+}
+/**
+ * SST is our abbreviation for "Self-Signed Token".
+ * These are JWT tokens that are signed with some symmetric secret with HS256.
+ */
+const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope }) => {
   const [userId, setUserId] = useState<string>('');
-  const { loginWithSst } = useUserState();
+  const isValidUserId = validateUserId(userId);
 
-  const invalidUserId = userId.length > 0 && !normalizeUserId(userId);
+  const { loginWithSst } = useUserState();
 
   return (
     <>
-      {title && (
-        <Typography variant="h5" sx={{ marginBottom: '8px' }}>
-          {title}
-        </Typography>
-      )}
-      <TextField
-        label="Daml User ID"
-        required
+      <OutlinedInput
         id="user-id-field"
         value={userId}
-        error={invalidUserId}
-        helperText={invalidUserId ? 'Invalid User Id' : undefined}
-        onChange={uid => setUserId(uid.target.value)}
-        onKeyPress={ev => {
-          if (ev.key === 'Enter') {
-            const id = normalizeUserId(userId);
-            if (id) {
-              loginWithSst(id, secret, audience, scope);
-              ev.preventDefault();
-            }
+        error={!isValidUserId}
+        onChange={evt => setUserId(evt.target.value)}
+        onKeyDown={evt => {
+          if (evt.key === 'Enter') {
+            loginWithSst(userId, secret, audience, scope);
+            evt.preventDefault();
           }
         }}
+        fullWidth
+        placeholder="Username for test login"
+        startAdornment={
+          // https://stackoverflow.com/questions/69554151/how-to-change-material-ui-textfield-inputadornment-background-color
+          <InputAdornment
+            sx={{
+              padding: theme.spacing(3.5, 2.5),
+              backgroundColor: theme.palette.colors.neutral[20],
+              borderRadius: '9999px 0 0 9999px',
+            }}
+            position="start"
+          >
+            <Person htmlColor="white" />
+          </InputAdornment>
+        }
+        sx={{ borderRadius: '9999px', paddingLeft: 0 }}
       />
       <Button
-        variant="contained"
-        disabled={!normalizeUserId(userId)}
-        sx={{ marginTop: '15px' }}
+        id="login-button"
+        variant="pill"
+        fullWidth
+        size="large"
+        disabled={!isValidUserId}
         onClick={e => {
           e.preventDefault();
-          loginWithSst(normalizeUserId(userId) || '', secret, audience, scope);
+          loginWithSst(userId, secret, audience, scope);
         }}
-        id="login-button"
       >
         Log In
       </Button>
@@ -112,13 +136,11 @@ const SstLoginPrompt: React.FC<{
   );
 };
 
-const OidcLoginPrompt: React.FC = () => {
-  const { loginWithOidc } = useUserState();
-  return (
-    <Button variant="outlined" onClick={loginWithOidc} id="oidc-login-button">
-      Log in with OAuth2
-    </Button>
-  );
-};
+/**
+ * @returns True if candidateId is a valid user ID, False otherwise.
+ */
+function validateUserId(candidateId: string): boolean {
+  return candidateId.length > 0 && !!candidateId.match(/^[a-zA-Z0-9@^$.!`\-#+'~_|:]{1,128}$/);
+}
 
 export default Login;
