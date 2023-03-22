@@ -121,6 +121,9 @@ class CoinLedgerConnection(
     )
   }
 
+  // When using submitAndWaitForTransaction with a command whose resulting transaction is
+  // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
+  // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.
   def submitCommandsNoDedupTransaction(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
@@ -179,6 +182,28 @@ class CoinLedgerConnection(
     submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts).map(
       _._2
     )
+
+  def submitWithResultAndOffset[T](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: Update[T],
+      commandId: CommandId,
+      deduplicationOffset: String,
+      domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+  ): Future[(String, T)] = {
+    doSubmitWithResultAndOffset(
+      actAs,
+      readAs,
+      update,
+      commandId.commandIdForSubmission,
+      DedupOffset(
+        offset = deduplicationOffset
+      ),
+      domainId,
+      disclosedContracts,
+    )
+  }
 
   def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],

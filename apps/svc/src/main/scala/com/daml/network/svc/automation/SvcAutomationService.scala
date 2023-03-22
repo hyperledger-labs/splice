@@ -36,13 +36,5 @@ class SvcAutomationService(
     ) {
 
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, store, connection))
-  registerTrigger(
-    new ArchiveClosedMiningRoundsTrigger(
-      triggerContext,
-      store,
-      connection,
-      config.automation.enableUnclaimedRewardExpiration,
-    )
-  )
   registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, store, connection))
 }

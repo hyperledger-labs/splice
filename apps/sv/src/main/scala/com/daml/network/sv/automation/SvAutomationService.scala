@@ -46,6 +46,14 @@ class SvAutomationService(
   registerTrigger(new SvcPartyHostingTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
+  registerTrigger(
+    new ArchiveClosedMiningRoundsTrigger(
+      triggerContext,
+      svcStore,
+      connection,
+      config.automation.enableUnclaimedRewardExpiration,
+    )
+  )
   if (config.automation.enableUnclaimedRewardExpiration) {
     registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svcStore, connection))
   }

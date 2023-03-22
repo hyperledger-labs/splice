@@ -2,13 +2,14 @@ package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMiningRound}
 import com.daml.network.codegen.java.cn.svcrules.Confirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
 import com.daml.network.environment.CoinLedgerConnection
@@ -109,6 +110,10 @@ class ExecuteConfirmedActionTrigger(
               val sumRoundCid =
                 startIssuingAction.coinRules_MiningRound_StartIssuingValue.miningRoundCid
               acs.lookupContractById(SummarizingMiningRound.COMPANION)(sumRoundCid).map(_.isEmpty)
+            case archiveAction: CRARC_MiningRound_Archive =>
+              val closedRoundCid =
+                archiveAction.coinRules_MiningRound_ArchiveValue.closedRoundCid
+              acs.lookupContractById(ClosedMiningRound.COMPANION)(closedRoundCid).map(_.isEmpty)
             case action =>
               throw new UnsupportedOperationException(
                 show"coin rules $action is not yet supported"

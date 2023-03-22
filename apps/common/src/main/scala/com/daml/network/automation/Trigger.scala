@@ -40,7 +40,7 @@ case class TriggerContext(
     loggerFactory: NamedLoggerFactory,
 )
 
-sealed trait TaskOutcome
+sealed trait TaskOutcome extends Product with Serializable
 
 /** Helper class for modelling the outcome of a task handled by a trigger.
   *

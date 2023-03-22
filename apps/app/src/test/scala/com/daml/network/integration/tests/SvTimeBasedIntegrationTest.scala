@@ -75,66 +75,44 @@ class SvTimeBasedIntegrationTest
       getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
     )
 
-    // Note: below we are checking that the "successfully archived closed mining round" line appears in the log.
-    // That line is not printed immediately after the ClosedMiningRound is archived, but only after the archive
-    // event is ingested back to the acsStore in the SVC app (see ArchiveClosedMiningRoundsTrigger.tryArchivingClosedRound).
-    // Therefore we need to use assertEventuallyLogsSeq.
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-      {
-        val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
-        // next tick - issuing round 0 can be closed
-        // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
-        advanceTime(java.time.Duration.ofSeconds(160))
-        eventually() {
-          // Check for closing mining round in transactions instead of acs
-          // to guard against automation archiving it concurrently.
-          val transactions =
-            svc.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
-              .treesJava(
-                Set(svcParty),
-                completeAfter = Int.MaxValue,
-                beginOffset = offsetBefore,
-                endOffset =
-                  Some(new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_END)),
-              )
-          val rounds =
-            transactions.flatMap(
-              DecodeUtil.decodeAllCreatedTree(cc.round.ClosedMiningRound.COMPANION)(_)
-            )
-          rounds should have size 1
-        }
-        eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
-          getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
-        )
-        // Advance time again to let automation kick-in and archive closed mining round
-        // TODO(tech-debt): generalize and reuse in other tests
-        advanceTime(
-          env.actualConfig.svcApp
-            .getOrElse(fail("svc backend config not found"))
-            .automation
-            .pollingInterval
-            .duration
-        )
-        clue("Wait until the closed round is archived") {
-          eventually()(
-            svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
+    val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+    // next tick - issuing round 0 can be closed
+    // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
+    advanceTime(java.time.Duration.ofSeconds(160))
+    eventually() {
+      // Check for closing mining round in transactions instead of acs
+      // to guard against automation archiving it concurrently.
+      val transactions =
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+          .treesJava(
+            Set(svcParty),
+            completeAfter = Int.MaxValue,
+            beginOffset = offsetBefore,
+            endOffset =
+              Some(new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_END)),
           )
-        }
-      },
-      entries => {
-        forAtLeast(1, entries)(
-          _.message should include(
-            "successfully created the closed mining round with cid"
-          )
+      val rounds =
+        transactions.flatMap(
+          DecodeUtil.decodeAllCreatedTree(cc.round.ClosedMiningRound.COMPANION)(_)
         )
-        forAtLeast(1, entries)(
-          _.message should include(
-            "successfully archived closed mining round"
-          )
-        )
-      },
+      rounds should have size 1
+    }
+    eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
+      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
     )
+
+    // advance time by 2 polling intervals to ensure that the automations
+    // to create confirmation contracts for archival and then executing the confirmations
+    // have both run
+    advanceTimeByPollingInterval(sv1)
+    advanceTimeByPollingInterval(sv1)
+    clue("Wait until the closed round is archived") {
+      eventually()(
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
+      )
+    }
+
   }
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
