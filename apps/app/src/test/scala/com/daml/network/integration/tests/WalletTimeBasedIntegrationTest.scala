@@ -447,10 +447,6 @@ class WalletTimeBasedIntegrationTest
       val (_, bobUserParty, _, splitwellProviderParty, key, _) =
         initSplitwellTest()
 
-      // TODO(#2871) Remove this again once the transfer no longer ends up picking the wrong
-      // topology time.
-      advanceTime(Duration.ofSeconds(30))
-
       aliceWallet.tap(350.0)
 
       def transferAndCheckRewards(expectedAppRewardsRange: (BigDecimal, BigDecimal)) = {

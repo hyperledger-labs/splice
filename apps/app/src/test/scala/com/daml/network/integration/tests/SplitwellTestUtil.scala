@@ -6,12 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.console.SplitwellAppClientReference
 import com.daml.network.console.WalletAppClientReference
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.time.RemoteClock
-
-import java.time.Duration
-import org.slf4j.event.Level
 
 trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTestUtil {
   def initSplitwellTest()(implicit
@@ -22,12 +17,6 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
     val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
     // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready
     waitForWalletUser(splitwellProviderWallet)
-
-    // TODO(#2871) Remove this again once the transfer no longer ends up picking the wrong
-    // topology time.
-    if (isSimTime()) {
-      advanceTime(Duration.ofSeconds(30))
-    }
 
     val splitwellProviderParty = providerSplitwellBackend.getProviderPartyId()
 
@@ -70,52 +59,25 @@ trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTest
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key, invite)
   }
 
-  private def isSimTime()(implicit env: CoinTestConsoleEnvironment): Boolean =
-    env.environment.clock match {
-      case _: RemoteClock =>
-        true
-      case _ => false
-    }
-
-  def syncOnTransfers[A](numTransfers: Int, act: => A)(implicit
-      env: CoinTestConsoleEnvironment
-  ) =
-    if (isSimTime()) {
-      // TODO(#2864) Remove workarounds for buggy transfers in simtime. For now, we need to
-      // advance time manually after the transfer out has been submitted.
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
-        act,
-        forExactly(numTransfers, _)(
-          _.message should include("Submitted transfer to ledger, waiting for completion")
-        ),
-      )
-      advanceTime(Duration.ofSeconds(5))
-    } else {
-      act
-    }
-
   def splitwellTransfer(
       senderSplitwell: SplitwellAppClientReference,
       senderWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
       key: GrpcSplitwellAppClient.GroupKey,
-  )(implicit env: CoinTestConsoleEnvironment) = {
-    syncOnTransfers(
-      2,
-      senderSplitwell.initiateTransfer(
-        key,
-        Seq(
-          new walletCodegen.ReceiverCCAmount(
-            receiver.toProtoPrimitive,
-            amount.bigDecimal,
-          )
-        ),
+  ) = {
+    senderSplitwell.initiateTransfer(
+      key,
+      Seq(
+        new walletCodegen.ReceiverCCAmount(
+          receiver.toProtoPrimitive,
+          amount.bigDecimal,
+        )
       ),
     )
     eventually()(senderWallet.listAppPaymentRequests() should not be empty)
     inside(senderWallet.listAppPaymentRequests()) { case Seq(request) =>
-      syncOnTransfers(1, senderWallet.acceptAppPaymentRequest(request.contractId))
+      senderWallet.acceptAppPaymentRequest(request.contractId)
     }
 
   }

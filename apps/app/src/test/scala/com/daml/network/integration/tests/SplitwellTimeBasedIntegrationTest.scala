@@ -105,16 +105,14 @@ class SplitwellTimeBasedIntegrationTest
     )
     bobWallet.tap(710)
     clue("Splitwell transfer with round change right after payment request") {
-      syncOnTransfers(
-        2,
-        bobSplitwell.initiateTransfer(
-          key,
-          Seq(
-            new walletCodegen.ReceiverCCAmount(
-              aliceUserParty.toProtoPrimitive,
-              BigDecimal(50.0).bigDecimal,
-            )
-          ),
+
+      bobSplitwell.initiateTransfer(
+        key,
+        Seq(
+          new walletCodegen.ReceiverCCAmount(
+            aliceUserParty.toProtoPrimitive,
+            BigDecimal(50.0).bigDecimal,
+          )
         ),
       )
       eventually()(bobWallet.listAppPaymentRequests() should not be empty)

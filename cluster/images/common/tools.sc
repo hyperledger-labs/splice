@@ -1,5 +1,4 @@
 import cats.syntax.functor._
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.admin.api.client.data.User
 import io.circe._
@@ -110,16 +109,16 @@ def resolveEnv(env: EnvSubst): String =
 
 def resolvePrimaryParty(p: ParticipantReference, primaryParty: PrimaryParty) =
   primaryParty match {
-    case AllocateParty(allocate) => p.ledger_api.parties.allocate(allocate, allocate).party
+    case AllocateParty(allocate) => PartyId.tryFromProtoPrimitive(p.ledger_api.parties.allocate(allocate, allocate).party)
     case PartyFromUser(env) =>
-      p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
+      PartyId.tryFromProtoPrimitive(p.ledger_api.users.get(resolveEnv(env)).primaryParty.get)
   }
 
-def resolvePartyRef(p: ParticipantReference, self: LfPartyId, ref: PartyRef) =
+def resolvePartyRef(p: ParticipantReference, self: PartyId, ref: PartyRef) =
   ref match {
     case PartyFromSelf(_) => self
     case PartyFromOther(env) =>
-      p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
+      PartyId.tryFromProtoPrimitive(p.ledger_api.users.get(resolveEnv(env)).primaryParty.get)
   }
 
 def createUser(p: ParticipantReference, user: UserDef) = {

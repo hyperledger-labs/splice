@@ -327,9 +327,9 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
         @ validatorParticipant.ledger_api.users.create(
               id = "$CLIENT_ID@clients",
-              actAs = Set(validatorParty.toLf),
+              actAs = Set(validatorParty),
               readAs = Set.empty,
-              primaryParty = Some(validatorParty.toLf),
+              primaryParty = Some(validatorParty),
               participantAdmin = true,
           )
         res5: User = User(id = "0wricJfT4Zm5RfBYhGKnyi695mzTXGsn@clients", primaryParty = Some(value = "validator_service_user::12207d5f2bee9947583e39ae8a890963e9a09b32bcbd47c44329408d144e0f6e2ae1"), isActive = true, annotations = Map())
