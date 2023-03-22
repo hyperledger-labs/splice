@@ -45,12 +45,12 @@ data SvcRules_ActionRequiringConfirmation
   | SRARC_ConfirmSv SvcRules_ConfirmSv
   deriving (Eq, Show)
 
--- | Information about members relevant to consortium governance.
+-- | Information about members relevant to collective governance.
 data MemberInfo = MemberInfo with
     joinedAsOfRound : Round
   deriving (Eq, Show)
 
-data ConsortiumSummary = ConsortiumSummary with
+data CollectiveSummary = CollectiveSummary with
     leader : Party
     numMembers : Int
     requiredNumConfirmations : Int
@@ -85,7 +85,7 @@ template ElectionRequest with
     ranking : [Party] -- preference ranking for new leaders
   where
     -- NOTE: we expect the requester to observe this contract through being
-    -- a backing member of the 'svc' consortium party. The requester can in
+    -- a backing member of the 'svc' collective party. The requester can in
     -- particular not be a signatory, as otherwise fetching and archiving of
     -- the request would require the requesters confirmation instead of only
     -- the confirmation of the 'svc'.
@@ -133,12 +133,12 @@ data SvcRulesConfig = SvcRulesConfig with
     svOnboardingTimeout : RelTime -- ^ The time after contracts representing an incomplete onboarding are archived.
   deriving (Eq, Show)
 
--- SV Consortium rules
+-- SV Collective rules
 ----------------------
 
--- | Rules governing the consortium.
+-- | Rules governing the collective.
 template SvcRules with
-    svc : Party        -- ^ The consortium party representing this consortium
+    svc : Party        -- ^ The collective party representing this collective
     epoch : Int        -- ^ The number of leaders that have already been elected.
     nextMiningRound : Round
     members : Map.Map Party MemberInfo
@@ -151,7 +151,7 @@ template SvcRules with
 
     -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the members are indirect signatories by being backing
-    -- members of the 'svc' consortium party.
+    -- members of the 'svc' collective party.
     signatory svc
 
 
@@ -215,7 +215,7 @@ template SvcRules with
       controller requester
       do
         -- TODO(M3-46): consider interaction with concurrent membership changes
-        require "Requester is a consortium member" (requester `Map.member` members)
+        require "Requester is a collective member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
         create ElectionRequest with
           ..
@@ -226,13 +226,13 @@ template SvcRules with
         requestCids : [ContractId ElectionRequest]
       controller actor
       do
-        let summary = summarizeConsortium this
+        let summary = summarizeCollective this
         -- fetch, check, and archive all requests
         reqs <- forA requestCids $ \requestCid -> do
           req <- fetch requestCid
           archive requestCid
           require "Request is for this epoch" (req.epoch == epoch)
-          require "Requestor is a consortium member" (req.requester `Map.member` members)
+          require "Requestor is a collective member" (req.requester `Map.member` members)
           pure req
         let numVotes = length reqs
             numVoters = numVotes
@@ -271,7 +271,7 @@ template SvcRules with
         action : ActionRequiringConfirmation
       controller confirmer
       do
-        require "Confirmer is a consortium member" (confirmer `Map.member` members)
+        require "Confirmer is a collective member" (confirmer `Map.member` members)
         create Confirmation with
           svc
           confirmer
@@ -283,13 +283,13 @@ template SvcRules with
         confirmationCids : [ContractId Confirmation]
       controller leader
       do
-        let s = summarizeConsortium this
+        let s = summarizeCollective this
         require "Enough confirmations" (length confirmationCids >= s.requiredNumConfirmations)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetch confirmationCid
           archive confirmationCid
           require "SVC matches" (confirmation.svc == svc)
-          require "Confirmer is a consortium member" (confirmation.confirmer `Map.member` members)
+          require "Confirmer is a collective member" (confirmation.confirmer `Map.member` members)
           require "Confirmed action matches" (confirmation.action == action)
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
@@ -307,7 +307,7 @@ template SvcRules with
         validator : Party
       controller sponsor
       do
-        require "Sponsor is a consortium member" (sponsor `Map.member` members)
+        require "Sponsor is a collective member" (sponsor `Map.member` members)
         create ValidatorLicense with ..
 
 
@@ -322,7 +322,7 @@ template SvcRules with
         sponsor : Party
       controller sponsor
       do
-        require "Sponsor is a consortium member" (sponsor `Map.member` members)
+        require "Sponsor is a collective member" (sponsor `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingTimeout
         create SvOnboarding with ..
@@ -452,8 +452,8 @@ template SvcRules with
 -- Utility functions
 --------------------
 
-summarizeConsortium : SvcRules -> ConsortiumSummary
-summarizeConsortium c = ConsortiumSummary with
+summarizeCollective : SvcRules -> CollectiveSummary
+summarizeCollective c = CollectiveSummary with
     leader = c.leader
     numMembers
     requiredNumConfirmations = 2 * (numMembers - 1) / 3 + 1

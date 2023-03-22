@@ -28,8 +28,8 @@ import CC.Scripts.Parameters
 testLeaderElection : Script ()
 testLeaderElection = do
 
-  (app, svc, (mallory, sv1, sv2, sv3)) <- initConsortium
-  -- we now have a consortium with BFT for f = 1, and mallory is the leader
+  (app, svc, (mallory, sv1, sv2, sv3)) <- initCollective
+  -- we now have a collective with BFT for f = 1, and mallory is the leader
 
   -- run an issuance
   runNextIssuanceD app 1.0
@@ -99,8 +99,8 @@ testLeaderElection = do
 
 testUnclaimedRewards : Script ()
 testUnclaimedRewards = do
-  (app, _, _) <- initConsortium
-  -- we now have a consortium with BFT for f = 1
+  (app, _, _) <- initCollective
+  -- we now have a collective with BFT for f = 1
 
   -- onboard a validator
   validator1 <- setupValidator app "validator1"
@@ -123,8 +123,8 @@ testUnclaimedRewards = do
 
 testOnboardValidator : Script ()
 testOnboardValidator = do
-  (app, svc, (_, sv2, _, _)) <- initConsortium
-  -- we now have a consortium with BFT for f = 1
+  (app, svc, (_, sv2, _, _)) <- initCollective
+  -- we now have a collective with BFT for f = 1
 
   -- a new validator prepares his participant
   v1 <- allocateParty "v1"
@@ -145,8 +145,8 @@ testOnboardValidator = do
 
 testSvOnboarding : Script ()
 testSvOnboarding = do
-  (app, svc, (_, sv2, sv3, sv4)) <- initConsortium
-  -- we now have a consortium with BFT for f = 1
+  (app, svc, (_, sv2, sv3, sv4)) <- initCollective
+  -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -201,8 +201,8 @@ testSvOnboarding = do
 
 testSvOnboardingExpiry : Script ()
 testSvOnboardingExpiry = do
-  (app, _, (_, sv2, _, _)) <- initConsortium
-  -- we now have a consortium with BFT for f = 1
+  (app, _, (_, sv2, _, _)) <- initCollective
+  -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -228,19 +228,19 @@ testSvOnboardingExpiry = do
 -- Utils
 --------
 
-initConsortium : Script (CCApp, Party, (Party, Party, Party, Party))
-initConsortium = do
+initCollective : Script (CCApp, Party, (Party, Party, Party, Party))
+initCollective = do
   -- allocate users for the four founding members
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
-  -- allocate consortium party
-  -- TODO(M3-46): make this a real consortium party
+  -- allocate collective party
+  -- TODO(M3-46): make this a real collective party
   svc <- allocateParty "svc"
 
   let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5, svOnboardingTimeout = hours 24
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
 
-  -- have mallory bootstrap the consortium
+  -- have mallory bootstrap the collective
   submit svc $ createAndExerciseCmd
     (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet = True)
     SvcBootstrap_Bootstrap
@@ -277,18 +277,18 @@ generateUnclaimedReward app provider1 = do
 
 leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
 leaderSubmits app mkCommands = do
-  [(consortiumCid, consortium)] <- query @SvcRules app.svc
-  submitMulti [consortium.leader] [app.svc] $ mkCommands consortiumCid
+  [(collectiveCid, collective)] <- query @SvcRules app.svc
+  submitMulti [collective.leader] [app.svc] $ mkCommands collectiveCid
 
 leaderSubmitsMustFail : CCApp -> (ContractId SvcRules -> Commands a) -> Script ()
 leaderSubmitsMustFail app mkCommands = do
-  [(consortiumCid, consortium)] <- query @SvcRules app.svc
-  submitMultiMustFail [consortium.leader] [app.svc] $ mkCommands consortiumCid
+  [(collectiveCid, collective)] <- query @SvcRules app.svc
+  submitMultiMustFail [collective.leader] [app.svc] $ mkCommands collectiveCid
 
 svSubmits : CCApp -> Party -> (ContractId SvcRules -> Commands a) -> Script a
 svSubmits app sv mkCommands = do
-  [(consortiumCid, _)] <- query @SvcRules app.svc
-  submitMulti [sv] [app.svc] $ mkCommands consortiumCid
+  [(collectiveCid, _)] <- query @SvcRules app.svc
+  submitMulti [sv] [app.svc] $ mkCommands collectiveCid
 
 onboardValidator : CCApp -> Party -> Party -> Script ()
 onboardValidator app sponsor validator = do
@@ -369,7 +369,7 @@ confirmAWC_MiningRound_Archive app = do
   -- get rules contracts
   [(coinRulesCid, _)] <- query @CoinRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
-  -- query closed mining rounds and consortium members
+  -- query closed mining rounds and collective members
   rounds <- query @ClosedMiningRound app.svc
   -- confirm the archival of all closed rounds
   forA_ rounds $ \round ->
@@ -389,9 +389,9 @@ confirmAWC_MiningRound_Archive app = do
 
 executeAllConfirmedActions : CCApp -> Script ()
 executeAllConfirmedActions app = do
-  -- get rules and consortium summary
+  -- get rules and collective summary
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
-  let s = summarizeConsortium rules
+  let s = summarizeCollective rules
   -- query all confirmations visible to svc
   confirmations0 <- query @Confirmation app.svc
   -- execute the actions for which there are enough confirmations

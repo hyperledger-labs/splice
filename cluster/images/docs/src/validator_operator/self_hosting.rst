@@ -51,8 +51,8 @@ Onboarding Validator
 
 To operate a validator node you will need to:
 
-1) Run a participant node that connects to the global domain operated by the supervalidator consortium.
-2) Run the validator app to register yourself with the supervalidator consortium.
+1) Run a participant node that connects to the global domain operated by the supervalidator collective.
+2) Run the validator app to register yourself with the supervalidator collective.
 
 The Canton participant is responsible for hosting your Daml apps; i.e. interpreting Daml code, securing your data, and talking to the public canton network. It connects to the global canton domain `canton.global`. We provide a bootstrap script to handle these steps for you. You can refer to the `canton tutorial <https://docs.daml.com/canton/tutorials/getting_started.html>`_ for greater detail on what each step does.
 

@@ -4,7 +4,7 @@ module CC.ValidatorLicense where
 template ValidatorLicense with
     validator : Party           -- ^ The validator (party) that this license is about.
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
-    svc : Party                 -- ^ The party representing the network's SV consortium.
+    svc : Party                 -- ^ The party representing the network's SV collective.
   where
     signatory svc
     observer validator

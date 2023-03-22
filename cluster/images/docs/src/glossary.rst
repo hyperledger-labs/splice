@@ -29,13 +29,13 @@ Glossary
       * public synchronization domain
       * can host small apps directly on domain
       * acts as shared synchronization domain to intermediate between different apps' domains
-      * run by super validator consortium with BFT
+      * run by super validator collective with BFT
       * domain usage costs domain fees which are paid in Canton Coin by the
         operator of each validator
 
     Canton Coin
 
-      * currency issued by super validator consortium
+      * currency issued by super validator collective
       * used for domain fees
       * fees in USD
       * coins accrue holding fees that pay for the coin's usage of SVC storage space
@@ -69,4 +69,3 @@ Glossary
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept directory names instead of party ids
-

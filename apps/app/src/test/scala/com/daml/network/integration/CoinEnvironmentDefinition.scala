@@ -82,7 +82,7 @@ case class CoinEnvironmentDefinition(
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs = sv.config.bootstrap match {
-              case _: SvBootstrapConfig.FoundConsortium => Set(svParty, svcParty)
+              case _: SvBootstrapConfig.FoundCollective => Set(svParty, svcParty)
               case _ => Set(svParty)
             },
             primaryParty = Some(svParty),

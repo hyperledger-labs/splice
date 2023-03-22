@@ -13,7 +13,7 @@ import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
-  JoinConsortiumRequest,
+  JoinCollectiveRequest,
   SetConfigScheduleRequest,
   SvcServiceGrpc,
   WithdrawFeaturedAppRightRequest,
@@ -114,16 +114,16 @@ class GrpcSvcAppService(
     }
 
   // TODO(#2241) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
-  override def joinConsortium(request: JoinConsortiumRequest): Future[Empty] =
+  override def joinCollective(request: JoinCollectiveRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      logger.info(s"Party ${request.svParty} wants to join the SV consortium")
+      logger.info(s"Party ${request.svParty} wants to join the SV collective")
       for {
         _ <- store.lookupSvcRules().flatMap {
           case None => {
             logger.info("SvcRules doesn't exist yet, waiting for the founding SV app to create it")
             throw new StatusRuntimeException(
               Status.FAILED_PRECONDITION.withDescription(
-                s"Cannot join consortium for party ${request.svParty}, as its `SvcRules` don't exist yet."
+                s"Cannot join collective for party ${request.svParty}, as its `SvcRules` don't exist yet."
               )
             )
           }

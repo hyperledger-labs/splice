@@ -10,7 +10,7 @@ import CC.API.V1.Round
 
 import CN.SvcRules
 
--- | A template for bootstrapping the consortium and CoinRules.
+-- | A template for bootstrapping the collective and CoinRules.
 template SvcBootstrap with
     svc : Party
     founder : Party -- ^ the founding SV

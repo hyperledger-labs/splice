@@ -255,7 +255,7 @@ template CoinRules
         executeTransfer coinRulesCid context svc transfer
 
     -- A choice for the SVC to mint coin for the cases where the
-    -- consortium rules allow for that; e.g., when redeeming SVC rewards.
+    -- collective rules allow for that; e.g., when redeeming SVC rewards.
     nonconsuming choice CoinRules_Mint: ContractId Coin
       with
         receiver: Party
@@ -884,4 +884,3 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
-

@@ -11,7 +11,7 @@ import com.daml.network.svc.v0.{
   GetDebugInfoResponse,
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
-  JoinConsortiumRequest,
+  JoinCollectiveRequest,
   SetConfigScheduleRequest,
   WithdrawFeaturedAppRightRequest,
 }
@@ -101,20 +101,20 @@ object GrpcSvcAppClient {
   }
 
   // TODO(#2241) part of mock SVC bootstrap; remove
-  case class JoinConsortium(svParty: PartyId)
+  case class JoinCollective(svParty: PartyId)
       extends BaseCommand[
-        JoinConsortiumRequest,
+        JoinCollectiveRequest,
         Empty,
         Unit,
       ] {
 
     override def submitRequest(
         service: SvcServiceStub,
-        request: JoinConsortiumRequest,
-    ): Future[Empty] = service.joinConsortium(request)
+        request: JoinCollectiveRequest,
+    ): Future[Empty] = service.joinCollective(request)
 
-    override def createRequest(): Either[String, JoinConsortiumRequest] = Right(
-      JoinConsortiumRequest(Codec.encode(svParty))
+    override def createRequest(): Either[String, JoinCollectiveRequest] = Right(
+      JoinCollectiveRequest(Codec.encode(svParty))
     )
 
     /** Handle the response the service has provided

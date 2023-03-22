@@ -203,12 +203,12 @@ class SvApp(
   ): Future[Unit] = {
     for {
       _ <- config.bootstrap match {
-        case foundingConfig: SvBootstrapConfig.FoundConsortium =>
-          foundConsortium(foundingConfig, svcStore, ledgerConnection, globalDomain)
+        case foundingConfig: SvBootstrapConfig.FoundCollective =>
+          foundCollective(foundingConfig, svcStore, ledgerConnection, globalDomain)
         case _: SvBootstrapConfig.JoinViaSvcApp =>
           retryProvider.retryForAutomation(
-            "join existing SV consortium",
-            joinConsortium(svcStore.key.svParty),
+            "join existing SV collective",
+            joinCollective(svcStore.key.svParty),
             logger,
           )
         case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
@@ -258,8 +258,8 @@ class SvApp(
     )
   }
 
-  private def foundConsortium(
-      foundingConfig: SvBootstrapConfig.FoundConsortium,
+  private def foundCollective(
+      foundingConfig: SvBootstrapConfig.FoundCollective,
       svcStore: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       globalDomain: DomainId,
@@ -286,7 +286,7 @@ class SvApp(
 
   // Create SvcRules and CoinRules and open the first mining round
   private def bootstrapSvc(
-      foundingConfig: SvBootstrapConfig.FoundConsortium,
+      foundingConfig: SvBootstrapConfig.FoundCollective,
       store: SvSvcStore,
       ledgerConnection: CoinLedgerConnection,
       domainId: DomainId,
@@ -343,7 +343,7 @@ class SvApp(
               } else {
                 sys.error(
                   "CoinRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
-                    "Is more than one SV app configured to `found-consortium`?" +
+                    "Is more than one SV app configured to `found-collective`?" +
                     show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
                 )
               }
@@ -401,14 +401,14 @@ class SvApp(
     }
   }
 
-  private def joinConsortium(svPartyId: PartyId): Future[Unit] = {
+  private def joinCollective(svPartyId: PartyId): Future[Unit] = {
     val svcConnection = new SvcConnection(
       config.remoteSvc.clientAdminApi,
       coinAppParameters.processingTimeouts,
       loggerFactory,
     )
     svcConnection
-      .joinConsortium(svPartyId)
+      .joinCollective(svPartyId)
       .andThen(_ => svcConnection.close())
   }
 

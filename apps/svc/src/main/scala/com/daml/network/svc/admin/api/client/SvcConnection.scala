@@ -22,10 +22,10 @@ final class SvcConnection(
 
   override val serviceName = "svc"
 
-  def joinConsortium(svParty: PartyId)(implicit
+  def joinCollective(svParty: PartyId)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    runCmd(GrpcSvcAppClient.JoinConsortium(svParty))
+    runCmd(GrpcSvcAppClient.JoinCollective(svParty))
   }
 
   def getDebugInfo()(implicit

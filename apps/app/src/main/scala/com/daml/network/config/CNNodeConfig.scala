@@ -477,8 +477,8 @@ object CNNodeConfig {
       deriveReader[RemoteSvAppConfig]
 
     implicit val svBootstrapConfigHint = new FieldCoproductHint[SvBootstrapConfig]("type")
-    implicit val svBootstrapFoundConsortiumReader: ConfigReader[SvBootstrapConfig.FoundConsortium] =
-      deriveReader[SvBootstrapConfig.FoundConsortium]
+    implicit val svBootstrapFoundCollectiveReader: ConfigReader[SvBootstrapConfig.FoundCollective] =
+      deriveReader[SvBootstrapConfig.FoundCollective]
     implicit val svBootstrapJoinViaSvcAppReader: ConfigReader[SvBootstrapConfig.JoinViaSvcApp] =
       deriveReader[SvBootstrapConfig.JoinViaSvcApp]
     implicit val svBootstrapJoinWithKeyReader: ConfigReader[SvBootstrapConfig.JoinWithKey] =
@@ -589,8 +589,8 @@ object CNNodeConfig {
 
     implicit val svBootstrapConfigHint: FieldCoproductHint[SvBootstrapConfig] =
       new FieldCoproductHint[SvBootstrapConfig]("type")
-    implicit val svBootstrapFoundConsortiumWriter: ConfigWriter[SvBootstrapConfig.FoundConsortium] =
-      deriveWriter[SvBootstrapConfig.FoundConsortium]
+    implicit val svBootstrapFoundCollectiveWriter: ConfigWriter[SvBootstrapConfig.FoundCollective] =
+      deriveWriter[SvBootstrapConfig.FoundCollective]
     implicit val svBootstrapJoinViaSvcAppWriter: ConfigWriter[SvBootstrapConfig.JoinViaSvcApp] =
       deriveWriter[SvBootstrapConfig.JoinViaSvcApp]
     implicit val svBootstrapJoinWithKeyWriter: ConfigWriter[SvBootstrapConfig.JoinWithKey] =

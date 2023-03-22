@@ -70,12 +70,12 @@ class LocalRunbookIntegrationTest
       |  println("Allocating " + svUserName + " party")
       |  val svParty = PartyId.tryFromProtoPrimitive(svc_participant.ledger_api.parties.allocate(svUserName, svUserName).party)
       |  println("Creating " + svUserName + " user")
-      |  val foundConsortium = svUserName == "sv1" // we configure sv1 to `found-consortium`
+      |  val foundCollective = svUserName == "sv1" // we configure sv1 to `found-collective`
       |  svc_participant.ledger_api.users.create(
       |    id = svUserName,
       |    actAs =
       |      // the SV app will revoke the "act as svcParty" right at the end of its init
-      |      if (foundConsortium) Set(svParty, svcParty)
+      |      if (foundCollective) Set(svParty, svcParty)
       |      else Set(svParty),
       |    readAs = Set(svcParty),
       |    primaryParty = Some(svParty),

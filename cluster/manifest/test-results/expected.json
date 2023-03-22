@@ -1056,7 +1056,7 @@
                            },
                            {
                               "name": "CN_APP_SV_BOOTSTRAP_TYPE",
-                              "value": "found-consortium"
+                              "value": "found-collective"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

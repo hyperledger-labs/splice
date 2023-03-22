@@ -32,7 +32,7 @@ local deployments(num, config) =
         {
           // the first one is the founding SV app
           name: "CN_APP_SV_BOOTSTRAP_TYPE",
-          value: if num == 1 then "found-consortium" else "join-via-svc-app",
+          value: if num == 1 then "found-collective" else "join-via-svc-app",
         },
       ] + (
         if (config.tickDuration != null && num == 1) then [{ name: "CN_APP_SV_INITIAL_TICK_DURATION", value: config.tickDuration }] else []

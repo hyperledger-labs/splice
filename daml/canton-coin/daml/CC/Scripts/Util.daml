@@ -42,7 +42,7 @@ setupApp = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
-  -- In this model the SV Consortium is not decentralized.
+  -- In this model the SV Collective is not decentralized.
   svc <- allocateParty "SVC"
   svcUser <- validateUserId "svc"
   _ <- createUser (User svcUser (Some svc)) []

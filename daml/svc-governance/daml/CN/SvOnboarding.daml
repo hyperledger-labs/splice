@@ -12,7 +12,7 @@ template ApprovedSvIdentity with
   where
     signatory approvingSv
 
--- | Template used by the SV consortium to keep track of the onboarding of an SV candidate.
+-- | Template used by the SV collective to keep track of the onboarding of an SV candidate.
 -- The existence of this contract triggers SV automation that creates confirmation contracts for
 -- the candidate if the token is a valid `SvOnboardingToken` and matches an `ApprovedSvIdentity`.
 template SvOnboarding with

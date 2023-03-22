@@ -32,7 +32,7 @@ sealed trait SvBootstrapConfig {
   val name: String // the human-readable name we want others to use for us
 }
 object SvBootstrapConfig {
-  case class FoundConsortium(
+  case class FoundCollective(
       name: String,
       initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
       // TODO(#2168): test edge cases.

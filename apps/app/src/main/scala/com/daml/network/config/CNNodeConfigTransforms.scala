@@ -167,7 +167,7 @@ object CNNodeConfigTransforms {
     config =>
       Seq(
         updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
-        updateAllSvAppFoundConsortiumConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
+        updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
       ).foldLeft(config)((c, tf) => tf(c))
 
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CNNodeConfigTransform =
@@ -231,13 +231,13 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs((_, config) => update(config))
 
-  def updateAllSvAppFoundConsortiumConfigs_(
-      update: SvBootstrapConfig.FoundConsortium => SvBootstrapConfig.FoundConsortium
+  def updateAllSvAppFoundCollectiveConfigs_(
+      update: SvBootstrapConfig.FoundCollective => SvBootstrapConfig.FoundCollective
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs_(c =>
       c.focus(_.bootstrap)
         .modify(_ match {
-          case found: SvBootstrapConfig.FoundConsortium => update(found)
+          case found: SvBootstrapConfig.FoundCollective => update(found)
           case other => other
         })
     )
