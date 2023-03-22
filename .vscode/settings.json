@@ -1,0 +1,3 @@
+{
+    "daml.extraArguments": "--studio-auto-run-all-scenarios=yes"
+}

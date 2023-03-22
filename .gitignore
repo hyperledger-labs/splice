@@ -19,6 +19,7 @@ _build/
 # We want to share run configurations
 !.idea/runConfigurations
 .vscode/*
+!.vscode/settings.json
 target
 .bsp
 !canton/community/participant/src/test/resources/daml/illformed.dar
