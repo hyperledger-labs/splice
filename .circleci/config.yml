@@ -728,6 +728,8 @@ commands:
         type: enum
         enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
       channel_notify:
+        # This parameter allows selecting different notification channels, which can be handy when a subteam
+        # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
         type: string
         # #team-canton-network-internal
         default: C03J6NCPSE4
@@ -1477,10 +1479,6 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "devnet"
-          # TODO (#3237) Move this back to the main slack channel and consider removing the
-          # infrastructure to specify different channels.
-          # #temp-cn-devnet-notifications
-          channel_notify: C04RSPJ5SBH
           context:
             - artifactory
             - canton-network-vpn
