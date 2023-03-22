@@ -1,108 +1,15 @@
-import {
-  Contract,
-  DirectoryClientProvider,
-  useDirectoryClient,
-  useUserState,
-} from 'common-frontend';
-import { DirectoryClient } from 'common-frontend/lib/contexts/DirectoryServiceContext';
-import { useEffect, useState } from 'react';
+import { DirectoryClientProvider, useUserState } from 'common-frontend';
+import { useEffect } from 'react';
 
-import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
-
-import {
-  LedgerApiClient,
-  LedgerApiClientProvider,
-  useLedgerApiClient,
-} from '../contexts/LedgerApiContext';
+import { DirectoryUiStateProvider, useDirectoryUiState } from '../contexts/DirectoryContext';
+import { LedgerApiClientProvider } from '../contexts/LedgerApiContext';
 import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 
-// TODO(#3550) Factor out retry functionality.
-const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const retry = async <T,>(
-  maxRetries: number,
-  retryDelay: number,
-  task: () => Promise<T>
-): Promise<T> => {
-  let retries = 0;
-  let error;
-  while (retries < maxRetries) {
-    if (retries > 0) {
-      console.debug('Retrying now...');
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response: { type: 'success'; value: T } | { type: 'retryable'; error: any } = await task()
-      .then<{ type: 'success'; value: T }>(r => {
-        return { type: 'success', value: r };
-      })
-      .catch(e => ({ type: 'retryable', error: e }));
-    switch (response.type) {
-      case 'retryable':
-        console.debug(
-          `Found retryable error ${JSON.stringify(error)}, retrying after ${retryDelay}ms...`
-        );
-        error = response.error;
-        retries++;
-        await sleep(retryDelay);
-        break;
-      case 'success':
-        return response.value;
-    }
-  }
-  console.debug('Exceeded retries, giving up...');
-  throw error;
-};
-
-export function useProviderParty(directoryClient: DirectoryClient): string | undefined {
-  const [providerPartyId, setProviderPartyId] = useState<string | undefined>();
-
-  useEffect(() => {
-    const fetchProviderParty = async () => {
-      try {
-        const response = await directoryClient.getProviderPartyId();
-        setProviderPartyId(response.providerPartyId);
-      } catch (err) {
-        console.error('Error finding provider party', err);
-        throw new Error('Error finding provider party, please confirm user onboarded.');
-      }
-    };
-    fetchProviderParty();
-  }, [directoryClient]);
-
-  return providerPartyId;
-}
-
-export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | undefined {
-  const [primaryParty, setPrimaryParty] = useState<string>();
-
-  useEffect(() => {
-    const fetchPrimaryParty = async () => {
-      try {
-        setPrimaryParty(await retry(100, 1000, () => ledgerApiClient.getPrimaryParty()));
-      } catch (err) {
-        console.error('Error finding primary party for user', err);
-        console.error(JSON.stringify(err));
-        throw new Error(
-          'Error finding primary party for user, please confirm user onboarded to this participant.'
-        );
-      }
-    };
-    fetchPrimaryParty();
-  }, [ledgerApiClient]);
-
-  return primaryParty;
-}
-
 const Home: React.FC = () => {
   const { updateStatus } = useUserState();
-  const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
-  const ledgerApiClient = useLedgerApiClient();
-  const directoryClient = useDirectoryClient();
-
-  const primaryPartyId = usePrimaryParty(ledgerApiClient);
-  const providerPartyId = useProviderParty(directoryClient);
+  const { primaryPartyId, directoryInstallContract } = useDirectoryUiState();
 
   useEffect(() => {
     if (primaryPartyId) {
@@ -110,53 +17,11 @@ const Home: React.FC = () => {
     }
   }, [primaryPartyId, updateStatus]);
 
-  // We don’t expect to have console-based auth in Q4 so we
-  // generate the install contract from the frontend rather than the backend.
-  useEffect(() => {
-    const setupInstallContract = async () => {
-      if (primaryPartyId && providerPartyId) {
-        console.debug('Searching for DirectoryInstall');
-        const install = await ledgerApiClient.queryDirectoryInstall(
-          primaryPartyId,
-          providerPartyId
-        );
-        if (install) {
-          console.debug('DirectoryInstall found');
-          setInstall(install);
-        } else {
-          console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
-          await ledgerApiClient.create([primaryPartyId], DirectoryInstallRequest, {
-            user: primaryPartyId,
-            provider: providerPartyId,
-          });
-          console.debug('Created DirectoryInstallRequest, waiting for DirectoryInstall');
-          setTimeout(() => {
-            const queryDirectoryInstall = async () => {
-              const install = await ledgerApiClient.queryDirectoryInstall(
-                primaryPartyId,
-                providerPartyId
-              );
-              if (install) {
-                console.debug('DirectoryInstall found');
-                setInstall(install);
-              } else {
-                console.debug('DirectoryInstall not found, waiting before retrying');
-                setTimeout(() => queryDirectoryInstall(), 500);
-              }
-            };
-            queryDirectoryInstall();
-          }, 500);
-        }
-      }
-    };
-    setupInstallContract();
-  }, [primaryPartyId, providerPartyId, ledgerApiClient]);
-
-  if (primaryPartyId && providerPartyId && install) {
+  if (directoryInstallContract) {
     return (
       <div>
-        <RequestDirectoryEntry primaryParty={primaryPartyId} provider={providerPartyId} />
-        <DirectoryEntries primaryParty={primaryPartyId} provider={providerPartyId} />
+        <RequestDirectoryEntry />
+        <DirectoryEntries />
       </div>
     );
   } else {
@@ -173,7 +38,9 @@ const HomeWithContexts: React.FC = () => {
       token={userAccessToken!}
     >
       <DirectoryClientProvider url={config.services.directory.url}>
-        <Home />
+        <DirectoryUiStateProvider>
+          <Home />
+        </DirectoryUiStateProvider>
       </DirectoryClientProvider>
     </LedgerApiClientProvider>
   );

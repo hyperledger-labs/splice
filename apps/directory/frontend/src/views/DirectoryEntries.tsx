@@ -1,23 +1,9 @@
-import { Contract, sameContracts, useInterval } from 'common-frontend';
-import { useCallback, useState } from 'react';
-
 import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
-import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
+import { useDirectoryUiState } from '../contexts/DirectoryContext';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
-
-const DirectoryEntries: React.FC<{ primaryParty: string; provider: string }> = ({
-  primaryParty,
-  provider,
-}) => {
-  const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
-  const ledgerApiClient = useLedgerApiClient();
-  const fetchDirectoryEntries = useCallback(async () => {
-    const current = await ledgerApiClient.queryOwnedDirectoryEntries(primaryParty, provider);
-    setDirectoryEntries(prev => (sameContracts(prev, current) ? prev : current));
-  }, [ledgerApiClient, primaryParty, provider]);
-  useInterval(fetchDirectoryEntries);
+const DirectoryEntries: React.FC = () => {
+  const { directoryEntries } = useDirectoryUiState();
 
   return (
     <div>
