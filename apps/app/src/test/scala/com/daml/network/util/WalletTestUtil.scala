@@ -713,4 +713,30 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     )
 
   }
+
+  /** Directly executes the CoinRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  def mintCoin(
+      remoteParticipant: CoinRemoteParticipantReference,
+      receiver: PartyId,
+      amount: BigDecimal,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = scan.getTransferContextWithInstances(now)
+
+    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      userId = aliceWallet.config.ledgerApiUser,
+      actAs = Seq(svcParty, receiver),
+      readAs = Seq.empty,
+      update = tc.coinRules.contractId.exerciseCoinRules_Mint(
+        receiver.toLf,
+        amount.bigDecimal,
+        tc.latestOpenMiningRound.contractId,
+      ),
+      domainId = domainId,
+    )
+  }
+
 }

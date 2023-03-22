@@ -63,6 +63,27 @@ class WalletTxLogIntegrationTest
       )
     }
 
+    "handle mint" in { implicit env =>
+      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
+
+      clue("Mint to get some coins") {
+        mintCoin(
+          sv1Validator.remoteParticipantWithAdminToken,
+          sv1UserParty,
+          47.0,
+        )
+      }
+
+      checkTxHistory(
+        sv1Wallet,
+        Seq(
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+            logEntry.amount shouldBe 47.0
+          }
+        ),
+      )
+    }
+
     "handle collected self-payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
