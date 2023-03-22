@@ -23,28 +23,25 @@ spec:
           image: "{{ .Values.imageRepo }}/sv-app:{{ .Values.cluster.imageTag }}"
           imagePullPolicy: "Always"
           env:
-            - name: "JAVA_TOOL_OPTIONS"
-              value: "{{ .Values.resources.jvmOptions}}"
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.defaultJvmOptions }}
             {{- include "cn-util-lib.auth0-env-vars" "sv" | indent 12}}
-            - name: "CN_APP_SV_ADMIN_API_PORT"
-              value: "{{ .Values.service.apiPort }}"
-            - name: "CN_APP_SV_IS_DEV_NET"
+            - name: CN_APP_SV_ADMIN_API_PORT
+              value: "5014"
+            - name: CN_APP_SV_IS_DEV_NET
               value: "true"
-            - name: "CN_APP_SV_BOOTSTRAP_TYPE"
-              value: "{{ .Values.bootstrapType }}"
+            - name: CN_APP_SV_BOOTSTRAP_TYPE
+              value: {{ .Values.bootstrapType }}
           ports:
             - name: sv-api
-              containerPort: {{ .Values.service.apiPort }}
+              containerPort: 5014
               protocol: TCP
             - name: sv-api-http
-              containerPort: {{ .Values.service.apiHttpPort }}
+              containerPort: 6014
               protocol: TCP
-          resources:
-            limits:
-              memory: "{{ .Values.resources.memoryLimit }}Mi"
-            requests:
-              cpu: {{ .Values.resources.cpuLimit }}
-              memory: "{{ .Values.resources.memoryLimit }}Mi"
+          {{- with .Values.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -56,10 +53,10 @@ spec:
     app: sv-app
   ports:
   - name: sv-api
-    port: {{ .Values.service.apiPort }}
+    port: 5014
     protocol: TCP
-    targetPort: {{ .Values.service.apiPort }}
+    targetPort: 5014
   - name: sv-api-http
-    port: {{ .Values.service.apiHttpPort }}
+    port: 6014
     protocol: TCP
-    targetPort: {{ .Values.service.apiHttpPort }}
+    targetPort: 6014

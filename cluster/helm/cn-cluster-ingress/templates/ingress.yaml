@@ -192,7 +192,7 @@ spec:
         image: "{{ .Values.imageRepo }}/external-proxy:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         imagePullPolicy: Always
         ports:
         - containerPort: 80

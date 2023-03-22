@@ -1,1 +1,2 @@
 imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4

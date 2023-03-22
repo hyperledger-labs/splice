@@ -20,7 +20,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         {{- include "cn-util-lib.auth0-env-vars" "wallet" | indent 8}}
         - name: CN_APP_WALLET_PARTICIPANT_ADDRESS
           value: participant
@@ -35,12 +35,9 @@ spec:
         - containerPort: 6004
           name: val1-wal-http
           protocol: TCP
-        resources:
-          limits:
-            memory: 1536Mi
-          requests:
-            cpu: "1"
-            memory: 1536Mi
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -78,7 +75,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_WALLET_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
@@ -142,7 +139,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_WALLET_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:

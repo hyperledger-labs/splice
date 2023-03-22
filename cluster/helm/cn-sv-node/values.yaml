@@ -1,9 +1,11 @@
 imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-bootstrapType: join-via-svc-app
-service:
-  apiPort: 5014
-  apiHttpPort: 6014
+
+defaultJvmOptions: -Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4
 resources:
-  jvmOptions: "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4"
-  memoryLimit: 1536
-  cpuLimit: 1
+  limits:
+    memory: 1536Mi
+  requests:
+    cpu: 1
+    memory: 1536Mi
+
+bootstrapType: join-via-svc-app

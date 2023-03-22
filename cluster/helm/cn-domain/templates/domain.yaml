@@ -22,7 +22,7 @@ spec:
         image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
           value: {{ .Values.postgres }}
         imagePullPolicy: Always
@@ -36,12 +36,9 @@ spec:
         - containerPort: 10013
           name: cd-metrics
           protocol: TCP
-        resources:
-          limits:
-            memory: 4Gi
-          requests:
-            cpu: "1"
-            memory: 4Gi
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
         readinessProbe:
           failureThreshold: 3
           periodSeconds: 10

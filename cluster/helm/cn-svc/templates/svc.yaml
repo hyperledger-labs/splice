@@ -23,18 +23,15 @@ spec:
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         {{- include "cn-util-lib.auth0-env-vars" "svc" | indent 8}}
         ports:
         - containerPort: 5005
           name: svc-app-adm-api
           protocol: TCP
-        resources:
-          limits:
-            memory: 1536Mi
-          requests:
-            cpu: "1"
-            memory: 1536Mi
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service

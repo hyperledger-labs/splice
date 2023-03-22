@@ -22,7 +22,7 @@ spec:
         image: "{{ .Values.imageRepo }}/scan-app:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         {{- include "cn-util-lib.auth0-env-vars" "scan" | indent 8}}
         imagePullPolicy: Always
         ports:
@@ -32,12 +32,9 @@ spec:
         - containerPort: 6012
           name: scan-api-http
           protocol: TCP
-        resources:
-          limits:
-            memory: 1536Mi
-          requests:
-            cpu: "1"
-            memory: 1536Mi
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -79,7 +76,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: scan-web-ui

@@ -20,7 +20,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         {{- include "cn-util-lib.auth0-env-vars" "splitwell" | indent 8}}
         image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always

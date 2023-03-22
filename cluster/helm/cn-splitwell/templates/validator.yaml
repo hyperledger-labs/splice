@@ -20,7 +20,7 @@ spec:
       containers:
       - env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         {{- include "cn-util-lib.auth0-env-vars" "validator" | indent 8}}
         - name: CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME
           valueFrom:

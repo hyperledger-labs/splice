@@ -51,19 +51,15 @@ spec:
           successThreshold: 1
           timeoutSeconds: 1
         ports:
-        - containerPort: 5432
-          name: postgresdb
-          protocol: TCP
-        resources:
-          limits:
-            cpu: "2"
-            memory: 8Gi
-          requests:
-            cpu: "2"
-            memory: 8Gi
+          - containerPort: 5432
+            name: postgresdb
+            protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
-        - mountPath: /var/lib/postgresql/data
-          name: pg-data
+          - mountPath: /var/lib/postgresql/data
+            name: pg-data
       restartPolicy: Always
   volumeClaimTemplates:
   - apiVersion: v1

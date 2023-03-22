@@ -21,7 +21,7 @@ spec:
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
+          value: {{ .Values.defaultJvmOptions }}
         - name: CANTON_PARTICIPANT_POSTGRES_SERVER
           value: {{ .Values.postgres }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
@@ -41,12 +41,9 @@ spec:
         - containerPort: 10013
           name: metrics-api
           protocol: TCP
-        resources:
-          limits:
-            memory: 32Gi
-          requests:
-            cpu: "1"
-            memory: 32Gi
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
       - name: envoy-proxy-lg-api
         image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
