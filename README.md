@@ -3,6 +3,8 @@
 1. [Setting up Your Development Environment](#setting-up-your-development-environment)
     1. [Directory Layout](#directory-layout)
     1. [IntelliJ Setup](#intellij-setup)
+    1. [VS Code Setup](#vs-code-setup)
+        1. [VS Code for Scala](#configuring-vs-code-for-scala-development)
     1. [Using `sbt`](#using-sbt)
         1. [`sbt` settings](#sbt-settings)
         1. [`sbt` Commands](#sbt-commands)
@@ -167,6 +169,64 @@ M3 - TestNet Launch.
 
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
+
+### VS Code Setup
+
+There are a few extensions that improve the VS Code experience when working on various parts of the Canton Network codebase, or for general collaboration. The recommendation is to pick the ones that currently seem relevant or useful to you.
+
+**Recommended Extensions**:
+- [GitLens](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens): Nice integration of git history/metadata inside the editor, displays git authors inline
+- [Open in GitHub](https://marketplace.visualstudio.com/items?itemName=ziyasal.vscode-open-in-github): Makes it easy to share specific links to code via an in-editor context menu option
+- [Docker](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-docker)
+- [Makefile Tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.makefile-tools)
+- [OpenAPI Editor](https://marketplace.visualstudio.com/items?itemName=42Crunch.vscode-openapi)
+- [YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
+- [Jsonnet Language Server](https://marketplace.visualstudio.com/items?itemName=Grafana.vscode-jsonnet)
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode): Code formatter for webdev-related stacks (Typescript/React/...)
+- [Scala Syntax](https://marketplace.visualstudio.com/items?itemName=scala-lang.scala): Syntax highlighting for Scala files, only; use `Metals` for adding IDE-like functionality
+- [Scala Metals](https://marketplace.visualstudio.com/items?itemName=scalameta.metals)
+- [Run it On](https://marketplace.visualstudio.com/items?itemName=fsevenm.run-it-on): Optional, if you want to add an automatic "scalafix on save" command while editing Scala files
+- [Nix](https://marketplace.visualstudio.com/items?itemName=bbenoist.Nix)
+- [vscode-proto3](https://marketplace.visualstudio.com/items?itemName=zxh404.vscode-proto3)
+
+#### Configuring VS Code for Scala Development
+
+It is possible to use VS Code for Scala development via the Metals extension (see above), if you'd prefer not to use IntelliJ (or just want to try it out). Setting this up requires some similar configuration as IntelliJ:
+
+* **Metals: Java Home**: From a terminal inside the repository directory & direnv environment, run `echo $JAVA_HOME` which should give you your Java Home path from nix: `/nix/store/<nix-pkg-id>...`. If not, try `which java` which should give you the nix path `/nix/store/<nix-pkg-id>.../bin/java`; strip the `/bin/java` suffix and use that path.
+* Follow any VS Code prompts to restart bloop/metals or reload the window
+* Ensure the following is in your VS Code `settings.json` (search for `Preferences: Open User Settings (JSON)` in the command palette):
+
+```json
+   "files.exclude": {
+      "**/.bloop": true
+   },
+   "files.watcherExclude": {
+      "**/.bloop": true,
+      "**/.metals": true,
+      "**/.ammonite": true
+   },
+```
+
+* Optional: To run `scalafix` on a file, you can either use the `Metals: Run all scalafix rules` command from the command palette, or add the following to `settings.json` to run scalafix automatically every time you save:
+
+```json
+  "runItOn": {
+    "commands": [
+      {
+        "match": ".*.scala",
+        "isShellCommand": false,
+        "cmd": "metals.scalafix-run"
+      }
+    ]
+  },
+```
+
+This configuration requires the `Run it On` plugin to be installed.
+
+**Caveats**
+- I haven't tested the `sbt` integration, instead opting for running builds/tests/etc from the command line. Metals is still useful for providing type hints, syntax error catching, auto-complete, "go-to-definition", etc. In theory, you should be able to provide the path of the `sbt` binary vended by nix (via `which sbt`) to the `Sbt Script` option in the Metals settings.
+- The cache can be finnicky: be prepared to have to re-import the build or re-compile the workspace, particularly if checking out different branches to get symbols to resolve properly again
 
 ### Using `sbt`
 
