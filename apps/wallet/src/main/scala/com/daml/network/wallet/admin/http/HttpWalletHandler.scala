@@ -34,7 +34,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.{CoinUtil, Contract, Codec}
+import com.daml.network.util.{Codec, CoinUtil, Contract}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.wallet.store.UserWalletStore
@@ -90,69 +90,68 @@ class HttpWalletHandler(
   override def listAcceptedAppPayments(
       respond: v0.WalletResource.ListAcceptedAppPaymentsResponse.type
   )()(user: String): Future[v0.WalletResource.ListAcceptedAppPaymentsResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        walletCodegen.AcceptedAppPayment.COMPANION,
-        user,
-        d0.ListAcceptedAppPaymentsResponse(_),
-      )
-    }
+    listContracts(
+      walletCodegen.AcceptedAppPayment.COMPANION,
+      user,
+      d0.ListAcceptedAppPaymentsResponse(_),
+    )
 
   override def listAcceptedTransferOffers(
       respond: v0.WalletResource.ListAcceptedTransferOffersResponse.type
   )()(user: String): Future[v0.WalletResource.ListAcceptedTransferOffersResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        transferOffersCodegen.AcceptedTransferOffer.COMPANION,
-        user,
-        d0.ListAcceptedTransferOffersResponse(_),
-      )
-    }
+    listContracts(
+      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+      user,
+      d0.ListAcceptedTransferOffersResponse(_),
+    )
+
+  override def getAppPaymentRequest(respond: r0.GetAppPaymentRequestResponse.type)(
+      contractId: String
+  )(user: String): Future[r0.GetAppPaymentRequestResponse] = {
+    getContract(
+      walletCodegen.AppPaymentRequest.COMPANION,
+      contractId,
+      user,
+      contract => r0.GetAppPaymentRequestResponseOK(contract),
+    )
+  }
 
   override def listAppPaymentRequests(
       respond: v0.WalletResource.ListAppPaymentRequestsResponse.type
   )()(user: String): Future[v0.WalletResource.ListAppPaymentRequestsResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        walletCodegen.AppPaymentRequest.COMPANION,
-        user,
-        d0.ListAppPaymentRequestsResponse(_),
-      )
-    }
+    listContracts(
+      walletCodegen.AppPaymentRequest.COMPANION,
+      user,
+      d0.ListAppPaymentRequestsResponse(_),
+    )
 
   override def listAppRewardCoupons(respond: v0.WalletResource.ListAppRewardCouponsResponse.type)()(
       user: String
   ): Future[v0.WalletResource.ListAppRewardCouponsResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        coinCodegen.AppRewardCoupon.COMPANION,
-        user,
-        d0.ListAppRewardCouponsResponse(_),
-      )
-    }
+    listContracts(
+      coinCodegen.AppRewardCoupon.COMPANION,
+      user,
+      d0.ListAppRewardCouponsResponse(_),
+    )
 
   override def listSubscriptionInitialPayments(
       respond: v0.WalletResource.ListSubscriptionInitialPaymentsResponse.type
   )()(user: String): Future[v0.WalletResource.ListSubscriptionInitialPaymentsResponse] = {
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        subsCodegen.SubscriptionInitialPayment.COMPANION,
-        user,
-        d0.ListSubscriptionInitialPaymentsResponse(_),
-      )
-    }
+    listContracts(
+      subsCodegen.SubscriptionInitialPayment.COMPANION,
+      user,
+      d0.ListSubscriptionInitialPaymentsResponse(_),
+    )
   }
 
   override def listSubscriptionRequests(
       respond: v0.WalletResource.ListSubscriptionRequestsResponse.type
   )()(user: String): Future[v0.WalletResource.ListSubscriptionRequestsResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        subsCodegen.SubscriptionRequest.COMPANION,
-        user,
-        d0.ListSubscriptionRequestsResponse(_),
-      )
-    }
+    listContracts(
+      subsCodegen.SubscriptionRequest.COMPANION,
+      user,
+      d0.ListSubscriptionRequestsResponse(_),
+    )
 
   override def listSubscriptions(respond: v0.WalletResource.ListSubscriptionsResponse.type)()(
       user: String
@@ -192,13 +191,11 @@ class HttpWalletHandler(
   override def listTransferOffers(respond: v0.WalletResource.ListTransferOffersResponse.type)()(
       user: String
   ): Future[v0.WalletResource.ListTransferOffersResponse] = {
-    withNewTrace(workflowId) { _ => _ =>
-      listContracts(
-        transferOffersCodegen.TransferOffer.COMPANION,
-        user,
-        d0.ListTransferOffersResponse(_),
-      )
-    }
+    listContracts(
+      transferOffersCodegen.TransferOffer.COMPANION,
+      user,
+      d0.ListTransferOffersResponse(_),
+    )
   }
 
   override def listValidatorRewardCoupons(
@@ -233,6 +230,23 @@ class HttpWalletHandler(
         )
       )
     }
+
+  private def getContract[TCid <: ContractId[T], T <: Template, ResponseT](
+      templateCompanion: Contract.Companion.Template[TCid, T],
+      contractId: String,
+      user: String,
+      mkResponse: d0.Contract => ResponseT,
+  ) = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val requestCid =
+        Codec.tryDecodeJavaContractId(templateCompanion)(contractId)
+      for {
+        userStore <- getUserStore(user)
+        acs <- userStore.defaultAcs
+        contract <- acs.getContractById(templateCompanion)(requestCid)
+      } yield mkResponse(contract.toJson)
+    }
+  }
 
   private def listContracts[TCid <: ContractId[T], T <: Template, ResponseT](
       templateCompanion: Contract.Companion.Template[TCid, T],
@@ -358,6 +372,17 @@ class HttpWalletHandler(
       })(user, _ => r0.RejectAppPaymentRequestResponseOK)
     }
 
+  override def getSubscriptionRequest(respond: r0.GetSubscriptionRequestResponse.type)(
+      contractId: String
+  )(user: String): Future[r0.GetSubscriptionRequestResponse] = {
+    getContract(
+      subsCodegen.SubscriptionRequest.COMPANION,
+      contractId,
+      user,
+      contract => r0.GetSubscriptionRequestResponseOK(contract),
+    )
+  }
+
   override def acceptSubscriptionRequest(
       respond: r0.AcceptSubscriptionRequestResponse.type
   )(contractId: String)(user: String): Future[r0.AcceptSubscriptionRequestResponse] =
@@ -411,7 +436,7 @@ class HttpWalletHandler(
 
   override def getBalance(respond: r0.GetBalanceResponse.type)()(
       user: String
-  ): Future[r0.GetBalanceResponse] = withNewTrace(workflowId) { _ => _ =>
+  ): Future[r0.GetBalanceResponse] =
     withNewTrace(workflowId) { implicit tc => _ =>
       for {
         userStore <- getUserStore(user)
@@ -438,7 +463,6 @@ class HttpWalletHandler(
         )
       }
     }
-  }
 
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest

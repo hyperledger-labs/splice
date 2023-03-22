@@ -83,6 +83,21 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Get a payment request")
+  @Help.Description(
+    "Queries the configured remote participant for the PaymentRequest with the passed contractId. " +
+      "Returns the contract of the payment request."
+  )
+  def getAppPaymentRequest(
+      contractId: walletCodegen.AppPaymentRequest.ContractId
+  ): Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.GetAppPaymentRequest(contractId)
+      )
+    }
+  }
+
   @Help.Summary("Accept a payment request")
   @Help.Description(
     "Accept a payment request and deliver the coin to be locked into the accepted payment." +
@@ -119,6 +134,21 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListAcceptedAppPayments)
     }
+
+  @Help.Summary("Get a subscription request")
+  @Help.Description(
+    "Queries the configured remote participant for the SubscriptionRequest with the passed contractId. " +
+      "Returns the contract of the subscription requests."
+  )
+  def getSubscriptionRequest(
+      contractId: subsCodegen.SubscriptionRequest.ContractId
+  ): Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.GetSubscriptionRequest(contractId)
+      )
+    }
+  }
 
   @Help.Summary("List all subscription requests of the configured user")
   @Help.Description(

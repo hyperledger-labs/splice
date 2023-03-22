@@ -1,9 +1,13 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
@@ -13,7 +17,33 @@ class WalletSubscriptionsIntegrationTest
     with WalletTestUtil {
 
   "A wallet" should {
-    "allow a user to list and reject subscription requests" in { implicit env =>
+    "fail to get a non-existent subscription request" in { implicit env =>
+      onboardWalletUser(aliceWallet, aliceValidator)
+
+      val nonExistentName = "does not exist"
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        assertThrows[CommandFailure](
+          aliceWallet.getSubscriptionRequest(new SubscriptionRequest.ContractId(nonExistentName))
+        ),
+        entries => {
+          forExactly(
+            1,
+            entries,
+          )(
+            _.errorMessage should include(nonExistentName)
+          )
+          forExactly(
+            1,
+            entries,
+          ) { log =>
+            log.message should include("HTTP GET /subscription-requests/does%20not%20exist")
+            log.message should include("Responding with status code: 404 Not Found")
+          }
+        },
+      )
+    }
+
+    "allow a user to get, list and reject subscription requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
@@ -22,7 +52,7 @@ class WalletSubscriptionsIntegrationTest
         aliceWalletBackend.remoteParticipantWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
-      );
+      )
 
       val requestId = clue("List subscription requests to find out request ID") {
         eventually() {
@@ -32,6 +62,11 @@ class WalletSubscriptionsIntegrationTest
           }
         }
       }
+
+      clue("Get the subscription request") {
+        aliceWallet.getSubscriptionRequest(requestId).payload shouldBe request
+      }
+
       clue("Reject the subscription request") {
         aliceWallet.rejectSubscriptionRequest(requestId)
         aliceWallet.listSubscriptionRequests() shouldBe empty

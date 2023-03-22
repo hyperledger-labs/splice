@@ -15,8 +15,12 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.http.v0.wallet as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.ErrorResponse
+import com.daml.network.http.v0.wallet.{
+  GetAppPaymentRequestResponse,
+  GetSubscriptionRequestResponse,
+}
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.util.{Contract, Codec}
+import com.daml.network.util.{Codec, Contract}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
@@ -301,6 +305,35 @@ object HttpWalletAppClient {
     }
   }
 
+  case class GetAppPaymentRequest(
+      contractId: walletCodegen.AppPaymentRequest.ContractId
+  ) extends BaseCommand[
+        http.GetAppPaymentRequestResponse,
+        Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAppPaymentRequestResponse] =
+      client.getAppPaymentRequest(Codec.encodeContractId(contractId), headers = headers)
+
+    override def handleResponse(
+        response: http.GetAppPaymentRequestResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Contract[
+      walletCodegen.AppPaymentRequest.ContractId,
+      walletCodegen.AppPaymentRequest,
+    ]] = {
+      response match {
+        case GetAppPaymentRequestResponse.OK(value) =>
+          Contract.fromJson(walletCodegen.AppPaymentRequest.COMPANION)(value).leftMap(_.toString)
+        case GetAppPaymentRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case GetAppPaymentRequestResponse.InternalServerError(ErrorResponse(error)) => Left(error)
+      }
+    }
+  }
+
   case class AcceptAppPaymentRequest(
       requestId: walletCodegen.AppPaymentRequest.ContractId
   ) extends BaseCommand[
@@ -516,6 +549,35 @@ object HttpWalletAppClient {
           Left(error)
         case http.ListSubscriptionsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
           Left(errorMsg)
+      }
+    }
+  }
+
+  case class GetSubscriptionRequest(
+      contractId: subsCodegen.SubscriptionRequest.ContractId
+  ) extends BaseCommand[
+        http.GetSubscriptionRequestResponse,
+        Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSubscriptionRequestResponse] =
+      client.getSubscriptionRequest(Codec.encodeContractId(contractId), headers = headers)
+
+    override def handleResponse(
+        response: http.GetSubscriptionRequestResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Contract[
+      subsCodegen.SubscriptionRequest.ContractId,
+      subsCodegen.SubscriptionRequest,
+    ]] = {
+      response match {
+        case GetSubscriptionRequestResponse.OK(value) =>
+          Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(value).leftMap(_.toString)
+        case GetSubscriptionRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
+        case GetSubscriptionRequestResponse.InternalServerError(ErrorResponse(error)) => Left(error)
       }
     }
   }

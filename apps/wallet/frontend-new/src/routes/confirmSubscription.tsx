@@ -16,21 +16,17 @@ import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
   const { cid } = useParams();
-  const { listSubscriptionRequests } = useWalletClient();
+  const { getSubscriptionRequest } = useWalletClient();
 
   const [subscriptionRequest, setSubscriptionRequest] =
     useState<Contract<damlSubscriptionRequest>>();
   useEffect(() => {
     const fetchSubscriptionRequest = async () => {
-      const { subscriptionRequestsList } = await listSubscriptionRequests();
-      const req = subscriptionRequestsList.find(c => c.contractId === cid);
-      if (!req) {
-        throw new Error('Subscription request contract not found');
-      }
-      setSubscriptionRequest(req);
+      const subscriptionRequest = await getSubscriptionRequest(cid!);
+      setSubscriptionRequest(subscriptionRequest);
     };
     fetchSubscriptionRequest();
-  }, [cid, listSubscriptionRequests]);
+  }, [cid, getSubscriptionRequest]);
 
   if (!subscriptionRequest) {
     return <Loading />;

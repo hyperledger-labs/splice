@@ -59,10 +59,12 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
+  getAppPaymentRequest: (contractId: string) => Promise<Contract<AppPaymentRequest>>;
   listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
+  getSubscriptionRequest: (contractId: string) => Promise<Contract<SubscriptionRequest>>;
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
   listSubscriptions: () => Promise<ListSubscriptionsResponse>;
@@ -196,7 +198,10 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           ),
         };
       },
-
+      getAppPaymentRequest: async contractId => {
+        const contract = await walletClient.getAppPaymentRequest(contractId);
+        return Contract.decodeOpenAPI(contract, AppPaymentRequest);
+      },
       listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
         const res = await walletClient.listAppPaymentRequests();
         return {
@@ -211,7 +216,10 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       rejectAppPaymentRequest: async requestContractId => {
         await walletClient.rejectAppPaymentRequest(requestContractId);
       },
-
+      getSubscriptionRequest: async contractId => {
+        const contract = await walletClient.getSubscriptionRequest(contractId);
+        return Contract.decodeOpenAPI(contract, SubscriptionRequest);
+      },
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
         const res = await walletClient.listSubscriptionRequests();
         return {

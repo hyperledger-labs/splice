@@ -19,7 +19,7 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
-  const { listAppPaymentRequests } = useWalletClient();
+  const { getAppPaymentRequest } = useWalletClient();
   const { cid } = useParams();
   const [appPayment, setAppPayment] = useState<Contract<AppPaymentRequest>>();
 
@@ -27,25 +27,23 @@ export const ConfirmPayment: React.FC = () => {
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     const fetchAppPayment = async (n: number) => {
-      // TODO (#3433): single fetch instead of linear search
-      const { paymentRequestsList } = await listAppPaymentRequests();
-      const req = paymentRequestsList.find(c => c.contractId === cid);
-      if (req) {
-        console.debug('Payment request found');
-        setAppPayment(req);
-      } else if (n < 0) {
-        throw new Error('Payment request not found, retries exceeded giving up...');
-      } else {
-        console.debug('Payment request not found, trying again...');
-        timer = setTimeout(fetchAppPayment, 500, n - 1);
-      }
+      await getAppPaymentRequest(cid!).then(
+        appPayment => {
+          console.debug('Payment request found');
+          setAppPayment(appPayment);
+        },
+        err => {
+          console.debug('Failed to get payment request, trying again...', err);
+          timer = setTimeout(fetchAppPayment, 500, n - 1);
+        }
+      );
     };
     fetchAppPayment(30);
 
     return () => {
       if (timer !== undefined) clearTimeout(timer);
     };
-  }, [cid, listAppPaymentRequests]);
+  }, [cid, getAppPaymentRequest]);
 
   const coinPrice = useCoinPrice();
 

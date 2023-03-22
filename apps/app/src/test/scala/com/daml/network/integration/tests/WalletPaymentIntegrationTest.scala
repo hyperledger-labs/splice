@@ -1,10 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import java.time.Duration
 import java.util.UUID
@@ -15,26 +18,61 @@ class WalletPaymentIntegrationTest
     with WalletTestUtil {
 
   "A wallet" should {
-    "allow a user to list, and reject app payment requests" in { implicit env =>
+    "fail to get a non-existent payment request" in { implicit env =>
+      onboardWalletUser(aliceWallet, aliceValidator)
+
+      val nonExistentName = "does not exist"
+
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        assertThrows[CommandFailure](
+          aliceWallet.getAppPaymentRequest(new AppPaymentRequest.ContractId(nonExistentName))
+        ),
+        entries => {
+          forExactly(
+            1,
+            entries,
+          )(
+            _.errorMessage should include(nonExistentName)
+          )
+          forExactly(
+            1,
+            entries,
+          ) { log =>
+            log.message should include("HTTP GET /app-payment-requests/does%20not%20exist")
+            log.message should include("Responding with status code: 404 Not Found")
+          }
+        },
+      )
+    }
+
+    "allow a user to get, list, and reject app payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
 
-      val (_, _, reqC) =
+      val (_, cid, reqC) =
         createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         )
 
-      val reqFound = clue("Check that we can see the created payment request") {
-        val reqFound = eventually() {
-          aliceWallet.listAppPaymentRequests().headOption.value
+      val reqFound = clue("Check that we can get the created payment request") {
+        val reqFound = eventuallySucceeds() {
+          aliceWallet.getAppPaymentRequest(cid)
         }
         reqFound.payload shouldBe reqC
         reqFound
+      }
+
+      clue("Check that the created payment request is listed") {
+        val reqList = eventually() {
+          aliceWallet.listAppPaymentRequests().headOption.value
+        }
+        reqList.payload shouldBe reqC
+        reqList
       }
 
       actAndCheck(
@@ -49,18 +87,15 @@ class WalletPaymentIntegrationTest
     "allow a user to list and accept app payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
-      val (referenceId, _, reqC) =
+      val (referenceId, cid, reqC) =
         createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         )
 
-      val cid = eventually() {
-        inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
-          r.payload shouldBe reqC
-          r.contractId
-        }
+      eventually() {
+        aliceWallet.getAppPaymentRequest(cid).payload shouldBe reqC
       }
 
       clue("Tap 50 coins") {

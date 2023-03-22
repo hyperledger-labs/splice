@@ -179,6 +179,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /app-payment-requests/{contract_id}:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "getAppPaymentRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "internal error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /app-payment-requests/{contract_id}/accept:
     post:
       tags: [wallet]
@@ -424,6 +454,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
   /subscription-requests/{contract_id}:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "getSubscriptionRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "internal error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       tags: [wallet]
       x-jvm-package: wallet
