@@ -206,7 +206,7 @@ class InMemoryMultiDomainAcsStore(
 
   override def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
-  )(id: ContractId[T])(implicit
+  )(id: ContractId[_])(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Option[ContractWithState[TCid, T]]] = {
     requireInScope(companion)

@@ -6,6 +6,7 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{TreeUpd
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.network.util.Contract
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -17,7 +18,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
-  )(id: ContractId[T])(implicit
+  )(id: ContractId[_])(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Option[ContractWithState[TCid, T]]]
 
@@ -105,7 +106,12 @@ object MultiDomainAcsStore {
   final case class ReadyContract[TCid, T](
       contract: Contract[TCid, T],
       domain: DomainId,
-  )
+  ) extends PrettyPrinting {
+    override def pretty = prettyOfClass[ReadyContract[TCid, T]](
+      param("contract", _.contract),
+      param("domain", _.domain),
+    )
+  }
 
   final case class ContractWithState[TCid, T](
       contract: Contract[TCid, T],

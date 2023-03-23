@@ -13,6 +13,7 @@ import com.daml.ledger.javaapi.data.codegen.{InterfaceCompanion, ContractId, Dam
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{AcsStore, CNNodeAppStore, MultiDomainAcsStore}
+import MultiDomainAcsStore.{ContractState, ReadyContract}
 import com.daml.network.util.{HasHealth, Contract}
 import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -317,6 +318,32 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
     acsFuture
       .flatMap(companionClass.lookupContractById(_)(companion)(task.contractId))
       .map(_.isEmpty)
+}
+
+/** A trigger for processing ready contracts. Note that the trigger
+  * can get called multiple times for the same contract as it gets transferred betweend domains.
+  */
+abstract class OnReadyContractTrigger[C, TCid <: ContractId[_], T](
+    store: CNNodeAppStore[_, _],
+    companion: C,
+)(implicit
+    ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+    companionClass: MultiDomainAcsStore.ContractCompanion[C, TCid, T],
+) extends SourceBasedTrigger[ReadyContract[TCid, T]] {
+
+  override protected val source: Source[ReadyContract[TCid, T], NotUsed] =
+    store.multiDomainAcsStore.streamReadyContracts(companion)
+
+  override final def isStaleTask(
+      task: ReadyContract[TCid, T]
+  )(implicit tc: TraceContext): Future[Boolean] =
+    store.multiDomainAcsStore
+      .lookupContractById(companion)(task.contract.contractId: TCid)
+      .map(
+        _.forall(_.state != ContractState.Assigned(task.domain))
+      )
 }
 
 abstract class OnReadyForTransferInTrigger(
