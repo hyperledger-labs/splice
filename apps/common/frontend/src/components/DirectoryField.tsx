@@ -5,7 +5,7 @@ import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 import { Party } from '@daml/types';
 
-import { useDirectoryClient } from '../contexts/DirectoryServiceContext';
+import { useDirectoryClient } from '../contexts';
 import { Contract } from '../utils';
 
 interface Props extends StandardTextFieldProps {
@@ -107,7 +107,6 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
         <TextField
           {...params}
           fullWidth
-          label={props.label}
           inputProps={{ ...params.inputProps, 'data-resolved-party-id': resolvedParty }}
         />
       )}
@@ -118,9 +117,9 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
       onInputChange={onInputChange}
       onChange={onItemSelected}
       freeSolo
-      sx={{ width: 200 }}
       id={props.id}
       className={props.className}
+      sx={{ width: 200 }}
     />
   );
 };

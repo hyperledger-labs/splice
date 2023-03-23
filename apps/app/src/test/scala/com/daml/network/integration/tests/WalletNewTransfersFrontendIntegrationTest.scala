@@ -8,7 +8,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime, ZoneOffset}
+import java.time.temporal.ChronoUnit
+import java.time.{Duration, Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
 
 class WalletNewTransfersFrontendIntegrationTest
@@ -25,11 +26,76 @@ class WalletNewTransfersFrontendIntegrationTest
   "A wallet UI" should {
     val aliceWalletNewPort = 3007
 
+    "create a p2p transfer" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceDirectoryName = perTestCaseName("alice.cns")
+
+      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobDirectoryName = perTestCaseName("bob.cns")
+
+      val cc = BigDecimal(10)
+      val transferAmount = BigDecimal(3.5)
+      val expiryDays = 10
+
+      // setup alice and bob
+      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(bobWallet, bobValidator)
+      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet, cc)
+      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
+
+      bobWallet.listTransferOffers() shouldBe empty
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        click on "navlink-transfer"
+
+        actAndCheck(
+          "alice creates transfer offer", {
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").underlying.sendKeys(bobUserParty.toProtoPrimitive)
+
+            click on "create-offer-cc-amount"
+            numberField("create-offer-cc-amount").value = ""
+            numberField("create-offer-cc-amount").underlying.sendKeys(transferAmount.toString())
+
+            click on "create-offer-expiration-days"
+            singleSel("create-offer-expiration-days").value = expiryDays.toString
+
+            click on "create-offer-description"
+            textArea("create-offer-description").underlying.sendKeys("by party ID")
+
+            click on "create-offer-submit-button"
+          },
+        )(
+          "bob observes transfer offer",
+          _ => {
+            bobWallet.listTransferOffers() should have size 1
+            val transfer = bobWallet.listTransferOffers().head.payload
+            val tenDaysFromNow = Instant.now().plus(expiryDays.toLong, ChronoUnit.DAYS)
+            val timeDiff = ChronoUnit.MINUTES.between(transfer.expiresAt, tenDaysFromNow)
+
+            transfer.amount.amount.floatValue() shouldBe transferAmount.floatValue
+            transfer.description shouldBe "by party ID"
+            transfer.sender shouldBe aliceUserParty.toProtoPrimitive
+            transfer.receiver shouldBe bobUserParty.toProtoPrimitive
+
+            // Allowing 1 min of correctness in the transfer dates
+            assertInRange(BigDecimal(timeDiff), (BigDecimal(0), BigDecimal(1)))
+          },
+        )
+      }
+    }
+
     "show a list of transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceDirectoryName = perTestCaseName("alice.cns")
-      val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
+
+      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobDirectoryName = perTestCaseName("bob.cns")
+      val bobDirectoryDisplay = expectedCns(bobUserParty, bobDirectoryName)
+
       val transferExpiry = CantonTimestamp.now().plusSeconds(100)
 
       val expectedExpiry =
@@ -38,15 +104,20 @@ class WalletNewTransfersFrontendIntegrationTest
           .format(LocalDateTime.ofInstant(transferExpiry.toInstant, ZoneOffset.UTC))
 
       onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(bobWallet, bobValidator)
       createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
+      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet)
 
-      aliceWallet.createTransferOffer(
-        aliceUserParty,
-        BigDecimal(1),
-        "Alice self transfer",
-        transferExpiry,
-        UUID.randomUUID().toString,
-      )
+      actAndCheck(
+        " Bob creates transfer offer to alice",
+        bobWallet.createTransferOffer(
+          aliceUserParty,
+          BigDecimal(1),
+          "Bobo transfer to Alice",
+          transferExpiry,
+          UUID.randomUUID().toString,
+        ),
+      )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
@@ -57,7 +128,7 @@ class WalletNewTransfersFrontendIntegrationTest
 
           inside(offerCards) { case Seq(offerCard) =>
             offerCard.childElement(className("transfer-offer-sender")).text should matchText(
-              aliceDirectoryDisplay
+              bobDirectoryDisplay
             )
 
             offerCard.childElement(className("transfer-offer-expiry")).text should matchText(
@@ -73,6 +144,45 @@ class WalletNewTransfersFrontendIntegrationTest
               .text should matchText(
               "2 USD @ 0.5 CC/USD"
             )
+          }
+        }
+      }
+    }
+
+    "not show transfer offers I created" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceDirectoryName = perTestCaseName("alice.cns")
+
+      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobDirectoryName = perTestCaseName("bob.cns")
+
+      val transferExpiry = CantonTimestamp.now().plusSeconds(100)
+
+      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(bobWallet, bobValidator)
+      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
+      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet)
+
+      actAndCheck(
+        "Alice creates transfer offer to bob",
+        aliceWallet.createTransferOffer(
+          bobUserParty,
+          BigDecimal(1),
+          "Alice transfer to Bob",
+          transferExpiry,
+          UUID.randomUUID().toString,
+        ),
+      )(
+        "alice has an outgoing transfer offer",
+        _ => aliceWallet.listTransferOffers() should have size 1,
+      )
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        clue("Alice can't see transfer offers she created") {
+          eventually() {
+            findAll(className("transfer-offer")).toList should have size 0
           }
         }
       }

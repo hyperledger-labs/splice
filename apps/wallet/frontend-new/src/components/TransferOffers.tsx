@@ -1,6 +1,12 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Contract, DirectoryEntry, useInterval } from 'common-frontend';
+import {
+  AmountDisplay,
+  Contract,
+  DirectoryEntry,
+  useInterval,
+  useUserState,
+} from 'common-frontend';
 import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import DateDisplay from 'common-frontend/lib/components/DateDisplay';
 import { useCallback, useState } from 'react';
@@ -21,29 +27,32 @@ export const TransferOffers: React.FC = () => {
   const { listTransferOffers } = useWalletClient();
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
   const coinPrice = useCoinPrice();
+  const { primaryPartyId } = useUserState();
 
   const toWalletTransferOffer = useCallback(
     async (
       offerList: Contract<TransferOffer>[],
       coinPrice: BigNumber
     ): Promise<WalletTransferOffer[]> => {
-      return offerList.map(offer => {
-        return {
-          contractId: offer.contractId,
-          ccAmount: offer.payload.amount.amount,
-          usdAmount: coinPrice ? coinPrice.times(offer.payload.amount.amount).toString() : '...',
-          conversionRate: coinPrice ? coinPrice?.toString() : '...',
-          convertedCurrency: convertCurrency(
-            BigNumber(offer.payload.amount.amount),
-            Currency.CC,
-            coinPrice
-          ),
-          senderId: offer.payload.sender,
-          expiry: offer.payload.expiresAt,
-        };
-      });
+      return offerList
+        .filter(o => o.payload.sender !== primaryPartyId)
+        .map(offer => {
+          return {
+            contractId: offer.contractId,
+            ccAmount: offer.payload.amount.amount,
+            usdAmount: coinPrice ? coinPrice.times(offer.payload.amount.amount).toString() : '...',
+            conversionRate: coinPrice ? coinPrice?.toString() : '...',
+            convertedCurrency: convertCurrency(
+              BigNumber(offer.payload.amount.amount),
+              Currency.CC,
+              coinPrice
+            ),
+            senderId: offer.payload.sender,
+            expiry: offer.payload.expiresAt,
+          };
+        });
     },
-    []
+    [primaryPartyId]
   );
 
   const fetchTransferOffers = useCallback(async () => {
