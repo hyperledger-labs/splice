@@ -19,7 +19,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryMultiDomainAcsStoreTest")
 
-  import MultiDomainAcsStore.{ContractState, ContractWithState, TransferId}
+  import MultiDomainAcsStore.*
 
   private var offsetCounter = 0
 
@@ -154,6 +154,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
   }
 
   private type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
+  private type CReady = ReadyContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   private def assertList(expected: (C, Option[DomainId])*)(implicit store: MultiDomainAcsStore) = {
     val expected_ = expected.map {
@@ -182,19 +183,19 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     }
 
   private def assertTestState(
-      contractLocationsById: Map[ContractId[_], NonEmpty[Map[DomainId, Long]]] = Map.empty,
+      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
       archivedTombstones: Set[ContractId[_]] = Set.empty,
       pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
       bootstrapTransferOutIds: Set[TransferId] = Set.empty,
   )(implicit store: InMemoryMultiDomainAcsStore) =
     for {
-      actualContractLocationsById <- store.contractLocationsById
+      actualContractStateEventsById <- store.contractStateEventsById
       actualArchivedTombstones <- store.archivedTombstones
       actualPendingTransfersById <- store.pendingTransfersById
       actualBootstrapTransferOutIds <- store.bootstrapTransferOutIds
     } yield {
-      clue("contractLocationsById") {
-        actualContractLocationsById shouldBe contractLocationsById
+      clue("contractStateEventsById") {
+        actualContractStateEventsById shouldBe contractStateEventsById
       }
       clue("archivedTombstones") {
         actualArchivedTombstones shouldBe archivedTombstones
@@ -587,6 +588,48 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         _ <- d1.removeTransferOutIfBootstrap(c(1).contractId, tf0)
         _ <- assertReadyForTransferIn(tf0Id, false)
       } yield succeed
+    }
+    "stream ready contracts" in {
+      implicit val store = mkStore()
+      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val streamF = store
+        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .take(5)
+        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
+      val tf0 = nextTransferId
+      val tf1 = nextTransferId
+      val tf2 = nextTransferId
+      for {
+        _ <- d1.acsAndTransferOuts(
+          acs = Seq(c(1)),
+          transferOuts = Seq((c(2) -> d2, tf2)),
+        )
+        _ <- d1.switchToUpdates()
+        _ <- d2.switchToUpdates()
+        _ = eventually()(readyContracts.get() should have size 1)
+        // transfer out before transfer in
+        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ = eventually()(readyContracts.get() should have size 2)
+        // transfer in before transfer out
+        _ <- d1.transferIn(c(1) -> d2, tf1)
+        _ <- d2.transferOut(c(1) -> d1, tf1)
+        _ = eventually()(readyContracts.get() should have size 3)
+        // Complete transfer in of in-flight transfer out.
+        _ <- d2.transferIn(c(2) -> d1, tf2)
+        _ = eventually()(readyContracts.get() should have size 4)
+        _ <- d2.create(c(3))
+        _ = eventually()(readyContracts.get() should have size 5)
+        _ <- streamF
+      } yield {
+        readyContracts.get() shouldBe Seq(
+          ReadyContract(c(1), d1),
+          ReadyContract(c(1), d2),
+          ReadyContract(c(1), d1),
+          ReadyContract(c(2), d2),
+          ReadyContract(c(3), d2),
+        )
+      }
     }
   }
 }

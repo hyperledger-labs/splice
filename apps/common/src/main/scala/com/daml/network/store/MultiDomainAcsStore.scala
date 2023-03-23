@@ -14,7 +14,7 @@ import scala.concurrent.Future
 
 trait MultiDomainAcsStore extends AutoCloseable {
 
-  import MultiDomainAcsStore.{ContractWithState, TransferId}
+  import MultiDomainAcsStore.*
 
   def lookupContractById[TCid <: ContractId[T], T <: Template](
       templateCompanion: TemplateCompanion[TCid, T]
@@ -25,6 +25,14 @@ trait MultiDomainAcsStore extends AutoCloseable {
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Option[Long] = None,
   ): Future[Seq[ContractWithState[TCid, T]]]
+
+  /** Stream all ready contracts that can be acted upon.
+    * Note that the same contract can be returned multiple
+    * times as it moves across domains.
+    */
+  def streamReadyContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
+  ): Source[ReadyContract[TCid, T], NotUsed]
 
   /** Stream all transfer out events that are ready for transfer in.
     * The only guarantee provided is that a transfer out that does not get transferred in
@@ -42,7 +50,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
 object MultiDomainAcsStore {
 
-  case class TransferId(source: DomainId, id: String)
+  final case class TransferId(source: DomainId, id: String)
 
   object TransferId {
     def fromTransferIn(in: TransferEvent.In) =
@@ -53,7 +61,15 @@ object MultiDomainAcsStore {
 
   import AcsStore.IngestionFilter
 
-  case class ContractWithState[TCid, T](
+  /** A contract that is ready to be acted upon
+    * on the given domain.
+    */
+  final case class ReadyContract[TCid, T](
+      contract: Contract[TCid, T],
+      domain: DomainId,
+  )
+
+  final case class ContractWithState[TCid, T](
       contract: Contract[TCid, T],
       state: ContractState,
   )

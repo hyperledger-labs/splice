@@ -31,7 +31,7 @@ class InMemoryMultiDomainAcsStore(
 ) extends MultiDomainAcsStore
     with NamedLogging {
 
-  import MultiDomainAcsStore.{ContractState, ContractWithState, TransferId}
+  import MultiDomainAcsStore.*
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -41,9 +41,9 @@ class InMemoryMultiDomainAcsStore(
       nextCreateEventNumber = 0,
       createEvents = SortedMap.empty,
       createEventsById = Map.empty,
-      nextContractLocationEventNumber = 0,
-      contractLocations = SortedMap.empty,
-      contractLocationsById = Map.empty,
+      nextContractStateEventNumber = 0,
+      contractStateEvents = SortedMap.empty,
+      contractStateEventsById = Map.empty,
       nextTransferOutEventNumber = 0,
       transferOutEvents = SortedMap.empty,
       transferOutEventsById = Map.empty,
@@ -229,12 +229,52 @@ class InMemoryMultiDomainAcsStore(
       state.transferOutEventsById.contains(transfer)
     }
 
+  private def nextReadyContract[T](
+      fromCreated: CreatedEvent => Option[T],
+      startingFromIncl: Long,
+  ): Future[(Long, (T, DomainId))] = {
+    val st = stateVar
+    val optEntry = st.contractStateEvents
+      .iteratorFrom(startingFromIncl)
+      .collectFirst(Function.unlift { case (num, state) =>
+        for {
+          domain <- state.toAssigned
+          evNum <- st.createEventsById.get(state.contractId)
+          ev <- st.createEvents.get(evNum)
+          t <- fromCreated(ev)
+        } yield (num, (t, domain))
+      })
+    optEntry match {
+      case None =>
+        st.offsetChanged.future.flatMap(_ =>
+          nextReadyContract(fromCreated, st.nextContractStateEventNumber)
+        )
+      case Some((eventNumber, co)) => Future((eventNumber + 1, co))
+    }
+  }
+
+  private def streamReadyContracts[T](
+      fromCreatedEvent: CreatedEvent => Option[T]
+  ): Source[(T, DomainId), NotUsed] = {
+    Source.unfoldAsync(0: Long)(eventNumber =>
+      nextReadyContract(fromCreatedEvent, eventNumber).map(Some(_))
+    )
+  }
+
+  override def streamReadyContracts[TCid <: ContractId[T], T <: Template](
+      templateCompanion: TemplateCompanion[TCid, T]
+  ): Source[ReadyContract[TCid, T], NotUsed] = {
+    requireInScope(templateCompanion)
+    streamReadyContracts(Contract.fromCreatedEvent(templateCompanion)).map {
+      case (contract, domain) => ReadyContract(contract, domain)
+    }
+  }
+
   /** Testing APIs
     */
 
-  private[store] def contractLocationsById
-      : Future[Map[ContractId[_], NonEmpty[Map[DomainId, Long]]]] =
-    Future.successful(stateVar.contractLocationsById)
+  private[store] def contractStateEventsById: Future[Map[ContractId[_], Long]] =
+    Future.successful(stateVar.contractStateEventsById)
   private[store] def archivedTombstones: Future[Set[ContractId[_]]] =
     Future.successful(stateVar.archivedTombstones)
   private[store] def pendingTransfersById: Future[Map[ContractId[_], NonEmpty[Set[TransferId]]]] =
@@ -254,6 +294,18 @@ object InMemoryMultiDomainAcsStore {
       domain: DomainId,
   )
 
+  private case class ContractStateEvent(
+      contractId: ContractId[_],
+      domains: Set[DomainId],
+  ) {
+
+    /** Get the assigned domain of the contract
+      * Returns None if there is not exactly one.
+      */
+    def toAssigned: Option[DomainId] =
+      domains.headOption.filter(_ => domains.size == 1)
+  }
+
   /** General assumption: We're connected to both source and target domain.
     * Trivially given for non-multi hosted parties. For multi-hosted parties
     * still a given provided all participants hosting a party are connected
@@ -263,10 +315,11 @@ object InMemoryMultiDomainAcsStore {
     * - createdEvents
     *   - added on the first create/tranfer in that matches the filter out if the contract is not in archivedTombstones.
     *   - removed on archive
-    * - contractLocations
-    *   - added on each create/transfer in
-    *   - removed on the corresponding transfer out/archive
-    *   - on archive, all locations are removed.
+    * - contractStateEvents
+    *   - entry added on first transfer in/cretae
+    *   - domain added to entry on transfer in/create
+    *   - domain removed on transfer out
+    *   - on archive, full entry is removed
     * - transferOutEvents
     *   - added on transfer out if we have the contract in createdEvents (so it matched our filter) and we do not yet
     *     have the transfer id in earlyTransferIns.
@@ -314,18 +367,13 @@ object InMemoryMultiDomainAcsStore {
       // Event number stays stable across transfers.
       createEvents: SortedMap[Long, CreatedEvent],
       createEventsById: Map[ContractId[_], Long],
-
-      // contract-locations
-      nextContractLocationEventNumber: Long,
-      // Domains that we have seen the contract move into (via a transfer in/create) but have not yet
-      // seen a transfer out/archive.
-      // There can be multiple entries if we see transfer ins before transfer outs.
-      // At the moment, we treat the contract as in-flight in that case until domains have
-      // caught up far enough that we're back to a single one.
-      // There can also be no entry for a given contract if we have seen a transfer out
-      // but not yet the transfer in.
-      contractLocations: SortedMap[Long, ContractLocation],
-      contractLocationsById: Map[ContractId[_], NonEmpty[Map[DomainId, Long]]],
+      nextContractStateEventNumber: Long,
+      // States of all active contracts.
+      // Each contract will be in there only once
+      // but contracts get readded with a new
+      // event number as their state changes.
+      contractStateEvents: SortedMap[Long, ContractStateEvent],
+      contractStateEventsById: Map[ContractId[_], Long],
 
       // in-flights
       nextTransferOutEventNumber: Long,
@@ -354,17 +402,12 @@ object InMemoryMultiDomainAcsStore {
   ) {
 
     def getContractState(cid: ContractId[_]): Option[ContractState] =
-      createEventsById.get(cid).map { _ =>
-        val domains = contractLocationsById.get(cid).fold(Set.empty[DomainId])(_.keySet)
-        domains.headOption match {
-          case Some(domain) if domains.size == 1 =>
-            // If we only have one domain the contract has moved in to and not yet moved out off
-            // we assume that's the contract's current location. Note that there still may be
-            // in-flight transfers at this point.
+      contractStateEventsById.get(cid).map { eventNum =>
+        val stateEvent = contractStateEvents(eventNum)
+        stateEvent.toAssigned match {
+          case Some(domain) =>
             ContractState.Assigned(domain)
-          case _ =>
-            // If we have more than one or no domain but the contract is active
-            // we must be tracking at least one in-flight transfer
+          case None =>
             assert(!pendingTransfersById.get(cid).isEmpty)
             ContractState.InFlight
         }
@@ -540,6 +583,34 @@ object InMemoryMultiDomainAcsStore {
       }
     }
 
+    private def updateContractStateEvent(
+        cid: ContractId[_],
+        update: Set[DomainId] => Set[DomainId],
+    ): State = {
+      val evNum = contractStateEventsById.get(cid)
+      val oldDomains = evNum.map(contractStateEvents(_)).fold(Set.empty[DomainId])(_.domains)
+      val newEv = ContractStateEvent(cid, update(oldDomains))
+      copy(
+        contractStateEvents =
+          contractStateEvents -- evNum + (nextContractStateEventNumber -> newEv),
+        contractStateEventsById = contractStateEventsById + (cid -> nextContractStateEventNumber),
+        nextContractStateEventNumber = nextContractStateEventNumber + 1,
+      )
+    }
+
+    private def removeContractStateEvent(
+        cid: ContractId[_]
+    ): State = {
+      val evNum = contractStateEventsById.getOrElse(
+        cid,
+        throw new IllegalStateException(s"Contract id $cid is not in contractStateEventsById"),
+      )
+      copy(
+        contractStateEvents = contractStateEvents - evNum,
+        contractStateEventsById = contractStateEventsById - cid,
+      )
+    }
+
     private def ingestCreatedEvents(
         domain: DomainId,
         evs: Seq[CreatedEvent],
@@ -630,15 +701,7 @@ object InMemoryMultiDomainAcsStore {
         (this, CreatedEventSummary.SkippedTombstone)
       } else {
         val newSt =
-          copy(
-            nextContractLocationEventNumber = nextContractLocationEventNumber + 1,
-            contractLocations = contractLocations + (nextContractLocationEventNumber -> location),
-            contractLocationsById = contractLocationsById.updatedWith(cid) { prev =>
-              val newEntry = location.domain -> nextContractLocationEventNumber
-              Some(prev.fold(NonEmpty(Map, newEntry))(_.updated(newEntry._1, newEntry._2)))
-            },
-          )
-
+          updateContractStateEvent(cid, _.incl(location.domain))
         createEventsById.get(cid) match {
           case None =>
             (
@@ -665,12 +728,16 @@ object InMemoryMultiDomainAcsStore {
           // When we see an archive, we drop all state for that contract immediately.
           // If we might still see events later, we add a tombstone marker that is only used to
           // ignore all events and will be removed once we know that there will be no further events.
-          val locations = contractLocationsById.get(contractId).fold(Iterable.empty[Long])(_.values)
-          val newSt = copy(
+          val stateEventNum = contractStateEventsById.getOrElse(
+            contractId,
+            throw new IllegalStateException(
+              s"Contract id $contractId not in contractStateEventsById on archive"
+            ),
+          )
+          val stateEvent = contractStateEvents(stateEventNum)
+          val newSt = removeContractStateEvent(contractId).copy(
             createEvents = createEvents - createId,
             createEventsById = createEventsById - contractId,
-            contractLocations = contractLocations -- locations,
-            contractLocationsById = contractLocationsById - contractId,
             archivedTombstones =
               if (pendingTransfersById.contains(contractId)) (archivedTombstones + contractId)
               else archivedTombstones,
@@ -679,7 +746,7 @@ object InMemoryMultiDomainAcsStore {
             newSt,
             ArchivedEventSummary.Ingested(
               newSt.archivedTombstones.contains(contractId),
-              locations.map(contractLocations(_)),
+              stateEvent.domains.map(ContractLocation(contractId, _)),
             ),
           )
       }
@@ -846,30 +913,31 @@ object InMemoryMultiDomainAcsStore {
         // transfers.
         (newSt, summary)
       } else {
-        contractLocationsById.get(out.contractId).flatMap(_.get(out.source)) match {
-          case None =>
-            if (bootstrap) {
-              // If we hit this during bootstrapping, we need to store the contract
-              // to guarantee we will submit the transfer in. We accept
-              // potentially leaking the in-flight contract for now.
-              (newSt, summary)
-            } else {
-              // If the transfer is not from bootstrapping, then we can only hit this
-              // because we filtered out the create/transfer in.
-              // We deliberately use `this` instead of `newSt` here. We don't want to update
-              // pending transfers for ignored contracts.
-              (this, TransferOutEventSummary.Filtered)
-            }
-          case Some(id) =>
-            (
-              newSt.copy(
-                contractLocations = contractLocations - id,
-                contractLocationsById = contractLocationsById.updatedWith(out.contractId)(
-                  _.flatMap(p => NonEmpty.from(p - out.source))
-                ),
-              ),
-              summary,
-            )
+        // Whether we saw the contract move into the domain
+        // via a create or transfer in
+        val sawMoveIn =
+          contractStateEventsById.get(out.contractId).fold(false) { num =>
+            val ev = contractStateEvents(num)
+            ev.domains.contains(out.source)
+          }
+        if (!sawMoveIn) {
+          if (bootstrap) {
+            // If we hit this during bootstrapping, we need to store the contract
+            // to guarantee we will submit the transfer in. We accept
+            // potentially leaking the in-flight contract for now.
+            (newSt, summary)
+          } else {
+            // If the transfer is not from bootstrapping, then we can only hit this
+            // because we filtered out the create/transfer in.
+            // We deliberately use `this` instead of `newSt` here. We don't want to update
+            // pending transfers for ignored contracts.
+            (this, TransferOutEventSummary.Filtered)
+          }
+        } else {
+          (
+            newSt.updateContractStateEvent(out.contractId, _.excl(out.source)),
+            summary,
+          )
         }
       }
     }
