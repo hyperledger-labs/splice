@@ -843,6 +843,19 @@ function subcmd_top() {
 
 ###
 
+subcommand_whitelist[pods]='Display a list of cluster pods'
+
+function subcmd_pods() {
+    _cluster_show
+
+    kubectl top node
+
+    _log ""
+    kubectl get pods -A | grep -v kube-system
+}
+
+###
+
 subcommand_whitelist[wait]='Wait for the cluster to reach a fully ready state'
 
 function subcmd_wait() {
@@ -1074,6 +1087,42 @@ function subcmd_papply() {
                   -c "IMAGE_TAG=${IMAGE_TAG}" \
                   -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
                   -c "DNS_SA_KEY=${dns_sa_key}"
+}
+###
+
+subcommand_whitelist[ppreview]="Preview applying the current Pulumi configuration"
+
+function subcmd_ppreview() {
+    _production_gate
+    _cluster_must_exist
+
+    IMAGE_TAG=${SOURCE_IMAGE_TAG}
+
+    if [ -z "${1-}" ]; then
+       if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
+          _docker_must_be_running
+          if ! make -C ${REPO_ROOT} docker-check -j; then
+             _error "Images missing from artifact registry, cannot apply."
+             exit 1
+         fi
+       else
+           _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+       fi
+    else
+        IMAGE_TAG=$1
+       _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
+    fi
+
+    # Use the existing secret to populate the secret needed in the
+    # ingress namespace. Eventually, the secret management will be
+    # done in Pulumi.
+    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
+                     | jq -r '.data["key.json"]')
+
+    subcmd_pulumi preview --show-sames \
+                  -c "IMAGE_TAG=${IMAGE_TAG}" \
+                  -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
+                  -c "DNS_SA_KEY=${dns_sa_key}" --json
 }
 
 ###
