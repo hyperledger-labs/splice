@@ -1,12 +1,17 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{value as scalaValue}
-import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId, ValueDecoder}
+import com.daml.ledger.api.v1.value as scalaValue
 import com.daml.ledger.javaapi.data.Value
+import com.daml.ledger.javaapi.data.codegen.{
+  ContractCompanion,
+  ContractId,
+  InterfaceCompanion,
+  ValueDecoder,
+}
 import com.daml.lf.archive.{ArchivePayload, Dar, DarReader}
-import com.daml.lf.data.Ref.PackageId
-import com.daml.lf.data.{ImmArray, Ref}
+import com.daml.lf.data.Ref
+import com.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
 import com.daml.lf.typesig
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.platform.participant.util.LfEngineToApi
@@ -22,6 +27,10 @@ abstract class TemplateJsonDecoder {
   def decodeTemplate[TCid <: ContractId[T], T](
       companion: ContractCompanion[?, TCid, T]
   )(json: Json): T
+
+  def decodeInterface[ICid <: ContractId[Marker], Marker, View](
+      companion: InterfaceCompanion[Marker, ICid, View]
+  )(json: Json): View
 }
 
 /** Template decoder constructed from loading DAR files of the resources of our apps.
@@ -44,26 +53,51 @@ class ResourceTemplateDecoder(
   override def decodeTemplate[TCid <: ContractId[T], T](
       companion: ContractCompanion[?, TCid, T]
   )(json: Json): T = {
-    val sprayJson = json.noSpaces.parseJson
-    val lfIdentifier = typesig.TypeConName(
-      Ref.Identifier.assertFromString(
-        s"${companion.TEMPLATE_ID.getPackageId}:${companion.TEMPLATE_ID.getModuleName}:${companion.TEMPLATE_ID.getEntityName}"
-      )
+    val templateId = companion.TEMPLATE_ID
+    val lfIdentifier = Ref.Identifier.assertFromString(
+      s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
     )
-    val ty: typesig.Type = typesig.TypeCon(lfIdentifier, ImmArray.ImmArraySeq.empty)
+
+    decode(ContractCompanion.valueDecoder[T](companion), lfIdentifier, json)
+  }
+
+  override def decodeInterface[ICid <: ContractId[Marker], Marker, View](
+      companion: InterfaceCompanion[Marker, ICid, View]
+  )(json: Json): View = {
+    val viewType = packageSignatures(PackageId.assertFromString(companion.TEMPLATE_ID.getPackageId))
+      .interfaces(
+        QualifiedName(
+          ModuleName.assertFromString(companion.TEMPLATE_ID.getModuleName),
+          DottedName.assertFromString(companion.TEMPLATE_ID.getEntityName),
+        )
+      )
+      .viewType
+      .getOrElse(
+        throw new IllegalStateException(
+          s"Internal error: ${companion.TEMPLATE_ID} does not have a view type"
+        )
+      )
+    decode(companion.valueDecoder, viewType, json)
+  }
+
+  private def decode[TCid <: ContractId[T], T](
+      decoder: ValueDecoder[T],
+      entityName: Ref.TypeConName,
+      json: Json,
+  ): T = {
+    val sprayJson = json.noSpaces.parseJson
     val lfValue = ApiCodecCompressed.jsValueToApiValue(
       sprayJson,
-      ty,
-      typeLookup(_),
+      entityName,
+      typeLookup,
     )
     // TODO(#2019) Switch to native JSON serialization in Java codegen once that has been added.
     val scalaApiValue = LfEngineToApi
-      .lfValueToApiValue(false, lfValue)
+      .lfValueToApiValue(verbose = false, lfValue)
       .valueOr(err =>
         ErrorUtil.invalidState(s"Unexpected failure converting lf value to API value: $err")
       )
     val javaApiValue = Value.fromProto(scalaValue.Value.toJavaProto(scalaApiValue))
-    val decoder: ValueDecoder[T] = ContractCompanion.valueDecoder[T](companion)
     decoder.decode(javaApiValue)
   }
 }

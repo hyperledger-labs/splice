@@ -3,7 +3,6 @@
 
 package com.daml.network.util
 
-import com.google.protobuf
 import cats.syntax.either.*
 import com.daml.ledger.api.v1.contract_metadata.ContractMetadata.toJavaProto
 import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
@@ -18,8 +17,8 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Value}
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
-import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.lf.value as lf
+import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.v0
@@ -29,7 +28,8 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
-import io.circe.parser as circe
+import com.google.protobuf
+import io.circe.{Json, parser as circe}
 import org.apache.commons.codec.binary.Hex
 
 import scala.util.Try
@@ -169,6 +169,30 @@ object Contract {
   )(contract: http.Contract)(implicit
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+    val contractId = companion.toContractId(new ContractId[T](contract.contractId))
+    fromJson(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion))(contract)
+  }
+
+  def fromJson[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
+      interfaceCompanion: Companion.Interface[ICid, Marker, View]
+  )(contract: http.Contract)(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
+    val contractId = interfaceCompanion.toContractId(new ContractId[Marker](contract.contractId))
+    fromJson(
+      interfaceCompanion.TEMPLATE_ID,
+      contractId,
+      decoder.decodeInterface(interfaceCompanion),
+    )(contract)
+  }
+
+  private def fromJson[TCid <: ContractId[?], T <: DamlRecord[?]](
+      companionTemplateId: Identifier,
+      contractId: TCid,
+      decodePayload: Json => T,
+  )(
+      contract: http.Contract
+  ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       templateId <- LfIdentifier
         .fromString(contract.templateId)
@@ -180,17 +204,14 @@ object Contract {
         templateId.qualifiedName.name.dottedName,
       )
       _ <- Either.cond(
-        javaTemplateId == companion.TEMPLATE_ID,
+        javaTemplateId == companionTemplateId,
         (),
         ProtoDeserializationError.ValueConversionError(
           "templateId",
-          s"Actual template id $javaTemplateId does not match expected template id ${companion.TEMPLATE_ID}",
+          s"Actual template id $javaTemplateId does not match expected template id $companionTemplateId",
         ),
       )
-      contractId = companion.toContractId(new ContractId[T](contract.contractId))
-      payload <- Try(
-        decoder.decodeTemplate(companion)(contract.payload)
-      ).toEither.left.map(ex =>
+      payload <- Try(decodePayload(contract.payload)).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
       metadata = ContractMetadataUtil.fromJson(contract.metadata)

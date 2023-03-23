@@ -12,15 +12,13 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.http.v0.wallet as http
-import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.ErrorResponse
+import com.daml.network.http.v0.{definitions, wallet as http}
 import com.daml.network.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
 }
-import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.util.{Codec, Contract}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
