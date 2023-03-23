@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
 import scala.concurrent.duration.DurationInt
@@ -15,7 +15,7 @@ class DirectoryFrontendIntegrationTest
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition =
-    CoinEnvironmentDefinition
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)

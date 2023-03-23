@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.SvApp.{isSvcMemberName, isSvcMemberParty}
@@ -29,7 +29,7 @@ import scala.jdk.CollectionConverters.*
 class ExecuteConfirmedActionTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,

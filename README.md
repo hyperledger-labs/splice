@@ -644,7 +644,7 @@ encounter an error like the following, there might have been a problem
 with the running Canton instance so try restarting.
 
 ```
-ERROR c.d.n.e.CoinLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
+ERROR c.d.n.e.CNNodeLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
 NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),
@@ -692,9 +692,9 @@ If you wish to extend our testing topology please also consult [this README](/ap
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
 Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the
-initialization of the [`CoinEnvironment`](apps/app/src/main/scala/com/daml/network/environment/CoinEnvironment.scala).
+initialization of the [`CNNodeEnvironment`](apps/app/src/main/scala/com/daml/network/environment/CNNodeEnvironment.scala).
 You usually can't debug this behaviour
-via our integration tests because the integration tests require an initialized `CoinEnvironment`.
+via our integration tests because the integration tests require an initialized `CNNodeEnvironment`.
 At other times, you may want to start an interactive console without having to run `sbt bundle`.
 
 You can achieve this by using the ['Simple topology' runtime configuration](https://i.imgur.com/dPgUd2Q.png) from IntelliJ.
@@ -704,7 +704,7 @@ see the results of adding log statements without needing to run `sbt bundle`.
 
 All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu.
 
-If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CoinApp -c <conf-files>`, however,
+If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CNNodeApp -c <conf-files>`, however,
 this doesn't give you a debugger.
 
 ### Testing Auth0 Auth Flows Locally

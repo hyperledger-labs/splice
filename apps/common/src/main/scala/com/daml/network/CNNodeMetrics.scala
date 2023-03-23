@@ -7,7 +7,7 @@ import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 
 /** A shared trait to capture the commonalities across our coin node metrics. */
-trait CoinNodeMetrics {
+trait CNNodeMetrics {
   def prefix: MetricName
 
   def dropwizardFactory: CantonDropwizardMetricsFactory

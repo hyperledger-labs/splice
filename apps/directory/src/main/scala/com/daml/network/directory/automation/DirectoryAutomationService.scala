@@ -2,10 +2,10 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
+import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,17 +19,17 @@ class DirectoryAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     store: DirectoryStore,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     scanConnection: ScanConnection,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
       Map(store.providerParty -> store),

@@ -2,12 +2,12 @@ package com.daml.network.integration.tests
 
 import com.daml.lf.data.Numeric
 import com.daml.network.console.WalletAppClientReference
-import com.daml.network.integration.tests.CoinTests.CoinTestCommon
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import org.scalatest.Assertion
 
-trait WalletTxLogTestUtil extends CoinTestCommon with WalletTestUtil with TimeTestUtil {
+trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
 
   // Amount paid by `createSelfPaymentRequest()`
   val selfPaymentAmount: BigDecimal = BigDecimal(10.0)

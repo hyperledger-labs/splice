@@ -2,8 +2,8 @@ package com.daml.network.console
 
 import akka.util.ByteString
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.util.Contract
@@ -14,9 +14,9 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import scala.concurrent.duration.FiniteDuration
 
 abstract class SvAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends HttpCoinAppReference {
+) extends HttpCNNodeAppReference {
 
   override protected val instanceType = "SV Client"
 
@@ -48,7 +48,7 @@ abstract class SvAppReference(
 }
 
 class SvAppClientReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     override val config: RemoteSvAppConfig,
 ) extends SvAppReference(consoleEnvironment, name)
@@ -62,15 +62,15 @@ class SvAppClientReference(
   * app.
   */
 class SvAppBackendReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SvAppReference(consoleEnvironment, name)
-    with LocalCoinAppReference
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SV"
 
-  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here. Also remove the "+ 1000" once we
@@ -103,7 +103,7 @@ class SvAppBackendReference(
 
   /** Remote participant this sv app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -111,7 +111,7 @@ class SvAppBackendReference(
 
   /** Remote participant this sv app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,

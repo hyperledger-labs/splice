@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.health.HealthReporting.implicitPrettyString
@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     waitForUnclaimedRewardsToBeExpired: Boolean,
 )(implicit
     override val ec: ExecutionContext,
@@ -139,7 +139,7 @@ class ArchiveClosedMiningRoundsTrigger(
           actAs = Seq(svParty),
           readAs = Seq(svcParty),
           update = update,
-          commandId = CoinLedgerConnection.CommandId(
+          commandId = CNLedgerConnection.CommandId(
             "com.daml.network.sv.createMiningRoundArchiveConfirmation",
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,

@@ -1,6 +1,9 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeTestCommon,
+  CNNodeTestConsoleEnvironment,
+}
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
@@ -8,9 +11,9 @@ import com.daml.network.console.SplitwellAppClientReference
 import com.daml.network.console.WalletAppClientReference
 import com.digitalasset.canton.topology.PartyId
 
-trait SplitwellTestUtil extends CoinTestCommon with WalletTestUtil with TimeTestUtil {
+trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
   def initSplitwellTest()(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
     val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)

@@ -2,8 +2,8 @@ package com.daml.network.integration.plugins
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.tests.CoinTests
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.tests.CNNodeTests
 import com.daml.network.config.CNNodeConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
@@ -19,7 +19,7 @@ import com.digitalasset.canton.config.RequireTypes
   * that will be required by the following test, but leaves the port in a TIME_WAIT state.
   */
 case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
-    extends EnvironmentSetupPlugin[CoinEnvironmentImpl, CoinTests.CoinTestConsoleEnvironment]
+    extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTests.CNNodeTestConsoleEnvironment]
     with BaseTest {
 
   protected val timeout = 2.minutes

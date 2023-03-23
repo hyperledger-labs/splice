@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
-import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
+import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -20,8 +20,8 @@ class UpdateIngestionService(
     ingestionTargetName: String,
     ingestionSink: MultiDomainAcsStore.IngestionSink,
     domain: DomainId,
-    connection: CoinLedgerConnection,
-    override protected val retryProvider: CoinRetries,
+    connection: CNLedgerConnection,
+    override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
@@ -36,7 +36,7 @@ class UpdateIngestionService(
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription[?]] =
+  ): Future[CNLedgerSubscription[?]] =
     for {
       lastIngestedOffset <- ingestionSink.getLastIngestedOffset(domain)
       subscribeFrom <- lastIngestedOffset match {

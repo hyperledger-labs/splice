@@ -8,14 +8,14 @@ import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.console.LocalCoinAppReference
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.console.LocalCNNodeAppReference
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinUtil.defaultIssuanceCurve
+import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.{Contract, SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -30,14 +30,14 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class SvTimeBasedIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with SvTestUtil
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .withManualStart
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
@@ -686,8 +686,10 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(_.start())
-      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+        _.start()
+      )
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 3
@@ -742,7 +744,7 @@ class SvTimeBasedIntegrationTest
   )
 
   private def getOpenMiningRounds()(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): OpenMiningRoundsTriplet = {
     val rounds = getSortedOpenMiningRounds(
       svc.remoteParticipantWithAdminToken,
@@ -754,7 +756,7 @@ class SvTimeBasedIntegrationTest
 
   private def advanceTimeAndCheckOpenRounds(
       toAdvanceAt: Instant
-  )(implicit env: CoinTestConsoleEnvironment): Unit = {
+  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
     val duration = Duration.between(now.toInstant, toAdvanceAt)
     val timeShift = Duration.ofSeconds(10)
@@ -791,7 +793,7 @@ class SvTimeBasedIntegrationTest
 
   private def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, Duration]
-  )(implicit env: CoinTestConsoleEnvironment): Unit = eventually() {
+  )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
     val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>

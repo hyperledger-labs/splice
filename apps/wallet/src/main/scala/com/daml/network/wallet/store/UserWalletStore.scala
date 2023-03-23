@@ -19,9 +19,9 @@ import com.daml.network.codegen.java.cn.{
   directory as directoryCodegen,
   splitwell as splitwellCodegen,
 }
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.store.{AcsStore, CoinAppStoreWithHistory}
-import com.daml.network.util.{CoinUtil, Contract}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory}
+import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -39,7 +39,7 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
-    extends CoinAppStoreWithHistory[
+    extends CNNodeAppStoreWithHistory[
       UserWalletTxLogParser.TxLogIndexRecord,
       UserWalletTxLogParser.TxLogEntry,
     ]
@@ -91,7 +91,7 @@ trait UserWalletStore
     Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
   ]] = {
     def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
-      state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
+      state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
     )
 
     for {
@@ -110,7 +110,7 @@ trait UserWalletStore
   } yield coins
     .map(c =>
       (
-        CoinUtil
+        CNNodeUtil
           .currentAmount(c.payload, submittingRound),
         c,
       )
@@ -224,8 +224,8 @@ object UserWalletStore {
       globalDomain: DomainAlias,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      connection: CoinLedgerConnection,
-      retryProvider: CoinRetries,
+      connection: CNLedgerConnection,
+      retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =

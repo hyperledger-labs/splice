@@ -135,7 +135,7 @@ object CNNodeConfigTransforms {
     addConfigName(id)(addDamlNameSuffix(id)(config))
   }
 
-  /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
+  /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally
     * collide, and adds a suffix to Daml user names that is specific to a given test
     * context.
@@ -393,7 +393,7 @@ object CNNodeConfigTransforms {
   private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
     c.copy(port = c.port + bump)
 
-  private def portTransform(bump: Int, c: CoinLedgerApiClientConfig): CoinLedgerApiClientConfig =
+  private def portTransform(bump: Int, c: CNLedgerApiClientConfig): CNLedgerApiClientConfig =
     c.focus(_.clientConfig).modify(portTransform(bump, _))
 
   private def portTransform(bump: Int, c: LedgerApiServerConfig): LedgerApiServerConfig =
@@ -401,8 +401,8 @@ object CNNodeConfigTransforms {
 
   private def portTransform(
       bump: Int,
-      c: CoinRemoteParticipantConfig,
-  ): CoinRemoteParticipantConfig =
+      c: CNRemoteParticipantConfig,
+  ): CNRemoteParticipantConfig =
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
       .focus(_.ledgerApi)
@@ -427,7 +427,7 @@ object CNNodeConfigTransforms {
   }
 
   private def updateAllLedgerApiClientConfigs(
-      enableAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig
+      enableAuth: (String, CNLedgerApiClientConfig) => CNLedgerApiClientConfig
   ): CNNodeConfigTransform = { config =>
     val transforms: Seq[CNNodeConfigTransform] = Seq(
       updateAllValidatorConfigs_(c => {
@@ -463,8 +463,8 @@ object CNNodeConfigTransforms {
 
   private def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
       user: String,
-      c: CoinLedgerApiClientConfig,
-  ): CoinLedgerApiClientConfig = {
+      c: CNLedgerApiClientConfig,
+  ): CNLedgerApiClientConfig = {
     val userToken = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
     val adminToken = getAdminToken(clockConfig, c.clientConfig)
     c.copy(
@@ -520,7 +520,7 @@ object CNNodeConfigTransforms {
     tokens.toMap
   }
 
-  def getAdminToken(clockConfig: ClockConfig, config: CoinRemoteParticipantConfig): String = {
+  def getAdminToken(clockConfig: ClockConfig, config: CNRemoteParticipantConfig): String = {
     getAdminToken(clockConfig, config.ledgerApi.clientConfig)
   }
 

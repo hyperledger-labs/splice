@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.{WalletApp, WalletAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -15,7 +15,7 @@ class WalletApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, WalletAppBackendConfig],
-    parametersFor: String => SharedCoinAppParameters,
+    parametersFor: String => SharedCNNodeAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -23,6 +23,6 @@ class WalletApps(
       // this trait.
       WalletApp,
       WalletAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
       WalletAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

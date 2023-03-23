@@ -1,11 +1,11 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CoinTests.CoinTestCommon
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import com.digitalasset.canton.topology.PartyId
 
-trait SplitwellFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
-  this: CommonCoinAppInstanceReferences & FrontendTestCommon =>
+trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
+  this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
 
   def addTeamLunch(quantity: Double)(implicit webDriver: WebDriverType) = {
     inside(find(className("enter-payment-amount-field"))) { case Some(field) =>

@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-object CoinUtil {
+object CNNodeUtil {
 
   def selectLatestOpenMiningRound(
       now: CantonTimestamp,
@@ -61,9 +61,9 @@ object CoinUtil {
       validator: PartyId,
       user: PartyId,
       logger: TracedLogger,
-      connection: CoinLedgerConnection,
+      connection: CNLedgerConnection,
       domainId: DomainId,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
       lookupValidatorRightByParty: (
           PartyId
       ) => Future[
@@ -79,7 +79,7 @@ object CoinUtil {
               actAs = Seq(validator, user),
               readAs = Seq.empty,
               commands = createValidatorRightCommand(svc, validator, user),
-              commandId = CoinLedgerConnection
+              commandId = CNLedgerConnection
                 .CommandId("com.daml.network.validator.createValidatorRight", Seq(user)),
               deduplicationOffset = off,
               domainId = domainId,

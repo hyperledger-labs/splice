@@ -6,13 +6,13 @@ import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.CNLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{CoinUtil, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -26,16 +26,16 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 import com.daml.network.admin.api.client.HttpAppConnection
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
   */
 final class ScanConnection(
-    coinLedgerClient: CoinLedgerClient,
+    coinLedgerClient: CNLedgerClient,
     config: ScanAppClientConfig,
     clock: Clock,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -102,7 +102,7 @@ final class ScanConnection(
     for {
       openAndIssuingRounds <- getOpenAndIssuingMiningRounds()
       openRounds = openAndIssuingRounds._1
-      latestOpenMiningRound = CoinUtil.selectLatestOpenMiningRound(clock.now, openRounds)
+      latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(clock.now, openRounds)
       coinRules <- getCoinRules()
     } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }
@@ -145,7 +145,7 @@ final class ScanConnection(
     for {
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
       now = clock.now
-      openRound = CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+      openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
     } yield openRound
   }
 
@@ -260,10 +260,10 @@ final class ScanConnection(
 
 object ScanConnection {
   def apply(
-      coinLedgerClient: CoinLedgerClient,
+      coinLedgerClient: CNLedgerClient,
       config: ScanAppClientConfig,
       clock: Clock,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit

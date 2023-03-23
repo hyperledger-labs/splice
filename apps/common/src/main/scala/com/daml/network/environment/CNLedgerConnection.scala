@@ -54,12 +54,12 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class CoinLedgerConnection(
+class CNLedgerConnection(
     client: LedgerClient,
     applicationId: String,
     protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends FlagCloseable
@@ -71,7 +71,7 @@ class CoinLedgerConnection(
 
   override def onClosed(): Unit = {}
 
-  import CoinLedgerConnection.*
+  import CNLedgerConnection.*
 
   private def callCallbacksOnCompletion[T](result: Future[T]): Future[T] = {
     import TraceContext.Implicits.Empty.*
@@ -109,7 +109,7 @@ class CoinLedgerConnection(
     callCallbacksOnCompletion(
       client
         .submitAndWait(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
@@ -134,7 +134,7 @@ class CoinLedgerConnection(
     callCallbacksOnCompletion(
       client
         .submitAndWaitForTransaction(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = applicationId,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
@@ -158,7 +158,7 @@ class CoinLedgerConnection(
     callCallbacksOnCompletion(
       client
         .submitAndWait(
-          workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
           applicationId = applicationId,
           commandId = commandId.commandIdForSubmission,
           deduplicationConfig = DedupOffset(
@@ -255,7 +255,7 @@ class CoinLedgerConnection(
       tree <- callCallbacksOnCompletion(
         client
           .submitAndWaitForTransactionTree(
-            workflowId = CoinLedgerConnection.domainIdToWorkflowId(domainId),
+            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
             applicationId = applicationId,
             commandId = commandIdForSubmission,
             actAs = actAs.map(_.toProtoPrimitive),
@@ -323,7 +323,7 @@ class CoinLedgerConnection(
   ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
     activeContractsWithOffset(
       domain,
-      CoinLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID),
+      CNLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID),
     ).map { case (events, off) =>
       (events.map(companion.fromCreatedEvent(_)), off)
     }
@@ -376,8 +376,8 @@ class CoinLedgerConnection(
       endOffset: Option[LedgerOffset],
       party: PartyId,
       domain: DomainId,
-  )(mapOperator: Flow[TreeUpdate, Any, _]): CoinLedgerSubscription[?] = {
-    new CoinLedgerSubscription(
+  )(mapOperator: Flow[TreeUpdate, Any, _]): CNLedgerSubscription[?] = {
+    new CNLedgerSubscription(
       client.updates(
         LedgerClient.GetUpdatesRequest(beginOffset, endOffset, party, domain)
       ),
@@ -436,7 +436,7 @@ class CoinLedgerConnection(
       endOffset: Option[LedgerOffset] = None,
       filter: PartyId,
       domain: DomainId,
-  )(f: TreeUpdate => Future[Unit]): CoinLedgerSubscription[?] =
+  )(f: TreeUpdate => Future[Unit]): CNLedgerSubscription[?] =
     subscription(clientName, baseLoggerFactory, beginOffset, endOffset, filter, domain)({
       Flow[TreeUpdate].mapAsync(1)(f)
     })
@@ -718,7 +718,7 @@ class CoinLedgerConnection(
 }
 
 /** Subscription for reading the ledger */
-class CoinLedgerSubscription[S](
+class CNLedgerSubscription[S](
     source: Source[S, NotUsed],
     mapOperator: Flow[S, ?, ?],
     override protected val timeouts: ProcessingTimeout,
@@ -763,7 +763,7 @@ class CoinLedgerSubscription[S](
   }
 }
 
-object CoinLedgerConnection {
+object CNLedgerConnection {
 
   // TODO(#2699) Remove this once we have a proper ACS endpoint
 

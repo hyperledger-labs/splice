@@ -4,7 +4,7 @@ import cats.data.OptionT
 import cats.instances.future.*
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -18,7 +18,7 @@ import scala.jdk.CollectionConverters.*
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,

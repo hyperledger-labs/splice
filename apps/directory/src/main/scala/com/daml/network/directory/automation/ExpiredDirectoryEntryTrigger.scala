@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 class ExpiredDirectoryEntryTrigger(
     override protected val context: TriggerContext,
     store: DirectoryStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,

@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
-  CoinAppAutomationService,
+  CNNodeAppAutomationService,
   DomainOrchestrator,
   Trigger,
   TransferInTrigger,
@@ -17,7 +17,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.splitwell.config.SplitwellDomainConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -33,17 +33,17 @@ class SplitwellAutomationService(
     domainConfig: SplitwellDomainConfig,
     clock: Clock,
     store: SplitwellStore,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     scanConnection: ScanConnection,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
       Map(store.providerParty -> store),

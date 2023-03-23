@@ -7,11 +7,11 @@ import com.daml.network.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.DiscardOps
@@ -26,7 +26,7 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
-class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   import DirectoryIntegrationTest.*
 
@@ -35,8 +35,8 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
   private val testEntryName = "mycoolentry"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)

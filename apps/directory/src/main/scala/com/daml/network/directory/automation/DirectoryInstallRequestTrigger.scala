@@ -5,7 +5,7 @@ import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, T
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
@@ -18,7 +18,7 @@ import scala.jdk.CollectionConverters.*
 class DirectoryInstallRequestTrigger(
     override protected val context: TriggerContext,
     store: DirectoryStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -76,7 +76,7 @@ class DirectoryInstallRequestTrigger(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd.commands.asScala.toSeq,
-              commandId = CoinLedgerConnection.CommandId(
+              commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.directory.createDirectoryInstall",
                 Seq(provider, user),
               ),

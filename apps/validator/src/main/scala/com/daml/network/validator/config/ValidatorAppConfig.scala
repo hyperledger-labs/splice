@@ -3,8 +3,8 @@ package com.daml.network.validator.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
-  CoinHttpClientConfig,
-  CoinRemoteParticipantConfig,
+  CNHttpClientConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
@@ -49,7 +49,7 @@ case class ValidatorAppBackendConfig(
     walletServiceUser: String,
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
@@ -63,7 +63,7 @@ case class ValidatorAppBackendConfig(
 }
 
 case class ValidatorAppClientConfig(
-    adminApi: CoinHttpClientConfig
+    adminApi: CNHttpClientConfig
 ) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

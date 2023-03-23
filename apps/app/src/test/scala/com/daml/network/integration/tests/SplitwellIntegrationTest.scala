@@ -3,11 +3,11 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTestWithSharedEnvironment,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -17,15 +17,15 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 
 class SplitwellIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with SplitwellTestUtil
     with WalletTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(darPath)

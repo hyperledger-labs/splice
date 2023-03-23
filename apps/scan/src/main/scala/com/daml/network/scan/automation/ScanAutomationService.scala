@@ -2,9 +2,9 @@ package com.daml.network.scan.automation
 
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
+import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -17,9 +17,9 @@ import scala.concurrent.ExecutionContextExecutor
 class ScanAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     protected val timeouts: ProcessingTimeout,
     store: ScanStore,
@@ -27,7 +27,7 @@ class ScanAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
       Map(store.svcParty -> store),

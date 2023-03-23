@@ -32,7 +32,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Try}
 
-/** The CoinRetries class serves two purposes:
+/** The RetryProvider class serves two purposes:
   *  1. It provides methods for retrying failed futures when processing RPC requests
   *     and background tasks.
   *  2. It serves to communicate that a node is shutting down. Background services
@@ -40,7 +40,7 @@ import scala.util.{Failure, Try}
   *
   *  TODO(tech-debt): the name of the class could likely be better. Find a better name and change to it.
   */
-class CoinRetries(
+class RetryProvider(
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 ) extends NamedLogging
@@ -66,7 +66,7 @@ class CoinRetries(
 
   /** True if node-level shutdown was initiated.
     *
-    * This method relies on the guarantee that a `CoinNode` will close its retry provider
+    * This method relies on the guarantee that a `CNNode` will close its retry provider
     * before closing its other services.
     */
   def isShuttingDown: Boolean = shutdownSignal.isCompleted
@@ -128,7 +128,7 @@ class CoinRetries(
       waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
     )
 
-  import CoinRetries.{AutomationRetryConfig, RetryConfig}
+  import RetryProvider.{AutomationRetryConfig, RetryConfig}
 
   private val retryForAutomationConfig =
     AutomationRetryConfig(
@@ -152,7 +152,7 @@ class CoinRetries(
       operationName,
       task,
       logger,
-      CoinRetries.RetryableError(
+      RetryProvider.RetryableError(
         _,
         additionalCodes,
         transientDescription,
@@ -202,7 +202,7 @@ class CoinRetries(
       task,
       logger,
       retryForClientCallsConfig,
-      CoinRetries.RetryableError(
+      RetryProvider.RetryableError(
         _,
         additionalCodes,
         transientDescription,
@@ -234,7 +234,7 @@ class CoinRetries(
   }
 }
 
-object CoinRetries {
+object RetryProvider {
   case class RetryConfig(maxRetries: Int, initialDelay: FiniteDuration, maxDelay: Duration) {}
 
   /** Retry config for automation. For automation we use an outer loop that retries forever
@@ -247,8 +247,8 @@ object CoinRetries {
       outerLoopDelay: FiniteDuration,
   )
 
-  def apply(loggerFactory: NamedLoggerFactory, timeouts: ProcessingTimeout): CoinRetries = {
-    new CoinRetries(loggerFactory, timeouts)
+  def apply(loggerFactory: NamedLoggerFactory, timeouts: ProcessingTimeout): RetryProvider = {
+    new RetryProvider(loggerFactory, timeouts)
   }
 
   /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,

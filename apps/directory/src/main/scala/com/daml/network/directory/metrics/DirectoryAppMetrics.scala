@@ -3,7 +3,7 @@ package com.daml.network.directory.metrics
 import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.daml.network.CoinNodeMetrics
+import com.daml.network.CNNodeMetrics
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 
@@ -16,6 +16,6 @@ class DirectoryAppMetrics(
     override val dropwizardFactory: CantonDropwizardMetricsFactory,
     override val grpcMetrics: GrpcServerMetrics,
     override val healthMetrics: HealthMetrics,
-) extends CoinNodeMetrics {
+) extends CNNodeMetrics {
   override object dbStorage extends DbStorageMetrics(prefix, dropwizardFactory)
 }

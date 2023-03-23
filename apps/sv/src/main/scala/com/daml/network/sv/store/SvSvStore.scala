@@ -2,8 +2,8 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
@@ -15,7 +15,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
-trait SvSvStore extends CoinAppStoreWithoutHistory {
+trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: SvDomainConfig
 
@@ -85,7 +85,7 @@ object SvSvStore {
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): SvSvStore =
     storage match {
       case _: MemoryStorage =>

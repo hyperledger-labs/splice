@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
@@ -9,7 +9,7 @@ import scala.concurrent.{Future, ExecutionContext}
 
 /** Store setup shared by all of our apps
   */
-trait CoinAppStore[
+trait CNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
 ] extends NamedLogging
@@ -58,14 +58,14 @@ trait CoinAppStore[
   protected def txLogParser: TxLogStore.Parser[TXI, TXE]
 }
 
-object CoinAppStore {
+object CNNodeAppStore {
   import scala.concurrent.Promise
 
-  /** Stores [[CoinAppStore#PerDomainStore]] in an in-memory mutable map. */
+  /** Stores [[CNNodeAppStore#PerDomainStore]] in an in-memory mutable map. */
   trait InMemoryMutableStoreMap[
       TXI <: TxLogStore.IndexRecord,
       TXE <: TxLogStore.Entry[TXI],
-  ] extends CoinAppStore[TXI, TXE] {
+  ] extends CNNodeAppStore[TXI, TXE] {
     import java.util.concurrent as juc
 
     private[this] val state: juc.ConcurrentMap[DomainId, Promise[PerDomainStore]] =
@@ -99,19 +99,19 @@ object CoinAppStore {
 
 /** A coin app store whose TxLog is always empty.
   */
-trait CoinAppStoreWithoutHistory
-    extends CoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {
+trait CNNodeAppStoreWithoutHistory
+    extends CNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {
   override protected def txLogParser = TxLogStore.Parser.Empty()
 }
 
 /** A coin app store that supports storing and retrieving historical data.
   * Note that retrieving historical data requires a connection to the ledger.
   */
-trait CoinAppStoreWithHistory[
+trait CNNodeAppStoreWithHistory[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
-] extends CoinAppStore[TXI, TXE] {
-  protected def connection: CoinLedgerConnection
+] extends CNNodeAppStore[TXI, TXE] {
+  protected def connection: CNLedgerConnection
 
   protected final def txLogReader(domain: DomainId): Future[TxLogStore.Reader[TXI, TXE]] = for {
     txLog <- txLog(domain)

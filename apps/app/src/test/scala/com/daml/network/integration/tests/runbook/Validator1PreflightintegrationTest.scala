@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests.runbook
 
 import com.daml.network.LiveDevNetTest
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{
   Auth0User,
@@ -88,8 +88,8 @@ class Validator1PreflightIntegrationTest
   }
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )
 

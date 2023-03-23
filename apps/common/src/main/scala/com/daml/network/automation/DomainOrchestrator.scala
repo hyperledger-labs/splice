@@ -4,7 +4,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.DomainId
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.DomainStore
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
@@ -53,7 +53,7 @@ final class DomainOrchestrator private (
 
   triggerContext.retryProvider.runOnShutdown(new RunOnShutdown {
     override def name = s"shutdown per domain retry providers"
-    // this is not perfectly precise, but CoinRetries.close is idempotent
+    // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
     override def run() = closeRetryProviders()
   })(TraceContext.empty)
@@ -104,7 +104,7 @@ final class DomainOrchestrator private (
             val perDomainLoggerFactory =
               triggerContext.loggerFactory.append("domainId", show"${event.domainId}")
             val perDomainRetries =
-              new CoinRetries(perDomainLoggerFactory, triggerContext.retryProvider.timeouts)
+              new RetryProvider(perDomainLoggerFactory, triggerContext.retryProvider.timeouts)
             val perDomainContext = triggerContext.copy(
               retryProvider = perDomainRetries,
               loggerFactory = perDomainLoggerFactory,

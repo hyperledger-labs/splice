@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{
   DirectoryTestUtil,
   FrontendLoginUtil,
@@ -30,11 +30,11 @@ class SplitwellFrontendIntegrationTest
   private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
-        CoinEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
+        CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>
           aliceValidator.remoteParticipant.dars.upload(path)
           bobValidator.remoteParticipant.dars.upload(path)

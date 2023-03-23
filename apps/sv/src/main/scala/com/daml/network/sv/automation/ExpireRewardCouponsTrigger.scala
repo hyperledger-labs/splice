@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_ClaimExpiredR
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward.ContractId
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -19,7 +19,7 @@ import scala.jdk.CollectionConverters.*
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,

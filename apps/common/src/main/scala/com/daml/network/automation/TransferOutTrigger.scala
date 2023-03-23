@@ -1,18 +1,18 @@
 package com.daml.network.automation
 
-import com.daml.network.store.CoinAppStore
+import com.daml.network.store.CNNodeAppStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import akka.stream.Materializer
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
+import com.daml.network.environment.{CNLedgerConnection, LedgerClient}
 import com.daml.network.util.Contract
 import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
-import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
+import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{
   ContractTypeCompanion,
   DamlRecord,
@@ -24,8 +24,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
-    store: CoinAppStore[_, _],
-    connection: CoinLedgerConnection,
+    store: CNNodeAppStore[_, _],
+    connection: CNLedgerConnection,
     targetDomain: DomainAlias,
     sourceDomainId: DomainId,
     partyId: PartyId,

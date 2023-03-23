@@ -6,7 +6,7 @@ import com.digitalasset.canton.config.{ClientConfig, KeepAliveClientConfig, TlsC
 /** Extension of ClientConfig that supports specifying a URL
   * which is used for http requests.
   */
-case class CoinHttpClientConfig(
+case class CNHttpClientConfig(
     address: String = "127.0.0.1",
     port: Port,
     url: String,
@@ -22,9 +22,9 @@ case class CoinHttpClientConfig(
   )
 }
 
-object CoinHttpClientConfig {
-  def fromClientConfig(url: String, config: ClientConfig): CoinHttpClientConfig =
-    CoinHttpClientConfig(
+object CNHttpClientConfig {
+  def fromClientConfig(url: String, config: ClientConfig): CNHttpClientConfig =
+    CNHttpClientConfig(
       config.address,
       config.port,
       url,

@@ -4,13 +4,13 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.WalletAppClientReference
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -24,13 +24,13 @@ import scala.annotation.nowarn
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: CoinEnvironmentDefinition = {
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // for testing that input limits are respected.
       .withoutAutomaticRewardsCollectionAndCoinMerging
@@ -365,7 +365,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // 4 coins at once by default & so even in the case it starts expiring coins, we have one unexpired coin for the test.
     // If this test flakes because the automation already expired all expired coins, increase the number of
     // soon-to-be-expired coins we create here
-    (1 to 5).map(_ => aliceWallet.tap(CoinUtil.defaultHoldingFee.rate))
+    (1 to 5).map(_ => aliceWallet.tap(CNNodeUtil.defaultHoldingFee.rate))
 
     eventually() {
       aliceWallet.list().coins should have length 6
@@ -470,7 +470,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       }
   }
 
-  private def getOpenIssuingRounds(now: Instant)(implicit env: CoinTestConsoleEnvironment) = {
+  private def getOpenIssuingRounds(now: Instant)(implicit env: CNNodeTestConsoleEnvironment) = {
     val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))
   }

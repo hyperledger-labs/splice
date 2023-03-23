@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.validator.admin.api.client.commands.HttpValidatorAppClient
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -20,7 +20,7 @@ final case class UserInfo(
 )
 
 final class ValidatorConnection(
-    config: CoinHttpClientConfig,
+    config: CNHttpClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     tokenO: Option[String],

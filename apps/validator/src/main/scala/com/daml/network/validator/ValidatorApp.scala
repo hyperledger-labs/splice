@@ -11,8 +11,8 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
+import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
@@ -48,7 +48,7 @@ import akka.http.scaladsl.server.directives.BasicDirectives
 class ValidatorApp(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -59,7 +59,7 @@ class ValidatorApp(
     esf: ExecutionSequencerFactory,
     ec: ExecutionContextExecutor,
     tracer: Tracer,
-) extends CoinNode[ValidatorApp.State](
+) extends CNNode[ValidatorApp.State](
       config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -68,7 +68,7 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  private def getSvcPartyId(ledgerClient: CoinLedgerClient): Future[PartyId] = {
+  private def getSvcPartyId(ledgerClient: CNLedgerClient): Future[PartyId] = {
     // Via scan
     for {
       scanConnection <- ScanConnection(
@@ -91,7 +91,7 @@ class ValidatorApp(
     } yield partyId
   }
 
-  private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
+  private def setupWallet(connection: CNLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
@@ -115,7 +115,7 @@ class ValidatorApp(
   }
 
   private def setupAppInstance(
-      connection: CoinLedgerConnection,
+      connection: CNLedgerConnection,
       name: String,
       instance: AppInstance,
       validatorParty: PartyId,
@@ -193,7 +193,7 @@ class ValidatorApp(
   }
 
   private def requestOnboarding(
-      svConfig: CoinHttpClientConfig,
+      svConfig: CNHttpClientConfig,
       validatorParty: PartyId,
       secret: String,
   ): Future[Unit] = {
@@ -214,7 +214,7 @@ class ValidatorApp(
   }
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =

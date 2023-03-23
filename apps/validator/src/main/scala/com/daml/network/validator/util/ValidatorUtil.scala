@@ -1,13 +1,13 @@
 package com.daml.network.validator.util
 
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.CNNodeUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -21,10 +21,10 @@ private[validator] object ValidatorUtil {
       endUserParty: PartyId,
       endUserName: String,
       svcParty: PartyId,
-      connection: CoinLedgerConnection,
+      connection: CNLedgerConnection,
       store: ValidatorStore,
       domainId: DomainId,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
@@ -52,7 +52,7 @@ private[validator] object ValidatorUtil {
                 ).create.commands.asScala.toSeq,
                 // We dedup on the party rather than the username because the username can
                 // have special characters not allowed in command ids.
-                commandId = CoinLedgerConnection
+                commandId = CNLedgerConnection
                   .CommandId("com.daml.network.validator.installWalletForUser", Seq(endUserParty)),
                 deduplicationOffset = off,
                 domainId = domainId,
@@ -69,12 +69,12 @@ private[validator] object ValidatorUtil {
   def onboard(
       endUserName: String,
       knownParty: Option[PartyId],
-      connection: CoinLedgerConnection,
+      connection: CNLedgerConnection,
       store: ValidatorStore,
       validatorUserName: String,
       walletServiceUser: String,
       domainId: DomainId,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     for {
@@ -106,7 +106,7 @@ private[validator] object ValidatorUtil {
         logger = logger,
       )
       // Create validator right contract so validator can collect validator rewards
-      _ <- CoinUtil.createValidatorRight(
+      _ <- CNNodeUtil.createValidatorRight(
         user = userPartyId,
         validator = store.key.validatorParty,
         svc = store.key.svcParty,

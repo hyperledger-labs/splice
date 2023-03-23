@@ -4,7 +4,7 @@
 
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.{
   LocalDomainReference,
@@ -23,7 +23,7 @@ trait EntitySyntax {
   val defaultParticipant: String
 
   implicit class ParticipantReferenceSyntax(participantReference: ParticipantReference)(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) {
     def uid: UniqueIdentifier = participantReference.id.uid
 
@@ -38,7 +38,7 @@ trait EntitySyntax {
   }
 
   implicit class ParticipantIdSyntax(participantId: ParticipantId)(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) {
 
     import env.*
@@ -52,7 +52,7 @@ trait EntitySyntax {
       participantId.toReference.myParties(filterDomain)
   }
 
-  implicit class PartyIdSyntax(partyId: PartyId)(implicit env: CoinTestConsoleEnvironment) {
+  implicit class PartyIdSyntax(partyId: PartyId)(implicit env: CNNodeTestConsoleEnvironment) {
     def participants(
         requestingParticipant: LocalParticipantReference,
         filterDomain: String = "",
@@ -63,7 +63,7 @@ trait EntitySyntax {
         .toSet
   }
 
-  implicit class StringConversions(name: String)(implicit env: CoinTestConsoleEnvironment) {
+  implicit class StringConversions(name: String)(implicit env: CNNodeTestConsoleEnvironment) {
     import env.*
 
     def toDomainRef: LocalDomainReference = d(name)
@@ -90,7 +90,7 @@ trait EntitySyntax {
   }
 
   implicit class SeqConversions(names: Seq[String])(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) {
     def toDomainRef: Seq[LocalDomainReference] = names.map(_.toDomainRef)
 

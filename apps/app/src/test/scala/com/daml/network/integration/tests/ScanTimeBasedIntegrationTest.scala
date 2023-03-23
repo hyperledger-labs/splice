@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CoinUtil}
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CNNodeUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.console.WalletAppClientReference
@@ -15,13 +15,13 @@ import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
 class ScanTimeBasedIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
@@ -47,19 +47,19 @@ class ScanTimeBasedIntegrationTest
         scan.getCoinConfigForRound(3)
       }
       cfg.coinCreateFee.bigDecimal.setScale(10) should be(
-        CoinUtil.defaultCreateFee.fee.setScale(10)
+        CNNodeUtil.defaultCreateFee.fee.setScale(10)
       )
       cfg.holdingFee.bigDecimal.setScale(10) should be(
-        CoinUtil.defaultHoldingFee.rate.setScale(10)
+        CNNodeUtil.defaultHoldingFee.rate.setScale(10)
       )
       cfg.lockHolderFee.bigDecimal.setScale(10) should be(
-        CoinUtil.defaultLockHolderFee.fee.setScale(10)
+        CNNodeUtil.defaultLockHolderFee.fee.setScale(10)
       )
       cfg.transferFee.initial.bigDecimal.setScale(10) should be(
-        CoinUtil.defaultTransferFee.initialRate.setScale(10)
+        CNNodeUtil.defaultTransferFee.initialRate.setScale(10)
       )
       cfg.transferFee.steps shouldBe (
-        CoinUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
+        CNNodeUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
           HttpScanAppClient.RateStep(step._1, step._2)
         )
       )

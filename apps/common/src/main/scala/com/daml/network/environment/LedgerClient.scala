@@ -62,7 +62,7 @@ final case class DedupDuration(duration: Duration) extends DedupConfig
   * two adjustments:
   * 1. They translate to/from types in javaapi.data.
   * 2. They convert to futures and akka sources for akka.
-  * All functionality built on top of that is part of CoinLedgerConnection.
+  * All functionality built on top of that is part of CNLedgerConnection.
   */
 class LedgerClient(channel: Channel, token: Option[String])(implicit
     esf: ExecutionSequencerFactory,

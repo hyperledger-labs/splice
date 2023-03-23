@@ -7,20 +7,20 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TracerProvider
 import com.daml.network.automation.TransferInTrigger
 import com.daml.network.codegen.java.cc.coin.ValidatorRight
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.environment.LedgerClient.TransferCommand
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.WalletTestUtil
 
 import scala.util.Using
 
-class DuplicateTransferTest extends CoinIntegrationTest with WalletTestUtil {
+class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   private val darPath = "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
 
   override def environmentDefinition =
-    CoinEnvironmentDefinition
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
@@ -49,7 +49,7 @@ class DuplicateTransferTest extends CoinIntegrationTest with WalletTestUtil {
         .party
     )
     Using.resource(
-      new CoinLedgerClient(
+      new CNLedgerClient(
         config = aliceValidator.remoteParticipantWithAdminToken.config.ledgerApi,
         applicationId = "test",
         token = aliceValidator.remoteParticipantWithAdminToken.config.token,
@@ -58,7 +58,7 @@ class DuplicateTransferTest extends CoinIntegrationTest with WalletTestUtil {
         loggerFactory = loggerFactory,
         tracerProvider = TracerProvider.Factory(env.environment.configuredOpenTelemetry, "test"),
         retryProvider =
-          CoinRetries(loggerFactory, env.environment.config.parameters.timeouts.processing),
+          RetryProvider(loggerFactory, env.environment.config.parameters.timeouts.processing),
       )(
         env.environment.executionContext,
         env.actorSystem,

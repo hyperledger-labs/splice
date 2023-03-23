@@ -4,7 +4,7 @@ import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
@@ -18,7 +18,7 @@ import scala.jdk.CollectionConverters.*
 class GroupRequestTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     splitwellDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
@@ -62,7 +62,7 @@ class GroupRequestTrigger(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd,
-              commandId = CoinLedgerConnection.CommandId(
+              commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createGroupRequest",
                 Seq(provider, user),
                 groupId.unpack,

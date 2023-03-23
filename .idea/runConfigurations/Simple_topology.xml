@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Simple topology" type="Application" factoryName="Application">
     <option name="ALTERNATIVE_JRE_PATH" value="CC nix JDK" />
-    <option name="MAIN_CLASS_NAME" value="com.daml.network.CoinApp" />
+    <option name="MAIN_CLASS_NAME" value="com.daml.network.CNNodeApp" />
     <module name="apps-app" />
     <option name="PROGRAM_PARAMETERS" value="--no-tty -v -c $PROJECT_DIR$/apps/app/src/test/resources/simple-topology.conf" />
     <extension name="net.ashald.envfile">

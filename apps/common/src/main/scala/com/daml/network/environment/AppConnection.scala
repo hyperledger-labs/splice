@@ -18,8 +18,8 @@ import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.environment.CoinRetries
+import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.RetryProvider
 
 abstract class BaseAppConnection(
     override val timeouts: ProcessingTimeout,
@@ -146,8 +146,8 @@ abstract class AppConnection(
 /** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
   */
 abstract class HttpAppConnection(
-    config: CoinHttpClientConfig,
-    retryProvider: CoinRetries,
+    config: CNHttpClientConfig,
+    retryProvider: RetryProvider,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit

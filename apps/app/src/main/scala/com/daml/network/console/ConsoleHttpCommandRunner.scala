@@ -10,8 +10,8 @@ import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.environment.CoinEnvironment
+import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.CNNodeEnvironment
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   CustomClientTimeout,
@@ -39,7 +39,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** HTTP version of Canton’s GrpcAdminCommandRunner
   */
 class ConsoleHttpCommandRunner(
-    environment: CoinEnvironment,
+    environment: CNNodeEnvironment,
     timeouts: ProcessingTimeout,
     commandTimeouts: ConsoleCommandTimeout,
 )(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
@@ -69,7 +69,7 @@ class ConsoleHttpCommandRunner(
       instanceName: String,
       command: HttpCommand[_, Result],
       headers: List[HttpHeader],
-      clientConfig: CoinHttpClientConfig,
+      clientConfig: CNHttpClientConfig,
   ): ConsoleCommandResult[Result] =
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
       span.setAttribute("instance_name", instanceName)

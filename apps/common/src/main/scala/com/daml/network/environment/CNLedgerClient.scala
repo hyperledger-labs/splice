@@ -14,7 +14,7 @@ import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContextExecutor
 
-class CoinLedgerClient(
+class CNLedgerClient(
     config: ClientConfig,
     applicationId: String,
     token: Option[String],
@@ -22,7 +22,7 @@ class CoinLedgerClient(
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
     as: ActorSystem,
@@ -64,8 +64,8 @@ class CoinLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
-  ): CoinLedgerConnection =
-    new CoinLedgerConnection(
+  ): CNLedgerConnection =
+    new CNLedgerConnection(
       this.client,
       applicationId,
       baseLoggerFactory.append("connClient", connectionClient),

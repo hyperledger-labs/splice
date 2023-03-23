@@ -4,13 +4,13 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.scan.admin.api.client.commands.{HttpScanAppClient}
+import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.util.{CoinUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, Contract}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
@@ -19,16 +19,16 @@ import com.digitalasset.canton.topology.PartyId
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.ConsoleMacros
-import com.daml.network.environment.CoinNodeStatus
+import com.daml.network.environment.CNNodeStatus
 import scala.util.Try
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
   */
 abstract class ScanAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends HttpCoinAppReference {
+) extends HttpCNNodeAppReference {
 
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
@@ -43,7 +43,7 @@ abstract class ScanAppReference(
   ): HttpScanAppClient.TransferContextWithInstances = {
     val openAndIssuingRounds = getOpenAndIssuingMiningRounds()
     val openRounds = openAndIssuingRounds._1
-    val latestOpenMiningRound = CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+    val latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
     val coinRules = getCoinRules()
     TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }
@@ -56,7 +56,7 @@ abstract class ScanAppReference(
   ): Contract[OpenMiningRound.ContractId, OpenMiningRound] = {
 
     val (openRounds, _) = getOpenAndIssuingMiningRounds()
-    CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+    CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
   }
 
   @Help.Summary(
@@ -161,20 +161,20 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.getTopValidatorsByValidatorRewards(round, limit))
     }
 
-  // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")
   def httpHealth = {
     consoleEnvironment.run {
       httpCommand(
-        HttpAdminAppClient.GetHealthStatus[CoinNodeStatus](CoinNodeStatus.fromJsonV0)
+        HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
       )
     }
   }
 
-  // TODO(#3490): extract this to HttpCoinAppReference for all HTTP-based apps
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
   override def waitForInitialization(
-      timeout: NonNegativeDuration = coinConsoleEnvironment.commandTimeouts.bounded
+      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
   ): Unit =
     ConsoleMacros.utils.retry_until_true(timeout)(
       // The outer Try ensures we keep retrying if the status endpoint isn't up yet (e.g. slow app initialization)
@@ -187,15 +187,15 @@ abstract class ScanAppReference(
 }
 
 final class ScanAppBackendReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends ScanAppReference(coinConsoleEnvironment, name)
-    with LocalCoinAppReference
+) extends ScanAppReference(cnNodeConsoleEnvironment, name)
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Scan Backend"
 
-  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
@@ -203,37 +203,37 @@ final class ScanAppBackendReference(
     config.clientAdminApi,
   )
 
-  protected val nodes = coinConsoleEnvironment.environment.scans
+  protected val nodes = cnNodeConsoleEnvironment.environment.scans
 
   @Help.Summary("Return local scan app config")
   override def config: ScanAppBackendConfig =
-    coinConsoleEnvironment.environment.config.scansByString(name)
+    cnNodeConsoleEnvironment.environment.config.scansByString(name)
 
   /** Remote participant this scan app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
-      coinConsoleEnvironment,
+    new CNRemoteParticipantReference(
+      cnNodeConsoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
   /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
-      coinConsoleEnvironment,
+    new CNRemoteParticipantReference(
+      cnNodeConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 }
 
-/** Remote reference to a scan app in the style of CoinRemoteParticipantReference, i.e.,
+/** Remote reference to a scan app in the style of CNRemoteParticipantReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class ScanAppClientReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     override val config: ScanAppClientConfig,
-) extends ScanAppReference(coinConsoleEnvironment, name)
+) extends ScanAppReference(cnNodeConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 

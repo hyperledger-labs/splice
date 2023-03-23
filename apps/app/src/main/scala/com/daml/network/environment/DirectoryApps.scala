@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.{DirectoryApp, DirectoryAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -15,7 +15,7 @@ class DirectoryApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, LocalDirectoryAppConfig],
-    parametersFor: String => SharedCoinAppParameters,
+    parametersFor: String => SharedCNNodeAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -23,6 +23,6 @@ class DirectoryApps(
       // this trait.
       DirectoryApp,
       LocalDirectoryAppConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
       DirectoryAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

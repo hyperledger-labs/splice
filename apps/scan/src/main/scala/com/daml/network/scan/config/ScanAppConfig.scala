@@ -2,12 +2,12 @@ package com.daml.network.scan.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CoinRemoteParticipantConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
 import com.digitalasset.canton.config.*
-import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.config.CNHttpClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 trait BaseScanAppConfig {}
@@ -16,7 +16,7 @@ case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     svcUser: String,
-    override val remoteParticipant: CoinRemoteParticipantConfig,
+    override val remoteParticipant: CNRemoteParticipantConfig,
     domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCNNodeConfig
@@ -29,7 +29,7 @@ case class ScanAppBackendConfig(
 }
 
 case class ScanAppClientConfig(
-    adminApi: CoinHttpClientConfig,
+    adminApi: CNHttpClientConfig,
 
     /** Configures how long clients cache the CoinRules they receive from the ScanApp
       * before rehydrating their cached value. In general, clients have a mechanism to invalidate

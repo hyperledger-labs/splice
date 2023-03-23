@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.ContractFilter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,7 +19,7 @@ object AcsWithTxLogStore {
       scope: ContractFilter,
       txLogParser: TxLogStore.Parser[TXI, TXE],
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
   ): AcsStore = {

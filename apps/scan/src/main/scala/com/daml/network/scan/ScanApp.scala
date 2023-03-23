@@ -8,8 +8,8 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
@@ -33,7 +33,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.admin.http.HttpAdminHandler
 import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.daml.network.environment.CoinNodeStatus
+import com.daml.network.environment.CNNodeStatus
 
 /** Class representing a Scan app instance.
   *
@@ -42,7 +42,7 @@ import com.daml.network.environment.CoinNodeStatus
 class ScanApp(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -53,7 +53,7 @@ class ScanApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[ScanApp.State](
+) extends CNNode[ScanApp.State](
       config.svcUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -62,7 +62,7 @@ class ScanApp(
     ) {
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       svcParty: PartyId,
   ): Future[ScanApp.State] = {
@@ -97,9 +97,9 @@ class ScanApp(
       )
 
       // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
-      adminHandler = new HttpAdminHandler[CoinNodeStatus](
+      adminHandler = new HttpAdminHandler[CNNodeStatus](
         status
-          .map(CoinNodeStatus.fromNodeStatus)
+          .map(CNNodeStatus.fromNodeStatus)
           .map(NodeStatus.Success(_)),
         status => status.toJsonV0,
         loggerFactory,

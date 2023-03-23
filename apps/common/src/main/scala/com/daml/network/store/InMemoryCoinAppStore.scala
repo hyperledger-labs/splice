@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
@@ -9,17 +9,17 @@ import scala.concurrent.ExecutionContext
 
 /** In memory store setup shared by all of our apps
   */
-abstract class InMemoryCoinAppStore[
+abstract class InMemoryCNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
 ](implicit protected val ec: ExecutionContext)
-    extends CoinAppStore[TXI, TXE]
-    with CoinAppStore.InMemoryMutableStoreMap[TXI, TXE] {
+    extends CNNodeAppStore[TXI, TXE]
+    with CNNodeAppStore.InMemoryMutableStoreMap[TXI, TXE] {
   protected def futureSupervisor: FutureSupervisor
 
-  protected def retryProvider: CoinRetries
+  protected def retryProvider: RetryProvider
 
-  private[network] override type PerDomainStore = InMemoryCoinAppStore.PerDomainStore[TXI, TXE]
+  private[network] override type PerDomainStore = InMemoryCNNodeAppStore.PerDomainStore[TXI, TXE]
 
   val multiDomainAcsStore: InMemoryMultiDomainAcsStore =
     new InMemoryMultiDomainAcsStore(loggerFactory, acsContractFilter)
@@ -28,7 +28,7 @@ abstract class InMemoryCoinAppStore[
       domain: DomainId,
       perDomainLoggerFactory: NamedLoggerFactory,
   ) =
-    new InMemoryCoinAppStore.PerDomainStore(
+    new InMemoryCNNodeAppStore.PerDomainStore(
       new InMemoryAcsWithTxLogStore(
         perDomainLoggerFactory,
         contractFilter = acsContractFilter,
@@ -53,12 +53,15 @@ abstract class InMemoryCoinAppStore[
   override def close(): Unit = ()
 }
 
-object InMemoryCoinAppStore {
+object InMemoryCNNodeAppStore {
   class PerDomainStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
       val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE]
   )
 }
 
-abstract class InMemoryCoinAppStoreWithoutHistory(implicit
+abstract class InMemoryCNNodeAppStoreWithoutHistory(implicit
     override protected val ec: ExecutionContext
-) extends InMemoryCoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {}
+) extends InMemoryCNNodeAppStore[
+      TxLogStore.IndexRecord,
+      TxLogStore.Entry[TxLogStore.IndexRecord],
+    ] {}

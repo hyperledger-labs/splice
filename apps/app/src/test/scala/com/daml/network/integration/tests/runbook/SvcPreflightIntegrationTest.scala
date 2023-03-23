@@ -1,21 +1,21 @@
 package com.daml.network.integration.tests.runbook
 
 import com.daml.network.LiveDevNetTest
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinTestConsoleEnvironment,
-  CoinIntegrationTestWithSharedEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeTestConsoleEnvironment,
+  CNNodeIntegrationTestWithSharedEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 /** Preflight test that makes sure that all SVs have initialized fine.
   */
-class SvcPreflightIntegrationTest extends CoinIntegrationTestWithSharedEnvironment {
+class SvcPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.preflightTopology(
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName()
     )
 

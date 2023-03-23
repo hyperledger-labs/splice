@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.console.{CoinRemoteParticipantReference, LocalCoinAppReference}
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.console.{CNRemoteParticipantReference, LocalCNNodeAppReference}
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.SvTestUtil
@@ -24,7 +24,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import com.google.protobuf.ByteString
 
-class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
+class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
@@ -33,8 +33,8 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
     "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
 
@@ -235,8 +235,10 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(_.start())
-      Seq(svc: LocalCoinAppReference, scan: LocalCoinAppReference, sv1, sv2, sv3).foreach(
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+        _.start()
+      )
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 3
@@ -463,7 +465,7 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
         ),
       )
 
-      def checkCoinContract(participant: CoinRemoteParticipantReference, party: PartyId) = {
+      def checkCoinContract(participant: CNRemoteParticipantReference, party: PartyId) = {
         val coins = getCoins(participant, party, _.data.owner == sv5Party.toProtoPrimitive)
         inside(coins) { case Seq(coin) =>
           coin.data.svc shouldBe svcPartyStr
@@ -492,9 +494,9 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
   )
 
   private def createCoinOwnBySvc(
-      participant: CoinRemoteParticipantReference,
+      participant: CNRemoteParticipantReference,
       amount: Double,
-  )(implicit env: CoinTestConsoleEnvironment) =
+  )(implicit env: CNNodeTestConsoleEnvironment) =
     participant.ledger_api_extensions.commands.submitWithResult(
       svc.config.ledgerApiUser,
       actAs = Seq(svcParty),
@@ -503,7 +505,7 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
     )
 
   def getCoins(
-      participant: CoinRemoteParticipantReference,
+      participant: CNRemoteParticipantReference,
       party: PartyId,
       predicate: cc.coin.Coin.Contract => Boolean = _ => true,
   ): Seq[cc.coin.Coin.Contract] = {
@@ -512,7 +514,7 @@ class SvIntegrationTest extends CoinIntegrationTest with SvTestUtil {
       .sortBy(_.data.amount.initialAmount)
   }
 
-  def getCoinRules()(implicit env: CoinTestConsoleEnvironment) =
+  def getCoinRules()(implicit env: CNNodeTestConsoleEnvironment) =
     clue("There is exactly one CoinRules contract") {
       val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)

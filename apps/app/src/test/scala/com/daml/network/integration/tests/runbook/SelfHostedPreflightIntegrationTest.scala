@@ -3,9 +3,9 @@ package com.daml.network.integration.tests.runbook
 import better.files.*
 import com.daml.network.LiveDevNetTest
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
   CantonProcessTestUtil,
@@ -48,8 +48,8 @@ class SelfHostedPreflightIntegrationTest
   )
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",

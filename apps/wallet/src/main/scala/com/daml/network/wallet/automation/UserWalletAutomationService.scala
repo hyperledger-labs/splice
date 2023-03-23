@@ -1,18 +1,18 @@
 package com.daml.network.wallet.automation
 
-import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
+import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
-  CoinAppAutomationService,
+  CNNodeAppAutomationService,
   DomainOrchestrator,
   TransferInTrigger,
   TransferOutTrigger,
   TriggerContext,
 }
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.store.DomainStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -26,19 +26,19 @@ import scala.concurrent.ExecutionContext
 class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     globalDomain: DomainAlias,
     participantAdminConnection: ParticipantAdminConnection,
     automationConfig: AutomationConfig,
     clock: Clock,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
       Map(store.key.endUserParty -> store),

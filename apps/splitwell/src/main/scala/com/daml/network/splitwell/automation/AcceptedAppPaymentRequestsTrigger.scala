@@ -7,7 +7,7 @@ import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, T
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.Contract
@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters.*
 class AcceptedAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     globalDomain: DomainAlias,
     scanConnection: ScanConnection,
 )(implicit

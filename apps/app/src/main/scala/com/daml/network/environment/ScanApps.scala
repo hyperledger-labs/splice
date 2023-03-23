@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -15,7 +15,7 @@ class ScanApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, ScanAppBackendConfig],
-    parametersFor: String => SharedCoinAppParameters,
+    parametersFor: String => SharedCNNodeAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -23,6 +23,6 @@ class ScanApps(
       // this trait.
       ScanApp,
       ScanAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
       ScanAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

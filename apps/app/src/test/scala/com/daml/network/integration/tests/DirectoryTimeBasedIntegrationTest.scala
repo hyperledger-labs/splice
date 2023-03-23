@@ -2,12 +2,12 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.BracketSynchronous.*
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -18,7 +18,7 @@ import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
 class DirectoryTimeBasedIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -27,8 +27,8 @@ class DirectoryTimeBasedIntegrationTest
   private val testEntryName = "mycoolentry"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)

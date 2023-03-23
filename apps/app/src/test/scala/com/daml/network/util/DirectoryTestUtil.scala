@@ -3,11 +3,11 @@ package com.daml.network.util
 import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
-import com.daml.network.integration.tests.CoinTests.CoinTestCommon
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.digitalasset.canton.topology.PartyId
 
-trait DirectoryTestUtil extends CoinTestCommon with CnsTestUtil {
-  this: CommonCoinAppInstanceReferences =>
+trait DirectoryTestUtil extends CNNodeTestCommon with CnsTestUtil {
+  this: CommonCNNodeAppInstanceReferences =>
   def initialiseDirectoryApp(
       userName: String,
       userParty: PartyId,

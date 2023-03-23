@@ -11,12 +11,12 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
@@ -40,7 +40,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class DirectoryApp(
     override val name: InstanceName,
     val config: LocalDirectoryAppConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -52,7 +52,7 @@ class DirectoryApp(
     esf: ExecutionSequencerFactory,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinNode[DirectoryApp.State](
+) extends CNNode[DirectoryApp.State](
       config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -61,7 +61,7 @@ class DirectoryApp(
     ) {
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =

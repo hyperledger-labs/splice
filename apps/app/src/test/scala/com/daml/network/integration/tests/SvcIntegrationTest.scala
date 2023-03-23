@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 
-class SvcIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class SvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   "restart cleanly" in { implicit env =>
-    // TODO(tech-debt): share tests for common properties of CoinApps, like restartabilty
+    // TODO(tech-debt): share tests for common properties of CNNodeApps, like restartabilty
     svc.stop()
     svc.startSync()
   }

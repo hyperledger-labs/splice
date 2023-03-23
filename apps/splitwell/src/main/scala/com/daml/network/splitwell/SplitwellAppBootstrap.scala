@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -30,7 +30,7 @@ import scala.concurrent.Future
 class SplitwellAppBootstrap(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
-    val splitwellAppParameters: SharedCoinAppParameters,
+    val splitwellAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: SplitwellAppMetrics,
@@ -44,10 +44,10 @@ class SplitwellAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       SplitwellApp,
       SplitwellAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -87,7 +87,7 @@ object SplitwellAppBootstrap {
   def apply(
       name: String,
       splitwellConfig: SplitwellAppBackendConfig,
-      coinAppParameters: SharedCoinAppParameters,
+      coinAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       splitwellMetrics: SplitwellAppMetrics,
       testingConfigInternal: TestingConfigInternal,

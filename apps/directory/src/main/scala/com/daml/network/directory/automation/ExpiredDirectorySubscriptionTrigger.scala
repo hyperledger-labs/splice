@@ -6,7 +6,7 @@ import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSucce
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -17,7 +17,7 @@ import scala.jdk.CollectionConverters.*
 class ExpiredDirectorySubscriptionTrigger(
     override protected val context: TriggerContext,
     store: DirectoryStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,

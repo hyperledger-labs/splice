@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.LedgerApiExtensions.*
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
@@ -30,9 +30,9 @@ import scala.jdk.CollectionConverters.*
 /** Splitwell app reference. Defines the console commands that can be run against either a client or backend splitwell reference.
   */
 abstract class SplitwellAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends CNNodeAppReference {
 
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
@@ -45,7 +45,7 @@ abstract class SplitwellAppReference(
 
   lazy val remoteScan =
     new ScanAppClientReference(
-      coinConsoleEnvironment,
+      cnNodeConsoleEnvironment,
       s"remote scan for `$name``",
       remoteScanConfig,
     )
@@ -64,10 +64,10 @@ abstract class SplitwellAppReference(
 }
 
 final class SplitwellAppClientReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: SplitwellAppClientConfig, // adding this explicitly for easier overriding
-) extends SplitwellAppReference(coinConsoleEnvironment, name)
+) extends SplitwellAppReference(cnNodeConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
   private val acceptDuration = new RelTime(
@@ -85,8 +85,8 @@ final class SplitwellAppClientReference(
     )(consoleEnvironment)
 
   override lazy val participantAdminApi =
-    new CoinRemoteParticipantReference(
-      coinConsoleEnvironment,
+    new CNRemoteParticipantReference(
+      cnNodeConsoleEnvironment,
       "splitwell participant admin api",
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
@@ -385,10 +385,10 @@ final class SplitwellAppClientReference(
 }
 
 final class SplitwellAppBackendReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SplitwellAppReference(consoleEnvironment, name)
-    with LocalCoinAppReference
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Splitwell Backend"
@@ -407,7 +407,7 @@ final class SplitwellAppBackendReference(
 
   /** Remote participant this splitwell app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -415,7 +415,7 @@ final class SplitwellAppBackendReference(
 
   /** Remote participant this splitwell app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,

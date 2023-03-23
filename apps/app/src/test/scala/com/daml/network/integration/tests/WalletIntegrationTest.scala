@@ -12,8 +12,8 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
@@ -25,12 +25,12 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 
 class WalletIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {
 
-  override def environmentDefinition: CoinEnvironmentDefinition = {
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         config.copy(akkaConfig =

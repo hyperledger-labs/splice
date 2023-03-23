@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
@@ -22,9 +22,9 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 abstract class WalletAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends HttpCoinAppReference {
+) extends HttpCNNodeAppReference {
 
   override protected val instanceType = "Wallet user"
 
@@ -363,31 +363,31 @@ abstract class WalletAppReference(
   * app reference.
   */
 class WalletAppBackendReference(
-    val coinConsoleEnvironment: CoinConsoleEnvironment,
+    val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     val name: String,
-) extends LocalCoinAppReference
+) extends LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Wallet"
 
-  protected val nodes = coinConsoleEnvironment.environment.wallets
+  protected val nodes = cnNodeConsoleEnvironment.environment.wallets
 
   @Help.Summary("Return wallet app backend config")
   def config: WalletAppBackendConfig =
-    coinConsoleEnvironment.environment.config.walletBackendsByString(name)
+    cnNodeConsoleEnvironment.environment.config.walletBackendsByString(name)
 
   /** Remote participant this wallet app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
-      coinConsoleEnvironment,
+    new CNRemoteParticipantReference(
+      cnNodeConsoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
   /** Remote participant this wallet app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
-      coinConsoleEnvironment,
+    new CNRemoteParticipantReference(
+      cnNodeConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
@@ -396,11 +396,11 @@ class WalletAppBackendReference(
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
-/** Client (aka remote) reference to a wallet app in the style of CoinRemoteParticipantReference, i.e.,
+/** Client (aka remote) reference to a wallet app in the style of CNRemoteParticipantReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class WalletAppClientReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     override val config: WalletAppClientConfig,
 ) extends WalletAppReference(consoleEnvironment, name)

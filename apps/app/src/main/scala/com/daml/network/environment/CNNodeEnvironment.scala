@@ -4,7 +4,7 @@ import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.directory.DirectoryAppBootstrap
 import com.daml.network.directory.config.LocalDirectoryAppConfig
-import com.daml.network.metrics.CoinMetricsFactory
+import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.SplitwellAppBootstrap
@@ -31,13 +31,13 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 
-trait CoinEnvironment extends Environment {
+trait CNNodeEnvironment extends Environment {
 
   override type Config = CNNodeConfig
-  override type Console = CoinConsoleEnvironment
+  override type Console = CNNodeConsoleEnvironment
 
-  // TODO(tech-debt): check that the CoinMetrics factory is used in all of this trait's methods.
-  val coinMetrics = CoinMetricsFactory.forConfig(config.monitoring.metrics)
+  // TODO(tech-debt): check that the CNNodeMetrics factory is used in all of this trait's methods.
+  val cnNodeMetrics = CNNodeMetricsFactory.forConfig(config.monitoring.metrics)
 
   protected def createValidator(
       name: String,
@@ -49,7 +49,7 @@ trait CoinEnvironment extends Environment {
       validatorConfig,
       config.tryValidatorAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forValidator(name),
+      cnNodeMetrics.forValidator(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -82,7 +82,7 @@ trait CoinEnvironment extends Environment {
       svcConfig,
       config.trySvcAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forSvc(name),
+      cnNodeMetrics.forSvc(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -115,7 +115,7 @@ trait CoinEnvironment extends Environment {
       svConfig,
       config.trySvAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forSv(name),
+      cnNodeMetrics.forSv(name),
       testingConfig,
       appLoggerFactory,
       writeHealthDumpToFile,
@@ -148,7 +148,7 @@ trait CoinEnvironment extends Environment {
       scanConfig,
       config.tryScanAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forScan(name),
+      cnNodeMetrics.forScan(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -181,7 +181,7 @@ trait CoinEnvironment extends Environment {
       walletConfig,
       config.tryWalletAppBackendParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forWallet(name),
+      cnNodeMetrics.forWallet(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -214,7 +214,7 @@ trait CoinEnvironment extends Environment {
       directoryConfig,
       config.tryDirectoryAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forDirectory(name),
+      cnNodeMetrics.forDirectory(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -246,7 +246,7 @@ trait CoinEnvironment extends Environment {
       splitwellConfig,
       config.trySplitwellAppParametersByString(name),
       createClock(appLoggerFactory),
-      coinMetrics.forSplitwell(name),
+      cnNodeMetrics.forSplitwell(name),
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
@@ -273,7 +273,7 @@ trait CoinEnvironment extends Environment {
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
     val errors =
-      // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
+      // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
       svcs.startAll.left.getOrElse(Seq.empty) ++
         svs.startAll.left.getOrElse(Seq.empty) ++
         scans.startAll.left.getOrElse(Seq.empty) ++
@@ -284,46 +284,46 @@ trait CoinEnvironment extends Environment {
     Either.cond(errors.isEmpty, (), errors)
   }
 
-  // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
-  def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
+  // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
+  def allCNNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     List(svcs, svs, scans, validators, wallets, directories, splitwells)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    super.allNodes ::: allCoinNodes
+    super.allNodes ::: allCNNodes
 
 }
 
-object CoinEnvironmentFactory extends EnvironmentFactory[CoinEnvironmentImpl] {
+object CNNodeEnvironmentFactory extends EnvironmentFactory[CNNodeEnvironmentImpl] {
   override def create(
       config: CNNodeConfig,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal,
-  ): CoinEnvironmentImpl = {
+  ): CNNodeEnvironmentImpl = {
     val envLoggerFactory = config.name.fold(loggerFactory)(loggerFactory.append("config", _))
-    new CoinEnvironmentImpl(config, testingConfigInternal, envLoggerFactory)
+    new CNNodeEnvironmentImpl(config, testingConfigInternal, envLoggerFactory)
   }
 }
 
-class CoinEnvironmentImpl(
+class CNNodeEnvironmentImpl(
     override val config: CNNodeConfig,
     override val testingConfig: TestingConfigInternal,
     override val loggerFactory: NamedLoggerFactory,
-) extends CoinEnvironment {
+) extends CNNodeEnvironment {
   override type Config = CNNodeConfig
 
   // dump config (without sensitive data) to ease debugging
-  logger.info(s"CoinEnvironment with config = {\n${config.dumpString}\n}")
+  logger.info(s"CNNodeEnvironment with config = {\n${config.dumpString}\n}")
 
   override def _createConsole(
       consoleOutput: ConsoleOutput,
       createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner,
-  ): CoinConsoleEnvironment =
-    new CoinConsoleEnvironment(this, consoleOutput, createAdminCommandRunner)
+  ): CNNodeConsoleEnvironment =
+    new CNNodeConsoleEnvironment(this, consoleOutput, createAdminCommandRunner)
 
   override protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
   ): HealthDumpGenerator[_] = {
-    new CoinHealthDumpGenerator(this, commandRunner)
+    new CNNodeHealthDumpGenerator(this, commandRunner)
   }
 
   override protected val participantNodeFactory
@@ -332,7 +332,7 @@ class CoinEnvironmentImpl(
 
   override protected val domainFactory: DomainNodeBootstrap.Factory[Config#DomainConfigType] =
     DomainNodeBootstrap.CommunityDomainFactory
-  override type Console = CoinConsoleEnvironment
+  override type Console = CNNodeConsoleEnvironment
 
   override protected lazy val migrationsFactory: DbMigrationsFactory =
     new CommunityDbMigrationsFactory(loggerFactory)

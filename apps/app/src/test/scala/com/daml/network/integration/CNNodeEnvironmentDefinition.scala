@@ -4,11 +4,11 @@ import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.environment.{
-  CoinConsoleEnvironment,
-  CoinEnvironmentFactory,
-  CoinEnvironmentImpl,
+  CNNodeConsoleEnvironment,
+  CNNodeEnvironmentFactory,
+  CNNodeEnvironmentImpl,
 }
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.config.SvBootstrapConfig
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
@@ -27,16 +27,16 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.SuppressingLogger
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
-case class CoinEnvironmentDefinition(
+case class CNNodeEnvironmentDefinition(
     override val baseConfig: CNNodeConfig,
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
-    val preSetup: CoinTestConsoleEnvironment => Unit = _ => (),
-    val setup: CoinTestConsoleEnvironment => Unit = _ => (),
+    val preSetup: CNNodeTestConsoleEnvironment => Unit = _ => (),
+    val setup: CNNodeTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
     val configTransformsWithContext: (String => Seq[CNNodeConfig => CNNodeConfig]) = (_: String) =>
       CNNodeConfigTransforms.defaults(),
-) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
+) extends BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment](
       baseConfig,
       testingConfig,
       List(preSetup, setup),
@@ -48,7 +48,7 @@ case class CoinEnvironmentDefinition(
   override def loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   override val configTransforms = configTransformsWithContext(context)
 
-  def withManualStart: CoinEnvironmentDefinition = {
+  def withManualStart: CNNodeEnvironmentDefinition = {
     this
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       // We manually start apps so we disable the default setup
@@ -56,7 +56,7 @@ case class CoinEnvironmentDefinition(
       .copy(setup = _ => ())
   }
 
-  def withAllocatedSvcAndSvUsers(): CoinEnvironmentDefinition =
+  def withAllocatedSvcAndSvUsers(): CNNodeEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
@@ -100,56 +100,58 @@ case class CoinEnvironmentDefinition(
       })
     })
 
-  def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
+  def withAllocatedValidatorUsers(): CNNodeEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
       validators.local.foreach(validator => {
-        CoinEnvironmentDefinition.withAllocatedValidator(validator)
+        CNNodeEnvironmentDefinition.withAllocatedValidator(validator)
       })
     })
 
-  def withInitializedNodes(): CoinEnvironmentDefinition =
+  def withInitializedNodes(): CNNodeEnvironmentDefinition =
     copy(setup = implicit env => {
       this.setup(env)
-      CoinEnvironmentDefinition.waitForNodeInitialization(env)
+      CNNodeEnvironmentDefinition.waitForNodeInitialization(env)
     })
 
-  def withPreSetup(preSetup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+  def withPreSetup(preSetup: CNNodeTestConsoleEnvironment => Unit): CNNodeEnvironmentDefinition =
     copy(preSetup = preSetup)
 
   /** Use exactly this setup and replace any previously existing setup. */
-  def withThisSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+  def withThisSetup(setup: CNNodeTestConsoleEnvironment => Unit): CNNodeEnvironmentDefinition =
     copy(setup = setup)
 
   /** Add an extra setup step after the already registered setup */
-  def withAdditionalSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+  def withAdditionalSetup(
+      setup: CNNodeTestConsoleEnvironment => Unit
+  ): CNNodeEnvironmentDefinition =
     copy(setup = env => {
       this.setup(env)
       setup(env)
     })
 
-  def withoutAutomaticRewardsCollectionAndCoinMerging: CoinEnvironmentDefinition =
+  def withoutAutomaticRewardsCollectionAndCoinMerging: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllAutomationConfigs(
         _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
       )(config)
     )
 
-  def withCoinPrice(price: BigDecimal): CoinEnvironmentDefinition =
+  def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
-  def clearConfigTransforms(): CoinEnvironmentDefinition =
+  def clearConfigTransforms(): CNNodeEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
   def addConfigTransforms(
       transforms: (String, CNNodeConfig) => CNNodeConfig*
-  ): CoinEnvironmentDefinition =
+  ): CNNodeEnvironmentDefinition =
     transforms.foldLeft(this)((ed, ct) => ed.addConfigTransform(ct))
 
   def addConfigTransform(
       transform: (String, CNNodeConfig) => CNNodeConfig
-  ): CoinEnvironmentDefinition =
+  ): CNNodeEnvironmentDefinition =
     copy(configTransformsWithContext =
       ctx => this.configTransformsWithContext(ctx) :+ (conf => transform(ctx, conf))
     )
@@ -157,39 +159,39 @@ case class CoinEnvironmentDefinition(
   /** Apply these config transforms before all others configured so far. */
   def addConfigTransformsToFront(
       transforms: (String, CNNodeConfig) => CNNodeConfig*
-  ): CoinEnvironmentDefinition =
+  ): CNNodeEnvironmentDefinition =
     transforms.foldRight(this)((ct, ed) => ed.addConfigTransformToFront(ct))
 
   def addConfigTransformToFront(
       transform: (String, CNNodeConfig) => CNNodeConfig
-  ): CoinEnvironmentDefinition =
+  ): CNNodeEnvironmentDefinition =
     copy(configTransformsWithContext =
       ctx => (conf => transform(ctx, conf)) +: this.configTransformsWithContext(ctx)
     )
 
-  override lazy val environmentFactory: EnvironmentFactory[CoinEnvironmentImpl] =
-    CoinEnvironmentFactory
+  override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =
+    CNNodeEnvironmentFactory
 
   override def createTestConsole(
-      environment: CoinEnvironmentImpl,
+      environment: CNNodeEnvironmentImpl,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment[CoinEnvironmentImpl] =
-    new CoinConsoleEnvironment(
+  ): TestConsoleEnvironment[CNNodeEnvironmentImpl] =
+    new CNNodeConsoleEnvironment(
       environment,
       new TestConsoleOutput(loggerFactory),
-    ) with TestEnvironment[CoinEnvironmentImpl] {
+    ) with TestEnvironment[CNNodeEnvironmentImpl] {
       override val actualConfig: CNNodeConfig = environment.config
     }
 }
 
-object CoinEnvironmentDefinition {
-  def simpleTopology(testName: String): CoinEnvironmentDefinition =
+object CNNodeEnvironmentDefinition {
+  def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
       .withAllocatedSvcAndSvUsers()
       .withAllocatedValidatorUsers()
       .withInitializedNodes()
 
-  def simpleTopologyWithSimTime(testName: String): CoinEnvironmentDefinition =
+  def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology(testName)
       // all of these transforms need to happen before the auth-related default transforms,
       // which use the `clock` parameter to determine which `.tokens` file to read
@@ -219,12 +221,12 @@ object CoinEnvironmentDefinition {
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
 
-  def preflightTopology(testName: String): CoinEnvironmentDefinition = {
+  def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)
   }
 
-  def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
-    CoinEnvironmentDefinition(
+  def fromResource(path: String, testName: String): CNNodeEnvironmentDefinition =
+    CNNodeEnvironmentDefinition(
       baseConfig = loadConfigFromResource(path),
       context = testName,
     )
@@ -234,15 +236,15 @@ object CoinEnvironmentDefinition {
     CNNodeConfig.loadOrThrow(rawConfig)
   }
 
-  def fromFiles(testName: String, files: File*): CoinEnvironmentDefinition = {
+  def fromFiles(testName: String, files: File*): CNNodeEnvironmentDefinition = {
     val config = CNNodeConfig.parseAndLoadOrThrow(files.map(_.toJava))
-    CoinEnvironmentDefinition(baseConfig = config, context = testName)
+    CNNodeEnvironmentDefinition(baseConfig = config, context = testName)
   }
 
-  def empty(testName: String): CoinEnvironmentDefinition =
-    CoinEnvironmentDefinition(CNNodeConfig.empty, context = testName)
+  def empty(testName: String): CNNodeEnvironmentDefinition =
+    CNNodeEnvironmentDefinition(CNNodeConfig.empty, context = testName)
 
-  def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
+  def waitForNodeInitialization(env: CNNodeConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {

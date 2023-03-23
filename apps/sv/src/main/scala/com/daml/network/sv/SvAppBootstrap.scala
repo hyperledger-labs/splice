@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -31,7 +31,7 @@ import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 class SvAppBootstrap(
     override val name: InstanceName,
     val config: LocalSvAppConfig,
-    val svAppParameters: SharedCoinAppParameters,
+    val svAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: SvAppMetrics,
@@ -45,10 +45,10 @@ class SvAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       SvApp,
       LocalSvAppConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -87,7 +87,7 @@ object SvAppBootstrap {
   def apply(
       name: String,
       svConfig: LocalSvAppConfig,
-      svAppParameters: SharedCoinAppParameters,
+      svAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       svMetrics: SvAppMetrics,
       testingConfigInternal: TestingConfigInternal,

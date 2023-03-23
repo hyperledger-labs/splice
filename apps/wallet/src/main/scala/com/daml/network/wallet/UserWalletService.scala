@@ -3,7 +3,7 @@ package com.daml.network.wallet
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.UserWalletAutomationService
@@ -22,7 +22,7 @@ import scala.concurrent.ExecutionContext
 
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     globalDomain: DomainAlias,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
@@ -30,7 +30,7 @@ class UserWalletService(
     clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     loggerFactory0: NamedLoggerFactory,
     scanConnection: ScanConnection,
     override protected val timeouts: ProcessingTimeout,

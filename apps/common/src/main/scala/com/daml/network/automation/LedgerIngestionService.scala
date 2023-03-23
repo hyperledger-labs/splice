@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import akka.Done
-import com.daml.network.environment.{CoinLedgerSubscription, CoinRetries}
+import com.daml.network.environment.{CNLedgerSubscription, RetryProvider}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -21,21 +21,21 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
     with NamedLogging
     with Spanning {
 
-  protected def retryProvider: CoinRetries
+  protected def retryProvider: RetryProvider
 
   /** Allocate a new subscription that drives ingestion. */
   protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
-  ): Future[CoinLedgerSubscription[?]]
+  ): Future[CNLedgerSubscription[?]]
 
   // Note that we are tracking the current subscription outside the retry loop instead of just
   // calling 'runOnShutdown' on every newly acquired subscription, as that would leak memory.
-  private val currentSubscription = new AtomicReference[Option[CoinLedgerSubscription[?]]](None)
+  private val currentSubscription = new AtomicReference[Option[CNLedgerSubscription[?]]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
   retryProvider.runOnShutdown(new RunOnShutdown {
     override def name: String = s"terminate subscription"
-    // this is not perfectly precise, but CoinLedgerSubscription.close is idempotent
+    // this is not perfectly precise, but CNLedgerSubscription.close is idempotent
     override def done: Boolean = false
     override def run(): Unit = currentSubscription
       .get()
@@ -64,7 +64,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                   logger.debug("detected shutdown, closing subscription")
                   subscription.close()
                 }
-                // The actual return value of the future being retried is the future inside the CoinLedgerConnection,
+                // The actual return value of the future being retried is the future inside the CNLedgerConnection,
                 // which signals when the subscription terminated.
                 subscription.completed.map(_ => {
                   // Defensive programming: resubscribe if the subscription terminates normally, outside of closing

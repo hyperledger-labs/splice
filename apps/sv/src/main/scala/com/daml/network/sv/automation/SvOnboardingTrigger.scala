@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
-import com.daml.network.environment.{CoinLedgerConnection, DedupOffset}
+import com.daml.network.environment.{CNLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.SvApp
@@ -26,7 +26,7 @@ class SvOnboardingTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     svStore: SvSvStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -131,7 +131,7 @@ class SvOnboardingTrigger(
               actAs = Seq(svParty),
               readAs = Seq(svcParty),
               update = cmd,
-              commandId = CoinLedgerConnection.CommandId(
+              commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.svOnboardingConfirmSvConfirmation",
                 Seq(svParty, svcParty),
                 party.toProtoPrimitive,

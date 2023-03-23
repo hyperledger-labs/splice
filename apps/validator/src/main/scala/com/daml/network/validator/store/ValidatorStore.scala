@@ -3,9 +3,9 @@ package com.daml.network.validator.store
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
@@ -17,7 +17,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends CoinAppStoreWithoutHistory {
+trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
@@ -87,7 +87,7 @@ object ValidatorStore {
       domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): ValidatorStore =
     storage match {
       case _: MemoryStorage =>

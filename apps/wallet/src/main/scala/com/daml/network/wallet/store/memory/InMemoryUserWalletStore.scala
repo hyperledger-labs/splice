@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store.memory
 
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.store.InMemoryCoinAppStore
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.store.InMemoryCNNodeAppStore
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -15,11 +15,11 @@ class InMemoryUserWalletStore(
     override val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
-    override protected val connection: CoinLedgerConnection,
-    override protected val retryProvider: CoinRetries,
+    override protected val connection: CNLedgerConnection,
+    override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore[
+) extends InMemoryCNNodeAppStore[
       UserWalletStore.TxLogIndexRecord,
       UserWalletStore.TxLogEntry,
     ]

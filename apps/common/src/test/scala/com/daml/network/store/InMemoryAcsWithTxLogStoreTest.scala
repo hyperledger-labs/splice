@@ -7,7 +7,7 @@ import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree, TreeEvent}
 import com.daml.network.codegen.java.cc.coin as directoryCodegen
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, Trees}
@@ -110,7 +110,7 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
       txFilter,
       TestTxLogStoreParser,
       FutureSupervisor.Noop,
-      CoinRetries(loggerFactory, timeouts),
+      RetryProvider(loggerFactory, timeouts),
     )
     for {
       // ingest test events

@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.http.v0.{definitions, validatorAdmin as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
@@ -15,12 +15,12 @@ import io.grpc.{Status, StatusRuntimeException}
 import scala.jdk.CollectionConverters.*
 
 class HttpValidatorAdminHandler(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     store: ValidatorStore,
     validatorUserName: String,
     walletServiceUser: String,
     domainId: DomainId,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,

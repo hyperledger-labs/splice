@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.console.CommandFailure
@@ -13,7 +13,7 @@ import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
 class WalletSubscriptionsIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil {
 
   "A wallet" should {

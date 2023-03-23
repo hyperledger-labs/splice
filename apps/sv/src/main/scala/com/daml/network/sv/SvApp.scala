@@ -6,8 +6,8 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.config.{CoinHttpClientConfig, SharedCoinAppParameters}
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
+import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -17,7 +17,7 @@ import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CoinUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
+import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.Contract
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -41,7 +41,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 class SvApp(
     override val name: InstanceName,
     val config: LocalSvAppConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -52,7 +52,7 @@ class SvApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SvApp.State](
+) extends CNNode[SvApp.State](
       config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -61,7 +61,7 @@ class SvApp(
     ) {
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       svPartyId: PartyId,
   ): Future[SvApp.State] =
@@ -175,7 +175,7 @@ class SvApp(
   }
 
   private def ensureBootstrapped(
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       svcStore: SvSvcStore,
       globalDomain: DomainId,
   ): Future[Unit] = {
@@ -196,7 +196,7 @@ class SvApp(
   }
 
   private def startBootstrapping(
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       svcStore: SvSvcStore,
       globalDomain: DomainId,
   ): Future[Unit] = {
@@ -260,7 +260,7 @@ class SvApp(
   private def foundCollective(
       foundingConfig: SvBootstrapConfig.FoundCollective,
       svcStore: SvSvcStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
   ): Future[Unit] = {
     for {
@@ -275,7 +275,7 @@ class SvApp(
     } yield ()
   }
 
-  private def uploadDars(ledgerConnection: CoinLedgerConnection): Future[Unit] =
+  private def uploadDars(ledgerConnection: CNLedgerConnection): Future[Unit] =
     for {
       _ <- ledgerConnection.uploadDarFile(SvApp.coinPackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
@@ -287,7 +287,7 @@ class SvApp(
   private def bootstrapSvc(
       foundingConfig: SvBootstrapConfig.FoundCollective,
       store: SvSvcStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       domainId: DomainId,
   ): Future[Unit] = {
     val svcParty = store.key.svcParty
@@ -324,7 +324,7 @@ class SvApp(
                     .commands
                     .asScala
                     .toSeq,
-                  commandId = CoinLedgerConnection
+                  commandId = CNLedgerConnection
                     .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
                   deduplicationOffset = off,
                   domainId = domainId,
@@ -360,7 +360,7 @@ class SvApp(
 
   private def waiveSvcRights(
       svcParty: PartyId,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
   ): Future[Unit] =
     for {
       _ <- ledgerConnection.grantUserRights(config.ledgerApiUser, Seq.empty, Seq(svcParty))
@@ -368,7 +368,7 @@ class SvApp(
     } yield ()
 
   private def requestOnboarding(
-      sponsorConfig: CoinHttpClientConfig,
+      sponsorConfig: CNHttpClientConfig,
       name: String,
       partyId: PartyId,
       publicKey: String,
@@ -414,7 +414,7 @@ class SvApp(
 
   private def expectConfiguredValidatorOnboardings(
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
       clock: Clock,
   ): Future[List[Unit]] = {
@@ -439,7 +439,7 @@ class SvApp(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
       clock: Clock,
   ): Future[Unit] = {
@@ -462,7 +462,7 @@ class SvApp(
 
   private def approveConfiguredSvIdentities(
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
   ): Future[List[Unit]] = {
     if (
@@ -490,7 +490,7 @@ class SvApp(
       name: String,
       key: String,
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
   ): Future[Unit] = {
     logger.info("Ensuring that a SV state contract exists for the configured name and key")
@@ -534,7 +534,7 @@ object SvApp {
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
       clock: Clock,
       logger: TracedLogger,
@@ -566,7 +566,7 @@ object SvApp {
                   actAs = Seq(svParty),
                   readAs = Seq.empty,
                   commands = validatorOnboarding,
-                  commandId = CoinLedgerConnection
+                  commandId = CNLedgerConnection
                     .CommandId(
                       "com.daml.network.sv.expectValidatorOnboarding",
                       Seq(svParty),
@@ -590,7 +590,7 @@ object SvApp {
       name: String,
       key: String,
       svStore: SvSvStore,
-      ledgerConnection: CoinLedgerConnection,
+      ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -621,7 +621,7 @@ object SvApp {
                   actAs = Seq(svParty),
                   readAs = Seq.empty,
                   commands = approvedSvIdentity,
-                  commandId = CoinLedgerConnection
+                  commandId = CNLedgerConnection
                     .CommandId(
                       "com.daml.network.sv.approveSvIdentity",
                       Seq(svParty),

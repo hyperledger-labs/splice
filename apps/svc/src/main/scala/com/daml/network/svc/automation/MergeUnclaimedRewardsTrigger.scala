@@ -2,7 +2,7 @@ package com.daml.network.svc.automation
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -13,7 +13,7 @@ import scala.jdk.CollectionConverters.*
 class MergeUnclaimedRewardsTrigger(
     override protected val context: TriggerContext,
     store: SvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,

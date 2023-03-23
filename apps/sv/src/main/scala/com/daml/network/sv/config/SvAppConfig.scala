@@ -2,8 +2,8 @@ package com.daml.network.sv.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CoinHttpClientConfig,
-  CoinRemoteParticipantConfig,
+  CNHttpClientConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
@@ -65,7 +65,7 @@ case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     remoteSvc: SvcAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
@@ -81,7 +81,7 @@ case class LocalSvAppConfig(
 }
 
 case class RemoteSvAppConfig(
-    adminApi: CoinHttpClientConfig
+    adminApi: CNHttpClientConfig
 ) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }

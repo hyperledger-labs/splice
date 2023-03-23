@@ -5,8 +5,8 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AuthTokenSourceConfig,
   AutomationConfig,
-  CoinHttpClientConfig,
-  CoinRemoteParticipantConfig,
+  CNHttpClientConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
@@ -21,7 +21,7 @@ case class WalletAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     serviceUser: String,
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     validator: WalletRemoteValidatorAppConfig,
     validatorAuth: AuthTokenSourceConfig,
@@ -39,13 +39,13 @@ case class WalletAppBackendConfig(
 
 // Inlined to avoid a dependency
 case class WalletRemoteValidatorAppConfig(
-    adminApi: CoinHttpClientConfig
+    adminApi: CNHttpClientConfig
 ) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
 case class WalletAppClientConfig(
-    adminApi: CoinHttpClientConfig,
+    adminApi: CNHttpClientConfig,
     ledgerApiUser: String,
 ) extends RemoteCNNodeConfig {
   override def clientAdminApi: ClientConfig = adminApi.clientConfig

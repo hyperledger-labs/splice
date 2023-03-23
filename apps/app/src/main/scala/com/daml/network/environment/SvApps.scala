@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.{SvApp, SvAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -15,7 +15,7 @@ class SvApps(
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, LocalSvAppConfig],
-    parametersFor: String => SharedCoinAppParameters,
+    parametersFor: String => SharedCNNodeAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
@@ -23,6 +23,6 @@ class SvApps(
       // this trait.
       SvApp,
       LocalSvAppConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
       SvAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

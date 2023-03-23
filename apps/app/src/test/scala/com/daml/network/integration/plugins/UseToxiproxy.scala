@@ -1,8 +1,8 @@
 package com.daml.network.integration.plugins.toxiproxy
 
-import com.daml.network.config.{CNNodeConfig, CoinRemoteParticipantConfig}
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.config.{CNNodeConfig, CNRemoteParticipantConfig}
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -18,7 +18,7 @@ case class UseToxiproxy(
     // these arguments are just a way to reduce startup time without investing into a proper generalization yet.
     createLedgerApiProxies: Boolean = false,
     createScanAppProxies: Boolean = false,
-) extends EnvironmentSetupPlugin[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
+) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
     with BaseTest {
 
   val client = new ToxiproxyClient()
@@ -33,9 +33,9 @@ case class UseToxiproxy(
   override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     def addLedgerApiProxy(
         instanceName: String,
-        remoteParticipant: CoinRemoteParticipantConfig,
+        remoteParticipant: CNRemoteParticipantConfig,
         extraPortBump: Int,
-    ): CoinRemoteParticipantConfig = {
+    ): CNRemoteParticipantConfig = {
       val bump = 20000 + extraPortBump
       val lapiHost = remoteParticipant.ledgerApi.clientConfig.address
       val lapiPort = remoteParticipant.ledgerApi.clientConfig.port

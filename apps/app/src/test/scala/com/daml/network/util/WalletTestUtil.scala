@@ -10,7 +10,10 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.*
-import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeTestCommon,
+  CNNodeTestConsoleEnvironment,
+}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -21,8 +24,8 @@ import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
-  this: CommonCoinAppInstanceReferences =>
+trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
+  this: CommonCNNodeAppInstanceReferences =>
 
   val exactly = (x: BigDecimal) => (x, x)
 
@@ -44,7 +47,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
             coin.contract.payload.amount
           assertInRange(coinAmount.initialAmount, amountBounds)
           coinAmount.ratePerRound shouldBe
-            CoinUtil.defaultHoldingFee
+            CNNodeUtil.defaultHoldingFee
         }
     }
   }
@@ -95,7 +98,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def onboardAliceAndBob()(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): (PartyId, PartyId) = {
     val alice = onboardWalletUser(aliceWallet, aliceValidator)
     val bob = onboardWalletUser(bobWallet, bobValidator)
@@ -142,13 +145,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       signatories: Seq[PartyId],
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -168,13 +171,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Rejects an accepted app payment request. */
   def rejectAcceptedAppPaymentRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -192,14 +195,14 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Collects an accepted subscription payment request without doing anything useful in return. */
   def collectAcceptedSubscriptionRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       sender: PartyId,
       acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -218,13 +221,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def rejectAcceptedSubscriptionRequest(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -244,14 +247,14 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectSubscriptionPayment(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       senderParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -270,13 +273,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def rejectSubscriptionPayment(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
@@ -306,7 +309,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   protected def createDirectoryEntryForDirectoryItself(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): String = {
     val dirEntryName = "directory.cns"
     val dirParty = directory.getProviderPartyId()
@@ -355,11 +358,11 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def createTestDeliveryOffer(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       domainId: Option[DomainId] = None,
-  )(implicit env: CoinTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
+  )(implicit env: CNNodeTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
     val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
       scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
@@ -400,13 +403,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
     )
 
   def createPaymentRequest(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
-  )(implicit env: CoinTestConsoleEnvironment): (
+  )(implicit env: CNNodeTestConsoleEnvironment): (
       testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
@@ -443,14 +446,14 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   def createSelfPaymentRequest(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       amount: BigDecimal = defaultPaymentAmount.amount,
       currency: paymentCodegen.Currency = defaultPaymentAmount.currency,
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
-  )(implicit env: CoinTestConsoleEnvironment): (
+  )(implicit env: CNNodeTestConsoleEnvironment): (
       testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
@@ -481,13 +484,13 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   )
 
   protected def createSubscriptionContext(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       serviceParty: PartyId,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): testSubsCodegen.TestSubscriptionContext.ContractId = {
     val context = new testSubsCodegen.TestSubscriptionContext(
       scan.getSvcPartyId().toProtoPrimitive,
@@ -516,7 +519,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       paymentDuration: Duration,
       amount: paymentCodegen.PaymentAmount,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val subscription = new subsCodegen.Subscription(
       userParty.toProtoPrimitive,
@@ -540,7 +543,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       paymentDuration: Duration,
       amount: paymentCodegen.PaymentAmount,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     createSubscriptionData(
       contextId,
@@ -555,7 +558,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Note: all of the sender, receiver, and provider parties must be on the same participant */
   protected def createSubscriptionRequest(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       receiverParty: PartyId,
@@ -565,7 +568,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       paymentDuration: Duration = defaultSubscriptionDuration,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val contextId =
       createSubscriptionContext(
@@ -602,7 +605,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   protected def createSelfSubscriptionRequest(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
@@ -610,7 +613,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       paymentDuration: Duration = defaultSubscriptionDuration,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val contextId =
       createSubscriptionContext(
@@ -639,7 +642,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   protected def createSelfSubscription(
-      remoteParticipantWithAdminToken: CoinRemoteParticipantReference,
+      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
@@ -647,7 +650,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       paymentDuration: Duration = defaultSubscriptionDuration,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val contextId =
       createSubscriptionContext(
@@ -696,7 +699,7 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   }
 
   protected def grantFeaturedAppRight(wallet: WalletAppClientReference)(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ) = {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
@@ -716,12 +719,12 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
 
   /** Directly executes the CoinRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
   def mintCoin(
-      remoteParticipant: CoinRemoteParticipantReference,
+      remoteParticipant: CNRemoteParticipantReference,
       receiver: PartyId,
       amount: BigDecimal,
       domainId: Option[DomainId] = None,
   )(implicit
-      env: CoinTestConsoleEnvironment
+      env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)

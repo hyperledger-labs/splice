@@ -3,8 +3,8 @@ package com.daml.network.svc
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.SvcAppBackendConfig
@@ -29,7 +29,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvcApp(
     override val name: InstanceName,
     val config: SvcAppBackendConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -41,7 +41,7 @@ class SvcApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SvcApp.State](
+) extends CNNode[SvcApp.State](
       config.ledgerApiUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -50,7 +50,7 @@ class SvcApp(
     ) {
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =

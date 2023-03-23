@@ -1,6 +1,6 @@
 package com.daml.network.validator.admin.http
 
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
@@ -13,12 +13,12 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorHandler(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     store: ValidatorStore,
     validatorUserName: String,
     walletServiceUser: String,
     domainId: DomainId,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,

@@ -18,14 +18,9 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{
-  CoinLedgerClient,
-  CoinLedgerConnection,
-  DedupConfig,
-  DedupDuration,
-}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, DedupConfig, DedupDuration}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.environment.CoinLedgerConnection.CommandId
+import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
@@ -34,7 +29,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.{Codec, CoinUtil, Contract}
+import com.daml.network.util.{Codec, CNNodeUtil, Contract}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.wallet.store.UserWalletStore
@@ -50,7 +45,7 @@ import scala.reflect.ClassTag
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     clock: Clock,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
@@ -447,12 +442,12 @@ class HttpWalletHandler(
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       } yield {
         val unlockedHoldingFees =
-          coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
+          coins.view.map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, currentRound))).sum
         val unlockedQty =
-          coins.view.map(c => BigDecimal(CoinUtil.currentAmount(c.payload, currentRound))).sum
+          coins.view.map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, currentRound))).sum
         val lockedQty =
           lockedCoins.view
-            .map(c => BigDecimal(CoinUtil.currentAmount(c.payload.coin, currentRound)))
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.coin, currentRound)))
             .sum
 
         d0.GetBalanceResponse(
@@ -489,7 +484,7 @@ class HttpWalletHandler(
           ),
         dedup = Some(
           (
-            CoinLedgerConnection.CommandId(
+            CNLedgerConnection.CommandId(
               "com.daml.network.wallet.createTransferOffer",
               Seq(
                 sender,
@@ -573,8 +568,8 @@ class HttpWalletHandler(
     d0.CoinPosition(
       coin.toJson,
       round,
-      Codec.encode(CoinUtil.holdingFee(coin.payload, round)),
-      Codec.encode(CoinUtil.currentAmount(coin.payload, round)),
+      Codec.encode(CNNodeUtil.holdingFee(coin.payload, round)),
+      Codec.encode(CNNodeUtil.currentAmount(coin.payload, round)),
     )
   }
 
@@ -585,8 +580,8 @@ class HttpWalletHandler(
     d0.CoinPosition(
       lockedCoin.toJson,
       round,
-      Codec.encode(CoinUtil.holdingFee(lockedCoin.payload.coin, round)),
-      Codec.encode(CoinUtil.currentAmount(lockedCoin.payload.coin, round)),
+      Codec.encode(CNNodeUtil.holdingFee(lockedCoin.payload.coin, round)),
+      Codec.encode(CNNodeUtil.currentAmount(lockedCoin.payload.coin, round)),
     )
 
   private[this] def getUserWallet(user: String): UserWalletService =

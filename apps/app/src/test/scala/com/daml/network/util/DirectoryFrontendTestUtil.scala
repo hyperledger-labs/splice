@@ -1,11 +1,11 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.CoinTests.CoinTestCommon
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import scala.concurrent.duration.*
 
-trait DirectoryFrontendTestUtil extends CoinTestCommon with CnsTestUtil {
-  this: CommonCoinAppInstanceReferences & FrontendTestCommon =>
+trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
+  this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
 
   def allocateDirectoryEntry(
       directoryUiLogin: () => Unit,

@@ -2,8 +2,8 @@ package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.automation.CNNodeAppAutomationService
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -18,16 +18,16 @@ class SvAutomationService(
     config: LocalSvAppConfig,
     svStore: SvSvStore,
     svcStore: SvSvcStore,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       config.automation,
       clock,
       Map(svStore.key.svParty -> svStore, svcStore.key.svcParty -> svcStore),

@@ -2,11 +2,11 @@ package com.daml.network.integration.tests
 
 import better.files.*
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{CantonProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
@@ -17,7 +17,7 @@ import scala.util.Using
 import scala.concurrent.duration.*
 
 class WalletSurviveCantonRestartIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with CantonProcessTestUtil
     with WalletTestUtil {
 
@@ -44,8 +44,8 @@ class WalletSurviveCantonRestartIntegrationTest
   )
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] = {
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
@@ -69,7 +69,7 @@ class WalletSurviveCantonRestartIntegrationTest
           aliceWalletBackend.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
         }
-        CoinEnvironmentDefinition.withAllocatedValidator(aliceValidator)
+        CNNodeEnvironmentDefinition.withAllocatedValidator(aliceValidator)
         aliceValidator.waitForInitialization()
         aliceWalletBackend.waitForInitialization()
 

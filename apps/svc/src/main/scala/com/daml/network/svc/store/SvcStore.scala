@@ -3,7 +3,7 @@ package com.daml.network.svc.store
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
@@ -15,10 +15,10 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait SvcStore extends CoinAppStoreWithoutHistory {
+trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -140,7 +140,7 @@ object SvcStore {
       domains: SvcDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
   ): SvcStore =

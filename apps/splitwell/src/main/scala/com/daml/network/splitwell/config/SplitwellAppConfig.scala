@@ -3,7 +3,7 @@ package com.daml.network.splitwell.config
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.config.{
   AutomationConfig,
-  CoinRemoteParticipantConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
@@ -29,7 +29,7 @@ case class SplitwellAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     providerUser: String,
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SplitwellDomainConfig,
@@ -45,7 +45,7 @@ case class SplitwellAppClientConfig(
     // Admin API for reads.
     adminApi: ClientConfig,
     // Ledger API for writes.
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     remoteScan: ScanAppClientConfig,
     ledgerApiUser: String,
 ) extends RemoteCNNodeConfig {

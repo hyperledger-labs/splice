@@ -3,9 +3,9 @@ package com.daml.network.wallet.automation
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.automation.CoinAppAutomationService
+import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,17 +19,17 @@ class WalletAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     walletManager: UserWalletManager,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     globalDomain: DomainAlias,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     implicit protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinAppAutomationService(
+) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
       Map(walletManager.store.key.validatorParty -> walletManager.store),

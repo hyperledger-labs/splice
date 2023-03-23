@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
 import com.daml.network.codegen.java.cc.coinconfig.USD
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, DedupOffset}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, DedupOffset}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.{
@@ -30,7 +30,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvcAppService(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     svcUserName: String,
     store: SvcStore,
     globalDomain: DomainId,
@@ -72,7 +72,7 @@ class GrpcSvcAppService(
                 store.svcParty.toProtoPrimitive,
                 request.appProvider,
               ).create(),
-              commandId = CoinLedgerConnection.CommandId(
+              commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.svc.grantFeaturedAppRight",
                 Seq(svcParty, providerParty),
               ),

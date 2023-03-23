@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
@@ -22,7 +22,7 @@ import scala.jdk.CollectionConverters.*
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -88,7 +88,7 @@ class SummarizingMiningRoundTrigger(
               actAs = Seq(svParty),
               readAs = Seq(svcParty),
               commands = cmd.commands.asScala.toSeq,
-              commandId = CoinLedgerConnection.CommandId(
+              commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
                 Seq(svParty, svcParty),
                 summarizingRound.contractId.contractId,

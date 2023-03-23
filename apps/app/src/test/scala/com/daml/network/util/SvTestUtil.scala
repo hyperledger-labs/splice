@@ -1,15 +1,18 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cn
-import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeTestCommon,
+  CNNodeTestConsoleEnvironment,
+}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
-trait SvTestUtil extends CoinTestCommon {
-  this: CommonCoinAppInstanceReferences =>
+trait SvTestUtil extends CNNodeTestCommon {
+  this: CommonCNNodeAppInstanceReferences =>
 
-  def getSvcRules()(implicit env: CoinTestConsoleEnvironment) =
+  def getSvcRules()(implicit env: CNNodeTestConsoleEnvironment) =
     clue("There is exactly one SvcRules contract") {
       val foundSvcRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
@@ -17,7 +20,7 @@ trait SvTestUtil extends CoinTestCommon {
       foundSvcRules.head
     }
 
-  def addPhantomSv()(implicit env: CoinTestConsoleEnvironment) = {
+  def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
     // random value for test
     val svXParty = PartyId
       .fromProtoPrimitive(

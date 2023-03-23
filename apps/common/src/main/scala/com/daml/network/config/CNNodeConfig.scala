@@ -28,7 +28,7 @@ abstract class LocalCNNodeConfig extends LocalNodeConfig {
   override val caching: CachingConfigs = CachingConfigs()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
-  def remoteParticipant: CoinRemoteParticipantConfig
+  def remoteParticipant: CNRemoteParticipantConfig
   def automation: AutomationConfig
 }
 
@@ -41,15 +41,15 @@ abstract class RemoteCNNodeConfig extends NodeConfig {}
   * For example, the [[TracingConfig]] is configured once for all CN apps that are started by a CN binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].
   * To avoid having to pass the configuration options for all apps (as implemented in [[com.daml.network.config.CNNodeConfig]])
-  * to a single app, a [[SharedCoinAppParameters]] class instance is constructed and passed to each app during bootstrapping.
+  * to a single app, a [[SharedCNNodeAppParameters]] class instance is constructed and passed to each app during bootstrapping.
   *
   * An exception to this are the [[SequencerClientConfig]] and [[CachingConfigs]]. These are configured on a per-node-level
-  * but are still in the [[SharedCoinAppParameters]]. They will be removed in the future.
-  * These two parameters are also the reason why the [[SharedCoinAppParameters]] are created individually for each configured
+  * but are still in the [[SharedCNNodeAppParameters]]. They will be removed in the future.
+  * These two parameters are also the reason why the [[SharedCNNodeAppParameters]] are created individually for each configured
   * SVC/Validator/Wallet app in, e.g., `svcAppParameters_` of [[com.daml.network.config.CNNodeConfig]] (instead of just
-  * creating a single [[SharedCoinAppParameters]] instance once and passing that instance to all apps).
+  * creating a single [[SharedCNNodeAppParameters]] instance once and passing that instance to all apps).
   */
-case class SharedCoinAppParameters(
+case class SharedCNNodeAppParameters(
     override val tracing: TracingConfig,
     override val delayLoggingThreshold: NonNegativeFiniteDuration,
     override val loggingConfig: LoggingConfig,

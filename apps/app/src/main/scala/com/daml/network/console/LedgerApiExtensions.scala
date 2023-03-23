@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
-import com.daml.ledger.client.binding.{Primitive as P}
+import com.daml.ledger.client.binding.Primitive as P
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.javaapi
 import com.daml.ledger.api.v1.CommandsOuterClass
@@ -10,8 +10,8 @@ import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
-import com.daml.ledger.javaapi.data.{TransactionTree as JavaTransactionTree}
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -96,14 +96,14 @@ trait LedgerApiExtensions {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            workflowId = domainId.fold("")(CoinLedgerConnection.domainIdToWorkflowId(_)),
+            workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
             optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
-          CoinLedgerConnection.decodeExerciseResult(
+          CNLedgerConnection.decodeExerciseResult(
             update,
             tree,
           )
@@ -125,14 +125,14 @@ trait LedgerApiExtensions {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            workflowId = domainId.fold("")(CoinLedgerConnection.domainIdToWorkflowId(_)),
+            workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
             optTimeout = None,
             disclosedContracts = disclosedContracts,
           )
-          val cid = CoinLedgerConnection
+          val cid = CNLedgerConnection
             .decodeExerciseResult(
               update,
               tree,

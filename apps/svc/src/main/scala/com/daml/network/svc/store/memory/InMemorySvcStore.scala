@@ -1,7 +1,7 @@
 package com.daml.network.svc.store.memory
 
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{InMemoryCoinAppStore, TxLogStore}
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -15,10 +15,10 @@ class InMemorySvcStore(
     override protected[this] val domainConfig: SvcDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
-    override protected val retryProvider: CoinRetries,
+    override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]]
+) extends InMemoryCNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]]
     with SvcStore {
 
   override lazy val acsContractFilter = SvcStore.contractFilter(svcParty)

@@ -3,8 +3,8 @@ package com.daml.network.integration.tests
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser
@@ -15,7 +15,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTxLogIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
@@ -23,8 +23,8 @@ class WalletTxLogIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
-  override def environmentDefinition: CoinEnvironmentDefinition = {
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.

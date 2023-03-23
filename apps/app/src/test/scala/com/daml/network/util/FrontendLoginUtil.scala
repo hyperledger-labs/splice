@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.integration.tests.{CoinTests, FrontendTestCommon}
+import com.daml.network.integration.tests.{CNNodeTests, FrontendTestCommon}
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.WebDriver
 
@@ -63,7 +63,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
 
   protected def withAuth0LoginCheck[A](frontendDriverName: String, localHostPort: Int)(
       afterLoginChecks: (PartyId, WebDriverType) => A
-  )(implicit env: CoinTests.CoinTestConsoleEnvironment): A = {
+  )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment): A = {
     val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
     Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")

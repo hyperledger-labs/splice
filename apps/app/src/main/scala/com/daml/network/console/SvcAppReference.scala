@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -13,9 +13,9 @@ import com.digitalasset.canton.topology.PartyId
 import java.time.Instant
 
 abstract class SvcAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends CNNodeAppReference {
 
   def getDebugInfo(): GrpcSvcAppClient.DebugInfo = {
     consoleEnvironment.run {
@@ -25,7 +25,7 @@ abstract class SvcAppReference(
 }
 
 class SvcAppClientReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     override val config: SvcAppClientConfig,
 ) extends SvcAppReference(consoleEnvironment, name)
@@ -59,10 +59,10 @@ class SvcAppClientReference(
   * app.
   */
 class SvcAppBackendReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SvcAppReference(consoleEnvironment, name)
-    with LocalCoinAppReference
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC"
@@ -75,7 +75,7 @@ class SvcAppBackendReference(
 
   /** Remote participant this SVC app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -83,7 +83,7 @@ class SvcAppBackendReference(
 
   /** Remote participant this SVC app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,

@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests.connectivity
 
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
@@ -17,11 +17,11 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
-class WalletAppConnectivityIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // we want fine-grained control when we send a CoinOperation from the wallet & query the scan app

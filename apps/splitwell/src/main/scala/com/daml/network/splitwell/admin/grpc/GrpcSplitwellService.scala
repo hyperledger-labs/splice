@@ -2,7 +2,7 @@ package com.daml.network.splitwell.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.CNLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.store.SplitwellStore
@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters.*
 
 @nowarn("cat=unused")
 class GrpcSplitwellService(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     splitwellDomains: SplitwellDomains,
     scanConnection: ScanConnection,
     providerParty: PartyId,

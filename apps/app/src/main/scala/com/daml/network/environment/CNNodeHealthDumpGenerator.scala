@@ -11,22 +11,23 @@ import io.circe.generic.semiauto.deriveEncoder
 
 import scala.annotation.nowarn
 
-case class CoinStatus() extends CantonStatus {
-  override def pretty: Pretty[CoinStatus.this.type] =
+// TODO(tech-debt): named CNNodeStatus as there already exists a com.daml.network.environment.CNNodeStatus -- figure out how to name this better, or merge these two classes
+case class CNNodeStatus2() extends CantonStatus {
+  override def pretty: Pretty[CNNodeStatus2.this.type] =
     Pretty.prettyOfString(_ => "Not implemented")
 }
 
 // TODO(#1159): Properly implement or remove health dumping
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
-class CoinHealthDumpGenerator(
-    override val environment: CoinEnvironment,
+class CNNodeHealthDumpGenerator(
+    override val environment: CNNodeEnvironment,
     override val grpcAdminCommandRunner: GrpcAdminCommandRunner,
-) extends HealthDumpGenerator[CoinStatus] {
-  override protected implicit val statusEncoder: Encoder[CoinStatus] = {
-    deriveEncoder[CoinStatus]
+) extends HealthDumpGenerator[CNNodeStatus2] {
+  override protected implicit val statusEncoder: Encoder[CNNodeStatus2] = {
+    deriveEncoder[CNNodeStatus2]
   }
 
-  override def status(): CoinStatus = {
-    CoinStatus()
+  override def status(): CNNodeStatus2 = {
+    CNNodeStatus2()
   }
 }

@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.DirectoryUtil
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
@@ -22,7 +22,7 @@ import scala.jdk.CollectionConverters.*
 class SubscriptionInitialPaymentTrigger(
     override protected val context: TriggerContext,
     store: DirectoryStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     scanConnection: ScanConnection,
 )(implicit
     ec: ExecutionContext,

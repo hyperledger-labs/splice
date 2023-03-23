@@ -84,7 +84,7 @@ case class LogEntry(
       "com.digitalasset.canton.integration.CommunityEnvironmentDefinition",
       "com.digitalasset.canton.integration.EnterpriseEnvironmentDefinition",
       // TODO(M1-90): add as parameter for Canton library-isation
-      "com.daml.network.integration.CoinEnvironmentDefinition",
+      "com.daml.network.integration.CNNodeEnvironmentDefinition",
     )
 
   def shouldBeCommandFailure(code: ErrorCode, message: String = "")(implicit

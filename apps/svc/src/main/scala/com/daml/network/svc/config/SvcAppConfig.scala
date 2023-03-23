@@ -2,7 +2,7 @@ package com.daml.network.svc.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CoinRemoteParticipantConfig,
+  CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
 }
@@ -12,7 +12,7 @@ case class SvcAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
-    remoteParticipant: CoinRemoteParticipantConfig,
+    remoteParticipant: CNRemoteParticipantConfig,
     domains: SvcDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     // TODO(M3-07): use price from SvcRules

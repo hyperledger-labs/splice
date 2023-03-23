@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -30,7 +30,7 @@ import scala.concurrent.Future
 class SvcAppBootstrap(
     override val name: InstanceName,
     val config: SvcAppBackendConfig,
-    val svcAppParameters: SharedCoinAppParameters,
+    val svcAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: SvcAppMetrics,
@@ -44,10 +44,10 @@ class SvcAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       SvcApp,
       SvcAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -87,7 +87,7 @@ object SvcAppBootstrap {
   def apply(
       name: String,
       svcConfig: SvcAppBackendConfig,
-      svcAppParameters: SharedCoinAppParameters,
+      svcAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       svcMetrics: SvcAppMetrics,
       testingConfigInternal: TestingConfigInternal,

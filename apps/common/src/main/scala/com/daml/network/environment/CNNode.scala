@@ -11,7 +11,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.auth.AuthTokenSource
-import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
+import com.daml.network.config.{CNRemoteParticipantConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -37,10 +37,10 @@ import scala.util.Failure
 import scala.util.Success
 
 /** A running instance of a canton node */
-abstract class CoinNode[State <: AutoCloseable & HasHealth](
+abstract class CNNode[State <: AutoCloseable & HasHealth](
     serviceUser: String,
-    remoteParticipant: CoinRemoteParticipantConfig,
-    parameters: SharedCoinAppParameters,
+    remoteParticipant: CNRemoteParticipantConfig,
+    parameters: SharedCNNodeAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
 )(implicit
@@ -54,8 +54,8 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     with NoTracing {
   val name: InstanceName
 
-  protected val retryProvider: CoinRetries =
-    CoinRetries(loggerFactory, parameters.processingTimeouts)
+  protected val retryProvider: RetryProvider =
+    RetryProvider(loggerFactory, parameters.processingTimeouts)
 
   override val timeouts = parameters.processingTimeouts
 
@@ -153,12 +153,12 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   }
 
   def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[State]
 
-  private def waitForPackages(connection: CoinLedgerConnection): Future[Unit] = {
+  private def waitForPackages(connection: CNLedgerConnection): Future[Unit] = {
     val requiredPackageIds: Set[String] = requiredTemplates.map(t => t.getPackageId)
 
     def query(): Future[Unit] = for {
@@ -179,7 +179,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   }
 
-  private def createLedgerClient(): Future[CoinLedgerClient] = for {
+  private def createLedgerClient(): Future[CNLedgerClient] = for {
     _ <- Future.successful(())
     _ = logger.info("Creating ledger API auth token source")
     authTokenSource = AuthTokenSource.fromConfig(
@@ -193,7 +193,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     )
   } yield {
     logger.debug(s"Using token $token for this ledger client")
-    new CoinLedgerClient(
+    new CNLedgerClient(
       remoteParticipant.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
       serviceUser,
@@ -218,7 +218,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     )
 
   private def initializeNode(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
   ) = for {
     _ <- Future.successful(())

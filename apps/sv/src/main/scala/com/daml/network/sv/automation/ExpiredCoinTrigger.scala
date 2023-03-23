@@ -2,7 +2,7 @@ package com.daml.network.sv.automation
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.*
 class ExpiredCoinTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     tracer: Tracer,

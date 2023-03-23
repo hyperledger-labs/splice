@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
@@ -14,7 +14,7 @@ import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
 class WalletPaymentIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil {
 
   "A wallet" should {

@@ -11,8 +11,8 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
@@ -41,7 +41,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class WalletApp(
     override val name: InstanceName,
     val config: WalletAppBackendConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -53,7 +53,7 @@ class WalletApp(
     esf: ExecutionSequencerFactory,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinNode[WalletApp.State](
+) extends CNNode[WalletApp.State](
       config.serviceUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -62,7 +62,7 @@ class WalletApp(
     ) {
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {

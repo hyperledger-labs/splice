@@ -3,8 +3,8 @@ package com.daml.network.console
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.{CoinHttpClientConfig, LocalCNNodeConfig}
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.config.{CNHttpClientConfig, LocalCNNodeConfig}
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.digitalasset.canton.config.{NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.commands.{
   HealthAdministration,
@@ -28,14 +28,14 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 
 /** Copy of Canton ParticipantReference */
-trait CoinAppReference extends InstanceReference {
+trait CNNodeAppReference extends InstanceReference {
 
   def config: NodeConfig
 
   override val name: String
 
-  override implicit val consoleEnvironment: ConsoleEnvironment = coinConsoleEnvironment
-  implicit val coinConsoleEnvironment: CoinConsoleEnvironment
+  override implicit val consoleEnvironment: ConsoleEnvironment = cnNodeConsoleEnvironment
+  implicit val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment
 
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("Wallet", name)
@@ -74,7 +74,7 @@ trait CoinAppReference extends InstanceReference {
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
-      timeout: NonNegativeDuration = coinConsoleEnvironment.commandTimeouts.bounded
+      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
   ): Unit =
     ConsoleMacros.utils.retry_until_true(timeout)(
       health.status.successOption.map(_.active).getOrElse(false)
@@ -89,18 +89,18 @@ trait CoinAppReference extends InstanceReference {
     consoleEnvironment.environment.participants.getRunning(name)
 }
 
-trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
+trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   def token: Option[String] = None
 
   def headers =
     token.map(t => List(Authorization(OAuth2BearerToken(t)))).getOrElse(List.empty[HttpHeader])
 
-  def httpClientConfig: CoinHttpClientConfig
+  def httpClientConfig: CNHttpClientConfig
 
   override protected[console] def httpCommand[Result](
       httpCommand: HttpCommand[_, Result]
   ): ConsoleCommandResult[Result] =
-    coinConsoleEnvironment.httpCommandRunner.runCommand(
+    cnNodeConsoleEnvironment.httpCommandRunner.runCommand(
       name,
       httpCommand,
       headers,
@@ -108,7 +108,7 @@ trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
     )
 }
 
-trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference {
+trait LocalCNNodeAppReference extends CNNodeAppReference with LocalInstanceReference {
   override def config: LocalCNNodeConfig
 
   @Help.Summary("Start node and wait for initialization to complete")
@@ -121,8 +121,8 @@ trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference
 /** Subclass of RemoteParticipant that takes the config as an argument
   * instead of relying on remoteParticipantsByName.
   */
-class CoinRemoteParticipantReference(
-    consoleEnvironment: CoinConsoleEnvironment,
+class CNRemoteParticipantReference(
+    consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,
 ) extends RemoteParticipantReference(consoleEnvironment, name) {}

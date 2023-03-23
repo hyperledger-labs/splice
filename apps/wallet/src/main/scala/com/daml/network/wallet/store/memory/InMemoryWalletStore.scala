@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store.memory
 
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.InMemoryCoinAppStoreWithoutHistory
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -16,9 +16,9 @@ class InMemoryWalletStore(
     override protected val loggerFactory: NamedLoggerFactory,
     val timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
-    override protected val retryProvider: CoinRetries,
+    override protected val retryProvider: RetryProvider,
 )(implicit override protected val ec: ExecutionContext)
-    extends InMemoryCoinAppStoreWithoutHistory
+    extends InMemoryCNNodeAppStoreWithoutHistory
     with WalletStore {
 
   override lazy val acsContractFilter = WalletStore.contractFilter(key)

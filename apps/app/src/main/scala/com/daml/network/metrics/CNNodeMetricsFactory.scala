@@ -17,7 +17,7 @@ import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 import scala.collection.concurrent.TrieMap
 
-case class CoinMetricsFactory(
+case class CNNodeMetricsFactory(
     reporters: Seq[metrics.Reporter],
     registry: metrics.MetricRegistry,
     reportJVMMetrics: Boolean,
@@ -138,13 +138,13 @@ case class CoinMetricsFactory(
   }
 }
 
-object CoinMetricsFactory {
-  def forConfig(config: MetricsConfig): CoinMetricsFactory = {
+object CNNodeMetricsFactory {
+  def forConfig(config: MetricsConfig): CNNodeMetricsFactory = {
     val registry = new metrics.MetricRegistry()
     val meterProviderBuilder = SdkMeterProvider.builder()
     val reporter = registerReporter(config, registry)
     val meterProvider = meterProviderBuilder.build()
-    new CoinMetricsFactory(
+    new CNNodeMetricsFactory(
       reporter,
       registry,
       config.reportJvmMetrics,

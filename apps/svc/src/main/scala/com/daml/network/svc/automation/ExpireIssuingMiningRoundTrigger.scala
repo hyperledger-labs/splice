@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ExpireIssuingMiningRoundTrigger(
     override protected val context: TriggerContext,
     store: SvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,

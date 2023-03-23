@@ -17,7 +17,7 @@ import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.google.protobuf.ByteString
 
 // A fork of SimpleStatus from Canton for Coin apps, without topologyQueues member
-case class CoinNodeStatus(
+case class CNNodeStatus(
     uid: UniqueIdentifier,
     uptime: Duration,
     ports: Map[String, Port],
@@ -30,7 +30,7 @@ case class CoinNodeStatus(
   private[environment] def multiline(elements: Seq[String]): String =
     if (elements.isEmpty) "None" else elements.map(el => s"\n\t$el").mkString
 
-  override def pretty: Pretty[CoinNodeStatus] =
+  override def pretty: Pretty[CNNodeStatus] =
     prettyOfString(_ =>
       Seq(
         s"Node uid: ${uid.toProtoPrimitive}",
@@ -61,8 +61,8 @@ case class CoinNodeStatus(
     )
 }
 
-object CoinNodeStatus {
-  def fromJsonV0(json: jsonV0.Status): Either[String, CoinNodeStatus] = {
+object CNNodeStatus {
+  def fromJsonV0(json: jsonV0.Status): Either[String, CNNodeStatus] = {
     for {
       uid <- UniqueIdentifier
         .fromProtoPrimitive(json.id, "Status.id")
@@ -76,7 +76,7 @@ object CoinNodeStatus {
         }
         .map(_.toMap)
         .leftMap(_ => "Failed to deserialize ports")
-    } yield CoinNodeStatus(
+    } yield CNNodeStatus(
       uid,
       Duration.parse(json.uptime),
       ports,
@@ -84,6 +84,6 @@ object CoinNodeStatus {
     )
   }
 
-  def fromNodeStatus(status: NodeStatus.Status): CoinNodeStatus =
-    CoinNodeStatus(status.uid, status.uptime, status.ports, status.active)
+  def fromNodeStatus(status: NodeStatus.Status): CNNodeStatus =
+    CNNodeStatus(status.uid, status.uptime, status.ports, status.active)
 }

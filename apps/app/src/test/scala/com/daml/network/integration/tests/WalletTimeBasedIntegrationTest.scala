@@ -3,12 +3,12 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.BracketSynchronous.*
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTestWithSharedEnvironment,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -19,7 +19,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTimeBasedIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil {
@@ -30,8 +30,8 @@ class WalletTimeBasedIntegrationTest
   private val testEntryName = "mycoolentry"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => {
         // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.

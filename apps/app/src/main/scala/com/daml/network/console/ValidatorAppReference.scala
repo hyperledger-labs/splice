@@ -1,8 +1,8 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.config.CoinHttpClientConfig
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAppClient,
@@ -16,9 +16,9 @@ import com.digitalasset.canton.topology.PartyId
 /** Console commands that can be executed either through client or backend reference.
   */
 abstract class ValidatorAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends HttpCoinAppReference {
+) extends HttpCNNodeAppReference {
 
   override protected val instanceType = "Validator"
 
@@ -84,10 +84,10 @@ abstract class ValidatorAppReference(
 }
 
 final class ValidatorAppBackendReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends ValidatorAppReference(consoleEnvironment, name)
-    with LocalCoinAppReference
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Local Validator"
@@ -102,7 +102,7 @@ final class ValidatorAppBackendReference(
     )
   }
 
-  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
@@ -118,7 +118,7 @@ final class ValidatorAppBackendReference(
 
   /** Remote participant this validator app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`",
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -126,7 +126,7 @@ final class ValidatorAppBackendReference(
 
   /** Remote participant this validator app is configured to interact with. Uses admin tokens to bypass auth. */
   val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
@@ -136,11 +136,11 @@ final class ValidatorAppBackendReference(
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
-/** Client (aka remote) reference to a validator app in the style of CoinRemoteParticipantReference, i.e.,
+/** Client (aka remote) reference to a validator app in the style of CNRemoteParticipantReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class ValidatorAppClientReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     override val config: ValidatorAppClientConfig,
 ) extends ValidatorAppReference(consoleEnvironment, name)

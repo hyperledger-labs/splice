@@ -34,10 +34,10 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{CoinUtil, Contract, HasHealth}
+import com.daml.network.util.{CNNodeUtil, Contract, HasHealth}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -76,13 +76,13 @@ import scala.util.{Failure, Success}
   * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913
   */
 class TreasuryService(
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     globalDomain: DomainAlias,
     treasuryConfig: TreasuryConfig,
     clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     scanConnection: ScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -479,7 +479,7 @@ class TreasuryService(
     for {
       coinRules <- scanConnection.getCoinRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
-      openRound = CoinUtil.selectLatestOpenMiningRound(now, openRounds)
+      openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
       configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
       openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))

@@ -43,8 +43,8 @@ one running with regular wall-clock time, and one running with a `simclock` that
 To use `canton-simtime` instead of `canton`, a test needs to use an appropriate environment definition such as (truncated):
 
 ```
-  override def environmentDefinition: CoinEnvironmentDefinition = {
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 ```
 
@@ -53,7 +53,7 @@ Time-based test classes typically mixin the [`TimeTestUtil`](/apps/app/src/test/
 Time in time-based tests flows in non-obvious ways:
 
 - *Ledger time* doesn't flow; it only advances when explicitly triggered via `advanceTime` or a similar method.
-- All other operations run normally; i.e.: communication, code execution and any periodic processes that are not triggered by ledger time (such as our [retry logic](/apps/common/src/main/scala/com/daml/network/environment/CoinRetries.scala)) still run in "real time".
+- All other operations run normally; i.e.: communication, code execution and any periodic processes that are not triggered by ledger time (such as our [retry logic](/apps/common/src/main/scala/com/daml/network/environment/RetryProvider.scala)) still run in "real time".
 - [`PollingTrigger`](/apps/common/src/main/scala/com/daml/network/automation/Trigger.scala)s are triggered by ledger time.
   On *each* advancement of simulation time, the status of *all* polling triggers is checked and triggers that are due are activated.
   Use the `advanceTimeByPollingInterval` method if you want to advance time by the minimal duration sufficient to cause polling-based triggers to be activated.
@@ -69,7 +69,7 @@ Solution: Add an invocation of `advanceTimeByPollingInterval` to the beginning o
 Starting up our [test topology](apps/app/src/test/resources/simple-topology.conf) is time-intensive.
 Whenever a test suite affords it (which should be most of the time),
 we therefore want to do this only once for the whole test suite.
-This is realized by defining test classes as `extends CoinIntegrationTestWithSharedEnvironment` / `extends FrontendIntegrationTestWithSharedEnvironment(...)`.
+This is realized by defining test classes as `extends CNNodeIntegrationTestWithSharedEnvironment` / `extends FrontendIntegrationTestWithSharedEnvironment(...)`.
 Use tests with a shared environment whenever it's possible!
 It prevents our CI waiting times from exploding.
 
@@ -77,7 +77,7 @@ When working in a test class that uses a shared environment, you must take a bit
 For example:
 Whenever you are registering new identifiers, such as CNS names, you must wrap them in a `perTestCaseName(...)` to avoid name collisions.
 Many ledger API user names are automatically wrapped in this way when you are using references like `aliceWallet`.
-Some aren't though - such as service users (for the SV and validator participants) that are allocated via a test's [environment definition](/apps/app/src/test/scala/com/daml/network/integration/CoinEnvironmentDefinition.scala).
+Some aren't though - such as service users (for the SV and validator participants) that are allocated via a test's [environment definition](/apps/app/src/test/scala/com/daml/network/integration/CNNodeEnvironmentDefinition.scala).
 
 ## When to run preflight checks
 

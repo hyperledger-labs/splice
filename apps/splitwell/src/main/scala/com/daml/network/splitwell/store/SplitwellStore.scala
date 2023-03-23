@@ -2,10 +2,10 @@ package com.daml.network.splitwell.store
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -15,7 +15,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SplitwellStore extends CoinAppStoreWithoutHistory {
+trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   import AcsStore.QueryResult
 
   def providerParty: PartyId
@@ -75,7 +75,7 @@ object SplitwellStore {
       domainConfig: SplitwellDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
   ): SplitwellStore =

@@ -2,11 +2,11 @@ package com.daml.network.integration.tests
 
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinIntegrationTestWithSharedEnvironment,
-  CoinTestCommon,
-  CoinTestConsoleEnvironment,
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestCommon,
+  CNNodeTestConsoleEnvironment,
 }
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
@@ -58,7 +58,7 @@ trait CustomMatchers {
 }
 
 abstract class FrontendIntegrationTest(override val frontendNames: String*)
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with FrontendTestCommon
     with BeforeAndAfterEach {
 
@@ -73,7 +73,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     env
   }
 
-  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
     // testFinished runs before afterEach and tears down all our apps.
     // Therefore, we stop the web browsers here so we don't get log warnings
     // because the frontends fail to connect to backends.
@@ -83,7 +83,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
 }
 
 abstract class FrontendIntegrationTestWithSharedEnvironment(override val frontendNames: String*)
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with FrontendTestCommon {
 
   override def beforeAll() = {
@@ -93,7 +93,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
     }
   }
 
-  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
     clearWebDrivers(provideEnvironment.executionContext)
     super.testFinished(env)
   }
@@ -105,7 +105,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
   }
 }
 
-trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatchers {
+trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMatchers {
 
   protected lazy val autostartWebDrivers: Boolean = true
 

@@ -26,7 +26,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Temporarily added a new release version in `CantonVersion.scala`
 * Added `class UnitCommand` for admin commands that do not take arguments
 * Adds some more utility methods to `PartyId`
-* Added `com.daml.network.integration.CoinEnvironmentDefinition` to `LogEntry.scala`
+* Added `com.daml.network.integration.CNNodeEnvironmentDefinition` to `LogEntry.scala`
 * Added `DecodeUtil.decodeArchivedExercise`
 * Support `readAs` in `commands.submit`, should be upstreamed
 * Added `internalErrorGrpc` to `ErrorUtil`

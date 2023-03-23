@@ -3,7 +3,7 @@ package com.daml.network.automation
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
-import com.daml.network.store.CoinAppStore
+import com.daml.network.store.CNNodeAppStore
 import com.daml.network.store.MultiDomainAcsStore.TransferId
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
@@ -15,7 +15,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.environment.{CoinLedgerConnection, LedgerClient}
+import com.daml.network.environment.{CNLedgerConnection, LedgerClient}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -24,8 +24,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TransferInTrigger(
     override protected val context: TriggerContext,
-    store: CoinAppStore[_, _],
-    connection: CoinLedgerConnection,
+    store: CNNodeAppStore[_, _],
+    connection: CNLedgerConnection,
     partyId: PartyId,
 )(implicit
     ec: ExecutionContext,

@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
 import com.daml.network.config.CNNodeConfigTransforms.updateAllWalletAppBackendConfigs_
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.FrontendLoginUtil
 import monocle.macros.syntax.lens.*
 
@@ -14,7 +14,7 @@ class WalletAuth0FrontendIntegrationTest
     with FrontendLoginUtil {
 
   override def environmentDefinition = {
-    CoinEnvironmentDefinition
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllWalletAppBackendConfigs_(walletConfig =>

@@ -3,8 +3,8 @@ package com.daml.network.automation
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.store.CoinAppStore
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.store.CNNodeAppStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -12,13 +12,13 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 
-abstract class CoinAppAutomationService(
+abstract class CNNodeAppAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    stores: Map[PartyId, CoinAppStore[?, ?]],
-    ledgerClient: CoinLedgerClient,
+    stores: Map[PartyId, CNNodeAppStore[?, ?]],
+    ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -30,7 +30,7 @@ abstract class CoinAppAutomationService(
   )
 
   private[this] def registerDomainAcs(
-      store: CoinAppStore[?, ?],
+      store: CNNodeAppStore[?, ?],
       domain: DomainId,
       perDomainTriggerContext: TriggerContext,
   ) = {
@@ -56,7 +56,7 @@ abstract class CoinAppAutomationService(
   }
 
   def newUpdateIngestionService(
-      store: CoinAppStore[?, ?],
+      store: CNNodeAppStore[?, ?],
       domain: DomainId,
       perDomainTriggerContext: TriggerContext,
   ) =

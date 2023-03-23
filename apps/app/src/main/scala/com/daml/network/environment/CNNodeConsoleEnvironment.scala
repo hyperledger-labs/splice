@@ -1,10 +1,10 @@
 package com.daml.network.environment
 
 import com.daml.network.console.{
-  CoinAppReference,
+  CNNodeAppReference,
   ConsoleHttpCommandRunner,
   DirectoryAppReference,
-  LocalCoinAppReference,
+  LocalCNNodeAppReference,
   LocalDirectoryAppReference,
   RemoteDirectoryAppReference,
   ScanAppBackendReference,
@@ -50,8 +50,8 @@ import com.digitalasset.canton.console.{
   StandardConsoleOutput,
 }
 
-class CoinConsoleEnvironment(
-    val environment: CoinEnvironmentImpl,
+class CNNodeConsoleEnvironment(
+    val environment: CNNodeEnvironmentImpl,
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
     protected val createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner =
       new ConsoleGrpcAdminCommandRunner(_),
@@ -73,15 +73,17 @@ class CoinConsoleEnvironment(
     environment.config.parameters.timeouts.console,
   )(this.tracer, templateDecoder)
 
-  override type Env = CoinEnvironmentImpl
+  override type Env = CNNodeEnvironmentImpl
   override type DomainLocalRef = CommunityLocalDomainReference
   override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
-  def mergeLocalCoinInstances(locals: Seq[LocalCoinAppReference]*): Seq[LocalCoinAppReference] =
+  def mergeLocalCNNodeInstances(
+      locals: Seq[LocalCNNodeAppReference]*
+  ): Seq[LocalCNNodeAppReference] =
     locals.flatten
 
-  def mergeRemoteCoinInstances(remotes: Seq[CoinAppReference]*): Seq[CoinAppReference] =
+  def mergeRemoteCNNodeInstances(remotes: Seq[CNNodeAppReference]*): Seq[CNNodeAppReference] =
     remotes.flatten
 
   override lazy val nodes = NodeReferences(
@@ -99,17 +101,17 @@ class CoinConsoleEnvironment(
   )
 
   lazy val coinNodes: NodeReferences[
-    CoinAppReference,
-    CoinAppReference,
-    LocalCoinAppReference,
+    CNNodeAppReference,
+    CNNodeAppReference,
+    LocalCNNodeAppReference,
   ] = {
     NodeReferences(
-      mergeLocalCoinInstances(
+      mergeLocalCNNodeInstances(
         appsHostedBySvc.local,
         appsHostedByValidator.local,
         appsHostedByThirdParty.local,
       ),
-      mergeRemoteCoinInstances(
+      mergeRemoteCNNodeInstances(
         appsHostedBySvc.remote,
         appsHostedByValidator.remote,
         appsHostedByThirdParty.remote,
@@ -119,14 +121,14 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalCoinInstances(
+    mergeLocalCNNodeInstances(
       svcOpt.toList,
       // SV5 is not hosted by the SVC
       svs.local.filter(sv => sv.name != "sv5"),
       scans.local,
       directories.local,
     ),
-    mergeRemoteCoinInstances(
+    mergeRemoteCNNodeInstances(
       remoteSvcOpt.toList,
       svs.remote.filter(sv => sv.name != "sv5"),
       scans.remote,
@@ -136,8 +138,8 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
-    mergeLocalCoinInstances(validators.local, wallets.local),
-    mergeRemoteCoinInstances(validators.remote, wallets.remote),
+    mergeLocalCNNodeInstances(validators.local, wallets.local),
+    mergeRemoteCNNodeInstances(validators.remote, wallets.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -178,14 +180,14 @@ class CoinConsoleEnvironment(
       .map(createRemoteSvcReference)
       .headOption
 
-  lazy val svs: NodeReferences[CoinAppReference, SvAppClientReference, SvAppBackendReference] =
+  lazy val svs: NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] =
     NodeReferences(
       environment.config.svsByString.keys.map(createSvBackendReference).toSeq,
       environment.config.svAppClients.toSeq.map(createSvAppClientReference),
     )
 
   lazy val wallets
-      : NodeReferences[CoinAppReference, WalletAppClientReference, WalletAppBackendReference] =
+      : NodeReferences[CNNodeAppReference, WalletAppClientReference, WalletAppBackendReference] =
     NodeReferences(
       environment.config.walletBackendsByString.keys.map(createWalletBackendReference).toSeq,
       environment.config.walletAppClients.toSeq.map(createWalletAppClientReference),

@@ -12,15 +12,15 @@ import scala.concurrent.duration.DurationInt
 /** @param clientConfig Connection parameters
   * @param authConfig Auth tokens used by the app
   */
-case class CoinLedgerApiClientConfig(
+case class CNLedgerApiClientConfig(
     clientConfig: ClientConfig,
     authConfig: AuthTokenSourceConfig,
 ) {
   // Note: Some places, e.g., Cantons RemoteParticipantConfig expects a static token,
-  // CoinLedgerApiClientConfig contains information for how to acquire tokens.
+  // CNLedgerApiClientConfig contains information for how to acquire tokens.
   // We need to perform some blocking IO to generate the token here.
   def getToken(): Option[String] = {
-    implicit val actorSystem = ActorSystem("CoinLedgerApiClientConfig")
+    implicit val actorSystem = ActorSystem("CNLedgerApiClientConfig")
     implicit val executionContext = actorSystem.dispatcher
     implicit val traceContext = TraceContext.empty
     val loggerFactory = NamedLoggerFactory.root

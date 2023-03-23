@@ -3,13 +3,13 @@ package com.daml.network.integration.tests
 import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTestWithSharedEnvironment,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
 }
-import CoinTests.BracketSynchronous.*
+import CNNodeTests.BracketSynchronous.*
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
@@ -21,15 +21,15 @@ import org.slf4j.event.Level
 import scala.util.Try
 
 class SplitwellUpgradeIntegrationTest
-    extends CoinIntegrationTestWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with SplitwellTestUtil
     with WalletTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {

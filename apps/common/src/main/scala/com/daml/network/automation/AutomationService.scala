@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference
 abstract class AutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
 ) extends HasHealth
     with FlagCloseableAsync
     with NamedLogging

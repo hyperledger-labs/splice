@@ -5,8 +5,8 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SplitwellApp(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
-    val coinAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -47,7 +47,7 @@ class SplitwellApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SplitwellApp.State](
+) extends CNNode[SplitwellApp.State](
       config.providerUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -58,7 +58,7 @@ class SplitwellApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   override def initialize(
-      ledgerClient: CoinLedgerClient,
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[SplitwellApp.State] = for {

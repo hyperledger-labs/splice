@@ -1,16 +1,16 @@
 package com.daml.network.scan.store.memory
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.InMemoryCoinAppStore
+import com.daml.network.store.InMemoryCNNodeAppStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.*
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import io.grpc.Status
 import com.digitalasset.canton.tracing.TraceContext
 import scala.collection.immutable.Map
@@ -23,11 +23,11 @@ class InMemoryScanStore(
     override protected[this] val domainConfig: ScanDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
-    override protected val connection: CoinLedgerConnection,
-    override protected val retryProvider: CoinRetries,
+    override protected val connection: CNLedgerConnection,
+    override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCoinAppStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
+) extends InMemoryCNNodeAppStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
     with ScanStore {
 
   override lazy val acsContractFilter = ScanStore.contractFilter(svcParty)

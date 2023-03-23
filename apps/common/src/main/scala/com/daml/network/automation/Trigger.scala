@@ -8,11 +8,11 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
-import com.daml.ledger.javaapi.data.{Template as CodegenTemplate}
+import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{InterfaceCompanion, ContractId, DamlRecord}
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, CoinAppStore, MultiDomainAcsStore}
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{AcsStore, CNNodeAppStore, MultiDomainAcsStore}
 import com.daml.network.util.{HasHealth, Contract}
 import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -36,7 +36,7 @@ case class TriggerContext(
     config: AutomationConfig,
     timeouts: ProcessingTimeout,
     clock: Clock,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
 )
 
@@ -293,7 +293,7 @@ object OnCreateTrigger {
   * This trigger assumes that the created contract is archived as part of processing it.
   */
 abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
-    store: CoinAppStore[_, _],
+    store: CNNodeAppStore[_, _],
     protected val getDomainId: () => Future[DomainId],
     companion: C,
 )(implicit
@@ -320,7 +320,7 @@ abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
 }
 
 abstract class OnReadyForTransferInTrigger(
-    store: CoinAppStore[_, _]
+    store: CNNodeAppStore[_, _]
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -364,7 +364,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
   private val pollingLoopRef = new AtomicReference[Option[Future[Done]]](None)
 
-  private val retryable = CoinRetries.RetryableError(
+  private val retryable = RetryProvider.RetryableError(
     "pollingTriggerTask",
     Seq.empty,
     "transient",

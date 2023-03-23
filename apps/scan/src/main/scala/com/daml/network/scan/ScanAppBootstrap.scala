@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -30,7 +30,7 @@ import scala.concurrent.Future
 class ScanAppBootstrap(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
-    val scanAppParameters: SharedCoinAppParameters,
+    val scanAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: ScanAppMetrics,
@@ -44,10 +44,10 @@ class ScanAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       ScanApp,
       ScanAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -86,7 +86,7 @@ object ScanAppBootstrap {
   def apply(
       name: String,
       scanConfig: ScanAppBackendConfig,
-      coinAppParameters: SharedCoinAppParameters,
+      coinAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       scanMetrics: ScanAppMetrics,
       testingConfigInternal: TestingConfigInternal,

@@ -5,12 +5,12 @@ import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svonboarding as so
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, CoinAppStoreWithoutHistory}
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
-import com.daml.network.util.{CoinUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -23,7 +23,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
-trait SvSvcStore extends CoinAppStoreWithoutHistory {
+trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def key: SvStore.Key
 
@@ -257,7 +257,7 @@ trait SvSvcStore extends CoinAppStoreWithoutHistory {
             .listContracts(
               companion,
               (e: Contract[Id, T]) =>
-                CoinUtil.coinExpiresAt(coin(e.payload)).number <= latest.payload.round.number - 2,
+                CNNodeUtil.coinExpiresAt(coin(e.payload)).number <= latest.payload.round.number - 2,
             )
         } yield allExpired.iterator.take(limit).toSeq
       }
@@ -271,7 +271,7 @@ object SvSvcStore {
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
-      retryProvider: CoinRetries,
+      retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): SvSvcStore =
     storage match {
       case _: MemoryStorage =>
@@ -326,7 +326,7 @@ object SvSvcStore {
 
     /** The time after which these can be advanced at assuming the given tick duration. */
     def readyToAdvanceAt: Instant = {
-      val middleTickDuration = CoinUtil.relTimeToDuration(
+      val middleTickDuration = CNNodeUtil.relTimeToDuration(
         middle.payload.tickDuration
       )
       Ordering[Instant].max(

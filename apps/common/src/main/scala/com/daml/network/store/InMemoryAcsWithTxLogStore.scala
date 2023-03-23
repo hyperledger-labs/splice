@@ -19,7 +19,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Tra
 import com.daml.network.util.{Contract, Trees}
 import com.daml.network.util.PrettyInstances.*
 import Contract.Companion.Template as TemplateCompanion
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -40,7 +40,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     contractFilter: AcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     futureSupervisor: FutureSupervisor,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
 
     // Boolean flag to enable very verbose state update logging
     logAllStateUpdates: Boolean = false,

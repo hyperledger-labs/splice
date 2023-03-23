@@ -1,6 +1,6 @@
 package com.daml.network.directory
 
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.topology.PartyId
 
 object DirectoryUtil {
@@ -9,8 +9,8 @@ object DirectoryUtil {
   def createDirectoryEntryCommandId(
       provider: PartyId,
       entryName: String,
-  ): CoinLedgerConnection.CommandId =
-    CoinLedgerConnection.CommandId(
+  ): CNLedgerConnection.CommandId =
+    CNLedgerConnection.CommandId(
       "com.daml.network.directory.createDirectoryEntry",
       Seq(provider),
       entryName,

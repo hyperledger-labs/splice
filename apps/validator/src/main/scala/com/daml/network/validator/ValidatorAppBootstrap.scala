@@ -5,9 +5,9 @@ import cats.data.EitherT
 import cats.implicits.*
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CoinNodeBootstrapBase}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.{CNNodeBootstrapBase}
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -31,7 +31,7 @@ import scala.concurrent.Future
 class ValidatorAppBootstrap(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
-    val validatorAppParameters: SharedCoinAppParameters,
+    val validatorAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: ValidatorAppMetrics,
@@ -45,10 +45,10 @@ class ValidatorAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       ValidatorApp,
       ValidatorAppBackendConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -87,7 +87,7 @@ object ValidatorAppBootstrap {
   def apply(
       name: String,
       validatorConfig: ValidatorAppBackendConfig,
-      validatorAppParameters: SharedCoinAppParameters,
+      validatorAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       validatorMetrics: ValidatorAppMetrics,
       testingConfigInternal: TestingConfigInternal,

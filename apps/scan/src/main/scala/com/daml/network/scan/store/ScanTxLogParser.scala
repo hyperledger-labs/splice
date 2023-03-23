@@ -5,7 +5,7 @@ import com.daml.network.store.TxLogStore
 import com.daml.network.history.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.CoinUtil.dollarsToCC
+import com.daml.network.util.CNNodeUtil.dollarsToCC
 
 import cats.Monoid
 import cats.syntax.foldable.*

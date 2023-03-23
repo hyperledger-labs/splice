@@ -3,7 +3,7 @@ package com.daml.network.sv.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -13,7 +13,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class SvConnection(
-    config: CoinHttpClientConfig,
+    config: CNHttpClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor)

@@ -5,9 +5,9 @@ import com.daml.network.config.CNNodeConfigTransforms.{
   setPollingInterval,
   updateAllWalletAppBackendConfigs_,
 }
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
-import com.daml.network.util.{CoinUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
+import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.SuppressionRule
@@ -23,7 +23,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Success
 
 class TimeBasedTreasuryIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with TimeTestUtil {
@@ -32,8 +32,8 @@ class TimeBasedTreasuryIntegrationTest
   // need a larger queue size so we can guarantee that it is still pretty full once we shutdown.
   private val queueSize = 80
 
-  override def environmentDefinition: CoinEnvironmentDefinition = {
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllWalletAppBackendConfigs_(walletConfig =>
@@ -207,7 +207,7 @@ class TimeBasedTreasuryIntegrationTest
         3,
         (99, 100),
         (9, 10),
-        exactly(CoinUtil.defaultHoldingFee.rate),
+        exactly(CNNodeUtil.defaultHoldingFee.rate),
       )
   }
 

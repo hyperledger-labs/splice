@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.tests.CoinTests.{CoinIntegrationTest, CoinTestCommon}
+import com.daml.network.integration.tests.CNNodeTests.{CNNodeIntegrationTest, CNNodeTestCommon}
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
 
 import scala.jdk.CollectionConverters.*
 
 // TODO(tech-debt): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil with CoinTestCommon {
+class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with CNNodeTestCommon {
 
   "restart cleanly" in { implicit env =>
     scan.stop()

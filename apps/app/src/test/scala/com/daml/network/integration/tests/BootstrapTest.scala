@@ -2,22 +2,22 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import com.daml.network.config.CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BootstrapTest extends CoinIntegrationTest with HasConsoleScriptRunner {
+class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       // we want a network in the same state that we would get when running `start-backends-for-local-frontend-testing.sh`
       .fromResource("simple-topology.conf", this.getClass.getSimpleName)
       .clearConfigTransforms()

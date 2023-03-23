@@ -3,7 +3,7 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.*
 class SvcPartyHostingTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

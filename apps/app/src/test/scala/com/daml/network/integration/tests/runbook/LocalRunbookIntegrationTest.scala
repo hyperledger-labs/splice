@@ -3,11 +3,11 @@ package com.daml.network.integration.tests.runbook
 import java.nio.file.Files
 import better.files.{File, *}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.config.ExpectedOnboardingConfig
 import com.daml.network.util.CantonProcessTestUtil
@@ -17,7 +17,7 @@ import monocle.macros.syntax.lens.*
 
 /** Runs through runbook but does so while spinning up a local SVC. */
 class LocalRunbookIntegrationTest
-    extends CoinIntegrationTest
+    extends CNNodeIntegrationTest
     with HasConsoleScriptRunner
     with CantonProcessTestUtil {
   import CantonProcessTestUtil.CantonProcess
@@ -112,7 +112,7 @@ class LocalRunbookIntegrationTest
     cantonProcess = Some(process)
   }
 
-  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
     super.testFinished(env)
     cantonProcess.foreach { p =>
       p.destroyAndWait()
@@ -120,8 +120,8 @@ class LocalRunbookIntegrationTest
   }
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
         // Config file for the self-hosted validator (original version from the runbook)

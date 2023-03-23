@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -26,7 +26,7 @@ class AcceptedTransferOfferTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     treasury: TreasuryService,
-    connection: CoinLedgerConnection,
+    connection: CNLedgerConnection,
     globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,

@@ -100,9 +100,9 @@ case class CNNodeConfig(
 
   override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
-  private lazy val validatorAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val validatorAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     validatorApps.fmap { validatorConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -121,12 +121,12 @@ case class CNNodeConfig(
 
   private[network] def validatorAppParameters(
       participant: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(validatorAppParameters_, "participant", participant)
 
   /** Use `validatorAppParameters`` instead!
     */
-  def tryValidatorAppParametersByString(name: String): SharedCoinAppParameters =
+  def tryValidatorAppParametersByString(name: String): SharedCNNodeAppParameters =
     validatorAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -146,9 +146,9 @@ case class CNNodeConfig(
   lazy val remoteSvcApps =
     svcAppClient.toList.map(config => remoteSvcAppInstanceName -> config).toMap
 
-  private lazy val svcAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val svcAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     svcApps.fmap { svcConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -167,12 +167,12 @@ case class CNNodeConfig(
 
   private[network] def svcAppParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(svcAppParameters_, "svc-app", appName)
 
   /** Use `svcAppParameters` instead!
     */
-  def trySvcAppParametersByString(name: String): SharedCoinAppParameters =
+  def trySvcAppParametersByString(name: String): SharedCNNodeAppParameters =
     svcAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -183,9 +183,9 @@ case class CNNodeConfig(
     n.unwrap -> c
   }
 
-  private lazy val svAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val svAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     svApps.fmap { svConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -204,12 +204,12 @@ case class CNNodeConfig(
 
   private[network] def svAppParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(svAppParameters_, "sv-app-backend", appName)
 
   /** Use `svAppParameters` instead!
     */
-  def trySvAppParametersByString(name: String): SharedCoinAppParameters =
+  def trySvAppParametersByString(name: String): SharedCNNodeAppParameters =
     svAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -226,9 +226,9 @@ case class CNNodeConfig(
   private lazy val scanApps =
     scanApp.toList.map(config => InstanceName.tryCreate(scanAppName) -> config).toMap
 
-  private lazy val scanAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val scanAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     scanApps.fmap { scanConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -247,12 +247,12 @@ case class CNNodeConfig(
 
   private[network] def scanAppParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(scanAppParameters_, scanAppName, appName)
 
   /** Use `scanAppParameters` instead!
     */
-  def tryScanAppParametersByString(name: String): SharedCoinAppParameters =
+  def tryScanAppParametersByString(name: String): SharedCNNodeAppParameters =
     scanAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -263,9 +263,9 @@ case class CNNodeConfig(
     n.unwrap -> c
   }
 
-  private lazy val walletAppBackendParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val walletAppBackendParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     walletAppBackends.fmap { walletConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -284,12 +284,12 @@ case class CNNodeConfig(
 
   private[network] def walletAppBackendParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(walletAppBackendParameters_, "wallet-app-backend", appName)
 
   /** Use `WalletAppBackendParameters` instead!
     */
-  def tryWalletAppBackendParametersByString(name: String): SharedCoinAppParameters =
+  def tryWalletAppBackendParametersByString(name: String): SharedCNNodeAppParameters =
     walletAppBackendParameters(
       InstanceName.tryCreate(name)
     )
@@ -307,9 +307,9 @@ case class CNNodeConfig(
   private lazy val directoryApps =
     directoryApp.toList.map(config => directoryAppInstanceName -> config).toMap
 
-  private lazy val directoryAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val directoryAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     directoryApps.fmap { directoryConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -328,12 +328,12 @@ case class CNNodeConfig(
 
   private[network] def directoryAppParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(directoryAppParameters_, "directory-app", appName)
 
   /** Use `directoryAppParameters` instead!
     */
-  def tryDirectoryAppParametersByString(name: String): SharedCoinAppParameters =
+  def tryDirectoryAppParametersByString(name: String): SharedCNNodeAppParameters =
     directoryAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -350,9 +350,9 @@ case class CNNodeConfig(
       n.unwrap -> c
     }
 
-  private lazy val splitwellAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+  private lazy val splitwellAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     splitwellApps.fmap { splitwellConfig =>
-      SharedCoinAppParameters(
+      SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -371,12 +371,12 @@ case class CNNodeConfig(
 
   private[network] def splitwellAppParameters(
       appName: InstanceName
-  ): SharedCoinAppParameters =
+  ): SharedCNNodeAppParameters =
     nodeParametersFor(splitwellAppParameters_, "splitwell-app", appName)
 
   /** Use `splitwellAppParameters` instead!
     */
-  def trySplitwellAppParametersByString(name: String): SharedCoinAppParameters =
+  def trySplitwellAppParametersByString(name: String): SharedCNNodeAppParameters =
     splitwellAppParameters(
       InstanceName.tryCreate(name)
     )
@@ -454,12 +454,12 @@ object CNNodeConfig {
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
-    implicit val coinHttpClientConfigReader: ConfigReader[CoinHttpClientConfig] =
-      deriveReader[CoinHttpClientConfig]
-    implicit val coinLedgerApiClientConfigReader: ConfigReader[CoinLedgerApiClientConfig] =
-      deriveReader[CoinLedgerApiClientConfig]
-    implicit val coinRemoteParticipantConfigReader: ConfigReader[CoinRemoteParticipantConfig] =
-      deriveReader[CoinRemoteParticipantConfig]
+    implicit val cnNodeHttpClientConfigReader: ConfigReader[CNHttpClientConfig] =
+      deriveReader[CNHttpClientConfig]
+    implicit val cnNodeLedgerApiClientConfigReader: ConfigReader[CNLedgerApiClientConfig] =
+      deriveReader[CNLedgerApiClientConfig]
+    implicit val cnNodeRemoteParticipantConfigReader: ConfigReader[CNRemoteParticipantConfig] =
+      deriveReader[CNRemoteParticipantConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
@@ -492,8 +492,8 @@ object CNNodeConfig {
     implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
       deriveReader[LocalSvAppConfig]
 
-    implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
-      deriveReader[SharedCoinAppParameters]
+    implicit val cnNodeAppParametersReader: ConfigReader[SharedCNNodeAppParameters] =
+      deriveReader[SharedCNNodeAppParameters]
     implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
       deriveReader[ValidatorOnboardingConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
@@ -567,12 +567,12 @@ object CNNodeConfig {
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
-    implicit val coinHttpClientConfigWriter: ConfigWriter[CoinHttpClientConfig] =
-      deriveWriter[CoinHttpClientConfig]
-    implicit val coinLedgerApiClientConfigWriter: ConfigWriter[CoinLedgerApiClientConfig] =
-      deriveWriter[CoinLedgerApiClientConfig]
-    implicit val coinRemoteParticipantConfigWriter: ConfigWriter[CoinRemoteParticipantConfig] =
-      deriveWriter[CoinRemoteParticipantConfig]
+    implicit val cnNodeHttpClientConfigWriter: ConfigWriter[CNHttpClientConfig] =
+      deriveWriter[CNHttpClientConfig]
+    implicit val cnNodeLedgerApiClientConfigWriter: ConfigWriter[CNLedgerApiClientConfig] =
+      deriveWriter[CNLedgerApiClientConfig]
+    implicit val cnNodeRemoteParticipantConfigWriter: ConfigWriter[CNRemoteParticipantConfig] =
+      deriveWriter[CNRemoteParticipantConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
     implicit val remoteScanConfigWriter: ConfigWriter[ScanAppClientConfig] =
@@ -605,8 +605,8 @@ object CNNodeConfig {
     implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
       deriveWriter[LocalSvAppConfig]
 
-    implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
-      deriveWriter[SharedCoinAppParameters]
+    implicit val cnNodeAppParametersWriter: ConfigWriter[SharedCNNodeAppParameters] =
+      deriveWriter[SharedCNNodeAppParameters]
     implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
       deriveWriter[ValidatorDomainConfig]
     implicit val validatorOnboardingConfigWriter: ConfigWriter[ValidatorOnboardingConfig] =

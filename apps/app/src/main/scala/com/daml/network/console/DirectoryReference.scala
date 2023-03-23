@@ -2,10 +2,10 @@ package com.daml.network.console
 
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
-import com.daml.network.config.CoinHttpClientConfig
+import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
-import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -17,9 +17,9 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 abstract class DirectoryAppReference(
-    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends HttpCoinAppReference {
+) extends HttpCNNodeAppReference {
 
   @Help.Summary("List directory entries")
   @Help.Description(
@@ -60,10 +60,10 @@ abstract class DirectoryAppReference(
   * app reference.
   */
 class LocalDirectoryAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
 ) extends DirectoryAppReference(consoleEnvironment, name)
-    with LocalCoinAppReference
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Directory"
@@ -72,7 +72,7 @@ class LocalDirectoryAppReference(
   def config: LocalDirectoryAppConfig =
     consoleEnvironment.environment.config.directoriesByString(name)
 
-  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
@@ -84,7 +84,7 @@ class LocalDirectoryAppReference(
 
   /** Remote participant this directory app is configured to interact with. */
   lazy val remoteParticipant =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -92,7 +92,7 @@ class LocalDirectoryAppReference(
 
   /** Remote participant this directory app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
-    new CoinRemoteParticipantReference(
+    new CNRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
@@ -100,7 +100,7 @@ class LocalDirectoryAppReference(
 }
 
 class RemoteDirectoryAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: RemoteDirectoryAppConfig, // adding this explicitly for easier overriding
 ) extends DirectoryAppReference(consoleEnvironment, name)

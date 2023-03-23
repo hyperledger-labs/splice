@@ -1,7 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.SvApp
@@ -28,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     globalDomain: DomainId,
     svUserName: String,
     svStore: SvSvStore,
@@ -36,7 +36,7 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -285,7 +285,7 @@ class HttpSvHandler(
                   actAs = Seq(svParty),
                   readAs = Seq(svcParty),
                   commands = cmd.commands.asScala.toSeq,
-                  commandId = CoinLedgerConnection.CommandId(
+                  commandId = CNLedgerConnection.CommandId(
                     "com.daml.network.sv.startSvOnboarding",
                     Seq(svParty),
                     s"$token",

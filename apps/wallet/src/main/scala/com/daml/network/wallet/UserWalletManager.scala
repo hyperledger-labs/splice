@@ -5,7 +5,7 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{HasHealth, Contract}
 import com.daml.network.wallet.config.TreasuryConfig
@@ -30,7 +30,7 @@ import com.digitalasset.canton.lifecycle.RunOnShutdown
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: CNLedgerClient,
     val globalDomain: DomainAlias,
     private[wallet] val participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
@@ -38,7 +38,7 @@ class UserWalletManager(
     clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
-    retryProvider: CoinRetries,
+    retryProvider: RetryProvider,
     scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
@@ -50,12 +50,12 @@ class UserWalletManager(
 
   // map from end user name to end-user treasury service
   private[this] val endUserWalletsMap
-      : scala.collection.concurrent.Map[String, (CoinRetries, UserWalletService)] =
+      : scala.collection.concurrent.Map[String, (RetryProvider, UserWalletService)] =
     TrieMap.empty
 
   retryProvider.runOnShutdown(new RunOnShutdown {
     override def name = s"shutdown per-user retry providers"
-    // this is not perfectly precise, but CoinRetries.close is idempotent
+    // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
     override def run() =
       endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
@@ -70,7 +70,7 @@ class UserWalletManager(
   final def lookupUserWallet(endUserName: String): Option[UserWalletService] =
     endUserWalletsMap.get(endUserName).map(_._2)
 
-  final def endUserWallets: Iterable[(CoinRetries, UserWalletService)] = endUserWalletsMap.values
+  final def endUserWallets: Iterable[(RetryProvider, UserWalletService)] = endUserWalletsMap.values
 
   final def listUsers: Seq[String] = endUserWallets.map(_._2.store.key.endUserName).toSeq
 
@@ -98,7 +98,7 @@ class UserWalletManager(
         )
       // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
       // without the entire node going down.
-      val userRetryProvider = CoinRetries(loggerFactory, retryProvider.timeouts)
+      val userRetryProvider = RetryProvider(loggerFactory, retryProvider.timeouts)
       val walletService = new UserWalletService(
         ledgerClient,
         globalDomain,

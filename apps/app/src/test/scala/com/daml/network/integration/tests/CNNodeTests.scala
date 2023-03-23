@@ -12,10 +12,10 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
-import com.daml.network.util.CoinUtil.defaultCoinConfig
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
+import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -26,22 +26,22 @@ import scala.language.implicitConversions
 import java.time.Duration
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
 import org.scalatest.matchers.Matcher
 
 /** Analogue to Canton's CommunityTests */
-object CoinTests {
-  type CoinTestConsoleEnvironment = TestConsoleEnvironment[CoinEnvironmentImpl]
-  type SharedCoinEnvironment =
-    SharedEnvironment[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
-  type IsolatedCoinEnvironments =
-    IsolatedEnvironments[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
+object CNNodeTests {
+  type CNNodeTestConsoleEnvironment = TestConsoleEnvironment[CNNodeEnvironmentImpl]
+  type SharedCNNodeEnvironment =
+    SharedEnvironment[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+  type IsolatedCNNodeEnvironments =
+    IsolatedEnvironments[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
 
-  trait CoinIntegrationTest
-      extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
-      with IsolatedCoinEnvironments
-      with CoinTestCommon
+  trait CNNodeIntegrationTest
+      extends BaseIntegrationTest[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+      with IsolatedCNNodeEnvironments
+      with CNNodeTestCommon
       with LedgerApiExtensions {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -49,22 +49,22 @@ object CoinTests {
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     override def environmentDefinition
-        : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-      CoinEnvironmentDefinition
+        : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+      CNNodeEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
 
-    protected def initSvc()(implicit env: CoinTestConsoleEnvironment): Unit = {
+    protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
       env.appsHostedBySvc.local.foreach(_.start())
       env.appsHostedBySvc.local.foreach(_.waitForInitialization())
     }
 
   }
 
-  trait CoinIntegrationTestWithSharedEnvironment
-      extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
-      with SharedCoinEnvironment
+  trait CNNodeIntegrationTestWithSharedEnvironment
+      extends BaseIntegrationTest[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
+      with SharedCNNodeEnvironment
       with BeforeAndAfterEach
-      with CoinTestCommon
+      with CNNodeTestCommon
       with LedgerApiExtensions {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -72,8 +72,8 @@ object CoinTests {
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     override def environmentDefinition
-        : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-      CoinEnvironmentDefinition
+        : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+      CNNodeEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
 
     // We append this to configured Daml user names for isolation across test cases.
@@ -87,24 +87,24 @@ object CoinTests {
       super.beforeEach()
     }
 
-    override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+    override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
       testCaseId += 1
       super.testFinished(env)
     }
 
     // make `aliceWallet` etc. use updated usernames
     override def uwc(name: String)(implicit
-        env: CoinTestConsoleEnvironment
+        env: CNNodeTestConsoleEnvironment
     ): WalletAppClientReference = extendLedgerApiUserWithCaseId(super.wc(name))
 
     // make `aliceDirectory` etc. use updated usernames
     override def rdp(name: String)(implicit
-        env: CoinTestConsoleEnvironment
+        env: CNNodeTestConsoleEnvironment
     ): RemoteDirectoryAppReference = extendLedgerApiUserWithCaseId(super.rdp(name))
 
     // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
-        env: CoinTestConsoleEnvironment
+        env: CNNodeTestConsoleEnvironment
     ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
 
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
@@ -114,7 +114,7 @@ object CoinTests {
     ): WalletAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       new WalletAppClientReference(
-        ref.coinConsoleEnvironment,
+        ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser),
       )
@@ -127,7 +127,7 @@ object CoinTests {
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
       new RemoteDirectoryAppReference(
-        ref.coinConsoleEnvironment,
+        ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
       )
@@ -143,7 +143,7 @@ object CoinTests {
         )
       val newRemoteParticipant = ref.config.remoteParticipant.copy(ledgerApi = newLedgerApiConfig)
       new SplitwellAppClientReference(
-        ref.coinConsoleEnvironment,
+        ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config
           .copy(ledgerApiUser = newLedgerApiUser, remoteParticipant = newRemoteParticipant),
@@ -168,9 +168,9 @@ object CoinTests {
     }
   }
 
-  trait CoinTestCommon
+  trait CNNodeTestCommon
       extends BaseTest
-      with CommonCoinAppInstanceReferences
+      with CommonCNNodeAppInstanceReferences
       with LedgerApiExtensions {
 
     lazy val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
@@ -178,7 +178,7 @@ object CoinTests {
     protected def mkCoinConfig(
         tickDuration: NonNegativeFiniteDuration = defaultTickDuration,
         maxNumInputs: Int = 100,
-        holdingFee: BigDecimal = CoinUtil.defaultHoldingFee.rate,
+        holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
     ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
       defaultCoinConfig(
         tickDuration,

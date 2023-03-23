@@ -3,9 +3,9 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
-import com.daml.network.CoinNodeMetrics
+import com.daml.network.CNNodeMetrics
 import com.daml.network.admin.grpc.GrpcVersionService
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
 import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -33,13 +33,13 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
 
-object CoinNodeBootstrap {
+object CNNodeBootstrap {
   type HealthDumpFunction = () => Future[File]
 }
 
 /** Modelled after CantonNodeBootstrap
   */
-trait CoinNodeBootstrap[+Node <: CantonNode]
+trait CNNodeBootstrap[+Node <: CantonNode]
     extends CantonNodeBootstrap[Node] // TODO(#736): remove the dependency on this trait.
     {
 
@@ -74,7 +74,7 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
   * - removed all topology commands
   * - removed all crypto key generation
   */
-abstract class CoinNodeBootstrapBase[
+abstract class CNNodeBootstrapBase[
     T <: CantonNode,
     NodeConfig <: LocalNodeConfig,
     ParameterConfig <: CantonNodeParameters,
@@ -83,7 +83,7 @@ abstract class CoinNodeBootstrapBase[
     config: NodeConfig,
     parameterConfig: ParameterConfig,
     val clock: Clock,
-    nodeMetrics: CoinNodeMetrics,
+    nodeMetrics: CNNodeMetrics,
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
@@ -92,7 +92,7 @@ abstract class CoinNodeBootstrapBase[
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
     implicit val scheduler: ScheduledExecutorService,
     implicit val actorSystem: ActorSystem,
-) extends CoinNodeBootstrap[T]
+) extends CNNodeBootstrap[T]
     with HasCloseContext
     with NoTracing {
 

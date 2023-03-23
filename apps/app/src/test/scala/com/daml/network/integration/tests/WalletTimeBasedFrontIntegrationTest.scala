@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{
   FrontendLoginUtil,
   TimeTestUtil,
@@ -17,8 +17,8 @@ class WalletTimeBasedFrontIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: CoinEnvironmentDefinition =
-    CoinEnvironmentDefinition
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
+    CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 
   "A wallet UI" should {

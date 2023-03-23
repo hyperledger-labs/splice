@@ -4,11 +4,11 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
-import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -29,7 +29,7 @@ import scala.concurrent.Future
 class DirectoryAppBootstrap(
     override val name: InstanceName,
     val config: LocalDirectoryAppConfig,
-    val directoryAppParameters: SharedCoinAppParameters,
+    val directoryAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: DirectoryAppMetrics,
@@ -43,10 +43,10 @@ class DirectoryAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CoinNodeBootstrapBase[
+) extends CNNodeBootstrapBase[
       DirectoryApp,
       LocalDirectoryAppConfig,
-      SharedCoinAppParameters,
+      SharedCNNodeAppParameters,
     ](
       name,
       config,
@@ -85,7 +85,7 @@ object DirectoryAppBootstrap {
   def apply(
       name: String,
       directoryConfig: LocalDirectoryAppConfig,
-      coinAppParameters: SharedCoinAppParameters,
+      coinAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       directoryMetrics: DirectoryAppMetrics,
       testingConfigInternal: TestingConfigInternal,
