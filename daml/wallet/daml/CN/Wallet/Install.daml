@@ -79,7 +79,6 @@ mkMergeCoinAndRewardsTransfer endUserP inputs = do
         provider = endUserP
         inputs = inputs
         outputs = []
-        payload = "mergeCoinsAndRewards"
   transfer
 
 -- Enum of the possible ways coins can be manipulated through the wallet.

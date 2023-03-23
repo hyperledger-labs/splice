@@ -43,7 +43,6 @@ testTransferExceedsMaxInputs = do
           provider = alice.primaryParty
           inputs = inputCoins
           outputs = []
-          payload = "test"
         context = context
         expectedError = "More than the maximum number of inputs"
     return ()
@@ -63,7 +62,6 @@ testTransferExceedsMaxOutputs = do
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId coin]
           outputs = outputCoins
-          payload = "test"
         context = context
         expectedError = "More than the maximum number of outputs"
     return ()
@@ -97,26 +95,6 @@ testTransferExceedsMaxLockHolders = do
                 expiresAt = now `addRelTime` (minutes 1)
               receiverFeeRatio = 0.0
           ]
-        payload = "test"
       context = context
       expectedError = "Fewer than the allowed number of lock holders"
-    return ()
-
-testTransferExceedsMaxPayloadLength: Script ()
-testTransferExceedsMaxPayloadLength = do
-    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-    coin <- tap app alice 100.0
-    context <- getPaymentTransferContext app alice
-    let payloadOfLength33 = "testing123testing123testing123456"
-    -- Payload length is above limit
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
-      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
-        transfer = API.Transfer with
-          sender = alice.primaryParty
-          provider = alice.primaryParty
-          inputs = [API.InputCoin $ toInterfaceContractId coin]
-          outputs = [ API.TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0 ]
-          payload = payloadOfLength33
-        context = context
-        expectedError = "Payload length is above limit"
     return ()

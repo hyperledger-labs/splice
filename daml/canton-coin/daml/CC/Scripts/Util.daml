@@ -283,22 +283,21 @@ queryCoinRulesByKey svc = do
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
 -- The left-over amount is kept.
-pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
-pay app sender recipient coinAmount msg = do
-  payWithTransferFeeRatio app sender recipient coinAmount 0.0 msg
+pay : CCApp -> CCUser -> Party -> Decimal -> Script ()
+pay app sender recipient coinAmount = do
+  payWithTransferFeeRatio app sender recipient coinAmount 0.0
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
 -- The left-over amount is kept.
-payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text -> Script ()
-payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = do
+payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Script ()
+payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   coins <- getCoinInputs sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
-        payload = msg
         inputs = coins
         outputs =
           [  API.TransferOutput with
@@ -316,8 +315,8 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio msg = d
 -- | Locks a coin of the given amount to the given lock holder
 -- for the given time starting at the current time
 -- It gathers all coints of the sender as input coins.
-lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
-lockTo1 app sender lockHolder coinAmount lockDuration msg = do
+lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script ()
+lockTo1 app sender lockHolder coinAmount lockDuration = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
@@ -325,7 +324,6 @@ lockTo1 app sender lockHolder coinAmount lockDuration msg = do
   let transfer = API.Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
-        payload = msg
         inputs = coins
         outputs =
           [ API.TransferOutput with
@@ -376,7 +374,6 @@ runCoinDepositBots app = do
     let transfer = API.Transfer with
           sender = user
           provider = user
-          payload = "merge all my coins"
           inputs =
               map (API.InputAppRewardCoupon . toInterfaceContractId . fst) appRewardCoupons ++
               map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++

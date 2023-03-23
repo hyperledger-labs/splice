@@ -64,7 +64,6 @@ testUsageFees = do
                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
 
                 ]
-      payload = "test"
     context = context.context
 
   let config = scaleFees 1.0 defaultTransferConfig
@@ -137,7 +136,6 @@ testCoinUsedInRoundBeforeItsCreation = do
                       amount = 10.0
                       lock = None
                       receiverFeeRatio = 0.4 ]
-        payload = "test"
       context = contextWithRound1.context
 
   -- Input amount is exactly 100.0.
@@ -219,6 +217,5 @@ transfer coinRulesCid transferContext svc sender receiver coinCid amount = do
                       amount
                       lock = None
                       receiverFeeRatio = 1.0]
-        payload = "test"
       context = transferContext
 

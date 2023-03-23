@@ -129,7 +129,6 @@ testScaledHoldingFees = do
                       amount = 10.0
                       lock = None
                       receiverFeeRatio = 1.0]
-        payload = "test"
       context = context.context
 
   -- Actual holding fee should be based on the coin price when the coin was created, not the current one

@@ -1,9 +1,9 @@
 import {
-  useInterval,
   Contract,
   DirectoryEntry as DirectoryEntryComponent,
-  useUserState,
   DirectoryField,
+  useInterval,
+  useUserState,
 } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
@@ -259,7 +259,6 @@ const TransferOffers: React.FC = () => {
             <TableCell>Sender</TableCell>
             <TableCell>Receiver</TableCell>
             <TableCell>Amount</TableCell>
-            <TableCell>Description</TableCell>
             <TableCell>Expiration</TableCell>
           </TableRow>
         </TableHead>
@@ -275,7 +274,6 @@ const TransferOffers: React.FC = () => {
               <TableCell>
                 <PaymentAmountDisplay amount={c.payload.amount} />
               </TableCell>
-              <TableCell>{c.payload.description}</TableCell>
               <TableCell>
                 <Timestamp time={c.payload.expiresAt} />
               </TableCell>

@@ -236,7 +236,6 @@ getLockedCoinCmd app owner lockHolder amount lockDuration = do
   let transfer = API.Transfer with
         sender = owner.primaryParty
         provider = owner.primaryParty
-        payload = "lock"
         inputs = map (API.InputCoin . toInterfaceContractId) [coin]
         outputs =
           [ API.TransferOutput with

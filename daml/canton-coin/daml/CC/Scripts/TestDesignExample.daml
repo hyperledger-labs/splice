@@ -43,7 +43,6 @@ template Escrow
          let transfer = API.Transfer with
                sender = p
                provider = arbiter
-               payload = "refresh"
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
                  [ API.TransferOutput with
@@ -88,7 +87,7 @@ test = do
   (_, c0) <- getLatestOpenRound app
 
   let lockedCoinAmount = 1000.25
-  lockTo1 app alice arbiter.primaryParty lockedCoinAmount (days 90) "lock"
+  lockTo1 app alice arbiter.primaryParty lockedCoinAmount (days 90)
 
   -- check rewards that are issued for the locking tx
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 2)
@@ -106,7 +105,7 @@ test = do
   (_, c1) <- getLatestOpenRound app
 
   let refreshCoinAmount = 5.0
-  pay app alice alice.primaryParty refreshCoinAmount "split"
+  pay app alice alice.primaryParty refreshCoinAmount
   -- check reward issued by this payment
   [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 40002)
   appRewardCoupon === AppRewardCoupon with
@@ -202,7 +201,7 @@ test = do
   -- check that the 'arbiter' does not receive featured app rewards when he's the provider
   runNextIssuance app
   let reimbursementAmount = 0.5
-  pay app arbiter alice.primaryParty reimbursementAmount "reimbursement"
+  pay app arbiter alice.primaryParty reimbursementAmount
 
   [(_, appReward)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50003)
   appReward === AppRewardCoupon with

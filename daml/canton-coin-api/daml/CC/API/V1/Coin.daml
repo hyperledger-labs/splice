@@ -186,7 +186,6 @@ data Transfer = Transfer with
     provider : Party
     inputs : [TransferInput]
     outputs : [TransferOutput]
-    payload : Text
   deriving (Eq, Ord, Show)
 
 -- | An individual output for a batch transfer.

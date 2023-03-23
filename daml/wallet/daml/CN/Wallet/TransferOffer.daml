@@ -44,7 +44,6 @@ template AcceptedTransferOffer
     sender : Party
     receiver : Party
     svc : Party
-    description : Text
     amount : PaymentAmount
     expiresAt : Time
   where
@@ -75,7 +74,6 @@ template AcceptedTransferOffer
                   lock = None
                   receiverFeeRatio = 0.0
               ]
-            payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
         archive self
         pure (result, result.senderChangeCoin)

@@ -43,11 +43,6 @@ defaultTransferConfig = TransferConfig with
     -- Chosen conservatively, but high enough to invite thinking about what's possible.
     maxNumLockHolders = 10
 
-    -- Fits a hex-encoded SHA-256 or a UUID
-    --
-    -- TODO(M3-90): charge per character
-    maxPayloadLength = 32
-
 -- | Default proposal for issuance curve and tickDuration
 defaultCoinConfig : CoinConfig USD
 defaultCoinConfig = CoinConfig with

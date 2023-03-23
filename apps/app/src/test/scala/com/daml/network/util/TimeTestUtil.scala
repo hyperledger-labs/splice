@@ -143,7 +143,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
                       ).toJava,
                     )
                   ).asJava,
-                  "lock coins",
                 ),
                 new v1.coin.TransferContext(
                   transferContext.openMiningRound,

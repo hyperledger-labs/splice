@@ -117,7 +117,6 @@ template AppPaymentRequest
                       expiresAt = expiresAt
                     receiverFeeRatio = 0.0
                 ]
-              payload = "lock payment"
          result <- exercisePaymentTransfer context transfer
          let [TransferResultLockedCoin lockedCoin] = result.createdCoins
          let round = result.round
@@ -183,7 +182,6 @@ template AcceptedAppPayment
               provider
               inputs = [InputCoin coin]
               outputs = map mkReceiverOutput ccReceiverAmounts
-              payload = "transfer locked payment"
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let coins = map (\(TransferResultCoin coinCid) -> coinCid) result.createdCoins

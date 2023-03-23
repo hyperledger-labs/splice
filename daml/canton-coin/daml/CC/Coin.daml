@@ -15,7 +15,6 @@ import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Set (Set)
 import qualified DA.Set as Set
-import qualified DA.Text
 import DA.Traversable (forA)
 import DA.Time
 
@@ -584,7 +583,6 @@ checkTransferConstraints: API.Transfer -> API.TransferSummary -> TransferConfig 
 checkTransferConstraints transfer summary transferConfigCC
     | length transfer.inputs > transferConfigCC.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
     | length transfer.outputs > transferConfigCC.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
-    | DA.Text.length transfer.payload > transferConfigCC.maxPayloadLength = Left $ ITR_Other $ "Payload length is above limit"
     | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
     | otherwise = Right ()
 
@@ -871,7 +869,6 @@ scaleFees s c = TransferConfig with
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
-    maxPayloadLength = c.maxPayloadLength
 
 transferConfigCCFromOpenRound : OpenMiningRound -> TransferConfig CC
 transferConfigCCFromOpenRound openRound = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd

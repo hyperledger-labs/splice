@@ -29,7 +29,7 @@ testCoinBurn = do
   runCoinDepositBots app
 
   -- user pays provider 1
-  pay app user provider1.primaryParty 5.0 "otc"
+  pay app user provider1.primaryParty 5.0
   runCoinDepositBots app
 
   advanceToIssuanceWithPrice app 1.2

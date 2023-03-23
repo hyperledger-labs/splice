@@ -29,7 +29,6 @@ data TransferConfig currency = TransferConfig with
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
-    maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
   deriving (Eq, Show)
 
 -- Check constraints on config params on which the implementation of the choices relies

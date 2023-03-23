@@ -27,10 +27,10 @@ test = do
   recordValidatorOf app user2.primaryParty validator2
 
   -- user1 transfers 0.01 coins to user2
-  mapA_ (\i -> do
+  mapA_ (\_ -> do
     runNextIssuance app
     runCoinDepositBots app
-    pay app user1 user2.primaryParty 0.01 ("pay in round " <> show i)
+    pay app user1 user2.primaryParty 0.01
     ) [1,2,3,4,5]
 
 

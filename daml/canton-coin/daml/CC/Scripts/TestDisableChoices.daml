@@ -56,7 +56,7 @@ testAppRewardCoupon = do
   bob <- setupUser app "bob" app.svc
 
   _ <- tap app alice 10.0
-  payWithTransferFeeRatio app alice bob.primaryParty 5.0 1.0 ""
+  payWithTransferFeeRatio app alice bob.primaryParty 5.0 1.0
   [_] <- query @AppRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
@@ -70,7 +70,7 @@ testValidatorRewardCoupon = do
   alice <- setupUser app "alice" validator
 
   _ <- tap app alice 10.0
-  pay app alice alice.primaryParty 5.0 ""
+  pay app alice alice.primaryParty 5.0
   [(cid, _)] <- query @ValidatorRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
@@ -103,7 +103,6 @@ testCoinRules = do
           provider = alice.primaryParty
           inputs = [API.InputCoin $ toInterfaceContractId @API.Coin coin]
           outputs = []
-          payload = "test"
         context = API.TransferContext with
           openMiningRound = toInterfaceContractId @API.OpenMiningRound round
           issuingMiningRounds = Map.empty
@@ -143,6 +142,6 @@ getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Contra
 getLockedCoin app owner lockHolder amount lockDuration =  do
 -- tap amount + 1 to account for fees
   _ <- tap app owner (amount + 1.0)
-  lockTo1 app owner lockHolder amount lockDuration "locktest"
+  lockTo1 app owner lockHolder amount lockDuration
   [(cid, _)] <- query @LockedCoin lockHolder
   pure cid

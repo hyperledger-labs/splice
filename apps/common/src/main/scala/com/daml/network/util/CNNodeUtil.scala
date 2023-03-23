@@ -203,9 +203,6 @@ object CNNodeUtil {
     // Maximum number of lock holders.
     // Chosen conservatively, but high enough to invite thinking about what's possible.
     50,
-
-    // Fits a hex-encoded SHA-256 or a UUID
-    32,
     // 2.5 min default duration
   )
 
