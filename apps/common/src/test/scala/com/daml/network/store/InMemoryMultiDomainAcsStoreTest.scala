@@ -2,9 +2,13 @@ package com.daml.network.store
 
 import akka.actor.ActorSystem
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.TreeEvent
+import com.daml.ledger.javaapi.data.{ContractMetadata, TreeEvent}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
+import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
+import com.daml.network.codegen.java.cn.splitwell.*
+import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransferEvent,
   TransferUpdate,
@@ -13,13 +17,17 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
 import com.daml.network.util.Contract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.topology.DomainId
+import com.google.protobuf
 import java.util.concurrent.atomic.AtomicReference
+
+import scala.jdk.CollectionConverters.*
 
 class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryMultiDomainAcsStoreTest")
 
   import MultiDomainAcsStore.*
+  import AcsStore.InterfaceImplementation
 
   private var offsetCounter = 0
 
@@ -41,8 +49,33 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
     AcsStore.SimpleContractFilter(
       svcParty,
-      Map(
+      templateFilters = Map(
         mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)
+      ),
+      interfaceFilters = Map(
+        mkFilter(DeliveryOffer.INTERFACE)(
+          _ => true,
+          Seq(
+            InterfaceImplementation(
+              TransferInProgress.COMPANION
+            )(offer =>
+              new DeliveryOfferView(
+                offer.group.svc,
+                offer.sender,
+                s"TransferInProgress",
+              )
+            ),
+            InterfaceImplementation(
+              TestDeliveryOffer.COMPANION
+            )(offer =>
+              new DeliveryOfferView(
+                offer.svc,
+                offer.sender,
+                "TestDeliveryOffer",
+              )
+            ),
+          ),
+        )
       ),
     )
   }
@@ -210,6 +243,59 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
 
   private def c(i: Int): C = appRewardCoupon(i, svcParty)
   private def cFeatured(i: Int): C = appRewardCoupon(i, svcParty, true)
+
+  def transferInProgress(
+      i: Int
+  ) =
+    Contract(
+      identifier = TransferInProgress.TEMPLATE_ID,
+      contractId = new TransferInProgress.ContractId(s"#$i"),
+      payload = new TransferInProgress(
+        new Group(
+          svcParty.toProtoPrimitive,
+          svcParty.toProtoPrimitive,
+          Seq.empty.asJava,
+          new GroupId("mygroup"),
+          svcParty.toProtoPrimitive,
+          new RelTime(5),
+        ),
+        svcParty.toProtoPrimitive,
+        Seq.empty.asJava,
+      ),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+
+  def testDeliveryOffer(
+      i: Int
+  ) =
+    Contract(
+      identifier = TestDeliveryOffer.TEMPLATE_ID,
+      contractId = new TestDeliveryOffer.ContractId(s"#$i"),
+      payload = new TestDeliveryOffer(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        "",
+      ),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+
+  def deliveryOffer(
+      i: Int,
+      description: String,
+  ) =
+    Contract(
+      identifier = DeliveryOffer.TEMPLATE_ID,
+      contractId = new DeliveryOffer.ContractId(s"#$i"),
+      payload = new DeliveryOfferView(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        description,
+      ),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
 
   private val d1: DomainId = DomainId.tryFromString("domain1::domain")
   private val d2: DomainId = DomainId.tryFromString("domain2::domain")
@@ -628,6 +714,26 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
           ReadyContract(c(1), d1),
           ReadyContract(c(2), d2),
           ReadyContract(c(3), d2),
+        )
+      }
+    }
+    "interfaces" in {
+      implicit val store = mkStore()
+      for {
+        _ <- d1.switchToUpdates()
+        _ <- d1.create(transferInProgress(1))
+        _ <- d1.create(testDeliveryOffer(2))
+        cs <- store.listContracts(DeliveryOffer.INTERFACE)
+      } yield {
+        cs shouldBe Seq(
+          ContractWithState(
+            deliveryOffer(1, "TransferInProgress"),
+            ContractState.Assigned(d1),
+          ),
+          ContractWithState(
+            deliveryOffer(2, "TestDeliveryOffer"),
+            ContractState.Assigned(d1),
+          ),
         )
       }
     }

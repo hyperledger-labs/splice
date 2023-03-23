@@ -3,10 +3,9 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{TreeUpdate, TransferEvent}
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, Template}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.network.util.Contract
-import Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -16,23 +15,25 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   import MultiDomainAcsStore.*
 
-  def lookupContractById[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T]
-  )(id: ContractId[T]): Future[Option[ContractWithState[TCid, T]]]
+  def lookupContractById[C, TCid <: ContractId[_], T](
+      companion: C
+  )(id: ContractId[T])(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[Option[ContractWithState[TCid, T]]]
 
-  def listContracts[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T],
+  def listContracts[C, TCid <: ContractId[_], T](
+      companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Option[Long] = None,
-  ): Future[Seq[ContractWithState[TCid, T]]]
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
 
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple
     * times as it moves across domains.
     */
-  def streamReadyContracts[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T]
-  ): Source[ReadyContract[TCid, T], NotUsed]
+  def streamReadyContracts[C, TCid <: ContractId[_], T](
+      companion: C
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Source[ReadyContract[TCid, T], NotUsed]
 
   /** Stream all transfer out events that are ready for transfer in.
     * The only guarantee provided is that a transfer out that does not get transferred in
@@ -49,6 +50,43 @@ trait MultiDomainAcsStore extends AutoCloseable {
 }
 
 object MultiDomainAcsStore {
+
+  trait ContractCompanion[-C, TCid <: ContractId[_], T] {
+    def fromCreatedEvent(
+        companion: C
+    )(filter: AcsStore.ContractFilter, event: CreatedEvent): Option[Contract[TCid, T]]
+    def mightContain(filter: AcsStore.ContractFilter)(companion: C): Boolean
+    def typeId(companion: C): Identifier
+  }
+
+  implicit def templateCompanion[TCid <: ContractId[T], T <: Template]
+      : ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] =
+    new ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] {
+      override def fromCreatedEvent(companion: Contract.Companion.Template[TCid, T])(
+          filter: AcsStore.ContractFilter,
+          event: CreatedEvent,
+      ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event)
+      override def mightContain(filter: AcsStore.ContractFilter)(
+          companion: Contract.Companion.Template[TCid, T]
+      ): Boolean = filter.mightContain(companion)
+      override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
+        companion.TEMPLATE_ID
+    }
+
+  implicit def interfaceCompanion[I, Id <: ContractId[I], View <: DamlRecord[_]]
+      : ContractCompanion[Contract.Companion.Interface[Id, I, View], Id, View] =
+    new ContractCompanion[Contract.Companion.Interface[Id, I, View], Id, View] {
+      override def fromCreatedEvent(companion: Contract.Companion.Interface[Id, I, View])(
+          filter: AcsStore.ContractFilter,
+          event: CreatedEvent,
+      ): Option[Contract[Id, View]] =
+        filter.decodeInterface(companion)(event)
+      override def mightContain(filter: AcsStore.ContractFilter)(
+          companion: Contract.Companion.Interface[Id, I, View]
+      ): Boolean = filter.mightContain(companion)
+      override def typeId(companion: Contract.Companion.Interface[Id, I, View]): Identifier =
+        companion.TEMPLATE_ID
+    }
 
   final case class TransferId(source: DomainId, id: String)
 

@@ -9,10 +9,9 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransferUpdate,
   TreeUpdate,
 }
-import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId}
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
 import com.daml.network.util.{Contract, Trees}
-import Contract.Companion.Template as TemplateCompanion
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -135,10 +134,12 @@ class InMemoryMultiDomainAcsStore(
       }
   }
 
-  private def requireInScope[TC, TCid, T](templateCompanion: ContractCompanion[TC, TCid, T]): Unit =
+  private def requireInScope[C, TCid <: ContractId[_], T](
+      companion: C
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Unit =
     require(
-      contractFilter.mightContain(templateCompanion),
-      s"template ${templateCompanion.TEMPLATE_ID} is part of the contract filter",
+      companionClass.mightContain(contractFilter)(companion),
+      s"template ${companionClass.typeId(companion)} is part of the contract filter",
     )
 
   private def listContracts[T](
@@ -165,14 +166,20 @@ class InMemoryMultiDomainAcsStore(
       .toSeq
   }
 
-  override def listContracts[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T],
+  override def listContracts[C, TCid <: ContractId[_], T](
+      companion: C,
       filter: Contract[TCid, T] => Boolean,
       limit: Option[Long],
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[ContractWithState[TCid, T]]] = {
-    requireInScope(templateCompanion)
-    listContracts(Contract.fromCreatedEvent(templateCompanion), filter, limit).map(_.map {
-      case (contract, state) => ContractWithState(contract, state)
+    requireInScope(companion)
+    listContracts(
+      fromCreatedEvent = companionClass.fromCreatedEvent(companion)(contractFilter, _),
+      filter = filter,
+      limit = limit,
+    ).map(_.map { case (contract, state) =>
+      ContractWithState(contract, state)
     })
   }
 
@@ -197,13 +204,16 @@ class InMemoryMultiDomainAcsStore(
     }
   }
 
-  override def lookupContractById[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T]
-  )(id: ContractId[T]): Future[Option[ContractWithState[TCid, T]]] = {
-    requireInScope(templateCompanion)
-    lookupContractById(Contract.fromCreatedEvent(templateCompanion))(id).map(_.map {
-      case (contract, state) => ContractWithState(contract, state)
-    })
+  override def lookupContractById[C, TCid <: ContractId[_], T](
+      companion: C
+  )(id: ContractId[T])(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[Option[ContractWithState[TCid, T]]] = {
+    requireInScope(companion)
+    lookupContractById(companionClass.fromCreatedEvent(companion)(contractFilter, _))(id)
+      .map(_.map { case (contract, state) =>
+        ContractWithState(contract, state)
+      })
   }
 
   override def streamReadyForTransferIn(
@@ -261,11 +271,13 @@ class InMemoryMultiDomainAcsStore(
     )
   }
 
-  override def streamReadyContracts[TCid <: ContractId[T], T <: Template](
-      templateCompanion: TemplateCompanion[TCid, T]
+  override def streamReadyContracts[C, TCid <: ContractId[_], T](
+      companion: C
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
   ): Source[ReadyContract[TCid, T], NotUsed] = {
-    requireInScope(templateCompanion)
-    streamReadyContracts(Contract.fromCreatedEvent(templateCompanion)).map {
+    requireInScope(companion)
+    streamReadyContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {
       case (contract, domain) => ReadyContract(contract, domain)
     }
   }
