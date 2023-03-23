@@ -11,7 +11,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{CantonProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import org.scalatest.Succeeded
 
 import scala.util.Using
 import scala.concurrent.duration.*
@@ -86,8 +85,12 @@ class WalletSurviveCantonRestartIntegrationTest
       }
 
       // Make sure we're connecting to the right (now disconnected) participant
-      // TODO (#3459): assert something better
-      assertThrowsAndLogsCommandFailures(aliceWallet.tap(3), _ => Succeeded)
+      assertThrowsAndLogsCommandFailures(
+        aliceWallet.tap(3),
+        _.message should include(
+          "The server is taking too long to respond"
+        ),
+      )
     }
 
   }

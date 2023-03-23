@@ -68,9 +68,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     loggerFactory.assertThrowsAndLogs[CommandFailure](
       aliceWallet.tap(2),
-      // triggered after 20s by Akka HTTP timeout.
-      // TODO(#3633): better error handling.
-      _.errorMessage should include("Unsupported Content-Type [Some(text/plain; charset=UTF-8)]"),
+      _.errorMessage should include("The server is taking too long to respond"),
     )
 
     toxiproxy.enableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceWalletBackend.name))
