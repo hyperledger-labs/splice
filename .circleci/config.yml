@@ -778,6 +778,9 @@ jobs:
           cmd: "damlTest"
           timeout: "10m"
       - cleanup_sbt_test_job
+      - run_bash_command_in_nix:
+          cmd_name: Check DAR package IDs
+          cmd: build-tools/dars-lock
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job

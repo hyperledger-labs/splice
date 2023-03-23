@@ -444,6 +444,11 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 
+To prevent accidental changes to dar files, we commit their current package IDs with the repo,
+in daml/dars.lock. CI verifies that those package IDs are correct. If you intentionally make
+changes in daml code, please run `build-tools/dars-lock` and commit the updated `dars.lock`
+file along with your dar changes.
+
 ### Bumping Our Canton fork
 
 Current Canton commit: `dd75dc44144f884a8af512227a2b7b91fc8f274a`
