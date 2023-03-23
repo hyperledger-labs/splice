@@ -154,71 +154,42 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 90 co
 
   @ bobWallet.list()
 
-Hosting the Wallet Web UI
+Configuring the Wallet UI
 -------------------------
 
-The Wallet Web UI is distributed as static files that connect to the
+The Wallet UI is distributed as static files that connect to the
 wallet backend that we started in the previous section.
 
-Before we can deploy the wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
+Before we can deploy the Wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
 For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
 
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     :end-before: END_WALLET_CLUSTER_BACKEND_CONFIG
 
-Lastly, we have to host the frontend files. You can use any static
-file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
-things simple, we use the builtin HTTP Server in PHP. If you don't have PHP installed, please install it now, e.g. using the following on a Debian-based OS: ::
-
-  apt install php-cli
-
-Start another terminal and run: ::
-
-  cd web-uis/wallet
-  php -S 127.0.0.1:3000
-
-The Wallet Web UI is now accessible at http://localhost:3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
-
-Hosting the Directory UI
-------------------------
+Configuring the Directory UI
+----------------------------
 
 The Canton Network includes a Canton Name Service (CNS), which maps party IDs to human-readable names, much like the DNS does for IP addresses.
-
-In order to use it in your self-hosted validator, you will need to serve one more UI - that of the Directory app.
 
 First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
 
   validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
 
-The directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run: ::
-
-  daml json-api --config examples/validator/json-api-app.conf
-
-Before you can use the directory UI, you need to configure the URL of the directory backend similar to
-how you configured the wallet UI earlier. For that,
+Before you can use the Directory UI, you need to configure the URL of the directory backend similar to
+how you configured the Wallet UI earlier. For that,
 open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:
 
 .. literalinclude:: ../../../../../apps/directory/frontend/public/config.js
     :start-after: BEGIN_DIRECTORY_CONFIG
     :end-before: END_DIRECTORY_CONFIG
 
-We are now ready to host the frontend - start another terminal and run: ::
+The Directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run: ::
 
-  cd web-uis/directory
-  php -S 127.0.0.1:3001
+  daml json-api --config examples/validator/json-api-app.conf
 
-The Directory Web UI should now be accessible at http://localhost:3001. You can login there using the same method you used for the wallet (either username if using the default insecure test
-authentication, or through Auth0 if configured). To begin with - you will have no registered entries.
-Insert a cns entry name of your choice, e.g. "alice.cns" in the "Request new entry" field, and click "Request Entry".
-You will be redirected to your wallet to confirm the Canton Coin payment for your directory entry (a subscription-based payment).
-Once confirmed, you will be redirected back to the directory UI, and should see your new entry listed.
-
-If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
-
-
-Running the Splitwell UI
-------------------------
+Configuring the Splitwell UI
+----------------------------
 
 To use splitwell, you first need to connect your participant to the splitwell domain
 and upload the DAR.
@@ -226,8 +197,8 @@ Go to the terminal you started Canton in and run:
 
 .. parsed-literal::
 
-   @ validatorParticipant.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
-   @ validatorParticipant.dars.upload("dars/splitwell-0.1.0.dar")
+   @ validatorApp.remoteParticipant.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
+   @ validatorApp.remoteParticipant.dars.upload("dars/splitwell-0.1.0.dar")
 
 The splitwell UI connects to the ledger API of your participant
 through `Envoy
@@ -244,16 +215,37 @@ As the last step before you can start the frontend, open ``web-uis/splitwell/con
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
     :end-before: END_SPLITWELL_CLUSTER_BACKEND_CONFIG
 
-Finally, open another terminal and start the frontend: ::
+Hosting the UIs
+---------------
 
-  cd web-uis/splitwell
-  php -S 127.0.0.1:3002
+Lastly, we have to host the frontend files for the wallet UI, the directory UI and the splitwell UI.
+We're going to use a standard NGINX Docker container to host all the frontends.
+If you don't have Docker installed, please install it now by following the `Docker installation documentation <https://docs.docker.com/get-docker/>`_.
+Please make sure to install version 20.10.0 or higher on Linux,which supports ``host.docker.internal``.
 
+If you are using Linux, start another terminal and run: ::
 
-You can now log in and start creating groups and split payments with
+  docker run -d --name nginx_cn_frontends --add-host=host.docker.internal:host-gateway -p 3000:3000 -v $(pwd)/examples/nginx/conf:/etc/nginx/conf.d -v $(pwd)/web-uis:/usr/share/nginx/html nginx
+
+On Windows or Mac you can omit the ``--add-host=host.docker.internal:host-gateway``: ::
+
+  docker run -d --name nginx_cn_frontends -p 3000:3000 -v $(pwd)/examples/nginx/conf:/etc/nginx/conf.d -v $(pwd)/web-uis:/usr/share/nginx/html nginx
+
+The Wallet UI is now accessible at http://wallet.localhost:3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
+
+The Directory UI should be accessible at http://directory.localhost:3000.
+
+You can login there using the same method you used for the wallet (either username if using the default insecure test
+authentication, or through Auth0 if configured). To begin with - you will have no registered entries.
+Insert a cns entry name of your choice, e.g. "alice.cns" in the "Request new entry" field, and click "Request Entry".
+You will be redirected to your wallet to confirm the Canton Coin payment for your directory entry (a subscription-based payment).
+Once confirmed, you will be redirected back to the directory UI, and should see your new entry listed.
+
+If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
+
+The Splitwell UI is now accessible at http://splitwell.localhost:3000. You can now log in and start creating groups and split payments with
 other users on the Canton Network. Note that you need to onboard your
 user through the wallet first before you can use it in splitwell.
-
 
 Enabling Authentication
 -----------------------
@@ -305,7 +297,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
     b. Choose "Single Page Web Applications", call it "Wallet web UI", and click Create
-    c. Determine the URL for your validator's wallet UI (if you've been following this runbook guide, it will be ``http://localhost:3000``)
+    c. Determine the URL for your validator's wallet UI (if you've been following this runbook guide, it will be ``http://wallet.localhost:3000``)
     d. In the Auth0 application settings, add the wallet URL to the following:
 
        - "Allowed Callback URLs"
@@ -313,7 +305,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
        - "Allowed Web Origins"
        - "Allowed Origins (CORS)"
     e. Save your application settings
-10. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://localhost:3001``)
+10. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://directory.localhost:3000``)
 11. Allocate the validator service party and user.
 
    a. First, go to ``Validator app backend`` application that you configured earlier and copy the Client ID.
@@ -383,7 +375,7 @@ NETWORK_AUTH_DOMAIN_URL               The "Domain" of your tenant (at the top of
 NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" application (at the top of the application's settings page)
 ====================================  =====
 
-16. Repeat step 9 for the directory UI configuration, at
+16. Repeat step 15 for the directory UI configuration, at
     ``web-uis/directory/config.js``. In addition to changing
     ``authority`` and ``client_id``, change ``token_audience`` to the
     same value you set ``NETWORK_AUTH_LEDGER_API_AUDIENCE`` to

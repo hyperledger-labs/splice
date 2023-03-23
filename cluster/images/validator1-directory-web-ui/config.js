@@ -19,10 +19,6 @@ window.canton_network_config = {
       url: `https://directory.${cluster}`,
       jsonApiUrl: "https://" + window.location.hostname + "/api/json-api/",
     },
-    ledgerApi: {
-      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      url: "https://" + window.location.hostname + "/api/v0/ledger-api",
-    },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
       url: "https://" + window.location.hostname + "/api/v0/wallet",

@@ -16,7 +16,6 @@ const reader = new ConfigReader(
         uiUrl: z.string().url(),
       }),
       directory: directorySchema,
-      ledgerApi: serviceSchema,
     }),
   })
 );

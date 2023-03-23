@@ -18,7 +18,7 @@ window.canton_network_config = {
   services: {
     // BEGIN_DIRECTORY_CONFIG
     directory: {
-      jsonApiUrl: "http://" + window.location.hostname + "/api/json-api/",
+      jsonApiUrl: "http://" + window.location.host + "/api/json-api/",
       // URL of the directory backend
       // Edit this to the cluster you're trying to connect on.
       url: 'https://directory.TARGET_CLUSTER.network.canton.global',
@@ -27,7 +27,7 @@ window.canton_network_config = {
     wallet: {
       url: 'http://localhost:6004',
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: 'http://localhost:3000',
+      uiUrl: 'http://wallet.localhost:3000',
     },
   },
 };
