@@ -8,8 +8,8 @@ function start_envoy() {
 }
 
 function check_envoy_running() {
-  ENVOY_PID=`cat ${REPO_ROOT}/envoy-proxy-dev/envoy.pid`
-  if [[ -z "$(ps -p $ENVOY_PID -o pid=)" ]]; then
+  ENVOY_PID=$(cat "${REPO_ROOT}/envoy-proxy-dev/envoy.pid")
+  if [[ -z "$(ps -p "$ENVOY_PID" -o pid=)" ]]; then
     echo "envoy failed to start" >&2
     return 1
   fi
@@ -50,7 +50,8 @@ function start_frontend() {
   # - The command 'tmux send-keys' does not handle sending long strings well
   # To avoid both issues, we are saving the content of the config to a temporary file
   # and reading it back from the tmux session.
-  local config_file=$(mktemp)
+  local config_file
+  config_file=$(mktemp)
 
   jsonnet \
     --tla-str clusterAddress="$cluster_address" \
@@ -58,7 +59,7 @@ function start_frontend() {
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
     --tla-str app="$app" \
-    $REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet \
+    "$REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
     > "$config_file"
 
   local log_file="${LOG_DIR}/npm-${app}-${user}-${frontend_dir_in_app}.log"
@@ -128,7 +129,7 @@ start_envoy
 # envoy kills itself if we spend too much time in `start-envoy.sh`, hence we check this here...
 sleep 0.5s && check_envoy_running
 
-(cd $REPO_ROOT && sbt --batch apps-frontends/compile)
+(cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 
@@ -174,8 +175,8 @@ if [ $use_preflight_frontends -eq 0 ]; then
 else
   if [ "$enable_test_auth" == "true" ]; then
     start_preflight_frontends
-    echo $NETWORK_APPS_ADDRESS > start-frontends-network-address
-    echo $PREFLIGHT_JSON_LEDGER_API_PORT > start-frontends-http-ledger-api-port
+    echo "$NETWORK_APPS_ADDRESS" > start-frontends-network-address
+    echo "$PREFLIGHT_JSON_LEDGER_API_PORT" > start-frontends-http-ledger-api-port
   else
     echo "enable_test_auth was set to false, -p is incompatible with -a"
     exit 1

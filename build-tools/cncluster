@@ -5,7 +5,8 @@ shift
 
 set -euo pipefail
 
-source ${TOOLS_LIB}/libcli.source
+# shellcheck disable=SC1091
+source "${TOOLS_LIB}/libcli.source"
 
 SCRIPTNAME=${0##*/}
 
@@ -55,7 +56,7 @@ function _production_gate() {
 
 function _cluster_ip() {
     gcloud compute addresses list \
-           --regions=${CLOUDSDK_COMPUTE_REGION} \
+           --regions="${CLOUDSDK_COMPUTE_REGION}" \
            --filter "name:${GCP_CLUSTER_NAME}-ip" \
            --format 'value(address)'
 }
@@ -70,7 +71,7 @@ function _nat_router() {
 function _nat_config() {
     # Check to see if the NAT is configured
     gcloud compute routers nats list \
-            --router=${GCP_NAT_ROUTER_NAME} \
+            --router="${GCP_NAT_ROUTER_NAME}" \
             --format 'value(name)'
 }
 
@@ -90,32 +91,32 @@ function _cluster_apply() {
     IMAGE_TAG=$1
 
     # Apply cert-manager deployments
-    kubectl apply -f $REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml
+    kubectl apply -f "$REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml"
 
     TOKEN_ARG=fixedTokens=false
 
-    if [ ! -z "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
         TOKEN_ARG=fixedTokens=true
     fi
 
     TICK_DURATION_ARG="tickDuration=null"
 
-    if [ ! -z "${CNCLUSTER_TICK_DURATION:-}" ]; then
+    if [ -n "${CNCLUSTER_TICK_DURATION:-}" ]; then
         TICK_DURATION_ARG="tickDuration=\"${CNCLUSTER_TICK_DURATION}\""
     fi
 
     # Apply base cluster config
-    jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
-            --tla-str gcpRepoName=${GCP_REPO_NAME} \
-            --tla-str gcpDnsProject=${GCP_DNS_PROJECT} \
-            --tla-str gcpDnsSASecret=${GCP_DNS_SA_SECRET} \
-            --tla-str imageTag=${IMAGE_TAG} \
-            --tla-str ipAddr=$(_cluster_ip) \
-            --tla-str clusterName=${GCP_CLUSTER_NAME} \
-            --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
+    jsonnet --tla-str gcpRegion="${CLOUDSDK_COMPUTE_REGION}" \
+            --tla-str gcpRepoName="${GCP_REPO_NAME}" \
+            --tla-str gcpDnsProject="${GCP_DNS_PROJECT}" \
+            --tla-str gcpDnsSASecret="${GCP_DNS_SA_SECRET}" \
+            --tla-str imageTag="${IMAGE_TAG}" \
+            --tla-str ipAddr="$(_cluster_ip)" \
+            --tla-str clusterName="${GCP_CLUSTER_NAME}" \
+            --tla-str clusterDnsName="${CLUSTER_DNS_NAME}" \
             --tla-code $TOKEN_ARG \
-            --tla-code $TICK_DURATION_ARG \
-            $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
+            --tla-code "$TICK_DURATION_ARG" \
+            "$REPO_ROOT/cluster/manifest/canton-network-config.jsonnet" \
         | kubectl apply -f -
 }
 
@@ -126,14 +127,14 @@ function _cluster_update_module() {
 
     pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
 
-    if [ ! -f ${pushStateFile} ]; then
+    if [ ! -f "${pushStateFile}" ]; then
         _error "Module not available for deployment (failure during either push or build): $1"
         exit 1
     fi
 
-    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
+    imageTag=$(gawk -F '::' '{ print $2; }' < "${pushStateFile}")
 
-    dnames=$(kubectl get deployment --all-namespaces -l moduleName=${module} -o jsonpath='{.items[*].metadata}' \
+    dnames=$(kubectl get deployment --all-namespaces -l moduleName="${module}" -o jsonpath='{.items[*].metadata}' \
                  | jq -r '.name + if has("namespace") then "@" + .namespace else "" end')
 
     if [ -z "$dnames" ]; then
@@ -173,7 +174,7 @@ function _cluster_show() {
 
 
 function _current_lockholder() {
-    kubectl get secret cluster-lock -o jsonpath={'.data.lockholder'} 2>/dev/null | base64 --decode
+    kubectl get secret cluster-lock -o jsonpath='{.data.lockholder}' 2>/dev/null | base64 --decode
 }
 
 function _assert_lock() {
@@ -227,7 +228,7 @@ subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to a
 function subcmd_activate() {
     _cluster_must_exist
 
-    gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
+    gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
 }
 
 ###
@@ -243,7 +244,7 @@ function subcmd_apply() {
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
           _docker_must_be_running
-          if ! make -C ${REPO_ROOT} docker-check -j; then
+          if ! make -C "${REPO_ROOT}" docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
@@ -255,7 +256,7 @@ function subcmd_apply() {
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
-    _cluster_apply ${IMAGE_TAG}
+    _cluster_apply "${IMAGE_TAG}"
 }
 
 ###
@@ -267,17 +268,17 @@ function subcmd_deploy() {
     _prompt_to_confirm
     _docker_must_be_running
 
-    make -C ${REPO_ROOT} clean -j
+    make -C "${REPO_ROOT}" clean -j
 
-    if ! make -C ${REPO_ROOT} docker-build -j; then
+    if ! make -C "${REPO_ROOT}" docker-build -j; then
         _error "Error building images, cannot apply."
     fi
 
-    if ! make -C ${REPO_ROOT} docker-push-force; then
+    if ! make -C "${REPO_ROOT}" docker-push-force; then
         _error "Error pushing images, cannot apply."
     fi
 
-    _cluster_apply ${SOURCE_IMAGE_TAG}
+    _cluster_apply "${SOURCE_IMAGE_TAG}"
 }
 
 ###
@@ -310,17 +311,17 @@ function subcmd_push() {
     fi
 
     # Clean and build in parallel
-    make -C ${REPO_ROOT} ${clean_targets} -j
-    make -C ${REPO_ROOT} ${db_targets} -j
+    make -C "${REPO_ROOT}" "${clean_targets}" -j
+    make -C "${REPO_ROOT}" "${db_targets}" -j
 
     # Run the push serially (since the push is ultimately serialized across
     # the shared upload link anyway, and adding contention won't help speed
     # things up).
-    make -C ${REPO_ROOT} ${dpf_targets}
+    make -C "${REPO_ROOT}" "${dpf_targets}"
 
     # Update all the modules in cluster
     for module in "$@"; do
-        _cluster_update_module ${module}
+        _cluster_update_module "${module}"
     done
 }
 
@@ -353,16 +354,16 @@ function subcmd_rlogs() {
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
-                          -n ${namespace} \
-                          -l app=${app} \
+                          -n "${namespace}" \
+                          -l app="${app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
 
         if [ -n "${raw-}" ] ; then
-            kubectl logs ${POD_SPEC} ${app} -f
+            kubectl logs "${POD_SPEC}" "${app}" -f
         else
-            kubectl logs ${POD_SPEC} ${app} -f | _json_log_format
+            kubectl logs "${POD_SPEC}" "${app}" -f | _json_log_format
         fi
     else
         _error "No pod for app found: ${app}"
@@ -388,15 +389,15 @@ function subcmd_logs() {
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
-                          -n ${namespace} \
-                          -l app=${app} \
+                          -n "${namespace}" \
+                          -l app="${app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
 
         LOGFILE=$(mktemp cnlogXXXXXXX.clog)
-        (kubectl logs ${POD_SPEC} ${app} -f >> ${LOGFILE} & lnav ${LOGFILE})
-        rm ${LOGFILE}
+        (kubectl logs "${POD_SPEC}" "${app}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")
+        rm "${LOGFILE}"
     else
         _error "No pod for app found: ${app}"
     fi
@@ -427,7 +428,7 @@ function subcmd_gcloud_logs() {
     echo "Writing log to $LOGFILE"
 
     gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter" \
-        | jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload' > $LOGFILE & lnav $LOGFILE
+        | jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload' > "$LOGFILE" & lnav "$LOGFILE"
 }
 
 ###
@@ -440,7 +441,7 @@ function subcmd_set_machine_type() {
 
     _info "Creating temporary node pool..."
     gcloud container node-pools create temp-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
-           --machine-type ${GCP_CLUSTER_NODE_TYPE} --num-nodes 1 \
+           --machine-type "${GCP_CLUSTER_NODE_TYPE}" --num-nodes 1 \
            || _error "Could not create node pool with machine type: ${GCP_CLUSTER_NODE_TYPE}"
 
     _info "Deleting default node pool..."
@@ -449,11 +450,11 @@ function subcmd_set_machine_type() {
 
     _info "Recreading default node pool..."
     gcloud container node-pools create default-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
-           --machine-type ${GCP_CLUSTER_NODE_TYPE} \
+           --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
            --num-nodes 1 \
            --enable-autoscaling \
            --min-nodes 1 \
-           --max-nodes ${GCP_CLUSTER_MAX_NODES} \
+           --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
            || _error "Could not recreate default node pool. Terminating early."
 
     _info "Deleting temporary node pool..."
@@ -466,27 +467,28 @@ function subcmd_set_machine_type() {
 subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
 
 function subcmd_get_dns01_key_id() {
-    kubectl get secret $GCP_DNS_SA_SECRET -o jsonpath='{.data.key\.json}' | base64 -d | jq -r '.private_key_id'
+    kubectl get secret "$GCP_DNS_SA_SECRET" -o jsonpath='{.data.key\.json}' | base64 -d | jq -r '.private_key_id'
 }
 
 subcommand_whitelist[update_dns01_secret]='Update the gcloud service account key used for letsencrypt dns challenges.'
 
 function subcmd_update_dns01_secret() {
     IAM_ACCOUNT=dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
-    KEYS=$(gcloud iam service-accounts keys list --iam-account $IAM_ACCOUNT --format json | jq -c '.[]')
-    if [[ $(wc -l <<< $KEYS) -gt 9 ]]; then
+    KEYS=$(gcloud iam service-accounts keys list --iam-account "$IAM_ACCOUNT" --format json | jq -c '.[]')
+    if [[ $(wc -l <<< "$KEYS") -gt 9 ]]; then
         echo "Reached maximum number of service account keys, delete some keys through the gcloud console before proceeding."
-        echo "Check using `cncluster get_dns01_key_id` that the keys you delete are not in use on any cluster."
+        # shellcheck disable=SC2016
+        echo 'Check using `cncluster get_dns01_key_id` that the keys you delete are not in use on any cluster.'
         exit 1
     fi
-    if kubectl get secret $GCP_DNS_SA_SECRET > /dev/null 2>&1; then
-      kubectl delete secret $GCP_DNS_SA_SECRET
+    if kubectl get secret "$GCP_DNS_SA_SECRET" > /dev/null 2>&1; then
+      kubectl delete secret "$GCP_DNS_SA_SECRET"
     fi
     # This can fail with a precondition error on an attempt to create
     # keys beyond the tenth.
     gcloud iam service-accounts keys create /tmp/key.json \
-           --iam-account $IAM_ACCOUNT
-    kubectl create secret generic $GCP_DNS_SA_SECRET \
+           --iam-account "$IAM_ACCOUNT"
+    kubectl create secret generic "$GCP_DNS_SA_SECRET" \
             --from-file=key.json=/tmp/key.json
     rm /tmp/key.json
 }
@@ -501,25 +503,25 @@ function subcmd_create() {
     else
         #### Cluster can be resized from deployment directories with the following command:
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
-        gcloud container clusters create ${GCP_CLUSTER_NAME} \
-               --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
+        gcloud container clusters create "${GCP_CLUSTER_NAME}" \
+               --create-subnetwork name="${GCP_CLUSTER_NAME}-subnet" \
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
-               --machine-type ${GCP_CLUSTER_NODE_TYPE} \
+               --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
                --num-nodes 1 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
-               --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME} \
+               --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --enable-autoscaling \
                --min-nodes 1 \
-               --max-nodes ${GCP_CLUSTER_MAX_NODES}
+               --max-nodes "${GCP_CLUSTER_MAX_NODES}"
 
         #### Enable Firewall Access
-        gcloud container clusters update ${GCP_CLUSTER_NAME} \
+        gcloud container clusters update "${GCP_CLUSTER_NAME}" \
                --enable-master-authorized-networks \
-               --master-authorized-networks ${GCP_VPN_NETS}
+               --master-authorized-networks "${GCP_VPN_NETS}"
 
         #### Delete default firewall rules, if they exist.
         if (gcloud compute firewall-rules delete\
@@ -537,34 +539,34 @@ function subcmd_create() {
 
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(#1447)
-    if ! kubectl get secret ${GCP_DNS_SA_SECRET} > /dev/null; then
+    if ! kubectl get secret "${GCP_DNS_SA_SECRET}" > /dev/null; then
 
         _log "Missing DNS Service Account secret, creating key..."
         # This can fail with a precondition error on an attempt to create
         # keys beyond the tenth.
         gcloud iam service-accounts keys create /tmp/key.json \
-            --iam-account dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
+            --iam-account "dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com"
 
         _log "...storing secret"
-        kubectl create secret generic $GCP_DNS_SA_SECRET \
+        kubectl create secret generic "$GCP_DNS_SA_SECRET" \
             --from-file=key.json=/tmp/key.json
         rm /tmp/key.json
     fi
 
     #### Check for IP
 
-    if [ -z $(_cluster_ip) ]; then
+    if [ -z "$(_cluster_ip)" ]; then
         _log "Allocating IP address."
-        gcloud compute addresses create "${GCP_CLUSTER_NAME}-ip" --region=${CLOUDSDK_COMPUTE_REGION}
+        gcloud compute addresses create "${GCP_CLUSTER_NAME}-ip" --region="${CLOUDSDK_COMPUTE_REGION}"
     fi
 
     IPADDR=$(_cluster_ip)
 
-    if [ -z ${IPADDR} ]; then
+    if [ -z "${IPADDR}" ]; then
         _error "Could not determine cluster IP address."
     fi
 
-    gcloud dns record-sets create ${CLUSTER_DNS_NAME} \
+    gcloud dns record-sets create "${CLUSTER_DNS_NAME}" \
            --project="${GCP_DNS_PROJECT}" \
            --zone="canton-global" \
            --type=A \
@@ -581,7 +583,7 @@ function subcmd_create() {
     echo "Cluster at IP ${IPADDR}, applying configuration."
 
     #### Check for Cloud NAT rules
-    if [ -z $(_nat_router) ]; then
+    if [ -z "$(_nat_router)" ]; then
         _log "NAT router ${GCP_NAT_ROUTER_NAME} not found, creating..."
         gcloud compute routers create "${GCP_NAT_ROUTER_NAME}" \
             --network default \
@@ -590,7 +592,7 @@ function subcmd_create() {
         _log "NAT router ${GCP_NAT_ROUTER_NAME} exists, skipping..."
     fi
 
-    if [ -z $(_nat_config) ]; then
+    if [ -z "$(_nat_config)" ]; then
         _log "NAT config ${GCP_NAT_CONFIG_NAME} not found, creating..."
         gcloud compute routers nats create "${GCP_NAT_CONFIG_NAME}" \
                 --router-region "${CLOUDSDK_COMPUTE_REGION}" \
@@ -605,7 +607,7 @@ function subcmd_create() {
     subcmd_activate
 
     _log "Applying current manifest to cluster."
-    _cluster_apply ${SOURCE_IMAGE_TAG}
+    _cluster_apply "${SOURCE_IMAGE_TAG}"
 
     _log "Updating cluster secrets"
     subcmd_update_secrets
@@ -619,19 +621,19 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 
 function _cluster_reset() {
     _info "Deleting all stateful sets..."
-    kubectl delete StatefulSet --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl delete StatefulSet --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
     _info "Deleting all deployments..."
-    kubectl delete Deployment --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Deployment --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
     _info "Deleting all pods..."
-    kubectl delete Pods --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Pods --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
     _info "Deleting all services..."
-    kubectl delete Service --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Service --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
     _info "Deleting all persistent volume claims..."
-    kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
     _info "Cluster in reset/idle state."
 }
@@ -647,8 +649,8 @@ function subcmd_reset() {
 subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
 
 function _delete_cert_manager_objects() {
-    if objects=$(kubectl get $2 -n $1| grep cert-manager | gawk '{ print $1 }'); then
-        kubectl delete $2 -n $1 ${objects}
+    if objects=$(kubectl get "$2" -n "$1"| grep cert-manager | gawk '{ print $1 }'); then
+        kubectl delete "$2" -n "$1" "${objects}"
     else
         _info "No cert-manager objects of type $2 found in namespace $1."
     fi
@@ -660,13 +662,13 @@ function subcmd_obliterate_state() {
     _cluster_must_exist
 
     _info "Deleting all Canton Network Namespaces..."
-    kubectl delete Namespace -l cnjClusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Namespace -l cnjClusterName="${GCP_CLUSTER_NAME}"
 
     _info "Full delete... deleting default namespace deployments..."
-    kubectl delete Deployment -l cnjClusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Deployment -l cnjClusterName="${GCP_CLUSTER_NAME}"
 
     _info "Full delete... deleting default namespace services..."
-    kubectl delete Service -l cnjClusterName=${GCP_CLUSTER_NAME}
+    kubectl delete Service -l cnjClusterName="${GCP_CLUSTER_NAME}"
 
     # Delete the external service manually, since it does not have
     # the CNJ prefix cluster name label.
@@ -686,7 +688,7 @@ function subcmd_obliterate_state() {
     _delete_cert_manager_objects default ValidatingWebhookConfiguration
 
     kubectl delete Issuer letsencrypt-production --ignore-not-found=true
-    kubectl delete Certificate cn-${GCP_CLUSTER_BASENAME}net-certificate --ignore-not-found=true
+    kubectl delete Certificate "cn-${GCP_CLUSTER_BASENAME}net-certificate" --ignore-not-found=true
 
     _info "Cluster state obliterated"
 }
@@ -709,7 +711,7 @@ function subcmd_ciapply() {
 
     _cluster_show
     _cluster_reset
-    _cluster_apply ${SOURCE_IMAGE_TAG}
+    _cluster_apply "${SOURCE_IMAGE_TAG}"
 }
 
 ###
@@ -724,7 +726,7 @@ function subcmd_delete() {
               --project="${GCP_DNS_PROJECT}" \
               --zone="canton-global" \
               --type=A \
-              ${CLUSTER_DNS_NAME}; then
+              "${CLUSTER_DNS_NAME}"; then
         _log "DNS record deleted for ${CLUSTER_DNS_NAME}"
     else
         _warning "No DNS record to delete for ${CLUSTER_DNS_NAME}"
@@ -740,7 +742,7 @@ function subcmd_delete() {
         _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
     fi
 
-    gcloud container clusters delete --quiet ${GCP_CLUSTER_NAME}
+    gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
 
     echo "Cluster deleted."
 }
@@ -761,7 +763,7 @@ subcommand_whitelist[start_frontends]='Run the self-hosted frontends for the pre
 function subcmd_start_frontends() {
     _log "Starting frontends needed for preflight check..."
 
-    (cd ${REPO_ROOT} && \
+    (cd "${REPO_ROOT}" && \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global ./start-frontends.sh -d -p)
 }
 
@@ -789,7 +791,7 @@ function subcmd_preflight() {
     set -e
 
     _log "Stopping frontends..."
-    cd ${REPO_ROOT} && ./stop-frontends.sh
+    cd "${REPO_ROOT}" && ./stop-frontends.sh
 
     return $test_result
 }
@@ -801,7 +803,7 @@ subcommand_whitelist[sbt_for_preflight]='Runs Sbt, as if for the runbook preflig
 function subcmd_sbt_for_preflight() {
     _needs_auth0_management_api_creds
 
-    (cd ${REPO_ROOT} && \
+    (cd "${REPO_ROOT}" && \
          DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \
@@ -818,7 +820,7 @@ function subcmd_info() {
 
     kubectl get po -o json \
             --all-namespaces \
-            -l clusterName=${GCP_CLUSTER_NAME} \
+            -l clusterName="${GCP_CLUSTER_NAME}" \
         | jq -r '(["NAMESPACE", "POD-NAME", "CONTAINER", "IMAGE", "MEM-LIMIT", "CPU-REQ", "CPU-LIMIT"],(.items[] | .metadata as $pod | .spec.containers[] as $c | $c.resources as $r | [$pod.namespace, $pod.name, $c.name, ($c.image | split(":")[1]), $r.limits.memory, $r.requests.cpu, $r.limits.cpu]))|@tsv' \
         | sort \
         | column -t
@@ -838,7 +840,7 @@ function subcmd_top() {
 
     _log ""
 	_log "Pod Usage:"
-    kubectl top pod --all-namespaces -l clusterName=${GCP_CLUSTER_NAME}
+    kubectl top pod --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 }
 
 ###
@@ -877,11 +879,11 @@ function _set_auth0_ui_secret() {
     NAMESPACE=$3
 
     # Delete secret if it exists, easier than editing existing secrets
-    if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} > /dev/null 2>&1; then
-        kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
+    if kubectl get --namespace "$NAMESPACE" secret "${SECRET_NAME}" > /dev/null 2>&1; then
+        kubectl delete --namespace "$NAMESPACE" secret "${SECRET_NAME}"
     fi
 
-    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+    kubectl create --namespace "$NAMESPACE" secret generic "${SECRET_NAME}" \
       --from-literal=url="${AUTH_BASE_URL}" \
       --from-literal=client-id="${CLIENT_ID}"
 }
@@ -898,26 +900,26 @@ function _set_auth0_secret() {
   WELL_KNOWN_URL="${AUTH_BASE_URL}/.well-known/openid-configuration"
 
   # Delete secret if it exists, easier than editing existing secrets
-  if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} > /dev/null 2>&1; then
-      kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
+  if kubectl get --namespace "$NAMESPACE" secret "${SECRET_NAME}" > /dev/null 2>&1; then
+      kubectl delete --namespace "$NAMESPACE" secret "${SECRET_NAME}"
   fi
 
   # Create the namespace if it does not exist (no harm should be caused if it does)
-  kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-  if [ ! -z "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+  if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
     TOKEN_RESPONSE=$(curl -s --show-error --fail --request POST \
       --url https://canton-network-dev.us.auth0.com/oauth/token \
       --header 'content-type: application/json' \
       --data "{\"client_id\":\"$CLIENT_ID\",\"client_secret\":\"$CLIENT_SECRET\",\"audience\":\"https://canton.network.global\",\"grant_type\":\"client_credentials\"}")
 
-    ACCESS_TOKEN=$(echo $TOKEN_RESPONSE | jq -r ".access_token")
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r ".access_token")
 
-    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+    kubectl create --namespace "$NAMESPACE" secret generic "${SECRET_NAME}" \
       --from-literal=ledger-api-user="${USER_NAME}" \
       --from-literal=token="${ACCESS_TOKEN}"
   else
-    kubectl create --namespace "$NAMESPACE" secret generic ${SECRET_NAME} \
+    kubectl create --namespace "$NAMESPACE" secret generic "${SECRET_NAME}" \
       --from-literal=url="${WELL_KNOWN_URL}" \
       --from-literal=client-id="${CLIENT_ID}" \
       --from-literal=client-secret="${CLIENT_SECRET}" \
@@ -936,8 +938,8 @@ function _set_auth0_api_user() {
     _log "Setting user-only secret $SECRET_NAME ($NAMESPACE)"
 
     # Delete secret if it exists, easier than editing existing secrets
-    if kubectl get --namespace "$NAMESPACE" secret ${SECRET_NAME} &> /dev/null; then
-       kubectl delete --namespace "$NAMESPACE" secret ${SECRET_NAME}
+    if kubectl get --namespace "$NAMESPACE" secret "${SECRET_NAME}" &> /dev/null; then
+       kubectl delete --namespace "$NAMESPACE" secret "${SECRET_NAME}"
     fi
 
     kubectl create --namespace "$NAMESPACE" secret generic "${SECRET_NAME}" \
@@ -993,13 +995,13 @@ function subcmd_update_secrets() {
     "cn-app-validator-ledger-api-auth splitwell_validator splitwell" \
     "cn-app-wallet-ledger-api-auth splitwell_wallet splitwell"
   do
-    set -- $i
+    set -- "$i"
     client_id="${appToClientId[$2]}"
-    secret=$(echo $all | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
+    secret=$(echo "$all" | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
 
     # SECRET_NAME, CLIENT_ID,  CLIENT_SECRET, NAMESPACE=$4
 
-    _set_auth0_secret $1 "$client_id" $secret "$3"
+    _set_auth0_secret "$1" "$client_id" "$secret" "$3"
   done
 
   for i in sv1 sv2 sv3 sv4
@@ -1014,7 +1016,7 @@ function subcmd_update_secrets() {
     "cn-app-splitwell-ui-auth validator1" \
     "cn-app-wallet-ui-auth splitwell"
   do
-    set -- $i
+    set -- "$i"
     client_id="${namespaceToUiClientId[$2]}"
     _set_auth0_ui_secret "$1" "$client_id" "$2"
   done
@@ -1030,7 +1032,7 @@ function subcmd_help() {
     _info "Valid subcommands: "
     readarray -t sorted < <(printf '%s\n' "${!subcommand_whitelist[@]}" | sort)
 
-    for ii in ${sorted[@]};
+    for ii in "${sorted[@]}";
     do
         printf '%s\t%s\n' "${ii}" "${subcommand_whitelist[${ii}]}"
     done | column -ts $'\t'
@@ -1044,11 +1046,9 @@ subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the cur
 function subcmd_pulumi() {
     _production_gate
 
-    CONFIG_FILE="$(pwd)/Pulumi.${GCP_CLUSTER_BASENAME}.yaml"
-
-    pulumi --stack ${GCP_CLUSTER_BASENAME} \
-           --cwd ${REPO_ROOT}/cluster/pulumi  \
-            $@
+    pulumi --stack "${GCP_CLUSTER_BASENAME}" \
+           --cwd "${REPO_ROOT}/cluster/pulumi" \
+            "$@"
 }
 
 ###
@@ -1065,7 +1065,7 @@ function subcmd_papply() {
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
           _docker_must_be_running
-          if ! make -C ${REPO_ROOT} docker-check -j; then
+          if ! make -C "${REPO_ROOT}" docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
@@ -1161,7 +1161,7 @@ function subcmd_lock() {
             _error "Cluster already locked by: ${lockholder}"
         fi
     else
-        kubectl create secret generic cluster-lock --from-literal=lockholder=$(whoami) > /dev/null
+        kubectl create secret generic cluster-lock --from-literal=lockholder="$(whoami)" > /dev/null
         _info "Cluster lock claimed successfully."
     fi
 }
@@ -1219,4 +1219,4 @@ if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
     _error  "Unknown subcommand: ${SUBCOMMAND_NAME}"
 fi
 
-subcmd_${SUBCOMMAND_NAME} "$@"
+"subcmd_${SUBCOMMAND_NAME}" "$@"

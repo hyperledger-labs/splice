@@ -257,7 +257,7 @@ Note that the entire command must be quoted in this case, especially if it has s
     `scalafix` is a linting and rewrite tool. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
 - `formatFix`: apply `scalafmt`, `sbt scalafixAll`, `sbt apps-frontends/npmFix` and `sbt jsonnetfmtFix` to format source files
-- `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix`, `apps-frontends/npmLint` and `jsonnetfmt` rules
+- `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix`, `apps-frontends/npmLint`, `jsonnetfmt` and `shellcheck` rules
 - `damlBuild`: create `.dar` files for all Daml projects
 - `protobufLint`: to lint our protobuf files using `buf`
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.

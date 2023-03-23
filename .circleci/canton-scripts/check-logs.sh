@@ -30,7 +30,7 @@ SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 source "$SRCDIR"/io-utils.sh
 
 # Load ignore patterns for later use
-IGNORE_PATTERNS="$(cat ${FILES_WITH_IGNORE_PATTERNS[*]} | remove_comment_and_blank_lines)"
+IGNORE_PATTERNS="$(cat "${FILES_WITH_IGNORE_PATTERNS[@]}" | remove_comment_and_blank_lines)"
 
 # Keywords are based on `canton-json.lnav.json`
 MIN_LOG_LEVEL_WARNING="\"level\":\"WARN\"|\"level\":\"ERROR\""

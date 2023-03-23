@@ -22,23 +22,21 @@ then
 fi
 
 # Fail if the shutdown pattern is present more than once
-NUM_SHUTDOWN_PATTERNS=`grep --count --max-count=2 "$SHUTDOWN_MESSAGE_PATTERN" $LOGFILE || true`
+NUM_SHUTDOWN_PATTERNS=$(grep --count --max-count=2 "$SHUTDOWN_MESSAGE_PATTERN" "$LOGFILE" || true)
 if [[ "2" == "$NUM_SHUTDOWN_PATTERNS" ]]
 then
   # This error will be picked up by the sbt output checker
   echo "ERROR - not splitting the log-files, as there are two or more shutdown messages. See:"
-  grep "$SHUTDOWN_MESSAGE_PATTERN" $LOGFILE
+  grep "$SHUTDOWN_MESSAGE_PATTERN" "$LOGFILE"
   exit 2
 fi
 
 # Using range addresses to split the file: https://www.gnu.org/software/sed/manual/sed.html#Range-Addresses
 # This will print everything up to and including the shutdown log line.
-cat $LOGFILE |
-  sed -n "0,/$SHUTDOWN_MESSAGE_PATTERN/p" >> $LOGFILE_BEFORE
+sed -n "0,/$SHUTDOWN_MESSAGE_PATTERN/p" "$LOGFILE" >> "$LOGFILE_BEFORE"
 
 # This will print the shutdown log line and all lines until the end of the file.
-cat $LOGFILE |
-  sed -n "/$SHUTDOWN_MESSAGE_PATTERN/,\$p" >> $LOGFILE_AFTER
+sed -n "/$SHUTDOWN_MESSAGE_PATTERN/,\$p" "$LOGFILE" >> "$LOGFILE_AFTER"
 
 # Delete original logfile to ensure every log-line is present in at most one file
-rm -f $LOGFILE
+rm -f "$LOGFILE"

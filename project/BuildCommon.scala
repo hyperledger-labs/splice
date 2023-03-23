@@ -172,7 +172,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; jsonnetfmtCheck",
+          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; jsonnetfmtCheck ; runShellcheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case

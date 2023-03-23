@@ -15,6 +15,7 @@ function adjust_shellscript_binary() {
   REPLACE_MAIN_CLASS="$MAIN_CLASS"
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
+  # shellcheck disable=SC2043
   for file in "bin/cn-node" # TODO(#161): Canton supports windows. Do we want that too? "bin/cn-node.bat"
   do
       cat "$RELEASE_DIR"/$file |
@@ -22,11 +23,11 @@ function adjust_shellscript_binary() {
         sed -e "s/REPLACE_REVISION/${REPLACE_REVISION}/" |
         sed -e "s/REPLACE_JVM_OPTS/${REPLACE_JVM_OPTS}/" |
         sed -e "s/REPLACE_MAIN_CLASS/${REPLACE_MAIN_CLASS}/" |
-        sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > $RELEASE_DIR/tmp.txt
+        sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > "$RELEASE_DIR/tmp.txt"
         # TODO(#161): Look into this Mac Icon
 #        sed -e "s/REPLACE_MAC_ICON_FILE/${REPLACE_MAC_ICON_FILE}/"
       mv "$RELEASE_DIR"/tmp.txt "$RELEASE_DIR"/$file
-      chmod 755 $RELEASE_DIR/$file
+      chmod 755 "$RELEASE_DIR/$file"
   done
 }
 
@@ -37,9 +38,9 @@ JARFILE=$1
 # e.g. cn-node-0.1.0-SNAPSHOT.jar
 JAR=$(basename "$JARFILE")
 # e.g. cn-node-0.1.0-SNAPSHOT
-RELEASE=$(echo $JAR | sed -e 's/\.jar$//')
+RELEASE="${JAR%.jar}"
 
-RELEASES_DIR=$(dirname $JARFILE)/../release
+RELEASES_DIR=$(dirname "$JARFILE")/../release
 RELEASE_DIR=$RELEASES_DIR/$RELEASE
 echo "Creating release $RELEASE"
 
@@ -52,7 +53,7 @@ cp -v "$JARFILE" "$RELEASE_DIR"/lib
 shift # shift JARFILE argument out-of-scope
 MAIN_CLASS=$1
 shift
-ARGS=$@ # other command line args, given in form
+ARGS=$* # other command line args, given in form
 
 state="scan"
 
@@ -73,17 +74,17 @@ do
       esac
       ;;
     "copy")
-      if [[ -e $arg ]]; then
-        if [[ -d $arg ]]; then
-          if [[ -z $(ls -A $arg) ]]; then
+      if [[ -e "$arg" ]]; then
+        if [[ -d "$arg" ]]; then
+          if [[ -z $(ls -A "$arg") ]]; then
             echo "skipping empty $arg"
           else
             echo "copying content from $arg"
-            cp -r $arg/* "$RELEASE_DIR"
+            cp -r "$arg"/* "$RELEASE_DIR"
           fi
         else
           echo "copying file $arg"
-          cp $arg "$RELEASE_DIR"
+          cp "$arg" "$RELEASE_DIR"
         fi
       else
         echo "ERROR, no such file $arg for copying"

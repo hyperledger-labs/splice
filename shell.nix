@@ -71,6 +71,7 @@ in pkgs.mkShell {
     sbt
     scala
     selenium-server-standalone
+    shellcheck
     sphinx
     tmux
     toxiproxy

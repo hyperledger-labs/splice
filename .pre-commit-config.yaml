@@ -16,3 +16,11 @@ repos:
         entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
         types: [scala]
         exclude: '/bootstrap.scala$'
+      - id: shellcheck
+        name: shellcheck
+        language: system
+        entry: "shellcheck"
+        # ignore external sources
+        args: [-e, SC1091]
+        types: [shell]
+        exclude: '^canton/'

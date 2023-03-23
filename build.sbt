@@ -682,6 +682,12 @@ lazy val bundleTask = {
   }
 }
 
+lazy val runShellcheck = taskKey[Unit]("Check shell scripts with shellcheck")
+runShellcheck := {
+  val log = streams.value.log
+  runCommand(Seq("pre-commit", "run", "--all-files", "shellcheck"), log)
+}
+
 lazy val jsonnetfmtCheck = taskKey[Unit]("Check format of `.jsonnet` files`")
 jsonnetfmtCheck := {
   val log = streams.value.log

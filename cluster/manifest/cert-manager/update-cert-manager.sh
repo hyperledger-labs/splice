@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eou pipefail
-source ${TOOLS_LIB}/libcli.source
+source "${TOOLS_LIB}/libcli.source"
 
 # This script does three things:
 #   1. It downloads a particular version of `cert-manager`'s deployment manifest, in YAML form, from their GitHub releases page, and stores it in this directory
@@ -39,14 +39,14 @@ function copy_image() {
 }
 
 function mirror_container_images() {
-    for img in ${IMAGE_NAMES[@]}; do
+    for img in "${IMAGE_NAMES[@]}"; do
         _log "Mirroring image $img to GCP artifact repo..."
         copy_image "$img"
     done
 }
 
 function rewrite_image_refs() {
-    for name in ${IMAGE_NAMES[@]}; do
+    for name in "${IMAGE_NAMES[@]}"; do
         _log "Rewriting image reference for $name in $OUT_FILE..."
         local source_tag="$SOURCE_REPO_PREFIX/$name:v$CERT_MANAGER_VERSION"
         local dest_tag="$DEST_REPO_PREFIX/$name:v$CERT_MANAGER_VERSION"

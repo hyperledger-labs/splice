@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # This script calls the CircleCI API to delete scheduled triggers that are not defined in the repo as a JSON file.
 
 # Add your personal API token to the CIRCLECI_TOKEN environment variable before running the script.
 # https://circleci.com/docs/managing-api-tokens
 
-#!/usr/bin/env bash
 set -euo pipefail
 
 cci_api_all_schedules="https://circleci.com/api/v2/project/github/DACH-NY/the-real-canton-coin/schedule"
@@ -13,9 +13,9 @@ cci_api_schedule="https://circleci.com/api/v2/schedule"
 function is_remote_in_local {
     local remote_trigger_name="$1"
 
-    for TRIGGER in $REPO_ROOT/.circleci/trigger-*.json
+    for TRIGGER in "$REPO_ROOT"/.circleci/trigger-*.json
     do
-        local_trigger_name=$(cat ${TRIGGER} | jq -r '.name')
+        local_trigger_name=$(jq -r '.name' "${TRIGGER}")
         if [ "$remote_trigger_name" == "$local_trigger_name" ]; then
             return 0
         fi
@@ -24,7 +24,8 @@ function is_remote_in_local {
 }
 
 function get_remote_trigger_names {
-    local remote_triggers=$(curl -s "$cci_api_all_schedules" \
+    local remote_triggers
+    remote_triggers=$(curl -s "$cci_api_all_schedules" \
         -H "Content-Type: application/json" \
         -H "circle-token: $CIRCLECI_TOKEN" | jq -r '.items[] | .name')
 
@@ -34,7 +35,8 @@ function get_remote_trigger_names {
 function get_remote_trigger_id_by_name {
     local trigger_name="$1"
 
-    local trigger_id=$(curl -s "$cci_api_all_schedules" \
+    local trigger_id
+    trigger_id=$(curl -s "$cci_api_all_schedules" \
         -H "Content-Type: application/json" \
         -H "circle-token: $CIRCLECI_TOKEN" | jq -r '.items[] | select(.name | contains($tn)) | .id' --arg tn "$trigger_name")
 
@@ -51,8 +53,8 @@ function delete_remote_trigger {
 }
 
 function check_remote_triggers {
-    local IFS=$'\n'
-    local lines=($1)
+    local -a lines
+    readarray -t lines <<< "$1"
     local i
     for (( i=0; i<${#lines[@]}; i++ )) ; do
         local remote_trigger_name="${lines[$i]}"
@@ -63,7 +65,8 @@ function check_remote_triggers {
         set -e
 
         if [[ $result -eq 1 ]]; then
-            echo "\nTrigger (name: <$remote_trigger_name>) does not exist in the repo, deleting..."
+            echo
+            echo "Trigger (name: <$remote_trigger_name>) does not exist in the repo, deleting..."
             trigger_id=$(get_remote_trigger_id_by_name "$remote_trigger_name")
 
             echo "Deleting trigger by id: $trigger_id"

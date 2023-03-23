@@ -4,7 +4,7 @@ set -eou pipefail
 
 EXE=$(readlink -f cn-image-bin)
 
-ARGS="daemon --no-tty --log-encoder=json --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off"
+declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off )
 
 if [ -f /app/pre-bootstrap.sh ]; then
   echo "Running /app/pre-bootstrap.sh"
@@ -12,18 +12,18 @@ if [ -f /app/pre-bootstrap.sh ]; then
 fi
 
 if [ -f /app/bootstrap.sc ]; then
-  ARGS="${ARGS} --bootstrap /app/bootstrap-entrypoint.sc"
+  ARGS+=( --bootstrap /app/bootstrap-entrypoint.sc )
 fi
 
 if [ -f /app/app.conf ]; then
-   ARGS="${ARGS} --config /app/app.conf"
+   ARGS+=( --config /app/app.conf )
 fi
 
-if [ ! -z "${ADDITIONAL_CONFIG:-}" ]; then
+if [ -n "${ADDITIONAL_CONFIG:-}" ]; then
    echo "${ADDITIONAL_CONFIG}" > /app/additional-config.conf
-   ARGS="${ARGS} --config /app/additional-config.conf"
+   ARGS+=( --config /app/additional-config.conf )
 fi
 
-echo "Starting '${EXE}' with arguments: ${ARGS}"
+echo "Starting '${EXE}' with arguments: ${ARGS[*]}"
 
-exec $EXE $ARGS
+exec "$EXE" "${ARGS[@]}"

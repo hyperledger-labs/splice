@@ -6,7 +6,7 @@ WORKFLOW_NAMES="$2"
 fetch() {
     url=$1
     target=$2
-    curl -sSL --fail -X GET -u $CIRCLECI_TOKEN: -H "Content-Type: application/json" -o "${target}" "${url}"
+    curl -sSL --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" -o "${target}" "${url}"
 }
 
 pipeline_workflows_complete() {
@@ -28,12 +28,12 @@ START_TIME=$(date +%s)
 
 wait_for_pipeline_to_complete() {
     pipeline_id=$1
-    while ! pipeline_workflows_complete $PIPELINE_ID
+    while ! pipeline_workflows_complete "$PIPELINE_ID"
     do
         echo "Pipeline still running, waiting ..."
         sleep 5
         CURRENT_TIME=$(date +%s)
-        DIFF=$(($CURRENT_TIME - $START_TIME))
+        DIFF=$((CURRENT_TIME - START_TIME))
         # 120*60s, i.e., 120min
         MAX=$((120 * 60))
         if [[ $DIFF -ge $MAX ]]; then
@@ -48,17 +48,17 @@ fetch "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_P
 # wtihin the first page and not fetch later responses.
 PREVIOUS_JOBS=$(jq -c < /tmp/pipelines.json ".items | map(select(.number < $PIPELINE_NUMBER)) | .[]")
 while IFS= read -r JOB; do
-    PIPELINE_NUMBER=$(jq <<< $JOB -r '.number')
-    PIPELINE_ID=$(jq <<< $JOB -r '.id')
+    PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
+    PIPELINE_ID=$(jq <<< "$JOB" -r '.id')
     echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
     fetch "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow" "/tmp/workflows.json"
     while IFS= read -r WORKFLOW; do
-        WORKFLOW_NAME=$(jq -r <<< $WORKFLOW '.name')
-        if [[ " ${WORKFLOW_NAMES} " =~ " ${WORKFLOW_NAME} " ]]; then
+        WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
+        if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
             echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
-            wait_for_pipeline_to_complete $PIPELINE_ID
+            wait_for_pipeline_to_complete "$PIPELINE_ID"
         else
             echo "Ignoring workflow $WORKFLOW_NAME"
         fi
-    done <<< $(jq -c < /tmp/workflows.json ".items | .[]")
+    done <<< "$(jq -c < /tmp/workflows.json ".items | .[]")"
 done <<< "$PREVIOUS_JOBS"

@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # This script calls the CircleCI API to create / update the scheduled trigger.
 
 # Add your personal API token to the CIRCLECI_TOKEN environment variable before running the script.
 # https://circleci.com/docs/managing-api-tokens
 
-#!/usr/bin/env bash
 set -euo pipefail
 
 set +u
@@ -27,9 +27,9 @@ if [[ -z $CIRCLECI_TOKEN ]]; then
 fi
 set -u
 
-TRIGGER_NAME=$(jq -c '.name' < ${TRIGGER_DEFINITION_FILE})
+TRIGGER_NAME=$(jq -c '.name' < "${TRIGGER_DEFINITION_FILE}")
 
-if [[ -z $TRIGGER_NAME ]]; then
+if [[ -z "$TRIGGER_NAME" ]]; then
     echo "Error: Trigger definition file does not contain a trigger name"
     exit 1
 fi
@@ -43,7 +43,7 @@ existing_schedule=$(curl -s "$endpoint" \
 
 if [[ -n $existing_schedule ]]; then
     echo "Trigger ${TRIGGER_NAME} already exists... patching"
-    schedule_id=$(echo $existing_schedule | jq -r .id)
+    schedule_id=$(echo "$existing_schedule" | jq -r .id)
 
     verb=PATCH
     endpoint="https://circleci.com/api/v2/schedule/$schedule_id"
@@ -51,7 +51,7 @@ else
     echo "Trigger ${TRIGGER_NAME} does not exist... creating"
 fi
 
-curl -X $verb $endpoint \
-    -d @$TRIGGER_DEFINITION_FILE \
+curl -X "$verb" "$endpoint" \
+    -d "@$TRIGGER_DEFINITION_FILE" \
     -H "Content-Type: application/json" \
     -H "circle-token: $CIRCLECI_TOKEN"

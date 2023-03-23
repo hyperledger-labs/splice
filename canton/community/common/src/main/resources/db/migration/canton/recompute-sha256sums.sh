@@ -8,5 +8,4 @@
 set -euxo pipefail
 DIR=$1
 cd "$DIR"
-find . -type f -name "*.sql" | xargs sha256sum | awk '{print "echo " $1 " > " $2}' | sed 's/\.sql/\.sha256/' | sh
-
+find . -type f -name "*.sql" -print0 | xargs -0 sha256sum | awk '{print "echo " $1 " > " $2}' | sed 's/\.sql/\.sha256/' | sh

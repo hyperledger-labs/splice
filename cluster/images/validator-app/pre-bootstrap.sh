@@ -12,7 +12,7 @@ until [ $n -gt $MAX_RETRY ]; do
     break
   else
     echo "Curl failed. Retrying in 1 second..."
-    n=$[$n+1]
+    n=$((n+1))
     sleep 1
   fi
   if [ $n -gt $MAX_RETRY ]; then
