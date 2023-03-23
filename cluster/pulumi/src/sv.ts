@@ -113,11 +113,13 @@ export function installSVC(): k8s.helm.v3.Release {
       auth0UserNameEnvVar("svc"),
       auth0UserNameEnvVar("scan"),
       auth0UserNameEnvVar("directory"),
-    ]
+    ],
+    [domain]
   );
 
   const dependsOn = [
     xns.ns,
+    participant,
     installAuth0Secret(xns, "sv1", "sv-1"),
     installAuth0Secret(xns, "sv2", "sv-2"),
     installAuth0Secret(xns, "sv3", "sv-3"),

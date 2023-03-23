@@ -448,12 +448,12 @@ function subcmd_set_machine_type() {
     gcloud container node-pools delete default-pool --quiet --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            || _error "Could not delete default node pool. Terminating early."
 
-    _info "Recreading default node pool..."
+    _info "Recreating default node pool..."
     gcloud container node-pools create default-pool --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
            --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
-           --num-nodes 1 \
+           --num-nodes 2 \
            --enable-autoscaling \
-           --min-nodes 1 \
+           --min-nodes 2 \
            --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
            || _error "Could not recreate default node pool. Terminating early."
 
@@ -509,13 +509,13 @@ function subcmd_create() {
                --enable-ip-alias \
                --enable-private-nodes \
                --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
-               --num-nodes 1 \
+               --num-nodes 2 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
                --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
                --addons=GcePersistentDiskCsiDriver \
                --enable-autoscaling \
-               --min-nodes 1 \
+               --min-nodes 2 \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}"
 
         #### Enable Firewall Access

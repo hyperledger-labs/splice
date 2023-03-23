@@ -62,22 +62,23 @@ function loadYamlFromFile(path: PathLike): any {
 }
 
 function stripJsonComments(rawText: string): string {
-    const JSON_COMMENT_REGEX = /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|\#.*)/g;
+  const JSON_COMMENT_REGEX =
+    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|\#.*)/g;
 
-    return rawText.replace(JSON_COMMENT_REGEX, (m, g) => g ? "" : m)
+  return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? "" : m));
 }
 
 function loadJsonFromFile(path: PathLike): any {
-    return JSON.parse(stripJsonComments(fs.readFileSync(path, 'utf8')));
+  return JSON.parse(stripJsonComments(fs.readFileSync(path, "utf8")));
 }
 
 export function cnChartValues(
   chartPath: string,
   overrideValues: any = {}
 ): any {
-    const networkSettings = loadJsonFromFile(
-       process.env.REPO_ROOT + "/cluster/network-settings.json"
-    );
+  const networkSettings = loadJsonFromFile(
+    process.env.REPO_ROOT + "/cluster/network-settings.json"
+  );
 
   const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"

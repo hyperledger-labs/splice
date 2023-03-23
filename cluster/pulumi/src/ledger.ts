@@ -27,13 +27,20 @@ export function installParticipant(
   postgresDb: pulumi.Output<string>,
   extraDomains: any,
   participantUsers: any,
-  extraEnvVars: any
+  extraEnvVars: any,
+  dependsOn: any = []
 ): k8s.helm.v3.Release {
-  return installCNHelmChart(xns, name, "cn-participant", {
-    postgres: postgresDb,
-    postgresSchema: xns.logicalName + "_participant",
-    extraDomains: JSON.stringify(extraDomains),
-    participantUsers: JSON.stringify(participantUsers),
-    extraEnvVars,
-  });
+  return installCNHelmChart(
+    xns,
+    name,
+    "cn-participant",
+    {
+      postgres: postgresDb,
+      postgresSchema: xns.logicalName + "_participant",
+      extraDomains: JSON.stringify(extraDomains),
+      participantUsers: JSON.stringify(participantUsers),
+      extraEnvVars,
+    },
+    dependsOn
+  );
 }

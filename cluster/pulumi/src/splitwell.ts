@@ -39,7 +39,8 @@ export function installSplitwell(
         readAs: [],
       },
     ],
-    [auth0UserNameEnvVar("splitwell_validator", "validator")]
+    [auth0UserNameEnvVar("splitwell_validator", "validator")],
+    [domain]
   );
 
   const dependsOn = [
