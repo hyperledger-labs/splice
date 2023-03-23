@@ -16,14 +16,9 @@ export function installDomain(
   name: string,
   postgresDb: pulumi.Output<string>
 ): k8s.helm.v3.Release {
-  return installCNHelmChart(
-    xns,
-    name,
-    "cn-domain",
-    {
-      postgres: postgresDb,
-    }
-  );
+  return installCNHelmChart(xns, name, "cn-domain", {
+    postgres: postgresDb,
+  });
 }
 
 export function installParticipant(
@@ -34,16 +29,11 @@ export function installParticipant(
   participantUsers: any,
   extraEnvVars: any
 ): k8s.helm.v3.Release {
-  return installCNHelmChart(
-    xns,
-    name,
-    "cn-participant",
-    {
-      postgres: postgresDb,
-      postgresSchema: xns.logicalName + "_participant",
-      extraDomains: JSON.stringify(extraDomains),
-      participantUsers: JSON.stringify(participantUsers),
-      extraEnvVars,
-    }
-  );
+  return installCNHelmChart(xns, name, "cn-participant", {
+    postgres: postgresDb,
+    postgresSchema: xns.logicalName + "_participant",
+    extraDomains: JSON.stringify(extraDomains),
+    participantUsers: JSON.stringify(participantUsers),
+    extraEnvVars,
+  });
 }

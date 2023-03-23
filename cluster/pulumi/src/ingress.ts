@@ -1,6 +1,11 @@
 import * as k8s from "@pulumi/kubernetes";
 
-import { config, exactNamespace, GLOBAL_TIMEOUT_SEC, installCNHelmChart } from "./utils";
+import {
+  config,
+  exactNamespace,
+  GLOBAL_TIMEOUT_SEC,
+  installCNHelmChart,
+} from "./utils";
 
 function installCertManager(): k8s.helm.v3.Release {
   const { ns } = exactNamespace("cert-manager");
