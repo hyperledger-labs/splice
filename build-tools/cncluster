@@ -1101,7 +1101,7 @@ function subcmd_ppreview() {
     if [ -z "${1-}" ]; then
        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
           _docker_must_be_running
-          if ! make -C ${REPO_ROOT} docker-check -j; then
+          if ! make -C "${REPO_ROOT}" docker-check -j; then
              _error "Images missing from artifact registry, cannot apply."
              exit 1
          fi
