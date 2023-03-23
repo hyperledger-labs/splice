@@ -7,6 +7,7 @@ let
   };
 in (import src) ({
   overlays = [(self: super: {
+    scala = super.scala.override { jre = super.openjdk11; };
     sbt = super.sbt.override { jre = super.openjdk11; };
     lnav = super.callPackage ./lnav.nix {};
     canton = super.callPackage ./canton.nix {};
