@@ -1,4 +1,4 @@
-local networkDefaults = import "./network-defaults.jsonnet";
+local networkDefaults = import "../network-settings.json";
 
 local c = import "./cluster.jsonnet";
 

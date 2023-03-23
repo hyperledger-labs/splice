@@ -1,15 +1,15 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: letsencrypt-production
+  name: {{ .Values.cluster.networkSettings.tls.issuerName }}
   namespace: {{ .Release.Namespace }}
 spec:
   acme:
     email: team-canton-network@digitalasset.com
     preferredChain: ""
     privateKeySecretRef:
-      name: letsencrypt-production-acme-account
-    server: https://acme-v02.api.letsencrypt.org/directory
+      name: "{{ .Values.cluster.networkSettings.tls.issuerName }}-acme-account"
+    server: {{ .Values.cluster.networkSettings.tls.issuerServer }}
     solvers:
     - dns01:
         cloudDNS:
@@ -43,12 +43,7 @@ spec:
     app: external-proxy
   type: LoadBalancer
   loadBalancerIP: "{{ .Values.cluster.ipAddress }}"
-  loadBalancerSourceRanges:
-  - 35.194.81.56/32
-  - 35.198.147.95/32
-  - 35.189.40.124/32
-  - 34.132.91.75/32
-  - 18.210.210.130/32
+  loadBalancerSourceRanges: {{ .Values.cluster.networkSettings.externalIPRanges | toJson }}
   ports:
   - name: http
     port: 80

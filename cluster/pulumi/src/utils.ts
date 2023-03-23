@@ -27,7 +27,7 @@ export const clusterIp = pulumi.interpolate`${clusterAddress.address}`;
 /// Kubernetes Namespace
 
 // There is no way to read the logical name off a Namespace.  Exactly
-// specified nNamespaces are therefore returned as a tuple with the
+// specified namespaces are therefore returned as a tuple with the
 // logical name, to allow it to be used to ensure distinct Pulumi
 // logical names when creating objects of the same name in different
 // Kubernetes namespaces.
@@ -61,10 +61,24 @@ function loadYamlFromFile(path: PathLike): any {
   return load(fs.readFileSync(path, "utf-8"));
 }
 
+function stripJsonComments(rawText: string): string {
+    const JSON_COMMENT_REGEX = /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|\#.*)/g;
+
+    return rawText.replace(JSON_COMMENT_REGEX, (m, g) => g ? "" : m)
+}
+
+function loadJsonFromFile(path: PathLike): any {
+    return JSON.parse(stripJsonComments(fs.readFileSync(path, 'utf8')));
+}
+
 export function cnChartValues(
   chartPath: string,
   overrideValues: any = {}
 ): any {
+    const networkSettings = loadJsonFromFile(
+       process.env.REPO_ROOT + "/cluster/network-settings.json"
+    );
+
   const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
   );
@@ -78,6 +92,7 @@ export function cnChartValues(
         imageTag: config.require("IMAGE_TAG"),
         ipAddress: clusterIp,
         dnsName: CLUSTER_DNS_NAME,
+        networkSettings,
       },
     },
     overrideValues

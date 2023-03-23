@@ -678,8 +678,8 @@ cncluster activate
 ### Memory Settings
 
 The most commonly used memory settings for the cluster (Postgres and the ledger)
-are stored in [`network-defaults.json`](./manifest/network-defaults.json) and
-may be adjusted there.
+are stored in [`network-settings.json`](./manifest/network-settings.json) and
+may be adjusted there. There are also settings for the network whitelist.
 
 ## TLS Certificate Provisioning
 
