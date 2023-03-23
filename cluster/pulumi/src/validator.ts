@@ -21,7 +21,7 @@ export function installValidator(
 
   const participant = installParticipant(
     xns,
-    "p",
+    "participant",
     postgresDb,
     [{ alias: "splitwell", url: "http://domain.splitwell:5008" }],
     [

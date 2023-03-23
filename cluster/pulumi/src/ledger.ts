@@ -18,11 +18,10 @@ export function installDomain(
 ): k8s.helm.v3.Release {
   return installCNHelmChart(
     xns,
-    "domain-" + xns.logicalName + "-" + name,
+    name,
     "cn-domain",
     {
       postgres: postgresDb,
-      domainServiceName: name,
     }
   );
 }
@@ -37,7 +36,7 @@ export function installParticipant(
 ): k8s.helm.v3.Release {
   return installCNHelmChart(
     xns,
-    "participant-" + xns.logicalName + "-" + name,
+    name,
     "cn-participant",
     {
       postgres: postgresDb,

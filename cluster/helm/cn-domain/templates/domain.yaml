@@ -2,23 +2,23 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Values.domainServiceName }}
-  name: {{ .Values.domainServiceName }}
+    app: {{ .Release.Name }}
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.domainServiceName }}
+      app: {{ .Release.Name }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: {{ .Values.domainServiceName }}
+        app: {{ .Release.Name }}
     spec:
       containers:
-      - name: {{ .Values.domainServiceName }}
+      - name: {{ .Release.Name }}
         image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
@@ -65,11 +65,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.domainServiceName }}
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: {{ .Values.domainServiceName }}
+    app: {{ .Release.Name }}
   ports:
   - name: cd-pub-api
     port: 5008

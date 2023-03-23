@@ -15,14 +15,14 @@ function installCluster() {
 
   const svc = installSVC();
 
-  installSvNode(svc, "sv-1");
-  installSvNode(svc, "sv-2");
-  installSvNode(svc, "sv-3");
-  installSvNode(svc, "sv-4");
-  const validator = installValidator(svc, "validator1");
-  const splitwell = installSplitwell(svc);
+  // installSvNode(svc, "sv-1");
+  // installSvNode(svc, "sv-2");
+  // installSvNode(svc, "sv-3");
+  // installSvNode(svc, "sv-4");
+  // const validator = installValidator(svc, "validator1");
+  // const splitwell = installSplitwell(svc);
 
-  const docs = installDocs();
+  // const docs = installDocs();
   //installClusterIngress(validator, splitwell, docs);
 }
 

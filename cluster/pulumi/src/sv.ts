@@ -43,7 +43,7 @@ export function installSVC(): k8s.helm.v3.Release {
 
   const participant = installParticipant(
     xns,
-    "p",
+    "participant",
     postgresDb,
     [],
     [

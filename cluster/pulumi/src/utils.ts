@@ -92,7 +92,7 @@ export function installCNHelmChart(
   dependsOn: any = []
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
-    name,
+   `helm-${xns.logicalName}-${name}`,
     {
       name,
       namespace: xns.ns.metadata.name,

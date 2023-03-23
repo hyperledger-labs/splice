@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: participant
-  name: participant
+    app: {{ .Release.Name }}
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: participant
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: participant
+        app: {{ .Release.Name }}
     spec:
       containers:
-      - name: participant
+      - name: {{ .Release.Name }}
         image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         env:
@@ -86,11 +86,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: participant
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: participant
+    app: {{ .Release.Name }}
   ports:
   - name: lg-adm-api
     port: 5002
