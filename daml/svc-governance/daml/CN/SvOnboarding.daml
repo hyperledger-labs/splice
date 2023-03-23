@@ -36,9 +36,10 @@ template SvOnboarding with
 
 -- | A confirmation for approval of a candidate SV
 template SvConfirmed with
-    svc : Party
-    sv : Party
+    svParty : Party
+    svName : Text
     reason : Text
+    svc : Party
   where
     signatory svc
-    observer sv
+    observer svParty

@@ -136,8 +136,11 @@ class GrpcSvcAppService(
               connection.submitWithResultNoDedup(
                 actAs = Seq(store.svcParty),
                 readAs = Seq.empty,
-                update =
-                  svcRules.contractId.exerciseSvcRules_AddMember(request.svParty, "mock bootstrap"),
+                update = svcRules.contractId.exerciseSvcRules_AddMember(
+                  request.svParty,
+                  s"mockName:${request.svParty}",
+                  "mock bootstrap",
+                ),
                 domainId = globalDomain,
               )
             }

@@ -15,9 +15,11 @@ import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
+import com.daml.network.sv.SvApp.{isSvcMemberName, isSvcMemberParty}
 import com.daml.network.util.Contract
 import io.opentelemetry.api.trace.Tracer
 import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -126,11 +128,21 @@ class ExecuteConfirmedActionTrigger(
                 isSvConfirmed <- acs
                   .findContract(SvConfirmed.COMPANION)(c =>
                     c.payload.svc == store.key.svcParty.toProtoPrimitive &&
-                      c.payload.sv == confirmSvAction.svcRules_ConfirmSvValue.newMember
+                      c.payload.svParty == confirmSvAction.svcRules_ConfirmSvValue.newMemberParty
                   )
                   .map(_.nonEmpty)
-                newMember = confirmSvAction.svcRules_ConfirmSvValue.newMember
-                isSvPartOfSvc <- store.getSvcRules().map(_.payload.members.containsKey(newMember))
+                newMemberParty = PartyId.tryFromProtoPrimitive(
+                  confirmSvAction.svcRules_ConfirmSvValue.newMemberParty
+                )
+                newMemberName = confirmSvAction.svcRules_ConfirmSvValue.newMemberName
+                isSvPartOfSvc <- store
+                  .getSvcRules()
+                  .map(svcRules =>
+                    isSvcMemberParty(newMemberParty, svcRules) || isSvcMemberName(
+                      newMemberName,
+                      svcRules,
+                    )
+                  )
               } yield isSvConfirmed || isSvPartOfSvc
             case action =>
               throw new UnsupportedOperationException(

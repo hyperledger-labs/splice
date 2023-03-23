@@ -143,12 +143,18 @@ class HttpSvHandler(
               case Right(_) =>
                 // We retry here because the SvcRules can change while attempting this.
                 for {
-                  _ <- retryProvider.retryForClientCalls(
+                  outcome <- retryProvider.retryForClientCalls(
                     "start SV onboarding via SvcRules",
                     startSvOnboarding(token.candidateName, token.candidateParty, body.token),
                     logger,
                   )
-                } yield v0.SvResource.OnboardSvResponseOK
+                } yield outcome match {
+                  case Left(reason) =>
+                    v0.SvResource.OnboardSvResponseBadRequest(
+                      s"Could not start onboarding: $reason"
+                    )
+                  case Right(()) => v0.SvResource.OnboardSvResponseOK
+                }
             }
       }
     }
@@ -246,40 +252,52 @@ class HttpSvHandler(
       candidateName: String,
       candidateParty: PartyId,
       token: String,
-  ): Future[Unit] =
+  ): Future[Either[String, Unit]] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         svcRules <- svcStore.getSvcRules()
         lookup <- svcStore.lookupSvOnboardingByTokenWithOffset(token)
-        _ <- lookup match {
+        outcome <- lookup match {
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")
-            Future.successful(())
+            Future.successful(Right(()))
           case QueryResult(off, None) => {
-            val cmd = (
-              svcRules.contractId
-                .exerciseSvcRules_StartSvOnboarding(
-                  candidateName,
-                  candidateParty.toProtoPrimitive,
-                  token,
-                  svParty.toProtoPrimitive,
+            if (SvApp.isSvcMemberParty(candidateParty, svcRules)) {
+              Future.successful(
+                Left("An SV with that party ID already exists.")
+              )
+            } else if (SvApp.isSvcMemberName(candidateName, svcRules)) {
+              Future.successful(
+                Left("An SV with that name already exists.")
+              )
+            } else {
+              val cmd = (
+                svcRules.contractId
+                  .exerciseSvcRules_StartSvOnboarding(
+                    candidateName,
+                    candidateParty.toProtoPrimitive,
+                    token,
+                    svParty.toProtoPrimitive,
+                  )
+              )
+              ledgerConnection
+                .submitCommands(
+                  actAs = Seq(svParty),
+                  readAs = Seq(svcParty),
+                  commands = cmd.commands.asScala.toSeq,
+                  commandId = CoinLedgerConnection.CommandId(
+                    "com.daml.network.sv.startSvOnboarding",
+                    Seq(svParty),
+                    s"$token",
+                  ),
+                  deduplicationOffset = off,
+                  domainId = globalDomain,
                 )
-            )
-            ledgerConnection.submitCommands(
-              actAs = Seq(svParty),
-              readAs = Seq(svcParty),
-              commands = cmd.commands.asScala.toSeq,
-              commandId = CoinLedgerConnection.CommandId(
-                "com.daml.network.sv.startSvOnboarding",
-                Seq(svParty),
-                s"$token",
-              ),
-              deduplicationOffset = off,
-              domainId = globalDomain,
-            )
+                .map { _ => Right(()) }
+            }
           }
         }
-      } yield ()
+      } yield outcome
     }
 
   override def onboardSvPartyMigration(respond: v0.SvResource.OnboardSvPartyMigrationResponse.type)(

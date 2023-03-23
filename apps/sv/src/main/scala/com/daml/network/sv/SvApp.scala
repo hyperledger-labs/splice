@@ -18,6 +18,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CoinUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
+import com.daml.network.util.Contract
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -180,9 +181,7 @@ class SvApp(
   ): Future[Unit] = {
     for {
       svcRules <- svcStore.lookupSvcRules()
-      bootstrapped = svcRules
-        .map(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
-        .getOrElse(false)
+      bootstrapped = svcRules.map(SvApp.isSvcMemberParty(svcStore.key.svParty, _)).getOrElse(false)
       _ <-
         if (bootstrapped) {
           logger.info(
@@ -238,7 +237,7 @@ class SvApp(
         svcRules <- svcStore.lookupSvcRules()
         _ <- svcRules match {
           case Some(c) =>
-            if (c.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)) {
+            if (SvApp.isSvcMemberParty(svcStore.key.svParty, c)) {
               logger.info("SvcRules found and we are member, done waiting")
               Future.successful(())
             } else {
@@ -311,6 +310,7 @@ class SvApp(
                   commands = new cn.svcbootstrap.SvcBootstrap(
                     svcParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
+                    foundingConfig.name,
                     defaultCoinConfigSchedule(
                       foundingConfig.initialTickDuration,
                       foundingConfig.initialMaxNumInputs,
@@ -645,7 +645,7 @@ object SvApp {
       candidateParty: PartyId,
       rawToken: String,
       svStore: SvSvStore,
-  )(implicit ec: ExecutionContext): Future[Either[String, PartyId]] = {
+  )(implicit ec: ExecutionContext): Future[Either[String, (PartyId, String)]] = {
     svStore
       .lookupApprovedSvIdentityByName(candidateName)
       .map(approvedSvO =>
@@ -662,9 +662,29 @@ object SvApp {
             if (token.candidateParty == candidateParty) Right(())
             else Left("provided party name doesn't match party in token")
           _ <- if (token.svcParty == svStore.key.svcParty) Right(()) else Left("wrong svc party")
-        } yield token.candidateParty
+        } yield (token.candidateParty, token.candidateName)
       )
   }
+
+  private[sv] def isSvcMember(
+      name: String,
+      party: PartyId,
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+  ): Boolean =
+    svcRules.payload.members.asScala
+      .get(party.toProtoPrimitive)
+      .map(_.name == name)
+      .getOrElse(false)
+
+  private[sv] def isSvcMemberParty(
+      party: PartyId,
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+  ): Boolean = svcRules.payload.members.containsKey(party.toProtoPrimitive)
+
+  private[sv] def isSvcMemberName(
+      name: String,
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+  ): Boolean = svcRules.payload.members.values.asScala.exists(_.name == name)
 
   val coinPackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId

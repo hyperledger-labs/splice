@@ -30,7 +30,11 @@ trait SvTestUtil extends CoinTestCommon {
         actAs = Seq(svcParty),
         optTimeout = None,
         commands = getSvcRules().id
-          .exerciseSvcRules_AddMember(svXParty.toProtoPrimitive, "addPhantomSv")
+          .exerciseSvcRules_AddMember(
+            svXParty.toProtoPrimitive,
+            "svX, the phantom of the SVC",
+            "addPhantomSv",
+          )
           .commands
           .asScala
           .toSeq,

@@ -47,6 +47,7 @@ data SvcRules_ActionRequiringConfirmation
 
 -- | Information about members relevant to collective governance.
 data MemberInfo = MemberInfo with
+    name : Text -- ^ Human-readable name; must be unique.
     joinedAsOfRound : Round
   deriving (Eq, Show)
 
@@ -147,6 +148,7 @@ template SvcRules with
   where
     ensure
       leader `Map.member` members &&
+        unique (map (.name) (Map.values members)) &&
         config.numUnclaimedRewardsThreshold > 0
 
     -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
@@ -160,18 +162,20 @@ template SvcRules with
 
     choice SvcRules_AddMember : ContractId SvcRules
       with
-        newMember : Party
+        newMemberParty : Party
+        newMemberName : Text
         reason : Text
       controller svc
       do
-        require "Member is new" (not $ newMember `Map.member` members)
-        let info = MemberInfo with joinedAsOfRound = nextMiningRound
+        require "Member party is new" (not $ newMemberParty `Map.member` members)
+        require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
+        let info = MemberInfo with name = newMemberName, joinedAsOfRound = nextMiningRound
         create SvcRules with
           svc
           epoch
           nextMiningRound
           leader
-          members = Map.insert newMember info members
+          members = Map.insert newMemberParty info members
           config
 
     choice SvcRules_RemoveMember : ContractId SvcRules
@@ -199,9 +203,10 @@ template SvcRules with
         svConfirmed <- fetch svConfirmedCid
         archive svConfirmedCid
         require "SVC matches" (svConfirmed.svc == svc)
-        require "SV matches" (svConfirmed.sv == sv)
+        require "SV matches" (svConfirmed.svParty == sv)
         exercise self SvcRules_AddMember with
-          newMember = svConfirmed.sv
+          newMemberParty = sv
+          newMemberName = svConfirmed.svName
           reason = svConfirmed.reason
 
     -- Leader election
@@ -336,14 +341,18 @@ template SvcRules with
 
     nonconsuming choice SvcRules_ConfirmSv : ContractId SvConfirmed
       with
-        newMember : Party
+        newMemberParty : Party
+        newMemberName : Text
         reason : Text
       controller svc
       do
+        require "Member party is new" (not $ newMemberParty `Map.member` members)
+        require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
         create SvConfirmed with
-          svc
-          sv = newMember
+          svParty = newMemberParty
+          svName = newMemberName
           reason
+          svc
 
     -- Coin management driven directly by the leader
     --------------------------------------------------

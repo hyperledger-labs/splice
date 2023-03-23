@@ -8,6 +8,7 @@ import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
+import DA.Optional (fromSome)
 import DA.Time
 
 import CN.Util.Assert
@@ -28,7 +29,7 @@ import CC.Scripts.Parameters
 testLeaderElection : Script ()
 testLeaderElection = do
 
-  (app, svc, (mallory, sv1, sv2, sv3)) <- initCollective
+  (app, svc, (mallory, sv2, sv3, sv4)) <- initCollective
   -- we now have a collective with BFT for f = 1, and mallory is the leader
 
   -- run an issuance
@@ -36,50 +37,51 @@ testLeaderElection = do
 
   -- mallory stops acting, which the others detect; they thus request a re-election
   [(svcRulesCid, _)] <- query @SvcRules svc
-  req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
-    requester = sv1
-    ranking = [sv1, sv2, sv3, mallory]
-    reason = ERR_LeaderUnavailable
-  req2 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+  req1 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = sv2
-    ranking = [sv2, sv3, sv1, mallory]
+    ranking = [sv2, sv3, sv4, mallory]
     reason = ERR_LeaderUnavailable
-  req3 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+  req2 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = sv3
-    ranking = [sv3, sv2,  sv1, mallory]
+    ranking = [sv3, sv4, sv2, mallory]
+    reason = ERR_LeaderUnavailable
+  req3 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv4
+    ranking = [sv4, sv3, sv2, mallory]
     reason = ERR_LeaderUnavailable
   -- mallory tries to get himself re-elected
   req4 <- submitMulti [mallory] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
     requester = mallory
-    ranking = [mallory, sv1, sv2, sv3]
+    ranking = [mallory, sv2, sv3, sv4]
     reason = ERR_LeaderUnavailable
   -- mallory does not get re-elected, as sv1 reaches a weak majority first
-  _ <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_ElectLeader with
-    actor = sv2
+  _ <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_ElectLeader with
+    actor = sv3
     requestCids = [req1, req2, req3, req4]
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
-  require "SV1 got elected" (svcRules.leader == sv1)
+  require "SV2 got elected" (svcRules.leader == sv2)
 
   -- run a few more issuances
   runNextIssuanceD app 1.1
   runNextIssuanceD app 1.2
 
   -- add a new SV member
-  sv4 <- allocateParty "sv4"
-  forA_ [sv1, sv2, sv3] $ \sv ->
+  sv5 <- allocateParty "sv5"
+  forA_ [sv2, sv3, sv4] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
-          newMember = sv4
+          newMemberParty = sv5
+          newMemberName = "sv5"
           reason = "decision:123"  -- unambiguous reference to the decision
           -- TODO(M3-46): streamline references to off-ledger decisions
   executeAllConfirmedActions app
 
   -- kick out mallory, now that we have enough members to then still tolerate a failure
   [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ [sv2, sv3, sv4] $ \sv ->
+  forA_ [sv3, sv4, sv5] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
@@ -91,7 +93,7 @@ testLeaderElection = do
 
   -- check that mallory is no longer present
   [(_, svcRules)] <- query @SvcRules svc
-  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv1, sv2, sv3, sv4])
+  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv2, sv3, sv4, sv5])
 
   -- wow! stuff works :D
   return ()
@@ -175,7 +177,8 @@ testSvOnboarding = do
       confirmer = sv
       action = ARC_SvcRules with
         svcAction = SRARC_ConfirmSv $ SvcRules_ConfirmSv with
-          newMember = svX
+          newMemberParty = svX
+          newMemberName = "svX"
           reason = "because"
   executeAllConfirmedActions app
 
@@ -183,7 +186,8 @@ testSvOnboarding = do
   [(svConfirmedCid, svConfirmed)] <- query @SvConfirmed svc
   svConfirmed === SvConfirmed with
     svc
-    sv = svX
+    svParty = svX
+    svName = "svX"
     reason = "because"
 
 
@@ -225,6 +229,18 @@ testSvOnboardingExpiry = do
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_ExpireSvOnboarding svOnboardingCid
 
+
+testSvNameUniqueness : Script ()
+testSvNameUniqueness = do
+  (_, svc, (sv1, _, _, _)) <- initCollective
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  (fromSome (Map.lookup sv1 svcRules.members)).name === "sv1"
+
+  svX <- allocateParty "svX"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" "we want to see if we can get away with this"
+
 -- Utils
 --------
 
@@ -242,7 +258,7 @@ initCollective = do
 
   -- have mallory bootstrap the collective
   submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founder = sv1, coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet = True)
+    (SvcBootstrap with svc, founderParty = sv1, founderName = "sv1", coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet = True)
     SvcBootstrap_Bootstrap
 
   svcUserId <- validateUserId "svc-user"
@@ -254,9 +270,9 @@ initCollective = do
 
   -- add more sv nodes
   -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
-  forA_ [sv2, sv3, sv4] $ \sv -> do
+  forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember sv "we want to"
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svParty svName "we want to"
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 

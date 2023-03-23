@@ -13,7 +13,8 @@ import CN.SvcRules
 -- | A template for bootstrapping the collective and CoinRules.
 template SvcBootstrap with
     svc : Party
-    founder : Party -- ^ the founding SV
+    founderParty : Party -- ^ the founding SV
+    founderName : Text -- ^ human-readable name of the founding SV
     coinConfigSchedule : Schedule Time (CoinConfig USD)
     coinPrice : Decimal
     config : SvcRulesConfig
@@ -21,7 +22,7 @@ template SvcBootstrap with
     isDevNet : Bool
   where
     signatory svc
-    observer founder
+    observer founderParty
 
     choice SvcBootstrap_Bootstrap : ()
       controller svc
@@ -30,8 +31,8 @@ template SvcBootstrap with
           svc
           epoch = 0
           nextMiningRound = Round 1
-          members = Map.fromList [(founder, MemberInfo with joinedAsOfRound = Round 0)]
-          leader = founder
+          members = Map.fromList [(founderParty, MemberInfo with name = founderName, joinedAsOfRound = Round 0)]
+          leader = founderParty
           config
         coinRulesCid <- create CoinRules with
           svc

@@ -28,7 +28,6 @@ case class ApprovedSvIdentityConfig(
 )
 
 sealed trait SvBootstrapConfig {
-  // TODO(#3188): make sure this ends up in the `SvcRules`
   val name: String // the human-readable name we want others to use for us
 }
 object SvBootstrapConfig {

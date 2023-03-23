@@ -39,11 +39,13 @@ class SvcPartyHostingTrigger(
         SvConfirmed,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    if (svConfirmed.payload.sv == svParty.toProtoPrimitive)
+    if (svConfirmed.payload.svParty == svParty.toProtoPrimitive)
       for {
         // TODO(#3428): _ <- svcPartyMigration(participantId)
         _ <- addMemberToSvc(svConfirmed)
-      } yield TaskSuccess(s"Added member ${svConfirmed.payload.sv} to SVC ")
+      } yield TaskSuccess(
+        s"Added member ${svConfirmed.payload.svParty} (\"${svConfirmed.payload.svName}\") to SVC"
+      )
     else
       Future.successful(
         TaskSuccess(show"ignoring $svConfirmed, as we're not the new SV")
