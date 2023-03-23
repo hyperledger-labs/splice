@@ -32,6 +32,7 @@ Example usage:
 
 To prevent false negatives and flakes: Use `actAndCheck`.
 If this doesn't match your test's logic: Consider wrapping checks in an `eventually`.
+If you want to retry a check on failures that are different from `TestFailedException`: Use `eventuallySucceeds`.
 
 ## Time-based tests
 
@@ -64,6 +65,9 @@ the longest real-time wait won't help if an automation that is required simply d
 Solution: Add an invocation of `advanceTimeByPollingInterval` to the beginning of the "check" part of your `actAndCheck`
 (respectively, to the beginning of your `eventually` block).
 
+Another frequent error is to accidentally `advanceTime` too much.
+This can, for example, cause contracts with expiration times to expire and get archived.
+
 ## Shared test environments
 
 Starting up our [test topology](apps/app/src/test/resources/simple-topology.conf) is time-intensive.
@@ -78,6 +82,15 @@ For example:
 Whenever you are registering new identifiers, such as CNS names, you must wrap them in a `perTestCaseName(...)` to avoid name collisions.
 Many ledger API user names are automatically wrapped in this way when you are using references like `aliceWallet`.
 Some aren't though - such as service users (for the SV and validator participants) that are allocated via a test's [environment definition](/apps/app/src/test/scala/com/daml/network/integration/CNNodeEnvironmentDefinition.scala).
+
+## Errors and warnings in log files
+
+As part of CI, we run `sbt checkErrors` to make sure that all logs produced during the execution of our tests are free of exceptions, warnings and errors.
+A test that produces problematic log entries is thereby considered a failing test.
+Note that it's not always obvious which test is responsible for a problematic log entry.
+The log checking happens after the tests have completed, so that even a test that is reported as "passed" on CI could be responsible.
+
+If logging an error or warning is an expected and desirable outcome of your test, use `loggerFactory.assertLogs` or one of its cousins.
 
 ## When to run preflight checks
 
