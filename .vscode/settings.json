@@ -1,3 +1,6 @@
 {
-    "daml.extraArguments": "--studio-auto-run-all-scenarios=yes"
+    "daml.extraArguments": "--studio-auto-run-all-scenarios=yes",
+    "files.watcherExclude": {
+        "**/target": true
+    }
 }
