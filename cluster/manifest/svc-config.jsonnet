@@ -151,10 +151,6 @@ local deployments(config) = [
       name: "scan-api",
       port: 5012,
     },
-    {
-      name: "scan-api-http",
-      port: 6012,
-    },
   ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "scan")),
 
   c.deployment(config, "scan-web-ui", [

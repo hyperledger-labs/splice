@@ -105,9 +105,6 @@ spec:
   - name: scan-api
     port: 5012
     protocol: TCP
-  - name: scan-api-http
-    port: 6012
-    protocol: TCP
   - name: val1-adm-api
     port: 5102
     protocol: TCP
@@ -249,9 +246,6 @@ spec:
           protocol: TCP
         - containerPort: 5012
           name: scan-api
-          protocol: TCP
-        - containerPort: 6012
-          name: scan-api-http
           protocol: TCP
         - containerPort: 5102
           name: val1-adm-api

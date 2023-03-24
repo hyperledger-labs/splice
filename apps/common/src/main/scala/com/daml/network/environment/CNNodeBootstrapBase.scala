@@ -86,7 +86,6 @@ abstract class CNNodeBootstrapBase[
     nodeMetrics: CNNodeMetrics,
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
@@ -158,7 +157,65 @@ abstract class CNNodeBootstrapBase[
 
   protected def isActive: Boolean
 
-  private def status: Future[NodeStatus[NodeStatus.Status]] = {
+  protected val grpcAdminServers: List[AutoCloseable] = List()
+
+  /** Attempt to start the node.
+    */
+  def start(): EitherT[Future, String, Unit] = {
+    initialize.leftMap { err =>
+      logger.info(s"Failed to initialize node, trying to clean up: $err")
+      close()
+      err
+    }
+  }
+
+  override def onClosed(): Unit = blocking {
+    synchronized {
+      if (isRunningVar.getAndSet(false)) {
+        val stores = List()
+        val instances =
+          grpcAdminServers ++ getNode.toList ++ stores ++ List(clock)
+        Lifecycle.close(instances: _*)(logger)
+        logger.debug(s"Successfully completed shutdown of $name")
+      } else {
+        logger.warn(
+          s"Unnecessary second close of node $name invoked. Ignoring it.",
+          new Exception("location"),
+        )
+      }
+    }
+  }
+}
+
+abstract class CNNodeBootstrapBaseGrpc[
+    T <: CantonNode,
+    NodeConfig <: LocalNodeConfig,
+    ParameterConfig <: CantonNodeParameters,
+](
+    override val name: InstanceName,
+    config: NodeConfig,
+    parameterConfig: ParameterConfig,
+    override val clock: Clock,
+    nodeMetrics: CNNodeMetrics,
+    storageFactory: StorageFactory,
+    override val loggerFactory: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
+    configuredOpenTelemetry: ConfiguredOpenTelemetry,
+)(
+    override implicit val executionContext: ExecutionContextIdlenessExecutorService,
+    override implicit val scheduler: ScheduledExecutorService,
+    override implicit val actorSystem: ActorSystem,
+) extends CNNodeBootstrapBase[T, NodeConfig, ParameterConfig](
+      name,
+      config,
+      parameterConfig,
+      clock,
+      nodeMetrics,
+      storageFactory,
+      loggerFactory,
+      configuredOpenTelemetry,
+    ) {
+  def status: Future[NodeStatus[NodeStatus.Status]] = {
     getNode
       .map(_.status.map(NodeStatus.Success(_)))
       .getOrElse(Future.successful(NodeStatus.NotInitialized(isActive)))
@@ -207,32 +264,5 @@ abstract class CNNodeBootstrapBase[
     (Lifecycle.toCloseableServer(server, logger, "AdminServer"), registry)
   }
 
-  /** Attempt to start the node.
-    */
-  def start(): EitherT[Future, String, Unit] = {
-    initialize.leftMap { err =>
-      logger.info(s"Failed to initialize node, trying to clean up: $err")
-      close()
-      err
-    }
-  }
-
-  override def onClosed(): Unit = blocking {
-    synchronized {
-      if (isRunningVar.getAndSet(false)) {
-        val stores = List()
-        val instances = List(
-          adminServerRegistry,
-          adminServer,
-        ) ++ getNode.toList ++ stores ++ List(clock)
-        Lifecycle.close(instances: _*)(logger)
-        logger.debug(s"Successfully completed shutdown of $name")
-      } else {
-        logger.warn(
-          s"Unnecessary second close of node $name invoked. Ignoring it.",
-          new Exception("location"),
-        )
-      }
-    }
-  }
+  override val grpcAdminServers = List(adminServer, adminServerRegistry)
 }

@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBase
+import com.daml.network.environment.CNNodeBootstrapBaseGrpc
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -44,7 +44,7 @@ class WalletAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends CNNodeBootstrapBaseGrpc[
       WalletApp,
       WalletAppBackendConfig,
       SharedCNNodeAppParameters,

@@ -5,7 +5,6 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -36,7 +35,6 @@ class ScanAppBootstrap(
     metrics: ScanAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -56,7 +54,6 @@ class ScanAppBootstrap(
       metrics,
       storageFactory,
       loggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ) {
 
@@ -92,7 +89,6 @@ object ScanAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      writeHealthDumpToFile: HealthDumpFunction,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -112,7 +108,6 @@ object ScanAppBootstrap {
           scanMetrics,
           new CommunityStorageFactory(scanConfig.storage),
           loggerFactory,
-          writeHealthDumpToFile,
           futureSupervisor,
           configuredOpenTelemetry,
         )

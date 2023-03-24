@@ -29,9 +29,6 @@ spec:
         - containerPort: 5012
           name: scan-api
           protocol: TCP
-        - containerPort: 6012
-          name: scan-api-http
-          protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -49,10 +46,6 @@ spec:
     port: 5012
     protocol: TCP
     targetPort: 5012
-  - name: scan-api-http
-    port: 6012
-    protocol: TCP
-    targetPort: 6012
 ---
 apiVersion: apps/v1
 kind: Deployment

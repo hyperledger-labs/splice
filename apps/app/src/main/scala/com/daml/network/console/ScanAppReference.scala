@@ -21,6 +21,7 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.ConsoleMacros
 import com.daml.network.environment.CNNodeStatus
 import scala.util.Try
+import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -173,6 +174,22 @@ abstract class ScanAppReference(
   }
 
   // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
+  // Override topology to avoid using grpc status check
+  private lazy val topology_ =
+    new TopologyAdministrationGroup(
+      this,
+      None,
+      consoleEnvironment,
+      loggerFactory,
+    )
+  @Help.Summary("Topology management related commands")
+  @Help.Group("Topology")
+  @Help.Description(
+    "This group contains access to the full set of topology management commands."
+  )
+  override def topology: TopologyAdministrationGroup = topology_
+
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
   override def waitForInitialization(
       timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
   ): Unit =
@@ -199,7 +216,7 @@ final class ScanAppBackendReference(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 1000}",
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
     config.clientAdminApi,
   )
 

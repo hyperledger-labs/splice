@@ -116,14 +116,11 @@ class ScanApp(
         }
       }
 
-      httpConfig = config.adminApi.clientConfig.copy(
-        port = config.adminApi.port + 1000
-      )
-      _ = logger.info(s"Starting http server on ${httpConfig}")
+      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
       binding <- Http()
         .newServerAt(
-          httpConfig.address,
-          httpConfig.port.unwrap,
+          config.adminApi.clientConfig.address,
+          config.adminApi.clientConfig.port.unwrap,
         )
         .bind(
           routes

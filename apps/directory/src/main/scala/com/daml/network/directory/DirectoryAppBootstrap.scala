@@ -8,7 +8,7 @@ import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBase
+import com.daml.network.environment.CNNodeBootstrapBaseGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -43,7 +43,7 @@ class DirectoryAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends CNNodeBootstrapBaseGrpc[
       DirectoryApp,
       LocalDirectoryAppConfig,
       SharedCNNodeAppParameters,

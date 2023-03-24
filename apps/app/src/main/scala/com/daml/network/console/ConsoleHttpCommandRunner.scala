@@ -82,6 +82,7 @@ class ConsoleHttpCommandRunner(
       logger.debug(s"Running on ${instanceName} command ${command} against ${clientConfig}")(
         traceContext
       )
+      // TODO(#2019): after all apps are HTTP-only, construct host from clientConfig.address + clientConfig.port. Then we can drop CNHttpClientConfig.
       val host = clientConfig.url
       val apiResult =
         awaitTimeout.await(

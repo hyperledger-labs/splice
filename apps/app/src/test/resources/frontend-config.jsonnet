@@ -46,7 +46,7 @@ local validatorNodes(clusterAddress) = {
     wallet: { url: "http://localhost:6204", uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:6113" },
     directory: { url: "http://localhost:6110", jsonApiUrl: "http://localhost:3004/api/json-api/" },
-    scan: { url: "http://localhost:6012" },
+    scan: { url: "http://localhost:5012" },
   },
   bob: {
     ledgerApi: { url: "http://localhost:6301" },
@@ -55,7 +55,7 @@ local validatorNodes(clusterAddress) = {
     wallet: { url: "http://localhost:6304", uiUrl: "http://localhost:3001" },
     splitwell: { url: "http://localhost:6113" },
     directory: { url: "http://localhost:6110", jsonApiUrl: "http://localhost:3004/api/json-api/" },
-    scan: { url: "http://localhost:6012" },
+    scan: { url: "http://localhost:5012" },
   },
   preflight: {
     ledgerApi: { url: "http://localhost:8001" },
@@ -64,10 +64,10 @@ local validatorNodes(clusterAddress) = {
     wallet: { url: "http://localhost:6004", uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:6113" },
     directory: { url: clusterAddress + ":6010", jsonApiUrl: "http://localhost:3004/api/json-api/" },
-    scan: { url: clusterAddress + ":6012" },
+    scan: { url: clusterAddress + ":5012" },
   },
   scan: {
-    scan: { url: "http://localhost:6012" },
+    scan: { url: "http://localhost:5012" },
   },
 };
 

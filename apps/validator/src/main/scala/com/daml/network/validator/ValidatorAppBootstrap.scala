@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.{CNNodeBootstrapBase}
+import com.daml.network.environment.CNNodeBootstrapBaseGrpc
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -45,7 +45,7 @@ class ValidatorAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBase[
+) extends CNNodeBootstrapBaseGrpc[
       ValidatorApp,
       ValidatorAppBackendConfig,
       SharedCNNodeAppParameters,

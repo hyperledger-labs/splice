@@ -1695,10 +1695,6 @@
                            {
                               "containerPort": 5012,
                               "name": "scan-api"
-                           },
-                           {
-                              "containerPort": 6012,
-                              "name": "scan-api-http"
                            }
                         ],
                         "resources": {
@@ -1734,11 +1730,6 @@
                {
                   "name": "scan-api",
                   "port": 5012,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "scan-api-http",
-                  "port": 6012,
                   "protocol": "TCP"
                }
             ],
@@ -4304,10 +4295,6 @@
                               "name": "scan-api"
                            },
                            {
-                              "containerPort": 6012,
-                              "name": "scan-api-http"
-                           },
-                           {
                               "containerPort": 5102,
                               "name": "val1-adm-api"
                            },
@@ -4525,11 +4512,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "scan-api-http",
-                  "port": 6012,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "val1-adm-api",
                   "port": 5102,
                   "protocol": "TCP"
@@ -4731,11 +4713,6 @@
                {
                   "name": "scan-api",
                   "port": 5012,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "scan-api-http",
-                  "port": 6012,
                   "protocol": "TCP"
                },
                {
