@@ -995,7 +995,9 @@ function subcmd_update_secrets() {
     "cn-app-validator-ledger-api-auth splitwell_validator splitwell" \
     "cn-app-wallet-ledger-api-auth splitwell_wallet splitwell"
   do
-    set -- "$i"
+    # shellcheck disable=SC2086
+    set -- $i
+
     client_id="${appToClientId[$2]}"
     secret=$(echo "$all" | jq -r ".[] | select(.client_id==\"$client_id\") | .client_secret")
 
@@ -1016,7 +1018,8 @@ function subcmd_update_secrets() {
     "cn-app-splitwell-ui-auth validator1" \
     "cn-app-wallet-ui-auth splitwell"
   do
-    set -- "$i"
+    # shellcheck disable=SC2086
+    set -- $i
     client_id="${namespaceToUiClientId[$2]}"
     _set_auth0_ui_secret "$1" "$client_id" "$2"
   done
