@@ -142,7 +142,7 @@ abstract class WalletAppReference(
   )
   def getSubscriptionRequest(
       contractId: subsCodegen.SubscriptionRequest.ContractId
-  ): Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest] = {
+  ): HttpWalletAppClient.SubscriptionRequest = {
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient.GetSubscriptionRequest(contractId)
@@ -155,9 +155,7 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the SubscriptionRequests of the configured user. " +
       "Returns all found subscription requests."
   )
-  def listSubscriptionRequests(): Seq[
-    Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
-  ] = {
+  def listSubscriptionRequests(): Seq[HttpWalletAppClient.SubscriptionRequest] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListSubscriptionRequests)
     }

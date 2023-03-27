@@ -39,12 +39,14 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       createDirectoryEntry(alicePartyId, aliceDirectory, aliceEntryName, aliceWallet)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
+      val selfSubscriptionDescription = "A recurring thing"
       createSelfSubscription(
         aliceWalletBackend.remoteParticipantWithAdminToken,
         aliceDamlUser,
         alicePartyId,
         paymentAmount(42.0, paymentCodegen.Currency.CC),
         paymentInterval = Duration.ofDays(1),
+        description = selfSubscriptionDescription,
       )
 
       def matchSecondSubscription(row: Element) = matchSubscription(row)(
@@ -54,6 +56,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
         expectedCoinPrice = "84 USD @ 0.5CC/USD",
         expectedPaymentDate = s"${aDate.getMonthValue}/${aDate.getDayOfMonth}/${aDate.getYear}",
         expectedButtonEnabled = true,
+        expectedDescription = selfSubscriptionDescription,
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -75,6 +78,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
               expectedButtonEnabled = true,
+              expectedDescription = s"Directory entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -156,7 +160,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText("SOME DESCRIPTION") // TODO (#3304): use actual description
+              .text should matchText(s"Directory entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -182,7 +186,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2 // from createDirectoryEntry and just-accepted requestDirectoryEntry
-            matchSubscription(subscriptionRows.head)(
+            matchSubscription(subscriptionRows.last)(
               expectedReceiver = directoryParty,
               expectedProvider = directoryParty,
               expectedPrice = "1 USD per 90 days",
@@ -190,6 +194,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
               expectedButtonEnabled = true,
+              expectedDescription = s"Directory entry: \"$newlyPurchasedName\"",
             )
           },
         )
@@ -206,7 +211,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       expectedCoinPrice: String,
       expectedPaymentDate: String,
       expectedButtonEnabled: Boolean,
-      expectedDescription: String = "Service Desc.", // TODO: (#3304) check the description
+      expectedDescription: String,
   ) = {
     subscriptionRow.childElement(className("sub-receiver")).text should matchText(expectedReceiver)
 

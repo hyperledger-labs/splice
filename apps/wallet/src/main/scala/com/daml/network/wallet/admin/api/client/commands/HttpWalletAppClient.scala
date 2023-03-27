@@ -65,8 +65,42 @@ object HttpWalletAppClient {
   )
 
   final case class Subscription(
-      main: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
+      subscription: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
       state: SubscriptionState,
+      context: Contract[
+        subsCodegen.SubscriptionContext.ContractId,
+        subsCodegen.SubscriptionContextView,
+      ],
+  )
+
+  final case class SubscriptionRequest(
+      subscriptionRequest: Contract[
+        subsCodegen.SubscriptionRequest.ContractId,
+        subsCodegen.SubscriptionRequest,
+      ],
+      context: Contract[
+        subsCodegen.SubscriptionContext.ContractId,
+        subsCodegen.SubscriptionContextView,
+      ],
+  )
+
+  object SubscriptionRequest {
+    def parseHttp(
+        subscriptionRequest: definitions.SubscriptionRequest
+    )(implicit decoder: TemplateJsonDecoder): Either[String, SubscriptionRequest] = {
+      (for {
+        main <- Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(
+          subscriptionRequest.subscriptionRequest
+        )
+        context <- Contract.fromJson(subsCodegen.SubscriptionContext.INTERFACE)(
+          subscriptionRequest.context
+        )
+      } yield SubscriptionRequest(main, context)).leftMap(_.toString)
+    }
+  }
+
+  final case class SubscriptionContext(
+      description: String
   )
 
   sealed trait SubscriptionState extends Product with Serializable;
@@ -429,9 +463,7 @@ object HttpWalletAppClient {
   case object ListSubscriptionRequests
       extends BaseCommand[
         http.ListSubscriptionRequestsResponse,
-        Seq[
-          Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
-        ],
+        Seq[SubscriptionRequest],
       ] {
     def submitRequest(
         client: Client,
@@ -443,14 +475,10 @@ object HttpWalletAppClient {
         response: http.ListSubscriptionRequestsResponse
     )(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[
-      Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
-    ]] = {
+    ): Either[String, Seq[SubscriptionRequest]] = {
       response match {
         case http.ListSubscriptionRequestsResponse.OK(response) =>
-          response.subscriptionRequests
-            .traverse(req => Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(req))
-            .leftMap(_.toString)
+          response.subscriptionRequests.traverse(req => SubscriptionRequest.parseHttp(req))
         case http.ListSubscriptionRequestsResponse.NotFound(ErrorResponse(err)) =>
           Left(err)
         case http.ListSubscriptionRequestsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
@@ -523,7 +551,10 @@ object HttpWalletAppClient {
             .traverse(sub =>
               for {
                 main <- Contract
-                  .fromJson(subsCodegen.Subscription.COMPANION)(sub.main)
+                  .fromJson(subsCodegen.Subscription.COMPANION)(sub.subscription)
+                  .leftMap(_.toString)
+                context <- Contract
+                  .fromJson(subsCodegen.SubscriptionContext.INTERFACE)(sub.context)
                   .leftMap(_.toString)
                 state <- (sub.state match {
                   case SubscriptionStateContract(SubscriptionStateIdleContract(contract)) =>
@@ -541,7 +572,7 @@ object HttpWalletAppClient {
                       )
                     )
                 }).leftMap(_.toString)
-              } yield Subscription(main, state)
+              } yield Subscription(main, state, context)
             )
         case http.ListSubscriptionsResponse.NotFound(ErrorResponse(error)) =>
           Left(error)
@@ -555,7 +586,7 @@ object HttpWalletAppClient {
       contractId: subsCodegen.SubscriptionRequest.ContractId
   ) extends BaseCommand[
         http.GetSubscriptionRequestResponse,
-        Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest],
+        SubscriptionRequest,
       ] {
     def submitRequest(
         client: Client,
@@ -567,13 +598,10 @@ object HttpWalletAppClient {
         response: http.GetSubscriptionRequestResponse
     )(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Contract[
-      subsCodegen.SubscriptionRequest.ContractId,
-      subsCodegen.SubscriptionRequest,
-    ]] = {
+    ): Either[String, SubscriptionRequest] = {
       response match {
-        case GetSubscriptionRequestResponse.OK(value) =>
-          Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(value).leftMap(_.toString)
+        case GetSubscriptionRequestResponse.OK(subscriptionRequest) =>
+          SubscriptionRequest.parseHttp(subscriptionRequest)
         case GetSubscriptionRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
         case GetSubscriptionRequestResponse.InternalServerError(ErrorResponse(error)) => Left(error)
       }

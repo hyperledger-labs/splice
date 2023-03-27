@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Contract, DirectoryEntry, IntervalDisplay } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, IntervalDisplay } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -12,14 +12,14 @@ import Loading from '../components/Loading';
 import PaymentHeader from '../components/PaymentHeader';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { SubscriptionRequestWithContext } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
   const { cid } = useParams();
   const { getSubscriptionRequest } = useWalletClient();
 
-  const [subscriptionRequest, setSubscriptionRequest] =
-    useState<Contract<damlSubscriptionRequest>>();
+  const [subscriptionRequest, setSubscriptionRequest] = useState<SubscriptionRequestWithContext>();
   useEffect(() => {
     const fetchSubscriptionRequest = async () => {
       const subscriptionRequest = await getSubscriptionRequest(cid!);
@@ -41,11 +41,19 @@ export const ConfirmSubscription: React.FC = () => {
             <Stack alignItems="center" spacing={1}>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="h5">Confirm Subscription to </Typography>
-                <DirectoryEntry partyId={subscriptionRequest.payload.subscriptionData.receiver} />
+                <DirectoryEntry
+                  partyId={
+                    subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver
+                  }
+                />
               </Stack>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="body2">via </Typography>
-                <DirectoryEntry partyId={subscriptionRequest.payload.subscriptionData.provider} />
+                <DirectoryEntry
+                  partyId={
+                    subscriptionRequest.subscriptionRequest.payload.subscriptionData.provider
+                  }
+                />
               </Stack>
             </Stack>
             <SubscriptionContainer subscription={subscriptionRequest} />
@@ -58,7 +66,7 @@ export const ConfirmSubscription: React.FC = () => {
 
 export default ConfirmSubscription;
 
-const SubscriptionContainer: React.FC<{ subscription: Contract<damlSubscriptionRequest> }> = ({
+const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithContext }> = ({
   subscription,
 }) => {
   const coinPrice = useCoinPrice();
@@ -67,7 +75,7 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<damlSubscriptionR
     return <Loading />;
   }
 
-  const payData = subscription.payload.payData;
+  const payData = subscription.subscriptionRequest.payload.payData;
   const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
   const converted = convertCurrency(amount, currency, coinPrice);
@@ -78,9 +86,8 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<damlSubscriptionR
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Stack alignItems="center">
             <Typography variant="body1">Description</Typography>
-            {/*TODO (#3304): use proper description */}
             <Typography variant="h6" className="sub-request-description">
-              SOME DESCRIPTION
+              {subscription.context.payload.description}
             </Typography>
           </Stack>
           <Typography variant="body1">Subscription Details</Typography>
@@ -98,7 +105,7 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<damlSubscriptionR
           <Stack alignItems="center">
             <Typography variant="body2">The first payment will be deducted immediately.</Typography>
           </Stack>
-          <ConfirmSubscriptionButton cid={subscription.contractId} />
+          <ConfirmSubscriptionButton cid={subscription.subscriptionRequest.contractId} />
         </Stack>
       </Box>
     </Container>

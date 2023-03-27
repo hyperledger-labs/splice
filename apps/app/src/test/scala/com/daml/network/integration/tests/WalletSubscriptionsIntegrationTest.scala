@@ -48,23 +48,26 @@ class WalletSubscriptionsIntegrationTest
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
+      val description = "this will be rejected"
       val request = createSelfSubscriptionRequest(
         aliceWalletBackend.remoteParticipantWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
+        description = description,
       )
 
       val requestId = clue("List subscription requests to find out request ID") {
         eventually() {
           inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) =>
-            r.payload shouldBe request
-            r.contractId
+            r.subscriptionRequest.payload shouldBe request
+            r.context.payload.description shouldBe description
+            r.subscriptionRequest.contractId
           }
         }
       }
 
       clue("Get the subscription request") {
-        aliceWallet.getSubscriptionRequest(requestId).payload shouldBe request
+        aliceWallet.getSubscriptionRequest(requestId).subscriptionRequest.payload shouldBe request
       }
 
       clue("Reject the subscription request") {
@@ -88,6 +91,7 @@ class WalletSubscriptionsIntegrationTest
         aliceWallet.listSubscriptionRequests() shouldBe empty
         aliceWallet.listSubscriptions() shouldBe empty
 
+        val description = "this will be accepted"
         val (request, requestId) = actAndCheck(
           "Create self-subscription request",
           createSelfSubscriptionRequest(
@@ -96,13 +100,15 @@ class WalletSubscriptionsIntegrationTest
             aliceUserParty,
             paymentInterval = Duration.ofMinutes(10),
             paymentDuration = Duration.ofMinutes(10),
+            description = description,
           ),
         )(
           "the created subscription request is listed correctly",
           request =>
             inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) =>
-              r.payload shouldBe request
-              r.contractId
+              r.subscriptionRequest.payload shouldBe request
+              r.context.payload.description shouldBe description
+              r.subscriptionRequest.contractId
             },
         )
         clue("Alice gets some coins") {
@@ -147,9 +153,9 @@ class WalletSubscriptionsIntegrationTest
           "an automated subscription payment is eventually initiated by the wallet",
           _ =>
             inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
-              sub.main.payload should equal(request.subscriptionData)
+              sub.subscription.payload should equal(request.subscriptionData)
               inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
-                state.payload.subscription shouldBe sub.main.contractId
+                state.payload.subscription shouldBe sub.subscription.contractId
                 state.payload.payData should equal(request.payData)
                 state.contractId
               }
@@ -177,9 +183,9 @@ class WalletSubscriptionsIntegrationTest
           "the subscription is back in idle state",
           _ =>
             inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
-              sub.main.payload should equal(request.subscriptionData)
+              sub.subscription.payload should equal(request.subscriptionData)
               inside(sub.state) { case HttpWalletAppClient.SubscriptionIdleState(state) =>
-                state.payload.subscription should equal(sub.main.contractId)
+                state.payload.subscription should equal(sub.subscription.contractId)
                 state.payload.payData should equal(request.payData)
                 state.contractId
               }

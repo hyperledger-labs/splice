@@ -236,8 +236,8 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       // and accept it.
       val initialPayment = eventually()(inside(refs.wallet.listSubscriptionRequests()) {
         case Seq(storeRequest) =>
-          storeRequest.contractId shouldBe subscriptionRequest
-          refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
+          storeRequest.subscriptionRequest.contractId shouldBe subscriptionRequest
+          refs.wallet.acceptSubscriptionRequest(storeRequest.subscriptionRequest.contractId)
       })
       // Wait for the SubscriptionInitialPayment to be archived
       eventually() {

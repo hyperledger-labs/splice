@@ -470,7 +470,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+                $ref: "#/components/schemas/SubscriptionRequest"
         "404":
           description: not_found
           content:
@@ -908,7 +908,7 @@ components:
         subscription_requests:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/SubscriptionRequest"
 
     ListSubscriptionInitialPaymentsResponse:
       type: object
@@ -920,16 +920,30 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
 
+    SubscriptionRequest:
+      type: object
+      required:
+        - subscriptionRequest
+        - context
+      properties:
+        subscriptionRequest:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        context:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
     Subscription:
       type: object
       required:
-      - main
+      - subscription
       - state
+      - context
       properties:
-        main:
+        subscription:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
         state:
           $ref: "#/components/schemas/SubscriptionState"
+        context:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
     SubscriptionState:
       type: object
       properties:

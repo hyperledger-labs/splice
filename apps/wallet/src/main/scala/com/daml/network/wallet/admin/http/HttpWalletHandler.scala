@@ -103,12 +103,15 @@ class HttpWalletHandler(
   override def getAppPaymentRequest(respond: r0.GetAppPaymentRequestResponse.type)(
       contractId: String
   )(user: String): Future[r0.GetAppPaymentRequestResponse] = {
-    getContract(
-      walletCodegen.AppPaymentRequest.COMPANION,
-      contractId,
-      user,
-      contract => r0.GetAppPaymentRequestResponseOK(contract),
-    )
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val requestCid =
+        Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(contractId)
+      for {
+        userStore <- getUserStore(user)
+        acs <- userStore.defaultAcs
+        contract <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(requestCid)
+      } yield r0.GetAppPaymentRequestResponseOK(contract.toJson)
+    }
   }
 
   override def listAppPaymentRequests(
@@ -142,11 +145,16 @@ class HttpWalletHandler(
   override def listSubscriptionRequests(
       respond: v0.WalletResource.ListSubscriptionRequestsResponse.type
   )()(user: String): Future[v0.WalletResource.ListSubscriptionRequestsResponse] =
-    listContracts(
-      subsCodegen.SubscriptionRequest.COMPANION,
-      user,
-      d0.ListSubscriptionRequestsResponse(_),
-    )
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        userStore <- getUserStore(user)
+        subRequests <- userStore.listSubscriptionRequests()
+      } yield {
+        d0.ListSubscriptionRequestsResponse(subRequests.map { subRequest =>
+          d0.SubscriptionRequest(subRequest.subscription.toJson, subRequest.context.toJson)
+        }.toVector)
+      }
+    }
 
   override def listSubscriptions(respond: v0.WalletResource.ListSubscriptionsResponse.type)()(
       user: String
@@ -154,30 +162,22 @@ class HttpWalletHandler(
     implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
-        acs <- userStore.defaultAcs
-        subscriptions <- acs.listContracts(subsCodegen.Subscription.COMPANION)
-        subscriptionIdleStates <- acs.listContracts(
-          subsCodegen.SubscriptionIdleState.COMPANION
-        )
-        subscriptionPayments <- acs.listContracts(
-          subsCodegen.SubscriptionPayment.COMPANION
-        )
+        subscriptions <- userStore.listSubscriptions()
       } yield {
-        val mainMap = subscriptions.map(sub => (sub.contractId -> sub.toJson)).toMap
-        val idleStates = subscriptionIdleStates.map(state =>
-          (state.payload.subscription, d0.SubscriptionState(idle = Some(state.toJson)))
-        )
-        val payments = subscriptionPayments.map(state =>
-          (state.payload.subscription, d0.SubscriptionState(payment = Some(state.toJson)))
-        )
         v0.WalletResource.ListSubscriptionsResponseOK(
           d0.ListSubscriptionsResponse(
-            (for {
-              (mainId, state) <- (idleStates ++ payments).distinctBy(_._1)
-              main <- mainMap.get(mainId)
-            } yield {
-              d0.Subscription(main, state)
-            }).toVector
+            subscriptions.map { subscription =>
+              d0.Subscription(
+                subscription.subscription.toJson,
+                subscription.state match {
+                  case UserWalletStore.SubscriptionIdleState(contract) =>
+                    d0.SubscriptionState(idle = Some(contract.toJson))
+                  case UserWalletStore.SubscriptionPaymentState(contract) =>
+                    d0.SubscriptionState(payment = Some(contract.toJson))
+                },
+                subscription.context.toJson,
+              )
+            }.toVector
           )
         )
       }
@@ -225,23 +225,6 @@ class HttpWalletHandler(
         )
       )
     }
-
-  private def getContract[TCid <: ContractId[T], T <: Template, ResponseT](
-      templateCompanion: Contract.Companion.Template[TCid, T],
-      contractId: String,
-      user: String,
-      mkResponse: d0.Contract => ResponseT,
-  ) = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      val requestCid =
-        Codec.tryDecodeJavaContractId(templateCompanion)(contractId)
-      for {
-        userStore <- getUserStore(user)
-        acs <- userStore.defaultAcs
-        contract <- acs.getContractById(templateCompanion)(requestCid)
-      } yield mkResponse(contract.toJson)
-    }
-  }
 
   private def listContracts[TCid <: ContractId[T], T <: Template, ResponseT](
       templateCompanion: Contract.Companion.Template[TCid, T],
@@ -370,12 +353,19 @@ class HttpWalletHandler(
   override def getSubscriptionRequest(respond: r0.GetSubscriptionRequestResponse.type)(
       contractId: String
   )(user: String): Future[r0.GetSubscriptionRequestResponse] = {
-    getContract(
-      subsCodegen.SubscriptionRequest.COMPANION,
-      contractId,
-      user,
-      contract => r0.GetSubscriptionRequestResponseOK(contract),
-    )
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val requestCid =
+        Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(contractId)
+      for {
+        userStore <- getUserStore(user)
+        subscriptionRequest <- userStore.getSubscriptionRequest(requestCid)
+      } yield r0.GetSubscriptionRequestResponseOK(
+        d0.SubscriptionRequest(
+          subscriptionRequest.subscription.toJson,
+          subscriptionRequest.context.toJson,
+        )
+      )
+    }
   }
 
   override def acceptSubscriptionRequest(

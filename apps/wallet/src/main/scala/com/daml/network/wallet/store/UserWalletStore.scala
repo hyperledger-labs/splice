@@ -22,6 +22,13 @@ import com.daml.network.codegen.java.cn.{
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory}
 import com.daml.network.util.{CNNodeUtil, Contract}
+import com.daml.network.wallet.store.UserWalletStore.{
+  SubscriptionIdleState,
+  SubscriptionPaymentState,
+  SubscriptionRequest,
+  SubscriptionState,
+  Subscription,
+}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -98,6 +105,76 @@ trait UserWalletStore
       acs <- defaultAcs
       cos <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
     } yield cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq
+  }
+
+  def listSubscriptions()(implicit ec: ExecutionContext): Future[Seq[Subscription]] = {
+    // This is racy: you can miss subscriptions if their state change concurrently, i.e., you don't see them
+    // as either idle or payment. This is okay since it'll just refresh in the UI.
+    for {
+      acs <- defaultAcs
+      subscriptions <- acs.listContracts(subsCodegen.Subscription.COMPANION)
+      // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
+      subscriptionContexts <- acs.listContractsI(subsCodegen.SubscriptionContext.INTERFACE)(_ =>
+        true
+      )
+      subscriptionIdleStates <- acs.listContracts(
+        subsCodegen.SubscriptionIdleState.COMPANION
+      )
+      subscriptionPayments <- acs.listContracts(
+        subsCodegen.SubscriptionPayment.COMPANION
+      )
+    } yield {
+      val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
+      val contextsMap = subscriptionContexts.map(ctx => ctx.contractId -> ctx).toMap
+      val idleStates: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
+        subscriptionIdleStates.map(state =>
+          (state.payload.subscription, SubscriptionIdleState(state))
+        )
+      val payments: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
+        subscriptionPayments.map(state =>
+          (state.payload.subscription, SubscriptionPaymentState(state))
+        )
+      val states: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
+        (idleStates ++ payments).distinctBy(_._1)
+      for {
+        (mainId, state) <- states
+        main <- mainMap.get(mainId)
+        context <- contextsMap.get(main.payload.context)
+      } yield {
+        Subscription(main, context, state)
+      }
+    }
+  }
+
+  def getSubscriptionRequest(
+      cid: subsCodegen.SubscriptionRequest.ContractId
+  )(implicit ec: ExecutionContext): Future[SubscriptionRequest] = {
+    for {
+      acs <- defaultAcs
+      contract <- acs.getContractById(subsCodegen.SubscriptionRequest.COMPANION)(cid)
+      context <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+        contract.payload.subscriptionData.context
+      )
+    } yield SubscriptionRequest(contract, context)
+  }
+
+  def listSubscriptionRequests()(implicit
+      ec: ExecutionContext
+  ): Future[Seq[SubscriptionRequest]] = {
+    for {
+      acs <- defaultAcs
+      contracts <- acs.listContracts(subsCodegen.SubscriptionRequest.COMPANION)
+      // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
+      contexts <- acs.listContractsI(subsCodegen.SubscriptionContext.INTERFACE)(_ => true)
+    } yield {
+      val contextsMap = contexts.map(ctx => ctx.contractId -> ctx).toMap
+      contracts.map { contract =>
+        SubscriptionRequest(
+          contract,
+          contextsMap(contract.payload.subscriptionData.context),
+        )
+      }
+    }
   }
 
   /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
@@ -215,6 +292,40 @@ trait UserWalletStore
 }
 
 object UserWalletStore {
+  type SubscriptionContextContract =
+    Contract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
+
+  sealed trait SubscriptionState {
+    val contract: Contract[?, ?]
+  }
+  final case class SubscriptionIdleState(
+      contract: Contract[
+        subsCodegen.SubscriptionIdleState.ContractId,
+        subsCodegen.SubscriptionIdleState,
+      ]
+  ) extends SubscriptionState
+  final case class SubscriptionPaymentState(
+      contract: Contract[
+        subsCodegen.SubscriptionPayment.ContractId,
+        subsCodegen.SubscriptionPayment,
+      ]
+  ) extends SubscriptionState
+  final case class Subscription(
+      subscription: Contract[
+        subsCodegen.Subscription.ContractId,
+        subsCodegen.Subscription,
+      ],
+      context: SubscriptionContextContract,
+      state: SubscriptionState,
+  )
+  final case class SubscriptionRequest(
+      subscription: Contract[
+        subsCodegen.SubscriptionRequest.ContractId,
+        subsCodegen.SubscriptionRequest,
+      ],
+      context: SubscriptionContextContract,
+  )
+
   type TxLogIndexRecord = UserWalletTxLogParser.TxLogIndexRecord
   type TxLogEntry = UserWalletTxLogParser.TxLogEntry
 

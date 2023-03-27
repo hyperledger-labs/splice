@@ -339,7 +339,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       wallet.listSubscriptionRequests() should have length 1
     }
     wallet.acceptSubscriptionRequest(
-      wallet.listSubscriptionRequests().head.contractId
+      wallet.listSubscriptionRequests().head.subscriptionRequest.contractId
     )
   }
 
@@ -489,6 +489,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userParty: PartyId,
       serviceParty: PartyId,
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): testSubsCodegen.TestSubscriptionContext.ContractId = {
@@ -496,7 +497,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
       serviceParty.toProtoPrimitive,
-      "description",
+      description,
     )
     clue("Create a subscription context") {
       val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
@@ -612,6 +613,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
@@ -622,6 +624,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         userParty,
         userParty,
         domainId,
+        description,
       )
     val (subscription, payData) =
       createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
@@ -649,6 +652,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
@@ -659,6 +663,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         userParty,
         userParty,
         domainId,
+        description,
       )
     val (subscriptionData, payData) =
       createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)

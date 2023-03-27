@@ -83,7 +83,8 @@ class WalletFrontendIntegrationTest
       val subscriptionRequest = eventually()(
         getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
       )
-      val _ = aliceWallet.acceptSubscriptionRequest(subscriptionRequest.contractId)
+      val _ =
+        aliceWallet.acceptSubscriptionRequest(subscriptionRequest.subscriptionRequest.contractId)
 
       eventuallySucceeds() {
         directory.lookupEntryByName(entryName)

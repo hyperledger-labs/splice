@@ -156,7 +156,7 @@ class WalletNewPaymentFrontendIntegrationTest
       expectedProvider: String,
       expectedTotalCC: String,
       expectedComputeText: String,
-      expectedDescription: String = "Payment Desc.", // TODO: (#3304) check the description
+      expectedDescription: String = "Payment Desc.", // TODO: (#3483) check the description
   ) = {
     element.childElement(className("available-balance")).text should matchText(expectedBalance)
 

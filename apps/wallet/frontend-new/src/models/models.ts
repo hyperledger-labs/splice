@@ -9,6 +9,7 @@ import { CoinPosition } from 'wallet-openapi';
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
   Subscription,
+  SubscriptionContext,
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
@@ -62,9 +63,18 @@ export interface WalletTransferOffer {
 }
 
 export interface WalletSubscription {
-  provider: { description: string; cns: string }; // Receiver is currently missing in the design
-  price: { amount: string; currency: string; perPeriod: string };
-  nextPaymentDue: string;
+  subscription: Contract<Subscription>;
+  context: Contract<SubscriptionContext>;
+  state: SubscriptionState;
+}
+
+export type SubscriptionState =
+  | { type: 'idle'; value: Contract<SubscriptionIdleState> }
+  | { type: 'payment'; value: Contract<SubscriptionPayment> };
+
+export interface SubscriptionRequestWithContext {
+  subscriptionRequest: Contract<SubscriptionRequest>;
+  context: Contract<SubscriptionContext>;
 }
 
 //=== Endpoint responses ===
@@ -93,15 +103,9 @@ export interface ListAppPaymentRequestsResponse {
 }
 
 export interface ListSubscriptionRequestsResponse {
-  subscriptionRequestsList: Contract<SubscriptionRequest>[];
+  subscriptionRequestsList: SubscriptionRequestWithContext[];
 }
 
-export type SubscriptionTuple = [Contract<Subscription>, SubscriptionState];
-
-export type SubscriptionState =
-  | { type: 'idle'; value: Contract<SubscriptionIdleState> }
-  | { type: 'payment'; value: Contract<SubscriptionPayment> };
-
 export interface ListSubscriptionsResponse {
-  subscriptionsList: SubscriptionTuple[];
+  subscriptionsList: WalletSubscription[];
 }

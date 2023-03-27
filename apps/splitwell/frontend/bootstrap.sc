@@ -60,7 +60,9 @@ def ensureDirectoryEntry(
       println("Wallet initialization complete, tapping coin")
       wallet.tap(5.0)
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
-      wallet.acceptSubscriptionRequest(wallet.listSubscriptionRequests()(0).contractId)
+      wallet.acceptSubscriptionRequest(
+        wallet.listSubscriptionRequests()(0).subscriptionRequest.contractId
+      )
     }
   }
 }
@@ -78,5 +80,6 @@ Seq(
   charlieSplitwell -> charlieUserParty,
 ).foreach { case (splitwell, party) =>
   splitwell.createInstallRequests()
-  splitwell.ledgerApi.ledger_api_extensions.acs.awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
+  splitwell.ledgerApi.ledger_api_extensions.acs
+    .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
 }

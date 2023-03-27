@@ -8,7 +8,7 @@ import {
   ContractMetadata as OpenAPIContractMetadata,
 } from 'directory-openapi';
 
-import { ContractId, Template } from '@daml/types';
+import { ContractId, ContractTypeCompanion, Template } from '@daml/types';
 
 export interface Contract<T> {
   contractId: ContractId<T>;
@@ -65,7 +65,10 @@ export const Contract = {
       metadata: metadata,
     };
   },
-  decodeOpenAPI: <T extends object, K>(c: OpenAPIContract, tmpl: Template<T, K>): Contract<T> => ({
+  decodeOpenAPI: <T extends object, K, I extends string>(
+    c: OpenAPIContract,
+    tmpl: ContractTypeCompanion<T, K, I>
+  ): Contract<T> => ({
     contractId: c.contractId as ContractId<T>,
     payload: tmpl.decoder.runWithException(c.payload),
     metadata: c.metadata,

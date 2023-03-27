@@ -206,7 +206,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.listSubscriptionRequests();
         return {
           subscriptionRequestsList: res.subscriptionRequests.map(c =>
-            Contract.decodeOpenAPI(c, SubscriptionRequest)
+            Contract.decodeOpenAPI(c.subscriptionRequest, SubscriptionRequest)
           ),
         };
       },
@@ -217,7 +217,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.listSubscriptions();
         return {
           subscriptionsList: res.subscriptions.map(sub => {
-            const main = Contract.decodeOpenAPI(sub.main, Subscription);
+            const main = Contract.decodeOpenAPI(sub.subscription, Subscription);
             const state = sub.state.payment
               ? {
                   type: 'payment' as 'payment',

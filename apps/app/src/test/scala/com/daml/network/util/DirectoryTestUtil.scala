@@ -28,7 +28,7 @@ trait DirectoryTestUtil extends CNNodeTestCommon with CnsTestUtil {
       "There is exactly one subscription request",
       _ => {
         inside(wallet.listSubscriptionRequests()) { case Seq(req) =>
-          req.contractId
+          req.subscriptionRequest.contractId
         }
       },
     )

@@ -576,7 +576,7 @@ class WalletTxLogIntegrationTest
 
       val (initialPaymentCid, _) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.contractId),
+        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
@@ -602,10 +602,12 @@ class WalletTxLogIntegrationTest
       val paymentCid = clue("Alice's automation triggers the second payment") {
         eventually() {
           inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
-            sub.main.payload should equal(request.payload.subscriptionData)
+            sub.subscription.payload should equal(
+              request.subscriptionRequest.payload.subscriptionData
+            )
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
-              state.payload.subscription shouldBe sub.main.contractId
-              state.payload.payData should equal(request.payload.payData)
+              state.payload.subscription shouldBe sub.subscription.contractId
+              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
               state.contractId
             }
           }
@@ -725,7 +727,7 @@ class WalletTxLogIntegrationTest
 
       val (initialPaymentCid, _) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.contractId),
+        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
@@ -810,7 +812,7 @@ class WalletTxLogIntegrationTest
 
       val (initialPaymentCid, _) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.contractId),
+        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
@@ -836,10 +838,12 @@ class WalletTxLogIntegrationTest
       val paymentCid = clue("Alice's automation triggers the second payment") {
         eventually() {
           inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
-            sub.main.payload should equal(request.payload.subscriptionData)
+            sub.subscription.payload should equal(
+              request.subscriptionRequest.payload.subscriptionData
+            )
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
-              state.payload.subscription shouldBe sub.main.contractId
-              state.payload.payData should equal(request.payload.payData)
+              state.payload.subscription shouldBe sub.subscription.contractId
+              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
               state.contractId
             }
           }

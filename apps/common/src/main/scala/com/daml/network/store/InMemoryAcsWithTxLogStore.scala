@@ -242,12 +242,13 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
   }
 
   def listContractsI[I, Id <: ContractId[I], View <: DamlRecord[View]](
-      interfaceCompanion: InterfaceCompanion[I, Id, View],
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(
       filter: Contract[Id, View] => Boolean,
       limit: Option[Long],
   ): Future[Seq[Contract[Id, View]]] = {
     requireInScope(interfaceCompanion)
-    listContracts(Contract.fromCreatedEvent(interfaceCompanion), filter, limit)
+    listContracts(contractFilter.decodeInterface(interfaceCompanion), filter, limit)
   }
 
   private def lookupContractById[T](

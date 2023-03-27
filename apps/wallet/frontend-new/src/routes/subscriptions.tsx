@@ -27,21 +27,18 @@ import {
   Typography,
 } from '@mui/material';
 
-import {
-  Subscription,
-  SubscriptionPayData,
-} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
 import Loading from '../components/Loading';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { SubscriptionState, SubscriptionTuple } from '../models/models';
+import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 const Subscriptions: React.FC = () => {
   const { listSubscriptions, cancelSubscription } = useWalletClient();
-  const [subscriptionTuples, setSubscriptionTuples] = useState<SubscriptionTuple[]>([]);
+  const [subscriptionTuples, setSubscriptionTuples] = useState<WalletSubscription[]>([]);
 
   const fetchSubscriptions = useCallback(async () => {
     const { subscriptionsList } = await listSubscriptions();
@@ -68,25 +65,24 @@ const Subscriptions: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Receiver</TableCell>
-              <TableCell>Provider</TableCell>
+              <TableCell>Service</TableCell>
               <TableCell align="right">Price</TableCell>
               <TableCell>Payment Due</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {subscriptionTuples.map(([subscription, state], index) => {
+            {subscriptionTuples.map((subscription, index) => {
               const onCancel = () => {
-                cancelSubscription(state.value.contractId).catch(err =>
+                cancelSubscription(subscription.state.value.contractId).catch(err =>
                   console.error('Failed to cancel subscription.', err)
                 );
               };
 
               return (
                 <SubscriptionRow
-                  key={subscription.contractId}
+                  key={subscription.subscription.contractId}
                   subscription={subscription}
-                  state={state}
                   cancelSubscription={onCancel}
                   coinPrice={coinPrice}
                 />
@@ -100,30 +96,31 @@ const Subscriptions: React.FC = () => {
 };
 
 interface SubscriptionRowProps {
-  subscription: Contract<Subscription>;
-  state: SubscriptionState;
+  subscription: WalletSubscription;
   cancelSubscription: () => void;
   coinPrice: BigNumber;
 }
 const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   subscription,
-  state,
   cancelSubscription,
   coinPrice,
 }) => {
   return (
     <TableRow className="subscription-row">
       <PartyCell className="sub-receiver">
-        <DirectoryEntry partyId={subscription.payload.receiver} />
+        <DirectoryEntry partyId={subscription.subscription.payload.receiver} />
       </PartyCell>
       <PartyCell>
-        <Provider provider={subscription.payload.provider} />
+        <Service
+          provider={subscription.subscription.payload.provider}
+          description={subscription.context.payload.description}
+        />
       </PartyCell>
       <TableCell align="right">
-        <Price payData={state.value.payload.payData} coinPrice={coinPrice} />
+        <Price payData={subscription.state.value.payload.payData} coinPrice={coinPrice} />
       </TableCell>
       <TableCell>
-        <PaymentDue state={state} />
+        <PaymentDue state={subscription.state} />
       </TableCell>
       <TableCell>
         <Button
@@ -131,7 +128,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
           variant="pill"
           size="small"
           onClick={cancelSubscription}
-          disabled={state.type !== 'idle'}
+          disabled={subscription.state.type !== 'idle'}
         >
           Cancel
         </Button>
@@ -145,11 +142,11 @@ const PartyCell = styled(TableCell)({
   textOverflow: 'ellipsis',
 });
 
-const Provider: React.FC<{ provider: Party }> = ({ provider }) => {
+const Service: React.FC<{ provider: Party; description: string }> = ({ provider, description }) => {
   return (
     <Stack>
       <Typography variant="h6" className="sub-description">
-        Service Desc.{/*TODO (#3304): include description in BE response*/}
+        {description}
       </Typography>
       <Typography variant="caption" className="sub-provider">
         <DirectoryEntry partyId={provider} />
@@ -217,15 +214,19 @@ const PaymentDue: React.FC<{ state: SubscriptionState }> = ({ state }) => {
   );
 };
 
-const unchangedSubscriptionTuples = (a: SubscriptionTuple[], b: SubscriptionTuple[]): boolean => {
+const unchangedSubscriptionTuples = (a: WalletSubscription[], b: WalletSubscription[]): boolean => {
   return (
     sameContracts(
-      a.map(x => x[0]),
-      b.map(x => x[0])
+      a.map(x => x.subscription),
+      b.map(x => x.subscription)
     ) &&
     sameContracts(
-      a.map(x => x[1].value as Contract<unknown>),
-      b.map(x => x[1].value as Contract<unknown>)
+      a.map(x => x.state.value as Contract<unknown>),
+      b.map(x => x.state.value as Contract<unknown>)
+    ) &&
+    sameContracts(
+      a.map(x => x.context),
+      b.map(x => x.context)
     )
   );
 };

@@ -151,7 +151,8 @@ trait AcsStore extends AutoCloseable {
 
   /** List all active contracts of the given interface. */
   def listContractsI[I, Id <: ContractId[I], View <: DamlRecord[View]](
-      interfaceCompanion: InterfaceCompanion[I, Id, View],
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(
       filter: Contract[Id, View] => Boolean,
       limit: Option[Long] = None,
   ): Future[Seq[Contract[Id, View]]]
