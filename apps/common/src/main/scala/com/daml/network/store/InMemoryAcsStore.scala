@@ -31,16 +31,13 @@ import monocle.macros.syntax.lens.*
 import scala.collection.immutable.SortedMap
 import scala.collection.{immutable, mutable}
 import scala.concurrent.*
-import io.grpc.Status
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
   */
-class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
+class InMemoryAcsStore(
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: AcsStore.ContractFilter,
-    override val txLogParser: TxLogStore.Parser[TXI, TXE],
-    domainId: DomainId,
     futureSupervisor: FutureSupervisor,
     retryProvider: RetryProvider,
 
@@ -48,7 +45,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     logAllStateUpdates: Boolean = false,
 )(implicit
     ec: ExecutionContext
-) extends AcsWithTxLogStore[TXI, TXE]
+) extends AcsStore
     with NamedLogging {
 
   import AcsStore.QueryResult
@@ -57,19 +54,18 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var stateVar: InMemoryAcsWithTxLogStore.State[TXI, TXE] =
-    InMemoryAcsWithTxLogStore.State(
+  private var stateVar: InMemoryAcsStore.State =
+    InMemoryAcsStore.State(
       None,
       0,
       immutable.SortedMap.empty,
       immutable.Map.empty,
       Promise(),
       SortedMap.empty,
-      immutable.Queue.empty,
     )
 
   private def updateState[T](
-      f: InMemoryAcsWithTxLogStore.State[TXI, TXE] => (InMemoryAcsWithTxLogStore.State[TXI, TXE], T)
+      f: InMemoryAcsStore.State => (InMemoryAcsStore.State, T)
   )(implicit traceContext: TraceContext): Future[T] = {
     Future {
       blocking {
@@ -116,7 +112,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
         tx: TransactionTree
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
-        _.ingestTransaction(tx, contractFilter.contains, txLogParser)
+        _.ingestTransaction(tx, contractFilter.contains)
       ).map {
         case (summary, offsetChanged, offsetIngestionsToSignal) => {
           logger.debug(show"Ingested transaction $summary")
@@ -167,8 +163,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
       }
     ).flatten
 
-  private def offsetAndStateAfterIngestingAcs()
-      : Future[(String, InMemoryAcsWithTxLogStore.State[TXI, TXE])] =
+  private def offsetAndStateAfterIngestingAcs(): Future[(String, InMemoryAcsStore.State)] =
     finishedAcsIngestion.future
       .map(_ => {
         val st = stateVar
@@ -335,58 +330,23 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     }
   }
 
-  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.slice(offset, offset + limit))
-
-  def getTxLogIndicesAfterEventId(queryDomainId: DomainId, beginAfterEventId: String, limit: Int)(
-      implicit ec: ExecutionContext
-  ): Future[Seq[TXI]] =
-    if (queryDomainId == domainId) {
-      Future.successful(
-        stateVar.txLog
-          .dropWhile(_.eventId != beginAfterEventId)
-          .slice(1, 1 + limit)
-      )
-    } else
-      Future.successful(Seq.empty)
-
-  def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
-      ec: ExecutionContext
-  ): Future[TXI] =
-    Future.successful(
-      stateVar.txLog
-        .filter(query)
-        .lastOption
-        .getOrElse(
-          throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
-        )
-    )
-
-  def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.filter(filter))
-
   override def close(): Unit = ()
 }
 
-object InMemoryAcsWithTxLogStore {
+object InMemoryAcsStore {
 
   private case class IndexRecordWithLocation[TXI](
       domainId: DomainId,
       payload: TXI,
   )
 
-  private case class State[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
+  private case class State(
       offset: Option[String],
       nextEventNumber: Long,
       createEvents: immutable.SortedMap[Long, CreatedEvent],
       createEventsById: immutable.Map[ContractId[_], Long],
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
-      txLog: immutable.Queue[TXI],
   ) {
 
     def pretty: String = {
@@ -402,7 +362,7 @@ object InMemoryAcsWithTxLogStore {
       lines.mkString("\n")
     }
 
-    def ingestCreatedEvent(ev: CreatedEvent): State[TXI, TXE] = {
+    def ingestCreatedEvent(ev: CreatedEvent): State = {
       State(
         offset = offset,
         nextEventNumber = nextEventNumber + 1,
@@ -410,11 +370,10 @@ object InMemoryAcsWithTxLogStore {
         createEventsById = createEventsById + (new ContractId(ev.getContractId) -> nextEventNumber),
         offsetChanged = offsetChanged,
         offsetIngestionsToSignal = offsetIngestionsToSignal,
-        txLog = txLog,
       )
     }
 
-    def ingestArchivedEvent(contractId: ContractId[_]): (State[TXI, TXE], Boolean) = {
+    def ingestArchivedEvent(contractId: ContractId[_]): (State, Boolean) = {
       createEventsById.get(contractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
@@ -429,7 +388,6 @@ object InMemoryAcsWithTxLogStore {
               createEventsById = createEventsById - contractId,
               offsetChanged = offsetChanged,
               offsetIngestionsToSignal = offsetIngestionsToSignal,
-              txLog = txLog,
             ),
             true,
           )
@@ -440,7 +398,7 @@ object InMemoryAcsWithTxLogStore {
     def ingestCreatedEvents(
         evs: Seq[CreatedEvent],
         p: CreatedEvent => Boolean,
-    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
+    ): (State, IngestionSummary) = {
       assert(offset.isEmpty, "state was not switched to tx ingestion yet")
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredCreatedEvents = 0
@@ -469,7 +427,6 @@ object InMemoryAcsWithTxLogStore {
           numFilteredTransferOutEvents = 0,
           None,
           stNew.createEvents.size,
-          mutable.ListBuffer.empty,
         ),
       )
     }
@@ -477,23 +434,20 @@ object InMemoryAcsWithTxLogStore {
     def ingestTransferInEvent(
         in: TransferEvent.In,
         p: CreatedEvent => Boolean,
-    ): (State[TXI, TXE], Boolean) =
+    ): (State, Boolean) =
       if (p(in.createdEvent)) {
         (ingestCreatedEvent(in.createdEvent), true)
       } else {
         (this, false)
       }
 
-    def ingestTransferOutEvent(out: TransferEvent.Out): (State[TXI, TXE], Boolean) =
+    def ingestTransferOutEvent(out: TransferEvent.Out): (State, Boolean) =
       ingestArchivedEvent(out.contractId)
 
     def switchToIngestingTransactions(
         acsOffset: String
-    ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State, (Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to tx ingestion yet")
-      // Note: tx log entries are only generated from ingested transactions.
-      // History from before the initial ACS snapshot is currently not available.
-      assert(txLog.isEmpty, "TX log contains items before switching to tx ingestion")
       val offsetsToRemove = computeOffsetsToRemove(acsOffset)
       (
         State(
@@ -503,7 +457,6 @@ object InMemoryAcsWithTxLogStore {
           createEventsById = createEventsById,
           offsetChanged = Promise(),
           offsetIngestionsToSignal = offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
-          txLog = txLog,
         ),
         (offsetChanged, offsetsToRemove.values),
       )
@@ -519,10 +472,7 @@ object InMemoryAcsWithTxLogStore {
     def ingestTransaction(
         tx: TransactionTree,
         p: CreatedEvent => Boolean,
-        txLogParser: TxLogStore.Parser[TXI, TXE],
-    )(implicit
-        traceContext: TraceContext
-    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State, (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredCreatedEvents = 0
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -554,8 +504,6 @@ object InMemoryAcsWithTxLogStore {
         },
       )
 
-      val ingestedTxLogEntries = txLogParser.parse(tx)
-
       val offsetsToRemove = stNew.computeOffsetsToRemove(tx.getOffset)
       val newOffset = Some(tx.getOffset)
       (
@@ -565,11 +513,7 @@ object InMemoryAcsWithTxLogStore {
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,
           offsetChanged = Promise(),
-          offsetIngestionsToSignal =
-            stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
-          txLog = stNew.txLog.appendedAll(
-            ingestedTxLogEntries.map(_.indexRecord)
-          ),
+          offsetIngestionsToSignal = stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
         ),
         (
           IngestionSummary(
@@ -584,7 +528,6 @@ object InMemoryAcsWithTxLogStore {
             numFilteredTransferOutEvents = 0,
             offset = newOffset,
             newAcsSize = stNew.createEvents.size,
-            ingestedTxLogEntries = mutable.ListBuffer(ingestedTxLogEntries: _*),
           ),
           offsetChanged,
           offsetsToRemove.values,
@@ -595,9 +538,9 @@ object InMemoryAcsWithTxLogStore {
     def ingestTransfer(
         transfer: Transfer[TransferEvent],
         p: CreatedEvent => Boolean,
-    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State, (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       val newOffset = Some(transfer.offset.getOffset)
-      val baseSummary = IngestionSummary[TXE](
+      val baseSummary = IngestionSummary(
         txId = Some(transfer.updateId),
         ingestedCreatedEvents = mutable.ListBuffer.empty,
         numFilteredCreatedEvents = 0,
@@ -609,7 +552,6 @@ object InMemoryAcsWithTxLogStore {
         numFilteredTransferOutEvents = 0,
         offset = newOffset,
         newAcsSize = 0,
-        ingestedTxLogEntries = mutable.ListBuffer.empty,
       )
       val (stNew, summary) = transfer.event match {
         case out: TransferEvent.Out =>
@@ -641,9 +583,7 @@ object InMemoryAcsWithTxLogStore {
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,
           offsetChanged = Promise(),
-          offsetIngestionsToSignal =
-            stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
-          txLog = stNew.txLog,
+          offsetIngestionsToSignal = stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
         ),
         (
           summary.copy(newAcsSize = stNew.createEvents.size),
@@ -656,7 +596,7 @@ object InMemoryAcsWithTxLogStore {
     /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
       * offset has already been requested, don't change the state.
       */
-    def addOffsetToSignal(offset: String): (State[TXI, TXE], Future[Unit]) = {
+    def addOffsetToSignal(offset: String): (State, Future[Unit]) = {
       offsetIngestionsToSignal.get(offset) match {
         case None =>
           val p = Promise[Unit]()
@@ -666,7 +606,7 @@ object InMemoryAcsWithTxLogStore {
     }
   }
 
-  private case class IngestionSummary[TXE <: TxLogStore.Entry[?]](
+  private case class IngestionSummary(
       txId: Option[String],
       ingestedCreatedEvents: mutable.ListBuffer[CreatedEvent],
       numFilteredCreatedEvents: Int,
@@ -680,14 +620,10 @@ object InMemoryAcsWithTxLogStore {
       numFilteredTransferOutEvents: Int,
       offset: Option[String],
       newAcsSize: Int,
-      ingestedTxLogEntries: mutable.ListBuffer[TXE],
   ) extends PrettyPrinting {
 
     override def pretty: Pretty[this.type] = {
       import com.daml.network.util.PrettyInstances.*
-
-      @SuppressWarnings(Array("org.wartremover.warts.Product"))
-      implicit val txLogPretty: Pretty[TXE] = adHocPrettyInstance
 
       prettyNode(
         "", // intentionally left empty, as that worked better in the log messages above
@@ -730,11 +666,6 @@ object InMemoryAcsWithTxLogStore {
           _.numFilteredTransferOutEvents != 0,
         ),
         param("newAcsSize", _.newAcsSize),
-        param(
-          "ingestedTxLogEntries",
-          _.ingestedTxLogEntries.toSeq,
-          _.ingestedTxLogEntries.nonEmpty,
-        ),
       )
     }
   }

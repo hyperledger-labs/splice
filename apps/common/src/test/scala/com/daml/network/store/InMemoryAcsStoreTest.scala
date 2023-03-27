@@ -5,19 +5,17 @@ import cats.syntax.foldable.*
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{TransactionTree, TreeEvent}
 import com.daml.network.codegen.java.cc.coin as directoryCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
-import scala.jdk.CollectionConverters.*
 
-class InMemoryAcsWithTxLogStoreTest extends StoreTest {
+class InMemoryAcsStoreTest extends StoreTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryAcsStoreTest")
 
@@ -78,12 +76,10 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
     )
   }
 
-  def mkStore(): Future[InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry]] = {
-    val store = new InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry](
+  def mkStore(): Future[InMemoryAcsStore] = {
+    val store = new InMemoryAcsStore(
       loggerFactory,
       txFilter,
-      TestTxLogStoreParser,
-      dummyDomain,
       FutureSupervisor.Noop,
       RetryProvider(loggerFactory, timeouts),
     )
@@ -239,38 +235,5 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
         _ = result shouldBe appRewardCoupons
       } yield succeed
     }
-
-    "return tx log entries in correct order" in {
-      for {
-        store <- mkStore()
-        reader = new TxLogStore.Reader[TestTxLogIndexRecord, TestTxLogEntry](
-          txLogStore = store,
-          transactionTreeSource = TransactionTreeSource.StaticForTesting(Seq(tx1, tx2, tx3, tx4)),
-        )
-        indices <- store.getTxLogIndicesByOffset(0, 1000)
-        entries <- reader.getTxLogByOffset(0, 1000)
-        indices2 <- store.getTxLogIndicesByOffset(2, 3)
-        entries2 <- reader.getTxLogByOffset(2, 3)
-      } yield {
-        // The test tx log creates one entry for each create event.
-        // The test transactions only contain root nodes, the tx log should preserve their order.
-        val expectedEventsInTxLog = Seq(tx1, tx2).flatMap(tx =>
-          tx.getRootEventIds.asScala.toList
-            .collect(i =>
-              tx.getEventsById.get(i) match {
-                case c: CreatedEvent => c
-              }
-            )
-        )
-        val expectedEventIds = expectedEventsInTxLog.map(_.getEventId)
-
-        indices.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds
-        entries.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds
-
-        indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
-        entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
-      }
-    }
-
   }
 }

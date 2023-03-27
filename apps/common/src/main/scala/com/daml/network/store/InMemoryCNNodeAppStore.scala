@@ -31,11 +31,9 @@ abstract class InMemoryCNNodeAppStore[
       perDomainLoggerFactory: NamedLoggerFactory,
   ) =
     new InMemoryCNNodeAppStore.PerDomainStore(
-      new InMemoryAcsWithTxLogStore(
+      new InMemoryAcsStore(
         perDomainLoggerFactory,
         contractFilter = acsContractFilter,
-        txLogParser = txLogParser,
-        domainId = domain,
         futureSupervisor = futureSupervisor,
         retryProvider = retryProvider,
         logAllStateUpdates = false,
@@ -43,9 +41,9 @@ abstract class InMemoryCNNodeAppStore[
     )
 
   private[network] override def storesIngestionSink(stores: PerDomainStore) =
-    stores.acsWithTxLog.ingestionSink
+    stores.acs.ingestionSink
 
-  override protected[this] def storeAcs(store: PerDomainStore) = store.acsWithTxLog
+  override protected[this] def storeAcs(store: PerDomainStore) = store.acs
 
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 
@@ -56,7 +54,7 @@ abstract class InMemoryCNNodeAppStore[
 
 object InMemoryCNNodeAppStore {
   class PerDomainStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
-      val acsWithTxLog: InMemoryAcsWithTxLogStore[TXI, TXE]
+      val acs: InMemoryAcsStore
   )
 }
 
