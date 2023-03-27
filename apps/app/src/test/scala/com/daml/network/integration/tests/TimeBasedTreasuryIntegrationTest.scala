@@ -12,7 +12,6 @@ import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{HasExecutionContext, time}
-import com.typesafe.config.ConfigFactory
 import io.grpc.StatusRuntimeException
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
@@ -44,23 +43,9 @@ class TimeBasedTreasuryIntegrationTest
         // for testing non-automation-based coin merging.
         setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(30))(config)
       )
-      .addConfigTransform((_, config) =>
-        config.copy(akkaConfig =
-          Some(
-            // these settings are needed for the "operate and shutdown cleanly ..." test to pass,
-            // since it requires a lot of open / queued requests
-            ConfigFactory.parseString(
-              """
-            |akka.http.host-connection-pool {
-            |  max-connections = 500
-            |  min-connections = 20
-            |  max-open-requests = 1024
-            |}
-            |""".stripMargin
-            )
-          )
-        )
-      )
+      // these settings are needed for the "operate and shutdown cleanly ..." test to pass,
+      // since it requires a lot of open / queued requests
+      .withHttpSettingsForHigherThroughput
   }
 
   "operate and shutdown cleanly with lots of coin operations in flight" ignore { implicit env =>

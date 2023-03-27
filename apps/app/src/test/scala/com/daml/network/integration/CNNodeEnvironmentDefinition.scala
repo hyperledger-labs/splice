@@ -138,6 +138,23 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
+  def withHttpSettingsForHigherThroughput: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      config.copy(akkaConfig =
+        Some(
+          ConfigFactory.parseString(
+            """
+              |akka.http.host-connection-pool {
+              |  max-connections = 500
+              |  min-connections = 20
+              |  max-open-requests = 1024
+              |}
+              |""".stripMargin
+          )
+        )
+      )
+    )
+
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
