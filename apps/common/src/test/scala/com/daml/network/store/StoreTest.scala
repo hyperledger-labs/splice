@@ -13,10 +13,11 @@ import com.daml.ledger.javaapi.data.{
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -205,4 +206,28 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       event = event,
     )
 
+  case class TestTxLogIndexRecord(
+      offset: String,
+      eventId: String,
+  ) extends TxLogStore.IndexRecord
+
+  case class TestTxLogEntry(
+      indexRecord: TestTxLogIndexRecord,
+      payload: String,
+  ) extends TxLogStore.Entry[TestTxLogIndexRecord]
+
+  object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
+    override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
+      Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
+        onCreate = (res, event, _) => {
+          res :+
+            TestTxLogEntry(
+              indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
+              payload = event.getEventId,
+            )
+        },
+        onExercise = (res, _, _) => res,
+      )
+    }
+  }
 }

@@ -18,23 +18,26 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
 
-class InMemoryMultiDomainAcsStore(
+class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: AcsStore.ContractFilter,
+    override val txLogParser: TxLogStore.Parser[TXI, TXE],
 )(implicit
     ec: ExecutionContext
 ) extends MultiDomainAcsStore
+    with TxLogStore[TXI, TXE]
     with NamedLogging {
 
   import MultiDomainAcsStore.*
 
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var stateVar: InMemoryMultiDomainAcsStore.State =
+  private var stateVar: InMemoryMultiDomainAcsStore.State[TXI, TXE] =
     InMemoryMultiDomainAcsStore.State(
       offsets = Map.empty,
       nextCreateEventNumber = 0,
@@ -50,11 +53,15 @@ class InMemoryMultiDomainAcsStore(
       pendingTransfersById = Map.empty,
       bootstrapTransferOutIds = Set.empty,
       archivedTombstones = Set.empty,
-      Promise(),
+      offsetChanged = Promise(),
+      txLog = Queue.empty,
     )
 
   private def updateState[T](
-      f: InMemoryMultiDomainAcsStore.State => (InMemoryMultiDomainAcsStore.State, T)
+      f: InMemoryMultiDomainAcsStore.State[TXI, TXE] => (
+          InMemoryMultiDomainAcsStore.State[TXI, TXE],
+          T,
+      )
   ): Future[T] = {
     Future {
       blocking {
@@ -109,7 +116,7 @@ class InMemoryMultiDomainAcsStore(
       update match {
         case TransactionTreeUpdate(tree) =>
           updateState(
-            _.ingestTransaction(domain, tree, contractFilter.contains)
+            _.ingestTransaction(domain, tree, contractFilter.contains, txLogParser)
           ).map { case (summary, offsetChanged) =>
             logger.debug(show"Ingested transaction $summary")
             offsetChanged.success(())
@@ -321,6 +328,48 @@ class InMemoryMultiDomainAcsStore(
     }
   }
 
+  /** TX log APIs
+    */
+
+  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]] =
+    Future.successful(stateVar.txLog.slice(offset, offset + limit).map(_.payload))
+
+  override def getTxLogIndicesAfterEventId(
+      domainId: DomainId,
+      beginAfterEventId: String,
+      limit: Int,
+  )(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]] =
+    Future.successful(
+      stateVar.txLog.view
+        .filter(_.domain == domainId)
+        .map(_.payload)
+        .dropWhile(_.eventId != beginAfterEventId)
+        .slice(1, 1 + limit)
+        .toSeq
+    )
+
+  override def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+      ec: ExecutionContext
+  ): Future[TXI] =
+    Future.successful(
+      stateVar.txLog.view
+        .map(_.payload)
+        .filter(query)
+        .lastOption
+        .getOrElse(
+          throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
+        )
+    )
+
+  override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
+      ec: ExecutionContext
+  ): Future[Seq[TXI]] =
+    Future.successful(stateVar.txLog.view.map(_.payload).filter(filter).toSeq)
+
   /** Testing APIs
     */
 
@@ -356,6 +405,11 @@ object InMemoryMultiDomainAcsStore {
     def toAssigned: Option[DomainId] =
       domains.headOption.filter(_ => domains.size == 1)
   }
+
+  private case class IndexRecordWithDomain[+TXI](
+      domain: DomainId,
+      payload: TXI,
+  )
 
   /** General assumption: We're connected to both source and target domain.
     * Trivially given for non-multi hosted parties. For multi-hosted parties
@@ -410,7 +464,7 @@ object InMemoryMultiDomainAcsStore {
     *    and we only end up leaking constant-size data rather than the full payloads. Therefore,
     *    we accept this for now.
     */
-  private case class State(
+  private case class State[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
       offsets: Map[DomainId, String],
       nextCreateEventNumber: Long,
       // All active contracts across all domains that match our contract filter. Contracts are inserted
@@ -450,6 +504,7 @@ object InMemoryMultiDomainAcsStore {
       // for the contract.
       archivedTombstones: Set[ContractId[_]],
       offsetChanged: Promise[Unit],
+      txLog: Queue[IndexRecordWithDomain[TXI]],
   ) {
 
     def lookupContractState(cid: ContractId[_]): Option[ContractState] =
@@ -474,7 +529,7 @@ object InMemoryMultiDomainAcsStore {
         evs: Seq[CreatedEvent],
         transferOuts: Seq[TransferEvent.Out],
         p: CreatedEvent => Boolean,
-    ): (State, IngestionSummary) = {
+    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestCreatedEvents(domain, evs, p)
       val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs)
@@ -490,7 +545,7 @@ object InMemoryMultiDomainAcsStore {
     def switchToIngestingUpdates(
         domain: DomainId,
         offset: String,
-    ): (State, Promise[Unit]) = {
+    ): (State[TXI, TXE], Promise[Unit]) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
       (
         copy(
@@ -506,7 +561,10 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         tx: TransactionTree,
         p: CreatedEvent => Boolean,
-    ): (State, (IngestionSummary, Promise[Unit])) = {
+        txLogParser: TxLogStore.Parser[TXI, TXE],
+    )(implicit
+        traceContext: TraceContext
+    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit])) = {
       assert(offsets.contains(domain), "state was switched to update ingestion")
 
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -561,6 +619,8 @@ object InMemoryMultiDomainAcsStore {
         },
       )
 
+      val ingestedTxLogEntries = txLogParser.parse(tx)
+
       val newOffset = tx.getOffset
 
       val summary = IngestionSummary.empty.copy(
@@ -575,12 +635,16 @@ object InMemoryMultiDomainAcsStore {
         addedContractLocations = addedContractLocations.result(),
         removedContractLocations = removedContractLocations.result(),
         addedArchivedTombstones = addedArchivedTombstones.result(),
+        ingestedTxLogEntries = ingestedTxLogEntries,
       )
 
       (
         stNew.copy(
           offsets = offsets + (domain -> newOffset),
           offsetChanged = Promise(),
+          txLog = stNew.txLog.appendedAll(
+            ingestedTxLogEntries.map(entry => IndexRecordWithDomain(domain, entry.indexRecord))
+          ),
         ),
         (summary, offsetChanged),
       )
@@ -590,7 +654,7 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         transfer: Transfer[TransferEvent],
         p: CreatedEvent => Boolean,
-    ): (State, (IngestionSummary, Promise[Unit])) = {
+    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit])) = {
       assert(offsets.contains(domain), "state was switched to update ingestion")
       val (newSt, summary) = ingestTransferEvent(transfer.event, p)
       val newOffset = transfer.offset.getOffset
@@ -613,7 +677,7 @@ object InMemoryMultiDomainAcsStore {
     def removeTransferOutIfBootstrap(
         cid: ContractId[_],
         transferId: TransferId,
-    ): (State, IngestionSummary) = {
+    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       if (bootstrapTransferOutIds.contains(transferId)) {
         transferOutEventsById.get(transferId) match {
           case None =>
@@ -630,19 +694,20 @@ object InMemoryMultiDomainAcsStore {
                   _.flatMap(prev => NonEmpty.from(prev - transferId))
                 ),
               ),
-              IngestionSummary.empty
+              IngestionSummary
+                .empty[TXE]
                 .copy(removedBootstrapTransferOutIds = Seq((cid, transferId))),
             )
         }
       } else {
-        (this, IngestionSummary.empty)
+        (this, IngestionSummary.empty[TXE])
       }
     }
 
     private def updateContractStateEvent(
         cid: ContractId[_],
         update: Set[DomainId] => Set[DomainId],
-    ): State = {
+    ): State[TXI, TXE] = {
       val evNum = contractStateEventsById.get(cid)
       val oldDomains = evNum.map(contractStateEvents(_)).fold(Set.empty[DomainId])(_.domains)
       val newEv = ContractStateEvent(cid, update(oldDomains))
@@ -656,7 +721,7 @@ object InMemoryMultiDomainAcsStore {
 
     private def removeContractStateEvent(
         cid: ContractId[_]
-    ): State = {
+    ): State[TXI, TXE] = {
       val evNum = contractStateEventsById.getOrElse(
         cid,
         throw new IllegalStateException(s"Contract id $cid is not in contractStateEventsById"),
@@ -671,7 +736,7 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         evs: Seq[CreatedEvent],
         p: CreatedEvent => Boolean,
-    ): (State, IngestionSummary) = {
+    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredCreatedEvents = 0
@@ -699,25 +764,27 @@ object InMemoryMultiDomainAcsStore {
       )
       (
         stNew,
-        IngestionSummary.empty.copy(
-          ingestedCreatedEvents = ingestedCreatedEvents.result(),
-          addedContractLocations = addedContractLocations.result(),
-          numFilteredCreatedEvents = numFilteredCreatedEvents,
-        ),
+        IngestionSummary
+          .empty[TXE]
+          .copy(
+            ingestedCreatedEvents = ingestedCreatedEvents.result(),
+            addedContractLocations = addedContractLocations.result(),
+            numFilteredCreatedEvents = numFilteredCreatedEvents,
+          ),
       )
     }
 
     // Used during bootstrapping to ingest in-flight transfer outs
     private def ingestTransferOuts(
         evs: Seq[TransferEvent.Out],
-        summary: IngestionSummary,
-    ): (State, IngestionSummary) = {
+        summary: IngestionSummary[TXE],
+    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       val addedTransferOuts = Seq.newBuilder[(ContractId[_], TransferId)]
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredTransferOuts = 0
       val removedTransferIns = Seq.newBuilder[(ContractId[_], TransferId)]
       val removedArchivedTombstones = Seq.newBuilder[ContractId[_]]
-      val stNew = evs
+      val stNew: State[TXI, TXE] = evs
         .foldLeft(this)((st, ev) => {
           val id = TransferId.fromTransferOut(ev)
           val (newSt, summary) = st.ingestTransferOutEvent(ev, bootstrap = true)
@@ -751,7 +818,7 @@ object InMemoryMultiDomainAcsStore {
     private def ingestCreatedEvent(
         ev: CreatedEvent,
         location: ContractLocation,
-    ): (State, CreatedEventSummary) = {
+    ): (State[TXI, TXE], CreatedEventSummary) = {
       val cid = new ContractId(ev.getContractId)
       if (archivedTombstones.contains(cid)) {
         (this, CreatedEventSummary.SkippedTombstone)
@@ -775,7 +842,9 @@ object InMemoryMultiDomainAcsStore {
       }
     }
 
-    private def ingestArchivedEvent(contractId: ContractId[_]): (State, ArchivedEventSummary) = {
+    private def ingestArchivedEvent(
+        contractId: ContractId[_]
+    ): (State[TXI, TXE], ArchivedEventSummary) = {
       createEventsById.get(contractId) match {
         case None =>
           // This can only happen if we filtered out the create event. We just ignore it in this case.
@@ -791,7 +860,7 @@ object InMemoryMultiDomainAcsStore {
             ),
           )
           val stateEvent = contractStateEvents(stateEventNum)
-          val newSt = removeContractStateEvent(contractId).copy(
+          val newSt: State[TXI, TXE] = removeContractStateEvent(contractId).copy(
             createEvents = createEvents - createId,
             createEventsById = createEventsById - contractId,
             archivedTombstones =
@@ -811,7 +880,7 @@ object InMemoryMultiDomainAcsStore {
     private def ingestTransferEvent(
         event: TransferEvent,
         p: CreatedEvent => Boolean,
-    ): (State, IngestionSummary) =
+    ): (State[TXI, TXE], IngestionSummary[TXE]) =
       event match {
         case out: TransferEvent.Out =>
           val (newSt, tfSummary) = ingestTransferOutEvent(out)
@@ -819,20 +888,26 @@ object InMemoryMultiDomainAcsStore {
 
           val summary = tfSummary match {
             case TransferOutEventSummary.Filtered =>
-              IngestionSummary.empty.copy(
-                numFilteredTransferOutEvents = 1
-              )
+              IngestionSummary
+                .empty[TXE]
+                .copy(
+                  numFilteredTransferOutEvents = 1
+                )
             case TransferOutEventSummary.AddedTransferOut =>
-              IngestionSummary.empty.copy(
-                addedTransferOutEvents = Seq(ev)
-              )
+              IngestionSummary
+                .empty[TXE]
+                .copy(
+                  addedTransferOutEvents = Seq(ev)
+                )
             case TransferOutEventSummary.RemovedTransferIn(removedTombstone) =>
-              IngestionSummary.empty.copy(
-                removedTransferInEvents = Seq(ev),
-                removedArchivedTombstones =
-                  if (removedTombstone) Seq(out.contractId)
-                  else Seq.empty,
-              )
+              IngestionSummary
+                .empty[TXE]
+                .copy(
+                  removedTransferInEvents = Seq(ev),
+                  removedArchivedTombstones =
+                    if (removedTombstone) Seq(out.contractId)
+                    else Seq.empty,
+                )
           }
 
           (newSt, summary)
@@ -840,12 +915,14 @@ object InMemoryMultiDomainAcsStore {
           if (p(in.createdEvent)) {
             val (newSt, createdSummary, transferInSummary) = ingestTransferInEvent(in)
             val summary = createdSummary match {
-              case CreatedEventSummary.SkippedTombstone => IngestionSummary.empty
+              case CreatedEventSummary.SkippedTombstone => IngestionSummary.empty[TXE]
               case CreatedEventSummary.Added(first, location) =>
-                IngestionSummary.empty.copy(
-                  ingestedCreatedEvents = if (first) Seq(in.createdEvent) else Seq.empty,
-                  addedContractLocations = Seq(location),
-                )
+                IngestionSummary
+                  .empty[TXE]
+                  .copy(
+                    ingestedCreatedEvents = if (first) Seq(in.createdEvent) else Seq.empty,
+                    addedContractLocations = Seq(location),
+                  )
             }
             val tfid = TransferId.fromTransferIn(in)
             val cid = new ContractId(in.createdEvent.getContractId)
@@ -873,16 +950,18 @@ object InMemoryMultiDomainAcsStore {
           } else {
             (
               this,
-              IngestionSummary.empty.copy(
-                numFilteredTransferInEvents = 1
-              ),
+              IngestionSummary
+                .empty[TXE]
+                .copy(
+                  numFilteredTransferInEvents = 1
+                ),
             )
           }
       }
 
     private def ingestTransferInEvent(
         in: TransferEvent.In
-    ): (State, CreatedEventSummary, TransferInEventSummary) = {
+    ): (State[TXI, TXE], CreatedEventSummary, TransferInEventSummary) = {
       val transferId = TransferId.fromTransferIn(in)
       val cid = new ContractId(in.createdEvent.getContractId)
       // First update create events and contract locations by only looking at the create event.
@@ -932,37 +1011,40 @@ object InMemoryMultiDomainAcsStore {
     private def ingestTransferOutEvent(
         out: TransferEvent.Out,
         bootstrap: Boolean = false,
-    ): (State, TransferOutEventSummary) = {
+    ): (State[TXI, TXE], TransferOutEventSummary) = {
       val transferId = TransferId.fromTransferOut(out)
       val cid = out.contractId
-      val (newSt, summary) = if (earlyTransferIns.contains(transferId)) {
-        val newPendingTransfersById =
-          pendingTransfersById.updatedWith(cid)(_.flatMap(prev => NonEmpty.from(prev - transferId)))
-        val removeTombstone = !newPendingTransfersById.contains(cid)
-        (
-          copy(
-            earlyTransferIns = earlyTransferIns - transferId,
-            pendingTransfersById = newPendingTransfersById,
-            archivedTombstones =
-              if (removeTombstone) archivedTombstones - cid
-              else archivedTombstones,
-          ),
-          TransferOutEventSummary.RemovedTransferIn(removeTombstone),
-        )
-      } else {
-        (
-          copy(
-            nextTransferOutEventNumber = nextTransferOutEventNumber + 1,
-            transferOutEvents = transferOutEvents + (nextTransferOutEventNumber -> out),
-            transferOutEventsById =
-              transferOutEventsById + (transferId -> nextTransferOutEventNumber),
-            pendingTransfersById = pendingTransfersById.updatedWith(cid) { prev =>
-              Some(prev.fold(NonEmpty(Set, transferId))(_.incl(transferId)))
-            },
-          ),
-          TransferOutEventSummary.AddedTransferOut,
-        )
-      }
+      val (newSt, summary): (State[TXI, TXE], TransferOutEventSummary) =
+        if (earlyTransferIns.contains(transferId)) {
+          val newPendingTransfersById =
+            pendingTransfersById.updatedWith(cid)(
+              _.flatMap(prev => NonEmpty.from(prev - transferId))
+            )
+          val removeTombstone = !newPendingTransfersById.contains(cid)
+          (
+            copy(
+              earlyTransferIns = earlyTransferIns - transferId,
+              pendingTransfersById = newPendingTransfersById,
+              archivedTombstones =
+                if (removeTombstone) archivedTombstones - cid
+                else archivedTombstones,
+            ),
+            TransferOutEventSummary.RemovedTransferIn(removeTombstone),
+          )
+        } else {
+          (
+            copy(
+              nextTransferOutEventNumber = nextTransferOutEventNumber + 1,
+              transferOutEvents = transferOutEvents + (nextTransferOutEventNumber -> out),
+              transferOutEventsById =
+                transferOutEventsById + (transferId -> nextTransferOutEventNumber),
+              pendingTransfersById = pendingTransfersById.updatedWith(cid) { prev =>
+                Some(prev.fold(NonEmpty(Set, transferId))(_.incl(transferId)))
+              },
+            ),
+            TransferOutEventSummary.AddedTransferOut,
+          )
+        }
 
       if (archivedTombstones.contains(out.contractId)) {
         // We've already seen the archive, all we care about is updating pending
@@ -1028,7 +1110,7 @@ object InMemoryMultiDomainAcsStore {
         extends TransferInEventSummary
   }
 
-  private case class IngestionSummary(
+  private case class IngestionSummary[TXE <: TxLogStore.Entry[_]](
       txId: Option[String],
       offset: Option[String],
       domain: Option[DomainId],
@@ -1049,9 +1131,13 @@ object InMemoryMultiDomainAcsStore {
       removedBootstrapTransferOutIds: Seq[(ContractId[_], TransferId)],
       addedArchivedTombstones: Seq[ContractId[_]],
       removedArchivedTombstones: Seq[ContractId[_]],
+      ingestedTxLogEntries: Seq[TXE],
   ) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances
     import com.daml.network.util.PrettyInstances.*
+
+    @SuppressWarnings(Array("org.wartremover.warts.Product"))
+    implicit val txLogPretty: Pretty[TXE] = adHocPrettyInstance
 
     implicit def prettyContractLocation: Pretty[ContractLocation] =
       prettyNode("ContractLocation", param("cid", _.contractId), param("domain", _.domain))
@@ -1074,31 +1160,35 @@ object InMemoryMultiDomainAcsStore {
         paramIfDefined("offset", _.offset.map(_.unquoted)),
         paramIfDefined("domain", _.domain),
         param("newAcsSize", _.newAcsSize),
-        paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents.toSeq),
+        paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),
         paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),
-        paramIfNonEmpty("ingestedArchivedEvents", _.ingestedArchivedEvents.toSeq),
+        paramIfNonEmpty("ingestedArchivedEvents", _.ingestedArchivedEvents),
         paramIfNonZero("numFilteredArchivedEvents", _.numFilteredArchivedEvents),
-        paramIfNonEmpty("addedContractLocations", _.addedContractLocations.toSeq),
-        paramIfNonEmpty("removedContractLocations", _.removedContractLocations.toSeq),
-        paramIfNonEmpty("addedTransferInEvents", _.addedTransferInEvents.toSeq),
+        paramIfNonEmpty("addedContractLocations", _.addedContractLocations),
+        paramIfNonEmpty("removedContractLocations", _.removedContractLocations),
+        paramIfNonEmpty("addedTransferInEvents", _.addedTransferInEvents),
         paramIfNonZero("numFilteredTransferInEvents", _.numFilteredTransferInEvents),
-        paramIfNonEmpty("removedTransferInEvents", _.removedTransferInEvents.toSeq),
-        paramIfNonEmpty("addedTransferOutEvents", _.addedTransferOutEvents.toSeq),
+        paramIfNonEmpty("removedTransferInEvents", _.removedTransferInEvents),
+        paramIfNonEmpty("addedTransferOutEvents", _.addedTransferOutEvents),
         paramIfNonZero("numFilteredTransferOutEvents", _.numFilteredTransferOutEvents),
-        paramIfNonEmpty("removedTransferOutEvents", _.removedTransferOutEvents.toSeq),
-        paramIfNonEmpty("addedBootstrapTransferOutEvents", _.addedBootstrapTransferOutIds.toSeq),
+        paramIfNonEmpty("removedTransferOutEvents", _.removedTransferOutEvents),
+        paramIfNonEmpty("addedBootstrapTransferOutEvents", _.addedBootstrapTransferOutIds),
         paramIfNonEmpty(
           "removedBootstrapTransferOutEvents",
-          _.removedBootstrapTransferOutIds.toSeq,
+          _.removedBootstrapTransferOutIds,
         ),
-        paramIfNonEmpty("addedArchivedTombstones", _.addedArchivedTombstones.toSeq),
-        paramIfNonEmpty("removedArchivedTombstones", _.removedArchivedTombstones.toSeq),
+        paramIfNonEmpty("addedArchivedTombstones", _.addedArchivedTombstones),
+        paramIfNonEmpty("removedArchivedTombstones", _.removedArchivedTombstones),
+        paramIfNonEmpty(
+          "ingestedTxLogEntries",
+          _.ingestedTxLogEntries,
+        ),
       )
     }
   }
 
   private object IngestionSummary {
-    val empty: IngestionSummary = IngestionSummary(
+    def empty[TXE <: TxLogStore.Entry[_]]: IngestionSummary[TXE] = IngestionSummary(
       txId = None,
       offset = None,
       domain = None,
@@ -1119,6 +1209,7 @@ object InMemoryMultiDomainAcsStore {
       removedBootstrapTransferOutIds = Seq.empty,
       addedArchivedTombstones = Seq.empty,
       removedArchivedTombstones = Seq.empty,
+      ingestedTxLogEntries = Seq.empty,
     )
   }
 }

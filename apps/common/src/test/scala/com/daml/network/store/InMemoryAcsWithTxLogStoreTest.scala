@@ -10,9 +10,8 @@ import com.daml.network.codegen.java.cc.coin as directoryCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.{Contract, Trees}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
-import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
@@ -77,31 +76,6 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
         ),
       ),
     )
-  }
-
-  case class TestTxLogIndexRecord(
-      offset: String,
-      eventId: String,
-  ) extends TxLogStore.IndexRecord
-
-  case class TestTxLogEntry(
-      indexRecord: TestTxLogIndexRecord,
-      payload: String,
-  ) extends TxLogStore.Entry[TestTxLogIndexRecord]
-
-  object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
-    override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
-      Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
-        onCreate = (res, event, _) => {
-          res :+
-            TestTxLogEntry(
-              indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
-              payload = event.getEventId,
-            )
-        },
-        onExercise = (res, _, _) => res,
-      )
-    }
   }
 
   def mkStore(): Future[InMemoryAcsWithTxLogStore[TestTxLogIndexRecord, TestTxLogEntry]] = {
