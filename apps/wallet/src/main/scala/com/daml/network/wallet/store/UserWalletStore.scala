@@ -281,11 +281,10 @@ trait UserWalletStore
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] =
     for {
       domain <- domains.signalWhenConnected(defaultAcsDomain)
-      txReader <- txLogReader(domain)
       entries <- beginAfterEventId.fold(
-        txReader.getTxLogByOffset(0, limit)
+        txLogReader.getTxLogByOffset(0, limit)
       )(
-        txReader.getTxLogAfterEventId(domain, _, limit)
+        txLogReader.getTxLogAfterEventId(domain, _, limit)
       )
     } yield entries
 

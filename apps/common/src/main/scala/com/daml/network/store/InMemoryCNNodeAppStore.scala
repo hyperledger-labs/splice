@@ -24,6 +24,8 @@ abstract class InMemoryCNNodeAppStore[
   val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
     new InMemoryMultiDomainAcsStore(loggerFactory, acsContractFilter, txLogParser)
 
+  override def txLog = multiDomainAcsStore
+
   protected[this] override def newPerDomainStore(
       domain: DomainId,
       perDomainLoggerFactory: NamedLoggerFactory,
@@ -44,8 +46,6 @@ abstract class InMemoryCNNodeAppStore[
     stores.acsWithTxLog.ingestionSink
 
   override protected[this] def storeAcs(store: PerDomainStore) = store.acsWithTxLog
-
-  override protected[this] def storeTxLog(store: PerDomainStore) = store.acsWithTxLog
 
   override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
 

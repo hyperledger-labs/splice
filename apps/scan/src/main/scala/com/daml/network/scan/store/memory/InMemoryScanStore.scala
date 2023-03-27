@@ -56,8 +56,7 @@ class InMemoryScanStore(
       round: Long
   )(implicit tc: TraceContext): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = {
     for {
-      reader <- defaultTxLogReader
-      roundConfig <- reader.getLatestTxLogEntry((indexRecord) =>
+      roundConfig <- txLogReader.getLatestTxLogEntry((indexRecord) =>
         indexRecord match {
           case roundConfig: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord =>
             roundConfig.round == round
@@ -78,8 +77,7 @@ class InMemoryScanStore(
     // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
     // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
     for {
-      log <- defaultTxLog
-      round <- log.getLatestTxLogIndex((indexRecord) =>
+      round <- txLog.getLatestTxLogIndex((indexRecord) =>
         indexRecord match {
           case _: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord => true
           case _ => false
@@ -149,11 +147,10 @@ class InMemoryScanStore(
   ): Future[Seq[(PartyId, BigDecimal)]] =
     for {
       _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
-      log <- defaultTxLog
       // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
       // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
       perRound <- (0L to asOfEndOfRound).toList.traverse(
-        sumRewardsCollectedInRound(log, _, rewardTypeFilter)
+        sumRewardsCollectedInRound(txLog, _, rewardTypeFilter)
       )
     } yield {
       Monoid.combineAll(perRound).toSeq.sortWith(_._2 > _._2).slice(0, limit)

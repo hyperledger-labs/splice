@@ -32,11 +32,10 @@ trait CNNodeAppStore[
 
   def acs(domain: DomainId): Future[AcsStore]
 
-  def txLog(domain: DomainId): Future[TxLogStore[TXI, TXE]]
-
   def domains: DomainStore
 
   def multiDomainAcsStore: MultiDomainAcsStore
+  def txLog: TxLogStore[TXI, TXE]
 
   /** Orchestrate store and an ingestion sink for a newly-discovered domain. */
   private[network] def installNewPerDomainStore(
@@ -48,7 +47,6 @@ trait CNNodeAppStore[
   private[network] def uninstallPerDomainStore(domain: DomainId): Unit
 
   protected[this] def storeAcs(store: PerDomainStore): AcsStore
-  protected[this] def storeTxLog(store: PerDomainStore): TxLogStore[TXI, TXE]
 
   /** Fetch the ingestion sink that feeds into the given stores. */
   private[network] def storesIngestionSink(store: PerDomainStore): AcsStore.IngestionSink
@@ -92,8 +90,6 @@ object CNNodeAppStore {
     ): PerDomainStore
 
     override def acs(domain: DomainId) = fetchState(domain).future map storeAcs
-
-    override final def txLog(domain: DomainId) = fetchState(domain).future map storeTxLog
   }
 }
 
@@ -113,21 +109,10 @@ trait CNNodeAppStoreWithHistory[
 ] extends CNNodeAppStore[TXI, TXE] {
   protected def connection: CNLedgerConnection
 
-  protected final def txLogReader(domain: DomainId): Future[TxLogStore.Reader[TXI, TXE]] = for {
-    txLog <- txLog(domain)
-  } yield new TxLogStore.Reader[TXI, TXE](
-    txLog,
-    transactionTreeSource = TxLogStore.TransactionTreeSource
-      .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
-  )
-
-  protected final lazy val defaultTxLogReader: Future[TxLogStore.Reader[TXI, TXE]] =
-    domains.signalWhenConnected(defaultAcsDomain).flatMap(txLogReader(_))
-
-  /** Provides access to the tx log directly, not through the reader.
-    *  This should be used when all necessary data is readily available in the
-    *  tx Index Records, thus no re-reading from the ledger is required.
-    */
-  protected final lazy val defaultTxLog: Future[TxLogStore[TXI, TXE]] =
-    domains.signalWhenConnected(defaultAcsDomain).flatMap(txLog(_))
+  protected final val txLogReader: TxLogStore.Reader[TXI, TXE] =
+    new TxLogStore.Reader[TXI, TXE](
+      txLog,
+      transactionTreeSource = TxLogStore.TransactionTreeSource
+        .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
+    )
 }

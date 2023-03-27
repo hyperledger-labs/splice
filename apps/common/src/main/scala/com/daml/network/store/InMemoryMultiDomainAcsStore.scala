@@ -355,7 +355,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   override def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI] =
-    Future.successful(
+    Future {
       stateVar.txLog.view
         .map(_.payload)
         .filter(query)
@@ -363,7 +363,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
         )
-    )
+    }
 
   override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
       ec: ExecutionContext
