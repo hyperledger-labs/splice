@@ -2,7 +2,7 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.environment.CNLedgerConnection
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,8 +41,10 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   /** List all events that come after the given event id up to the set limit.
     * Excludes the event with the given id.
     */
-  def getTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(implicit
-      ec: ExecutionContext
+  // TODO(#3181) Consider if we cannot instead do cross-domain reads
+  // paginated by synthetic event numbers.
+  def getTxLogIndicesAfterEventId(domainId: DomainId, beginAfterEventId: String, limit: Int)(
+      implicit ec: ExecutionContext
   ): Future[Seq[TXI]]
 
   /** List all events that satisfy a given filter. Currently assumes the filter is selective enough for
@@ -134,11 +136,11 @@ object TxLogStore {
       entry <- loadTxLogEntry(index)
     } yield entry
 
-    def getTxLogAfterEventId(beginAfterEventId: String, limit: Int)(implicit
+    def getTxLogAfterEventId(domain: DomainId, beginAfterEventId: String, limit: Int)(implicit
         ec: ExecutionContext,
         tc: TraceContext,
     ): Future[Seq[TXE]] = for {
-      indices <- txLogStore.getTxLogIndicesAfterEventId(beginAfterEventId, limit)
+      indices <- txLogStore.getTxLogIndicesAfterEventId(domain, beginAfterEventId, limit)
       entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
     } yield entries
 

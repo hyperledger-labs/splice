@@ -5,6 +5,7 @@ import com.daml.network.store.AcsStore.ContractFilter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.ExecutionContext
 
@@ -18,6 +19,7 @@ object AcsWithTxLogStore {
       loggerFactory: NamedLoggerFactory,
       scope: ContractFilter,
       txLogParser: TxLogStore.Parser[TXI, TXE],
+      domainId: DomainId,
       futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit
@@ -29,6 +31,7 @@ object AcsWithTxLogStore {
           loggerFactory,
           scope,
           txLogParser,
+          domainId,
           futureSupervisor,
           retryProvider,
         )

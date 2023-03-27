@@ -279,13 +279,15 @@ trait UserWalletStore
       beginAfterEventId: Option[String],
       limit: Int,
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] =
-    defaultTxLogReader.flatMap { txLogReader =>
-      beginAfterEventId.fold(
-        txLogReader.getTxLogByOffset(0, limit)
+    for {
+      domain <- domains.signalWhenConnected(defaultAcsDomain)
+      txReader <- txLogReader(domain)
+      entries <- beginAfterEventId.fold(
+        txReader.getTxLogByOffset(0, limit)
       )(
-        txLogReader.getTxLogAfterEventId(_, limit)
+        txReader.getTxLogAfterEventId(domain, _, limit)
       )
-    }
+    } yield entries
 
   override protected def txLogParser =
     new UserWalletTxLogParser(loggerFactory, key.endUserParty.toProtoPrimitive)

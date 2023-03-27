@@ -24,6 +24,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.ShowUtil.*
 import monocle.macros.syntax.lens.*
 
@@ -39,6 +40,7 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: AcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
+    domainId: DomainId,
     futureSupervisor: FutureSupervisor,
     retryProvider: RetryProvider,
 
@@ -338,10 +340,17 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
   ): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.slice(offset, offset + limit))
 
-  def getTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(implicit
-      ec: ExecutionContext
+  def getTxLogIndicesAfterEventId(queryDomainId: DomainId, beginAfterEventId: String, limit: Int)(
+      implicit ec: ExecutionContext
   ): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.dropWhile(_.eventId != beginAfterEventId).slice(1, 1 + limit))
+    if (queryDomainId == domainId) {
+      Future.successful(
+        stateVar.txLog
+          .dropWhile(_.eventId != beginAfterEventId)
+          .slice(1, 1 + limit)
+      )
+    } else
+      Future.successful(Seq.empty)
 
   def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
@@ -364,6 +373,11 @@ class InMemoryAcsWithTxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore
 }
 
 object InMemoryAcsWithTxLogStore {
+
+  private case class IndexRecordWithLocation[TXI](
+      domainId: DomainId,
+      payload: TXI,
+  )
 
   private case class State[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
       offset: Option[String],
@@ -553,7 +567,9 @@ object InMemoryAcsWithTxLogStore {
           offsetChanged = Promise(),
           offsetIngestionsToSignal =
             stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
-          txLog = stNew.txLog.appendedAll(ingestedTxLogEntries.view.map(_.indexRecord)),
+          txLog = stNew.txLog.appendedAll(
+            ingestedTxLogEntries.map(_.indexRecord)
+          ),
         ),
         (
           IngestionSummary(

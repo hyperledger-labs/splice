@@ -109,6 +109,7 @@ class InMemoryAcsWithTxLogStoreTest extends StoreTest {
       loggerFactory,
       txFilter,
       TestTxLogStoreParser,
+      dummyDomain,
       FutureSupervisor.Noop,
       RetryProvider(loggerFactory, timeouts),
     )

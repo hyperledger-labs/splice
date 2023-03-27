@@ -33,6 +33,7 @@ abstract class InMemoryCNNodeAppStore[
         perDomainLoggerFactory,
         contractFilter = acsContractFilter,
         txLogParser = txLogParser,
+        domainId = domain,
         futureSupervisor = futureSupervisor,
         retryProvider = retryProvider,
         logAllStateUpdates = false,
