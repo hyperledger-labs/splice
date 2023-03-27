@@ -1,9 +1,13 @@
 package com.daml.network.sv.store
 
+import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
@@ -215,6 +219,54 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       acs <- defaultAcs
       rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
     } yield rounds.sortBy(_.payload.round.number).headOption
+
+  /** All `ClosedMiningRound` contracts that should be confirmed to be archived.
+    *
+    * These are all `ClosedMiningRound` contracts for which
+    * 1. there are no left-over reward coupon contracts and
+    * 2. there does not yet exist a ready-to-be-archived confirmation by this SV.
+    *
+    * Note: The QueryResult in the return value is composed of the closed mining round contract
+    * and the offset from the query for the confirmation contract.
+    */
+  def listArchivableClosedMiningRounds(): Future[
+    Seq[QueryResult[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]]
+  ] = {
+    for {
+      acs <- defaultAcs
+      closedRounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
+      archivableClosedRounds <- closedRounds.traverse(round => {
+        for {
+          appRewardCoupons <- listAppRewardCoupons(round.payload.round.number, Some(1))
+          validatorRewardCoupons <- listValidatorRewardCoupons(
+            round.payload.round.number,
+            Some(1),
+          )
+          coinRules <- getCoinRules()
+          action = new ARC_CoinRules(
+            coinRules.contractId,
+            new CRARC_MiningRound_Archive(
+              new CoinRules_MiningRound_Archive(
+                round.contractId
+              )
+            ),
+          )
+          confirmationQueryResult <- lookupConfirmationByActionWithOffset(key.svParty, action)
+        } yield {
+          (
+            // archivable if ...
+            if (
+              // ... there are no unclaimed rewards left in this round
+              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty &&
+              // ... and a confirmation to archive is not already created by this SV
+              confirmationQueryResult.value.isEmpty
+            ) Some(QueryResult(confirmationQueryResult.offset, round))
+            else None
+          )
+        }
+      })
+    } yield archivableClosedRounds.flatten
+  }
 
   def lookupConfirmationByActionWithOffset(
       confirmer: PartyId,

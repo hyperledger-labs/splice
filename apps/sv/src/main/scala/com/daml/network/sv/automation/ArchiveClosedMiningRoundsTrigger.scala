@@ -1,6 +1,5 @@
 package com.daml.network.sv.automation
 
-import cats.syntax.traverse.*
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -14,10 +13,9 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
-import com.digitalasset.canton.health.HealthReporting.implicitPrettyString
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -27,13 +25,13 @@ class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     connection: CNLedgerConnection,
-    waitForUnclaimedRewardsToBeExpired: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[
-      ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask
+      QueryResult[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
     ] {
+  private type Task = QueryResult[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
 
   private val svParty = store.key.svParty
   private val svcParty = store.key.svcParty
@@ -66,65 +64,20 @@ class ArchiveClosedMiningRoundsTrigger(
     } yield confirmationExists
   }
 
-  private def maybeCreateTask(
-      closedRound: Contract[ClosedMiningRound.ContractId, ClosedMiningRound]
-  ): Future[
-    Option[ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask]
-  ] = {
-    for {
-      appRewardCoupons <- store.listAppRewardCoupons(closedRound.payload.round.number, Some(1))
-      validatorRewardCoupons <- store.listValidatorRewardCoupons(
-        closedRound.payload.round.number,
-        Some(1),
-      )
-      coinRules <- store.getCoinRules()
-      action = coinRulesArchiveMiningRoundAction(
-        coinRules.contractId,
-        closedRound.contractId,
-      )
-      confirmationQueryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
-    } yield {
-      if (
-        // if there are unclaimed rewards left in this round
-        (waitForUnclaimedRewardsToBeExpired && (appRewardCoupons.length + validatorRewardCoupons.length > 0)) ||
-        // ... or a confirmation to archive was already created by this SV
-        confirmationQueryResult.value.isDefined
-      ) {
-        None
-      } else {
-        Some(
-          ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask(
-            closedRound,
-            confirmationQueryResult.offset,
-          )
-        )
-      }
-    }
-  }
-
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[
-    Seq[ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask]
-  ] = {
-    for {
-      acs <- store.defaultAcs
-      rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
-      tasks <- rounds.traverse(maybeCreateTask)
-    } yield tasks.flatten {
-      case None => Seq()
-      case Some(task) => Seq(task)
-    }
+  ): Future[Seq[Task]] = {
+    store.listArchivableClosedMiningRounds()
   }
 
   override protected def completeTask(
-      task: ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask
+      task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      closedRound = task.closedRound
+      closedRound = task.value
       action = coinRulesArchiveMiningRoundAction(
         coinRules.contractId,
         closedRound.contractId,
@@ -144,7 +97,7 @@ class ArchiveClosedMiningRoundsTrigger(
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,
           ),
-          deduplicationOffset = task.confirmationTxOffset,
+          deduplicationOffset = task.offset,
           domainId = domainId,
         )
         .map(_._1)
@@ -158,35 +111,22 @@ class ArchiveClosedMiningRoundsTrigger(
   }
 
   override protected def isStaleTask(
-      task: ArchiveClosedMiningRoundsTrigger.CreateArchiveClosedMiningRoundConfirmationTask
+      task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
       acs <- store.defaultAcs
+      closedRound = task.value
       // lookup closed mining round once again in the ACS to check if it was archived
       closedRoundExists <- acs
         .lookupContractById(cc.round.ClosedMiningRound.COMPANION)(
-          task.closedRound.contractId
+          closedRound.contractId
         )
         .map(_.isDefined)
       isStale <-
         if (!closedRoundExists)
           Future.successful(true)
         else
-          existsClosedRoundArchivalConfirmation(task.closedRound.contractId)
+          existsClosedRoundArchivalConfirmation(closedRound.contractId)
     } yield isStale
-  }
-}
-
-object ArchiveClosedMiningRoundsTrigger {
-  case class CreateArchiveClosedMiningRoundConfirmationTask(
-      closedRound: Contract[ClosedMiningRound.ContractId, ClosedMiningRound],
-      confirmationTxOffset: String,
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] = {
-      prettyOfClass(
-        param("closedRound", _.closedRound),
-        param("confirmationTxOffset", _.confirmationTxOffset),
-      )
-    }
   }
 }

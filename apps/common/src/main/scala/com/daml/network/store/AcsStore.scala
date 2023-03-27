@@ -22,6 +22,8 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.util.Contract
 import Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.PrettyInstances.PrettyContractId
+import com.digitalasset.canton.logging.pretty.PrettyUtil.{param, prettyOfClass}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -246,6 +248,13 @@ object AcsStore {
       copy(
         value = f(this.value)
       )
+  }
+
+  object QueryResult {
+    import com.digitalasset.canton.util.ShowUtil.*
+
+    implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] =
+      prettyOfClass(param("offset", _.offset.unquoted), param("value", _.value))
   }
 
   /** A sink for ingesting an initial ACS snapshot and transactions changing it. */
