@@ -216,6 +216,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v0/get-validator-credit:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getValidatorCredit"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorCreditResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -332,6 +350,13 @@ components:
       required: ["round"]
       properties:
         round:
+          type: integer
+          format: int64
+    GetValidatorCreditResponse:
+      type: object
+      required: ["validatorCredit"]
+      properties:
+        validatorCredit:
           type: integer
           format: int64
     GetTopProvidersByAppRewardsResponse:

@@ -19,6 +19,8 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import io.grpc.StatusRuntimeException
 
+import java.util.concurrent.atomic.AtomicLong
+
 class HttpScanHandler(
     store: ScanStore,
     protected val loggerFactory: NamedLoggerFactory,
@@ -29,6 +31,8 @@ class HttpScanHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
+  // Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
+  private val validatorCredit = new AtomicLong(0)
 
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
@@ -300,6 +304,17 @@ class HttpScanHandler(
                   .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")
               )
         })
+    }
+
+  def getValidatorCredit(
+      response: v0.ScanResource.GetValidatorCreditResponse.type
+  )(): Future[v0.ScanResource.GetValidatorCreditResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      Future.successful(
+        v0.ScanResource.GetValidatorCreditResponse.OK(
+          definitions.GetValidatorCreditResponse(this.validatorCredit.longValue())
+        )
+      )
     }
 
 }

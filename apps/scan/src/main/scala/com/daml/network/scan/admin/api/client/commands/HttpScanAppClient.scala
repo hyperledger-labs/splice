@@ -424,4 +424,23 @@ object HttpScanAppClient {
         Left(value.error)
     }
   }
+
+  case class GetValidatorCredit() extends BaseCommand[http.GetValidatorCreditResponse, Long] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorCreditResponse] =
+      client.getValidatorCredit(headers)
+
+    override def handleResponse(
+        response: http.GetValidatorCreditResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Long] =
+      response match {
+        case http.GetValidatorCreditResponse.OK(response) =>
+          Right(response.validatorCredit)
+        case http.GetValidatorCreditResponse.NotFound(value) =>
+          Left(value.error)
+      }
+
+  }
 }
