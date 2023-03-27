@@ -86,7 +86,7 @@ find_exceptions |
 
 find_secrets() {
   set +o pipefail # rg returns 1 if there were not matches
-  rg -e "secret=" -e "token=" -e "private-key=" "$LOGFILE" |
+  rg -o -e "(secret|token|private-key|password)=[^,[:space:]]*" "$LOGFILE" |
     # we mask secrets as "****" in our logs
     rg -v "=\\\\\"\*\*\*\*\\\\\"" || true
 }

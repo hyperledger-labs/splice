@@ -727,7 +727,9 @@ checkErrors := {
         ".circleci/canton-scripts/check-logs.sh",
         logFileName,
       ) ++ ignorePatternsFilenames
-    cmd.!
+    if (cmd.! != 0) {
+      sys.error(s"$logFileName contains problems.")
+    }
   }
 
   def splitAndCheckCantonLogFile(logName: String, usesSimtime: Boolean): Unit = {
