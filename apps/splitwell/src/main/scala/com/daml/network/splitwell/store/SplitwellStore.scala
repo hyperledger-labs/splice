@@ -5,18 +5,17 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{AcsStore, MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
-  import AcsStore.QueryResult
+  import MultiDomainAcsStore.{ContractWithState, QueryResult}
 
   def providerParty: PartyId
 
@@ -29,42 +28,21 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   ): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]]] =
-    acs(domainId).flatMap(
-      _.findContractWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
-        co.payload.user == user.toProtoPrimitive
-      )
+    multiDomainAcsStore.findContractOnDomainWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(
+      domainId,
+      co => co.payload.user == user.toProtoPrimitive,
     )
 
   def lookupGroupWithOffset(
       owner: PartyId,
       id: splitwellCodegen.GroupId,
   ): Future[
-    QueryResult[Option[Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]]
+    QueryResult[
+      Option[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]
+    ]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
-        co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
-      )
-    )
-
-  def lookupGroup(
-      owner: PartyId,
-      id: splitwellCodegen.GroupId,
-  ): Future[Option[Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
-    lookupGroupWithOffset(owner, id).map(_.value)
-
-  def getGroup(
-      owner: PartyId,
-      id: splitwellCodegen.GroupId,
-  ): Future[Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]] =
-    lookupGroup(owner, id).map(
-      _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(
-            s"No active Group contract for owner $owner and id $id"
-          )
-        )
-      )
+    multiDomainAcsStore.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
+      co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
     )
 }
 

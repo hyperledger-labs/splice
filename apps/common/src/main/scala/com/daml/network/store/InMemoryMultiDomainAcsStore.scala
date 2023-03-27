@@ -153,11 +153,6 @@ class InMemoryMultiDomainAcsStore(
         fromCreatedEvent(ev).map { parsedEv =>
           val state = st
             .getContractState(new ContractId(ev.getContractId))
-            .getOrElse(
-              throw new IllegalStateException(
-                s"Failed to find contract state for ${ev.getContractId}"
-              )
-            )
           (parsedEv, state)
         }
       })
@@ -194,11 +189,6 @@ class InMemoryMultiDomainAcsStore(
       } yield {
         val state = st
           .getContractState(new ContractId(ev.getContractId))
-          .getOrElse(
-            throw new IllegalStateException(
-              s"Failed to find contract state for ${ev.getContractId}"
-            )
-          )
         (parsedEv, state)
       }
     }
@@ -214,6 +204,55 @@ class InMemoryMultiDomainAcsStore(
       .map(_.map { case (contract, state) =>
         ContractWithState(contract, state)
       })
+  }
+
+  override def findContractWithOffset[C, TCid <: ContractId[_], T](
+      companion: C
+  )(
+      p: Contract[TCid, T] => Boolean = (_: Any) => true
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = Future {
+    requireInScope(companion)
+    val st = stateVar
+    val optEntry = st.createEvents.values.collectFirst(
+      Function.unlift(ev =>
+        for {
+          contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
+          if p(contract)
+        } yield contract
+      )
+    )
+    QueryResult(
+      st.offsets,
+      optEntry.map { contract =>
+        val state = st.getContractState(contract.contractId)
+        ContractWithState(contract, state)
+      },
+    )
+  }
+
+  override def findContractOnDomainWithOffset[C, TCid <: ContractId[_], T](
+      companion: C
+  )(domain: DomainId, p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true)(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[QueryResult[Option[Contract[TCid, T]]]] = Future {
+    requireInScope(companion)
+    val st = stateVar
+    val optEntry = st.createEvents.values.collectFirst(
+      Function.unlift(ev =>
+        for {
+          contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
+          if p(contract)
+          state = st.getContractState(contract.contractId)
+          if state == ContractState.Assigned(domain)
+        } yield contract
+      )
+    )
+    QueryResult(
+      st.offsets,
+      optEntry,
+    )
   }
 
   override def streamReadyForTransferIn(
@@ -413,7 +452,7 @@ object InMemoryMultiDomainAcsStore {
       offsetChanged: Promise[Unit],
   ) {
 
-    def getContractState(cid: ContractId[_]): Option[ContractState] =
+    def lookupContractState(cid: ContractId[_]): Option[ContractState] =
       contractStateEventsById.get(cid).map { eventNum =>
         val stateEvent = contractStateEvents(eventNum)
         stateEvent.toAssigned match {
@@ -424,6 +463,11 @@ object InMemoryMultiDomainAcsStore {
             ContractState.InFlight
         }
       }
+
+    def getContractState(cid: ContractId[_]): ContractState =
+      lookupContractState(cid).getOrElse(
+        throw new IllegalStateException(s"Failed to find contract state for $cid")
+      )
 
     def ingestAcsAndTransferOuts(
         domain: DomainId,

@@ -346,6 +346,11 @@ abstract class OnReadyContractTrigger[C, TCid <: ContractId[_], T](
       )
 }
 
+object OnReadyContractTrigger {
+  type Template[TCid <: ContractId[_], T] =
+    OnReadyContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
+}
+
 abstract class OnReadyForTransferInTrigger(
     store: CNNodeAppStore[_, _]
 )(implicit

@@ -6,11 +6,14 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{TreeUpd
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait MultiDomainAcsStore extends AutoCloseable {
 
@@ -21,6 +24,58 @@ trait MultiDomainAcsStore extends AutoCloseable {
   )(id: ContractId[_])(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Option[ContractWithState[TCid, T]]]
+
+  /** Variant of lookupContractById that will fail the future
+    * if the contract is active but not in state ContractState.Assigned(domain).
+    * This is particularly useful in automation where this will ensure it retries until
+    * all contracts have finished transferring.
+    */
+  def lookupContractByIdOnDomain[C, TCid <: ContractId[_], T](
+      companion: C
+  )(domain: DomainId, id: ContractId[_])(implicit
+      ec: ExecutionContext,
+      companionClass: ContractCompanion[C, TCid, T],
+  ): Future[Option[Contract[TCid, T]]] = lookupContractById(companion)(id).map(_.map { c =>
+    if (c.state == ContractState.Assigned(domain)) {
+      c.contract
+    } else {
+      throw Status.FAILED_PRECONDITION
+        .withDescription(show"Contract $id is active but not on domain $domain: ${c.state}")
+        .asRuntimeException()
+    }
+  })
+
+  /** Find a contract that satisfies a predicate.
+    *
+    * Caution: this function traverses all contracts!
+    * Not intended for production use, but very useful for prototyping.
+    */
+  def findContractWithOffset[C, TCid <: ContractId[_], T](
+      companion: C
+  )(
+      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]]
+
+  /** Find a contract that satisfies a predicate on the given domain.
+    * Only contracts with state ContractState.Assigned(domain) are considered
+    * so contracts are omitted if they have been transferred or are in-flight.
+    * This should generally only be used
+    * for contracts that exist in per-domain variations and are never transferred, e.g.,
+    * install contracts.
+    *
+    * Caution: this function traverses all contracts!
+    * Not intended for production use, but very useful for prototyping.
+    */
+  def findContractOnDomainWithOffset[C, TCid <: ContractId[_], T](
+      companion: C
+  )(
+      domain: DomainId,
+      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[QueryResult[Option[Contract[TCid, T]]]]
 
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
@@ -51,6 +106,23 @@ trait MultiDomainAcsStore extends AutoCloseable {
 }
 
 object MultiDomainAcsStore {
+
+  /** A query result computed as-of a specific set of per-domain ledger API offset. */
+  case class QueryResult[A](
+      offsets: Map[DomainId, String],
+      value: A,
+  ) {
+    // TODO(M3-19) Remove client-side minimum once the dedup APIs
+    // allow passing in multiple offsets.
+    def deduplicationOffset: String =
+      // Throwing here will result in automation retrying which is exactly
+      // what we want.
+      offsets.values.minOption.getOrElse(
+        throw Status.FAILED_PRECONDITION
+          .withDescription("No data for any domain has been ingested")
+          .asRuntimeException()
+      )
+  }
 
   trait ContractCompanion[-C, TCid <: ContractId[_], T] {
     def fromCreatedEvent(
@@ -118,14 +190,19 @@ object MultiDomainAcsStore {
       state: ContractState,
   )
 
-  sealed abstract class ContractState
+  sealed abstract class ContractState extends PrettyPrinting
 
   object ContractState {
     case class Assigned(
         domain: DomainId
-    ) extends ContractState
+    ) extends ContractState {
+      override def pretty: Pretty[this.type] =
+        prettyOfClass(param("domain", _.domain))
+    }
 
-    case object InFlight extends ContractState
+    case object InFlight extends ContractState {
+      override def pretty: Pretty[this.type] = prettyOfObject[InFlight.type]
+    }
   }
 
   trait IngestionSink {

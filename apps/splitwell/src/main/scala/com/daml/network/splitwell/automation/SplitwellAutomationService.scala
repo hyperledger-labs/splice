@@ -1,15 +1,12 @@
 package com.daml.network.splitwell.automation
 
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.store.DomainStore
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
-  DomainOrchestrator,
   TransferInTrigger,
   TransferOutTrigger,
-  TriggerContext,
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.splitwell.config.SplitwellDomainConfig
@@ -50,36 +47,26 @@ class SplitwellAutomationService(
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  // TODO(#3285) Consider not even starting this on non-splitwell
-  // domains.
-  def createAcceptedAppPaymentRequestTrigger(
-      domainAdded: DomainStore.DomainAdded,
-      triggerContext: TriggerContext,
-  ) =
+  registerTrigger(
     new AcceptedAppPaymentRequestsTrigger(
       triggerContext,
       store,
       connection,
-      domainAdded.domainAlias,
       scanConnection,
     )
+  )
 
-  def createSplitwellInstallRequestTrigger(
-      domainAdded: DomainStore.DomainAdded,
-      triggerContext: TriggerContext,
-  ) =
+  registerTrigger(
     new SplitwellInstallRequestTrigger(
       triggerContext,
       store,
       connection,
-      domainAdded.domainAlias,
     )
+  )
 
-  def createGroupRequestTrigger(
-      domainAdded: DomainStore.DomainAdded,
-      triggerContext: TriggerContext,
-  ) =
-    new GroupRequestTrigger(triggerContext, store, connection, domainAdded.domainAlias)
+  registerTrigger(
+    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell.preferred)
+  )
 
   registerTrigger(
     new TransferOutTrigger.Template(
@@ -98,30 +85,6 @@ class SplitwellAutomationService(
       store,
       connection,
       store.providerParty,
-    )
-  )
-
-  registerTrigger(
-    DomainOrchestrator(
-      triggerContext,
-      store.domains,
-      DomainOrchestrator.multipleServices(
-        Seq(
-          createAcceptedAppPaymentRequestTrigger,
-          createSplitwellInstallRequestTrigger,
-          createGroupRequestTrigger,
-        ).map { createTrigger =>
-          { case (domainAdded, triggerContext) =>
-            val trigger = createTrigger(
-              domainAdded,
-              triggerContext,
-            )
-            trigger.run()
-            trigger
-          }
-        },
-        triggerContext.loggerFactory,
-      ),
     )
   )
 }
