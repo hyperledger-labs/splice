@@ -5,6 +5,7 @@ import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cc.v1test as v1testcc
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
@@ -360,6 +361,9 @@ object SvSvcStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
+        // TODO(#3707): For now we just filter on the V1Test version of CoinRules, without using it anywhere.
+        // This serves as a basic sanity test that codegen worked for this version, and did not interfere with anything else.
+        mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ),
     )

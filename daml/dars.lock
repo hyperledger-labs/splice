@@ -4,6 +4,7 @@ daml/cn-util/.daml/dist/cn-util-0.1.0.dar f3fa5a6fb061430e2a0cbca6d4b8be2eaa8980
 daml/directory-service/.daml/dist/directory-service-0.1.0.dar bf2be488b1fcfd1c7bc7a340c7d29de7b40c8663ce2c6cbba4c5796784d2e03b
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar 8ee42a955ed4145cba6e4ee16ea657097bf392f49fe07014a1f1a1e6fbeb5884
 daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar b1ce56679c9bca6a18286141fdb0ff0b579f6d7c0e13bb9c0daf39aaa05f1782
+daml/upgrade-tests/canton-coin-upgrade-test/.daml/dist/canton-coin-0.1.1.dar 8ac1939e076bb927581c44ce9a8fb10bc852825300aff899f589a7d0d7c150bf
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar e301113d5c7eb60da6a76d024f256768ae02698c12870ba7111a46058dfaf47d
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar e689355efd473b05aaaf65d07f5fafaffe5ef50ad09e852a86077fecd0d2d534
 daml/wallet/.daml/dist/wallet-0.1.0.dar 0943e30dcb5691e529e9cb9b262d3b736e3662f4d2a9d4f3387997bef274b675

@@ -1,0 +1,16 @@
+sdk-version: 2.6.0-snapshot.20230210.11415.0.5c00481a
+name: canton-coin
+source: daml
+version: 0.1.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../../canton-coin-api/.daml/dist/canton-coin-api-0.1.0.dar
+  - ../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
+  - ../../cn-util/.daml/dist/cn-util-0.1.0.dar
+build-options:
+  - --target=1.dev
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches

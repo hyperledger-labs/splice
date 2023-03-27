@@ -1,0 +1,284 @@
+module CC.V1Test.Coin where
+
+import Prelude hiding (forA)
+
+import DA.Foldable (forA_)
+import qualified DA.Set as Set
+import DA.Traversable (forA)
+import DA.Time
+
+import CC.CoinConfig
+import CC.Schedule
+import CC.Fees
+import CC.Issuance
+import CC.Round
+
+import CC.Coin as Coin
+
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
+
+import CN.Util.Assert
+
+-- A version of CoinRules intended for testing upgrades.
+-- It is a copy of CoinRules at the time of writing, except that the bootstrap_rounds choice has been removed.
+template CoinRulesV1Test
+  with
+    svc : Party
+    configSchedule : Schedule Time (CoinConfig USD)
+    enabledChoices : API.EnabledChoices
+    isDevNet : Bool
+  where
+    ensure validSchedule configSchedule validCoinConfig
+
+    signatory svc
+
+    interface instance API.CoinRules for CoinRulesV1Test where
+      view = API.CoinRulesView with ..
+      coinrules_Transfer_Controllers = Set.toList . transferControllers
+      coinrules_ComputeFees context sender outputs = do
+        requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
+        computeFees svc context sender outputs
+      coinrules_Transfer coinRulesCid transfer context = do
+        requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
+        executeTransfer coinRulesCid context svc transfer
+
+    -- A choice for the SVC to mint coin for the cases where the
+    -- collective rules allow for that; e.g., when redeeming SVC rewards.
+    nonconsuming choice CoinRulesV1Test_Mint: ContractId Coin
+      with
+        receiver: Party
+        amount: Decimal
+        openRound: ContractId OpenMiningRound
+      controller svc, receiver
+      do
+        openRound <- fetch openRound
+        let transferConfigCC = transferConfigCCFromOpenRound openRound
+            expiringAmount = ExpiringAmount with
+                        initialAmount = amount
+                        createdAt = openRound.round
+                        ratePerRound = transferConfigCC.holdingFee
+        create Coin with
+                  owner = receiver
+                  amount = expiringAmount
+                  ..
+
+    nonconsuming choice CoinRulesV1Test_DevNet_Tap: ContractId Coin
+      with
+        receiver: Party
+        amount: Decimal
+        openRound: ContractId OpenMiningRound
+      controller receiver
+      do require "isDevNet flag is true" isDevNet
+         requireChoiceIsEnabled "CoinRules_DevNet_Tap" (\c -> c.enable_CoinRules_DevNet_Tap) (view $ toInterface @API.CoinRules this)
+         exercise self CoinRulesV1Test_Mint with ..
+
+    nonconsuming choice CoinRulesV1Test_DevNet_FeatureApp : ContractId FeaturedAppRight
+      with
+        provider : Party
+      controller provider
+      do require "isDevNet flag is true" isDevNet
+         create FeaturedAppRight with svc; provider
+
+    nonconsuming choice CoinRulesV1Test_AdvanceOpenMiningRounds
+      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+      with
+        coinPrice : Decimal
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+      controller svc
+      do
+        roundToArchive <- fetch roundToArchiveCid
+        middleRound <- fetch middleRoundCid
+        latestRound <- fetch latestRoundCid
+
+        now <- getTime
+        require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+        require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
+        require "latestRound is open" (latestRound.opensAt <= now)
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.tickDuration <= now)
+
+        -- archive and create the rounds
+        archive roundToArchiveCid
+        newSummarizingRound <- create SummarizingMiningRound with
+            svc
+            round = roundToArchive.round
+            issuanceConfig = roundToArchive.issuanceConfig
+            tickDuration = roundToArchive.tickDuration
+        newOpenRound <- do
+          let configUsd = getValueAsOf now configSchedule
+              tickDuration = configUsd.tickDuration
+              -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
+              opensAt = addRelTime (max now latestRound.opensAt) tickDuration
+              newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
+          create OpenMiningRound with
+              svc
+              round = API.Round (latestRound.round.number + 1)
+              coinPrice
+              opensAt
+              -- round is open for two ticks.
+              targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
+              -- We advance the time for which the SVC has been issuing independent of how real world advances.
+              -- Note that given the checks above the real time can only be slower.
+              issuingFor = newOpenRoundIssuingFor
+              transferConfigUsd = configUsd.transferConfig
+              issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
+              tickDuration
+        return (newSummarizingRound, newOpenRound)
+
+    nonconsuming choice CoinRulesV1Test_MiningRound_StartIssuing
+      : ContractId IssuingMiningRound
+      with
+        miningRoundCid : ContractId SummarizingMiningRound
+        -- The amount of coin burned in this round.
+        summary : OpenMiningRoundSummary
+      controller svc
+      do
+        -- archive summarizing mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        require "SVC matches" (miningRound.svc == svc)
+        validateOpenMiningRoundSummary summary
+
+        let params = computeIssuingRoundParameters miningRound.tickDuration miningRound.issuanceConfig summary
+
+        -- record reward for the SVC
+        create SvcReward with
+          svc
+          round = miningRound.round
+          amount = params.coinsToIssueToSvc
+
+        -- record unclaimed reward contract
+        create UnclaimedReward with
+          svc
+          amount = params.unclaimedValidatorRewards + params.unclaimedAppRewards
+
+        -- create issuing round
+        now <- getTime
+        let tickDuration = miningRound.tickDuration
+        let opensAt = addRelTime now tickDuration
+        let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
+
+        create IssuingMiningRound with
+          svc
+          round = miningRound.round
+          opensAt = opensAt
+          targetClosesAt = targetClosesAt
+          issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
+
+
+    nonconsuming choice CoinRulesV1Test_MiningRound_Close
+      : ContractId ClosedMiningRound
+      with
+        issuingRoundCid : ContractId IssuingMiningRound
+      controller svc
+      do
+        -- archive issuing mining round
+        now <- getTime
+        issuingRound <- fetch issuingRoundCid
+        archive issuingRoundCid
+        require "SVC matches" (issuingRound.svc == svc)
+        require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
+
+        -- create closed round
+        create ClosedMiningRound with
+          svc
+          issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
+          round = issuingRound.round
+
+    nonconsuming choice CoinRulesV1Test_MiningRound_Archive
+      : ()
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller svc
+      do
+        -- archive closed mining round
+        miningRound <- fetch closedRoundCid
+        archive closedRoundCid
+        require "SVC matches" (miningRound.svc == svc)
+
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    nonconsuming choice CoinRulesV1Test_ClaimExpiredRewards
+      : Optional (ContractId UnclaimedReward)
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+        validatorCouponCids : [ContractId ValidatorRewardCoupon]
+        appCouponCids : [ContractId AppRewardCoupon]
+      controller svc
+      do
+        -- retrieve round
+        closedRound <- fetch closedRoundCid
+        require "SVC matches" (closedRound.svc == svc)
+
+        -- expire validator rewards and compute their unclaimed rewards
+        expiredValidatorRewards <- forA validatorCouponCids $ \validatorCouponCid -> do
+          exercise validatorCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+
+        let validatorRewards = sum expiredValidatorRewards
+
+        -- expire app rewards and compute their unclaimed rewards
+        expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
+          exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+
+        let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
+        let unfeaturedAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, not featured ]
+
+        -- create unclaimed reward for the total
+        let amount =
+              validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
+              featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
+              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
+        if (amount <= 0.0)
+          then pure None
+          else Some <$> create UnclaimedReward with svc; amount
+
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice CoinRulesV1Test_MergeUnclaimedRewards
+      : ContractId UnclaimedReward
+      with
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller svc
+      do
+        require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
+
+        -- fetch and archive all given rewards
+        archivedAmounts <- forA unclaimedRewardCids $ \unclaimedRewardCid -> do
+          unclaimedReward <- fetch unclaimedRewardCid
+          archive unclaimedRewardCid
+          require "SVC matches" (unclaimedReward.svc == svc)
+          pure unclaimedReward.amount
+
+        -- create a new unclaimed reward over the total
+        create UnclaimedReward with
+          svc
+          amount = sum archivedAmounts
+
+    -- This allows fetchByKey-style fetches if you have readAs
+    -- but not actAs claims.
+    nonconsuming choice CoinRulesV1Test_Fetch
+      : (ContractId CoinRulesV1Test, CoinRulesV1Test)
+      with
+        p : Party
+      controller p
+      do pure (self, this)
+
+    choice CoinRulesV1Test_SetEnabledChoices : ContractId CoinRulesV1Test
+      with
+        newEnabledChoices : API.EnabledChoices
+      controller svc
+      do create this with enabledChoices = newEnabledChoices
+
+    choice CoinRulesV1Test_SetConfigSchedule : ContractId CoinRulesV1Test
+      with
+        newConfigSchedule : Schedule Time (CoinConfig USD)
+      controller svc
+      do forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
+           now <- getTime
+           require "Next change is not scheduled in the future" (now < t)
+         create this with configSchedule = newConfigSchedule
