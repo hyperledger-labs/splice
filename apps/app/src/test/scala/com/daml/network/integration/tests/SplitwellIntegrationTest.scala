@@ -109,19 +109,18 @@ class SplitwellIntegrationTest
         _ => aliceWallet.listAppPaymentRequests().headOption.value,
       )
 
-      val (_, balanceUpdate) = actAndCheck(
+      actAndCheck(
         "alice initiates payment accept request on global domain",
         aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
       )(
         "alice sees balance update on splitwell domain",
         _ =>
           inside(aliceSplitwell.listBalanceUpdates(key)) { case Seq(update) =>
-            update
+            aliceValidator.remoteParticipant.transfer
+              .lookup_contract_domain(update.contractId) shouldBe Map(
+              javaToScalaContractId(update.contractId) -> "splitwell"
+            )
           },
-      )
-      aliceValidator.remoteParticipant.transfer
-        .lookup_contract_domain(balanceUpdate.contractId) shouldBe Map(
-        javaToScalaContractId(balanceUpdate.contractId) -> "splitwell"
       )
     }
 

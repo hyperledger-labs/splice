@@ -91,7 +91,7 @@ object CNNodeAppStore {
         perDomainLoggerFactory: NamedLoggerFactory,
     ): PerDomainStore
 
-    override final def acs(domain: DomainId) = fetchState(domain).future map storeAcs
+    override def acs(domain: DomainId) = fetchState(domain).future map storeAcs
 
     override final def txLog(domain: DomainId) = fetchState(domain).future map storeTxLog
   }

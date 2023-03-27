@@ -13,6 +13,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   import MultiDomainAcsStore.{ContractWithState, QueryResult}
@@ -20,7 +21,12 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  override final def defaultAcsDomain = domainConfig.splitwell.preferred
+  // TODO (M3-19) Remove this
+  override final def defaultAcsDomain =
+    sys.error("Splitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead")
+
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    sys.error("Splitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead")
 
   def lookupInstallWithOffset(
       domainId: DomainId,
@@ -43,6 +49,60 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   ] =
     multiDomainAcsStore.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
       co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
+    )
+
+  def listGroups(
+      user: PartyId
+  ): Future[Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
+    multiDomainAcsStore.listContracts(
+      splitwellCodegen.Group.COMPANION,
+      c => groupMembers(c.payload).contains(user.toProtoPrimitive),
+    )
+
+  def listGroupInvites(owner: PartyId): Future[
+    Seq[ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]]
+  ] =
+    multiDomainAcsStore.listContracts(
+      splitwellCodegen.GroupInvite.COMPANION,
+      c => c.payload.group.owner == owner.toProtoPrimitive,
+    )
+
+  def listAcceptedGroupInvites(owner: PartyId, groupId: String): Future[Seq[ContractWithState[
+    splitwellCodegen.AcceptedGroupInvite.ContractId,
+    splitwellCodegen.AcceptedGroupInvite,
+  ]]] =
+    multiDomainAcsStore.listContracts(
+      splitwellCodegen.AcceptedGroupInvite.COMPANION,
+      c =>
+        c.payload.groupKey.owner == owner.toProtoPrimitive &&
+          c.payload.groupKey == groupKey(owner, groupId),
+    )
+
+  def listBalanceUpdates(user: PartyId, key: splitwellCodegen.GroupKey): Future[Seq[
+    ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
+  ]] =
+    multiDomainAcsStore.listContracts(
+      splitwellCodegen.BalanceUpdate.COMPANION,
+      c =>
+        groupMembers(c.payload.group).contains(user.toProtoPrimitive) &&
+          groupKey(c.payload.group) == key,
+    )
+
+  private def groupMembers(group: splitwellCodegen.Group): Set[String] =
+    group.members.asScala.toSet + group.owner
+
+  private def groupKey(owner: PartyId, id: String): splitwellCodegen.GroupKey =
+    new splitwellCodegen.GroupKey(
+      owner.toProtoPrimitive,
+      providerParty.toProtoPrimitive,
+      new splitwellCodegen.GroupId(id),
+    )
+
+  private def groupKey(group: splitwellCodegen.Group): splitwellCodegen.GroupKey =
+    new splitwellCodegen.GroupKey(
+      group.owner,
+      group.provider,
+      group.id,
     )
 }
 
