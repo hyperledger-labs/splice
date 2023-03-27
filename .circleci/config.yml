@@ -82,6 +82,8 @@ commands:
          password $ARTIFACTORY_PASSWORD
          EOF
          . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+         nix-build --out-link "$HOME/.nix-shell" -A inputDerivation shell.nix
+         nix-store --gc
          nix-shell shell.nix --run 'echo "Done loading all packages."'
     - save_cache:
         key: nix-{{ checksum "/tmp/nix-cache-key" }}
