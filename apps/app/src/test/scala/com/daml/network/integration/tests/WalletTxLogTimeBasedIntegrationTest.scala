@@ -99,7 +99,7 @@ class WalletTxLogTimeBasedIntegrationTest
             // Alice sending 40CC to Bob
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(40, 40 + smallAmount)
+              amount should beWithin(-40 - smallAmount, -40)
             }
             inside(logEntry.receivers) { case Seq((receiver, amount)) =>
               receiver shouldBe bobUserParty.toProtoPrimitive
@@ -112,11 +112,11 @@ class WalletTxLogTimeBasedIntegrationTest
             // TODO(#3525): this transfer should show the rewards used
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceValidator.getValidatorPartyId().toProtoPrimitive
-              amount should beWithin(BigDecimal(10), 10 + smallAmount)
+              amount should beWithin(-10 - smallAmount, BigDecimal(-10))
             }
             inside(logEntry.receivers) { case Seq((receiver, amount)) =>
               receiver shouldBe bobUserParty.toProtoPrimitive
-              amount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+              amount should beWithin(10 - smallAmount, BigDecimal(10))
             }
             logEntry.senderHoldingFees should be > BigDecimal(0)
           },

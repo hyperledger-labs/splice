@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.history.{CoinArchive, CoinCreate, Tap, Transfer}
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Codec}
+import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -35,6 +35,27 @@ class UserWalletTxLogParser(
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
+          // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
+          case AcceptedAppPayment_Collect(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).mergeBalanceChangesIntoTransfer()
+
+          // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
+          case SubscriptionInitialPayment_Collect(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).mergeBalanceChangesIntoTransfer()
+
+          // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
+          case SubscriptionPayment_Collect(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).mergeBalanceChangesIntoTransfer()
+
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
             State.fromTransfer(tree, root, node)
@@ -214,6 +235,46 @@ object UserWalletTxLogParser {
         case b: TxLogEntry.BalanceChange => b.receiver == party
       }
     )
+
+    /** Given a parsing state where the parser has encountered exactly one transfer and zero or more balance changes,
+      * returns a parsing state where all the balance changes have been merged into the transfer event.
+      *
+      * This is useful for app payments where the payment collection first unlocks locked coins and immediately uses
+      * them for a transfer. In this case, we only want to display one balance change for the user.
+      */
+    def mergeBalanceChangesIntoTransfer(): State = {
+      val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
+        entry match {
+          case b: TxLogEntry.BalanceChange =>
+            changes.updatedWith(b.receiver)(amount => Some(amount.fold(b.amount)(_ + b.amount)))
+          case _ => changes
+        }
+      )
+      def netAmount(party: String, amount: BigDecimal) =
+        party -> (amount + balanceChanges
+          .getOrElse(party, BigDecimal(0)))
+
+      // The code below works only if there is exactly one transfer.
+      // Otherwise the balance changes are lost or duplicated by adding them to multiple transfers.
+      assert(entries.collect { case t: TxLogEntry.Transfer => t }.length == 1)
+
+      val newEntries = entries.flatMap {
+        case t: TxLogEntry.Transfer =>
+          Some(
+            t.copy(
+              sender = netAmount(t.sender._1, t.sender._2),
+              receivers = t.receivers.map { case (receiver, amount) =>
+                netAmount(receiver, amount)
+              },
+            )
+          )
+        case _: TxLogEntry.BalanceChange => None
+      }
+
+      State(
+        entries = newEntries
+      )
+    }
   }
 
   object State {
@@ -357,7 +418,8 @@ object UserWalletTxLogParser {
     // Leftover change
     val netChange = BigDecimal(res.summary.senderChangeAmount)
 
-    sender -> (netInput - netOutput - netChange)
+    // Net change in the balance of the senders
+    sender -> (netOutput + netChange - netInput)
   }
 
   /** Returns a list of receivers */

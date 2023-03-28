@@ -1,10 +1,9 @@
 package com.daml.network.history
 
-import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, CoinRules, CoinRules_DevNet_Tap}
-import com.daml.network.codegen.java.cc.round.{OpenMiningRound, ClosedMiningRound}
+import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 
 case class Transfer(
@@ -42,10 +41,7 @@ object Tap extends ExerciseNodeCompanion {
   override val argDecoder = CoinRules_DevNet_Tap.valueDecoder()
   override def argToValue(arg: CoinRules_DevNet_Tap) = arg.toValue
 
-  override val resDecoder = (cid: Value) =>
-    Coin.ContractId.fromContractId(
-      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
-    )
+  override val resDecoder = (cid: Value) => new Coin.ContractId(cid.asContractId().get().getValue)
   override def resToValue(res: Coin.ContractId) = res.toValue
 }
 

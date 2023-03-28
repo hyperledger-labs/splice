@@ -216,26 +216,25 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({
   primaryPartyId,
 }) => {
   let amountCC: BigNumber;
-  let symbol: '+' | '-';
   switch (transaction.transactionType) {
     case 'automation':
       amountCC = transaction.senderAmountCC;
-      symbol = '-';
       break;
     case 'transfer':
       if (transaction.senderId === primaryPartyId) {
         amountCC = transaction.senderAmountCC;
-        symbol = '-';
       } else {
         amountCC = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
-        symbol = '+';
       }
       break;
     case 'balance_change':
       amountCC = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
-      symbol = '+';
       break;
   }
+
+  // This is forcing <AmountDisplay> to show a "+" sign for positive balance changes.
+  // If the balance change is negative, the number already contains the minus sign.
+  const sign = amountCC.isPositive() ? '+' : '';
 
   // TODO (#3623): this should be the exchange rate at the time of the transaction,
   //              but it's not included in the response
@@ -244,12 +243,12 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({
   return (
     <Stack direction="column">
       <Typography className="tx-amount-cc">
-        {symbol}
+        {sign}
         <AmountDisplay amount={amountCC.toString()} />
       </Typography>
       <Stack direction="row" spacing={0.5}>
         <Typography variant="caption" className="tx-amount-usd">
-          {symbol}
+          {sign}
           <AmountDisplay amount={totalUSDAmount.toString()} currency="USD" />
         </Typography>
         <Typography variant="caption">@</Typography>

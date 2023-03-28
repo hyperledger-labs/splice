@@ -156,6 +156,10 @@ mkReceiverOutput receiverAmount =
     receiverFeeRatio = 0.0
     lock = None
 
+data AcceptedAppPayment_Collect_Result = AcceptedAppPayment_Collect_Result with
+  deliveryOffer: ContractId DeliveryOffer
+  receiverCoins: [(Party, ContractId Coin)]
+
 template AcceptedAppPayment
   with
     sender : Party
@@ -168,7 +172,7 @@ template AcceptedAppPayment
   where
     signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
 
-    choice AcceptedAppPayment_Collect : (ContractId DeliveryOffer, [(Party, ContractId Coin)])
+    choice AcceptedAppPayment_Collect : AcceptedAppPayment_Collect_Result
       with
         context : AppTransferContext
       controller signatory this
@@ -188,7 +192,9 @@ template AcceptedAppPayment
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
         let receivers = map (\r -> r.receiver) ccReceiverAmounts
-        pure (deliveryOffer, zip receivers coins)
+        pure AcceptedAppPayment_Collect_Result with
+            deliveryOffer
+            receiverCoins = zip receivers coins
 
     choice AcceptedAppPayment_Reject : ContractId Coin
       with

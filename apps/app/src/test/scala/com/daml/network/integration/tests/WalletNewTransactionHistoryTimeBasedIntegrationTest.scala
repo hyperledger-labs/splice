@@ -46,7 +46,7 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           "Alice sees the transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 4
+            txs should have size 3
             txs
           },
         )
@@ -65,13 +65,13 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           "Alice sees the new transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 7
+            txs should have size 5
             txs
           },
         )
 
-        matchInitialTransactions(txsAfter.take(4))
-        matchLockUnlockDirectoryPayment(txsAfter.drop(4))
+        matchInitialTransactions(txsAfter.take(3))
+        matchLockUnlockDirectoryPayment(txsAfter.drop(3))
       }
     }
 
@@ -88,24 +88,20 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
     }
 
     def matchLockUnlockDirectoryPayment(txs: Seq[Element]) = {
-      inside(txs) { case lockForDirectory +: unlockForDirectory +: directoryCreation +: Nil =>
+      inside(txs) { case lockForDirectory +: directoryCreation +: Nil =>
         matchTransaction(lockForDirectory)(
           coinPrice = 2,
           expectedAction = "Automation",
           expectedParty = None,
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )
-        matchTransaction(unlockForDirectory)(
-          coinPrice = 2,
-          expectedAction = "Balance Change",
-          expectedParty = None,
-          expectedAmountCC = BigDecimal("0.5"), // 1 USD
-        )
+        // Note: this transfer has no effect on the balance of the sender:
+        // the input for the app payment is a locked coin that was unlocked in the same transaction.
         matchTransaction(directoryCreation)(
           coinPrice = 2,
           expectedAction = "Sent",
           expectedParty = None,
-          expectedAmountCC = BigDecimal("-0.5"), // 1 USD
+          expectedAmountCC = BigDecimal(0), // 0 USD
         )
       }
     }

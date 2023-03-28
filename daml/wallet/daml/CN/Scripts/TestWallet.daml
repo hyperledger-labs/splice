@@ -60,12 +60,12 @@ acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transfer
     walletProvider
   return accept
 
-collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script (ContractId DeliveryOffer, [(Party, ContractId API.Coin)])
+collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
 collectAcceptedPayment app provider acceptedAppPayment = do
   (_, round) <- getLatestOpenRound app
   collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
 
-collectAcceptedPaymentInRound : CCApp -> Round -> CCUser -> ContractId AcceptedAppPayment -> Script (ContractId DeliveryOffer, [(Party, ContractId API.Coin)])
+collectAcceptedPaymentInRound : CCApp -> Round -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
 collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContextForRound app provider round
@@ -124,7 +124,7 @@ testSingleReceiverCCPaymentRequest = script do
       ]
     round = lockedCoin.coin.amount.createdAt
 
-  (_, [(receiver, coinCid)]) <- collectAcceptedPayment app provider acceptedPaymentCid
+  AcceptedAppPayment_Collect_Result _ [(receiver, coinCid)] <- collectAcceptedPayment app provider acceptedPaymentCid
   receiver === bob.primaryParty
 
   Some coin <- queryContractId bob.primaryParty (fromInterfaceContractId @Coin coinCid)
@@ -254,9 +254,9 @@ testCCPaymentRequest = script do
   charlieLockedCoinCid === lockedCoin
 
 
-  (_, results) <- collectAcceptedPayment app alice acceptedPaymentCid
+  result <- collectAcceptedPayment app alice acceptedPaymentCid
 
-  case sortOn (._1) results of
+  case sortOn (._1) result.receiverCoins of
     [(bob', bobCoin), (charlie', charlieCoin)] ->  do
       bob' === bob.primaryParty
       charlie' === charlie.primaryParty
@@ -264,7 +264,7 @@ testCCPaymentRequest = script do
       coin.amount.initialAmount === 15.0
       Some coin <- queryContractId charlie' (fromInterfaceContractId @Coin charlieCoin)
       coin.amount.initialAmount === 10.0
-    _ -> abort $ "Expected exactly two coins but got " <> show results
+    _ -> abort $ "Expected exactly two coins but got " <> show result.receiverCoins
 
   checkCoinPositions alice [1.0, 1.615]
   checkCoinPositions bob [1.0, 15.0]

@@ -35,28 +35,41 @@ trait WalletNewFrontendTestUtil { self: FrontendTestCommon =>
       transactionRow.childElement(className("tx-party")).text should matchText(party)
     }
 
-    val ccAmount = transactionRow
-      .childElement(className("tx-amount-cc"))
-      .text
-      .replace("+", "")
-      .replace("CC", "")
-      .trim
-    val usdAmount = transactionRow
-      .childElement(className("tx-amount-usd"))
-      .text
-      .replace("+", "")
-      .replace("USD", "")
-      .trim
+    def parseAmountText(str: String, currency: String) = {
+      try {
+        BigDecimal(
+          str
+            .replace(currency, "")
+            .trim
+        )
+      } catch {
+        case e: Throwable =>
+          throw new RuntimeException(s"Could not parse the string '$str' as a coin amount", e)
+      }
+    }
+
+    val ccAmount = parseAmountText(
+      transactionRow
+        .childElement(className("tx-amount-cc"))
+        .text,
+      currency = "CC",
+    )
+    val usdAmount = parseAmountText(
+      transactionRow
+        .childElement(className("tx-amount-usd"))
+        .text,
+      currency = "USD",
+    )
 
     if (expectedAmountCC > 0) {
-      BigDecimal(ccAmount) should beWithin(expectedAmountCC, expectedAmountCC + smallAmount)
-      BigDecimal(usdAmount) should beWithin(
+      ccAmount should beWithin(expectedAmountCC, expectedAmountCC + smallAmount)
+      usdAmount should beWithin(
         expectedAmountUSD,
         expectedAmountUSD + smallAmount * coinPrice,
       )
     } else {
-      BigDecimal(ccAmount) should beWithin(expectedAmountCC - smallAmount, expectedAmountCC)
-      BigDecimal(usdAmount) should beWithin(
+      ccAmount should beWithin(expectedAmountCC - smallAmount, expectedAmountCC)
+      usdAmount should beWithin(
         expectedAmountUSD - smallAmount * coinPrice,
         expectedAmountUSD,
       )

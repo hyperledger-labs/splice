@@ -79,13 +79,13 @@ class WalletNewTransactionHistoryIntegrationTest
           "Alice sees the transactions",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 7
+            txs should have size 6
             txs
           },
         )
 
         inside(txs) {
-          case balanceChange +: lockForDirectory +: unlockForDirectory +: directoryCreation +: received +: sent +: otp +: Nil =>
+          case balanceChange +: lockForDirectory +: directoryCreation +: received +: sent +: otp +: Nil =>
             matchTransaction(balanceChange)(
               coinPrice = 2,
               expectedAction = "Balance Change",
@@ -98,17 +98,13 @@ class WalletNewTransactionHistoryIntegrationTest
               expectedParty = None,
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
-            matchTransaction(unlockForDirectory)(
-              coinPrice = 2,
-              expectedAction = "Balance Change",
-              expectedParty = None,
-              expectedAmountCC = BigDecimal("0.5"), // 1 USD
-            )
+            // Note: this transfer has no effect on the balance of the sender:
+            // the input for the app payment is a locked coin that was unlocked in the same transaction.
             matchTransaction(directoryCreation)(
               coinPrice = 2,
               expectedAction = "Sent",
               expectedParty = None,
-              expectedAmountCC = BigDecimal("-0.5"), // 1 USD
+              expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(received)(
               coinPrice = 2,

@@ -140,25 +140,19 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Accepting the self-payment request created a 10CC locked coin,
-            // leading to a net loss of slightly over 10CC because of transfer fees.
+            // leading to a net loss of slightly over 10CC because of fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
+              amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the 10CC locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
-          },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Second part of collecting the payment: Transferring the coin to ourselves.
-            // Note: this and the previous entry should really be merged in the history.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(-smallAmount, smallAmount)
+              amount should beWithin(selfPaymentAmount - smallAmount, selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -226,7 +220,7 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 10CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
+              amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -307,29 +301,18 @@ class WalletTxLogIntegrationTest
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(
-                BigDecimal(transferAmountTotalCC),
-                BigDecimal(transferAmountTotalCC) + smallAmount,
+                -BigDecimal(transferAmountTotalCC) - smallAmount,
+                -BigDecimal(transferAmountTotalCC),
               )
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(
-              transferAmountTotalCC,
-              BigDecimal(transferAmountTotalCC) + smallAmount,
-            )
-          },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Second part of collecting the payment: Transferring the coin to the receivers
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(
-                transferAmountTotalCC,
-                BigDecimal(transferAmountTotalCC) + smallAmount,
-              )
+              amount shouldBe BigDecimal(0)
             }
             inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
               receiver1 shouldBe charlieUserParty.toProtoPrimitive
@@ -385,7 +368,7 @@ class WalletTxLogIntegrationTest
         case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
-            amount should beWithin(transferAmount, transferAmount + smallAmount)
+            amount should beWithin(-transferAmount - smallAmount, -transferAmount)
           }
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
@@ -492,7 +475,7 @@ class WalletTxLogIntegrationTest
           // the receivers
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
-            amount should beWithin(50, 50 + smallAmount)
+            amount shouldBe BigDecimal(0)
           }
 
           inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
@@ -517,15 +500,10 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 50CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(50, 50 + smallAmount)
+              amount should beWithin(-50 - smallAmount, -50)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the 50CC locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(50, 50 + smallAmount)
           },
           checkTransfer,
         ),
@@ -635,7 +613,7 @@ class WalletTxLogIntegrationTest
           // the receivers
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
-            amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            amount shouldBe BigDecimal(0)
           }
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
@@ -657,15 +635,10 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 42CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
@@ -673,15 +646,10 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 42CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,
         ),
@@ -760,7 +728,7 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 42CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
@@ -873,7 +841,7 @@ class WalletTxLogIntegrationTest
           // the receivers
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
-            amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            amount shouldBe BigDecimal(0)
           }
 
           inside(logEntry.receivers) { case Seq((receiver, amount)) =>
@@ -895,15 +863,10 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 42CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-            // First part of collecting the payment: Unlocking the 42CC locked coin.
-            // TODO(#3486) - this and the next entry should be merged
-            logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
           checkSubscriptionPaymentTransfer,
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
@@ -911,7 +874,7 @@ class WalletTxLogIntegrationTest
             // leading to a net loss of slightly over 42CC because of transfer fees.
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
