@@ -2743,7 +2743,7 @@
                "app": "directory-web-ui",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
-               "moduleName": "validator1-directory-web-ui"
+               "moduleName": "directory-web-ui"
             },
             "name": "directory-web-ui",
             "namespace": "validator1"
@@ -2764,7 +2764,7 @@
                      "app": "directory-web-ui",
                      "clusterName": "cluster",
                      "cnjClusterName": "cluster",
-                     "moduleName": "validator1-directory-web-ui"
+                     "moduleName": "directory-web-ui"
                   }
                },
                "spec": {
@@ -2796,7 +2796,7 @@
                               }
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
+                        "image": "region-docker.pkg.dev/project/repo/directory-web-ui:tag",
                         "imagePullPolicy": "Always",
                         "name": "directory-web-ui",
                         "ports": [
@@ -2854,7 +2854,7 @@
                "app": "splitwell-web-ui",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
-               "moduleName": "validator1-splitwell-web-ui"
+               "moduleName": "splitwell-web-ui"
             },
             "name": "splitwell-web-ui",
             "namespace": "validator1"
@@ -2875,7 +2875,7 @@
                      "app": "splitwell-web-ui",
                      "clusterName": "cluster",
                      "cnjClusterName": "cluster",
-                     "moduleName": "validator1-splitwell-web-ui"
+                     "moduleName": "splitwell-web-ui"
                   }
                },
                "spec": {
@@ -2907,7 +2907,7 @@
                               }
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/validator1-splitwell-web-ui:tag",
+                        "image": "region-docker.pkg.dev/project/repo/splitwell-web-ui:tag",
                         "imagePullPolicy": "Always",
                         "name": "splitwell-web-ui",
                         "ports": [

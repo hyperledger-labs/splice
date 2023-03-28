@@ -108,7 +108,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="validator1-directory-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("directory")),
+  ], image="directory-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("directory")),
 
   c.deployment(config, "splitwell-web-ui", [
     {
@@ -116,7 +116,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="validator1-splitwell-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("splitwell")),
+  ], image="splitwell-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("splitwell")),
 ];
 
 {

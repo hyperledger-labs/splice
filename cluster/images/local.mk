@@ -15,8 +15,8 @@ images := \
 	validator-app \
 	splitwell-app \
 	\
-	validator1-directory-web-ui \
-	validator1-splitwell-web-ui \
+	directory-web-ui \
+	splitwell-web-ui \
 	\
 	docs \
 	external-proxy \
