@@ -72,15 +72,14 @@ object ExerciseNode {
   }
 
   private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) = {
-    companion.templateOrInterface match {
+    val idMatches = companion.templateOrInterface match {
       case Left(tplCompanion) =>
-        event.getTemplateId == tplCompanion.TEMPLATE_ID && event.getChoice == companion.choice.name
+        event.getTemplateId == tplCompanion.TEMPLATE_ID
       case Right(ifaceCompanion) =>
-        // TODO(#2842) This works around a bug in canton-research.
-        event.getInterfaceId.toScala.contains(ifaceCompanion.TEMPLATE_ID) && event.getChoice
-          .split("#")
-          .last == companion.choice.name
+        event.getInterfaceId.toScala.contains(ifaceCompanion.TEMPLATE_ID)
     }
+
+    idMatches && event.getChoice == companion.choice.name
   }
 
   def decodeExerciseEvent(companion: ExerciseNodeCompanion)(
