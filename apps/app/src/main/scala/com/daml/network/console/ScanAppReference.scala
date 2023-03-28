@@ -162,6 +162,12 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.getTopValidatorsByValidatorRewards(round, limit))
     }
 
+  @Help.Summary("Get the available credit for a validator")
+  def getValidatorCredit(): Long =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetValidatorCredit())
+    }
+
   // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")

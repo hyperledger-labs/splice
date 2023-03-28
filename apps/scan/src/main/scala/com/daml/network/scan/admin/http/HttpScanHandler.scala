@@ -10,16 +10,16 @@ import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{Contract, ContractMetadataUtil, Codec}
+import com.daml.network.util.{Codec, Contract, ContractMetadataUtil}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.RateLimiter
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import io.grpc.StatusRuntimeException
-
-import java.util.concurrent.atomic.AtomicLong
 
 class HttpScanHandler(
     store: ScanStore,
@@ -31,8 +31,12 @@ class HttpScanHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
+
   // Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
-  private val validatorCredit = new AtomicLong(0)
+  private val defaultThroughputRateLimiter = {
+    // default throughput of 4 transactions per second with a max burst of 20 transactions
+    new RateLimiter(NonNegativeNumeric.tryCreate(4.0), PositiveNumeric.tryCreate(5.0))
+  }
 
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
@@ -310,11 +314,20 @@ class HttpScanHandler(
       response: v0.ScanResource.GetValidatorCreditResponse.type
   )(): Future[v0.ScanResource.GetValidatorCreditResponse] =
     withNewTrace(workflowId) { _ => _ =>
-      Future.successful(
-        v0.ScanResource.GetValidatorCreditResponse.OK(
-          definitions.GetValidatorCreditResponse(this.validatorCredit.longValue())
-        )
-      )
+      // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
+      Future.successful {
+        val validatorCredit = defaultThroughputRateLimiter.getCurrentAllowance.toLong
+        if (validatorCredit >= 0) {
+          v0.ScanResource.GetValidatorCreditResponse.OK(
+            definitions.GetValidatorCreditResponse(validatorCredit)
+          )
+        } else {
+          // TODO(#3729): provide an appropriate error response here
+          v0.ScanResource.GetValidatorCreditResponse.OK(
+            definitions.GetValidatorCreditResponse(0)
+          )
+        }
+      }
     }
 
 }
