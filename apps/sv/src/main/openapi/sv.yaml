@@ -93,24 +93,24 @@ paths:
             text/plain:
               schema:
                 type: string
-  /onboard/sv/party-migration:
+  /onboard/sv/party-migration/authorize:
     post:
       tags: [ sv ]
       x-jvm-package: sv
-      operationId: "onboardSvPartyMigration"
+      operationId: "onboardSvPartyMigrationAuthorize"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/OnboardSvPartyMigrationRequest"
+              "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/OnboardSvPartyMigrationResponse"
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeResponse"
         "400":
           description: bad request
           content:
@@ -124,6 +124,7 @@ paths:
             text/plain:
               schema:
                 type: string
+
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -209,7 +210,7 @@ components:
         token:
           type: string
 
-    OnboardSvPartyMigrationRequest:
+    OnboardSvPartyMigrationAuthorizeRequest:
       type: object
       required:
         - participant_id
@@ -217,7 +218,7 @@ components:
         participant_id:
           type: string
 
-    OnboardSvPartyMigrationResponse:
+    OnboardSvPartyMigrationAuthorizeResponse:
       type: object
       required:
         - acs_snapshot

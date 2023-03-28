@@ -11,6 +11,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -74,6 +75,24 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       name: String
   ): Future[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]] =
     lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
+
+  def lookupSvConfirmedWithOffset(
+      svParty: PartyId
+  ): Future[
+    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+  ] =
+    defaultAcs.flatMap(
+      _.findContractWithOffset(so.SvConfirmed.COMPANION)(co =>
+        co.payload.svParty == svParty.toProtoPrimitive
+      )
+    )
+
+  def lookupSvConfirmed(
+      svParty: PartyId
+  ): Future[
+    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+  ] =
+    lookupSvConfirmedWithOffset(svParty).map(_.value)
 
   def key: SvStore.Key
 }

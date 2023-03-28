@@ -184,30 +184,33 @@ object HttpSvAppClient {
     }
   }
 
-  case class OnboardSvPartyMigration(participantId: ParticipantId)
-      extends BaseCommand[http.OnboardSvPartyMigrationResponse, ByteString] {
+  case class OnboardSvPartyMigrationAuthorize(participantId: ParticipantId)
+      extends BaseCommand[http.OnboardSvPartyMigrationAuthorizeResponse, ByteString] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardSvPartyMigrationResponse] =
-      client.onboardSvPartyMigration(
-        body = definitions.OnboardSvPartyMigrationRequest(participantId.toProtoPrimitive),
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.OnboardSvPartyMigrationAuthorizeResponse] =
+      client.onboardSvPartyMigrationAuthorize(
+        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(participantId.toProtoPrimitive),
         headers = headers,
       )
 
     override def handleResponse(
-        response: http.OnboardSvPartyMigrationResponse
+        response: http.OnboardSvPartyMigrationAuthorizeResponse
     )(implicit
         decoder: TemplateJsonDecoder
     ): Either[String, ByteString] = {
       response match {
-        case http.OnboardSvPartyMigrationResponse.OK(
-              definitions.OnboardSvPartyMigrationResponse(encodedAcsSnapshot)
+        case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
+              definitions.OnboardSvPartyMigrationAuthorizeResponse(encodedAcsSnapshot)
             ) =>
           Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
-        case http.OnboardSvPartyMigrationResponse.BadRequest(e) => Left(e)
-        case http.OnboardSvPartyMigrationResponse.Unauthorized(e) => Left(e)
+        case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(e) => Left(e)
+        case http.OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(e) => Left(e)
       }
     }
   }

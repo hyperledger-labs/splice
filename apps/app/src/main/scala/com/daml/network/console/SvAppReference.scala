@@ -41,9 +41,9 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.GetDebugInfo)
     }
 
-  def onboardSvPartyMigration(participantId: ParticipantId): ByteString =
+  def onboardSvPartyMigrationAuthorize(participantId: ParticipantId): ByteString =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.OnboardSvPartyMigration(participantId))
+      httpCommand(HttpSvAppClient.OnboardSvPartyMigrationAuthorize(participantId))
     }
 }
 

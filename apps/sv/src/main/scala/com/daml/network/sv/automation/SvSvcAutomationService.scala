@@ -13,7 +13,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
 
-class SvAutomationService(
+class SvSvcAutomationService(
     clock: Clock,
     config: LocalSvAppConfig,
     svStore: SvSvStore,
@@ -30,7 +30,7 @@ class SvAutomationService(
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
-      Map(svStore.key.svParty -> svStore, svcStore.key.svcParty -> svcStore),
+      Map(svcStore.key.svcParty -> svcStore),
       ledgerClient,
       participantAdminConnection,
       retryProvider,
@@ -43,7 +43,6 @@ class SvAutomationService(
   registerTrigger(new ExpiredSvOnboardingTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvOnboardingTrigger(triggerContext, svcStore, svStore, connection))
-  registerTrigger(new SvcPartyHostingTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))

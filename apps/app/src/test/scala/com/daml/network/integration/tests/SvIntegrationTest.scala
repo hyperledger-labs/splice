@@ -22,15 +22,11 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import com.google.protobuf.ByteString
 
 class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
-
-  private val svcGovernanceDarPath =
-    "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -60,6 +56,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("Starting SV4 app") {
       sv4.startSync()
+    }
+    clue("Starting SV5 app") {
+      sv5.startSync()
     }
   }
 
@@ -223,11 +222,18 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getDebugInfo().svParty)
       ) {
-        case Seq(approvedSvId) => {
+        case approvedSvIds => {
           // if this check fails:
           // make sure that the values (especially the key) are in sync with sv1's config file
-          approvedSvId.data.candidateName shouldBe "sv4"
-          approvedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
+          approvedSvIds should have size 2
+          val maybeSv4ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv4")
+          inside(maybeSv4ApprovedSvId) { case Some(sv4ApprovedSvId) =>
+            sv4ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
+          }
+          val maybeSv5ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv5")
+          inside(maybeSv5ApprovedSvId) { case Some(sv5ApprovedSvId) =>
+            sv5ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+fFVXv7BtvclgrzJTEELbtSn6Vm9pMxsBQbZYyzIG6udZ85glJCkinvWvxcD6wsMIsuDHM7j7JGygIdFWQ5prA=="
+          }
         }
       }
     }
@@ -246,7 +252,10 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv3.getDebugInfo().svParty)
+          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
+            sv3.getDebugInfo().svParty,
+            c => c.data.candidateName == "sv4",
+          )
       ) {
         case Seq(approvedSvId) => {
           sv3.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
@@ -333,66 +342,32 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )
   }
 
-  "The SVC party can be setup on the SV5 participant" in { implicit env =>
-    // ensure the SVC is initialized, so there are some contracts in the name of the SVC party
-    initSvc()
+  "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
+    implicit env =>
+      initSvc()
 
-    val sv5Participant = sv5.remoteParticipant
-    val svcParticipant = svc.remoteParticipant
+      val svcParty = svcClient.getDebugInfo().svcParty
+      val svcPartyStr: String = svcParty.toProtoPrimitive
+      val svcParticipant = svc.remoteParticipant
+      val sv5Participant = sv5.remoteParticipant
+      svcParticipant.ledger_api.acs.of_party(svcParty) should not be empty
+      sv5Participant.ledger_api.acs.of_party(svcParty) shouldBe empty
 
-    createCoinOwnBySvc(svcParticipant, 1.0)
+      createCoinOwnBySvc(svcParticipant, 1.0)
 
-    // Upload the package that the contracts reference
-    sv5Participant.ledger_api.packages.upload_dar(svcGovernanceDarPath)
-
-    // Get the svcParty, which will be a fresh one for every test environment
-    val svcParty = svcClient.getDebugInfo().svcParty
-    val svcPartyStr: String = svcParty.toProtoPrimitive
-
-    svcParticipant.ledger_api.acs.of_party(svcParty) should not be empty
-    sv5Participant.ledger_api.acs.of_party(svcParty) shouldBe empty
-
-    val globalDomainId =
-      clue("sv5Participant approves hosting of SVC party") {
-        // Ensure sv5Participant is connected to exactly the global domain
-        sv5Participant.domains.reconnect_all(ignoreFailures = false)
-
-        // We expect exactly one connected domain-id
-        val globalDomainId = inside(sv5Participant.domains.list_connected()) { case Seq(domain) =>
-          domain.domainId
-        }
-
-        // Allow hosting of svcParty on the sv5 participant from sv5's side
-        sv5Participant.topology.party_to_participant_mappings.authorize(
-          TopologyChangeOp.Add,
-          svcParty,
-          sv5Participant.id,
-          RequestSide.To,
-          ParticipantPermission.Observation,
-        )
-
-        globalDomainId
+      clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
+        // SV5 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
+        sv5.startSync()
       }
 
-    createCoinOwnBySvc(svcParticipant, 2.0)
+      createCoinOwnBySvc(svcParticipant, 2.0)
 
-    clue("disconnect sv5Participant") {
-      // Disconnect sv5Participant, so that no transactions reach it during the ACS migration
-      sv5Participant.domains.disconnect_all()
-    }
-
-    val acsBytes = clue(
-      "authorize hosting of SVC party in other sv5 participant and exports ACS"
-    ) {
-
-      createCoinOwnBySvc(svcParticipant, 3.0)
-
-      val acsSnapshotBytes = sv1.onboardSvPartyMigration(sv5Participant.id)
-
-      createCoinOwnBySvc(svcParticipant, 4.0)
+      val globalDomainId = inside(sv5Participant.domains.list_connected()) { case Seq(domain) =>
+        domain.domainId
+      }
 
       eventually() {
-        val mappings = svcParticipant.topology.party_to_participant_mappings
+        svcParticipant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOp.Add),
             filterStore = globalDomainId.toProtoPrimitive,
@@ -400,85 +375,69 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             filterParticipant = sv5Participant.id.uid.id.unwrap,
             filterRequestSide = Some(RequestSide.From),
             filterPermission = Some(ParticipantPermission.Observation),
-          )
-        mappings should have size 1
-      }
+          ) should have size 1
 
-      createCoinOwnBySvc(svcParticipant, 5.0)
-
-      ByteString.copyFrom(acsSnapshotBytes.asByteBuffer)
-    }
-
-    clue("Import the ACS on sv5Participant and reconnect sv5Participant") {
-      // Import the ACS on sv5Participant
-      sv5Participant.parties.migration.uploadAcsSnapshot(acsBytes)
-
-      // Reconnect sv5Participant
-      sv5Participant.domains.reconnect_all()
-
-      // Ensure sv5Participant is connected to exactly the global domain
-      inside(sv5Participant.domains.list_connected()) { case Seq(domain) =>
-        domain.domainId shouldBe globalDomainId
-      }
-
-      createCoinOwnBySvc(svcParticipant, 6.0)
-
-      // sv5Participant should see the same acs as svcParty
-      eventually() {
+        sv5Participant.topology.party_to_participant_mappings
+          .list(
+            operation = Some(TopologyChangeOp.Add),
+            filterStore = globalDomainId.toProtoPrimitive,
+            filterParty = svcPartyStr,
+            filterParticipant = sv5Participant.id.uid.id.unwrap,
+            filterRequestSide = Some(RequestSide.To),
+            filterPermission = Some(ParticipantPermission.Observation),
+          ) should have size 1
         val coinFromSv5Participant = getCoins(sv5Participant, svcParty)
         val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)
 
-        coinFromSv5Participant should have size 6
+        coinFromSv5Participant should have size 2
         coinFromSv5Participant shouldBe coinFromSvcParticipant
       }
-    }
 
-    clue("sv5 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
-      val sv5User = sv5Participant.ledger_api.users.get(sv5.config.ledgerApiUser)
+      clue("sv5 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
+        val sv5Party = sv5.getDebugInfo().svParty
 
-      // We are not using sv.getDebugInfo() to get sv5 party id
-      // because the SVApp is not started hence the Http service is not available.
-      // We do not start the SVApp as this test is independent of what the SvApp is doing.
-      val sv5Party = sv5User.primaryParty
-        .flatMap(PartyId.fromLfParty(_).toOption)
-        .getOrElse(fail("sv5 primary party not found"))
+        val coinRules = sv5Participant.ledger_api_extensions.acs
+          .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+          .head
 
-      val coinRules = sv5Participant.ledger_api_extensions.acs
-        .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
-        .head
+        val openRound = sv5Participant.ledger_api_extensions.acs
+          .filterJava(cc.round.OpenMiningRound.COMPANION)(
+            svcParty,
+            _.data.opensAt.isBefore(Instant.now),
+          )
+          .maxBy(_.data.round.number)
 
-      val openRound = sv5Participant.ledger_api_extensions.acs
-        .filterJava(cc.round.OpenMiningRound.COMPANION)(
-          svcParty,
-          _.data.opensAt.isBefore(Instant.now),
+        sv5Participant.ledger_api_extensions.commands.submitWithResult(
+          sv5.config.ledgerApiUser,
+          actAs = Seq(sv5Party),
+          readAs = Seq(svcParty),
+          update = coinRules.id.exerciseCoinRules_DevNet_Tap(
+            sv5Party.toProtoPrimitive,
+            BigDecimal(100.0).bigDecimal,
+            openRound.id,
+          ),
         )
-        .maxBy(_.data.round.number)
 
-      sv5Participant.ledger_api_extensions.commands.submitWithResult(
-        sv5.config.ledgerApiUser,
-        actAs = Seq(sv5Party),
-        readAs = Seq(svcParty),
-        update = coinRules.id.exerciseCoinRules_DevNet_Tap(
-          sv5Party.toProtoPrimitive,
-          BigDecimal(100.0).bigDecimal,
-          openRound.id,
-        ),
-      )
+        def checkCoinContract(participant: CNRemoteParticipantReference, party: PartyId) = {
+          val coins = getCoins(participant, party, _.data.owner == sv5Party.toProtoPrimitive)
+          inside(coins) { case Seq(coin) =>
+            coin.data.svc shouldBe svcPartyStr
+            coin.data.amount.initialAmount shouldBe BigDecimal(100.0).bigDecimal.setScale(10)
+            coin.data.owner shouldBe sv5Party.toProtoPrimitive
+          }
+        }
 
-      def checkCoinContract(participant: CNRemoteParticipantReference, party: PartyId) = {
-        val coins = getCoins(participant, party, _.data.owner == sv5Party.toProtoPrimitive)
-        inside(coins) { case Seq(coin) =>
-          coin.data.svc shouldBe svcPartyStr
-          coin.data.amount.initialAmount shouldBe BigDecimal(100.0).bigDecimal.setScale(10)
-          coin.data.owner shouldBe sv5Party.toProtoPrimitive
+        eventually() {
+          checkCoinContract(svcParticipant, svcParty)
+          checkCoinContract(sv5Participant, sv5Party)
         }
       }
 
-      eventually() {
-        checkCoinContract(svcParticipant, svcParty)
-        checkCoinContract(sv5Participant, sv5Party)
+      clue("sv5 can restart") {
+        sv5.stop()
+        sv5.startSync()
+
       }
-    }
   }
 
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(

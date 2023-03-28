@@ -8,6 +8,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedDomainsResult,
   ListPartyToParticipantResult,
 }
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -40,6 +41,23 @@ class ParticipantAdminConnection(
   ): Future[Seq[ListConnectedDomainsResult]] = {
     runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
   }
+
+  def reconnectAllDomains()(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    runCmd(ParticipantAdminCommands.DomainConnectivity.ReconnectDomains(ignoreFailures = false))
+  }
+
+  def disconnectFromAllDomains()(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = for {
+    domains <- listConnectedDomains()
+    _ <- Future.sequence(
+      domains.map(domain =>
+        runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(domain.domainAlias))
+      )
+    )
+  } yield ()
 
   def authorizePartyToParticipant(
       ops: TopologyChangeOp,
@@ -97,5 +115,18 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.PartyMigration
         .DownloadAcsSnapshot(parties, filterDomainId, timestamp, None)
     ).map(_._2)
+  }
+
+  def uploadAcsSnapshot(acsBytes: ByteString)(implicit traceContext: TraceContext): Future[Unit] = {
+    runCmd(
+      ParticipantAdminCommands.PartyMigration
+        .UploadAcsSnapshot(acsBytes, PositiveInt.tryCreate(1000))
+    )
+  }
+
+  def getParticipantId()(implicit traceContext: TraceContext): Future[Option[ParticipantId]] = {
+    runCmd(
+      TopologyAdminCommands.Init.GetId()
+    ).map(_.map(ParticipantId(_)))
   }
 }

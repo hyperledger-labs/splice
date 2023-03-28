@@ -1,0 +1,173 @@
+package com.daml.network.sv
+
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.Materializer
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.RetryProvider
+import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.sv.config.{RemoteSvAppConfig, SvBootstrapConfig}
+import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.transaction.{
+  ParticipantPermission,
+  RequestSide,
+  TopologyChangeOp,
+}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import io.grpc.{Status, StatusRuntimeException}
+
+import java.time.Instant
+import scala.concurrent.{ExecutionContextExecutor, Future}
+
+/** Class used to orchester the flow of SVC Party hosting on SV dedicated participant.
+  */
+class SvcPartyHosting(
+    bootstrapConfig: SvBootstrapConfig,
+    participantAdminConnection: ParticipantAdminConnection,
+    svcParty: PartyId,
+    coinAppParameters: SharedCNNodeAppParameters,
+    retryProvider: RetryProvider,
+    protected val loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContextExecutor,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateDecoder: TemplateJsonDecoder,
+    mat: Materializer,
+) extends NamedLogging {
+  def isAlreadyAuthorized(
+      domainId: DomainId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Boolean] = for {
+    mappings <- listSvcPartyAuthorizedMappings(domainId, participantId, None)
+  } yield mappings.nonEmpty
+
+  def start(domainId: DomainId, participantId: ParticipantId)(implicit
+      traceContext: TraceContext
+  ): Future[Either[String, Unit]] = {
+    getSponsorSvConfig(bootstrapConfig) match {
+      case Some(sponsorSvConfig) =>
+        for {
+          _ <- participantAdminConnection.reconnectAllDomains()
+          _ <- authorizeSvcPartyToParticipant(
+            domainId,
+            participantId,
+            RequestSide.To,
+          )
+          _ <- participantAdminConnection.disconnectFromAllDomains()
+          acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId)
+          _ <- participantAdminConnection.uploadAcsSnapshot(acsBytes)
+          _ <- participantAdminConnection.reconnectAllDomains()
+          _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
+        } yield Right(())
+      case None =>
+        Future.successful(Left("unexpected on-boarding config"))
+    }
+  }
+
+  private def getSponsorSvConfig(
+      bootstrapConfig: SvBootstrapConfig
+  ): Option[RemoteSvAppConfig] =
+    bootstrapConfig match {
+      case SvBootstrapConfig.JoinWithKey(_, sponsorSv, _, _) =>
+        Some(sponsorSv)
+      case _ => None
+    }
+
+  private def getAuthorizationAndAcsFromSponsor(
+      sponsorSvConfig: RemoteSvAppConfig,
+      candidateParticipantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[ByteString] = {
+    logger.info(
+      s"Requesting to authorize SVC party hosting via SV at: ${sponsorSvConfig.adminApi.url}"
+    )
+    retryProvider.retryForAutomation(
+      "authorize SVC party hosting", {
+        val svConnection = new SvConnection(
+          sponsorSvConfig.adminApi,
+          coinAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+        svConnection
+          .authorizeSvcPartyHosting(candidateParticipantId)
+          .map(bs => ByteString.copyFrom(bs.asByteBuffer))
+          .andThen(_ => svConnection.close())
+      },
+      logger,
+    )
+  }
+
+  def listSvcPartyAuthorizedMappings(
+      domain: DomainId,
+      participantId: ParticipantId,
+      side: Option[RequestSide],
+  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] =
+    participantAdminConnection
+      .listPartyToParticipantMappings(
+        filterStore = domain.toProtoPrimitive,
+        operation = Some(TopologyChangeOp.Add),
+        filterParty = svcParty.toProtoPrimitive,
+        filterParticipant = participantId.uid.id.unwrap,
+        filterRequestSide = side,
+      )
+
+  def authorizeSvcPartyToParticipant(
+      domain: DomainId,
+      participantId: ParticipantId,
+      side: RequestSide,
+  )(implicit traceContext: TraceContext): Future[Instant] =
+    // check if svc party has already been authorized to be hosted by the participant
+    listSvcPartyAuthorizedMappings(domain, participantId, Some(side)).flatMap {
+      case Seq() =>
+        for {
+          _ <- participantAdminConnection
+            .authorizePartyToParticipant(
+              TopologyChangeOp.Add,
+              svcParty,
+              participantId,
+              side,
+              ParticipantPermission.Observation,
+            )
+          authorizedAt <- waitForSvcPartyToParticipantAuthorization(domain, participantId, side)
+        } yield authorizedAt
+      case Seq(mapping) =>
+        logger.info(
+          s"Party ${svcParty.toProtoPrimitive} already authorized to participant ${participantId.toProtoPrimitive} from side $side"
+        )
+        Future.successful(mapping.context.validFrom)
+      case _ =>
+        Future.failed(
+          new IllegalStateException(
+            "More than 1 svc party to participant mapping which is not expected"
+          )
+        )
+    }
+
+  // Wait for party to participant authorization to be reflected from the TopologyAdminCommand.ListPartyToParticipant
+  // It is used in both candidate and sponsor side to ensure the party to participant are added successfully.
+  // It returns the timestamp when the authorization becomes valid.
+  private def waitForSvcPartyToParticipantAuthorization(
+      domain: DomainId,
+      participantId: ParticipantId,
+      side: RequestSide,
+  )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
+    "wait for svc party to participant authorization to complete", {
+      listSvcPartyAuthorizedMappings(domain, participantId, Some(side)).map {
+        case Seq(mapping) =>
+          mapping.context.validFrom
+        case Seq() =>
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("Authorization is still in progress")
+          )
+        case _ =>
+          throw new StatusRuntimeException(
+            Status.INTERNAL.withDescription("Unexpected number of mappings")
+          )
+      }
+    },
+    logger,
+  )
+}
