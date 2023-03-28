@@ -3,7 +3,8 @@
 $(dir)/$(docker-build): \
 	$(dir)/target/entrypoint.sh \
 	$(dir)/target/bootstrap-entrypoint.sc \
-	$(dir)/target/tools.sc
+	$(dir)/target/tools.sc \
+	$(dir)/target/tools.sh
 
 $(dir)/target:
 	mkdir -p $@
@@ -15,4 +16,7 @@ $(dir)/target/bootstrap-entrypoint.sc: $(dir)/../common/bootstrap-entrypoint.sc 
 	cp $< $@
 
 $(dir)/target/tools.sc: $(dir)/../common/tools.sc | $(dir)/target
+	cp $< $@
+
+$(dir)/target/tools.sh: $(dir)/../common/tools.sh | $(dir)/target
 	cp $< $@

@@ -2,12 +2,14 @@
 
 set -eou pipefail
 
+source /app/tools.sh
+
 EXE=$(readlink -f cn-image-bin)
 
 declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off )
 
 if [ -f /app/pre-bootstrap.sh ]; then
-  echo "Running /app/pre-bootstrap.sh"
+  json_log "Running /app/pre-bootstrap.sh" "entrypoint.sh"
   /app/pre-bootstrap.sh
 fi
 
@@ -24,6 +26,6 @@ if [ -n "${ADDITIONAL_CONFIG:-}" ]; then
    ARGS+=( --config /app/additional-config.conf )
 fi
 
-echo "Starting '${EXE}' with arguments: ${ARGS[*]}"
+json_log "Starting '${EXE}' with arguments: ${ARGS[*]}" "entrypoint.sh"
 
 exec "$EXE" "${ARGS[@]}"
