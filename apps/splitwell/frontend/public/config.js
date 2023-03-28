@@ -15,8 +15,7 @@ window.canton_network_config = {
   //   },
   services: {
     wallet: {
-      url: "http://localhost:6004",
-      uiUrl: "http://localhost:3000",
+      uiUrl: "http://wallet.localhost:3000",
     },
     ledgerApi: {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API

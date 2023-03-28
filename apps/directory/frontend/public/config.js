@@ -25,7 +25,6 @@ window.canton_network_config = {
     },
     // END_DIRECTORY_CONFIG
     wallet: {
-      url: 'http://localhost:6004',
       // URL of the web-ui, used to forward payment workflows to wallet
       uiUrl: 'http://wallet.localhost:3000',
     },

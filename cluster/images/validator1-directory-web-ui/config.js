@@ -21,7 +21,6 @@ window.canton_network_config = {
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      url: "https://" + window.location.hostname + "/api/v0/wallet",
       uiUrl: window.location.origin.replace("directory", "wallet"),
     },
   },

@@ -7,7 +7,7 @@ const reader = new ConfigReader(
     auth: authSchema,
     testAuth: testAuthSchema.optional(),
     services: z.object({
-      wallet: serviceSchema.extend({
+      wallet: z.object({
         uiUrl: z.string().url(),
       }),
       scan: serviceSchema,
