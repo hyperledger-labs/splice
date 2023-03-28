@@ -3,22 +3,30 @@ package com.daml.network.sv.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import akka.util.ByteString
-import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.admin.api.client.HttpAppConnection
 import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class SvConnection(
     config: CNHttpClientConfig,
+    retryProvider: RetryProvider,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContextExecutor)
-    extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
+)(implicit
+    ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateDecoder: TemplateJsonDecoder,
+) extends HttpAppConnection(config, retryProvider, timeouts, loggerFactory) {
 
   override val serviceName = "sv"
 

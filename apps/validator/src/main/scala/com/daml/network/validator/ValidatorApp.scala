@@ -202,6 +202,7 @@ class ValidatorApp(
       "request onboarding", {
         val svConnection = new SvConnection(
           svConfig,
+          retryProvider,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )

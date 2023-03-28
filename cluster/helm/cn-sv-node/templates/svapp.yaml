@@ -36,9 +36,6 @@ spec:
             - name: sv-api
               containerPort: 5014
               protocol: TCP
-            - name: sv-api-http
-              containerPort: 6014
-              protocol: TCP
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -56,7 +53,3 @@ spec:
     port: 5014
     protocol: TCP
     targetPort: 5014
-  - name: sv-api-http
-    port: 6014
-    protocol: TCP
-    targetPort: 6014

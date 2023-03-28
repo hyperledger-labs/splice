@@ -78,26 +78,14 @@ spec:
   - name: sv1-api
     port: 5014
     protocol: TCP
-  - name: sv1-api-http
-    port: 6014
-    protocol: TCP
   - name: sv2-api
     port: 5114
-    protocol: TCP
-  - name: sv2-api-http
-    port: 6114
     protocol: TCP
   - name: sv3-api
     port: 5214
     protocol: TCP
-  - name: sv3-api-http
-    port: 6214
-    protocol: TCP
   - name: sv4-api
     port: 5314
-    protocol: TCP
-  - name: sv4-api-http
-    port: 6314
     protocol: TCP
   - name: scan-api
     port: 5012
@@ -217,26 +205,14 @@ spec:
         - containerPort: 5014
           name: sv1-api
           protocol: TCP
-        - containerPort: 6014
-          name: sv1-api-http
-          protocol: TCP
         - containerPort: 5114
           name: sv2-api
-          protocol: TCP
-        - containerPort: 6114
-          name: sv2-api-http
           protocol: TCP
         - containerPort: 5214
           name: sv3-api
           protocol: TCP
-        - containerPort: 6214
-          name: sv3-api-http
-          protocol: TCP
         - containerPort: 5314
           name: sv4-api
-          protocol: TCP
-        - containerPort: 6314
-          name: sv4-api-http
           protocol: TCP
         - containerPort: 5012
           name: scan-api

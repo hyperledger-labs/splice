@@ -5,10 +5,8 @@ local c = import "./cluster.jsonnet";
 local deployments(num, config) =
   local namespace = std.format("sv-%d", num);
   local adminApi = std.format("sv%d-api", num);
-  local adminApiHttp = adminApi + "-http";
   local authBinding = std.format("sv%d", num);
   local port = 5014 + 100 * (num - 1);
-  local httpPort = port + 1000;
 
   [
     c.namespace(namespace, config),
@@ -19,10 +17,6 @@ local deployments(num, config) =
         {
           name: adminApi,
           port: port,
-        },
-        {
-          name: adminApiHttp,
-          port: httpPort,
         },
       ],
       image="sv-app",

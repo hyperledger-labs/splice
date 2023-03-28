@@ -5,6 +5,10 @@ info:
 tags:
   - name: sv
 paths:
+  /status:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
   /admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
@@ -95,7 +99,7 @@ paths:
                 type: string
   /onboard/sv/party-migration/authorize:
     post:
-      tags: [ sv ]
+      tags: [sv]
       x-jvm-package: sv
       operationId: "onboardSvPartyMigrationAuthorize"
       requestBody:
@@ -177,7 +181,7 @@ components:
     PrepareValidatorOnboardingRequest:
       type: object
       required:
-      - expires_in # duration in seconds
+        - expires_in # duration in seconds
       properties:
         expires_in:
           type: integer
@@ -186,7 +190,7 @@ components:
     PrepareValidatorOnboardingResponse:
       type: object
       required:
-      - secret
+        - secret
       properties:
         secret:
           type: string
@@ -194,8 +198,8 @@ components:
     OnboardValidatorRequest:
       type: object
       required:
-      - party_id
-      - secret
+        - party_id
+        - secret
       properties:
         party_id:
           type: string
@@ -205,7 +209,7 @@ components:
     OnboardSvRequest:
       type: object
       required:
-      - token
+        - token
       properties:
         token:
           type: string

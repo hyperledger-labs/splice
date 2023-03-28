@@ -28,7 +28,9 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
       clue("svc app should report as active")(svc.health.active shouldBe true)
 
-      clue("sv apps should report as active")(svs.foreach(_.health.active shouldBe true))
+      clue("sv apps should report as active")(eventually() {
+        svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true)
+      })
 
       clue("alice's validator starts successfully")(aliceValidator.startSync())
 
@@ -40,7 +42,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
       clue("sv apps should report as inactive") {
         eventually() {
-          svs.foreach(_.health.active shouldBe false)
+          svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false)
         }
       }
 
@@ -58,7 +60,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
           toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv.name))
         )
         eventually() {
-          svs.foreach(_.health.active shouldBe true)
+          svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true)
         }
       }
 

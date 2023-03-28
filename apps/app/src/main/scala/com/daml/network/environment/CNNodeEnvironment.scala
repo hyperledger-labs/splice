@@ -118,7 +118,6 @@ trait CNNodeEnvironment extends Environment {
       cnNodeMetrics.forSv(name),
       testingConfig,
       appLoggerFactory,
-      writeHealthDumpToFile,
       futureSupervisor,
       configuredOpenTelemetry,
     )

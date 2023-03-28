@@ -31,16 +31,16 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     config.svcApp.foreach(svc =>
       waitForPort(InstanceName.tryCreate("SVC"), svc.adminApi.port.unwrap)
     )
-    config.svApps.foreach(sv => waitForPortAndHttpPort(sv._1, sv._2.adminApi.port))
+    config.svApps.foreach(sv => waitForPort(sv._1, sv._2.adminApi.port.unwrap))
     config.walletAppBackends.foreach(wallet =>
       waitForPortAndHttpPort(wallet._1, wallet._2.adminApi.port)
     )
     config.splitwellApps.foreach(sw => waitForPort(sw._1, sw._2.adminApi.port.unwrap))
     config.directoryApp.foreach(directory =>
-      waitForPortAndHttpPort(InstanceName.tryCreate("Directory"), directory.adminApi.port)
+      waitForPort(InstanceName.tryCreate("Directory"), directory.adminApi.port.unwrap)
     )
     config.scanApp.foreach(scan =>
-      waitForPortAndHttpPort(InstanceName.tryCreate("Scan"), scan.adminApi.port)
+      waitForPort(InstanceName.tryCreate("Scan"), scan.adminApi.port.unwrap)
     )
     extraPortsToWaitFor.foreach(p => waitForPort(InstanceName.tryCreate(p._1), p._2))
     config

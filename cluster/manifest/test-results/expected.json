@@ -1057,10 +1057,6 @@
                            {
                               "containerPort": 5014,
                               "name": "sv1-api"
-                           },
-                           {
-                              "containerPort": 6014,
-                              "name": "sv1-api-http"
                            }
                         ],
                         "resources": {
@@ -1096,11 +1092,6 @@
                {
                   "name": "sv1-api",
                   "port": 5014,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv1-api-http",
-                  "port": 6014,
                   "protocol": "TCP"
                }
             ],
@@ -1220,10 +1211,6 @@
                            {
                               "containerPort": 5114,
                               "name": "sv2-api"
-                           },
-                           {
-                              "containerPort": 6114,
-                              "name": "sv2-api-http"
                            }
                         ],
                         "resources": {
@@ -1259,11 +1246,6 @@
                {
                   "name": "sv2-api",
                   "port": 5114,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv2-api-http",
-                  "port": 6114,
                   "protocol": "TCP"
                }
             ],
@@ -1383,10 +1365,6 @@
                            {
                               "containerPort": 5214,
                               "name": "sv3-api"
-                           },
-                           {
-                              "containerPort": 6214,
-                              "name": "sv3-api-http"
                            }
                         ],
                         "resources": {
@@ -1422,11 +1400,6 @@
                {
                   "name": "sv3-api",
                   "port": 5214,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv3-api-http",
-                  "port": 6214,
                   "protocol": "TCP"
                }
             ],
@@ -1546,10 +1519,6 @@
                            {
                               "containerPort": 5314,
                               "name": "sv4-api"
-                           },
-                           {
-                              "containerPort": 6314,
-                              "name": "sv4-api-http"
                            }
                         ],
                         "resources": {
@@ -1585,11 +1554,6 @@
                {
                   "name": "sv4-api",
                   "port": 5314,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv4-api-http",
-                  "port": 6314,
                   "protocol": "TCP"
                }
             ],
@@ -4250,32 +4214,16 @@
                               "name": "sv1-api"
                            },
                            {
-                              "containerPort": 6014,
-                              "name": "sv1-api-http"
-                           },
-                           {
                               "containerPort": 5114,
                               "name": "sv2-api"
-                           },
-                           {
-                              "containerPort": 6114,
-                              "name": "sv2-api-http"
                            },
                            {
                               "containerPort": 5214,
                               "name": "sv3-api"
                            },
                            {
-                              "containerPort": 6214,
-                              "name": "sv3-api-http"
-                           },
-                           {
                               "containerPort": 5314,
                               "name": "sv4-api"
-                           },
-                           {
-                              "containerPort": 6314,
-                              "name": "sv4-api-http"
                            },
                            {
                               "containerPort": 5012,
@@ -4454,18 +4402,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sv1-api-http",
-                  "port": 6014,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "sv2-api",
                   "port": 5114,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv2-api-http",
-                  "port": 6114,
                   "protocol": "TCP"
                },
                {
@@ -4474,18 +4412,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sv3-api-http",
-                  "port": 6214,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "sv4-api",
                   "port": 5314,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv4-api-http",
-                  "port": 6314,
                   "protocol": "TCP"
                },
                {
@@ -4653,18 +4581,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sv1-api-http",
-                  "port": 6014,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "sv2-api",
                   "port": 5114,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv2-api-http",
-                  "port": 6114,
                   "protocol": "TCP"
                },
                {
@@ -4673,18 +4591,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sv3-api-http",
-                  "port": 6214,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "sv4-api",
                   "port": 5314,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv4-api-http",
-                  "port": 6314,
                   "protocol": "TCP"
                },
                {

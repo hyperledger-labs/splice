@@ -47,7 +47,7 @@ Request a validator onboarding secret...
 
 .. parsed-literal::
 
-   curl -X POST https://|cn_cluster|.network.canton.global:6014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+   curl -X POST https://|cn_cluster|.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 ...and then start the splitwell validator with this configuration file and the onboarding config you just obtained:
 
@@ -132,7 +132,7 @@ splitwell domain, you can now start the validator again. First, request a new on
 
 .. parsed-literal::
 
-   curl -X POST https://|cn_cluster|.network.canton.global:6014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+   curl -X POST https://|cn_cluster|.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next start up the validator:
 

@@ -88,6 +88,7 @@ class SvcPartyHosting(
       "authorize SVC party hosting", {
         val svConnection = new SvConnection(
           sponsorSvConfig.adminApi,
+          retryProvider,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )
