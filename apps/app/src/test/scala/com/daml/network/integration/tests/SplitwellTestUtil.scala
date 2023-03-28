@@ -14,7 +14,8 @@ import com.digitalasset.canton.topology.PartyId
 trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
   def initSplitwellTest()(implicit
       env: CNNodeTestConsoleEnvironment
-  ) = {
+  ) = clue("setup splitwell users and contracts") {
+
     val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
     val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
     val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
@@ -23,32 +24,42 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
 
     val splitwellProviderParty = providerSplitwellBackend.getProviderPartyId()
 
-    // Setup install contracts
-    Seq(
-      (aliceSplitwell, aliceUserParty),
-      (bobSplitwell, bobUserParty),
-      (charlieSplitwell, charlieUserParty),
-    ).foreach { case (splitwell, party) =>
-      splitwell.createInstallRequests()
-      splitwell.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
+    clue("setup install contracts") {
+      Seq(
+        (aliceSplitwell, aliceUserParty),
+        (bobSplitwell, bobUserParty),
+        (charlieSplitwell, charlieUserParty),
+      ).foreach { case (splitwell, party) =>
+        splitwell.createInstallRequests()
+        splitwell.ledgerApi.ledger_api_extensions.acs
+          .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
+      }
     }
 
-    aliceSplitwell.requestGroup("group1")
-    eventually() {
-      aliceSplitwell.listGroups() should have size 1
+    clue("create 'group1'") {
+      aliceSplitwell.requestGroup("group1")
+      eventually() {
+        aliceSplitwell.listGroups() should have size 1
+      }
     }
-    val invite = aliceSplitwell.createGroupInvite(
-      "group1"
-    )
-
-    bobSplitwell.acceptInvite(invite)
-
-    eventually() {
-      aliceSplitwell.listAcceptedGroupInvites("group1") should not be empty
+    val invite = clue("create a generic invite for 'group1'") {
+      // Wait for the group contract to be visible to Alice's Ledger API
+      aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+        .awaitJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
+      aliceSplitwell.createGroupInvite(
+        "group1"
+      )
     }
-    inside(aliceSplitwell.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
-      aliceSplitwell.joinGroup(accepted.contractId)
+
+    clue("invite bob to 'group1'") {
+      bobSplitwell.acceptInvite(invite)
+
+      eventually() {
+        aliceSplitwell.listAcceptedGroupInvites("group1") should not be empty
+      }
+      inside(aliceSplitwell.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
+        aliceSplitwell.joinGroup(accepted.contractId)
+      }
     }
 
     val key = GrpcSplitwellAppClient.GroupKey(
@@ -57,7 +68,9 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       "group1",
     )
 
-    grantFeaturedAppRight(splitwellProviderWallet)
+    clue("grant featured app right to splitwell provider") {
+      grantFeaturedAppRight(splitwellProviderWallet)
+    }
 
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key, invite)
   }

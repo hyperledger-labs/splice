@@ -97,8 +97,10 @@ trait UserWalletStore
       deliveryOffer <- acs.listContractsI(walletCodegen.DeliveryOffer.INTERFACE)(_ => true)
     } yield {
       val deliveryOfferMap = deliveryOffer.map(offer => offer.contractId -> offer).toMap
-      contracts.map { c =>
-        AppPaymentRequest(c, deliveryOfferMap(c.payload.deliveryOffer))
+      // We drop payment requests for which we can't find a corresponding delivery offer, which can be
+      // the case if its transfer is still in flight.
+      contracts.flatMap { c =>
+        deliveryOfferMap.get(c.payload.deliveryOffer).map(AppPaymentRequest(c, _))
       }
     }
   }
