@@ -6,7 +6,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{
   FrontendLoginUtil,
   TimeTestUtil,
-  WalletFrontendTestUtil,
+  WalletNewFrontendTestUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -16,15 +16,16 @@ import java.time.Duration
 class WalletNewFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
-    with WalletFrontendTestUtil
+    with WalletNewFrontendTestUtil
     with FrontendLoginUtil
     with TimeTestUtil {
 
+  val coinPrice = 2
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .withCoinPrice(2)
+      .withCoinPrice(coinPrice)
 
   "A wallet UI" should {
 
@@ -130,8 +131,11 @@ class WalletNewFrontendTimeBasedIntegrationTest
           val cc = BigDecimal(ccText.split(" ").head)
           val usd = BigDecimal(usdText.split(" ").head)
 
-          assertInRange(cc, (BigDecimal(0.9), BigDecimal(1)))
-          assertInRange(usd, (BigDecimal(1.9), BigDecimal(2)))
+          assertInRange(cc, (BigDecimal(1) - smallAmount, BigDecimal(1)))
+          assertInRange(
+            usd,
+            ((BigDecimal(1) - smallAmount) * coinPrice, BigDecimal(1) * coinPrice),
+          )
         }
       }
     }

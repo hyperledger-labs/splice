@@ -5,6 +5,12 @@ import org.scalatest.Assertion
 
 trait WalletNewFrontendTestUtil { self: FrontendTestCommon =>
 
+  protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
+    click on "tap-amount-field"
+    numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString)
+    click on "tap-button"
+  }
+
   protected def matchBalance(balanceCC: String, balanceUSD: String)(implicit
       webDriverType: WebDriverType
   ): Assertion = {
