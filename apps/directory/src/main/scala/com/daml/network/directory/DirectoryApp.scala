@@ -3,6 +3,7 @@ package com.daml.network.directory
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
+import akka.http.scaladsl.server.Directives.*
 import akka.stream.Materializer
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatcher}
@@ -32,6 +33,10 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.admin.http.HttpAdminHandler
+import com.daml.network.environment.CNNodeStatus
+import com.digitalasset.canton.health.admin.data.NodeStatus
 
 /** Class representing a Directory app instance.
   *
@@ -118,24 +123,28 @@ class DirectoryApp(
         store,
         loggerFactory,
       )
+
+      // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
+      adminHandler = new HttpAdminHandler[CNNodeStatus](
+        status
+          .map(CNNodeStatus.fromNodeStatus)
+          .map(NodeStatus.Success(_)),
+        status => status.toJsonV0,
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            DirectoryResource.routes(
-              handler
-            )
+            concat(DirectoryResource.routes(handler), CommonAdminResource.routes(adminHandler))
           }
         }
       }
-      httpConfig = config.adminApi.clientConfig.copy(
-        // TODO(#2019) Remove once we disabled gRPC Servers completely.
-        port = config.adminApi.port + 1000
-      )
-      _ = logger.info(s"Starting http server on ${httpConfig}")
+      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
       binding <- Http()
         .newServerAt(
-          httpConfig.address,
-          httpConfig.port.unwrap,
+          config.adminApi.clientConfig.address,
+          config.adminApi.clientConfig.port.unwrap,
         )
         .bind(
           routes

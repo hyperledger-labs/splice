@@ -7,8 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBaseGrpc
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -35,7 +34,6 @@ class DirectoryAppBootstrap(
     metrics: DirectoryAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -43,7 +41,7 @@ class DirectoryAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBaseGrpc[
+) extends CNNodeBootstrapBase[
       DirectoryApp,
       LocalDirectoryAppConfig,
       SharedCNNodeAppParameters,
@@ -55,7 +53,6 @@ class DirectoryAppBootstrap(
       metrics,
       storageFactory,
       loggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ) {
 
@@ -91,7 +88,6 @@ object DirectoryAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      writeHealthDumpToFile: HealthDumpFunction,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -111,7 +107,6 @@ object DirectoryAppBootstrap {
           directoryMetrics,
           new CommunityStorageFactory(directoryConfig.storage),
           loggerFactory,
-          writeHealthDumpToFile,
           futureSupervisor,
           configuredOpenTelemetry,
         )

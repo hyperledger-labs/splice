@@ -29,9 +29,6 @@ spec:
         - containerPort: 5010
           name: dir-api
           protocol: TCP
-        - containerPort: 6010
-          name: dir-http-api
-          protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -49,7 +46,3 @@ spec:
     port: 5010
     protocol: TCP
     targetPort: 5010
-  - name: dir-http-api
-    port: 6010
-    protocol: TCP
-    targetPort: 6010

@@ -772,10 +772,6 @@
                            {
                               "containerPort": 5010,
                               "name": "dir-api"
-                           },
-                           {
-                              "containerPort": 6010,
-                              "name": "dir-http-api"
                            }
                         ],
                         "resources": {
@@ -811,11 +807,6 @@
                {
                   "name": "dir-api",
                   "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "dir-http-api",
-                  "port": 6010,
                   "protocol": "TCP"
                }
             ],
@@ -4251,10 +4242,6 @@
                               "name": "dir-api"
                            },
                            {
-                              "containerPort": 6010,
-                              "name": "dir-http-api"
-                           },
-                           {
                               "containerPort": 5005,
                               "name": "svc-app-adm-api"
                            },
@@ -4457,11 +4444,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "dir-http-api",
-                  "port": 6010,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "svc-app-adm-api",
                   "port": 5005,
                   "protocol": "TCP"
@@ -4658,11 +4640,6 @@
                {
                   "name": "dir-api",
                   "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "dir-http-api",
-                  "port": 6010,
                   "protocol": "TCP"
                },
                {

@@ -1,11 +1,12 @@
 package com.daml.network.console
 
+import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.{CNNodeStatus, CNNodeConsoleEnvironment}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -15,6 +16,11 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
+import com.digitalasset.canton.console.ConsoleMacros
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.console.ConsoleCommandResult
 
 abstract class DirectoryAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
@@ -54,6 +60,47 @@ abstract class DirectoryAppReference(
     consoleEnvironment.run {
       httpCommand(HttpDirectoryAppClient.GetProviderPartyId())
     }
+
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
+  @Help.Summary("Health and diagnostic related commands (HTTP)")
+  @Help.Group("HTTP Health")
+  def httpHealth = {
+    consoleEnvironment.run {
+      // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
+      // TODO(#3467) see if we still need this after the initialization order is fixed
+      ConsoleCommandResult.fromEither(
+        Right(
+          httpCommand(
+            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
+          ).toEither.fold(err => NodeStatus.Failure(err), success => success)
+        )
+      )
+    }
+  }
+
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
+  // Override topology to avoid using grpc status check
+  private lazy val topology_ =
+    new TopologyAdministrationGroup(
+      this,
+      None,
+      consoleEnvironment,
+      loggerFactory,
+    )
+  @Help.Summary("Topology management related commands")
+  @Help.Group("Topology")
+  @Help.Description(
+    "This group contains access to the full set of topology management commands."
+  )
+  override def topology: TopologyAdministrationGroup = topology_
+
+  // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
+  override def waitForInitialization(
+      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
+  ): Unit =
+    ConsoleMacros.utils.retry_until_true(timeout)(
+      httpHealth.successOption.map(_.active).getOrElse(false)
+    )
 }
 
 /** Single local Directory app reference. Defines the console commands that can be run against a Directory
@@ -76,7 +123,7 @@ class LocalDirectoryAppReference(
     // For local references, we assume that they are reachable on localhost.
     // TODO (#2019) Reconsider if we want these for local refs at all and if so
     // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 1000}",
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
     config.clientAdminApi,
   )
 

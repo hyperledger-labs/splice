@@ -5,6 +5,10 @@ info:
 tags:
   - name: directory
 paths:
+  /status:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
   /entries:
     get:
       tags: [directory]

@@ -217,7 +217,6 @@ trait CNNodeEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       appLoggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ).valueOr(err =>
       throw new RuntimeException(

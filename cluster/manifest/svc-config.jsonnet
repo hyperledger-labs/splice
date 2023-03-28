@@ -131,10 +131,6 @@ local deployments(config) = [
       name: "dir-api",
       port: 5010,
     },
-    {
-      name: "dir-http-api",
-      port: 6010,
-    },
   ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "directory")),
 
   c.deployment(config, "svc-app", [

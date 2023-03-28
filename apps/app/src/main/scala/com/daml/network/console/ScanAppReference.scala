@@ -11,8 +11,15 @@ import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CNNodeUtil, Contract}
-import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.console.{
+  BaseInspection,
+  ConsoleCommandResult,
+  GrpcRemoteInstanceReference,
+  Help,
+}
+import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
@@ -20,8 +27,6 @@ import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.ConsoleMacros
 import com.daml.network.environment.CNNodeStatus
-import scala.util.Try
-import com.digitalasset.canton.console.commands.TopologyAdministrationGroup
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -173,8 +178,14 @@ abstract class ScanAppReference(
   @Help.Group("HTTP Health")
   def httpHealth = {
     consoleEnvironment.run {
-      httpCommand(
-        HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
+      // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
+      // TODO(#3467) see if we still need this after the initialization order is fixed
+      ConsoleCommandResult.fromEither(
+        Right(
+          httpCommand(
+            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
+          ).toEither.fold(err => NodeStatus.Failure(err), success => success)
+        )
       )
     }
   }
@@ -200,12 +211,7 @@ abstract class ScanAppReference(
       timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
   ): Unit =
     ConsoleMacros.utils.retry_until_true(timeout)(
-      // The outer Try ensures we keep retrying if the status endpoint isn't up yet (e.g. slow app initialization)
-      // TODO(#3467) see if we still need this after this is fixed
-      Try(
-        httpHealth.successOption
-          .map(_.active)
-      ).toOption.flatten.getOrElse(false)
+      httpHealth.successOption.map(_.active).getOrElse(false)
     )
 }
 
