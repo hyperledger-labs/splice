@@ -83,6 +83,10 @@ export const UserProvider: React.FC<{
           userAccessToken ? isHs256UnsafeToken(userAccessToken) : 'undefined'
         }`
     );
+    const error = auth?.error;
+    if (error) {
+      console.warn(`Auth0 login error: ${JSON.stringify(error)}`);
+    }
   }
 
   const loginWithSst = useCallback(
