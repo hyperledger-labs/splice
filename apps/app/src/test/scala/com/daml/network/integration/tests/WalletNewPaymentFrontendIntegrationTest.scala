@@ -168,13 +168,13 @@ class WalletNewPaymentFrontendIntegrationTest
   ) = {
     element.childElement(className("available-balance")).text should matchText(expectedBalance)
 
-    element.childElement(className("payment-amount-receiver")).text should matchText(
-      s"Send ${expectedSendAmount._1} ${expectedSendAmount._2} to $expectedReceiver"
+    element.childElement(className("payment-amount")).text should matchText(
+      s"Send ${expectedSendAmount._1} ${expectedSendAmount._2} to"
     )
 
-    element.childElement(className("payment-provider")).text should matchText(
-      s"via $expectedProvider"
-    )
+    element.childElement(className("payment-receiver")).text should matchText(expectedReceiver)
+
+    element.childElement(className("payment-provider")).text should matchText(expectedProvider)
 
     element.childElement(className("payment-description")).text should matchText(
       s"\"$expectedDescription\""

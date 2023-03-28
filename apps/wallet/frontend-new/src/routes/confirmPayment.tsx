@@ -87,22 +87,22 @@ const RecipientInfo: React.FC<RecipientInfoProps> = ({ amount, receiver, provide
   return (
     <Stack alignItems="center" spacing={1}>
       <SendPaymentIcon />
-      <H5WithDirectoryEntry className="payment-amount-receiver">
+      <Typography variant="h5" className="payment-amount">
         Send <AmountDisplay amount={amount.amount} currency={amount.currency} /> to{' '}
-        <b>
-          <DirectoryEntry partyId={receiver} />
-        </b>
-      </H5WithDirectoryEntry>
-      <Body2WithDirectoryEntry className="payment-provider">
-        via <DirectoryEntry partyId={provider} />
-      </Body2WithDirectoryEntry>
+      </Typography>
+      <DirectoryEntry
+        partyId={receiver}
+        variant="h5"
+        fontWeight="bold"
+        classNames="payment-receiver"
+      />
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography variant="body2">via</Typography>{' '}
+        <DirectoryEntry partyId={provider} variant="body2" classNames="payment-provider" />
+      </Stack>
     </Stack>
   );
 };
-
-// TODO (#3503): refactor into DirectoryEntry
-const H5WithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.h5 }));
-const Body2WithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.body2 }));
 
 const SendPaymentIcon = styled(ArrowOutward)({
   border: '1px solid #fff',

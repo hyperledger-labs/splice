@@ -45,6 +45,7 @@ export const ConfirmSubscription: React.FC = () => {
                   partyId={
                     subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver
                   }
+                  variant="h5"
                 />
               </Stack>
               <Stack alignItems="center" direction="row" spacing={1}>
@@ -53,6 +54,7 @@ export const ConfirmSubscription: React.FC = () => {
                   partyId={
                     subscriptionRequest.subscriptionRequest.payload.subscriptionData.provider
                   }
+                  variant="body2"
                 />
               </Stack>
             </Stack>

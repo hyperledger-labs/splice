@@ -140,6 +140,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
 const PartyCell = styled(TableCell)({
   overflow: 'hidden',
   textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 });
 
 const Service: React.FC<{ provider: Party; description: string }> = ({ provider, description }) => {
@@ -148,9 +149,7 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
       <Typography variant="h6" className="sub-description">
         {description}
       </Typography>
-      <Typography variant="caption" className="sub-provider">
-        <DirectoryEntry partyId={provider} />
-      </Typography>
+      <DirectoryEntry partyId={provider} variant="caption" classNames="sub-provider" />
     </Stack>
   );
 };

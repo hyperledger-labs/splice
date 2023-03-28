@@ -1,12 +1,15 @@
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { Typography, TypographyProps } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
-const PartyId: React.FC<{ partyId: string; noCopy?: boolean; classNames?: string }> = ({
-  partyId,
-  noCopy,
-  classNames,
-}) => {
+export type PartyIdProps = {
+  partyId: string;
+  noCopy?: boolean;
+  classNames?: string;
+} & TypographyProps;
+const PartyId: React.FC<PartyIdProps> = props => {
+  const { partyId, classNames, noCopy, ...typographyProps } = props;
   const handleClick = () => navigator.clipboard.writeText(partyId);
 
   return (
@@ -22,7 +25,7 @@ const PartyId: React.FC<{ partyId: string; noCopy?: boolean; classNames?: string
           }}
           className={`party-id ${classNames}`}
         >
-          {partyId}
+          <Typography {...typographyProps}>{partyId}</Typography>
         </div>
       </Tooltip>
       {!noCopy && (

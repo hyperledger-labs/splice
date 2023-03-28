@@ -103,7 +103,11 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <DirectoryEntry partyId={offer.senderId} classNames={'transfer-offer-sender'} />
+            <DirectoryEntry
+              partyId={offer.senderId}
+              variant="h5"
+              classNames={'transfer-offer-sender'}
+            />
           </Stack>
         </Stack>
         <Stack direction="column" alignItems="flex-end">

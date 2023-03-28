@@ -14,7 +14,6 @@ import {
   Button,
   Icon,
   Stack,
-  styled,
   Table,
   TableBody,
   TableCell,
@@ -177,17 +176,9 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
   if (transaction.receivers.length === 0) {
     senderOrReceiver = <Typography variant="body1">Automation</Typography>;
   } else if (transaction.senderId !== primaryPartyId) {
-    senderOrReceiver = (
-      <Body1WithDirectoryEntry>
-        <DirectoryEntry partyId={transaction.senderId} />
-      </Body1WithDirectoryEntry>
-    );
+    senderOrReceiver = <DirectoryEntry partyId={transaction.senderId} variant="body1" />;
   } else if (transaction.receivers.length === 1) {
-    senderOrReceiver = (
-      <Body1WithDirectoryEntry>
-        <DirectoryEntry partyId={transaction.receivers[0].party} />
-      </Body1WithDirectoryEntry>
-    );
+    senderOrReceiver = <DirectoryEntry partyId={transaction.receivers[0].party} variant="body1" />;
   } else {
     senderOrReceiver = <Typography variant="body1">Multiple Recipients</Typography>;
   }
@@ -195,9 +186,10 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
   return (
     <Stack direction="column" className="tx-party">
       {senderOrReceiver}
-      <CaptionWithDirectoryEntry>
-        via <DirectoryEntry partyId={transaction.providerId} />
-      </CaptionWithDirectoryEntry>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography variant="caption">via </Typography>
+        <DirectoryEntry partyId={transaction.providerId} variant="caption" />
+      </Stack>
     </Stack>
   );
 };
@@ -212,10 +204,6 @@ const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore }) => {
     </Button>
   );
 };
-
-// TODO (#3503): refactor into DirectoryEntry
-const CaptionWithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.caption }));
-const Body1WithDirectoryEntry = styled('div')(({ theme }) => ({ ...theme.typography.caption }));
 
 interface TransactionAmountProps {
   transaction: Transaction;
