@@ -91,6 +91,7 @@ html_js_files = ['script.js']
 with open("../../../../nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_research_version = obj['version']
+    daml_sdk_version = obj['daml_version']
 
 # Sphinx does not allow something like ``|version|``
 # so instead we define a replacement that includes the formatting.
@@ -102,7 +103,8 @@ rst_prolog = """
 
 .. |version_literal| replace:: ``{version}``
 .. |canton_version| replace:: {canton_research_version}
+.. |daml_sdk_version| replace:: {daml_sdk_version}
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_cn-node-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
 .. |canton_research_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-{canton_research_version}.tar.gz">Download Canton research</a>`
-""".format(version = os.getenv("VERSION"), canton_research_version = canton_research_version)
+""".format(version = os.getenv("VERSION"), canton_research_version = canton_research_version, daml_sdk_version=daml_sdk_version)

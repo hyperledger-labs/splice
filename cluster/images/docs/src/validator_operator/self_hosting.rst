@@ -184,9 +184,11 @@ open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluste
     :start-after: BEGIN_DIRECTORY_CONFIG
     :end-before: END_DIRECTORY_CONFIG
 
-The Directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run: ::
+The Directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run:
 
-  daml json-api --config examples/validator/json-api-app.conf
+.. parsed-literal::
+
+    DAML_SDK_VERSION=\ |daml_sdk_version| daml json-api --config examples/validator/json-api-app.conf
 
 Configuring the Splitwell UI
 ----------------------------
