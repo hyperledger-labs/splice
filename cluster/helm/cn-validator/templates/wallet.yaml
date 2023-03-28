@@ -33,7 +33,7 @@ spec:
         name: wallet-app
         ports:
         - containerPort: 6004
-          name: val1-wal-http
+          name: wal-http
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -48,7 +48,7 @@ spec:
   selector:
     app: wallet-app
   ports:
-  - name: val1-wal-http
+  - name: wal-http
     port: 6004
     protocol: TCP
     targetPort: 6004
@@ -93,7 +93,7 @@ spec:
         name: wallet-new-web-ui
         ports:
         - containerPort: 80
-          name: val1-wal-new-ui
+          name: http
           protocol: TCP
         resources:
           limits:
@@ -111,7 +111,7 @@ spec:
   selector:
     app: wallet-new-web-ui
   ports:
-  - name: val1-wal-new-ui
+  - name: http
     port: 80
     protocol: TCP
     targetPort: 80
@@ -125,7 +125,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
-  revisionHistoryLimit: 10
   selector:
     matchLabels:
       app: wallet-web-ui
@@ -157,7 +156,7 @@ spec:
         name: wallet-web-ui
         ports:
         - containerPort: 80
-          name: val1-wal-ui
+          name: http
           protocol: TCP
         resources:
           limits:
@@ -175,7 +174,6 @@ spec:
   selector:
     app: wallet-web-ui
   ports:
-  - name: val1-wal-ui
+  - name: http
     port: 80
     protocol: TCP
-    targetPort: 80

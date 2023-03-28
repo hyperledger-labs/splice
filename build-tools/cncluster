@@ -396,7 +396,6 @@ function subcmd_logs() {
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
-
         LOGFILE=$(mktemp cnlogXXXXXXX.clog)
         # shellcheck disable=SC2086
         (kubectl logs ${POD_SPEC} "${app}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")

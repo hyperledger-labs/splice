@@ -1,2 +1,8 @@
 imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
 defaultJvmOptions: -Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4
+resources:
+  limits:
+    memory: 1536Mi
+  requests:
+    cpu: "1"
+    memory: 1536Mi

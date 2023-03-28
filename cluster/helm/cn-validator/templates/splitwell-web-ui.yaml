@@ -33,7 +33,7 @@ spec:
               key: url
               name: cn-app-splitwell-ui-auth
               optional: false
-        image: "{{ .Values.imageRepo }}/validator1-splitwell-web-ui:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: splitwell-web-ui
         ports:
