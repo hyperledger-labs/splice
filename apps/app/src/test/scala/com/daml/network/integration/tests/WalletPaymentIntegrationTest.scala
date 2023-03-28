@@ -52,18 +52,22 @@ class WalletPaymentIntegrationTest
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
 
+      val description = "a payment for cool stuff"
+
       val (_, cid, reqC) =
         createSelfPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
+          description = description,
         )
 
       val reqFound = clue("Check that we can get the created payment request") {
         val reqFound = eventuallySucceeds() {
           aliceWallet.getAppPaymentRequest(cid)
         }
-        reqFound.payload shouldBe reqC
+        reqFound.appPaymentRequest.payload shouldBe reqC
+        reqFound.deliveryOffer.payload.description shouldBe description
         reqFound
       }
 
@@ -71,13 +75,14 @@ class WalletPaymentIntegrationTest
         val reqList = eventually() {
           aliceWallet.listAppPaymentRequests().headOption.value
         }
-        reqList.payload shouldBe reqC
+        reqList.appPaymentRequest.payload shouldBe reqC
+        reqList.deliveryOffer.payload.description shouldBe description
         reqList
       }
 
       actAndCheck(
         "Reject the payment request",
-        aliceWallet.rejectAppPaymentRequest(reqFound.contractId),
+        aliceWallet.rejectAppPaymentRequest(reqFound.appPaymentRequest.contractId),
       )(
         "Rejected request disappears from list",
         _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
@@ -95,7 +100,7 @@ class WalletPaymentIntegrationTest
         )
 
       eventually() {
-        aliceWallet.getAppPaymentRequest(cid).payload shouldBe reqC
+        aliceWallet.getAppPaymentRequest(cid).appPaymentRequest.payload shouldBe reqC
       }
 
       clue("Tap 50 coins") {

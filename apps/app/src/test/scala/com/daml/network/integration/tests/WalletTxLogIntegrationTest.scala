@@ -475,7 +475,7 @@ class WalletTxLogIntegrationTest
 
       actAndCheck(
         "Alice confirms the payment request",
-        aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
+        aliceWallet.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
       )(
         "All parties see new balances",
         _ => {

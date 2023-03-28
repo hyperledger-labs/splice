@@ -400,7 +400,7 @@ class WalletIntegrationTest
       )
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       aliceWallet.tap(50)
-      val (_, (_, requestId)) = actAndCheck(
+      val (_, (deliveryOfferId, requestId)) = actAndCheck(
         "Create payment request on private domain",
         createSelfPaymentRequest(
           aliceValidator.remoteParticipantWithAdminToken,
@@ -425,10 +425,12 @@ class WalletIntegrationTest
           req
         }
       }
-      request.contractId shouldBe requestId
+      request.appPaymentRequest.contractId shouldBe requestId
+      // Left is view, right is TestDeliveryOffer
+      request.deliveryOffer.contractId.contractId shouldBe deliveryOfferId.contractId
       actAndCheck(
         "Accept payment request",
-        aliceWallet.acceptAppPaymentRequest(request.contractId),
+        aliceWallet.acceptAppPaymentRequest(request.appPaymentRequest.contractId),
       )(
         "wait for the accepted payment to appear",
         _ =>

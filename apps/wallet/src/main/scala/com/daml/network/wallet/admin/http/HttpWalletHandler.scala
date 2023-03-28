@@ -108,20 +108,31 @@ class HttpWalletHandler(
         Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(contractId)
       for {
         userStore <- getUserStore(user)
-        acs <- userStore.defaultAcs
-        contract <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(requestCid)
-      } yield r0.GetAppPaymentRequestResponseOK(contract.toJson)
+        appPaymentRequest <- userStore.getAppPaymentRequest(requestCid)
+      } yield r0.GetAppPaymentRequestResponseOK(
+        d0.AppPaymentRequest(
+          appPaymentRequest.appPaymentRequest.toJson,
+          appPaymentRequest.deliveryOffer.toJson,
+        )
+      )
     }
   }
 
   override def listAppPaymentRequests(
       respond: v0.WalletResource.ListAppPaymentRequestsResponse.type
-  )()(user: String): Future[v0.WalletResource.ListAppPaymentRequestsResponse] =
-    listContracts(
-      walletCodegen.AppPaymentRequest.COMPANION,
-      user,
-      d0.ListAppPaymentRequestsResponse(_),
-    )
+  )()(user: String): Future[v0.WalletResource.ListAppPaymentRequestsResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        userStore <- getUserStore(user)
+        appPaymentRequests <- userStore.listAppPaymentRequests
+      } yield d0.ListAppPaymentRequestsResponse(appPaymentRequests.map { appPaymentRequest =>
+        d0.AppPaymentRequest(
+          appPaymentRequest.appPaymentRequest.toJson,
+          appPaymentRequest.deliveryOffer.toJson,
+        )
+      }.toVector)
+    }
+  }
 
   override def listAppRewardCoupons(respond: v0.WalletResource.ListAppRewardCouponsResponse.type)()(
       user: String

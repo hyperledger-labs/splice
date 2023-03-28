@@ -1,27 +1,25 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Contract, DirectoryEntry } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ArrowOutward } from '@mui/icons-material';
 import { Box, Button, Container, Stack, styled, Typography } from '@mui/material';
 
-import {
-  AppPaymentRequest,
-  PaymentAmount,
-} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 import Loading from '../components/Loading';
 import PaymentHeader from '../components/PaymentHeader';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { AppPaymentRequest } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
   const { getAppPaymentRequest } = useWalletClient();
   const { cid } = useParams();
-  const [appPayment, setAppPayment] = useState<Contract<AppPaymentRequest>>();
+  const [appPayment, setAppPayment] = useState<AppPaymentRequest>();
 
   // TODO (#3333): react-query already does retries
   useEffect(() => {
@@ -51,7 +49,7 @@ export const ConfirmPayment: React.FC = () => {
     return <Loading />;
   }
 
-  const { payload } = appPayment;
+  const { appPaymentRequest, deliveryOffer } = appPayment;
   // TODO (#3485): handle multiple recipients
   return (
     <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
@@ -60,15 +58,14 @@ export const ConfirmPayment: React.FC = () => {
         <Container maxWidth="sm">
           <Stack alignItems="center" paddingTop={4} spacing={4}>
             <RecipientInfo
-              amount={payload.receiverAmounts[0].amount}
-              receiver={payload.receiverAmounts[0].receiver}
-              provider={payload.provider}
+              amount={appPaymentRequest.payload.receiverAmounts[0].amount}
+              receiver={appPaymentRequest.payload.receiverAmounts[0].receiver}
+              provider={appPaymentRequest.payload.provider}
             />
-            {/* TODO (#3483): use actual description */}
-            <PaymentDescription description="Payment Desc." />
+            <PaymentDescription description={deliveryOffer.payload.description} />
             <PaymentContainer
-              contractId={appPayment.contractId}
-              amount={payload.receiverAmounts[0].amount}
+              contractId={appPaymentRequest.contractId}
+              amount={appPaymentRequest.payload.receiverAmounts[0].amount}
               fee={new BigNumber(0)} // TODO (#3492): compute actual fee
               coinPrice={coinPrice}
             />
@@ -82,7 +79,7 @@ export const ConfirmPayment: React.FC = () => {
 export default ConfirmPayment;
 
 interface RecipientInfoProps {
-  amount: PaymentAmount;
+  amount: payment.PaymentAmount;
   receiver: string;
   provider: string;
 }
@@ -127,8 +124,8 @@ const PaymentDescription: React.FC<PaymentDescriptionProps> = ({ description }) 
 };
 
 interface PaymentContainerProps {
-  contractId: ContractId<AppPaymentRequest>;
-  amount: PaymentAmount;
+  contractId: ContractId<payment.AppPaymentRequest>;
+  amount: payment.PaymentAmount;
   fee: BigNumber;
   coinPrice: BigNumber;
 }
@@ -166,7 +163,7 @@ const PaymentContainer: React.FC<PaymentContainerProps> = ({
   );
 };
 
-const ConfirmPaymentButton: React.FC<{ contractId: ContractId<AppPaymentRequest> }> = ({
+const ConfirmPaymentButton: React.FC<{ contractId: ContractId<payment.AppPaymentRequest> }> = ({
   contractId,
 }) => {
   const { acceptAppPaymentRequest } = useWalletClient();

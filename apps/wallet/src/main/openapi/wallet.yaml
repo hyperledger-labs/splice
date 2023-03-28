@@ -196,7 +196,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+                $ref: "#/components/schemas/AppPaymentRequest"
         "404":
           description: not_found
           content:
@@ -856,6 +856,17 @@ components:
         total_holding_fees:
           type: string
 
+    AppPaymentRequest:
+      type: object
+      required:
+        - appPaymentRequest
+        - deliveryOffer
+      properties:
+        appPaymentRequest:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        deliveryOffer:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
     ListAppPaymentRequestsResponse:
       type: object
       required:
@@ -864,7 +875,7 @@ components:
         payment_requests:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/AppPaymentRequest"
 
     AcceptAppPaymentRequestRequest:
       type: object

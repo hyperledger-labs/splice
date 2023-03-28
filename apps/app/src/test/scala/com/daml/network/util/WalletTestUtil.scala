@@ -362,11 +362,12 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
     val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
       scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
-      "description",
+      description,
     )
     clue("Create delivery offer") {
       val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
@@ -409,13 +410,19 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): (
       testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {
     val deliveryOfferId =
-      createTestDeliveryOffer(remoteParticipantWithAdminToken, userId, userParty)
+      createTestDeliveryOffer(
+        remoteParticipantWithAdminToken,
+        userId,
+        userParty,
+        description = description,
+      )
 
     val now = env.environment.clock.now
 
@@ -453,6 +460,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       currency: paymentCodegen.Currency = defaultPaymentAmount.currency,
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
+      description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): (
       testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
@@ -469,6 +477,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       receiverAmounts,
       expirationTime,
       domainId,
+      description,
     )
   }
 

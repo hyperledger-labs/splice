@@ -118,7 +118,7 @@ class SplitwellTimeBasedIntegrationTest
       eventually()(bobWallet.listAppPaymentRequests() should not be empty)
       providerSplitwellBackend.stop() // to avoid the automation triggering before the round change
       inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
-        bobWallet.acceptAppPaymentRequest(request.contractId)
+        bobWallet.acceptAppPaymentRequest(request.appPaymentRequest.contractId)
       }
       eventually()(bobWallet.listAppPaymentRequests() shouldBe empty)
       advanceRoundsByOneTick

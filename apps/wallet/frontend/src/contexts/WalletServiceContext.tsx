@@ -191,7 +191,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.listAppPaymentRequests();
         return {
           paymentRequestsList: res.paymentRequests.map(c =>
-            Contract.decodeOpenAPI(c, AppPaymentRequest)
+            Contract.decodeOpenAPI(c.appPaymentRequest, AppPaymentRequest)
           ),
         };
       },

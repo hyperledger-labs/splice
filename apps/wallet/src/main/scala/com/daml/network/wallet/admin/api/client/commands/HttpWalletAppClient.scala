@@ -99,6 +99,33 @@ object HttpWalletAppClient {
     }
   }
 
+  final case class AppPaymentRequest(
+      appPaymentRequest: Contract[
+        walletCodegen.AppPaymentRequest.ContractId,
+        walletCodegen.AppPaymentRequest,
+      ],
+      deliveryOffer: Contract[
+        walletCodegen.DeliveryOffer.ContractId,
+        walletCodegen.DeliveryOfferView,
+      ],
+  )
+
+  object AppPaymentRequest {
+    def parseHttp(
+        response: definitions.AppPaymentRequest
+    )(implicit decoder: TemplateJsonDecoder): Either[String, AppPaymentRequest] = {
+      (for {
+        appPaymentRequest <- Contract
+          .fromJson(walletCodegen.AppPaymentRequest.COMPANION)(
+            response.appPaymentRequest
+          )
+        deliveryOffer <- Contract.fromJson(walletCodegen.DeliveryOffer.INTERFACE)(
+          response.deliveryOffer
+        )
+      } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)).leftMap(_.toString)
+    }
+  }
+
   final case class SubscriptionContext(
       description: String
   )
@@ -307,9 +334,7 @@ object HttpWalletAppClient {
   case object ListAppPaymentRequests
       extends BaseCommand[
         http.ListAppPaymentRequestsResponse,
-        Seq[
-          Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
-        ],
+        Seq[AppPaymentRequest],
       ] {
     def submitRequest(
         client: Client,
@@ -321,14 +346,11 @@ object HttpWalletAppClient {
         response: http.ListAppPaymentRequestsResponse
     )(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[
-      Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
-    ]] = {
+    ): Either[String, Seq[AppPaymentRequest]] = {
       response match {
         case http.ListAppPaymentRequestsResponse.OK(response) =>
           response.paymentRequests
-            .traverse(req => Contract.fromJson(walletCodegen.AppPaymentRequest.COMPANION)(req))
-            .leftMap(_.toString)
+            .traverse(req => AppPaymentRequest.parseHttp(req))
         case http.ListAppPaymentRequestsResponse.NotFound(ErrorResponse(error)) =>
           Left(error)
         case http.ListAppPaymentRequestsResponse.InternalServerError(ErrorResponse(errorMsg)) =>
@@ -339,10 +361,7 @@ object HttpWalletAppClient {
 
   case class GetAppPaymentRequest(
       contractId: walletCodegen.AppPaymentRequest.ContractId
-  ) extends BaseCommand[
-        http.GetAppPaymentRequestResponse,
-        Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest],
-      ] {
+  ) extends BaseCommand[http.GetAppPaymentRequestResponse, AppPaymentRequest] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -353,13 +372,10 @@ object HttpWalletAppClient {
         response: http.GetAppPaymentRequestResponse
     )(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Contract[
-      walletCodegen.AppPaymentRequest.ContractId,
-      walletCodegen.AppPaymentRequest,
-    ]] = {
+    ): Either[String, AppPaymentRequest] = {
       response match {
-        case GetAppPaymentRequestResponse.OK(value) =>
-          Contract.fromJson(walletCodegen.AppPaymentRequest.COMPANION)(value).leftMap(_.toString)
+        case GetAppPaymentRequestResponse.OK(response) =>
+          AppPaymentRequest.parseHttp(response)
         case GetAppPaymentRequestResponse.NotFound(ErrorResponse(error)) => Left(error)
         case GetAppPaymentRequestResponse.InternalServerError(ErrorResponse(error)) => Left(error)
       }

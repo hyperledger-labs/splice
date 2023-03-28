@@ -11,7 +11,7 @@ import {
   WalletApi,
 } from 'wallet-openapi';
 
-import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
   Subscription,
   SubscriptionContext,
@@ -25,7 +25,6 @@ import {
   Automation,
   BalanceChange,
   ListAcceptedTransferOffersResponse,
-  ListAppPaymentRequestsResponse,
   ListResponse,
   ListSubscriptionRequestsResponse,
   ListSubscriptionsResponse,
@@ -34,6 +33,7 @@ import {
   Transfer,
   WalletBalance,
   SubscriptionRequestWithContext,
+  AppPaymentRequest,
 } from '../models/models';
 import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
@@ -61,8 +61,7 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
-  getAppPaymentRequest: (contractId: string) => Promise<Contract<AppPaymentRequest>>;
-  listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
+  getAppPaymentRequest: (contractId: string) => Promise<AppPaymentRequest>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
@@ -201,16 +200,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         };
       },
       getAppPaymentRequest: async contractId => {
-        const contract = await walletClient.getAppPaymentRequest(contractId);
-        return Contract.decodeOpenAPI(contract, AppPaymentRequest);
-      },
-      listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
-        const res = await walletClient.listAppPaymentRequests();
-        return {
-          paymentRequestsList: res.paymentRequests.map(c =>
-            Contract.decodeOpenAPI(c, AppPaymentRequest)
-          ),
-        };
+        const response = await walletClient.getAppPaymentRequest(contractId);
+        const appPaymentRequest = Contract.decodeOpenAPI(
+          response.appPaymentRequest,
+          payment.AppPaymentRequest
+        );
+        const deliveryOffer = Contract.decodeOpenAPI(response.deliveryOffer, payment.DeliveryOffer);
+        return { appPaymentRequest, deliveryOffer };
       },
       acceptAppPaymentRequest: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(requestContractId);

@@ -33,8 +33,8 @@ class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with
 
     val cid = eventually() {
       inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
-        r.payload shouldBe reqC
-        r.contractId
+        r.appPaymentRequest.payload shouldBe reqC
+        r.appPaymentRequest.contractId
       }
     }
 

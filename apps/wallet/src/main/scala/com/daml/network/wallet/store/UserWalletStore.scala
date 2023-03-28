@@ -23,11 +23,12 @@ import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory}
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
+  AppPaymentRequest,
+  Subscription,
   SubscriptionIdleState,
   SubscriptionPaymentState,
   SubscriptionRequest,
   SubscriptionState,
-  Subscription,
 }
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
@@ -85,6 +86,34 @@ trait UserWalletStore
     listExpiredFromPayloadExpiry(defaultAcs, transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
       _.expiresAt
     )
+
+  def listAppPaymentRequests: Future[Seq[AppPaymentRequest]] = {
+    for {
+      acs <- defaultAcs
+      contracts <- acs.listContracts(walletCodegen.AppPaymentRequest.COMPANION)
+      // there's a 1-1 mapping AppPaymentRequest-DeliveryOffer, so all should be included
+      // This is racy: you can miss delivery offers if their state change concurrently.
+      // This is okay since it'll just refresh in the UI.
+      deliveryOffer <- acs.listContractsI(walletCodegen.DeliveryOffer.INTERFACE)(_ => true)
+    } yield {
+      val deliveryOfferMap = deliveryOffer.map(offer => offer.contractId -> offer).toMap
+      contracts.map { c =>
+        AppPaymentRequest(c, deliveryOfferMap(c.payload.deliveryOffer))
+      }
+    }
+  }
+
+  def getAppPaymentRequest(
+      cid: walletCodegen.AppPaymentRequest.ContractId
+  ): Future[AppPaymentRequest] = {
+    for {
+      acs <- defaultAcs
+      appPaymentRequest <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
+      deliveryOffer <- acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
+        appPaymentRequest.payload.deliveryOffer
+      )
+    } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)
+  }
 
   def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,
@@ -325,6 +354,17 @@ object UserWalletStore {
         subsCodegen.SubscriptionRequest,
       ],
       context: SubscriptionContextContract,
+  )
+
+  final case class AppPaymentRequest(
+      appPaymentRequest: Contract[
+        walletCodegen.AppPaymentRequest.ContractId,
+        walletCodegen.AppPaymentRequest,
+      ],
+      deliveryOffer: Contract[
+        walletCodegen.DeliveryOffer.ContractId,
+        walletCodegen.DeliveryOfferView,
+      ],
   )
 
   type TxLogIndexRecord = UserWalletTxLogParser.TxLogIndexRecord

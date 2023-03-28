@@ -37,6 +37,8 @@ class WalletNewPaymentFrontendIntegrationTest
         val charlieEntryName = perTestCaseName("charlie.cns")
         createDirectoryEntry(charlieUserParty, charlieDirectory, charlieEntryName, charlieWallet)
 
+        val description = "this will be accepted (in CC)"
+
         val (_, paymentRequestContractId, _) = createPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
@@ -44,6 +46,7 @@ class WalletNewPaymentFrontendIntegrationTest
           Seq(
             receiverAmount(charlieUserParty, BigDecimal("1.5"), paymentCodegen.Currency.CC)
           ),
+          description = description,
         )
 
         withFrontEnd("alice") { implicit webDriver =>
@@ -63,6 +66,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "1.5",
                 expectedComputeText = "1.5 CC + 0 CC fee / 3 USD",
+                expectedDescription = description,
               )
             },
           )
@@ -96,6 +100,8 @@ class WalletNewPaymentFrontendIntegrationTest
         val charlieEntryName = perTestCaseName("charlie.cns")
         createDirectoryEntry(charlieUserParty, charlieDirectory, charlieEntryName, charlieWallet)
 
+        val description = "this will be accepted (in USD)"
+
         val (_, paymentRequestContractId, _) = createPaymentRequest(
           aliceWalletBackend.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
@@ -103,6 +109,7 @@ class WalletNewPaymentFrontendIntegrationTest
           Seq(
             receiverAmount(charlieUserParty, BigDecimal("5.5"), paymentCodegen.Currency.USD)
           ),
+          description = description,
         )
 
         withFrontEnd("alice") { implicit webDriver =>
@@ -122,6 +129,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "2.75",
                 expectedComputeText = "2.75 CC + 0 CC fee / 5.5 USD",
+                expectedDescription = description,
               )
             },
           )
@@ -156,7 +164,7 @@ class WalletNewPaymentFrontendIntegrationTest
       expectedProvider: String,
       expectedTotalCC: String,
       expectedComputeText: String,
-      expectedDescription: String = "Payment Desc.", // TODO: (#3483) check the description
+      expectedDescription: String,
   ) = {
     element.childElement(className("available-balance")).text should matchText(expectedBalance)
 

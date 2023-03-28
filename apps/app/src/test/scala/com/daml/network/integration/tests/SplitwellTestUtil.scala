@@ -80,7 +80,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
     )
     eventually()(senderWallet.listAppPaymentRequests() should not be empty)
     inside(senderWallet.listAppPaymentRequests()) { case Seq(request) =>
-      senderWallet.acceptAppPaymentRequest(request.contractId)
+      senderWallet.acceptAppPaymentRequest(request.appPaymentRequest.contractId)
     }
 
   }

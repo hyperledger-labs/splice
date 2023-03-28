@@ -111,7 +111,7 @@ class SplitwellIntegrationTest
 
       actAndCheck(
         "alice initiates payment accept request on global domain",
-        aliceWallet.acceptAppPaymentRequest(paymentRequest.contractId),
+        aliceWallet.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
       )(
         "alice sees balance update on splitwell domain",
         _ =>
