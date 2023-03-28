@@ -712,6 +712,50 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  download_gcloud_logs:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Download gcloud logs
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            # download various interesting logs since "20 minutes ago"
+            duration=1200
+            now=$(date -u +%s)
+            before=$(date -u -d @$((now-duration)) +"%Y-%m-%dT%H:%M:%S")
+            query="timestamp>=\"$before\""
+            apps=(
+              "sv-1 sv-app"
+              "sv-2 sv-app"
+              "sv-3 sv-app"
+              "sv-4 sv-app"
+              "svc directory-app"
+              "svc global-domain"
+              "svc participant"
+              "svc scan-app"
+              "svc svc-app"
+              "validator1 participant"
+              "validator1 validator-app"
+              "validator1 wallet-app"
+              "splitwell domain"
+              "splitwell participant"
+              "splitwell splitwell-app"
+              "splitwell validator-app"
+              "splitwell wallet-app"
+            )
+            for app in "${apps[@]}"
+            do
+              echo "Downloading logs for $app '$query'"
+              cncluster gcloud_logs --download-only $app "$query"
+            done
+            mv *.clog $REPO_ROOT/log/
+            # never fail so we don't unnecessarily annoy ourselves with CI failures
+            true
+
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
     parameters:
@@ -955,6 +999,8 @@ jobs:
           extra_env_vars: DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "10m"
+      - download_gcloud_logs:
+          cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
