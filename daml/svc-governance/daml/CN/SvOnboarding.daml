@@ -39,7 +39,16 @@ template SvConfirmed with
     svParty : Party
     svName : Text
     reason : Text
-    svc : Party
+    svc : Party 
+    expiresAt : Time            -- ^ When this contract can be archived.
   where
     signatory svc
     observer svParty
+
+    -- Archive if we are past the `expiresAt`.
+    choice SvConfirmed_Expire : ()
+      controller svc
+      do
+        now <- getTime
+        require "SV candidate confirmation has expired" (now >= expiresAt)
+        pure ()

@@ -133,6 +133,7 @@ template AgreedCoinPrice
 data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
     svOnboardingTimeout : RelTime -- ^ The time after contracts representing an incomplete onboarding are archived.
+    svConfirmedTimeout : RelTime -- ^ The time after contracts representing a SV confirmation are archived.
   deriving (Eq, Show)
 
 -- SV Collective rules
@@ -352,13 +353,23 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
+        require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svConfirmedTimeout
         create SvConfirmed with
           svParty = newMemberParty
           svName = newMemberName
           reason
           svc
+          expiresAt
 
+    nonconsuming choice SvcRules_ExpireSvConfirmed : ()
+      with
+        cid: ContractId SvConfirmed
+      controller leader
+      do
+        exercise cid SvConfirmed_Expire
+          
     -- Coin management driven directly by the leader
     --------------------------------------------------
 

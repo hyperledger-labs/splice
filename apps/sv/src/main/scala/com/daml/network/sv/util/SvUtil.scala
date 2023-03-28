@@ -18,6 +18,7 @@ object SvUtil {
   def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
     10, // numUnclaimedRewardsThreshold
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(24)), // svConfirmedTimeout
   )
 
   def keyPairMatches(

@@ -185,10 +185,11 @@ testSvOnboarding = do
   -- svX is now a confirmed SV
   [(svConfirmedCid, svConfirmed)] <- query @SvConfirmed svc
   svConfirmed === SvConfirmed with
-    svc
     svParty = svX
     svName = "svX"
     reason = "because"
+    svc
+    expiresAt = svConfirmed.expiresAt
 
 
   [(svcRulesCid, _)] <- query @SvcRules svc
@@ -230,6 +231,40 @@ testSvOnboardingExpiry = do
     SvcRules_ExpireSvOnboarding svOnboardingCid
 
 
+testSvConfirmedExpiry : Script ()
+testSvConfirmedExpiry = do
+  (app, svc, (_, sv2, sv3, sv4)) <- initCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSv $ SvcRules_ConfirmSv with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+  executeAllConfirmedActions app
+
+  [(svConfirmedCid, _)] <- query @SvConfirmed svc
+
+  -- leader tries to expire the confirmation but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvConfirmed svConfirmedCid
+
+  -- wait for the confirmation to expire
+  passTime (hours 25)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvConfirmed svConfirmedCid
+
+
 testSvNameUniqueness : Script ()
 testSvNameUniqueness = do
   (_, svc, (sv1, _, _, _)) <- initCollective
@@ -253,7 +288,7 @@ initCollective = do
   -- TODO(M3-46): make this a real collective party
   svc <- allocateParty "svc"
 
-  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5, svOnboardingTimeout = hours 24
+  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5, svOnboardingTimeout = hours 24, svConfirmedTimeout = hours 24
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
 
   -- have mallory bootstrap the collective
