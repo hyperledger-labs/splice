@@ -3,8 +3,11 @@ module CN.Wallet.Install where
 import DA.Exception
 
 import qualified CC.API.V1.Coin as API
+
+import qualified CC.API.V1.ValidatorTraffic as API
+
 import CC.Round (OpenMiningRound)
-import CC.Coin (CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..))
+import CC.Coin (CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -32,6 +35,9 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
+    CO_BuyExtraTraffic extraAmount trafficCid -> do
+      resultE <- catchAll $ exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraAmount)
+      handleResult COO_BuyExtraTraffic resultE 
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
         result <- catchAll (API.exercisePaymentTransfer context transfer)
@@ -90,6 +96,9 @@ data CoinOperation
   -- This CO is periodically sent by the wallet to automatically collect outstanding rewards and
   -- merge coin contracts
   | CO_MergeTransferInputs
+  | CO_BuyExtraTraffic with
+      extraTrafficAmount: Decimal
+      validatorTraffic : ContractId API.ValidatorTraffic
   | CO_Tap with
       tapAmount: Decimal
 
@@ -102,10 +111,11 @@ data CoinOperationOutcome
   | COO_CompleteAcceptedTransfer API.TransferResult
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
-  | COO_Tap (ContractId API.Coin)
   -- Using `Optional` here as the wallet reuses that type for returning a result,
   -- and needs to communicate to the caller whether a merge happend.
   | COO_MergeTransferInputs (Optional (ContractId API.Coin))
+  | COO_BuyExtraTraffic (ContractId API.ValidatorTraffic)
+  | COO_Tap (ContractId API.Coin)
   | COO_Error InvalidTransferReason
   deriving (Eq, Show)
 

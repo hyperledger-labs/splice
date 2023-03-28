@@ -28,6 +28,7 @@ import CC.Util
 
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
+import qualified CC.API.V1.ValidatorTraffic as API
 
 import CN.Util.Assert
 
@@ -253,6 +254,44 @@ template CoinRules
         requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
         executeTransfer coinRulesCid context svc transfer
 
+    -- TODO(#3742): Also declare this method in the CoinRules interface 
+    nonconsuming choice CoinRules_BuyExtraTraffic
+      : (ContractId API.ValidatorTraffic, Optional (ContractId API.Coin))
+      with
+        inputs : [API.TransferInput]
+        context : API.PaymentTransferContext
+        validator: Party
+        trafficCid: ContractId API.ValidatorTraffic
+        extraTraffic : Decimal
+      controller validator
+      do 
+        traffic <- fetch trafficCid
+        require "validator party and ValidatorTraffic match" (validator == traffic.validator)
+        require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
+        require "extraTraffic is positive" (extraTraffic > 0.0)
+        let transfer = API.Transfer with
+              sender = validator
+              -- TODO(#3499): make this a parameter so callers can decide who should get the rewards
+              provider = svc
+              inputs 
+              outputs = [ API.TransferOutput with 
+                            receiver = svc
+                            amount = extraTraffic
+                            receiverFeeRatio = 0.0
+                            lock = None
+                        ]
+        result <- API.exercisePaymentTransfer context transfer
+        let [API.TransferResultCoin coin] = result.createdCoins
+        -- burn the coin created for the SVC
+        _ <- archive coin
+        -- .. and add new traffic to the validator's balance
+        archive trafficCid
+        newTraffic <- create API.ValidatorTraffic with
+              amount = traffic.amount + extraTraffic
+              ..
+        return (newTraffic, result.senderChangeCoin)
+    
+    
     -- A choice for the SVC to mint coin for the cases where the
     -- collective rules allow for that; e.g., when redeeming SVC rewards.
     nonconsuming choice CoinRules_Mint: ContractId Coin

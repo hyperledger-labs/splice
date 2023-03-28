@@ -3,11 +3,11 @@ package com.daml.network.validator.util
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.CNNodeUtil
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*

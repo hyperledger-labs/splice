@@ -1,7 +1,10 @@
 package com.daml.network.validator.store
 
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
+import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  validatorlicense as validatorLicenseCodegen,
+}
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.AcsStore.QueryResult
@@ -72,6 +75,15 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
+  def lookupValidatorTraffic: Future[
+    QueryResult[
+      Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
+    ]
+  ] =
+    defaultAcs.flatMap(
+      _.findContractWithOffset(ValidatorTraffic.COMPANION)(_ => true)
+    )
+
   def listUsers(): Future[Seq[String]] = {
     for {
       acs <- defaultAcs
@@ -130,6 +142,10 @@ object ValidatorStore {
           co.payload.validator == validator && co.payload.svc == svc
         ),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
+          co.payload.validator == validator &&
+            co.payload.svc == svc
+        ),
+        mkFilter(ValidatorTraffic.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
         ),

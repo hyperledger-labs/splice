@@ -90,7 +90,9 @@ lazy val `canton-coin-api-daml` =
     .in(file("daml/canton-coin-api"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value,
     )
 
 lazy val `canton-coin-daml` =

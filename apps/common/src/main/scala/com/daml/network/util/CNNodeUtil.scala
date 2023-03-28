@@ -8,8 +8,8 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
+import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}

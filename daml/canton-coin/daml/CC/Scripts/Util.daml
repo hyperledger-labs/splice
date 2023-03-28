@@ -71,12 +71,20 @@ setupApp = do
 
 setupValidator : CCApp -> Text -> Script Party
 setupValidator app name = do
+  validatorCcUser <- setupValidator' app name
+  return validatorCcUser.primaryParty
+
+setupValidator' : CCApp -> Text -> Script CCUser
+setupValidator' app name = do
   validatorParty <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
   tap app (CCUser userId validatorParty) 1.0
-  return validatorParty
+  let validatorUser = CCUser with 
+        primaryParty = validatorParty
+        userId = userId
+  return validatorUser
 
 data CCUser = CCUser
   with

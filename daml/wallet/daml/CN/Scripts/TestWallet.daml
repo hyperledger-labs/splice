@@ -6,6 +6,7 @@ import Daml.Script
 import DA.List
 
 import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.ValidatorTraffic as API
 import CC.API.V1.Round (Round(..))
 import CC.Coin
 import CC.CoinConfig hiding (CC, USD)
@@ -544,6 +545,39 @@ testCO_MergeTransferInputs = script do
   let [_, (mergedCoinCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceCoins
   resultCoin === (toInterfaceContractId @API.Coin mergedCoinCid)
 
+  pure ()
+
+
+-- Test to sanity check that buying extra traffic works 
+testBuyExtraTraffic : Script ()
+testBuyExtraTraffic = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
+  validator <- setupValidator' app "validator1"
+  coin <- tap app validator 42.0
+  install <- submit validator.primaryParty $ createCmd $ WalletAppInstall with
+    -- for simplicity, alice is service and end-user
+    walletServiceParty = validator.primaryParty
+    endUserParty = validator.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = validator.primaryParty
+  let initialTraffic = API.ValidatorTraffic with
+            amount = 0.0
+            svc = app.svc
+            validator = validator.primaryParty
+  traffic <- submit app.svc $ createCmd initialTraffic
+  context <- getPaymentTransferContext app validator
+  outcomes <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    operations = [(CO_BuyExtraTraffic 10.0 traffic)]
+    context
+
+  let [COO_BuyExtraTraffic updatedTrafficCid] = outcomes
+  [(updatedTraffic2Cid, udpatedTraffic)] <- query @API.ValidatorTraffic validator.primaryParty
+  updatedTrafficCid === updatedTraffic2Cid
+  udpatedTraffic.amount === 10.0
   pure ()
 
 testInsufficientFundsBatchSubscriptions : Script ()
