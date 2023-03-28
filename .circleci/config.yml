@@ -468,7 +468,8 @@ commands:
           when: always
           command: |
             if [[ -d log ]]; then
-              pigz -r log/*
+              # pigz fails if there is no file to compress, which can be the case if Canton just rolled its logs
+              pigz -r log/* || true
             fi
       - store_artifacts:
           name: Store test logs as artifacts (if any)
@@ -954,10 +955,10 @@ jobs:
           extra_env_vars: DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "10m"
+      - cleanup_sbt_test_job
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
-      - cleanup_sbt_test_job
 
   update_pipeline_schedule:
     docker:
