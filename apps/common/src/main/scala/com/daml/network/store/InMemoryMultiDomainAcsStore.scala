@@ -11,8 +11,10 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
@@ -27,6 +29,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: AcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
+    futureSupervisor: FutureSupervisor,
+    retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
 ) extends MultiDomainAcsStore
@@ -54,6 +58,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       bootstrapTransferOutIds = Set.empty,
       archivedTombstones = Set.empty,
       offsetChanged = Promise(),
+      offsetIngestionsToSignal = Map.empty,
       txLog = Queue.empty,
     )
 
@@ -101,10 +106,11 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       updateState(
         _.switchToIngestingUpdates(domain, offset)
       ).map {
-        case offsetChanged => {
+        case (offsetChanged, offsetIngestionsToSignal) => {
           logger.debug(
             show"Ingested complete ACS and in-flight transfers for domain $domain at offset ${offset}"
           )
+          offsetIngestionsToSignal.foreach(_.success(()))
           offsetChanged.success(())
         }
       }
@@ -117,15 +123,17 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         case TransactionTreeUpdate(tree) =>
           updateState(
             _.ingestTransaction(domain, tree, contractFilter.contains, txLogParser)
-          ).map { case (summary, offsetChanged) =>
+          ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transaction $summary")
+            offsetIngestionsToSignal.foreach(_.success(()))
             offsetChanged.success(())
           }
         case TransferUpdate(transfer) =>
           updateState(
             _.ingestTransfer(domain, transfer, contractFilter.contains)
-          ).map { case (summary, offsetChanged) =>
+          ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transfer $summary")
+            offsetIngestionsToSignal.foreach(_.success(()))
             offsetChanged.success(())
           }
       }
@@ -370,6 +378,44 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   ): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.view.map(_.payload).filter(filter).toSeq)
 
+  override def signalWhenIngestedOrShutdown(domainId: DomainId, offset: String)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    signalWhenIngestedOrShutdown(domainId, InMemoryMultiDomainAcsStore.OffsetSignal.Offset(offset))
+
+  def signalWhenAcsCompletedOrShutdown(domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    signalWhenIngestedOrShutdown(domainId, InMemoryMultiDomainAcsStore.OffsetSignal.Acs)
+
+  private def signalWhenIngestedOrShutdown(
+      domainId: DomainId,
+      offset: InMemoryMultiDomainAcsStore.OffsetSignal,
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    updateState[Future[Unit]](state =>
+      if (
+        state.offsets
+          .get(domainId)
+          .exists(actualOffset =>
+            InMemoryMultiDomainAcsStore.OffsetSignal.Offset(actualOffset) >= offset
+          )
+      ) {
+        (state, Future.unit)
+      } else {
+        val (newState, offsetIngested) = state.addOffsetToSignal(domainId, offset)
+        val name = s"signalWhenIngested($offset)"
+        val ingestedOrShutdown = retryProvider
+          .waitUnlessShutdown(offsetIngested)
+          .onShutdown(
+            logger.debug(s"Aborted $name, as we are shutting down")
+          )
+        val supervisedFuture = futureSupervisor.supervised(name)(ingestedOrShutdown)
+        (newState, supervisedFuture)
+      }
+    ).flatten
+
   /** Testing APIs
     */
 
@@ -388,6 +434,21 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 object InMemoryMultiDomainAcsStore {
 
   import MultiDomainAcsStore.{ContractState, TransferId}
+
+  private sealed abstract class OffsetSignal extends Ordered[OffsetSignal] {
+    override def compare(that: OffsetSignal) =
+      (this, that) match {
+        case (OffsetSignal.Acs, OffsetSignal.Acs) => 0
+        case (OffsetSignal.Acs, OffsetSignal.Offset(_)) => -1
+        case (OffsetSignal.Offset(_), OffsetSignal.Acs) => 1
+        case (OffsetSignal.Offset(thisO), OffsetSignal.Offset(thatO)) => thisO.compare(thatO)
+      }
+  }
+
+  private object OffsetSignal {
+    final case object Acs extends OffsetSignal
+    final case class Offset(offset: String) extends OffsetSignal
+  }
 
   private case class ContractLocation(
       contractId: ContractId[_],
@@ -504,8 +565,31 @@ object InMemoryMultiDomainAcsStore {
       // for the contract.
       archivedTombstones: Set[ContractId[_]],
       offsetChanged: Promise[Unit],
+      offsetIngestionsToSignal: Map[DomainId, SortedMap[OffsetSignal, Promise[Unit]]],
       txLog: Queue[IndexRecordWithDomain[TXI]],
   ) {
+
+    private def removeOffsetSignalsBefore(
+        domainId: DomainId,
+        offset: OffsetSignal,
+    ): (State[TXI, TXE], Map[OffsetSignal, Promise[Unit]]) = {
+      // because we use a SortedMap, we can use takeWhile.
+      val offsetsToRemove = offsetIngestionsToSignal
+        .getOrElse(domainId, SortedMap.empty[OffsetSignal, Promise[Unit]])
+        .takeWhile(_._1 <= offset)
+      (
+        copy(
+          offsetIngestionsToSignal = offsetIngestionsToSignal.updatedWith(domainId)(prev =>
+            Some(
+              prev
+                .getOrElse(SortedMap.empty[OffsetSignal, Promise[Unit]])
+                .removedAll(offsetsToRemove.keys)
+            )
+          )
+        ),
+        offsetsToRemove,
+      )
+    }
 
     def lookupContractState(cid: ContractId[_]): Option[ContractState] =
       contractStateEventsById.get(cid).map { eventNum =>
@@ -545,14 +629,15 @@ object InMemoryMultiDomainAcsStore {
     def switchToIngestingUpdates(
         domain: DomainId,
         offset: String,
-    ): (State[TXI, TXE], Promise[Unit]) = {
+    ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
+      val (newSt, offsetsToRemove) = removeOffsetSignalsBefore(domain, OffsetSignal.Offset(offset))
       (
-        copy(
+        newSt.copy(
           offsets = offsets + (domain -> offset),
           offsetChanged = Promise(),
         ),
-        offsetChanged,
+        (offsetChanged, offsetsToRemove.values),
       )
     }
 
@@ -564,7 +649,7 @@ object InMemoryMultiDomainAcsStore {
         txLogParser: TxLogStore.Parser[TXI, TXE],
     )(implicit
         traceContext: TraceContext
-    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit])) = {
+    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offsets.contains(domain), "state was switched to update ingestion")
 
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -638,15 +723,18 @@ object InMemoryMultiDomainAcsStore {
         ingestedTxLogEntries = ingestedTxLogEntries,
       )
 
+      val (stNewWithoutOffsets, offsetsToRemove) =
+        stNew.removeOffsetSignalsBefore(domain, OffsetSignal.Offset(newOffset))
+
       (
-        stNew.copy(
+        stNewWithoutOffsets.copy(
           offsets = offsets + (domain -> newOffset),
           offsetChanged = Promise(),
           txLog = stNew.txLog.appendedAll(
             ingestedTxLogEntries.map(entry => IndexRecordWithDomain(domain, entry.indexRecord))
           ),
         ),
-        (summary, offsetChanged),
+        (summary, offsetChanged, offsetsToRemove.values),
       )
     }
 
@@ -654,12 +742,14 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         transfer: Transfer[TransferEvent],
         p: CreatedEvent => Boolean,
-    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit])) = {
+    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offsets.contains(domain), "state was switched to update ingestion")
       val (newSt, summary) = ingestTransferEvent(transfer.event, p)
       val newOffset = transfer.offset.getOffset
+      val (newStWithoutOffsets, offsetsToRemove) =
+        newSt.removeOffsetSignalsBefore(domain, OffsetSignal.Offset(newOffset))
       (
-        newSt.copy(
+        newStWithoutOffsets.copy(
           offsets = offsets + (domain -> newOffset),
           offsetChanged = Promise(),
         ),
@@ -670,6 +760,7 @@ object InMemoryMultiDomainAcsStore {
             newAcsSize = newSt.createEvents.size,
           ),
           newSt.offsetChanged,
+          offsetsToRemove.values,
         ),
       )
     }
@@ -1077,6 +1168,27 @@ object InMemoryMultiDomainAcsStore {
             summary,
           )
         }
+      }
+    }
+
+    /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
+      * offset has already been requested, don't change the state.
+      */
+    def addOffsetToSignal(
+        domainId: DomainId,
+        offset: OffsetSignal,
+    ): (State[TXI, TXE], Future[Unit]) = {
+      val perDomainOffsets =
+        offsetIngestionsToSignal.getOrElse(domainId, SortedMap.empty[OffsetSignal, Promise[Unit]])
+      perDomainOffsets.get(offset) match {
+        case None =>
+          val p = Promise[Unit]()
+          val newSt: State[TXI, TXE] = copy(
+            offsetIngestionsToSignal =
+              offsetIngestionsToSignal + (domainId -> (perDomainOffsets + (offset -> p)))
+          )
+          (newSt, p.future)
+        case Some(existingP) => (this, existingP.future)
       }
     }
   }

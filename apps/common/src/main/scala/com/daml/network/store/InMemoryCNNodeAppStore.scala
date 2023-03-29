@@ -22,7 +22,13 @@ abstract class InMemoryCNNodeAppStore[
   private[network] override type PerDomainStore = InMemoryCNNodeAppStore.PerDomainStore[TXI, TXE]
 
   val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
-    new InMemoryMultiDomainAcsStore(loggerFactory, acsContractFilter, txLogParser)
+    new InMemoryMultiDomainAcsStore(
+      loggerFactory,
+      acsContractFilter,
+      txLogParser,
+      futureSupervisor,
+      retryProvider,
+    )
 
   override def txLog = multiDomainAcsStore
 

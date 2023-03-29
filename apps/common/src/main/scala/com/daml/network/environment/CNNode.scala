@@ -3,7 +3,7 @@ package com.daml.network.environment
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.store.DomainStore
+import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directive0
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -137,6 +137,16 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     store.signalWhenConnected(domain).map { r =>
       logger.info(show"Connection to domain $domain has been established")
       r
+    }
+  }
+
+  protected def waitForAcsIngestion(
+      store: MultiDomainAcsStore,
+      domain: DomainId,
+  ): Future[Unit] = {
+    logger.info(show"Waiting for ACS ingestion of domain $domain")
+    store.signalWhenAcsCompletedOrShutdown(domain).map { _ =>
+      logger.info(show"ACS ingestion for domain $domain has been completed")
     }
   }
 

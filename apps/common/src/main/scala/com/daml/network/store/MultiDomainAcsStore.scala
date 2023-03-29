@@ -102,6 +102,20 @@ trait MultiDomainAcsStore extends AutoCloseable {
     */
   def isReadyForTransferIn(out: TransferId): Future[Boolean]
 
+  /** Signal when the store has finished ingesting ledger data from the given offset for the given domain
+    * or a larger one or node-level shutdown was initiated
+    */
+  def signalWhenIngestedOrShutdown(domainId: DomainId, offset: String)(implicit
+      tc: TraceContext
+  ): Future[Unit]
+
+  /** Signal when the store has finished ingesting ledger data for the ACS of the given domain
+    * or node-level shutdown was initiated
+    */
+  def signalWhenAcsCompletedOrShutdown(domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Unit]
+
   def ingestionSink: MultiDomainAcsStore.IngestionSink
 }
 

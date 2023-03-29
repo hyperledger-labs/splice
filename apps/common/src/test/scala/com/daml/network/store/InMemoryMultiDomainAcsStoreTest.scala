@@ -14,12 +14,15 @@ import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
   TransferUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.google.protobuf
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Future
 
 import scala.jdk.CollectionConverters.*
 
@@ -86,6 +89,8 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       loggerFactory,
       txFilter,
       TestTxLogStoreParser,
+      FutureSupervisor.Noop,
+      RetryProvider(loggerFactory, timeouts),
     )(actorSystem.dispatcher)
 
   private def mkCreateTx[TCid <: ContractId[T], T](
@@ -112,17 +117,18 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         },
       )
 
-    def switchToUpdates()(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.switchToIngestingUpdates(domain, nextOffset)
+    def switchToUpdates(offset: String = nextOffset)(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.switchToIngestingUpdates(domain, offset)
 
     def create[TCid <: ContractId[T], T](
-        c: Contract[TCid, T]
+        c: Contract[TCid, T],
+        offset: String = nextOffset,
     )(implicit store: MultiDomainAcsStore) =
       store.ingestionSink.ingestUpdate(
         domain,
         TransactionTreeUpdate(
           mkCreateTx(
-            nextOffset,
+            offset,
             Seq(c),
           )
         ),
@@ -818,6 +824,55 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
           .map(_.getEventId)
           .tail
       }
+    }
+
+    "signals offsets as ingestion progresses" in {
+      implicit val store = mkStore()
+
+      val d1AcsOffset = "010"
+      val d2AcsOffset = "010"
+      val d1Tx1Offset = "012"
+      val d2Tx1Offset = "012"
+
+      val signalD1_ACS = store.signalWhenAcsCompletedOrShutdown(d1)
+
+      val signalD1_010 = store.signalWhenIngestedOrShutdown(d1, "010")
+      val signalD1_011 = store.signalWhenIngestedOrShutdown(d1, "011")
+      val signalD1_012 = store.signalWhenIngestedOrShutdown(d1, "012")
+
+      val signalD2_010 = store.signalWhenIngestedOrShutdown(d2, "010")
+      val signalD2_011 = store.signalWhenIngestedOrShutdown(d2, "011")
+
+      def notCompleted(futures: Future[Unit]*) =
+        forAll(futures)(_.isCompleted shouldBe false)
+
+      notCompleted(
+        signalD1_ACS,
+        signalD1_010,
+        signalD1_011,
+        signalD1_012,
+        signalD2_010,
+        signalD2_011,
+      )
+
+      for {
+        _ <- d1.switchToUpdates(d1AcsOffset)
+        _ <- signalD1_ACS
+        _ <- signalD1_010
+        _ = notCompleted(signalD1_011, signalD1_012, signalD2_010, signalD2_011)
+        _ <- d1.create(c(1), d1Tx1Offset)
+        _ <- signalD1_011
+        _ <- signalD1_012
+        _ = notCompleted(signalD2_010, signalD2_011)
+        _ <- d2.switchToUpdates(d2AcsOffset)
+        _ <- signalD2_010
+        _ = notCompleted(signalD2_011)
+        _ <- d2.create(c(2), d2Tx1Offset)
+        _ <- signalD2_011
+        // We can still register signals for already ingested offsets
+        _ <- store.signalWhenAcsCompletedOrShutdown(d1)
+        _ <- store.signalWhenIngestedOrShutdown(d1, "010")
+      } yield succeed
     }
   }
 }
