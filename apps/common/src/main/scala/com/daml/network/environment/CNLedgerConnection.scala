@@ -96,6 +96,11 @@ class CNLedgerConnection(
     result
   }
 
+  // The participant ledger end as opposed to the per-domain ledger end.
+  // We use this for synchronization in `UpdateIngestionService`.
+  def participantLedgerEnd(): Future[LedgerOffset] =
+    client.participantLedgerEnd()
+
   def ledgerEnd(domain: DomainId): Future[LedgerOffset] =
     client.ledgerEnd(domain)
 
@@ -376,12 +381,14 @@ class CNLedgerConnection(
       endOffset: Option[LedgerOffset],
       party: PartyId,
       domain: DomainId,
+      retryProvider: RetryProvider,
   )(mapOperator: Flow[TreeUpdate, Any, _]): CNLedgerSubscription[?] = {
     new CNLedgerSubscription(
       client.updates(
         LedgerClient.GetUpdatesRequest(beginOffset, endOffset, party, domain)
       ),
       Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
+      retryProvider,
       timeouts,
       baseLoggerFactory.append("subsClient", clientName),
     )
@@ -436,8 +443,17 @@ class CNLedgerConnection(
       endOffset: Option[LedgerOffset] = None,
       filter: PartyId,
       domain: DomainId,
+      retryProvider: RetryProvider,
   )(f: TreeUpdate => Future[Unit]): CNLedgerSubscription[?] =
-    subscription(clientName, baseLoggerFactory, beginOffset, endOffset, filter, domain)({
+    subscription(
+      clientName,
+      baseLoggerFactory,
+      beginOffset,
+      endOffset,
+      filter,
+      domain,
+      retryProvider,
+    )({
       Flow[TreeUpdate].mapAsync(1)(f)
     })
 
@@ -721,6 +737,7 @@ class CNLedgerConnection(
 class CNLedgerSubscription[S](
     source: Source[S, NotUsed],
     mapOperator: Flow[S, ?, ?],
+    retryProvider: RetryProvider,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -730,7 +747,12 @@ class CNLedgerSubscription[S](
   import TraceContext.Implicits.Empty.*
 
   private val (killSwitch, completed_) = AkkaUtil.runSupervised(
-    logger.error("Fatally failed to handle transaction", _),
+    ex =>
+      if (retryProvider.isShuttingDown) {
+        logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)
+      } else {
+        logger.error("Fatally failed to handle transaction", ex)
+      },
     source
       // we place the kill switch before the map operator, such that
       // we can shut down the operator quickly and signal upstream to cancel further sending
@@ -742,6 +764,9 @@ class CNLedgerSubscription[S](
   )
 
   def completed: Future[Done] = completed_
+
+  def initiateShutdown() =
+    killSwitch.shutdown()
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*

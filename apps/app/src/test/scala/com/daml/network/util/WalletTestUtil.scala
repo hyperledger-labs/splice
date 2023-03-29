@@ -14,7 +14,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -110,8 +109,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      // We allow disabling this since nested log suppression doesn't work
-      retryAcceptance: Boolean = true,
   ) = {
     val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
     val transferOfferId =
@@ -127,18 +124,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         offer.contractId shouldBe transferOfferId
       )
     }
-    // TODO (#2728) Remove this hacky retry against contract not found errors.
-    // This is only necessary because the update service does not synchronize properly.
-    if (retryAcceptance)
-      eventually() {
-        loggerFactory.assertThrowsAndLogs[CommandFailure](
-          receiverWallet.acceptTransferOffer(transferOfferId),
-          _.errorMessage should include("CONTRACT_NOT_FOUND"),
-        )
-      }
-    else {
-      receiverWallet.acceptTransferOffer(transferOfferId)
-    }
+    receiverWallet.acceptTransferOffer(transferOfferId)
     // note that something like `receiverWallet.listAcceptedTransferOffers() should have size 1`
     // is potentially racy (possible to circumvent this by being clever, but we chose the simple solution for now)
   }

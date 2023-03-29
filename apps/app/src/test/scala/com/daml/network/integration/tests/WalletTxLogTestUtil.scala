@@ -21,9 +21,12 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
       expected: Seq[CheckTxHistoryFn],
   ): Unit = {
 
-    val actual = wallet.listTransactions(None, pageSize = 100000)
+    val actual = eventually() {
+      val actual = wallet.listTransactions(None, pageSize = 100000)
 
-    actual should have length expected.size.toLong
+      actual should have length expected.size.toLong
+      actual
+    }
 
     actual.zip(expected).zipWithIndex.foreach { case ((entry, pf), i) =>
       clue(s"Entry at position $i") {

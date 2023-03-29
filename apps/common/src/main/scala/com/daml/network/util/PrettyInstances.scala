@@ -159,6 +159,19 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     param("driverMetadata", _.driverMetadata),
     param("contractKeyHash", _.contractKeyHash),
   )
+
+  implicit def prettyJavaLedgerOffset: Pretty[javaapi.data.LedgerOffset] = {
+    case _: javaapi.data.LedgerOffset.LedgerBegin =>
+      Tree.Literal("LedgerOffsetBegin")
+    case _: javaapi.data.LedgerOffset.LedgerEnd =>
+      Tree.Literal("LedgerOffsetEnd")
+    case absolute: javaapi.data.LedgerOffset.Absolute =>
+      prettyNode[javaapi.data.LedgerOffset.Absolute](
+        "LedgerOffsetAbsolute",
+        param("offset", _.getOffset.unquoted),
+      ).treeOf(absolute)
+    case offset => sys.error(s"Invalid java offset: $offset")
+  }
 }
 
 object PrettyInstances extends PrettyInstances {

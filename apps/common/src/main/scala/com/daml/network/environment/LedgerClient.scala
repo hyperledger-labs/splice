@@ -15,6 +15,7 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
+  GetLedgerEndResponse,
   GetUserRequest,
   GrantUserRightsRequest,
   LedgerOffset,
@@ -77,19 +78,20 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     scalapbToJava,
   }
 
-  val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
+  private val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
     withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
-  val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
+  private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
     withCredentials(CommandServiceGrpc.newStub(channel), token)
-  val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
+  private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
     withCredentials(TransactionServiceGrpc.newStub(channel), token)
-  val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
+  private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
     withCredentials(PackageServiceGrpc.newStub(channel), token)
-  val packageManagementServiceStub: PackageManagementServiceGrpc.PackageManagementServiceStub =
+  private val packageManagementServiceStub
+      : PackageManagementServiceGrpc.PackageManagementServiceStub =
     withCredentials(PackageManagementServiceGrpc.newStub(channel), token)
-  val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
+  private val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
-  val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
+  private val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
   private val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
     withCredentials(upsvc.UpdateServiceGrpc.stub(channel), token)
@@ -125,6 +127,13 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     updateServiceStub.getLedgerEnd(req).map { resp =>
       LedgerOffset.fromProto(scalapbToJava(resp.getOffset)(_.companion))
     }
+  }
+
+  def participantLedgerEnd(): Future[LedgerOffset] = {
+    val req = TransactionServiceOuterClass.GetLedgerEndRequest.newBuilder.build
+    wrapFuture(
+      transactionServiceStub.getLedgerEnd(req, _)
+    ).map(GetLedgerEndResponse.fromProto(_).getOffset)
   }
 
   def activeContracts(

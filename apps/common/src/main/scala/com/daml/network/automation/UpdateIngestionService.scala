@@ -2,11 +2,18 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
+import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+  TransactionTreeUpdate,
+  TransferUpdate,
+}
 import com.daml.network.store.MultiDomainAcsStore
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,22 +65,67 @@ class UpdateIngestionService(
       None,
       filter.primaryParty,
       domain,
-    ) { ingestionSink.ingestUpdate(domain, _) }
+      retryProvider,
+    ) { update =>
+      for {
+        _ <- update match {
+          case TransactionTreeUpdate(tree) =>
+            waitForOffset(new LedgerOffset.Absolute(tree.getOffset))
+          case TransferUpdate(_) =>
+            // Transfers don't reliably advance the offset in the participant, so we don't synchronize on those.
+            Future.unit
+        }
+        _ <- ingestionSink.ingestUpdate(domain, update)
+      } yield ()
+    }
 
   private def ingestAcsAndInFlight(
       offset: String
   )(implicit traceContext: TraceContext): Future[Unit] = {
+    val javaOffset = new LedgerOffset.Absolute(offset)
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
-      evs <- connection.activeContracts(domain, filter, Some(new LedgerOffset.Absolute(offset)))
+      evs <- connection.activeContracts(domain, filter, Some(javaOffset))
       tfs <- connection.getInFlightTransfers(
         domain,
         filter.primaryParty,
-        Some(new LedgerOffset.Absolute(offset)),
+        Some(javaOffset),
       )
       _ <- ingestionSink.ingestAcsAndTransferOuts(domain, evs, tfs)
+      _ <- waitForOffset(javaOffset)
       _ <- ingestionSink.switchToIngestingUpdates(domain, offset)
     } yield ()
+  }
+
+  // TODO(#2728) Remove this once the multi-domain APIs are properly
+  // integrated in the ledger API server. In the current state, the
+  // multi-domain APIs can emit an update before the ledger API server
+  // has updated all its caches. That can result in a
+  // CONTRACT_NOT_FOUND error when we try to use that contract in a
+  // submission.  By blocking on the ledger end update we regain that
+  // synchronization at least for transactions.  Transfers don't
+  // update the ledger offset in the ledger API server so for now we
+  // ignore that.  The cases where this would cause issues are
+  // sufficiently rare that this seems acceptable for now.
+  private def waitForOffset(
+      offset: LedgerOffset.Absolute
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    retryProvider.retryForAutomation(
+      show"wait for offset $offset", {
+        connection
+          .participantLedgerEnd()
+          .map {
+            case endAbsolute: LedgerOffset.Absolute if endAbsolute.getOffset >= offset.getOffset =>
+            case endOffset =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  show"Ledger end not yet caught up to $offset, current offset: $endOffset"
+                )
+                .asRuntimeException()
+          }
+      },
+      logger,
+    )
   }
 
   // Kick-off the ingestion

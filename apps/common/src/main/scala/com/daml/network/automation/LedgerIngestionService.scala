@@ -35,14 +35,14 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
 
   retryProvider.runOnShutdown(new RunOnShutdown {
     override def name: String = s"terminate subscription"
-    // this is not perfectly precise, but CNLedgerSubscription.close is idempotent
+    // this is not perfectly precise, but CNLedgerSubscription.initiateShutdown is idempotent
     override def done: Boolean = false
     override def run(): Unit = currentSubscription
       .get()
       .foreach(subscription => {
         logger
           .debug(s"Terminating ledger ingestion loop, as we are shutting down.")(TraceContext.empty)
-        subscription.close()
+        subscription.initiateShutdown()
       })
   })(TraceContext.empty)
 
@@ -55,14 +55,14 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
             "ledger ingestion loop", {
               newLedgerSubscription().flatMap(subscription => {
                 // Smuggle the current subscription out of the body here, so that we can use
-                // runOnShutdown outside to signal the termination via a call to .close().
+                // runOnShutdown outside to signal the termination via a call to .initiateShutdown().
                 currentSubscription.set(Some(subscription))
                 // The creation of the new subscription races with the call to close the content of `currentSubscription`, which is issued
                 // at most once from outside and might end up closing the previous subscription set in a retry loop.
                 // We resolve that race by checking here whether we are closing, and issuing the call ourselves.
                 if (retryProvider.isShuttingDown) {
                   logger.debug("detected shutdown, closing subscription")
-                  subscription.close()
+                  subscription.initiateShutdown()
                 }
                 // The actual return value of the future being retried is the future inside the CNLedgerConnection,
                 // which signals when the subscription terminated.

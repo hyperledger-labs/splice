@@ -56,6 +56,7 @@ class LegacyUpdateIngestionService(
       None,
       acsFilter.primaryParty,
       domain,
+      retryProvider,
     )(acsIngestionSink.ingestUpdate(_))
 
   /** Ingests the ACS at the given offset */

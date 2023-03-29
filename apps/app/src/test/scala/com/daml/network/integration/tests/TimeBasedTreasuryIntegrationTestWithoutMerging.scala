@@ -381,9 +381,6 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
           bobWallet,
           bob,
           1,
-          // In theory we could also run into the sync issues requiring retries here
-          // but the complexity of handling nested log suppression doesn't seem worth it given that this is rare.
-          retryAcceptance = false,
         )
         eventually() {
           bobWallet.balance().unlockedQty should be > BigDecimal(0)
