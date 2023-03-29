@@ -623,21 +623,19 @@ class SvTimeBasedIntegrationTest
   }
 
   "collect expired reward coupons" in { implicit env =>
-    def getNumRewardCoupons(
+    def getRewardCoupons(
         round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
-    ): Int = {
+    ) = {
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
         .filterJava(AppRewardCoupon.COMPANION)(
           svcParty,
           co => co.data.round.number == round.payload.round.number,
-        )
-        .length +
+        ) ++
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(ValidatorRewardCoupon.COMPANION)(
             svcParty,
             co => co.data.round.number == round.payload.round.number,
           )
-          .length
     }
     initSvc()
     Seq(aliceValidator, bobValidator).foreach(_.start())
@@ -647,8 +645,8 @@ class SvTimeBasedIntegrationTest
 
     val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
-    // number of existing ones, and compare to that below
-    val numRewards = getNumRewardCoupons(round)
+    // contract IDs of existing ones, and compare to that below
+    val leftoverRewardIds = getRewardCoupons(round).view.map(_.id).toSet
 
     val (aliceParty, bobParty) = onboardAliceAndBob()
     aliceWallet.tap(100.0)
@@ -665,7 +663,10 @@ class SvTimeBasedIntegrationTest
       "Wait for all reward coupons to be created",
       _ => {
         advanceTimeByPollingInterval(sv1)
-        getNumRewardCoupons(round) should be(numRewards + 8) // 4 app rewards + 4 validator
+        getRewardCoupons(round)
+          .filterNot(c =>
+            leftoverRewardIds(c.id)
+          ) should have length 8 // 4 app rewards + 4 validator
       },
     )
 
@@ -676,7 +677,7 @@ class SvTimeBasedIntegrationTest
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
         advanceTimeByPollingInterval(sv1)
-        getNumRewardCoupons(round) should be(0)
+        getRewardCoupons(round) shouldBe empty
         scan
           .getClosedRounds()
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
