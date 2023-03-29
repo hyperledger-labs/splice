@@ -1,0 +1,66 @@
+module CN.Wallet.V1Test.Scripts.TestWalletUpgrade where
+
+import Daml.Script
+
+import qualified CC.API.V1.Coin as API
+import CN.Wallet.Payment
+import CC.Coin
+import CC.Scripts.Util
+import CN.Scripts.TestWallet
+import CC.V1Test.Scripts.TestCoinRulesUpgrade
+
+-- Tests the wallet working correctly against an upgraded CoinRules contract
+testCCPaymentRequestWithUpgradedCoinRules : Script ()
+testCCPaymentRequestWithUpgradedCoinRules = script do
+
+  (app, oliver, newton, newValidator) <- setupForCoinRulesUpgradeTest
+
+  -- Perform a payment through payment API - no change required despite the new coinRules
+  coin <- tap app newton 27.0
+  (transferRequest, _) <-
+    createPaymentRequest app newton.primaryParty newton.primaryParty [
+      (oliver.primaryParty, PaymentAmount 15.0 CC)]
+  acceptedPaymentCid <- acceptPaymentRequestThroughV1Test app newton newValidator transferRequest coin
+  _ <- collectAcceptedPaymentThroughV1Test app newton acceptedPaymentCid
+
+  checkCoinPositions newton [1.0, 11.7866666667]
+  checkCoinPositions oliver [1.0, 15.0]
+
+  pure ()
+
+-- Versions of acceptPaymentRequest and collectAcceptedPayment, where no only change is that the
+-- coinRules API contractID is fetched through a CoinRulesV1Test.
+
+acceptPaymentRequestThroughV1Test : CCApp -> CCUser -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequestThroughV1Test app sender walletProvider transferRequest coin = do
+  context <- getTransferContext app sender None
+  coinRules <- getCoinRulesV1TestAsAPI app
+  let transferContext = API.PaymentTransferContext with ..
+  -- TODO(#2957): remove read-as SVC.
+  (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    context = transferContext
+    walletProvider
+  return accept
+
+collectAcceptedPaymentThroughV1Test : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPaymentThroughV1Test app provider acceptedAppPayment = do
+  (_, round) <- getLatestOpenRound app
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  openMiningRounds <- getOpenRoundsSorted app
+  openMiningRound <- case find (\(_, payload) -> payload.round == round.round) openMiningRounds of
+        None -> abort ("No open mining round for round " <> show round)
+        Some (cid, _) -> pure (toInterfaceContractId cid )
+  coinRules <- getCoinRulesV1TestAsAPI app
+  let context = API.AppTransferContext with
+        coinRules
+        openMiningRound
+        featuredAppRight = None
+  -- multi party submit to simplify test
+  submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+
+
+getCoinRulesV1TestAsAPI : CCApp -> Script (ContractId API.CoinRules)
+getCoinRulesV1TestAsAPI app = do
+  (newCoinRules, _) <- fetchCoinRulesV1TestByKey app.svc
+  pure $ toInterfaceContractId @API.CoinRules newCoinRules

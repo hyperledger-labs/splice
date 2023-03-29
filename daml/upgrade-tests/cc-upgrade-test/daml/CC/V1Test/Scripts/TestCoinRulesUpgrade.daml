@@ -1,0 +1,215 @@
+module CC.V1Test.Scripts.TestCoinRulesUpgrade where
+
+import Daml.Script
+import DA.Assert
+import DA.List
+import DA.Time
+import DA.Foldable (forA_)
+import qualified CC.API.V1.Coin as API
+import CC.Scripts.Util
+import CC.Scripts.Parameters
+import CC.V1Test.Coin
+import CC.Coin
+import CC.Issuance
+import CC.Round
+
+setupForCoinRulesUpgradeTest: Script (CCApp, CCUser, CCUser, Party)
+setupForCoinRulesUpgradeTest = do
+  app <- setupApp
+
+  advanceToIssuanceWithPrice app 1.0
+  runCoinDepositBots app
+
+  _ <- submit app.svc $ createCmd CoinRulesV1Test with
+      configSchedule = defaultCoinConfigSchedule
+      enabledChoices = API.enableAllChoices
+      isDevNet = True
+      svc = app.svc
+
+  -- Setup two validators - users on one will keep using the "old" CoinRules,
+  -- while users on the other will use CoinRulesV1Test (to simulate their validator software being upgraded)
+  oldValidator <- setupValidator app "oldValidator"
+  newValidator <- setupValidator app "newValidator"
+
+  oliver <- setupUser app "oliver" oldValidator
+  newton <- setupUser app "newton" newValidator
+
+  -- Advance rounds using the new CoinRules
+  advanceToIssuanceWithPriceThroughV1Test app 1.5
+  runCoinDepositBots app
+
+  pure (app, oliver, newton, newValidator)
+
+
+testUpgrade: Script ()
+testUpgrade = do
+
+  (app, oliver, newton, _) <- setupForCoinRulesUpgradeTest
+
+
+  -- Tap some coin through both old and new coinRules, both should succeed
+  oCid <- tap app oliver 100.0
+  Some oCoin <- queryContractId @Coin oliver.primaryParty oCid
+  oCoin.amount.initialAmount === 100.0
+  oCoin.amount.createdAt.number === 5
+  nCid <- tapThroughV1Test app newton 105.0
+  Some nCoin <- queryContractId @Coin newton.primaryParty nCid
+  nCoin.amount.initialAmount === 105.0
+  nCoin.amount.createdAt.number === 5
+
+  context <- getTransferContext app newton None
+  (newCoinRules, _) <- fetchCoinRulesV1TestByKey app.svc
+  let newCoinRulesAPI = toInterfaceContractId @API.CoinRules newCoinRules
+
+  let transferAmount = 10.0
+  -- Transfer using new CoinRules
+  _ <- submitMulti [newton.primaryParty, oliver.primaryParty, newton.primaryParty] [app.svc] $
+      exerciseCmd newCoinRulesAPI API.CoinRules_Transfer with
+          transfer = API.Transfer with
+              sender = newton.primaryParty
+              provider = newton.primaryParty
+              inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[nCid]
+              outputs = [ API.TransferOutput with
+                      receiver = oliver.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = transferAmount
+                      lock = None
+                  ]
+          context = context
+
+  oCoins <- query @Coin oliver.primaryParty
+  sort (map (\(_, c) -> c.amount.initialAmount) oCoins) === [1.0, transferAmount, 100.0]
+  nCoins <- query @Coin newton.primaryParty
+  let [_, change] = sort (map (\(_, c) -> c.amount.initialAmount) nCoins)
+  assertMsg "Change to newton is roughly as expected"
+      (105.0-transferAmount-1.0 < change && change < 105.0-transferAmount)
+
+  runCoinDepositBots app
+
+  oldVerContext <- getPaymentTransferContext app oliver
+  [(oCid, oCoin)] <- query @Coin oliver.primaryParty
+
+  -- Transfer back using old coinRules
+  _ <- submitMulti [newton.primaryParty, oliver.primaryParty, newton.primaryParty] [app.svc] $
+      exerciseCmd oldVerContext.coinRules API.CoinRules_Transfer with
+          transfer = API.Transfer with
+              sender = oliver.primaryParty
+              provider = oliver.primaryParty
+              inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[oCid]
+              outputs = [ API.TransferOutput with
+                      receiver = newton.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = transferAmount
+                      lock = None
+                  ]
+          context = oldVerContext.context
+
+  oCoins <- query @Coin oliver.primaryParty
+  let [change] = sort (map (\(_, c) -> c.amount.initialAmount) oCoins)
+  assertMsg "Change to oliver is roughly as expected"
+      (oCoin.amount.initialAmount-transferAmount-1.0 < change && change < oCoin.amount.initialAmount-transferAmount)
+  nCoins <- query @Coin newton.primaryParty
+  let [received, _] = sort (map (\(_, c) -> c.amount.initialAmount) nCoins)
+  received === transferAmount
+
+
+-- TODO(#3707): everything below is copied from other places, replacing all CoinRules with CoinRulesV1Test.
+-- Consider cleaning this up and reducing code duplication here.
+
+tapThroughV1Test : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
+tapThroughV1Test app user amount = do
+  (openRound, _) <- getLatestOpenRound app
+  submitExerciseCoinRulesV1TestByKey' app user CoinRulesV1Test_DevNet_Tap with
+    receiver = user.primaryParty
+    amount
+    openRound
+
+
+-- Advance issuance such that the next transfers use a round with the given coin-price
+-- using the upgraded V1Test version of CoinRules
+advanceToIssuanceWithPriceThroughV1Test : CCApp -> Decimal -> Script ()
+advanceToIssuanceWithPriceThroughV1Test app coinPrice = do
+  runNextIssuanceThroughV1TestInternal app coinPrice
+  -- the round with the new price only becomes effective after one tick
+  -- we simulate that by runing another issuance, but run the coin deposit bots before
+  -- to collect eventual rewards
+  runCoinDepositBots app
+  runNextIssuanceThroughV1TestInternal app coinPrice
+
+
+runNextIssuanceThroughV1TestInternal : CCApp -> Decimal -> Script ()
+runNextIssuanceThroughV1TestInternal app coinPrice = do
+  now <- getTime
+  setTime (addRelTime now defaultCoinConfig.tickDuration)
+  -- expire rewards for closed rounds
+  closedRounds <- query @ClosedMiningRound app.svc
+  forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
+    -- app rewards
+    rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+    forA_ rewards $ \(rcid, _) ->
+      submit app.svc $ exerciseCmd rcid AppRewardCoupon_SvcExpire with closedRoundCid
+    -- validator rewards
+    rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
+    forA_ rewards $ \(rcid, _) ->
+      submit app.svc $ exerciseCmd rcid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+    -- the closed round
+    submitExerciseCoinRulesV1TestByKey app [app.svc] [] CoinRulesV1Test_MiningRound_Archive with
+      closedRoundCid
+
+
+  -- close issuing rounds that are ready for close
+  imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
+  forA_ imcs $ \(issuingRoundCid, _) ->
+    submitExerciseCoinRulesV1TestByKey app [app.svc] [] CoinRulesV1Test_MiningRound_Close with
+      issuingRoundCid
+
+  -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
+  -- create a new OpenMiningRound
+  [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
+  (closingRoundCid, _) <- submitExerciseCoinRulesV1TestByKey app [app.svc] [] CoinRulesV1Test_AdvanceOpenMiningRounds with
+    coinPrice
+    roundToArchiveCid
+    middleRoundCid = r2Cid
+    latestRoundCid = r3Cid
+
+  -- compute total burn
+  appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+  validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+
+  let summary = OpenMiningRoundSummary with
+        totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+        totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+        totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+
+  -- create issuing mining round
+  submitExerciseCoinRulesV1TestByKey app [app.svc] [] CoinRulesV1Test_MiningRound_StartIssuing with
+    miningRoundCid = closingRoundCid
+    summary
+
+  pure ()
+
+submitExerciseCoinRulesV1TestByKey : Choice CoinRulesV1Test c r => CCApp -> [Party] -> [Party] -> c -> Script r
+submitExerciseCoinRulesV1TestByKey app actors readers arg = do
+  (rules, _) <- fetchCoinRulesV1TestByKey app.svc
+  -- TODO(#2957): remove read-as SVC.
+  let adjustedReaders = (app.svc :: readers)
+  submitMulti actors adjustedReaders $ exerciseCmd rules arg
+
+submitExerciseCoinRulesV1TestByKey' : Choice CoinRulesV1Test c r => CCApp -> CCUser -> c -> Script r
+submitExerciseCoinRulesV1TestByKey' app user arg = do
+  (rules, _) <- fetchCoinRulesV1TestByKey app.svc
+  submitUser user.userId $ exerciseCmd rules arg
+
+fetchCoinRulesV1TestByKey : Party -> Script (ContractId CoinRulesV1Test, CoinRulesV1Test)
+fetchCoinRulesV1TestByKey svc =
+  queryCoinRulesV1TestByKey svc >>= \case
+    None -> abort "No active CoinRules contract"
+    Some rules -> pure rules
+
+queryCoinRulesV1TestByKey : Party -> Script (Optional (ContractId CoinRulesV1Test, CoinRulesV1Test))
+queryCoinRulesV1TestByKey svc = do
+  coinRules <- query @CoinRulesV1Test svc
+  case coinRules of
+    [] -> pure None
+    [coinRules] -> pure (Some coinRules)
+    rules -> abort $ "Expected 0 or 1 CoinRules contracts but got " <> show rules

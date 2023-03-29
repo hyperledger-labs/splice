@@ -53,6 +53,7 @@ lazy val root = (project in file("."))
     `canton-coin-v1test-daml`,
     `wallet-payments-daml`,
     `wallet-daml`,
+    `wallet-v1test-daml`,
     `directory-daml`,
     `splitwell-daml`,
     `svc-governance-daml`,
@@ -108,7 +109,7 @@ lazy val `canton-coin-daml` =
 
 lazy val `canton-coin-v1test-daml` =
   project
-    .in(file("daml/upgrade-tests/canton-coin-upgrade-test"))
+    .in(file("daml/upgrade-tests/cc-upgrade-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -162,6 +163,19 @@ lazy val `wallet-daml` =
       Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
     )
 
+lazy val `wallet-v1test-daml` =
+  project
+    .in(file("daml/upgrade-tests/wallet-upgrade-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`canton-coin-v1test-daml` / Compile / damlBuild).value ++
+          (`canton-coin-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-daml` / Compile / damlBuild).value ++
+          (`wallet-daml` / Compile / damlBuild).value,
+    )
+
 lazy val `directory-daml` =
   project
     .in(file("daml/directory-service"))
@@ -190,6 +204,7 @@ lazy val `apps-common` =
       `canton-coin-v1test-daml`,
       `canton-research-services`,
       `wallet-daml` % "test",
+      `wallet-v1test-daml` % "test",
       `splitwell-daml` % "test",
     )
     .enablePlugins(BuildInfoPlugin)
