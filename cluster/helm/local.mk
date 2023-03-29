@@ -1,9 +1,12 @@
 charts := \
 	cn-cluster-ingress \
+	cn-directory-web-ui \
 	cn-docs \
 	cn-domain \
+	cn-participant \
 	cn-postgres \
-	cn-splitwell \
+	cn-splitwell-app \
+	cn-splitwell-web-ui \
 	cn-sv-node \
 	cn-svc \
 	cn-validator

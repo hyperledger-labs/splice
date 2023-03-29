@@ -43,9 +43,20 @@ export function installSplitwell(
     [domain]
   );
 
+  const splitwellApp = installCNHelmChart(
+    xns,
+    "splitwell-app",
+    "cn-splitwell-app",
+    {
+      postgres: postgresDb,
+    },
+    [participant]
+  );
+
   const dependsOn = [
     xns.ns,
     svc,
+    splitwellApp,
     installAuth0Secret(xns, "splitwell", "splitwell"),
     installAuth0Secret(xns, "validator", "splitwell_validator"),
     installAuth0Secret(xns, "wallet", "splitwell_wallet"),
@@ -55,9 +66,39 @@ export function installSplitwell(
   return installCNHelmChart(
     xns,
     "splitwell",
-    "cn-splitwell",
+    "cn-validator",
     {
-      postgres: postgresDb,
+        postgres: postgresDb,
+        additionalUsers: [
+            {
+                name: "CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
+                valueFrom: {
+                    secretKeyRef: {
+                        key: "ledger-api-user",
+                        name: "cn-app-splitwell-ledger-api-auth",
+                        optional: false
+                    }
+                }
+            },
+            {
+                name: "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
+                valueFrom: {
+                    secretKeyRef: {
+                        key: "ledger-api-user",
+                        name: "cn-app-wallet-ledger-api-auth",
+                        optional: false
+                    }
+                }
+            }
+        ],
+        additionalConfig: [
+            "  canton.validator-apps.validator_backend.app-instances.splitwise = {",
+            "    service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}",
+            "    wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}",
+            "    dars = [\"cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]",
+            "}"
+        ].join("\n"),
+        walletValidatorGrpcPort: 5203
     },
     dependsOn
   );

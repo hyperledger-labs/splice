@@ -6,8 +6,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: docs
-    clusterName: {{ .Values.cluster.name }}
-    moduleName: docs
 spec:
   replicas: 1
   selector:
@@ -19,8 +17,6 @@ spec:
     metadata:
       labels:
         app: docs
-        clusterName: {{ .Values.cluster.name }}
-        moduleName: docs
     spec:
       containers:
         - name: docs
@@ -45,8 +41,6 @@ kind: Service
 metadata:
   name: docs
   namespace: {{ .Release.Namespace }}
-  labels:
-    clusterName: {{ .Values.cluster.name }}
 spec:
   selector:
     app: docs
@@ -67,8 +61,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: gcs-proxy
-    clusterName: {{ .Values.cluster.name }}
-    moduleName: gcs-proxy
 spec:
   replicas: 1
   selector:
@@ -80,8 +72,6 @@ spec:
     metadata:
       labels:
         app: gcs-proxy
-        clusterName: {{ .Values.cluster.name }}
-        moduleName: gcs-proxy
     spec:
       containers:
         - name: gcs-proxy
@@ -103,8 +93,6 @@ kind: Service
 metadata:
   name: gcs-proxy
   namespace: {{ .Release.Namespace }}
-  labels:
-    clusterName: {{ .Values.cluster.name }}
 spec:
   selector:
     app: gcs-proxy

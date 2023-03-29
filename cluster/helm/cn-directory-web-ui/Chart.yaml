@@ -1,6 +1,6 @@
 apiVersion: v2
-name: cn-splitwell
-description: Canton Network Splitwell
+name: cn-directory-web-ui
+description: Canton Network Directory UI
 type: application
 
 version: 0.1.0

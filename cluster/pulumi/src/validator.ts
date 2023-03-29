@@ -40,9 +40,27 @@ export function installValidator(
     [auth0UserNameEnvVar("validator")]
   );
 
+  const directoryWebUI = installCNHelmChart(
+    xns,
+    "directory-web-ui",
+    "cn-directory-web-ui",
+    {},
+    []
+  );
+
+  const splitwellWebUI = installCNHelmChart(
+    xns,
+    "splitwell-web-ui",
+    "cn-splitwell-web-ui",
+    {},
+    []
+  );
+
   const dependsOn = [
     svc,
     xns.ns,
+    directoryWebUI,
+    splitwellWebUI,
     installAuth0Secret(xns, "validator", "validator"),
     installAuth0Secret(xns, "wallet", "wallet"),
 
@@ -56,7 +74,24 @@ export function installValidator(
     "validator-" + xns.logicalName,
     "cn-validator",
     {
-      postgres: postgresDb,
+        postgres: postgresDb,
+        additionalUsers: [
+            {
+                name: "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
+                valueFrom: {
+                    secretKeyRef: {
+                        key: "ledger-api-user",
+                        name: "cn-app-wallet-ledger-api-auth",
+                        optional: false
+                    }
+                }
+            }
+        ],
+        appDars: [
+            "cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar",
+            "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"
+        ],
+        walletValidatorGrpcPort: 5103
     },
     dependsOn
   );

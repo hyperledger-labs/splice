@@ -24,22 +24,29 @@ spec:
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" "validator" | indent 8}}
-        - name: CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME
-          valueFrom:
-            secretKeyRef:
-              key: ledger-api-user
-              name: cn-app-wallet-ledger-api-auth
-              optional: false
-        - name: CN_APP_VALIDATOR_WALLET_USER_NAME
-          value: auth0|63e3d75ff4114d87a2c1e4f5
-        - name: CN_APP_DARS
-          value: '["cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]'
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
           value: participant
+        {{ if .Values.appDars -}}
+        - name: CN_APP_DARS
+          value: {{ .Values.appDars | toJson | quote }}
+        {{ end }}
+        {{- include "cn-util-lib.auth0-env-vars" "validator" | indent 8}}
+        {{- range $ii, $user := .Values.additionalUsers }}
+        - name: {{ $user.name }}
+          {{ if $user.value }}
+          value: {{ $user.value }}
+          {{ end }}
+          {{ if $user.valueFrom }}
+          valueFrom: {{ $user.valueFrom | toYaml | nindent 12 }}
+          {{ end }}
+        {{- end }}
+        {{ if .Values.additionalConfig -}}
+        - name: ADDITIONAL_CONFIG
+          value: {{- .Values.additionalConfig | toYaml | indent 12 }}
+        {{ end }}
         ports:
         - containerPort: 6003
-          name: val1-val-http
+          name: val-http
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -54,7 +61,7 @@ spec:
   selector:
     app: validator-app
   ports:
-  - name: val1-val-http
+  - name: val-http
     port: 6003
     protocol: TCP
     targetPort: 6003

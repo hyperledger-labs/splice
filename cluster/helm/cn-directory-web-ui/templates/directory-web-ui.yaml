@@ -2,43 +2,43 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: splitwell-web-ui
-  name: splitwell-web-ui
+    app: directory-web-ui
+  name: directory-web-ui
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: splitwell-web-ui
+      app: directory-web-ui
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: splitwell-web-ui
+        app: directory-web-ui
     spec:
       containers:
-      - env:
+      - name: directory-web-ui
+        image: "{{ .Values.imageRepo }}/directory-web-ui:{{ .Values.cluster.imageTag }}"
+        imagePullPolicy: Always
+        env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        - name: CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID
+        - name: CN_APP_DIRECTORY_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
               key: client-id
-              name: cn-app-splitwell-ui-auth
+              name: cn-app-directory-ui-auth
               optional: false
-        - name: CN_APP_SPLITWELL_UI_AUTH_URL
+        - name: CN_APP_DIRECTORY_UI_AUTH_URL
           valueFrom:
             secretKeyRef:
               key: url
-              name: cn-app-splitwell-ui-auth
+              name: cn-app-directory-ui-auth
               optional: false
-        image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        name: splitwell-web-ui
         ports:
         - containerPort: 80
-          name: val1-sw-ui
+          name: http
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -47,15 +47,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  labels:
-    clusterName: cn-stagingnet
-  name: splitwell-web-ui
+  name: directory-web-ui
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: splitwell-web-ui
+    app: directory-web-ui
   ports:
-  - name: val1-sw-ui
+  - name: http
     port: 80
     protocol: TCP
     targetPort: 80

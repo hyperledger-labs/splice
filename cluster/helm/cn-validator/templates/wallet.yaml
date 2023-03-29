@@ -27,7 +27,7 @@ spec:
         - name: CN_APP_WALLET_VALIDATOR_ADDRESS
           value: validator-app
         - name: CN_APP_WALLET_VALIDATOR_GRPC_PORT
-          value: "5103"
+          value: "{{ .Values.walletValidatorGrpcPort }}"
         image: "{{ .Values.imageRepo }}/wallet-app:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: wallet-app
