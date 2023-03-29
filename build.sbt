@@ -57,6 +57,7 @@ lazy val root = (project in file("."))
     `directory-daml`,
     `splitwell-daml`,
     `svc-governance-daml`,
+    `svc-governance-v1test-daml`,
     `validator-lifecycle-daml`,
     `canton-community-common`,
     `canton-research-services`,
@@ -127,6 +128,20 @@ lazy val `svc-governance-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-daml` / Compile / damlBuild).value ++
+          (`canton-coin-api-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `svc-governance-v1test-daml` =
+  project
+    .in(file("daml/upgrade-tests/svc-governance-upgrade-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`svc-governance-daml` / Compile / damlBuild).value ++
+          (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-daml` / Compile / damlBuild).value ++
+          (`canton-coin-v1test-daml` / Compile / damlBuild).value ++
           (`canton-coin-api-daml` / Compile / damlBuild).value,
     )
 
@@ -292,6 +307,7 @@ lazy val `apps-svc` =
     .dependsOn(
       `svc-governance-daml`
     )
+    .dependsOn(`svc-governance-v1test-daml`)
 
 lazy val `apps-sv` =
   project
