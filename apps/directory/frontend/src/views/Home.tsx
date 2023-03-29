@@ -1,5 +1,7 @@
 import { DirectoryClientProvider, useUserState } from 'common-frontend';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
+
+import { Box, Container } from '@mui/material';
 
 import { DirectoryUiStateProvider, useDirectoryUiState } from '../contexts/DirectoryContext';
 import { LedgerApiClientProvider } from '../contexts/LedgerApiContext';
@@ -19,10 +21,16 @@ const Home: React.FC = () => {
 
   if (directoryInstallContract) {
     return (
-      <div>
-        <RequestDirectoryEntry />
-        <DirectoryEntries />
-      </div>
+      <>
+        <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" pb={4}>
+          <Container maxWidth="md">
+            <RequestDirectoryEntry />
+          </Container>
+        </Box>
+        <Container maxWidth="md" sx={{ marginTop: '16px' }}>
+          <DirectoryEntries />
+        </Container>
+      </>
     );
   } else {
     return <span>Loading ...</span>;

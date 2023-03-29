@@ -7,8 +7,8 @@ const DirectoryEntries: React.FC = () => {
 
   return (
     <div>
-      <Typography variant="h6">Your Directory Entries</Typography>
-      <Table>
+      <Typography variant="h5">Your Directory Entries</Typography>
+      <Table sx={{ marginTop: '16px' }}>
         <TableHead>
           <TableRow>
             <TableCell>Entry Name</TableCell>

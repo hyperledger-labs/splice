@@ -14,7 +14,7 @@ const App: React.FC = () => {
         <Box bgcolor="colors.neutral.20">
           <Toolbar>
             <Typography
-              variant="h3"
+              variant="h4"
               textTransform="uppercase"
               fontFamily={theme => theme.fonts.monospace.fontFamily}
               fontWeight={theme => theme.fonts.monospace.fontWeight}
@@ -36,17 +36,17 @@ const App: React.FC = () => {
             )}
           </Toolbar>
         </Box>
-        <Container style={{ height: '100%', flex: '1' }}>
-          {isAuthenticated ? (
-            <Home />
-          ) : (
+        {isAuthenticated ? (
+          <Home />
+        ) : (
+          <Container style={{ height: '100%', flex: '1' }}>
             <Login
               title="Canton Name Service Log In"
               authConfig={config.auth}
               testAuthConfig={config.testAuth}
             />
-          )}
-        </Container>
+          </Container>
+        )}
       </Box>
     </ErrorBoundary>
   );
