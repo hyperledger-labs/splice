@@ -382,7 +382,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       stateVar.txLog.view
         .map(_.payload)
         .filter(query)
-        .lastOption
+        .headOption
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
         )
@@ -745,8 +745,10 @@ object InMemoryMultiDomainAcsStore {
         stNewWithoutOffsets.copy(
           offsets = offsets + (domain -> newOffset),
           offsetChanged = Promise(),
-          txLog = stNew.txLog.appendedAll(
-            ingestedTxLogEntries.map(entry => IndexRecordWithDomain(domain, entry.indexRecord))
+          txLog = stNew.txLog.prependedAll(
+            ingestedTxLogEntries.reverse.map(entry =>
+              IndexRecordWithDomain(domain, entry.indexRecord)
+            )
           ),
         ),
         (summary, offsetChanged, offsetsToRemove.values),

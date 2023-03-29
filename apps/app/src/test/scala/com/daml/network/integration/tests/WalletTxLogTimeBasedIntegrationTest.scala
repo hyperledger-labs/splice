@@ -96,18 +96,6 @@ class WalletTxLogTimeBasedIntegrationTest
         bobWallet,
         Seq[CheckTxHistoryFn](
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-            // Alice sending 40CC to Bob
-            inside(logEntry.sender) { case (sender, amount) =>
-              sender shouldBe aliceUserParty.toProtoPrimitive
-              amount should beWithin(-40 - smallAmount, -40)
-            }
-            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-              receiver shouldBe bobUserParty.toProtoPrimitive
-              amount should beWithin(40 - smallAmount, 40)
-            }
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
             // TODO(#3525): this transfer should show the rewards used
             inside(logEntry.sender) { case (sender, amount) =>
@@ -119,6 +107,18 @@ class WalletTxLogTimeBasedIntegrationTest
               amount should beWithin(10 - smallAmount, BigDecimal(10))
             }
             logEntry.senderHoldingFees should be > BigDecimal(0)
+          },
+          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+            // Alice sending 40CC to Bob
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(-40 - smallAmount, -40)
+            }
+            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+              receiver shouldBe bobUserParty.toProtoPrimitive
+              amount should beWithin(40 - smallAmount, 40)
+            }
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
           },
         ),
       )

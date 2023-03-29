@@ -781,7 +781,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         txLogStore = store,
         transactionTreeSource = TransactionTreeSource.StaticForTesting(Seq(tx1, tx2, tx3, tx4)),
       )
-      val initialEventIdD1 = tx1.getRootEventIds.asScala.headOption.value
+      val initialEventIdD1 = tx2.getRootEventIds.asScala.headOption.value
       val initialEventIdD2 = tx3.getRootEventIds.asScala.headOption.value
       for {
         _ <- d1.switchToUpdates()
@@ -806,7 +806,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
                 case c: CreatedEvent => c
               }
             )
-        val expectedEventsInTxLog = Seq(tx1, tx2, tx3).flatMap(createEvents(_))
+        val expectedEventsInTxLog = Seq(tx1, tx2, tx3).flatMap(createEvents(_)).reverse
         val expectedEventIds = expectedEventsInTxLog.map(_.getEventId)
 
         indices.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds
@@ -815,14 +815,11 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
         entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
 
-        d1Indices.map(_.eventId) should contain theSameElementsInOrderAs Seq(tx1, tx2)
+        d1Indices.map(_.eventId) should contain theSameElementsInOrderAs Seq(tx1)
           .flatMap(createEvents(_))
           .map(_.getEventId)
-          .tail
-        d2Indices.map(_.eventId) should contain theSameElementsInOrderAs Seq(tx3)
-          .flatMap(createEvents(_))
-          .map(_.getEventId)
-          .tail
+          .reverse
+        d2Indices.map(_.eventId) shouldBe empty
       }
     }
 

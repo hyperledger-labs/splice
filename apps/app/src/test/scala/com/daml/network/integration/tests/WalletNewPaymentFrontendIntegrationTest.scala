@@ -79,7 +79,7 @@ class WalletNewPaymentFrontendIntegrationTest
           )(
             "The payment is processed",
             _ => {
-              val tx = findAll(className("tx-row")).toSeq.last
+              val tx = findAll(className("tx-row")).toSeq.head
 
               matchTransaction(tx)(2, "Automation", None, BigDecimal("-1.5"))
 
@@ -142,7 +142,7 @@ class WalletNewPaymentFrontendIntegrationTest
           )(
             "The payment is processed",
             _ => {
-              val tx = findAll(className("tx-row")).toSeq.last
+              val tx = findAll(className("tx-row")).toSeq.head
 
               matchTransaction(tx)(2, "Automation", None, BigDecimal("-2.75"))
 

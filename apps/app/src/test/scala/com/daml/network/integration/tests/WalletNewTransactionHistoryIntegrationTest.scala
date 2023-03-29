@@ -85,34 +85,12 @@ class WalletNewTransactionHistoryIntegrationTest
         )
 
         inside(txs) {
-          case balanceChange +: lockForDirectory +: directoryCreation +: received +: sent +: otp +: Nil =>
-            matchTransaction(balanceChange)(
+          case otp +: sent +: received +: directoryCreation +: lockForDirectory +: balanceChange +: Nil =>
+            matchTransaction(otp)(
               coinPrice = 2,
-              expectedAction = "Balance Change",
+              expectedAction = "Automation", // Actually OTP, but we cannot distinguish
               expectedParty = None,
-              expectedAmountCC = BigDecimal(5),
-            )
-            matchTransaction(lockForDirectory)(
-              coinPrice = 2,
-              expectedAction = "Automation",
-              expectedParty = None,
-              expectedAmountCC = BigDecimal("-0.5"), // 1 USD
-            )
-            // Note: this transfer has no effect on the balance of the sender:
-            // the input for the app payment is a locked coin that was unlocked in the same transaction.
-            matchTransaction(directoryCreation)(
-              coinPrice = 2,
-              expectedAction = "Sent",
-              expectedParty = None,
-              expectedAmountCC = BigDecimal(0), // 0 USD
-            )
-            matchTransaction(received)(
-              coinPrice = 2,
-              expectedAction = "Received",
-              expectedParty = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
-              ),
-              expectedAmountCC = BigDecimal("1.07"),
+              expectedAmountCC = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
               coinPrice = 2,
@@ -122,11 +100,33 @@ class WalletNewTransactionHistoryIntegrationTest
               ),
               expectedAmountCC = BigDecimal("-1.18"),
             )
-            matchTransaction(otp)(
+            matchTransaction(received)(
               coinPrice = 2,
-              expectedAction = "Automation", // Actually OTP, but we cannot distinguish
+              expectedAction = "Received",
+              expectedParty = Some(
+                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
+              ),
+              expectedAmountCC = BigDecimal("1.07"),
+            )
+            // Note: this transfer has no effect on the balance of the sender:
+            // the input for the app payment is a locked coin that was unlocked in the same transaction.
+            matchTransaction(directoryCreation)(
+              coinPrice = 2,
+              expectedAction = "Sent",
               expectedParty = None,
-              expectedAmountCC = BigDecimal("-1.31415"),
+              expectedAmountCC = BigDecimal(0), // 0 USD
+            )
+            matchTransaction(lockForDirectory)(
+              coinPrice = 2,
+              expectedAction = "Automation",
+              expectedParty = None,
+              expectedAmountCC = BigDecimal("-0.5"), // 1 USD
+            )
+            matchTransaction(balanceChange)(
+              coinPrice = 2,
+              expectedAction = "Balance Change",
+              expectedParty = None,
+              expectedAmountCC = BigDecimal(5),
             )
         }
       }

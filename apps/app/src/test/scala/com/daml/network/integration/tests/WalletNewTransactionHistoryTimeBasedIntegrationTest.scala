@@ -70,31 +70,25 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           },
         )
 
-        matchInitialTransactions(txsAfter.take(3))
-        matchLockUnlockDirectoryPayment(txsAfter.drop(3))
+        matchLockUnlockDirectoryPayment(txsAfter.take(2))
+        matchInitialTransactions(txsAfter.drop(2))
       }
     }
 
     def matchInitialTransactions(txs: Seq[Element]) = {
-      inside(txs) { case balanceChange +: rest =>
+      inside(txs) { case rest :+ balanceChange =>
+        matchLockUnlockDirectoryPayment(rest)
         matchTransaction(balanceChange)(
           coinPrice = 2,
           expectedAction = "Balance Change",
           expectedParty = None,
           expectedAmountCC = BigDecimal(5),
         )
-        matchLockUnlockDirectoryPayment(rest)
       }
     }
 
     def matchLockUnlockDirectoryPayment(txs: Seq[Element]) = {
-      inside(txs) { case lockForDirectory +: directoryCreation +: Nil =>
-        matchTransaction(lockForDirectory)(
-          coinPrice = 2,
-          expectedAction = "Automation",
-          expectedParty = None,
-          expectedAmountCC = BigDecimal("-0.5"), // 1 USD
-        )
+      inside(txs) { case directoryCreation +: lockForDirectory +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:
         // the input for the app payment is a locked coin that was unlocked in the same transaction.
         matchTransaction(directoryCreation)(
@@ -102,6 +96,12 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedParty = None,
           expectedAmountCC = BigDecimal(0), // 0 USD
+        )
+        matchTransaction(lockForDirectory)(
+          coinPrice = 2,
+          expectedAction = "Automation",
+          expectedParty = None,
+          expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )
       }
     }

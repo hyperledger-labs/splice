@@ -78,10 +78,10 @@ const TransactionHistory: React.FC = () => {
       </TableContainer>
       <ViewMoreButton
         loadMore={() => {
-          // TODO (#3573): this is currently only refreshing, because the order is not correct
-          // const afterId: string | undefined =
-          //   transactions.length > 0 ? transactions[transactions.length - 1].id : undefined;
-          return fetchTransactionsAfterId();
+          // TODO(#3792): this is loading more data, but the new data is not added to the current results
+          const afterId: string | undefined =
+            transactions.length > 0 ? transactions[transactions.length - 1].id : undefined;
+          return fetchTransactionsAfterId(afterId);
         }}
       />
     </Stack>
