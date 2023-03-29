@@ -13,6 +13,7 @@ import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode,
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.HttpSvHandler
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -188,7 +189,8 @@ class SvApp(
           val svcAutomation =
             newSvSvcAutomationService(svStore, svcStore, ledgerClient, participantAdminConnection)
           for {
-            _ <- waitForDomainConnection(svcStore.domains, config.domains.global)
+            domainId <- waitForDomainConnection(svcStore.domains, config.domains.global)
+            _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
             bootstrapped <- isBootstrapped(svcStore)
             _ <-
               if (bootstrapped) {
@@ -196,13 +198,15 @@ class SvApp(
                   "We can see the SvcRules and are listed as an SVC member => already bootstrapped."
                 )
                 Future.successful(())
-              } else
+              } else {
+                logger.info("Not yet bootstrapped, starting bootstrapping")
                 startBootstrappingWithSvcPartyHosted(
                   svStore,
                   svcStore,
                   globalDomain,
                   ledgerConnection,
                 )
+              }
           } yield (svcStore, svcAutomation)
         } else {
           logger.info(
@@ -551,7 +555,7 @@ class SvApp(
     for {
       coinRules <- store.lookupCoinRules()
       _ <- store.lookupSvcRulesWithOffset().flatMap {
-        case QueryResult(off, None) => {
+        case result @ MultiDomainAcsStore.QueryResult(_, None) => {
           coinRules match {
             case Some(coinRules) =>
               sys.error(
@@ -582,12 +586,12 @@ class SvApp(
                     .toSeq,
                   commandId = CNLedgerConnection
                     .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
-                  deduplicationOffset = off,
+                  deduplicationOffset = result.deduplicationOffset,
                   domainId = domainId,
                 )
           }
         }
-        case QueryResult(_, Some(svcRules)) =>
+        case MultiDomainAcsStore.QueryResult(_, Some(svcRules)) =>
           coinRules match {
             case Some(coinRules) => {
               if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {

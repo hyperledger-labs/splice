@@ -1,7 +1,12 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_MiningRound_StartIssuing}
 import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
@@ -10,9 +15,10 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -27,12 +33,11 @@ class SummarizingMiningRoundTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       cc.round.SummarizingMiningRound.ContractId,
       cc.round.SummarizingMiningRound,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       cc.round.SummarizingMiningRound.COMPANION,
     ) {
 
@@ -55,19 +60,21 @@ class SummarizingMiningRoundTrigger(
     )
 
   override def completeTask(
-      summarizingRound: Contract[
+      summarizingRound: ReadyContract[
         cc.round.SummarizingMiningRound.ContractId,
         cc.round.SummarizingMiningRound,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      rewards <- queryRewards(summarizingRound.payload.round.number)
+      rewards <- queryRewards(
+        summarizingRound.contract.payload.round.number,
+        summarizingRound.domain,
+      )
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
       action = coinRulesStartIssuingAction(
         coinRules.contractId,
-        summarizingRound.contractId,
+        summarizingRound.contract.contractId,
         rewards.summary,
       )
       queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
@@ -82,7 +89,7 @@ class SummarizingMiningRoundTrigger(
               s"skipping as confirmation from ${svParty} is already created for such action"
             )
           )
-        case QueryResult(offset, None) =>
+        case result @ QueryResult(_, None) =>
           connection
             .submitCommands(
               actAs = Seq(svParty),
@@ -91,10 +98,10 @@ class SummarizingMiningRoundTrigger(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
                 Seq(svParty, svcParty),
-                summarizingRound.contractId.contractId,
+                summarizingRound.contract.contractId.contractId,
               ),
-              deduplicationOffset = offset,
-              domainId = domainId,
+              deduplicationOffset = result.deduplicationOffset,
+              domainId = summarizingRound.domain,
             )
             .map { _ =>
               TaskSuccess(
@@ -132,16 +139,19 @@ class SummarizingMiningRoundTrigger(
   /** Query the open reward contracts for a given round. This should only be used
     * for a SummarizingMiningRound.
     */
-  private def queryRewards(round: Long)(implicit ec: ExecutionContext): Future[RoundRewards] =
+  private def queryRewards(round: Long, domain: DomainId)(implicit
+      ec: ExecutionContext
+  ): Future[RoundRewards] =
     for {
-      acs <- store.defaultAcs
-      appRewardCoupons <- acs.listContracts(
+      appRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
         cc.coin.AppRewardCoupon.COMPANION,
+        domain,
         (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
       )
-      validatorRewardCoupons <- acs.listContracts(
+      validatorRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
         cc.coin.ValidatorRewardCoupon.COMPANION,
+        domain,
         (c: Contract[
           cc.coin.ValidatorRewardCoupon.ContractId,
           cc.coin.ValidatorRewardCoupon,

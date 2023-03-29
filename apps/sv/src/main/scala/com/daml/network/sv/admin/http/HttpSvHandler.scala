@@ -4,7 +4,7 @@ import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, sv as v0}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.{SvApp, SvcPartyHosting}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvOnboardingToken
@@ -256,7 +256,7 @@ class HttpSvHandler(
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")
             Future.successful(Right(()))
-          case QueryResult(off, None) => {
+          case result @ QueryResult(_, None) => {
             if (SvApp.isSvcMemberParty(candidateParty, svcRules)) {
               Future.successful(
                 Left("An SV with that party ID already exists.")
@@ -285,7 +285,7 @@ class HttpSvHandler(
                     Seq(svParty),
                     s"$token",
                   ),
-                  deduplicationOffset = off,
+                  deduplicationOffset = result.deduplicationOffset,
                   domainId = globalDomain,
                 )
                 .map { _ => Right(()) }

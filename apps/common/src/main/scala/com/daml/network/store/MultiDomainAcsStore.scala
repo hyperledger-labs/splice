@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Source
 import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{TreeUpdate, TransferEvent}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
+import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -83,6 +84,35 @@ trait MultiDomainAcsStore extends AutoCloseable {
       limit: Option[Long] = None,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
 
+  /** Only contracts with state ContractState.Assigned(domain) are considered
+    * so contracts are omitted if they have been transferred or are in-flight.
+    * This should generally only be used
+    * for contracts that exist in per-domain variations and are never transferred, e.g.,
+    * install contracts.
+    */
+  def listContractsOnDomain[C, TCid <: ContractId[_], T](
+      companion: C,
+      domain: DomainId,
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+      limit: Option[Long] = None,
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]]
+
+  private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
+      companion: C
+  )(
+      expiresAt: T => java.time.Instant
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      ec: ExecutionContext,
+  ): ListExpiredContracts[TCid, T] = (now, limit) =>
+    for {
+      contracts <- listContracts(companion)
+    } yield contracts.view
+      .collect(Function.unlift(_.toReadyContract))
+      .filter(co => now.toInstant isAfter expiresAt(co.contract.payload))
+      .take(limit)
+      .toSeq
+
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple
     * times as it moves across domains.
@@ -136,6 +166,16 @@ object MultiDomainAcsStore {
           .withDescription("No data for any domain has been ingested")
           .asRuntimeException()
       )
+  }
+
+  object QueryResult {
+    implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] = {
+      import com.digitalasset.canton.logging.pretty.PrettyUtil.*
+      prettyOfClass(
+        param("offsets", _.offsets.map({ case (k, v) => k -> v.unquoted })),
+        param("value", _.value),
+      )
+    }
   }
 
   trait ContractCompanion[-C, TCid <: ContractId[_], T] {
@@ -202,7 +242,13 @@ object MultiDomainAcsStore {
   final case class ContractWithState[TCid, T](
       contract: Contract[TCid, T],
       state: ContractState,
-  )
+  ) {
+    def toReadyContract: Option[ReadyContract[TCid, T]] =
+      state match {
+        case ContractState.Assigned(domain) => Some(ReadyContract(contract, domain))
+        case ContractState.InFlight => None
+      }
+  }
 
   sealed abstract class ContractState extends PrettyPrinting
 

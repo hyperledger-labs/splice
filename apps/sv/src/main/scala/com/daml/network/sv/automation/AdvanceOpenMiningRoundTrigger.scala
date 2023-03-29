@@ -43,8 +43,8 @@ class AdvanceOpenMiningRoundTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
     for {
-      svcRules <- store.getSvcRules()
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      svcRules <- store.getSvcRules()
       agreedCoinPrice <- store.getAgreedCoinPrice()
       cmd = svcRules.contractId.exerciseSvcRules_AdvanceOpenMiningRounds(
         task.work.coinRulesId,
@@ -59,10 +59,9 @@ class AdvanceOpenMiningRoundTrigger(
         commands = cmd.commands.asScala.toSeq,
         domainId = domainId,
       )
-      acs <- store.acs(domainId)
       // make sure the store ingested our update so we don't
       // attempt to advance the same round twice
-      _ <- acs.signalWhenIngestedOrShutdown(tx.getOffset())
+      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, tx.getOffset())
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )
@@ -84,10 +83,16 @@ class AdvanceOpenMiningRoundTrigger(
     import cats.syntax.traverse.*
 
     (for {
-      acs <- OptionT liftF store.defaultAcs
-      _ <- OptionT(acs.lookupContractById(cc.coin.CoinRules.COMPANION)(task.work.coinRulesId))
+      domainId <- OptionT liftF store.domains.signalWhenConnected(store.defaultAcsDomain)
+      _ <- OptionT(
+        store.multiDomainAcsStore
+          .lookupContractByIdOnDomain(cc.coin.CoinRules.COMPANION)(domainId, task.work.coinRulesId)
+      )
       _ <- task.work.openRounds.toSeq.traverse(co =>
-        OptionT(acs.lookupContractById(cc.round.OpenMiningRound.COMPANION)(co.contractId))
+        OptionT(
+          store.multiDomainAcsStore
+            .lookupContractByIdOnDomain(cc.round.OpenMiningRound.COMPANION)(domainId, co.contractId)
+        )
       )
     } yield ()).isEmpty
   }

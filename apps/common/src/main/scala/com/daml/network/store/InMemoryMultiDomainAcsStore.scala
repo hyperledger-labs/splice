@@ -193,6 +193,21 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     })
   }
 
+  override def listContractsOnDomain[C, TCid <: ContractId[_], T](
+      companion: C,
+      domainId: DomainId,
+      filter: Contract[TCid, T] => Boolean,
+      limit: Option[Long],
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[Seq[Contract[TCid, T]]] =
+    listContracts(companion, filter, None).map(
+      _.collect {
+        case ContractWithState(contract, ContractState.Assigned(domain)) if domain == domainId =>
+          contract
+      }.take(limit.fold(Int.MaxValue)(_.intValue()))
+    )
+
   private def lookupContractById[T](
       fromCreatedEvent: CreatedEvent => Option[T]
   )(id: ContractId[_]): Future[Option[(T, ContractState)]] = Future {

@@ -1,11 +1,16 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -19,15 +24,14 @@ class SvRewardTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       cn.svcrules.SvReward.ContractId,
       cn.svcrules.SvReward,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       cn.svcrules.SvReward.COMPANION,
     ) {
-  type SvRewardContract = Contract[
+  type SvRewardContract = ReadyContract[
     cn.svcrules.SvReward.ContractId,
     cn.svcrules.SvReward,
   ]
@@ -36,14 +40,13 @@ class SvRewardTrigger(
       svReward: SvRewardContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
       openMiningRound <- store.getLatestActiveOpenMiningRound()
       cmd = svcRules.contractId
         .exerciseSvcRules_CollectSvReward(
           store.key.svParty.toProtoPrimitive,
-          svReward.contractId,
+          svReward.contract.contractId,
           coinRules.contractId,
           openMiningRound.contractId,
         )
@@ -52,10 +55,10 @@ class SvRewardTrigger(
           Seq(store.key.svParty),
           Seq(store.key.svcParty),
           cmd,
-          domainId,
+          svReward.domain,
         )
     } yield TaskSuccess(
-      s"collected `SvReward` of round ${svReward.payload.round.number} and create Coin for SV ${svReward.payload.sv}"
+      s"collected `SvReward` of round ${svReward.contract.payload.round.number} and create Coin for SV ${svReward.contract.payload.sv}"
     )
   }
 }

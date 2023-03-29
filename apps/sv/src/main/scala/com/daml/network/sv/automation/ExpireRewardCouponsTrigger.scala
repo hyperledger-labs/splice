@@ -72,7 +72,6 @@ class ExpireRewardCouponsTrigger(
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       cmds <- getCmdsForRound(closedRound, svcRules, coinRules)
-      acs <- store.defaultAcs
       _ <- Future.sequence(
         cmds.map(cmd =>
           connection
@@ -86,7 +85,9 @@ class ExpireRewardCouponsTrigger(
               // make sure the store ingested our update so we don't
               // attempt to collect the same coupon twice
               case (offset, outcome) =>
-                acs.signalWhenIngestedOrShutdown(offset).map(_ => Some(outcome))
+                store.multiDomainAcsStore
+                  .signalWhenIngestedOrShutdown(domainId, offset)
+                  .map(_ => Some(outcome))
             }
         )
       )

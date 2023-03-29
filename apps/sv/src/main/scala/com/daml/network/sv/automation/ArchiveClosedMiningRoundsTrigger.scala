@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -97,12 +97,11 @@ class ArchiveClosedMiningRoundsTrigger(
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,
           ),
-          deduplicationOffset = task.offset,
+          deduplicationOffset = task.deduplicationOffset,
           domainId = domainId,
         )
         .map(_._1)
-      acs <- store.defaultAcs
-      _ <- acs.signalWhenIngestedOrShutdown(txOffset)
+      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, txOffset)
     } yield {
       TaskSuccess(
         s"Successfully created a confirmation for archiving closed mining round ${closedRound.payload.round.number}"
@@ -114,12 +113,13 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
-      acs <- store.defaultAcs
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       closedRound = task.value
       // lookup closed mining round once again in the ACS to check if it was archived
-      closedRoundExists <- acs
-        .lookupContractById(cc.round.ClosedMiningRound.COMPANION)(
-          closedRound.contractId
+      closedRoundExists <- store.multiDomainAcsStore
+        .lookupContractByIdOnDomain(cc.round.ClosedMiningRound.COMPANION)(
+          domainId,
+          closedRound.contractId,
         )
         .map(_.isDefined)
       isStale <-

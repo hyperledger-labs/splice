@@ -1,7 +1,12 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -11,12 +16,13 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.environment.{CNLedgerConnection, DedupOffset}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.SvApp
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
@@ -31,12 +37,11 @@ class SvOnboardingTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       SvOnboarding.ContractId,
       SvOnboarding,
     ](
       svcStore,
-      () => svcStore.domains.signalWhenConnected(svcStore.defaultAcsDomain),
       SvOnboarding.COMPANION,
     ) {
 
@@ -54,7 +59,7 @@ class SvOnboardingTrigger(
   )
 
   override def completeTask(
-      svOnboarding: Contract[
+      svOnboarding: ReadyContract[
         SvOnboarding.ContractId,
         SvOnboarding,
       ]
@@ -62,9 +67,9 @@ class SvOnboardingTrigger(
     for {
       approval <- SvApp
         .isApprovedSvIdentity(
-          svOnboarding.payload.candidateName,
-          PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty),
-          svOnboarding.payload.token,
+          svOnboarding.contract.payload.candidateName,
+          PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty),
+          svOnboarding.contract.payload.token,
           svStore,
         )
       (party, name) <- approval match {
@@ -99,7 +104,7 @@ class SvOnboardingTrigger(
               .asRuntimeException()
           )
         } else {
-          confirm(party, name, svOnboarding.payload.token, svcRules)
+          confirm(party, name, svOnboarding.contract.payload.token, svcRules, svOnboarding.domain)
         }
     } yield outcome
   }
@@ -109,10 +114,10 @@ class SvOnboardingTrigger(
       name: String,
       reason: String,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
+      domainId: DomainId,
   ): Future[TaskOutcome] = {
     val action = svcRulesConfirmSvAction(party, name, reason)
     for {
-      domainId <- svcStore.domains.signalWhenConnected(svcStore.defaultAcsDomain)
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
         svParty.toProtoPrimitive,
@@ -125,7 +130,7 @@ class SvOnboardingTrigger(
               s"skipping as confirmation from ${svParty} is already created for such action"
             )
           )
-        case QueryResult(offset, None) =>
+        case result @ QueryResult(_, None) =>
           connection
             .submitWithResult(
               actAs = Seq(svParty),
@@ -137,7 +142,7 @@ class SvOnboardingTrigger(
                 party.toProtoPrimitive,
               ),
               deduplicationConfig = DedupOffset(
-                offset = offset
+                offset = result.deduplicationOffset
               ),
               domainId = domainId,
             )

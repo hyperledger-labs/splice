@@ -4,7 +4,7 @@ import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -20,31 +20,30 @@ class ExpiredLockedCoinTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listLockedExpiredCoins,
       cc.coin.LockedCoin.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[Contract[
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ]]] {
   type Task =
-    ScheduledTaskTrigger.ReadyTask[Contract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]
+    ScheduledTaskTrigger.ReadyTask[ReadyContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]
 
   override protected def completeTaskAsLeader(
       co: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
     coinRules <- store.getCoinRules()
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     svcRules <- store.getSvcRules()
     cmd = svcRules.contractId
       .exerciseSvcRules_LockedCoin_ExpireCoin(
-        co.work.contractId,
+        co.work.contract.contractId,
         new cc.coin.LockedCoin_ExpireCoin(
           latestOpenMiningRound.contractId,
           coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
@@ -55,13 +54,13 @@ class ExpiredLockedCoinTrigger(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         commands = cmd.commands.asScala.toSeq,
-        domainId = domainId,
+        domainId = co.work.domain,
       )
   } yield TaskSuccess(s"archived expired locked coin")
 
   override def completeTaskAsFollower(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     Future.successful(
-      TaskSuccess(show"ignoring ${PrettyContractId(co.work)}, as we're not the leader")
+      TaskSuccess(show"ignoring ${PrettyContractId(co.work.contract)}, as we're not the leader")
     )
   }
 
