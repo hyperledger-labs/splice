@@ -26,6 +26,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
 trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
@@ -339,6 +340,21 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboarding.COMPANION)(
       _.expiresAt
     )
+
+  def listSvOnboardingsBySvcMembers(
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+  ): Future[Seq[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      svOnboardings <- multiDomainAcsStore.listContractsOnDomain(
+        so.SvOnboarding.COMPANION,
+        domain,
+        (co: Contract[so.SvOnboarding.ContractId, so.SvOnboarding]) =>
+          svcRules.payload.members.asScala
+            .get(co.payload.candidateParty)
+            .exists(_.name == co.payload.candidateName),
+      )
+    } yield svOnboardings
 
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]

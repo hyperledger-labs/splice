@@ -338,7 +338,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     actAndCheck("SV2 comes back online", sv2.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
-      _ => getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive),
+      { _ =>
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) shouldBe empty
+        getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive)
+      },
     )
   }
 

@@ -37,6 +37,7 @@ class SvSvcAutomationService(
     ) {
 
   registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svcStore, connection))

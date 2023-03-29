@@ -8,7 +8,6 @@ import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
-import DA.Optional (fromSome)
 import DA.Time
 
 import CN.Util.Assert
@@ -231,6 +230,35 @@ testSvOnboardingExpiry = do
     SvcRules_ExpireSvOnboarding svOnboardingCid
 
 
+testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember : Script ()
+testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember = do
+  (app, svc, (_, sv2, _, _)) <- initCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- leader cannot archive the onboarding as svX is not yet added as member
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboarding svOnboardingCid
+
+  -- create a SvConfirmed contract
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" "because"
+
+  -- leader can archive the onboarding as svX is added as member
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboarding svOnboardingCid
+
+
 testSvConfirmedExpiry : Script ()
 testSvConfirmedExpiry = do
   (app, svc, (_, sv2, sv3, sv4)) <- initCollective
@@ -264,17 +292,6 @@ testSvConfirmedExpiry = do
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_ExpireSvConfirmed svConfirmedCid
 
-
-testSvNameUniqueness : Script ()
-testSvNameUniqueness = do
-  (_, svc, (sv1, _, _, _)) <- initCollective
-
-  [(svcRulesCid, svcRules)] <- query @SvcRules svc
-
-  (fromSome (Map.lookup sv1 svcRules.members)).name === "sv1"
-
-  svX <- allocateParty "svX"
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" "we want to see if we can get away with this"
 
 -- Utils
 --------

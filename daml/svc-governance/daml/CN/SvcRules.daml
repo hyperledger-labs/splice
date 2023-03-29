@@ -3,6 +3,7 @@ module CN.SvcRules where
 import DA.Action (void)
 import DA.Foldable (forA_)
 import DA.List as List
+import DA.Optional (fromSome, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import DA.Time
@@ -316,7 +317,7 @@ template SvcRules with
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         license <- create ValidatorLicense with ..
-        _ <- create ValidatorTraffic with 
+        _ <- create ValidatorTraffic with
               amount = 0.0
               ..
         return license
@@ -345,6 +346,19 @@ template SvcRules with
       do
         exercise cid SvOnboarding_Expire
 
+    nonconsuming choice SvcRules_ArchiveSvOnboarding : ()
+      with
+        svOnboardingCid: ContractId SvOnboarding
+      controller leader
+      do
+        -- require that the member is already added to the SVC
+        -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvConfirmed` contract is created.
+        svOnboarding <- fetch svOnboardingCid
+        let maybeMember = Map.lookup svOnboarding.candidateParty members
+        require "member party is already added to the SVC collective" (isSome maybeMember)
+        require "member name matches" ((fromSome maybeMember).name == svOnboarding.candidateName)
+        archive svOnboardingCid
+
     nonconsuming choice SvcRules_ConfirmSv : ContractId SvConfirmed
       with
         newMemberParty : Party
@@ -369,7 +383,7 @@ template SvcRules with
       controller leader
       do
         exercise cid SvConfirmed_Expire
-          
+
     -- Coin management driven directly by the leader
     --------------------------------------------------
 

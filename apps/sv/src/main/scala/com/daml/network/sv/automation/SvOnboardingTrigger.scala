@@ -10,8 +10,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
-  SvcRules_ConfirmSv,
   SvcRules,
+  SvcRules_ConfirmSv,
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
