@@ -20,13 +20,16 @@ trait SvTestUtil extends CNNodeTestCommon {
       foundSvcRules.head
     }
 
+  def allocationRandomParty()(implicit env: CNNodeTestConsoleEnvironment) = {
+    val id = (new scala.util.Random).nextInt().toHexString
+    PartyId
+      .fromLfParty(svc.remoteParticipant.ledger_api.parties.allocate(s"svX-$id", "svX").party)
+      .value
+  }
+
   def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
     // random value for test
-    val svXParty = PartyId
-      .fromProtoPrimitive(
-        "svX::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
-      )
-      .value
+    val svXParty = allocationRandomParty()
     actAndCheck(
       "Add the phantom SV \"svX\"",
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(

@@ -341,6 +341,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.expiresAt
     )
 
+  def listExpiredSvConfirmed: ListExpiredContracts[so.SvConfirmed.ContractId, so.SvConfirmed] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvConfirmed.COMPANION)(
+      _.expiresAt
+    )
+
   def listSvOnboardingsBySvcMembers(
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Future[Seq[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]] =
