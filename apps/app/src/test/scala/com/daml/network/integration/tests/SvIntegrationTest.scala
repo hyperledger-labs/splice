@@ -209,7 +209,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
-      sv2.listOngoingValidatorOnboardings() should have length 2
+      eventually() {
+        sv2.listOngoingValidatorOnboardings() should have length 2
+      }
       sv2.stop()
       sv2.startSync()
       sv2.listOngoingValidatorOnboardings() should have length 2
