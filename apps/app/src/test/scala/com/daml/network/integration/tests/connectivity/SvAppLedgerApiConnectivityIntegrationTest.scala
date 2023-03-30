@@ -52,7 +52,9 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
         bobValidator.start()
       }
       clue("bob's validator reports as not active") {
-        bobValidator.health.active shouldBe false
+        eventually() {
+          bobValidator.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
+        }
       }
 
       clue("re-enable the connection and wait for sv apps to report healthy again") {
@@ -65,7 +67,9 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
       }
 
       clue("wait for bob's validator app to become active") {
-        eventually()(bobValidator.health.active shouldBe true)
+        eventually() {
+          bobValidator.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
+        }
       }
   }
 }

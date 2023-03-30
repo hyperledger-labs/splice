@@ -80,7 +80,6 @@ export function installSplitwell(
         '    dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
         "}",
       ].join("\n"),
-      walletValidatorGrpcPort: 5203,
     },
     dependsOn
   );

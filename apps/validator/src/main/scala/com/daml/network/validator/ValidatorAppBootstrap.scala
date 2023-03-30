@@ -6,8 +6,7 @@ import cats.implicits.*
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBaseGrpc
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -37,7 +36,6 @@ class ValidatorAppBootstrap(
     metrics: ValidatorAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -45,7 +43,7 @@ class ValidatorAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBaseGrpc[
+) extends CNNodeBootstrapBase[
       ValidatorApp,
       ValidatorAppBackendConfig,
       SharedCNNodeAppParameters,
@@ -57,7 +55,6 @@ class ValidatorAppBootstrap(
       metrics,
       storageFactory,
       loggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ) {
 
@@ -93,7 +90,6 @@ object ValidatorAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      writeHealthDumpToFile: HealthDumpFunction,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -113,7 +109,6 @@ object ValidatorAppBootstrap {
           validatorMetrics,
           new CommunityStorageFactory(validatorConfig.storage),
           loggerFactory,
-          writeHealthDumpToFile,
           futureSupervisor,
           configuredOpenTelemetry,
         )

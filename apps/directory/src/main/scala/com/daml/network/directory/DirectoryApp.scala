@@ -125,11 +125,10 @@ class DirectoryApp(
       )
 
       // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
-      adminHandler = new HttpAdminHandler[CNNodeStatus](
+      adminHandler = new HttpAdminHandler(
         status
           .map(CNNodeStatus.fromNodeStatus)
           .map(NodeStatus.Success(_)),
-        status => status.toJsonV0,
         loggerFactory,
       )
 

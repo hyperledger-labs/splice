@@ -26,7 +26,7 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
 
   override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     config.validatorApps.foreach(validator =>
-      waitForPortAndHttpPort(validator._1, validator._2.adminApi.port)
+      waitForPort(validator._1, validator._2.adminApi.port.unwrap)
     )
     config.svcApp.foreach(svc =>
       waitForPort(InstanceName.tryCreate("SVC"), svc.adminApi.port.unwrap)
@@ -55,6 +55,7 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
   }
 
   /** Bumps the port by 1000 before waiting for it, to match the http ports used by most of our apps
+    * TODO(#2019) -- remove during grpc cleanup
     */
   private def waitForHttpPort(instanceName: InstanceName, adminPort: Int): Unit = {
     waitForPort(InstanceName.tryCreate(s"${instanceName}-http"), adminPort + 1000)

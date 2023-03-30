@@ -59,8 +59,8 @@ local deployments(config) = [
                "validator-app",
                [
                  {
-                   name: "val1-val-http",
-                   port: 6003,
+                   name: "val1-val",
+                   port: 5003,
                    internalOnly: true,
                  },
                ],
@@ -82,8 +82,6 @@ local deployments(config) = [
     },
   ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
-    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
-    { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5103" },
   ]),
 
   c.deployment(config, "wallet-web-ui", [

@@ -8,12 +8,11 @@ import com.digitalasset.canton.health.admin.{data}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import com.daml.network.environment.BuildInfo
+import com.daml.network.environment.{BuildInfo, CNNodeStatus}
 import java.time.{OffsetDateTime, Instant, ZoneOffset}
 
-class HttpAdminHandler[S <: data.NodeStatus.Status](
-    status: => Future[data.NodeStatus[S]],
-    serialize: S => definitions.Status,
+class HttpAdminHandler(
+    status: => Future[data.NodeStatus[CNNodeStatus]],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -29,7 +28,7 @@ class HttpAdminHandler[S <: data.NodeStatus.Status](
     status
       .map {
         case data.NodeStatus.Success(status) =>
-          definitions.NodeStatus(success = Some(serialize(status)))
+          definitions.NodeStatus(success = Some(status.toJsonV0))
         case data.NodeStatus.NotInitialized(active) =>
           definitions.NodeStatus(
             notInitialized = Some(

@@ -93,8 +93,8 @@ local deployments(config) = [
 
   c.deployment(config, "validator-app", [
     {
-      name: "sw-val-http",
-      port: 6003,
+      name: "sw-val",
+      port: 5003,
       internalOnly: true,
     },
   ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator", "validator") +
@@ -124,8 +124,6 @@ local deployments(config) = [
     },
   ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
     { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
-    { name: "CN_APP_WALLET_VALIDATOR_ADDRESS", value: "validator-app" },
-    { name: "CN_APP_WALLET_VALIDATOR_GRPC_PORT", value: "5203" },
   ]),
 
   c.deployment(config, "wallet-web-ui", [

@@ -24,10 +24,6 @@ spec:
         {{- include "cn-util-lib.auth0-env-vars" "wallet" | indent 8}}
         - name: CN_APP_WALLET_PARTICIPANT_ADDRESS
           value: participant
-        - name: CN_APP_WALLET_VALIDATOR_ADDRESS
-          value: validator-app
-        - name: CN_APP_WALLET_VALIDATOR_GRPC_PORT
-          value: "{{ .Values.walletValidatorGrpcPort }}"
         image: "{{ .Values.imageRepo }}/wallet-app:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: wallet-app

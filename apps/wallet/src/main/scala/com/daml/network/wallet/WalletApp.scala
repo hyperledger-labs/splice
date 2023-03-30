@@ -79,6 +79,7 @@ class WalletApp(
       validatorConnection <- Future {
         new ValidatorConnection(
           config.validator.adminApi,
+          retryProvider,
           coinAppParameters.processingTimeouts,
           loggerFactory,
           validatorAuthToken,

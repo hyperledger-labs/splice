@@ -2289,8 +2289,8 @@
                         "name": "validator-app",
                         "ports": [
                            {
-                              "containerPort": 6003,
-                              "name": "val1-val-http"
+                              "containerPort": 5003,
+                              "name": "val1-val"
                            }
                         ],
                         "resources": {
@@ -2324,8 +2324,8 @@
          "spec": {
             "ports": [
                {
-                  "name": "val1-val-http",
-                  "port": 6003,
+                  "name": "val1-val",
+                  "port": 5003,
                   "protocol": "TCP"
                }
             ],
@@ -2417,14 +2417,6 @@
                            {
                               "name": "CN_APP_WALLET_PARTICIPANT_ADDRESS",
                               "value": "participant"
-                           },
-                           {
-                              "name": "CN_APP_WALLET_VALIDATOR_ADDRESS",
-                              "value": "validator-app"
-                           },
-                           {
-                              "name": "CN_APP_WALLET_VALIDATOR_GRPC_PORT",
-                              "value": "5103"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-app:tag",
@@ -3536,8 +3528,8 @@
                         "name": "validator-app",
                         "ports": [
                            {
-                              "containerPort": 6003,
-                              "name": "sw-val-http"
+                              "containerPort": 5003,
+                              "name": "sw-val"
                            }
                         ],
                         "resources": {
@@ -3571,8 +3563,8 @@
          "spec": {
             "ports": [
                {
-                  "name": "sw-val-http",
-                  "port": 6003,
+                  "name": "sw-val",
+                  "port": 5003,
                   "protocol": "TCP"
                }
             ],
@@ -3664,14 +3656,6 @@
                            {
                               "name": "CN_APP_WALLET_PARTICIPANT_ADDRESS",
                               "value": "participant"
-                           },
-                           {
-                              "name": "CN_APP_WALLET_VALIDATOR_ADDRESS",
-                              "value": "validator-app"
-                           },
-                           {
-                              "name": "CN_APP_WALLET_VALIDATOR_GRPC_PORT",
-                              "value": "5203"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-app:tag",

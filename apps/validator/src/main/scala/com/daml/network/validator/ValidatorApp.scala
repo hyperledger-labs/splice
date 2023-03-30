@@ -1,18 +1,19 @@
 package com.daml.network.validator
 
-import akka.http.scaladsl.server.Directives.*
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives.*
 import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.http.HttpAdminHandler
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
@@ -31,6 +32,7 @@ import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -43,6 +45,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import akka.http.scaladsl.server.directives.BasicDirectives
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -296,6 +299,14 @@ class ValidatorApp(
         loggerFactory,
       )
 
+      // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
+      commonAdminHandler = new HttpAdminHandler(
+        status
+          .map(CNNodeStatus.fromNodeStatus)
+          .map(NodeStatus.Success(_)),
+        loggerFactory,
+      )
+
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
@@ -308,19 +319,17 @@ class ValidatorApp(
                 adminHandler,
                 _ => provide(()),
               ),
+              CommonAdminResource.routes(commonAdminHandler),
             )
           }
         }
       }
 
-      httpConfig = config.adminApi.clientConfig.copy(
-        port = config.adminApi.port + 1000
-      )
-      _ = logger.info(s"Starting http server on ${httpConfig}")
+      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
       binding <- Http()
         .newServerAt(
-          httpConfig.address,
-          httpConfig.port.unwrap,
+          config.adminApi.clientConfig.address,
+          config.adminApi.clientConfig.port.unwrap,
         )
         .bind(
           routes

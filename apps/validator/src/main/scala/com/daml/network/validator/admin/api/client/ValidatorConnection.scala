@@ -3,12 +3,14 @@ package com.daml.network.validator.admin.api.client
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.admin.api.client.HttpAppConnection
 import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.environment.RetryProvider
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.validator.admin.api.client.commands.HttpValidatorAppClient
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
 
 import java.util.concurrent.atomic.AtomicReference
@@ -21,11 +23,17 @@ final case class UserInfo(
 
 final class ValidatorConnection(
     config: CNHttpClientConfig,
+    retryProvider: RetryProvider,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     tokenO: Option[String],
-)(implicit ec: ExecutionContextExecutor)
-    extends AppConnection(config.clientConfig, timeouts, loggerFactory) {
+)(implicit
+    ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateDecoder: TemplateJsonDecoder,
+) extends HttpAppConnection(config, retryProvider, timeouts, loggerFactory) {
 
   // cached validator reference.
   private val validatorRef: AtomicReference[Option[UserInfo]] = new AtomicReference(None)

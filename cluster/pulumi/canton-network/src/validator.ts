@@ -68,7 +68,6 @@ export function installValidator(
         "cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar",
         "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar",
       ],
-      walletValidatorGrpcPort: 5103,
     },
     dependsOn
   );

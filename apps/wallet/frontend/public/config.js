@@ -19,7 +19,7 @@ window.canton_network_config = {
     },
     validator: {
       // URL of the validator app HTTP API
-      url: 'http://localhost:6003',
+      url: 'http://localhost:5003',
     },
     // BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     directory: {
