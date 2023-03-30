@@ -403,13 +403,7 @@ class WalletTxLogIntegrationTest
       val (aliceUserParty, bobUserParty, charlieUserParty, _, key, invite) =
         initSplitwellTest()
 
-      // Note: initSplitwellTest() adds Bob to the group
-      clue("Bob was already added to the group") {
-        bobSplitwell.listGroups() should have size 1
-        aliceSplitwell.listAcceptedGroupInvites(key.id) should be(empty)
-      }
-
-      // Note: initSplitwellTest() does not add Charlie to the group
+      // Note: initSplitwellTest() adds Bob to the group, but not Charlie
       actAndCheck(
         "Charlie accepts the invite",
         charlieSplitwell.acceptInvite(invite),

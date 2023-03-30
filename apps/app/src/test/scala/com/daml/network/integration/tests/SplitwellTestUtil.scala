@@ -16,6 +16,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       env: CNNodeTestConsoleEnvironment
   ) = clue("setup splitwell users and contracts") {
 
+    val group = "group1"
     val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
     val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
     val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
@@ -36,36 +37,42 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       }
     }
 
-    clue("create 'group1'") {
-      aliceSplitwell.requestGroup("group1")
-      eventually() {
-        aliceSplitwell.listGroups() should have size 1
-      }
-    }
+    actAndCheck("create 'group1'", aliceSplitwell.requestGroup(group))(
+      "Alice sees 'group1'",
+      _ => aliceSplitwell.listGroups() should have size 1,
+    )
+
     val invite = clue("create a generic invite for 'group1'") {
       // Wait for the group contract to be visible to Alice's Ledger API
       aliceSplitwell.ledgerApi.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
       aliceSplitwell.createGroupInvite(
-        "group1"
+        group
       )
     }
 
-    clue("invite bob to 'group1'") {
-      bobSplitwell.acceptInvite(invite)
+    actAndCheck("bob asks to join 'group1'", bobSplitwell.acceptInvite(invite))(
+      "Alice sees the accepted invite",
+      _ => aliceSplitwell.listAcceptedGroupInvites(group) should not be empty,
+    )
 
-      eventually() {
-        aliceSplitwell.listAcceptedGroupInvites("group1") should not be empty
-      }
-      inside(aliceSplitwell.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
+    actAndCheck(
+      "bob joins 'group1'",
+      inside(aliceSplitwell.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
         aliceSplitwell.joinGroup(accepted.contractId)
-      }
-    }
+      },
+    )(
+      "bob is in 'group1'",
+      _ => {
+        bobSplitwell.listGroups() should have size 1
+        aliceSplitwell.listAcceptedGroupInvites(group) should be(empty)
+      },
+    )
 
     val key = GrpcSplitwellAppClient.GroupKey(
       aliceUserParty,
       aliceSplitwell.getProviderPartyId(),
-      "group1",
+      group,
     )
 
     clue("grant featured app right to splitwell provider") {
