@@ -3,6 +3,7 @@ package com.daml.network.sv.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
@@ -437,6 +438,19 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         } yield allExpired.view.take(limit).map(ReadyContract(_, domainId)).toSeq
       }
     } yield result
+
+  def listUnclaimedRewards(
+      limit: Long
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      svOnboardings <- multiDomainAcsStore.listContractsOnDomain(
+        cc.coin.UnclaimedReward.COMPANION,
+        domain,
+        (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
+        Some(limit),
+      )
+    } yield svOnboardings
 }
 
 object SvSvcStore {
@@ -483,6 +497,7 @@ object SvSvcStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
         // TODO(#3707): For now we just filter on the V1Test version of CoinRules, without using it anywhere.
         // This serves as a basic sanity test that codegen worked for this version, and did not interfere with anything else.
         mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),

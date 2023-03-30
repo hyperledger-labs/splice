@@ -764,6 +764,42 @@ class SvTimeBasedIntegrationTest
     )
   }
 
+  "auto-merge unclaimed rewards" in { implicit env =>
+    initSvc()
+
+    val threshold =
+      10 // TODO(M3-46): base this on the actual threshold read from the svcRules config
+    val numRewards = threshold + 1
+    val rewardAmount = 0.1
+
+    def getUnclaimedRewardContracts() =
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        .filterJava(UnclaimedReward.COMPANION)(svcParty)
+
+    val existingUnclaimedRewards = getUnclaimedRewardContracts().length
+
+    actAndCheck(
+      s"Create as many unclaimed rewards as needed to have at least ${numRewards}", {
+        val unclaimedRewards = ((existingUnclaimedRewards + 1) to numRewards).map(_ =>
+          new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
+        )
+        if (!unclaimedRewards.isEmpty) {
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+            actAs = Seq(svcParty),
+            optTimeout = None,
+            commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
+          )
+        }
+      },
+    )(
+      "Wait for the unclaimed rewards to get merged automagically",
+      _ => {
+        advanceTimeByPollingInterval(svc)
+        getUnclaimedRewardContracts().length should (be < threshold)
+      },
+    )
+  }
+
   private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
     Ordering[Instant].max(
       rounds.oldestOpen.data.targetClosesAt,

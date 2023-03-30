@@ -51,4 +51,5 @@ class SvSvcAutomationService(
   if (config.automation.enableUnclaimedRewardExpiration) {
     registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svcStore, connection))
   }
+  registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svcStore, connection))
 }

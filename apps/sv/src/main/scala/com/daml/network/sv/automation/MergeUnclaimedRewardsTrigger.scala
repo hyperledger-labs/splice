@@ -1,7 +1,9 @@
-package com.daml.network.svc.automation
+package com.daml.network.sv.automation
 
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.svc.store.SvcStore
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.util.Contract
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.digitalasset.canton.tracing.TraceContext
@@ -12,13 +14,15 @@ import scala.jdk.CollectionConverters.*
 
 class MergeUnclaimedRewardsTrigger(
     override protected val context: TriggerContext,
-    store: SvcStore,
+    store: SvSvcStore,
     connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
-  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+  private def performWorkAsLeader(svcRules: Contract[SvcRules.ContractId, SvcRules])(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] = {
     val threshold: Long =
       10 // TODO(M3-46): make this the actual threshold read from the svcRules config
 
@@ -27,7 +31,7 @@ class MergeUnclaimedRewardsTrigger(
       .flatMap({
         case None =>
           Future.successful(false)
-        case Some(rules) =>
+        case Some(coinRules) =>
           for {
             // Fetch up to two times the threshold of contracts for increased merging throughput.
             unclaimedRewards <- store.listUnclaimedRewards(threshold * 2)
@@ -36,17 +40,22 @@ class MergeUnclaimedRewardsTrigger(
               case false =>
                 Future(None)
               case true =>
-                val arg = new coinCodegen.CoinRules_MergeUnclaimedRewards(
-                  unclaimedRewards.map(co => co.contractId).asJava
+                val arg = new SvcRules_MergeUnclaimedRewards(
+                  coinRules.contractId,
+                  unclaimedRewards.map(co => co.contractId).asJava,
                 )
-                val cmd = rules.contractId.exerciseCoinRules_MergeUnclaimedRewards(arg)
+                val cmd = svcRules.contractId.exerciseSvcRules_MergeUnclaimedRewards(arg)
                 for {
-                  (offset, outcome) <- connection
-                    .submitWithResultAndOffsetNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
-                  acs <- store.defaultAcs
+                  (txOffset, outcome) <- connection
+                    .submitWithResultAndOffsetNoDedup(
+                      Seq(store.key.svParty),
+                      Seq(store.key.svcParty),
+                      cmd,
+                      domainId,
+                    )
                   // make sure the store ingested our update so we don't
                   // attempt to merge the same reward twice
-                  _ <- acs.signalWhenIngestedOrShutdown(offset)
+                  _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, txOffset)
                 } yield Some(outcome)
             }
           } yield {
@@ -59,4 +68,23 @@ class MergeUnclaimedRewardsTrigger(
           }
       })
   }
+
+  def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+    store
+      .lookupSvcRules()
+      .flatMap({
+        case None =>
+          logger.debug("SvcRules contract not found")
+          Future.successful(false)
+        case Some(svcRules) =>
+          store
+            .svIsLeader()
+            .flatMap(if (_) {
+              performWorkAsLeader(svcRules)
+            } else {
+              Future.successful(false)
+            })
+      })
+  }
+
 }

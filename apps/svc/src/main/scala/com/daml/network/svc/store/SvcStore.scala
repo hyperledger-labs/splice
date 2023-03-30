@@ -14,7 +14,6 @@ import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 import com.daml.network.environment.RetryProvider
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
@@ -73,17 +72,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
     defaultAcs.flatMap(
       _.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
-    )
-
-  def listUnclaimedRewards(
-      limit: Long
-  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
-    defaultAcs.flatMap(
-      _.listContracts(
-        cc.coin.UnclaimedReward.COMPANION,
-        (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
-        Some(limit),
-      )
     )
 
   def lookupOldestClosedMiningRound(): Future[
@@ -178,7 +166,6 @@ object SvcStore {
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

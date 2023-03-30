@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -13,8 +12,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
-
-import scala.jdk.CollectionConverters.*
 
 class SvcTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
@@ -34,40 +31,6 @@ class SvcTimeBasedIntegrationTest
           _.focus(_.enableUnclaimedRewardExpiration).replace(true)
         )(config)
       })
-
-  "auto-merge unclaimed rewards" in { implicit env =>
-    val threshold =
-      10 // TODO(M3-46): base this on the actual threshold read from the svcRules config
-    val numRewards = threshold + 1
-    val rewardAmount = 0.1
-
-    def getUnclaimedRewardContracts() =
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(UnclaimedReward.COMPANION)(svcParty)
-
-    val existingUnclaimedRewards = getUnclaimedRewardContracts().length
-
-    actAndCheck(
-      s"Create as many unclaimed rewards as needed to have at least ${numRewards}", {
-        val unclaimedRewards = ((existingUnclaimedRewards + 1) to numRewards).map(_ =>
-          new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
-        )
-        if (!unclaimedRewards.isEmpty) {
-          svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-            actAs = Seq(svcParty),
-            optTimeout = None,
-            commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
-          )
-        }
-      },
-    )(
-      "Wait for the unclaimed rewards to get merged automagically",
-      _ => {
-        advanceTimeByPollingInterval(svc)
-        getUnclaimedRewardContracts().length should (be < threshold)
-      },
-    )
-  }
 
   "coin rules cache should be invalidated when the coin rules change" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
