@@ -1063,7 +1063,7 @@ function subcmd_pulumi() {
     _production_gate
 
     pulumi --stack "${GCP_CLUSTER_BASENAME}" \
-           --cwd "${REPO_ROOT}/cluster/pulumi" \
+           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
             "$@"
 }
 

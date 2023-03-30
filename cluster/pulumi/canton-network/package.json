@@ -1,0 +1,18 @@
+{
+    "name": "canton-network-pulumi-deployment",
+    "version": "1.0.0",
+    "main": "src/index.ts",
+    "devDependencies": {
+    },
+    "dependencies": {
+        "@pulumi/kubernetes": "^3.22.1"
+    },
+    "scripts": {
+        "fix": "npm run format:fix && npm run lint:fix",
+        "check": "npm run format:check && npm run lint:check",
+        "format:fix": "prettier --write src",
+        "format:check": "prettier --check src",
+        "lint:fix": "eslint src --fix",
+        "lint:check": "eslint src --max-warnings=0"
+    }
+}

@@ -16,7 +16,6 @@
     },
     "dependencies": {
         "@pulumi/gcp": "^6.0.0",
-        "@pulumi/kubernetes": "^3.22.1",
         "@pulumi/pulumi": "^3.0.0",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
@@ -29,5 +28,8 @@
         "format:check": "prettier --check src",
         "lint:fix": "eslint src --fix",
         "lint:check": "eslint src --max-warnings=0"
-    }
+    },
+    "workspaces": [
+        "canton-network"
+    ]
 }
