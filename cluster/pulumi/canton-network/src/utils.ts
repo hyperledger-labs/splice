@@ -104,7 +104,7 @@ export function installCNHelmChart(
   xns: ExactNamespace,
   name: string,
   chartName: string,
-  values: { [key: string]: any },
+  values: { [key: string]: any } = {},
   dependsOn: any = []
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
