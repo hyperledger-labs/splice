@@ -453,7 +453,7 @@ class SvApp(
     retryProvider.retryForAutomation(
       "Wait for SVC SvConfirmed contract",
       for {
-        svConfirmedOpt <- svStore.lookupSvConfirmed(svStore.key.svParty)
+        svConfirmedOpt <- svStore.lookupSvConfirmed()
         svConfirmed <- svConfirmedOpt match {
           case Some(sc) =>
             logger.info("svConfirmed found, done waiting")

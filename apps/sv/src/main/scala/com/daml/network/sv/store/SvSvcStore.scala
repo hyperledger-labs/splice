@@ -6,9 +6,13 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
+import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, SvcRules_ConfirmSv}
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+  ARC_CoinRules,
+  ARC_SvcRules,
+}
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
@@ -336,6 +340,24 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
+  def lookupSvOnboardingByCandidatePartyWithOffset(
+      candidateParty: PartyId
+  ): Future[
+    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+        _,
+        co => co.payload.candidateParty == candidateParty.toProtoPrimitive,
+      )
+    )
+
+  def lookupSvOnboardingByCandidateParty(
+      candidateParty: PartyId
+  ): Future[
+    Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]
+  ] = lookupSvOnboardingByCandidatePartyWithOffset(candidateParty).map(_.value)
+
   def listExpiredSvOnboardings: ListExpiredContracts[so.SvOnboarding.ContractId, so.SvOnboarding] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboarding.COMPANION)(
       _.expiresAt
@@ -345,6 +367,40 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvConfirmed.COMPANION)(
       _.expiresAt
     )
+
+  def lookupSvConfirmedWithOffset(
+      svParty: PartyId
+  ): Future[
+    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+        _,
+        co => co.payload.svParty == svParty.toProtoPrimitive,
+      )
+    )
+
+  def lookupSvConfirmed(
+      svParty: PartyId
+  ): Future[
+    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+  ] =
+    lookupSvConfirmedWithOffset(svParty).map(_.value)
+
+  def listSvOnboardingConfirmations(
+      svOnboarding: Contract[so.SvOnboarding.ContractId, so.SvOnboarding]
+  ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
+    val expectedAction = new ARC_SvcRules(
+      new SRARC_ConfirmSv(
+        new SvcRules_ConfirmSv(
+          svOnboarding.payload.candidateParty,
+          svOnboarding.payload.candidateName,
+          svOnboarding.payload.token,
+        )
+      )
+    )
+    listConfirmations(expectedAction)
+  }
 
   def listSvOnboardingsBySvcMembers(
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]

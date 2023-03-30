@@ -97,6 +97,36 @@ paths:
             text/plain:
               schema:
                 type: string
+  /onboard/sv/status/{candidate_party_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "getSvOnboardingStatus"
+      parameters:
+        - name: "candidate_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSvOnboardingStatusResponse"
+        "400":
+          description: bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+        "500":
+          description: internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
   /onboard/sv/party-migration/authorize:
     post:
       tags: [sv]
@@ -213,6 +243,32 @@ components:
       properties:
         token:
           type: string
+
+    GetSvOnboardingStatusResponse:
+      type: object
+      required:
+      - state
+      properties:
+        # Note: our codegen does not support oneOf; if it did, the state would be an enum with the following values:
+        # - 'unknown', with no fields
+        # - 'onboarding', with fields: name, contract_id (of `SvOnboarding`), confirmed_by, required_num_confirmations
+        # - 'confirmed', with fields: name, contract_id (of `SvConfirmed`)
+        # - 'completed', with fields: name, contract_id (of `SvcRules`)
+        # TODO(#2755) Make an issue to refactor this with a proper `oneOf`.
+        state:
+          type: string
+        name:
+          type: string
+        contract_id:
+          type: string
+        confirmed_by:
+          type: array
+          items:
+            type: string
+        required_num_confirmations:
+          type: integer
+          format: int32
+          minimum: 1
 
     OnboardSvPartyMigrationAuthorizeRequest:
       type: object

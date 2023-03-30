@@ -9,9 +9,10 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.svonboarding.{SvConfirmed, SvOnboarding}
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import java.util.Base64
@@ -37,6 +38,25 @@ object HttpSvAppClient {
       coinRules: CoinRules.ContractId,
       svcRules: SvcRules.ContractId,
   )
+
+  sealed trait SvOnboardingStatus;
+  object SvOnboardingStatus {
+    final case class Unknown() extends SvOnboardingStatus
+    final case class Onboarding(
+        name: String,
+        svOnboardingCid: SvOnboarding.ContractId,
+        confirmedBy: Vector[String],
+        requiredNumConfirmations: Int,
+    ) extends SvOnboardingStatus
+    final case class Confirmed(
+        name: String,
+        svConfirmedCid: SvConfirmed.ContractId,
+    ) extends SvOnboardingStatus
+    final case class Completed(
+        name: String,
+        svcRulesCid: SvcRules.ContractId,
+    ) extends SvOnboardingStatus
+  }
 
   case object ListOngoingValidatorOnboardings
       extends BaseCommand[http.ListOngoingValidatorOnboardingsResponse, Seq[
@@ -123,6 +143,72 @@ object HttpSvAppClient {
       case http.OnboardSvResponse.OK => Right(())
       case http.OnboardSvResponse.BadRequest(e) => Left(e)
       case http.OnboardSvResponse.Unauthorized(e) => Left(e)
+    }
+  }
+
+  case class getSvOnboardingStatus(candidate: PartyId)
+      extends BaseCommand[http.GetSvOnboardingStatusResponse, SvOnboardingStatus] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvOnboardingStatusResponse] =
+      client.getSvOnboardingStatus(candidatePartyId = candidate.toProtoPrimitive, headers = headers)
+
+    override def handleResponse(
+        response: http.GetSvOnboardingStatusResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, SvOnboardingStatus] = {
+      response match {
+        case http.GetSvOnboardingStatusResponse.OK(response) =>
+          (response.state match {
+            case "unknown" => Some(SvOnboardingStatus.Unknown())
+            case "onboarding" =>
+              for {
+                name <- response.name
+                cidString <- response.contractId
+                svOnboardingCid <- Codec
+                  .decodeJavaContractId(SvOnboarding.COMPANION)(cidString)
+                  .toOption
+                confirmedBy <- response.confirmedBy
+                requiredNumConfirmations <- response.requiredNumConfirmations
+              } yield SvOnboardingStatus.Onboarding(
+                name,
+                svOnboardingCid,
+                confirmedBy,
+                requiredNumConfirmations,
+              )
+            case "confirmed" =>
+              for {
+                name <- response.name
+                cidString <- response.contractId
+                svConfirmedCid <- Codec
+                  .decodeJavaContractId(SvConfirmed.COMPANION)(cidString)
+                  .toOption
+              } yield SvOnboardingStatus.Confirmed(
+                name,
+                svConfirmedCid,
+              )
+            case "completed" =>
+              for {
+                name <- response.name
+                cidString <- response.contractId
+                svcRulesCid <- Codec
+                  .decodeJavaContractId(SvcRules.COMPANION)(cidString)
+                  .toOption
+              } yield SvOnboardingStatus.Completed(
+                name,
+                svcRulesCid,
+              )
+            case _ => None
+          }) match {
+            case Some(status) => Right(status: SvOnboardingStatus)
+            case None => Left(s"Could not parse response: $response.")
+          }
+        case http.GetSvOnboardingStatusResponse.BadRequest(e) => Left(e)
+        case http.GetSvOnboardingStatusResponse.InternalServerError(e) => Left(e)
+      }
     }
   }
 

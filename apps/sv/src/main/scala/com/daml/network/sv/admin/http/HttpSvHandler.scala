@@ -1,5 +1,6 @@
 package com.daml.network.sv.admin.http
 
+import cats.data.OptionT
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
@@ -7,8 +8,8 @@ import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.{SvApp, SvcPartyHosting}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvOnboardingToken
-import com.daml.network.util.Contract
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -153,6 +154,70 @@ class HttpSvHandler(
             }
       }
     }
+
+  def getSvOnboardingStatus(
+      respond: v0.SvResource.GetSvOnboardingStatusResponse.type
+  )(svPartyIdS: String): Future[v0.SvResource.GetSvOnboardingStatusResponse] = {
+
+    PartyId.fromProtoPrimitive(svPartyIdS) match {
+      case Left(error) =>
+        Future.successful(
+          v0.SvResource.GetSvOnboardingStatusResponseBadRequest(
+            s"Could not decode party ID $svPartyIdS; error: $error"
+          )
+        )
+      case Right(svPartyId) =>
+        for {
+          svcRules <- svcStore.getSvcRules()
+          result <- OptionT
+            .fromOption[Future](
+              Option.when(SvApp.isSvcMemberParty(svPartyId, svcRules))(
+                definitions.GetSvOnboardingStatusResponse(
+                  state = "completed",
+                  name = Some(svcRules.payload.members.get(svPartyId.toProtoPrimitive).name),
+                  contractId = Some(Codec.encodeContractId(svcRules.contractId)),
+                )
+              )
+            )
+            .orElse(
+              OptionT(
+                svcStore
+                  .lookupSvConfirmed(svPartyId)
+              ).map(svConfirmed =>
+                definitions.GetSvOnboardingStatusResponse(
+                  state = "confirmed",
+                  name = Some(svConfirmed.payload.svName),
+                  contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
+                )
+              )
+            )
+            .orElse(
+              for {
+                svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateParty(svPartyId))
+                confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboarding))
+                confirmedBy = confirmations
+                  .map(c =>
+                    svcRules.payload.members.asScala.get(c.payload.confirmer) match {
+                      case Some(member) => member.name
+                      case None => c.payload.confirmer
+                    }
+                  )
+                  .toVector
+              } yield definitions.GetSvOnboardingStatusResponse(
+                state = "onboarding",
+                name = Some(svOnboarding.payload.candidateName),
+                contractId = Some(Codec.encodeContractId(svOnboarding.contractId)),
+                confirmedBy = Some(confirmedBy),
+                requiredNumConfirmations = Some(SvUtil.requiredNumConfirmations(svcRules)),
+              )
+            )
+            .value
+        } yield result match {
+          case Some(result) => result
+          case None => definitions.GetSvOnboardingStatusResponse(state = "unknown")
+        }
+    }
+  }
 
   def devNetOnboardValidatorPrepare(
       respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type

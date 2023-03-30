@@ -40,6 +40,11 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.OnboardSv(token))
     }
 
+  def getSvOnboardingStatus(candidate: PartyId): HttpSvAppClient.SvOnboardingStatus =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.getSvOnboardingStatus(candidate))
+    }
+
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via client API)")
   def devNetOnboardValidatorPrepare(): String =
     consoleEnvironment.run {
