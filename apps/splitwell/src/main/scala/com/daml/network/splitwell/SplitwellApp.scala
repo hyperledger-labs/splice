@@ -86,8 +86,8 @@ class SplitwellApp(
       loggerFactory,
       timeouts,
     )
-    _ <- store.domains.signalWhenConnected(config.domains.global)
-    preferred <- store.domains.signalWhenConnected(config.domains.splitwell.preferred)
+    _ <- waitForDomainConnection(store.domains, config.domains.global)
+    preferred <- waitForDomainConnection(store.domains, config.domains.splitwell.preferred)
     others <- config.domains.splitwell.others.toList.traverse(store.domains.signalWhenConnected(_))
   } yield {
     val splitwellDomains = SplitwellDomains(preferred, others)
