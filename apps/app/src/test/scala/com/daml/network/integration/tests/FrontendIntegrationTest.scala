@@ -39,6 +39,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Try
+import scala.util.control.NonFatal
 
 trait CustomMatchers {
 
@@ -301,17 +302,26 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   }
 
   protected def completeAuth0Login(username: String, password: String)(implicit
-      webDriver: WebDriver
+      webDriver: WebDriverType
   ) = {
     clue("Auth0 login") {
-      textField(id("username")).value = username
+      try {
+        textField(id("username")).value = username
+      } catch {
+        case NonFatal(e) =>
+          logger.debug(
+            "username field not found in Auth0 login page, taking a screenshot before retrying or failing"
+          )
+          screenshot()
+          throw e
+      }
       find(id("password")).foreach(_.underlying.sendKeys(password))
       click on name("action") // complete password prompt
     }
   }
 
   protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
-      webDriver: WebDriver
+      webDriver: WebDriverType
   ) = {
     completeAuth0Login(username, password)
     completeOptionalAuth0Authorization(() => false)
@@ -324,7 +334,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       password: String,
       completedWhen: () => Boolean,
   )(implicit
-      webDriver: WebDriver
+      webDriver: WebDriverType
   ) = {
     completeOptionalAuth0Login(username, password, completedWhen)
     completeOptionalAuth0Authorization(completedWhen)
@@ -335,7 +345,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       password: String,
       completedWhen: () => Boolean,
   )(implicit
-      webDriver: WebDriver
+      webDriver: WebDriverType
   ) = {
     eventually()(
       if (!completedWhen())
