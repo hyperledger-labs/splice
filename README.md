@@ -812,7 +812,8 @@ If you don't find an usage of a given method within the CN network repo, you can
 
 If you've made changes to the logic of jobs in `.circleci/config.yaml` involved in a standard CI cluster deploy workflow (i.e., the docker build, preflight check, etc) then the only way to validate those changes is to run them on CircleCI.
 
-To do so before merging your changes into main, open CircleCI's UI to your PR's branch and manually approve one of the three scratchnet deploy holds corresponding to the cluster you've reserved amongst the team for use.
+To do so before merging your changes into main, open CircleCI's UI to your PR's branch and manually approve one of the three scratchnet deploy holds corresponding to the cluster you've reserved via [`cncluster lock`](/cluster/README.md#deploy-a-build-to-a-cluster).
+Don't forget to `cncluster unlock` the cluster once you are finished!
 
 ## Building and Running the Wallet and Splitwell Apps
 

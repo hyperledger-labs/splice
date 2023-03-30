@@ -604,9 +604,9 @@ cncluster activate
 ### Deploy a Build to a Cluster
 
 1. Scratchnet is used for ad-hoc testing, and we have a limited number
-   of shared instances. To claim a cluster for your use, run
-   `cncluster lock`, which will then assert a lock on the cluster in
-   your name (unless somebody else has it already).
+   of shared instances. To claim a cluster for your use, run `cncluster lock`
+   from the cluster's deployment directory, which will then assert a lock on
+   the cluster in your name (unless somebody else has it already).
 1. Build and upload all docker images
     1. Clean and build the main application, by invoking `make clean`
        and `make build` from the project root.
@@ -624,9 +624,10 @@ cncluster activate
 
 ### Update a Single Component in a Cluster
 
-1. Scratchnet is used for ad-hoc testing, and we only have one
-   instance of scratchnet.  Coordinate with team members via Slack if
-   you are not sure that you are the only one using it.
+1. Scratchnet is used for ad-hoc testing, and we have a limited number
+   of shared instances. To claim a cluster for your use, run `cncluster lock`
+   from the cluster's deployment directory, which will then assert a lock on
+   the cluster in your name (unless somebody else has it already).
 1. If ScratchNet is not in a running state, follow the instructions
    above to ensure it's running a valid code set. This should ideally
    be done against the HEAD of `main` to give the best chance of
@@ -639,11 +640,10 @@ cncluster activate
    the image tag to force an update.
 1. Debug your deployment. Tools mentioned in [Observing Cluster Operation](#observing-cluster-operation)
    can be useful.
-1. Once you are done with scratchnet, run `cncluster reset`. This
-   isn't strictly required but makes sure that the next person starts
-   with a clean state as well as not consuming unnecessary
-   resources. You should also announce to the Slack channel that you
-   are no longer using ScratchNet.
+1. Once you are done with scratchnet, release the cluster lock with
+   `cncluster unlock`. Unless you're handing the cluster state over
+   to someone else, reset the cluster with `cncluster reset`. This
+   will make it easier for the next person, and reduce cloud costs.
 
 ### Add a Component to the Build
 
