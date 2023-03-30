@@ -122,7 +122,7 @@ class HttpSvHandler(
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
           Future.successful(
-            v0.SvResource.OnboardSvResponseBadRequest(s"Could not vefify and decode token: $error")
+            v0.SvResource.OnboardSvResponseBadRequest(s"Could not verify and decode token: $error")
           )
         case Right(token) =>
           SvApp
