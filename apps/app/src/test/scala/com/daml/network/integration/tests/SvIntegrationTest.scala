@@ -420,6 +420,57 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       )
   }
 
+  "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
+    implicit env =>
+      clue("Initialize SVC with 3 SVs") {
+        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+          _.start()
+        )
+        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+          _.waitForInitialization()
+        )
+        getSvcRules().data.members should have size 3
+      }
+
+      val fakeSv4Party = allocateRandomSvParty("sv4")
+      actAndCheck(
+        "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
+          svc.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+            svc.config.ledgerApiUser,
+            actAs = Seq(svcParty),
+            readAs = Seq.empty,
+            update = getSvcRules().id.exerciseSvcRules_AddMember(
+              fakeSv4Party.toProtoPrimitive,
+              "sv4",
+              "want to see if it overwrite the existing member",
+            ),
+          )
+        },
+      )(
+        "sv4 is added as an SVC member with the fake party Id",
+        _ =>
+          inside(getSvcRules().data.members.asScala.get(fakeSv4Party.toProtoPrimitive)) {
+            case Some(memberInfo) =>
+              memberInfo.name shouldBe "sv4"
+          },
+      )
+
+      actAndCheck(
+        "start sv4 with a party id different from existing sv4 in SVC", {
+          sv4.startSync()
+        },
+      )(
+        "existing member sv4 is overwritten with different party id",
+        _ => {
+          inside(
+            getSvcRules().data.members.asScala.get(sv4.getDebugInfo().svParty.toProtoPrimitive)
+          ) { case Some(memberInfo) =>
+            memberInfo.name shouldBe "sv4"
+          }
+        },
+      )
+  }
+
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       initSvc()

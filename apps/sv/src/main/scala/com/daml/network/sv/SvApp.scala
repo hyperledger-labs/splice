@@ -942,6 +942,10 @@ object SvApp {
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
   ): Boolean = svcRules.payload.members.values.asScala.exists(_.name == name)
 
+  private[sv] def isDevNet(
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+  ): Boolean = svcRules.payload.isDevNet
+
   val coinPackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId
 

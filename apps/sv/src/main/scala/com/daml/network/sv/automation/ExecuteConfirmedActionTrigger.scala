@@ -21,7 +21,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.sv.SvApp.{isSvcMemberName, isSvcMemberParty}
+import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
 import io.opentelemetry.api.trace.Tracer
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
@@ -156,9 +156,8 @@ class ExecuteConfirmedActionTrigger(
               isSvPartOfSvc <- store
                 .getSvcRules()
                 .map(svcRules =>
-                  isSvcMemberParty(newMemberParty, svcRules) || isSvcMemberName(
-                    newMemberName,
-                    svcRules,
+                  isSvcMemberParty(newMemberParty, svcRules) || (
+                    !isDevNet(svcRules) && isSvcMemberName(newMemberName, svcRules)
                   )
                 )
             } yield isSvConfirmed || isSvPartOfSvc

@@ -731,7 +731,7 @@ class SvTimeBasedIntegrationTest
       )
       getSvcRules().data.members should have size 3
     }
-    val svXParty = allocationRandomParty()
+    val svXParty = allocateRandomSvParty("svX")
     actAndCheck(
       "Create a new `SvConfirmed` Contract with new party \"svX\"",
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(

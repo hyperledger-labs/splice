@@ -148,6 +148,7 @@ template SvcRules with
     members : Map.Map Party MemberInfo
     leader : Party
     config : SvcRulesConfig
+    isDevNet : Bool
   where
     ensure
       leader `Map.member` members &&
@@ -171,15 +172,22 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
+        if (not isDevNet)
+          then
+            require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+          else pure ()
         let info = MemberInfo with name = newMemberName, joinedAsOfRound = nextMiningRound
+        let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         create SvcRules with
           svc
           epoch
           nextMiningRound
           leader
-          members = Map.insert newMemberParty info members
+          -- existing entry of member with same name as the new member will be overwritten by the new member info
+          -- this should only happen if it is in devnet
+          members = Map.insert newMemberParty info membersNotMatchingNewMemberName
           config
+          isDevNet
 
     choice SvcRules_RemoveMember : ContractId SvcRules
       with
@@ -196,6 +204,7 @@ template SvcRules with
           -- NOTE: this immediate deletion also slashes that members share of the current round's issuance
           members = Map.delete member members
           config
+          isDevNet
 
     nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
       with
@@ -258,6 +267,7 @@ template SvcRules with
           members
           leader = newLeader
           config
+          isDevNet
         pure self
 
     nonconsuming choice SvcRules_ArchiveOutdatedElectionRequest : ()
@@ -367,7 +377,10 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+        if (not isDevNet)
+          then
+            require "Member name is expected to be new unless in devnet" (newMemberName `notElem` (map (.name) (Map.values members)))
+          else pure ()
         now <- getTime
         let expiresAt = now `addRelTime` config.svConfirmedTimeout
         create SvConfirmed with

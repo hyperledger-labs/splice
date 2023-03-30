@@ -34,6 +34,7 @@ template SvcBootstrap with
           members = Map.fromList [(founderParty, MemberInfo with name = founderName, joinedAsOfRound = Round 0)]
           leader = founderParty
           config
+          isDevNet
         coinRulesCid <- create CoinRules with
           svc
           configSchedule = coinConfigSchedule

@@ -326,7 +326,9 @@ class HttpSvHandler(
               Future.successful(
                 Left("An SV with that party ID already exists.")
               )
-            } else if (SvApp.isSvcMemberName(candidateName, svcRules)) {
+            } else if (
+              !SvApp.isDevNet(svcRules) && SvApp.isSvcMemberName(candidateName, svcRules)
+            ) {
               Future.successful(
                 Left("An SV with that name already exists.")
               )

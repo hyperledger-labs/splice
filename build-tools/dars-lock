@@ -23,7 +23,7 @@ if [ -n "${CI-}" ]; then
     are_diff=0
     diff "$out_file" "$LOCK_FILE" > /dev/null || are_diff=$?
     if [ $are_diff -ne 0 ]; then
-        echo -n "DAR package ids have changed, please run ./build-tools/dars-lock (after sbt test/compile)"\
+        echo -n "DAR package ids have changed, please run ./build-tools/dars-lock (after sbt Test/compile)"\
         " and commit the updated dars.lock file."
         rm "$out_file"
         exit 1

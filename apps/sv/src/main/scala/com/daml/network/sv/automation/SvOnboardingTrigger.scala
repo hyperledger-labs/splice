@@ -97,7 +97,7 @@ class SvOnboardingTrigger(
               .withDescription("An SV with that party ID already exists.")
               .asRuntimeException()
           )
-        } else if (SvApp.isSvcMemberName(name, svcRules)) {
+        } else if (!SvApp.isDevNet(svcRules) && SvApp.isSvcMemberName(name, svcRules)) {
           Future.failed(
             Status.ALREADY_EXISTS
               .withDescription("An SV with that name already exists.")

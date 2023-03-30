@@ -20,25 +20,32 @@ trait SvTestUtil extends CNNodeTestCommon {
       foundSvcRules.head
     }
 
-  def allocationRandomParty()(implicit env: CNNodeTestConsoleEnvironment) = {
+  def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
     PartyId
-      .fromLfParty(svc.remoteParticipant.ledger_api.parties.allocate(s"svX-$id", "svX").party)
+      .fromLfParty(svc.remoteParticipant.ledger_api.parties.allocate(s"$name-$id", name).party)
       .value
   }
 
   def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
     // random value for test
-    val svXParty = allocationRandomParty()
+    val svXParty = allocateRandomSvParty("svX")
+    addSvMember(svXParty, "svX, the phantom of the SVC")
+  }
+
+  def addSvMember(
+      svParty: PartyId,
+      svName: String,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
     actAndCheck(
-      "Add the phantom SV \"svX\"",
+      s"Add the phantom SV \"$svName\"",
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
         commands = getSvcRules().id
           .exerciseSvcRules_AddMember(
-            svXParty.toProtoPrimitive,
-            "svX, the phantom of the SVC",
+            svParty.toProtoPrimitive,
+            svName,
             "addPhantomSv",
           )
           .commands
@@ -46,8 +53,8 @@ trait SvTestUtil extends CNNodeTestCommon {
           .toSeq,
       ),
     )(
-      "SvX is a member of the SvcRules",
-      _ => getSvcRules().data.members should contain key svXParty.toProtoPrimitive,
+      s"$svName is a member of the SvcRules",
+      _ => getSvcRules().data.members should contain key svParty.toProtoPrimitive,
     )
   }
 }
