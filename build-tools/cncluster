@@ -183,8 +183,17 @@ function _assert_lock() {
     fi
 
     if lockholder=$(_current_lockholder); then
-        if [ "${lockholder}" != "$(whoami)" ]; then
-            _error "Cluster already locked by: ${lockholder}"
+        # CI asserts lock in shared cluster with a reduced strength
+        # compared to the lock assert on developer workstations. The
+        # cluster lock must be held, but we do not check user ID
+        # (because we don't have a reliable way of finding the user ID
+        # of the requesting user in CI.)
+        if [ "${1-}" != "--for-ci" ]; then
+            if [ "${lockholder}" != "$(whoami)" ]; then
+                _error "Cluster already locked by: ${lockholder}"
+            fi
+        else
+            _info "CI running with cluster lock held by: ${lockholder}"
         fi
     else
         _error "Cluster not locked. (See: https://github.com/DACH-NY/the-real-canton-coin#deploy-a-build-to-a-cluster))"
@@ -711,6 +720,8 @@ function subcmd_obliterate_state() {
 subcommand_whitelist[ciapply]='Run only by CircleCI'
 
 function subcmd_ciapply() {
+    _assert_lock --for-ci
+
     # A CI specific variant of 'cncluster apply' that removes the need
     # for manual confirmation and ensures that all pods are deleted
     # and recreated during the apply. With current (September 2022)
