@@ -173,6 +173,14 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetValidatorCredit())
     }
 
+  @Help.Summary(
+    "Atomically check if the validator has any credits available and if so, consume 1 credit"
+  )
+  def checkAndUpdateValidatorCredit(): Boolean =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.CheckAndUpdateValidatorCredit())
+    }
+
   // TODO(#3490): extract this to HttpCNNodeAppReference for all HTTP-based apps
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")

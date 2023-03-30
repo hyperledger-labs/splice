@@ -32,7 +32,7 @@ class HttpScanHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
 
-  // Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
+  // TODO(#3816): Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
   private val defaultThroughputRateLimiter = {
     // default throughput of 4 transactions per second with a max burst of 20 transactions
     new RateLimiter(NonNegativeNumeric.tryCreate(4.0), PositiveNumeric.tryCreate(5.0))
@@ -317,17 +317,23 @@ class HttpScanHandler(
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
       Future.successful {
         val validatorCredit = defaultThroughputRateLimiter.getCurrentAllowance.toLong
-        if (validatorCredit >= 0) {
-          v0.ScanResource.GetValidatorCreditResponse.OK(
-            definitions.GetValidatorCreditResponse(validatorCredit)
-          )
-        } else {
-          // TODO(#3729): provide an appropriate error response here
-          v0.ScanResource.GetValidatorCreditResponse.OK(
-            definitions.GetValidatorCreditResponse(0)
-          )
-        }
+        v0.ScanResource.GetValidatorCreditResponse.OK(
+          definitions.GetValidatorCreditResponse(validatorCredit)
+        )
       }
     }
 
+  def checkAndUpdateValidatorCredit(
+      response: v0.ScanResource.CheckAndUpdateValidatorCreditResponse.type
+  )(): Future[v0.ScanResource.CheckAndUpdateValidatorCreditResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
+      Future.successful {
+        // consume traffic credits from default traffic allowance
+        val approved = defaultThroughputRateLimiter.checkAndUpdateRate()
+        v0.ScanResource.CheckAndUpdateValidatorCreditResponse.OK(
+          definitions.CheckAndUpdateValidatorCreditResponse(approved)
+        )
+      }
+    }
 }

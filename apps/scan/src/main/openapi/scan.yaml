@@ -234,6 +234,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v0/check-and-update-validator-credit:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "checkAndUpdateValidatorCredit"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CheckAndUpdateValidatorCreditResponse"
+        "404":
+          description: not_found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -359,6 +377,12 @@ components:
         validatorCredit:
           type: integer
           format: int64
+    CheckAndUpdateValidatorCreditResponse:
+      type: object
+      required: ["approved"]
+      properties:
+        approved:
+          type: boolean
     GetTopProvidersByAppRewardsResponse:
       type: object
       required: ["providersAndRewards"]

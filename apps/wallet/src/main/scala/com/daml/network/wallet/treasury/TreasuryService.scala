@@ -479,6 +479,10 @@ class TreasuryService(
     for {
       coinRules <- scanConnection.getCoinRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
+      tapsApproved <-
+        if (treasuryConfig.enableValidatorCreditChecks) {
+          scanConnection.approveTaps(numTapOperations)
+        } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
       configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
@@ -503,6 +507,13 @@ class TreasuryService(
       )
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
+      if (!tapsApproved) {
+        new StatusRuntimeException(
+          Status.ABORTED.withDescription(
+            show"Aborted operation - insufficient validator credit to create coins"
+          )
+        )
+      }
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(

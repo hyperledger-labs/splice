@@ -193,7 +193,16 @@ final class ScanConnection(
         cachedRounds.get().getRoundTuple
       }
     }
+  }
 
+  def approveTaps(numTapOperations: Int)(implicit
+      ec: ExecutionContext
+  ): Future[Boolean] = {
+    Future.foldLeft(
+      (1 to numTapOperations).map(_ =>
+        runHttpCmd(config.adminApi.url, HttpScanAppClient.CheckAndUpdateValidatorCredit())
+      )
+    )(true)(_ && _)
   }
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit

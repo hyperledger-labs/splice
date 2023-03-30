@@ -17,4 +17,6 @@ package com.daml.network.wallet.config
 case class TreasuryConfig(
     batchSize: Int = 10,
     queueSize: Int = 20,
+    // TODO(#3816): Temporarily added flag as part of the DomainFees PoC
+    enableValidatorCreditChecks: Boolean = false,
 )

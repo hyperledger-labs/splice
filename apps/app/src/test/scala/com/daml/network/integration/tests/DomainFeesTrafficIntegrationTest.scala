@@ -34,6 +34,11 @@ class DomainFeesTrafficIntegrationTest
           walletConfig.focus(_.treasury.batchSize).replace(1)
         )(cnNodeConfig)
       )
+      .addConfigTransform((_, cnNodeConfig) =>
+        updateAllWalletAppBackendConfigs_(walletConfig =>
+          walletConfig.focus(_.treasury.enableValidatorCreditChecks).replace(true)
+        )(cnNodeConfig)
+      )
   }
 
   private lazy val loadTestDuration = 10.seconds
