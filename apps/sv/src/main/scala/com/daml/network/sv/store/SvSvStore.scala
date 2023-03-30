@@ -4,14 +4,14 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -22,14 +22,24 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = domainConfig.global
 
+  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "SvSvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
   def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
   ): Future[
     QueryResult[Option[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(vo.ValidatorOnboarding.COMPANION)(co =>
-        co.payload.candidateSecret == secret
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(vo.ValidatorOnboarding.COMPANION)(
+        _,
+        co => co.payload.candidateSecret == secret,
       )
     )
 
@@ -45,8 +55,11 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(vo.UsedSecret.COMPANION)(co => co.payload.secret == secret)
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(vo.UsedSecret.COMPANION)(
+        _,
+        co => co.payload.secret == secret,
+      )
     )
 
   def lookupUsedSecret(
@@ -58,16 +71,19 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   def listValidatorOnboardings()
       : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
-    defaultAcs.flatMap(_.listContracts(vo.ValidatorOnboarding.COMPANION))
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
+    )
 
   def lookupApprovedSvIdentityByNameWithOffset(
       name: String
   ): Future[
     QueryResult[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(so.ApprovedSvIdentity.COMPANION)(co =>
-        co.payload.candidateName == name
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.ApprovedSvIdentity.COMPANION)(
+        _,
+        co => co.payload.candidateName == name,
       )
     )
 
@@ -81,9 +97,10 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(so.SvConfirmed.COMPANION)(co =>
-        co.payload.svParty == svParty.toProtoPrimitive
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+        _,
+        co => co.payload.svParty == svParty.toProtoPrimitive,
       )
     )
 

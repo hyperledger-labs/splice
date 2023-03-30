@@ -177,6 +177,32 @@ class CNLedgerConnection(
     )
   }
 
+  def submitCommandsTransaction(
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      commands: Seq[Command],
+      commandId: CommandId,
+      deduplicationOffset: String,
+      domainId: DomainId,
+      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+  ): Future[Transaction] = {
+    callCallbacksOnCompletion(
+      client
+        .submitAndWaitForTransaction(
+          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+          applicationId = applicationId,
+          commandId = commandId.commandIdForSubmission,
+          deduplicationConfig = DedupOffset(
+            offset = deduplicationOffset
+          ),
+          actAs = actAs.map(_.toProtoPrimitive),
+          readAs = readAs.map(_.toProtoPrimitive),
+          commands = commands,
+          disclosedContracts = disclosedContracts,
+        )
+    )
+  }
+
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],

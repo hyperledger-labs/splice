@@ -12,8 +12,7 @@ import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.MultiDomainAcsStore
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.HttpSvHandler
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -81,6 +80,7 @@ class SvApp(
         participantAdminConnection,
       )
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global)
+      _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
       ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       (svcStore, svcAutomation) <- ensureBootstrapped(
@@ -555,7 +555,7 @@ class SvApp(
     for {
       coinRules <- store.lookupCoinRules()
       _ <- store.lookupSvcRulesWithOffset().flatMap {
-        case result @ MultiDomainAcsStore.QueryResult(_, None) => {
+        case result @ QueryResult(_, None) => {
           coinRules match {
             case Some(coinRules) =>
               sys.error(
@@ -591,7 +591,7 @@ class SvApp(
                 )
           }
         }
-        case MultiDomainAcsStore.QueryResult(_, Some(svcRules)) =>
+        case QueryResult(_, Some(svcRules)) =>
           coinRules match {
             case Some(coinRules) => {
               if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
@@ -805,7 +805,7 @@ object SvApp {
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         }
-        case QueryResult(off, None) => {
+        case result @ QueryResult(_, None) => {
           svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
             case QueryResult(_, Some(_)) => {
               Future.successful(
@@ -824,7 +824,7 @@ object SvApp {
                       Seq(svParty),
                       secret, // not a leak as this gets hashed before it's used
                     ),
-                  deduplicationOffset = off,
+                  deduplicationOffset = result.deduplicationOffset,
                   domainId = globalDomain,
                 )
                 .map(_ => {
@@ -867,26 +867,29 @@ object SvApp {
                 })
               )
             }
-            case QueryResult(off, None) => {
-              ledgerConnection
-                .submitCommands(
-                  actAs = Seq(svParty),
-                  readAs = Seq.empty,
-                  commands = approvedSvIdentity,
-                  commandId = CNLedgerConnection
-                    .CommandId(
-                      "com.daml.network.sv.approveSvIdentity",
-                      Seq(svParty),
-                      s"$key",
-                    ),
-                  deduplicationOffset = off,
-                  domainId = globalDomain,
-                )
-                .map(_ => {
-                  logger.info("Created new ApprovedSvIdentity contract.")
-                  Right(())
-                })
-            }
+            case result @ QueryResult(_, None) =>
+              for {
+                transaction <- ledgerConnection
+                  .submitCommandsTransaction(
+                    actAs = Seq(svParty),
+                    readAs = Seq.empty,
+                    commands = approvedSvIdentity,
+                    commandId = CNLedgerConnection
+                      .CommandId(
+                        "com.daml.network.sv.approveSvIdentity",
+                        Seq(svParty),
+                        s"$key",
+                      ),
+                    deduplicationOffset = result.deduplicationOffset,
+                    domainId = globalDomain,
+                  )
+                // TODO(#3815) Consider removing this once retries work properly.
+                _ <- svStore.multiDomainAcsStore
+                  .signalWhenIngestedOrShutdown(globalDomain, transaction.getOffset)
+              } yield {
+                logger.info("Created new ApprovedSvIdentity contract.")
+                Right(())
+              }
           }
         } yield res
     }

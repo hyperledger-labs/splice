@@ -42,7 +42,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   override final def acs(domain: DomainId): Future[AcsStore] =
     Future.failed(
       new RuntimeException(
-        "SvSvcStoreSplitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+        "SvSvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
       )
     )
 
