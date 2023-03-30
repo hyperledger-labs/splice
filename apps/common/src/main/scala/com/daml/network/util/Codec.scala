@@ -6,10 +6,11 @@ package com.daml.network.util
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
-import com.daml.lf.data.Numeric
+import com.daml.lf.data.{Decimal, Numeric}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.LfTimestamp
+import io.grpc.{Status, StatusRuntimeException}
 
 /** Trait for values used in our requests.
   * Dec is the Scala representation while Enc is the representation used in code generated for the serialization format, e.g., Codec[BigDecimal, String].
@@ -31,12 +32,12 @@ object Codec {
   def decode[Dec](companion: CodecCompanion[Dec])(e: companion.Enc): Either[String, Dec] =
     companion.instance.decode(e)
   def tryDecode[Dec](companion: CodecCompanion[Dec])(e: companion.Enc): Dec =
-    decode(companion)(e).fold(err => throw new IllegalArgumentException(err), identity)
+    decode(companion)(e).fold(err => failedToDecode(err), identity)
   // Convenience wrapper because we can’t have a generic companion.
   def decodeContractId[T](e: String): Either[String, Primitive.ContractId[T]] =
     contractIdValue[T].decode(e)
   def tryDecodeContractId[T](e: String): Primitive.ContractId[T] =
-    decodeContractId[T](e).fold(err => throw new IllegalArgumentException(err), identity)
+    decodeContractId[T](e).fold(err => failedToDecode(err), identity)
 
   def decodeJavaContractId[TC, TCid, T](companion: ContractCompanion[TC, TCid, T])(
       e: String
@@ -46,13 +47,13 @@ object Codec {
       companion: ContractCompanion[TC, TCid, T]
   )(e: String): TCid =
     decodeJavaContractId(companion)(e)
-      .fold(err => throw new IllegalArgumentException(err), identity)
+      .fold(err => failedToDecode(err), identity)
   def encodeContractId[TCid <: JavaContractId[_]](d: TCid): String = d.contractId
 
   implicit val bigDecimalValue: Codec[BigDecimal, String] =
     new Codec[BigDecimal, String] {
-      def encode(d: BigDecimal) = Numeric.toString(d.bigDecimal)
-      def decode(e: String) = Numeric.fromString(e).map(scala.BigDecimal(_))
+      def encode(d: BigDecimal) = Numeric.assertFromBigDecimal(Decimal.scale, d).toScaledString
+      def decode(e: String) = Decimal.fromString(e).map(scala.BigDecimal(_))
     }
 
   object BigDecimal extends CodecCompanion[BigDecimal] {
@@ -62,8 +63,9 @@ object Codec {
 
   implicit val javaBigDecimalValue: Codec[java.math.BigDecimal, String] =
     new Codec[java.math.BigDecimal, String] {
-      def encode(d: java.math.BigDecimal) = Numeric.toString(d)
-      def decode(e: String) = Numeric.fromString(e)
+      def encode(d: java.math.BigDecimal) =
+        Numeric.assertFromBigDecimal(Decimal.scale, d).toScaledString
+      def decode(e: String) = Decimal.fromString(e)
     }
 
   object JavaBigDecimal extends CodecCompanion[java.math.BigDecimal] {
@@ -109,5 +111,12 @@ object Codec {
   object Timestamp extends CodecCompanion[CantonTimestamp] {
     type Enc = Long
     def instance = timestampValue
+  }
+
+  // TODO (#3819): use a different exception
+  private def failedToDecode(err: String) = {
+    throw new StatusRuntimeException(
+      Status.INVALID_ARGUMENT.withDescription(s"Failed to decode: $err")
+    )
   }
 }

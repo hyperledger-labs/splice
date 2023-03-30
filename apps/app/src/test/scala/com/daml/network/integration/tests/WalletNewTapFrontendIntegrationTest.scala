@@ -58,12 +58,17 @@ class WalletNewTapFrontendIntegrationTest
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       onboardWalletUser(aliceWallet, aliceValidator)
 
+      val manyDigits = "0.19191919191919199191"
+
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
           "Alice taps balance with more than 10 decimal places in the wallet", {
             browseToWallet(aliceWalletNewPort, aliceDamlUser)
-            loggerFactory.suppressErrors(
-              tapCoins(BigDecimal("3.141592653589793238462643383279502884197"))
+            loggerFactory.assertLogs(
+              tapCoins(BigDecimal(manyDigits)),
+              _.errorMessage should include(
+                s"Failed to decode: Could not read Decimal string \\\"$manyDigits\\\""
+              ),
             )
           },
         )(

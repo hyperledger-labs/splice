@@ -37,6 +37,7 @@ final class HttpWalletErrorHandler(
       case Status.Code.UNAVAILABLE => StatusCodes.ServiceUnavailable
       case Status.Code.INTERNAL => StatusCodes.InternalServerError
       case Status.Code.FAILED_PRECONDITION => StatusCodes.BadRequest
+      case Status.Code.INVALID_ARGUMENT => StatusCodes.BadRequest
       case _ => StatusCodes.InternalServerError
     }
   }
