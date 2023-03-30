@@ -773,20 +773,21 @@ For convenience, you can `export` these from your `.envrc.private` which is igno
 
 Be aware: these tokens allow the requester to perform any administrative action against the Auth0 tenant! Use caution and keep production values secure.
 
-#### Setting up `lnav` to Inspect Canton logs
+#### Setting up `lnav` to Inspect Canton and CometBFT logs
 
-If you have never used `lnav` to inspect Canton logs, then we recommend:
-1. Install the Canton log format using `lnav -i canton/canton-json.lnav.json`.
-   The command will print the location where the log format is installed globally (most likely `~/.lnav/formats/installed/canton_logstash_json.json` or `~/.config/lnav/formats/installed/canton_logstash_json.json`)
-   and enable auto-detection of the Canton log format in future `lnav` sessions.
-2. To automatically keep the format definition up to date, delete the file installed above and create a symlink instead,
-   using `ln -s $PWD/canton/canton-json.lnav.json <LNAV_CONFIG_DIR>/formats/installed/canton_logstash_json.json` where `LNAV_CONFIG_DIR` is the
-   path containing lnav configuration files (read the output of `lnav --help` to determine that path).
-3. Type `lnav log/canton_network_test.clog` to inspect the test logs.
-4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
+If you have never used `lnav` to inspect Canton or CometBFT logs, then we recommend:
+1. Call `lnav --help` to determine the configuration directory. It should be something like `~/.lnav` or `~/.config/lnav`.
+2. Set `export LNAV_CONFIG_DIR=<the directory output by the help text above>`
+3. Create the following symlinks to automatically keep the format definitions up to date:
+   ```
+   ln -sf $PWD/canton/canton-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/canton_logstash_json.json
+   ln -sf $PWD/apps/cometbft/cometbft-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/cometbft-json.json
+   ```
+4. Type `lnav log/canton_network_test.clog` to inspect the test logs.
+5. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
    and [HotKeys](https://docs.lnav.org/en/latest/hotkeys.html), and learn to effectively navigate the test logs.
    The Canton docs also contain a [short tutorial](https://docs.daml.com/canton/usermanual/monitoring.html#viewing-logs) highlighting the most relevant features and hotkeys.
-5. In addition to the above documentation, here are some Canton Network specific tips:
+6. In addition to the above documentation, here are some Canton Network specific tips:
    1. Some of our debug log messages contain a lot of data including newlines and can take up quite a bit of vertical space.
       Here are examples of verbose loggers that can be disabled to remove multi-line messages:
       1. Logging incoming and outgoing network requests: `:filter-out RequestLogger`
