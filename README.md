@@ -156,7 +156,7 @@ M3 - TestNet Launch.
 * Add the Java SDK from nix per the instructions [in the Daml repo.](https://github.com/digital-asset/daml/blob/main/BAZEL.md#configuring-the-jdk-in-intellij)
  In the example above, the JDK would be at `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/lib/openjdk`.
 * Open the repository via 'File -> New -> Project from existing sources'
-* 'Import project from external model' and select sbt
+* 'Import project from external model' and select sbt. If you don't see sbt, make sure you have the `Scala` IntelliJ plugins installed.
 * Point IntelliJ to the JRE home and sbt-launch jar. From the example above, these should respectively be
         `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/` and
         `/nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/share/sbt/bin/sbt-launch.jar`.
