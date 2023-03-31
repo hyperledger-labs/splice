@@ -1,10 +1,14 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
@@ -15,30 +19,27 @@ import scala.concurrent.{ExecutionContext, Future}
 class WalletAppInstallTrigger(
     override protected val context: TriggerContext,
     walletManager: UserWalletManager,
-    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
     ](
       walletManager.store,
-      () => walletManager.store.domains.signalWhenConnected(globalDomain),
       installCodegen.WalletAppInstall.COMPANION,
     ) {
 
-  // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   override def completeTask(
-      install: Contract[
+      install: ReadyContract[
         installCodegen.WalletAppInstall.ContractId,
         installCodegen.WalletAppInstall,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     Future {
-      val endUserName = install.payload.endUserName
-      walletManager.getOrCreateUserWallet(install) match {
+      val endUserName = install.contract.payload.endUserName
+      walletManager.getOrCreateUserWallet(install.contract) match {
         case UnlessShutdown.AbortedDueToShutdown =>
           TaskSuccess(
             s"skipped or aborted onboarding wallet end-user '$endUserName', as we are shutting down."

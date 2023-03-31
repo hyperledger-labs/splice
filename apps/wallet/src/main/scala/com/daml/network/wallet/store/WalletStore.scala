@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import cats.syntax.traverseFilter.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,33 +29,48 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
 
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "WalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
+  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+
   def lookupInstallByParty(
       endUserParty: PartyId
   ): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
-    acs <- defaultAcs
-    install <- acs.findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
-      co.payload.endUserParty == endUserParty.toProtoPrimitive
+    domainId <- defaultAcsDomainIdF
+    install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
+      domainId,
+      (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
+        co.payload.endUserParty == endUserParty.toProtoPrimitive,
     )
-  } yield install.value
+  } yield install
 
   def lookupInstallByName(
       endUserName: String
   ): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
-    acs <- defaultAcs
-    install <- acs.findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
-      co.payload.endUserName == endUserName
+    domainId <- defaultAcsDomainIdF
+    install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
+      domainId,
+      (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
+        co.payload.endUserName == endUserName,
     )
-  } yield install.value
+  } yield install
 
   def lookupValidatorFeaturedAppRight()
       : Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] =
-    defaultAcs.flatMap(
-      _.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
-        co.payload.provider == key.validatorParty.toProtoPrimitive
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(
+        _,
+        (co: Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
+          co.payload.provider == key.validatorParty.toProtoPrimitive,
       )
     )
 

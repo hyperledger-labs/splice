@@ -1,6 +1,5 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
@@ -20,7 +19,6 @@ class WalletAutomationService(
     clock: Clock,
     walletManager: UserWalletManager,
     ledgerClient: CNLedgerClient,
-    globalDomain: DomainAlias,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     implicit protected val loggerFactory: NamedLoggerFactory,
@@ -38,6 +36,6 @@ class WalletAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, globalDomain))
+  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager))
 }

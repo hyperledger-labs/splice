@@ -491,8 +491,11 @@ class TreasuryService(
       issuingRoundsMap = openIssuingRounds
         .map(r => (r.payload.round, r.payload))
         .toMap
-      walletAcs <- walletManager.store.defaultAcs
-      validatorRights <- walletAcs.listContracts(coinCodegen.ValidatorRight.COMPANION)
+      domainId <- walletManager.store.domains.signalWhenConnected(
+        walletManager.store.defaultAcsDomain
+      )
+      validatorRights <- walletManager.store.multiDomainAcsStore
+        .listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, domainId)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
         openRound.payload.round.number,
