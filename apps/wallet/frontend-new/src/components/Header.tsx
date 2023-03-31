@@ -8,6 +8,7 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
 import CurrentUser from './CurrentUser';
+import FeaturedAppRight from './FeaturedAppRight';
 
 const Header: React.FC = () => {
   const navLinks = [
@@ -62,6 +63,7 @@ const Header: React.FC = () => {
         <Typography id="logged-in-user">
           <CurrentUser />
         </Typography>
+        <FeaturedAppRight />
         <Divider orientation="vertical" variant="middle" flexItem />
         <Button id="logout-button" onClick={logout} color="inherit">
           <Stack direction="row" alignItems="center">
