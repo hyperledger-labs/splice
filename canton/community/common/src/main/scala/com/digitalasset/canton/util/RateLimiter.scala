@@ -55,9 +55,9 @@ class RateLimiter(
 
     def update(now: Long): State = {
       val newApprovedTasks = computeApprovedTasks(now)
-      // if the newApprovedTasks is below the maxBurst value, the request is approved.
+      // if approving this task would not exceed the maxBurst threshold, the request is approved.
       // this allows bursts of up to "maxBurst" and thereafter enforces a strictly continuous rate limit
-      if (newApprovedTasks < maxBurst) {
+      if (newApprovedTasks + 1 < maxBurst) {
         State(approvedLastTask = true, now, newApprovedTasks + 1)
       } else State(approvedLastTask = false, now, newApprovedTasks)
     }

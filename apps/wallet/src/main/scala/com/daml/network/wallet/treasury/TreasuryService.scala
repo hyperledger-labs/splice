@@ -343,12 +343,12 @@ class TreasuryService(
     } else {
       val now = clock.now
       val batchExecutionF = for {
+        install <- userStore.getInstall()
         contextAndInputsOpt <- getTransferContextAndInputs(
           now,
           filteredBatch.isMergeOnly,
           filteredBatch.numTapOperations,
         )
-        install <- userStore.getInstall()
         res <-
           contextAndInputsOpt match {
             // if we returned None previously, this is (1) a batch that only contains a "merge" operation, but
@@ -512,7 +512,7 @@ class TreasuryService(
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
       if (!tapsApproved) {
-        new StatusRuntimeException(
+        throw new StatusRuntimeException(
           Status.ABORTED.withDescription(
             show"Aborted operation - insufficient validator credit to create coins"
           )

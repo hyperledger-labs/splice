@@ -34,8 +34,8 @@ class HttpScanHandler(
 
   // TODO(#3816): Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
   private val defaultThroughputRateLimiter = {
-    // default throughput of 4 transactions per second with a max burst of 20 transactions
-    new RateLimiter(NonNegativeNumeric.tryCreate(4.0), PositiveNumeric.tryCreate(5.0))
+    // default throughput of 2 transactions per second with a max burst of 2 transactions
+    new RateLimiter(NonNegativeNumeric.tryCreate(2.0), PositiveNumeric.tryCreate(1.0))
   }
 
   def getSvcPartyId(
@@ -304,11 +304,14 @@ class HttpScanHandler(
   def checkAndUpdateValidatorCredit(
       response: v0.ScanResource.CheckAndUpdateValidatorCreditResponse.type
   )(): Future[v0.ScanResource.CheckAndUpdateValidatorCreditResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
       Future.successful {
         // consume traffic credits from default traffic allowance
         val approved = defaultThroughputRateLimiter.checkAndUpdateRate()
+        logger.debug(
+          s"Remaining free throughput allowance is ${defaultThroughputRateLimiter.getCurrentAllowance}"
+        )
         v0.ScanResource.CheckAndUpdateValidatorCreditResponse.OK(
           definitions.CheckAndUpdateValidatorCreditResponse(approved)
         )
