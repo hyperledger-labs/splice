@@ -3,11 +3,14 @@
 
 package com.digitalasset.canton.console.commands
 
-import cats.instances.either.*
-import cats.instances.option.*
-import cats.syntax.traverse.*
+import better.files.File
+import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.{
+  AdminCommandRunner,
+  CommandErrors,
+  CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   FeatureFlag,
@@ -15,21 +18,26 @@ import com.digitalasset.canton.console.{
   Help,
   Helpful,
 }
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.{LfContractId, SerializableContractWithWitnesses}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
+import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DomainAlias, SequencerCounter}
+import com.digitalasset.canton.{DiscardOps, DomainAlias, SequencerCounter}
+import com.google.protobuf.ByteString
+import io.grpc.StatusRuntimeException
 
-import java.io.File
 import java.time.Instant
+import scala.concurrent.{Await, Promise, TimeoutException}
 
 abstract class ParticipantRepairAdministration(
     val consoleEnvironment: ConsoleEnvironment,
+    runner: AdminCommandRunner,
     val loggerFactory: NamedLoggerFactory,
 ) extends FeatureFlagFilter
     with NoTracing
@@ -246,37 +254,84 @@ abstract class ParticipantRepairAdministration(
         |
         The arguments are:
         - parties: identifying contracts having at least one stakeholder from the given set
-        - target: the target file where to store the data. Use .gz as a suffix to get a compressed file (recommended)
-        - protocolVersion: optional the protocol version to use for the serialization. Defaults to the one of the domains.
+        - outputFile: the output file name where to store the data. Use .gz as a suffix to get a compressed file (recommended)
         - filterDomainId: restrict the export to a given domain
         - timestamp: optionally a timestamp for which we should take the state (useful to reconcile states of a domain)
-        - batchSize: batch size used to load contracts. Defaults to 1000.
+        - protocolVersion: optional the protocol version to use for the serialization. Defaults to the one of the domains.
+        - chunkSize: size of the byte chunks to stream back: default 1024 * 1024 * 2 = (2MB)
         """
   )
   def download(
       parties: Set[PartyId],
-      target: String,
+      outputFile: String = ParticipantRepairAdministration.defaultFile,
       filterDomainId: String = "",
       timestamp: Option[Instant] = None,
-      batchSize: PositiveInt = PositiveInt.tryCreate(1000),
       protocolVersion: Option[ProtocolVersion] = None,
-  ): Map[DomainId, Long] = {
-    runRepairCommand { tc =>
-      access(participant =>
-        for {
-          timestampConverted <- timestamp.traverse(CantonTimestamp.fromInstant)
-          res <- participant.sync.stateInspection
-            .storeActiveContractsToFile(
-              parties,
-              new File(target),
-              batchSize,
-              _.filterString.startsWith(filterDomainId),
-              timestampConverted,
-              protocolVersion,
-            )(tc)
-        } yield res
+      chunkSize: Option[PositiveInt] = None,
+  ): Unit = {
+    consoleEnvironment.run {
+      val target = File(outputFile)
+      val requestComplete = Promise[String]()
+      val observer = new GrpcByteChunksToFileObserver[AcsSnapshotChunk](
+        target,
+        requestComplete,
       )
+      val timeout = consoleEnvironment.commandTimeouts.ledgerCommand
+
+      def call = consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .Download(
+              parties,
+              filterDomainId,
+              timestamp,
+              protocolVersion,
+              chunkSize,
+              observer,
+              target.toJava.getName.endsWith(".gz"),
+            )
+        )
+      }
+
+      try {
+        ResourceUtil.withResource(call) { _ =>
+          CommandSuccessful(
+            Await
+              .result(
+                requestComplete.future,
+                timeout.duration,
+              )
+              .discard
+          )
+        }
+      } catch {
+        case sre: StatusRuntimeException =>
+          GenericCommandError(
+            GrpcError("Generating acs snapshot file", "download_acs_snapshot", sre).toString
+          )
+        case _: TimeoutException =>
+          target.delete(swallowIOExceptions = true)
+          CommandErrors.ConsoleTimeout.Error(timeout.asJavaApproximation)
+      }
     }
   }
 
+  @Help.Summary("Import ACS snapshot", FeatureFlag.Preview)
+  @Help.Description("""Uploads a binary into the participant's ACS""")
+  def upload(
+      inputFile: String = ParticipantRepairAdministration.defaultFile
+  ): Unit = {
+    val file = File(inputFile)
+    consoleEnvironment.run {
+      runner.adminCommand(
+        ParticipantAdminCommands.ParticipantRepairManagement.Upload(
+          ByteString.copyFrom(file.loadBytes)
+        )
+      )
+    }
+  }
+}
+
+object ParticipantRepairAdministration {
+  private val defaultFile = "canton-acs-snapshot.gz"
 }

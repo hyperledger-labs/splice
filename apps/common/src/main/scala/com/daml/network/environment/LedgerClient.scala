@@ -411,15 +411,16 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       parties: Seq[PartyId],
       source: DomainId,
       offset: Option[LedgerOffset.Absolute],
-  ): Future[LedgerClient.GetInFlightTransfersResponse] = {
+  ): Source[LedgerClient.GetInFlightTransfersResponse, NotUsed] = {
     val req = snapshotsvc.GetInFlightTransfersRequest(
       sourceDomainId = source.toProtoPrimitive,
       validAtOffset = offset.fold("")(_.getOffset),
       stakeholders = parties.map(_.toProtoPrimitive),
     )
-    stateSnapshotServiceStub
-      .getInFlightTransfers(req)
-      .map(LedgerClient.GetInFlightTransfersResponse.fromProto)
+    ClientAdapter.serverStreaming(
+      req,
+      stateSnapshotServiceStub.getInFlightTransfers,
+    ) map LedgerClient.GetInFlightTransfersResponse.fromProto
   }
 }
 

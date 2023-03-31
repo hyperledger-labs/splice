@@ -16,6 +16,7 @@ option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidom
 service StateSnapshotService {
 
   // Get the list of in-flight transfers.
+  // If there are no in-flight transfers, the stream returns a single response message with the offset at which the snapshot has been taken.
   // Clients SHOULD use the offset in the GetInFlightTransfersResponse message to continue streaming updates with the update service.
   // Clients SHOULD NOT assume that the set of in-flight transfers they receive reflects the state at the ledger end.
   // Clients SHOULD be aware of limitations of this endpoint.
@@ -29,7 +30,11 @@ service StateSnapshotService {
 
     Note that 2. may not be valid at the time of the query if topology was changed.
    */
-  rpc GetInFlightTransfers (GetInFlightTransfersRequest) returns (GetInFlightTransfersResponse);
+  rpc GetInFlightTransfers (GetInFlightTransfersRequest) returns (stream GetInFlightTransfersResponse);
+
+  // Get the list of connected domains to which the party has the rights to submit to and the
+  // participant is connected to.
+  rpc GetConnectedDomains (GetConnectedDomainsRequest) returns (GetConnectedDomainsResponse);
 }
 
 
@@ -51,13 +56,33 @@ message GetInFlightTransfersRequest {
   repeated string stakeholders = 5;
 }
 
+// When returning the GetInFlightTransfersResponse as a stream, then
+//   - All but the last GetInFlightTransfersResponse will have empty offset
+//   - The last GetInFlightTransfersResponse will have `offset` and empty `transfer_outs`
 message GetInFlightTransfersResponse {
+  // Included only in the last message.
   // The absolute offset. The format of this field is described in ``ledger_offset.proto``.
-  // Required
   string offset = 1;
 
   // All transfer-outs on the source domain before offset `offset` that MAY still be eligible for transfer-in.
   // No guarantees are made with respect to synchronization on transfer-ins on other domains.
   // You should attempt to transfer in all in-flight transfers and handle errors where the contract has already been transferred in.
   repeated TransferredOutEvent transfer_outs = 2;
+}
+
+message GetConnectedDomainsRequest {
+  // The submitting party
+  // Must be a valid PartyIdString (as described in ``value.proto``).
+  // Required
+  string party = 1;
+}
+
+message GetConnectedDomainsResponse {
+  message ConnectedDomain {
+    // The alias of the domain
+    string domain_alias = 1;
+    // The ID of the domain
+    string domain_id = 2;
+  }
+  repeated ConnectedDomain connected_domains = 1;
 }

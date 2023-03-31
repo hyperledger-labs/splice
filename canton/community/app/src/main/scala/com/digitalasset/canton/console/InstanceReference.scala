@@ -556,7 +556,7 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   def commitments: LocalCommitmentsAdministrationGroup = commitments_
 
   private lazy val repair_ =
-    new ParticipantRepairAdministration(consoleEnvironment, loggerFactory) {
+    new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory) {
       override protected def access[T](handler: ParticipantNode => T): T =
         LocalParticipantReference.this.access(handler)
     }

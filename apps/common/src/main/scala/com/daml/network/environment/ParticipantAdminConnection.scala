@@ -1,5 +1,6 @@
 package com.daml.network.admin.api.client
 
+import com.daml.network.environment.GrpcByteChunksToByteArrayObserver
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -11,6 +12,7 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.store.TimeQuery
@@ -19,11 +21,11 @@ import com.digitalasset.canton.topology.transaction.{
   RequestSide,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-
 import java.time.Instant
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -110,17 +112,27 @@ class ParticipantAdminConnection(
       parties: Set[PartyId],
       filterDomainId: String = "",
       timestamp: Option[Instant] = None,
+      chunkSize: Option[PositiveInt] = None,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
+    val requestComplete = Promise[ByteString]()
+    val observer = new GrpcByteChunksToByteArrayObserver[AcsSnapshotChunk](requestComplete)
     runCmd(
-      ParticipantAdminCommands.PartyMigration
-        .DownloadAcsSnapshot(parties, filterDomainId, timestamp, None)
-    ).map(_._2)
+      ParticipantAdminCommands.ParticipantRepairManagement.Download(
+        parties,
+        filterDomainId,
+        timestamp,
+        None,
+        chunkSize,
+        observer,
+        gzipFormat = false,
+      )
+    ).discard
+    requestComplete.future
   }
 
   def uploadAcsSnapshot(acsBytes: ByteString)(implicit traceContext: TraceContext): Future[Unit] = {
     runCmd(
-      ParticipantAdminCommands.PartyMigration
-        .UploadAcsSnapshot(acsBytes, PositiveInt.tryCreate(1000))
+      ParticipantAdminCommands.ParticipantRepairManagement.Upload(acsBytes)
     )
   }
 

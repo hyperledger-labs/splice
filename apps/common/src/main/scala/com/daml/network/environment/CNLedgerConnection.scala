@@ -384,7 +384,8 @@ class CNLedgerConnection(
         source,
         offset,
       )
-      .map(_.transferOuts)
+      .mapConcat(_.transferOuts)
+      .runWith(Sink.seq)
 
   // TODO (#2706)
   // This is a hacked up wrapper that transforms transaction trees into flat transactions.

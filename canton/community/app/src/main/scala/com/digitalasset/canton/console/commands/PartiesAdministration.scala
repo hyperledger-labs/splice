@@ -321,10 +321,6 @@ class ParticipantPartiesAdministrationGroup(
     )
   }
 
-  @Help.Summary("Party migration tools", FeatureFlag.Preview)
-  @Help.Description("Tools to migrate ACS to another participant")
-  def migration: PartyMigrationGroup = new PartyMigrationGroup(runner, consoleEnvironment)
-
 }
 
 class LocalParticipantPartiesAdministrationGroup(
