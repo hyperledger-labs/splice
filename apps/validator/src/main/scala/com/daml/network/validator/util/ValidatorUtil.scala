@@ -2,7 +2,7 @@ package com.daml.network.validator.util
 
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
@@ -38,7 +38,7 @@ private[validator] object ValidatorUtil {
       _ <- retryProvider.retryForAutomation(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
-          case QueryResult(off, None) =>
+          case result @ QueryResult(_, None) =>
             connection
               .submitCommands(
                 actAs = Seq(validatorServiceParty, walletServiceParty, endUserParty),
@@ -56,7 +56,7 @@ private[validator] object ValidatorUtil {
                     Seq(validatorServiceParty),
                     CNLedgerConnection.sanitizeUserIdToPartyString(endUserName),
                   ),
-                deduplicationOffset = off,
+                deduplicationOffset = result.deduplicationOffset,
                 domainId = domainId,
               )
           case QueryResult(_, Some(_)) =>

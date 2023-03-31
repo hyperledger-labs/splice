@@ -3,6 +3,7 @@ package com.daml.network.validator.admin.http
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.http.v0.{definitions, validatorAdmin as v0}
+import com.daml.network.util.Contract
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -86,9 +87,12 @@ class HttpValidatorAdminHandler(
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     logger.debug(s"Offboarding user: ${user}")
     for {
-      acsStore <- store.defaultAcs
-      install <- acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(
-        _.payload.endUserName == user
+      install <- store.multiDomainAcsStore.findContractOnDomain(
+        walletCodegen.WalletAppInstall.COMPANION
+      )(
+        domainId,
+        (co: Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]) =>
+          co.payload.endUserName == user,
       )
       res <- install match {
         case None =>

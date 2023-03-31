@@ -16,7 +16,7 @@ import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.HttpValidatorHandler
@@ -249,8 +249,8 @@ class ValidatorApp(
         loggerFactory,
         timeouts,
       )
-      _ <- store.domains.signalWhenConnected(config.domains.global)
-      domainId <- store.domains.getDomainId(config.domains.global)
+      domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      _ <- waitForAcsIngestion(store.multiDomainAcsStore, domainId)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(
           connection,

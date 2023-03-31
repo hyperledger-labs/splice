@@ -69,8 +69,6 @@ class WalletNewFrontendTimeBasedIntegrationTest
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val entryName = perTestCaseName("alice.cns")
 
-      onboardWalletUser(aliceWallet, aliceValidator)
-
       createDirectoryEntry(
         aliceParty,
         aliceDirectory,

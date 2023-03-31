@@ -7,8 +7,8 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
@@ -16,7 +16,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,6 +24,15 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
+
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "WalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
+  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
   protected[this] def domainConfig: ValidatorDomainConfig
 
@@ -34,9 +43,10 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
   ): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
   ]] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(walletCodegen.WalletAppInstall.COMPANION)(co =>
-        co.payload.endUserName == endUserName
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(walletCodegen.WalletAppInstall.COMPANION)(
+        _,
+        co => co.payload.endUserName == endUserName,
       )
     )
 
@@ -50,7 +60,10 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
   def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
-    defaultAcs.flatMap(_.findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true))
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .findContractOnDomainWithOffset(coinCodegen.CoinRules.COMPANION)(_, _ => true)
+    )
 
   def lookupValidatorLicenseWithOffset(): Future[
     QueryResult[Option[Contract[
@@ -58,10 +71,10 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(validatorLicenseCodegen.ValidatorLicense.COMPANION)(vl =>
-        vl.payload.validator == key.validatorParty.toProtoPrimitive
-      )
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(
+        validatorLicenseCodegen.ValidatorLicense.COMPANION
+      )(_, vl => vl.payload.validator == key.validatorParty.toProtoPrimitive)
     )
 
   def lookupValidatorRightByPartyWithOffset(
@@ -69,9 +82,10 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
   ): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(coinCodegen.ValidatorRight.COMPANION)(co =>
-        co.payload.user == party.toProtoPrimitive
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(coinCodegen.ValidatorRight.COMPANION)(
+        _,
+        co => co.payload.user == party.toProtoPrimitive,
       )
     )
 
@@ -80,14 +94,17 @@ trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
       Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
     ]
   ] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(ValidatorTraffic.COMPANION)(_ => true)
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTraffic.COMPANION)(_, _ => true)
     )
 
   def listUsers(): Future[Seq[String]] = {
     for {
-      acs <- defaultAcs
-      installs <- acs.listContracts(walletCodegen.WalletAppInstall.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      installs <- multiDomainAcsStore.listContractsOnDomain(
+        walletCodegen.WalletAppInstall.COMPANION,
+        domainId,
+      )
     } yield installs.map(i => i.payload.endUserName)
   }
 }

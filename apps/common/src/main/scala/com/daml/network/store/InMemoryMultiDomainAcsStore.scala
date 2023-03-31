@@ -292,7 +292,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       )
     )
     QueryResult(
-      st.offsets,
+      st.offsets.filter({ case (k, _) => k == domain }),
       optEntry,
     )
   }
