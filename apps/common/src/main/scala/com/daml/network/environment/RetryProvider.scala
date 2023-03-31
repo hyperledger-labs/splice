@@ -24,7 +24,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
-import com.digitalasset.canton.util.retry.{Backoff, Pause, Success}
+import com.digitalasset.canton.util.retry.{Backoff, Success}
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
@@ -132,11 +132,21 @@ class RetryProvider(
 
   private val retryForAutomationConfig =
     AutomationRetryConfig(
-      RetryConfig(maxRetries = 35, initialDelay = 200.millis, maxDelay = 5.seconds),
+      RetryConfig(
+        maxRetries = 35,
+        initialDelay = 200.millis,
+        maxDelay = 5.seconds,
+        resetRetriesAfter = 1.minute,
+      ),
       outerLoopDelay = 5.seconds,
     )
   private val retryForClientCallsConfig =
-    RetryConfig(maxRetries = 10, initialDelay = 100.millis, maxDelay = 1.seconds)
+    RetryConfig(
+      maxRetries = 10,
+      initialDelay = 100.millis,
+      maxDelay = 1.seconds,
+      resetRetriesAfter = 24.hours,
+    )
 
   /** A retry intended for automation calls, retries forever. */
   def retryForAutomation[T](
@@ -170,22 +180,8 @@ class RetryProvider(
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[T] = {
-    def outerLoop(task: => Future[T]) = {
-      implicit val success: Success[T] = Success.always
-      Pause(
-        logger,
-        this,
-        Int.MaxValue, // This is special cased as infinite retries so don’t need to worry about overflows.
-        retryForAutomationConfig.outerLoopDelay,
-        operationName,
-        longDescription = s"Outer retry loop for $operationName",
-      ).apply(task, retryable(operationName))
-    }
-    outerLoop(
-      retry(operationName, task, logger, retryForAutomationConfig.config, retryable)
-    )
-  }
+  ): Future[T] =
+    retry(operationName, task, logger, retryForAutomationConfig.config, retryable)
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T](
@@ -230,12 +226,18 @@ class RetryProvider(
       retryConfig.initialDelay,
       retryConfig.maxDelay,
       operationName,
+      resetRetriesAfter = retryConfig.resetRetriesAfter,
     ).apply(task, retryable(operationName))
   }
 }
 
 object RetryProvider {
-  case class RetryConfig(maxRetries: Int, initialDelay: FiniteDuration, maxDelay: Duration) {}
+  case class RetryConfig(
+      maxRetries: Int,
+      initialDelay: FiniteDuration,
+      maxDelay: Duration,
+      resetRetriesAfter: FiniteDuration,
+  )
 
   /** Retry config for automation. For automation we use an outer loop that retries forever
     * with a fixed delay `outerLoopDelay` and an inner loop with exponential backoff configured

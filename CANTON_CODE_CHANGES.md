@@ -35,6 +35,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Fixed a bug where `RemoteClock` was not waiting for a proper channel shudown
 * Changed default log file name to `log/canton_network.clog` and `log/canton_network_test.clog`
 * Changed default JSON logger configuration to try to shorten logger names to 30 characters
+* Added `resetRetriesAfter` option to `Backoff` retry policy
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

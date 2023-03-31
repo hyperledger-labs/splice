@@ -63,7 +63,7 @@ class WalletSurviveCantonRestartIntegrationTest
       Using.resource(startCanton(cantonArgs)) { _ =>
         // A failed request will usually run into the 20s akka timeout since the backend retries forever.
         // That means that in practice even with 40s timeouts we only have 2 attempts. Therefore we use an absurdly high timeout atm.
-        // TODO(#2178) Check if we still need this once the retry logic in the treasury service is better.
+        // We may no longer need this with different retry logic in the treasury service
         eventuallySucceeds(timeUntilSuccess = 80.seconds) {
           aliceWalletBackend.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")

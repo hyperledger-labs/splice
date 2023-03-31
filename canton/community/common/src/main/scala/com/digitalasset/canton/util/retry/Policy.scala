@@ -26,8 +26,9 @@ import com.digitalasset.canton.util.retry.RetryWithDelay.{RetryOutcome, RetryTer
 import com.digitalasset.canton.util.{DelayUtil, LoggerUtil}
 import org.slf4j.event.Level
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.jdk.DurationConverters.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
@@ -89,6 +90,7 @@ abstract class RetryWithDelay(
     actionable: Option[String], // How to mitigate the error
     initialDelay: FiniteDuration,
     totalMaxRetries: Int,
+    resetRetriesAfter: FiniteDuration,
     flagCloseable: FlagCloseable,
     retryLogLevel: Option[Level],
 ) extends Policy(logger) {
@@ -157,6 +159,9 @@ abstract class RetryWithDelay(
 
     import LoggerUtil.logOnThrow
 
+    val clock = java.time.Clock.systemUTC()
+    import java.time.Duration as JDuration, clock.instant as now
+
     def runTask(): Future[T] = Future.fromTry(Try(task)).flatten
 
     def run(
@@ -166,7 +171,9 @@ abstract class RetryWithDelay(
         retriesOfLastErrorKind: Int,
         delay: FiniteDuration,
     ): Future[RetryOutcome[T]] = logOnThrow {
+      val startedAt = now()
       previousResult.transformWith { x =>
+        val finishedAt = now()
         logOnThrow(x match {
           case succ @ util.Success(result) if success.predicate(result) =>
             logger.trace(
@@ -269,12 +276,20 @@ abstract class RetryWithDelay(
                               // is registered with the normal execution context before it can close.
                               directExecutionContext
                             )
+                          import scala.math.Ordering.Implicits.*
+                          val (nextTotalRetries, nextDelayIs) =
+                            if (
+                              resetRetriesAfter.toJava <= JDuration.between(startedAt, finishedAt)
+                            )
+                              (0, initialDelay)
+                            else
+                              (totalRetries + 1, nextDelay(totalRetries + 1, delay))
                           val retryF = run(
                             nextRunF,
-                            totalRetries + 1,
+                            nextTotalRetries,
                             errorKind,
                             retriesOfErrorKind + 1,
-                            nextDelay(totalRetries + 1, delay),
+                            nextDelayIs,
                           )
                           retryP.completeWith(retryF)
                         }(traceContext)
@@ -380,6 +395,7 @@ case class Directly(
       None,
       Duration.Zero,
       maxRetries,
+      resetRetriesAfter = 24.hours,
       flagCloseable,
       retryLogLevel,
     ) {
@@ -404,6 +420,7 @@ case class Pause(
       actionable,
       delay,
       maxRetries,
+      resetRetriesAfter = 24.hours,
       flagCloseable,
       retryLogLevel,
     ) {
@@ -451,6 +468,7 @@ case class Backoff(
     initialDelay: FiniteDuration,
     maxDelay: Duration,
     operationName: String,
+    resetRetriesAfter: FiniteDuration = 24.hours,
     longDescription: String = "",
     actionable: Option[String] = None,
     retryLogLevel: Option[Level] = None,
@@ -462,6 +480,7 @@ case class Backoff(
       actionable,
       initialDelay,
       maxRetries,
+      resetRetriesAfter,
       flagCloseable,
       retryLogLevel,
     ) {
