@@ -103,12 +103,12 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     val partyIdFromBadUserId = aliceValidator.onboardUser(s"test@example!#+~-user|123|${randomId}")
     partyIdFromBadUserId.toString
       .split("::")
-      .head should fullyMatch regex (s"test_example____-user_123_${randomId}-.*")
+      .head should fullyMatch regex (s"test_0040example_0021_0023_002b_007e-user_007c123_007c${randomId}")
 
     val partyIdFromGoodUserId = aliceValidator.onboardUser(s"other-_us:er-${randomId}")
     partyIdFromGoodUserId.toString
       .split("::")
-      .head should fullyMatch regex (s"other-_us:er-${randomId}")
+      .head should fullyMatch regex (s"other-__us:er-${randomId}")
   }
 
   "register user" in { implicit env =>

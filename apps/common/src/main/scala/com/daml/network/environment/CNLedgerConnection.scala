@@ -529,7 +529,7 @@ class CNLedgerConnection(
       userRights: Seq[User.Right],
   ): Future[PartyId] = {
     for {
-      party <- allocatePartyViaLedgerApi(Some(sanitizeUserIdToLedgerString(user)), Some(user))
+      party <- allocatePartyViaLedgerApi(Some(sanitizeUserIdToPartyString(user)), Some(user))
       partyId <- createUserWithPrimaryParty(user, party, userRights)
     } yield partyId
   }
@@ -907,26 +907,24 @@ object CNLedgerConnection {
     }
   }
 
-  /** In a number of places we want to use a user id in a place where a `LedgerString` is expected, e.g.,
+  /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
     * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
-    * this function can be used to perform the necessary escaping.g
+    * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than
+    * LedgerString so this can also be used to escape to ledger strings.
     */
-  def sanitizeUserIdToLedgerString(userId: String): String = {
-    val (processed, invalidCharDetected) = userId.foldLeft(("", false))((res, currentChar) => {
-      if ("[^\\w-_:]".r matches (s"$currentChar")) {
-        (res._1 + "_", true)
-      } else {
-        (res._1 + currentChar, res._2)
-      }
-    })
-
-    if (invalidCharDetected) {
-      // append a UUID if we had to rewrite the user id
-      // because there's a chance it could now conflict with an existing party
-      s"${processed}-${UUID.randomUUID.toString}"
-    } else {
-      processed
-    }
+  def sanitizeUserIdToPartyString(userId: String): String = {
+    // We escape invalid characters using _hexcode(invalidchar)
+    // See https://github.com/digital-asset/daml/blob/dfc8619e35969ce30daa2427d7318bf70bb75386/daml-lf/data/src/main/scala/com/digitalasset/daml/lf/data/IdString.scala#L320
+    // for allowed characters.
+    userId.view.flatMap {
+      case c if c >= 'a' && c <= 'z' => Seq(c)
+      case c if c >= 'A' && c <= 'Z' => Seq(c)
+      case c if c >= '0' && c <= '9' => Seq(c)
+      case c if c == ':' || c == '-' || c == ' ' => Seq(c)
+      case '_' => Seq('_', '_')
+      case c =>
+        '_' +: "%04x".format(c.toInt)
+    }.mkString
   }
 
   def transactionFilterByParty(partyId: PartyId, templateId: Identifier): IngestionFilter =

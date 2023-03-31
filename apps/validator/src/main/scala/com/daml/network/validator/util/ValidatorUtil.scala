@@ -31,7 +31,7 @@ private[validator] object ValidatorUtil {
       traceContext: TraceContext,
   ): Future[Unit] = {
     logger.debug(
-      s"Installing wallet for endUserParty=$endUserParty, walletServiceParty=$walletServiceParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
+      s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, walletServiceParty=$walletServiceParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
@@ -50,10 +50,12 @@ private[validator] object ValidatorUtil {
                   endUserName,
                   endUserParty.toProtoPrimitive,
                 ).create.commands.asScala.toSeq,
-                // We dedup on the party rather than the username because the username can
-                // have special characters not allowed in command ids.
                 commandId = CNLedgerConnection
-                  .CommandId("com.daml.network.validator.installWalletForUser", Seq(endUserParty)),
+                  .CommandId(
+                    "com.daml.network.validator.installWalletForUser",
+                    Seq(validatorServiceParty),
+                    CNLedgerConnection.sanitizeUserIdToPartyString(endUserName),
+                  ),
                 deduplicationOffset = off,
                 domainId = domainId,
               )
