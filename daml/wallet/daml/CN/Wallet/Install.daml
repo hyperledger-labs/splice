@@ -7,7 +7,7 @@ import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.ValidatorTraffic as API
 
 import CC.Round (OpenMiningRound)
-import CC.Coin (CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
+import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -37,14 +37,14 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_BuyExtraTraffic extraAmount trafficCid -> do
       resultE <- catchAll $ exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraAmount)
-      handleResult COO_BuyExtraTraffic resultE 
+      handleResult COO_BuyExtraTraffic resultE
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
         result <- catchAll (API.exercisePaymentTransfer context transfer)
         handleResultMergeInputs result
     CO_Tap tapAmount -> do
-      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_DevNet_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
-      handleResultTap (toInterfaceContractId @API.Coin <$> coin)
+      mintSummary <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_DevNet_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
+      handleResultTap mintSummary
   where
     handle : Choice t c (r, Optional (ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
@@ -66,10 +66,12 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         let inputCoins = optional [] (\coin -> [API.InputCoin coin]) senderChange
         executeCoinOperationRec endUserP validatorP context inputCoins (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
 
-    handleResultTap : Either InvalidTransferReason (ContractId API.Coin) -> Update [CoinOperationOutcome]
+    handleResultTap : Either InvalidTransferReason (API.MintSummary (ContractId CC.Coin.Coin)) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right tappedCoin -> executeCoinOperationRec endUserP validatorP context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
+      Right mintSummary -> do
+        let tappedCoin = toInterfaceContractId @API.Coin mintSummary.coin
+        executeCoinOperationRec endUserP validatorP context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations

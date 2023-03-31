@@ -71,17 +71,25 @@ template LockedCoin
         -- Need to qualify view here, see https://github.com/digital-asset/daml/issues/15459
         coin = DA.Internal.Desugar.view (toInterface @API.Coin coin)
 
-      lockedCoin_OwnerExpireLock coinRulesCid = do
+      lockedCoin_OwnerExpireLock coinRulesCid openRoundCid = do
         coinRules <- view <$> fetch coinRulesCid
+        openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
         requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
         t <- getTime
         require "Lock is expired" (lock.expiresAt < t)
-        toInterfaceContractId <$> create coin
+        coinCid <- toInterfaceContractId <$> create coin
+        return API.MintSummary with
+          coin = coinCid
+          coinPrice = openMiningRound.coinPrice
 
-      lockedCoin_Unlock coinRulesCid = do
+      lockedCoin_Unlock coinRulesCid openRoundCid = do
         coinRules <- view <$> fetch coinRulesCid
+        openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
-        toInterfaceContractId <$> create coin
+        coinCid <- toInterfaceContractId <$> create coin
+        return API.MintSummary with
+          coin = coinCid
+          coinPrice = openMiningRound.coinPrice
 
     choice LockedCoin_ExpireCoin : ()
       with
@@ -254,7 +262,7 @@ template CoinRules
         requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
         executeTransfer coinRulesCid context svc transfer
 
-    -- TODO(#3742): Also declare this method in the CoinRules interface 
+    -- TODO(#3742): Also declare this method in the CoinRules interface
     nonconsuming choice CoinRules_BuyExtraTraffic
       : (ContractId API.ValidatorTraffic, Optional (ContractId API.Coin))
       with
@@ -264,7 +272,7 @@ template CoinRules
         trafficCid: ContractId API.ValidatorTraffic
         extraTraffic : Decimal
       controller validator
-      do 
+      do
         traffic <- fetch trafficCid
         require "validator party and ValidatorTraffic match" (validator == traffic.validator)
         require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
@@ -273,8 +281,8 @@ template CoinRules
               sender = validator
               -- TODO(#3499): make this a parameter so callers can decide who should get the rewards
               provider = svc
-              inputs 
-              outputs = [ API.TransferOutput with 
+              inputs
+              outputs = [ API.TransferOutput with
                             receiver = svc
                             amount = extraTraffic
                             receiverFeeRatio = 0.0
@@ -290,11 +298,11 @@ template CoinRules
               amount = traffic.amount + extraTraffic
               ..
         return (newTraffic, result.senderChangeCoin)
-    
-    
+
+
     -- A choice for the SVC to mint coin for the cases where the
     -- collective rules allow for that; e.g., when redeeming SVC rewards.
-    nonconsuming choice CoinRules_Mint: ContractId Coin
+    nonconsuming choice CoinRules_Mint: API.MintSummary (ContractId Coin)
       with
         receiver: Party
         amount: Decimal
@@ -307,12 +315,16 @@ template CoinRules
                         initialAmount = amount
                         createdAt = openRound.round
                         ratePerRound = transferConfigCC.holdingFee
-        create Coin with
+        coin <- create Coin with
                   owner = receiver
                   amount = expiringAmount
                   ..
+        return API.MintSummary with
+                  coin
+                  coinPrice = openRound.coinPrice
 
-    nonconsuming choice CoinRules_DevNet_Tap: ContractId Coin
+
+    nonconsuming choice CoinRules_DevNet_Tap: API.MintSummary (ContractId Coin)
       with
         receiver: Party
         amount: Decimal
@@ -633,7 +645,7 @@ executeTransfer coinRulesCid context svc t = do
   csum <- summarizeAndValidateContext context svc t
   isum <- summarizeAndConsumeInputs coinRulesCid csum svc t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
-  summary <- summarizeTransfer csum.config isum osum
+  summary <- summarizeTransfer csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
   case checkTransferConstraints t summary csum.config of
     Left err -> throw (InvalidTransfer err)
@@ -825,8 +837,8 @@ preprocessOutputs transferConfigCC sender outs =
             amount = amount - receiverOutputFee
             lock
 
-summarizeTransfer : TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
-summarizeTransfer transferConfigCC inp preprocessedOutputs = do
+summarizeTransfer : OpenMiningRound -> TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
+summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
     -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
     trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
   where
@@ -845,6 +857,7 @@ summarizeTransfer transferConfigCC inp preprocessedOutputs = do
       outputFees
       senderChangeFee
       senderChangeAmount = leftOverAmount - senderChangeFee
+      coinPrice = openRound.coinPrice
 
 
 issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -> Update ()

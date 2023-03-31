@@ -164,15 +164,15 @@ template SubscriptionInitialPayment
 
         pure (subscription, state, coin)
 
-    choice SubscriptionInitialPayment_Reject : ContractId Coin
+    choice SubscriptionInitialPayment_Reject : MintSummary (ContractId Coin)
       with
         transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         archive subscriptionData.context
-        exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
+        exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
 
-    choice SubscriptionInititalPayment_Expire : ContractId Coin
+    choice SubscriptionInititalPayment_Expire : MintSummary (ContractId Coin)
       with
         actor : Party
         transferContext : AppTransferContext
@@ -180,7 +180,7 @@ template SubscriptionInitialPayment
       do
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         archive subscriptionData.context
-        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules) -- would fail if we can't expire yet
+        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
 
 
 -- | The base state in our subscription flow.
@@ -277,8 +277,8 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
-        pure (state, coin)
+        msum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+        pure (state, msum.coin)
 
     choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, ContractId Coin)
       with
@@ -291,8 +291,8 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules) -- would fail if we can't expire yet
-        pure (state, coin)
+        msum <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
+        pure (state, msum.coin)
 
 
 lockAndMakeChange
@@ -340,11 +340,11 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
   let Subscription { sender; receiver; provider } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
-  coin <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
+  msum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
   let transfer = Transfer with
         sender
         provider
-        inputs = [InputCoin coin]
+        inputs = [InputCoin msum.coin]
         outputs = [mkTransferOutput receiver targetAmount]
   result <- exerciseAppTransfer transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)

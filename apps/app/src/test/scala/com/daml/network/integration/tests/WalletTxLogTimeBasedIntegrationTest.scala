@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
@@ -15,12 +16,16 @@ class WalletTxLogTimeBasedIntegrationTest
     with SplitwellTestUtil
     with WalletTxLogTestUtil {
 
+  private val coinPrice = BigDecimal(1.25).setScale(10)
+
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      // Set a non-unit coin price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
   }
 
   "A wallet" should {
@@ -39,7 +44,6 @@ class WalletTxLogTimeBasedIntegrationTest
           sv1Wallet.balance().unlockedQty should be > BigDecimal(0)
         },
       )
-
       checkTxHistory(
         sv1Wallet,
         Seq[CheckTxHistoryFn](
@@ -107,6 +111,7 @@ class WalletTxLogTimeBasedIntegrationTest
               amount should beWithin(10 - smallAmount, BigDecimal(10))
             }
             logEntry.senderHoldingFees should be > BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Alice sending 40CC to Bob
@@ -119,6 +124,7 @@ class WalletTxLogTimeBasedIntegrationTest
               amount should beWithin(40 - smallAmount, 40)
             }
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )

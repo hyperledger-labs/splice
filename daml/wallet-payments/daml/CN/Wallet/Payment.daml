@@ -180,11 +180,11 @@ template AcceptedAppPayment
         contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock coin and transfer the remainder to the receiver
-        coin <- exercise lockedCoin (LockedCoin_Unlock context.coinRules)
+        msum <- exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
         let transfer = Transfer with
               sender
               provider
-              inputs = [InputCoin coin]
+              inputs = [InputCoin msum.coin]
               outputs = map mkReceiverOutput ccReceiverAmounts
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
@@ -196,16 +196,16 @@ template AcceptedAppPayment
             deliveryOffer
             receiverCoins = zip receivers coins
 
-    choice AcceptedAppPayment_Reject : ContractId Coin
+    choice AcceptedAppPayment_Reject : MintSummary (ContractId Coin)
       with
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
       do archive deliveryOffer
-         exercise lockedCoin (LockedCoin_Unlock context.coinRules)
+         exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
 
-    choice AcceptedAppPayment_Expire : ContractId Coin
+    choice AcceptedAppPayment_Expire : MintSummary (ContractId Coin)
       with
         context : AppTransferContext
       controller sender
       do archive deliveryOffer
-         exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules)
+         exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules context.openMiningRound)

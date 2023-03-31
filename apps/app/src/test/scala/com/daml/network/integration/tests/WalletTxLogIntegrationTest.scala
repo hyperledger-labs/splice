@@ -23,6 +23,8 @@ class WalletTxLogIntegrationTest
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
+  private val coinPrice = BigDecimal(0.75).setScale(10)
+
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
@@ -30,7 +32,7 @@ class WalletTxLogIntegrationTest
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
       // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(0.75)(config))
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
@@ -55,9 +57,11 @@ class WalletTxLogIntegrationTest
         Seq(
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 12.0
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 11.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -79,6 +83,7 @@ class WalletTxLogIntegrationTest
         Seq(
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 47.0
+            logEntry.coinPrice shouldBe coinPrice
           }
         ),
       )
@@ -137,6 +142,7 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Accepting the self-payment request created a 10CC locked coin,
@@ -147,15 +153,19 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 30.0
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 20.0
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 10.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -219,15 +229,19 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 30.0
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 20.0
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 10.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -237,8 +251,6 @@ class WalletTxLogIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
       val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
-      val coinPrice = scan.getLatestOpenMiningRound(env.environment.clock.now).payload.coinPrice
-      assert(coinPrice.compareTo(BigDecimal(1.0)) != 0, "Test is more useful if CC != USD")
 
       // Based on Numeric to make sure divisions match Decimal computation in Daml.
       val transferAmountCC = Numeric.assertFromBigDecimal(scale, 22.0)
@@ -306,6 +318,7 @@ class WalletTxLogIntegrationTest
               amount2 shouldBe BigDecimal(transferAmountUSDinCC)
             }
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Accepting the payment request created a locked coin,
@@ -319,9 +332,11 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -368,6 +383,7 @@ class WalletTxLogIntegrationTest
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
@@ -376,6 +392,7 @@ class WalletTxLogIntegrationTest
           checkTransfer,
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -472,6 +489,7 @@ class WalletTxLogIntegrationTest
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
@@ -487,9 +505,11 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -607,6 +627,7 @@ class WalletTxLogIntegrationTest
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
@@ -622,6 +643,7 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           checkSubscriptionPaymentTransfer,
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
@@ -633,9 +655,11 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -718,9 +742,11 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )
@@ -835,6 +861,7 @@ class WalletTxLogIntegrationTest
           }
 
           logEntry.senderHoldingFees shouldBe BigDecimal(0)
+          logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
@@ -843,6 +870,7 @@ class WalletTxLogIntegrationTest
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             // Rejecting the second payment returned the 42CC locked coin.
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
@@ -853,6 +881,7 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           checkSubscriptionPaymentTransfer,
           { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
@@ -864,9 +893,11 @@ class WalletTxLogIntegrationTest
             }
             logEntry.receivers shouldBe empty
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
             logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
           },
         ),
       )

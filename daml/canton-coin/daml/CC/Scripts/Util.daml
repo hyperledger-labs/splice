@@ -81,7 +81,7 @@ setupValidator' app name = do
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
   tap app (CCUser userId validatorParty) 1.0
-  let validatorUser = CCUser with 
+  let validatorUser = CCUser with
         primaryParty = validatorParty
         userId = userId
   return validatorUser
@@ -503,10 +503,11 @@ getTransferContext app user featuredAppRight = do
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
-  submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
+  mintSummary <- submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
     receiver = user.primaryParty
     amount
     openRound
+  return mintSummary.coin
 
 featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do

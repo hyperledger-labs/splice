@@ -22,13 +22,15 @@ testLockedCoin = do
   bob <- setupUser app "bob" app.svc
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
+  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
   testChoice @"enable_LockedCoin_Unlock" app [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules)
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   passTime (minutes 6)
+  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
   testChoice @"enable_LockedCoin_OwnerExpireLock" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules)
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
   replicateA_ 4 $ runNextIssuance app

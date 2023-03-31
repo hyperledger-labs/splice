@@ -12,6 +12,7 @@ import DA.Time
 import CN.Util.Assert
 import CC.Coin
 import CC.Round
+import CC.API.V1.Coin (MintSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.API.V1.ValidatorTraffic (ValidatorTraffic(..))
 
@@ -459,7 +460,7 @@ template SvcRules with
             round = reward.round
             amount = issuancePerSV
 
-    nonconsuming choice SvcRules_CollectSvReward : ContractId Coin
+    nonconsuming choice SvcRules_CollectSvReward : MintSummary (ContractId Coin)
       with
         sv : Party
         rewardCid : ContractId SvReward

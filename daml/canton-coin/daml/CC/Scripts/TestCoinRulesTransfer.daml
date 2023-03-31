@@ -89,6 +89,7 @@ testUsageFees = do
     outputFees
     senderChangeFee
     senderChangeAmount = 0.0
+    coinPrice = 1.0
   assertMsg "Partial sender change fee"
     (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
 

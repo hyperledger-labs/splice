@@ -2,7 +2,9 @@ package com.daml.network.wallet.store
 
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.util.ExerciseNodeCompanion
 
@@ -73,4 +75,22 @@ object SubscriptionPayment_Collect extends ExerciseNodeCompanion {
     _.toValue,
     _.toValue,
   )
+}
+
+object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
+  override type Tpl = svcCodegen.SvcRules
+  override type Arg = svcCodegen.SvcRules_CollectSvReward
+  override type Res = ccApiCodegen.coin.MintSummary[coinCodegen.Coin.ContractId]
+
+  override val templateOrInterface = Left(svcCodegen.SvcRules.COMPANION)
+  override val choice = svcCodegen.SvcRules.CHOICE_SvcRules_CollectSvReward
+
+  override val argDecoder = svcCodegen.SvcRules_CollectSvReward.valueDecoder()
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder =
+    ccApiCodegen.coin.MintSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
+    )
+  override def resToValue(res: Res) = res.toValue(_.toValue)
 }

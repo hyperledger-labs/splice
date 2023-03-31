@@ -6,7 +6,16 @@ import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.*
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.history.{CoinArchive, CoinCreate, Tap, Transfer}
+import com.daml.network.codegen.java.cc.api.v1.coin.MintSummary
+import com.daml.network.history.{
+  CoinArchive,
+  CoinCreate,
+  LockedCoinOwnerExpireLock,
+  LockedCoinUnlock,
+  Mint,
+  Tap,
+  Transfer,
+}
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
@@ -35,6 +44,10 @@ class UserWalletTxLogParser(
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
+          // ------------------------------------------------------------------
+          // Transferring coins
+          // ------------------------------------------------------------------
+
           // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
           case AcceptedAppPayment_Collect(_) =>
             parseTrees(
@@ -60,9 +73,32 @@ class UserWalletTxLogParser(
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
             State.fromTransfer(tree, root, node)
 
+          // ------------------------------------------------------------------
+          // Minting new coins
+          // ------------------------------------------------------------------
+
           case Tap(node) =>
-            // Note: we do not parse the child events, as we can extract all information about the balance change from this node
-            State.fromTap(tree, root, node)
+            State.fromMintSummary(tree, root, node.result.value)
+
+          case SvcRules_CollectSvReward(node) =>
+            State.fromMintSummary(tree, root, node.result.value)
+
+          case Mint(node) =>
+            State.fromMintSummary(tree, root, node.result.value)
+
+          // ------------------------------------------------------------------
+          // Unlocking locked coins
+          // ------------------------------------------------------------------
+
+          case LockedCoinUnlock(node) =>
+            State.fromMintSummary(tree, root, node.result.value)
+
+          case LockedCoinOwnerExpireLock(node) =>
+            State.fromMintSummary(tree, root, node.result.value)
+
+          // ------------------------------------------------------------------
+          // Other
+          // ------------------------------------------------------------------
 
           case CoinArchive(_) =>
             // TODO (#2845) Fix all uses of this.
@@ -78,9 +114,14 @@ class UserWalletTxLogParser(
       case created: CreatedEvent =>
         created match {
           // A coin create that is not a child of the above exercise events.
-          // This can be for example a coin being unlocked when collecting an app payment.
+          // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
+          // all possible exercise events that produce new coins.
           case CoinCreate(coin) =>
-            State.fromCoinCreate(tree, root, coin)
+            // Using an error to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
+            logger.error(
+              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
+            )
+            State.empty
 
           case _ =>
             State.empty
@@ -130,6 +171,7 @@ object UserWalletTxLogParser {
         sender: (String, BigDecimal),
         receivers: Seq[(String, BigDecimal)],
         senderHoldingFees: BigDecimal,
+        coinPrice: BigDecimal,
     ) extends TxLogEntry {
       override def toJson: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
@@ -142,6 +184,7 @@ object UserWalletTxLogParser {
           receivers =
             Some(receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector),
           holdingFees = Some(Codec.encode(senderHoldingFees)),
+          coinPrice = Some(Codec.encode(coinPrice)),
         )
     }
     object Transfer {
@@ -155,6 +198,7 @@ object UserWalletTxLogParser {
         date: Instant,
         receiver: String,
         amount: BigDecimal,
+        coinPrice: BigDecimal,
     ) extends TxLogEntry {
       override def toJson: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
@@ -166,6 +210,7 @@ object UserWalletTxLogParser {
           sender = None,
           receivers = Some(Vector(httpDef.PartyAndAmount(receiver, Codec.encode(amount)))),
           holdingFees = None,
+          coinPrice = Some(Codec.encode(coinPrice)),
         )
     }
     object BalanceChange {
@@ -183,11 +228,14 @@ object UserWalletTxLogParser {
           )
           for {
             receiverAndAmount <- item.receivers.flatMap(_.headOption).toRight("No receivers")
+            coinPriceStr <- item.coinPrice.toRight("Coin price missing")
+            coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
           } yield TxLogEntry.BalanceChange(
             indexRecord = indexRecord,
             date = item.date.toInstant,
             receiver = receiverAndAmount.party,
             amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
+            coinPrice = coinPrice,
           )
         case Transfer.transaction_type =>
           val indexRecord = TxLogIndexRecord(
@@ -204,6 +252,8 @@ object UserWalletTxLogParser {
             )
             holdingFees <- item.holdingFees.toRight("Holding fees missing")
             senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
+            coinPriceStr <- item.coinPrice.toRight("Coin price missing")
+            coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
           } yield TxLogEntry.Transfer(
             indexRecord = indexRecord,
             date = item.date.toInstant,
@@ -211,6 +261,7 @@ object UserWalletTxLogParser {
             sender = sender.party -> senderAmount,
             receivers = receivers,
             senderHoldingFees = senderHoldingFees,
+            coinPrice = coinPrice,
           )
         case _ => Left(s"Unknown item $item")
       }
@@ -301,30 +352,53 @@ object UserWalletTxLogParser {
         sender = parseSender(node.argument.value, node.result.value),
         receivers = parseReceivers(node.argument.value, node.result.value),
         senderHoldingFees = node.result.value.summary.holdingFees,
+        coinPrice = node.result.value.summary.coinPrice,
       )
 
       State(
         entries = immutable.Queue(newEntry)
       )
     }
-    def fromTap(
+
+    /** State from a choice that returns a `MintSummary`.
+      * These are choices that create exactly one new coin in their transaction subtree.
+      */
+    def fromMintSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
         event: TreeEvent,
-        node: ExerciseNode[Tap.Arg, Tap.Res],
+        msum: MintSummary[T],
     ): State = {
+      // Note: MintSummary only contains the contract id of the new coin, but not the coin payload.
+      // However, the new coin is always created in the same transaction.
+      // Instead of including the coin price and owner in MintSummary,
+      // we locate the corresponding coin create event in the transaction tree.
+      val coinCid = msum.coin.contractId
+      val coin = tx.getEventsById.asScala
+        .collectFirst {
+          case (_, c: CreatedEvent) if c.getContractId == coinCid =>
+            CoinCreate.unapply(c).map(_.payload)
+        }
+        .flatten
+        .getOrElse(
+          throw new RuntimeException(
+            s"The coin contract $coinCid referenced by MintSummary was not found in transaction ${tx.getTransactionId}"
+          )
+        )
       val newEntry = TxLogEntry.BalanceChange(
         indexRecord = TxLogIndexRecord(
           offset = tx.getOffset,
           eventId = event.getEventId,
         ),
         date = tx.getEffectiveAt,
-        amount = node.argument.value.amount,
-        receiver = node.argument.value.receiver,
+        amount = coin.amount.initialAmount,
+        receiver = coin.owner,
+        coinPrice = msum.coinPrice,
       )
       State(
         entries = immutable.Queue(newEntry)
       )
     }
+    // TODO(#2845) Remove this once we stop matching on create/archive events
     def fromCoinCreate(
         tx: TransactionTree,
         event: TreeEvent,
@@ -338,6 +412,7 @@ object UserWalletTxLogParser {
         date = tx.getEffectiveAt,
         amount = coin.payload.amount.initialAmount,
         receiver = coin.payload.owner,
+        coinPrice = BigDecimal(0),
       )
       State(
         entries = immutable.Queue(newEntry)
