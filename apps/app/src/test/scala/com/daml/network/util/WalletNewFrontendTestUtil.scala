@@ -61,21 +61,15 @@ trait WalletNewFrontendTestUtil { self: FrontendTestCommon =>
       currency = "USD",
     )
 
-    if (expectedAmountCC > 0) {
-      ccAmount should beWithin(expectedAmountCC, expectedAmountCC + smallAmount)
-      usdAmount should beWithin(
-        expectedAmountUSD,
-        expectedAmountUSD + smallAmount * coinPrice,
-      )
-    } else {
-      ccAmount should beWithin(expectedAmountCC - smallAmount, expectedAmountCC)
-      usdAmount should beWithin(
-        expectedAmountUSD - smallAmount * coinPrice,
-        expectedAmountUSD,
-      )
-    }
+    ccAmount should beWithin(expectedAmountCC - smallAmount, expectedAmountCC)
+    usdAmount should beWithin(
+      expectedAmountUSD - smallAmount * coinPrice,
+      expectedAmountUSD,
+    )
 
-    transactionRow.childElement(className("tx-amount-rate")).text should matchText("0.5 CC/USD")
+    transactionRow.childElement(className("tx-amount-rate")).text should matchText(
+      s"${BigDecimal(1) / coinPrice} CC/USD"
+    )
   }
 
 }

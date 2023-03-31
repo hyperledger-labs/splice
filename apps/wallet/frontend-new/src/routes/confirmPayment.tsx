@@ -4,9 +4,21 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ArrowOutward } from '@mui/icons-material';
-import { Box, Button, Container, Stack, styled, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Container,
+  Stack,
+  styled,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  Typography,
+} from '@mui/material';
 
 import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 import Loading from '../components/Loading';
@@ -50,23 +62,44 @@ export const ConfirmPayment: React.FC = () => {
   }
 
   const { appPaymentRequest, deliveryOffer } = appPayment;
-  // TODO (#3485): handle multiple recipients
+
+  const total = computeTotal(appPayment.appPaymentRequest.payload.receiverAmounts, coinPrice);
+
+  if (!total) {
+    console.error('No receivers in app payment.');
+    return <>No receivers in app payment.</>;
+  }
+
+  const fee = new BigNumber(0); // TODO (#3492): compute actual fee
+
+  const isSingleRecipient = appPaymentRequest.payload.receiverAmounts.length === 1;
+  const recipientInfo = isSingleRecipient ? (
+    <SingleRecipientInfo
+      amount={appPaymentRequest.payload.receiverAmounts[0].amount}
+      receiver={appPaymentRequest.payload.receiverAmounts[0].receiver}
+      provider={appPaymentRequest.payload.provider}
+    />
+  ) : (
+    <MultiRecipientsInfo
+      receiverAmounts={appPaymentRequest.payload.receiverAmounts}
+      currencyForAllReceivers={total.currencyForAllReceivers}
+      coinPrice={coinPrice}
+      provider={appPaymentRequest.payload.provider}
+    />
+  );
+
   return (
     <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
       <PaymentHeader />
       <Box bgcolor="colors.neutral.25" flex={1}>
         <Container maxWidth="sm">
           <Stack alignItems="center" paddingTop={4} spacing={4}>
-            <RecipientInfo
-              amount={appPaymentRequest.payload.receiverAmounts[0].amount}
-              receiver={appPaymentRequest.payload.receiverAmounts[0].receiver}
-              provider={appPaymentRequest.payload.provider}
-            />
+            {recipientInfo}
             <PaymentDescription description={deliveryOffer.payload.description} />
-            <PaymentContainer
+            <TotalPaymentContainer
               contractId={appPaymentRequest.contractId}
-              amount={appPaymentRequest.payload.receiverAmounts[0].amount}
-              fee={new BigNumber(0)} // TODO (#3492): compute actual fee
+              total={total}
+              fee={fee}
               coinPrice={coinPrice}
             />
           </Stack>
@@ -76,14 +109,66 @@ export const ConfirmPayment: React.FC = () => {
   );
 };
 
+type BothCurrencies = 'CC & USD';
+interface Total {
+  totalAmount: BigNumber;
+  /**
+   * The currency of `totalAmount`.
+   */
+  totalCurrency: Currency;
+  /**
+   * The currency in which all the receivers are paid.
+   */
+  currencyForAllReceivers: Currency | BothCurrencies;
+}
+function computeTotal(receiverAmounts: ReceiverAmount[], coinPrice: BigNumber): Total | undefined {
+  // The currency is NOT necessarily the same for all receivers
+  const { totalCC, totalUSD } = receiverAmounts.reduce(
+    (acc, next) => {
+      let newAcc;
+      switch (next.amount.currency) {
+        case 'CC':
+          newAcc = { totalCC: acc.totalCC.plus(next.amount.amount), totalUSD: acc.totalUSD };
+          break;
+        case 'USD':
+          newAcc = { totalUSD: acc.totalUSD.plus(next.amount.amount), totalCC: acc.totalCC };
+          break;
+      }
+      return newAcc;
+    },
+    {
+      totalCC: new BigNumber(0),
+      totalUSD: new BigNumber(0),
+    }
+  );
+
+  if (totalCC.eq(0) && totalUSD.eq(0)) {
+    return undefined;
+  } else if (totalUSD.eq(0)) {
+    // everything is in CC
+    return { totalCurrency: 'CC', totalAmount: totalCC, currencyForAllReceivers: 'CC' };
+  } else if (totalCC.eq(0)) {
+    // everything is in USD
+    return { totalCurrency: 'USD', totalAmount: totalUSD, currencyForAllReceivers: 'USD' };
+  } else {
+    // both, we use CC to show the total amount
+    const totalAmount = totalUSD.div(coinPrice).plus(totalCC);
+    return { totalCurrency: 'CC', totalAmount, currencyForAllReceivers: 'CC & USD' };
+  }
+}
+
 export default ConfirmPayment;
 
-interface RecipientInfoProps {
+interface SingleRecipientInfoProps {
   amount: payment.PaymentAmount;
   receiver: string;
   provider: string;
 }
-const RecipientInfo: React.FC<RecipientInfoProps> = ({ amount, receiver, provider }) => {
+const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
+  amount,
+  receiver,
+  provider,
+}) => {
   return (
     <Stack alignItems="center" spacing={1}>
       <SendPaymentIcon />
@@ -100,6 +185,60 @@ const RecipientInfo: React.FC<RecipientInfoProps> = ({ amount, receiver, provide
         <Typography variant="body2">via</Typography>{' '}
         <DirectoryEntry partyId={provider} variant="body2" classNames="payment-provider" />
       </Stack>
+    </Stack>
+  );
+};
+
+interface MultipleRecipientsInfoProps {
+  receiverAmounts: ReceiverAmount[];
+  currencyForAllReceivers: Currency | BothCurrencies;
+  coinPrice: BigNumber;
+  provider: string;
+}
+
+const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
+  currencyForAllReceivers,
+  receiverAmounts,
+  coinPrice,
+  provider,
+}) => {
+  return (
+    <Stack alignItems="center" spacing={1}>
+      <SendPaymentIcon />
+      <Typography variant="h5" className="payment-amount">
+        Send {currencyForAllReceivers} to multiple recipients
+      </Typography>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography variant="body2">via</Typography>{' '}
+        <DirectoryEntry partyId={provider} variant="body2" classNames="payment-provider" />
+      </Stack>
+      <Table>
+        <TableBody>
+          {receiverAmounts.map(({ amount: { amount, currency }, receiver }) => {
+            const converted = convertCurrency(new BigNumber(amount), currency, coinPrice);
+            return (
+              <TableRow key={receiver} id={`${receiver}-payment-row`}>
+                <TableCell variant="party">
+                  <DirectoryEntry partyId={receiver} variant="h6" classNames="receiver-entry" />
+                </TableCell>
+                <TableCell>
+                  <Typography variant="h6" className="receiver-amount">
+                    <AmountDisplay amount={amount} currency={currency} />
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="caption" className="receiver-amount-converted">
+                    <AmountDisplay
+                      amount={converted.amount.toString()}
+                      currency={converted.currency}
+                    />
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </Stack>
   );
 };
@@ -125,18 +264,18 @@ const PaymentDescription: React.FC<PaymentDescriptionProps> = ({ description }) 
 
 interface PaymentContainerProps {
   contractId: ContractId<payment.AppPaymentRequest>;
-  amount: payment.PaymentAmount;
+  total: Total;
   fee: BigNumber;
   coinPrice: BigNumber;
 }
-const PaymentContainer: React.FC<PaymentContainerProps> = ({
+const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   contractId,
-  amount,
+  total,
   fee,
   coinPrice,
 }) => {
-  const converted = convertCurrency(new BigNumber(amount.amount), amount.currency, coinPrice);
-  const ccAmount = amount.currency === 'CC' ? new BigNumber(amount.amount) : converted.amount;
+  const converted = convertCurrency(total.totalAmount, total.totalCurrency, coinPrice);
+  const ccAmount = total.totalCurrency === 'CC' ? total.totalAmount : converted.amount;
 
   const totalCC = ccAmount.plus(fee);
   const totalUSD = totalCC.times(coinPrice);

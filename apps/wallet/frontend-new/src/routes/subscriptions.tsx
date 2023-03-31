@@ -17,7 +17,6 @@ import {
   Box,
   Button,
   Stack,
-  styled,
   Table,
   TableBody,
   TableCell,
@@ -107,15 +106,15 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
 }) => {
   return (
     <TableRow className="subscription-row">
-      <PartyCell className="sub-receiver">
+      <TableCell variant="party" className="sub-receiver">
         <DirectoryEntry partyId={subscription.subscription.payload.receiver} />
-      </PartyCell>
-      <PartyCell>
+      </TableCell>
+      <TableCell variant="party">
         <Service
           provider={subscription.subscription.payload.provider}
           description={subscription.context.payload.description}
         />
-      </PartyCell>
+      </TableCell>
       <TableCell align="right">
         <Price payData={subscription.state.value.payload.payData} coinPrice={coinPrice} />
       </TableCell>
@@ -136,12 +135,6 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
     </TableRow>
   );
 };
-
-const PartyCell = styled(TableCell)({
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-});
 
 const Service: React.FC<{ provider: Party; description: string }> = ({ provider, description }) => {
   return (

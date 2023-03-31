@@ -37,6 +37,12 @@ declare module '@mui/material/Button' {
   }
 }
 
+declare module '@mui/material/TableCell' {
+  interface TableCellPropsVariantOverrides {
+    party: true;
+  }
+}
+
 let theme = createTheme({
   /**
    * We can add our own custom key/values to the palette, but
@@ -203,6 +209,14 @@ theme = createTheme(theme, {
           fontSize: '0.8125rem',
           fontWeight: 700,
           textTransform: 'uppercase',
+        },
+        variants: {
+          props: { variant: 'party' },
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          },
         },
       },
     },

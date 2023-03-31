@@ -36,7 +36,10 @@ const DirectoryEntry: React.FC<DirectoryEntryProps> = props => {
     return <PartyId {...props} />;
   } else {
     return (
-      <div style={{ display: 'flex', alignItems: 'center' }} className={classNames}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}
+        className={classNames}
+      >
         <Tooltip title="Directory Entry" style={{ marginRight: '4px' }}>
           <div className="dir-entry" style={{ display: 'flex', alignItems: 'center' }}>
             <Typography {...typographyProps}>{entry.entry.name}</Typography>
