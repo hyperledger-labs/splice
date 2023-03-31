@@ -649,7 +649,7 @@ class SvApp(
     val svcParty = store.key.svcParty
     for {
       _ <- store.lookupCoinRulesV1TestWithOffset().flatMap {
-        case result @ MultiDomainAcsStore.QueryResult(_, None) =>
+        case result @ QueryResult(_, None) =>
           connection.submitWithResult(
             actAs = Seq(svcParty),
             readAs = Seq.empty,
@@ -669,7 +669,7 @@ class SvApp(
             deduplicationConfig = DedupOffset(result.deduplicationOffset),
             domainId = domainId,
           )
-        case MultiDomainAcsStore.QueryResult(_, Some(_)) =>
+        case QueryResult(_, Some(_)) =>
           logger.info("Upgraded CoinRules (V1Test) contract already exists")
           Future.successful(())
       }
