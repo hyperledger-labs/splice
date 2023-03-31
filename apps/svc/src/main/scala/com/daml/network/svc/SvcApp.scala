@@ -66,10 +66,6 @@ class SvcApp(
         )
       )
       connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      // We can't move this to the SV app at the moment because of init order;
-      // without uploading this DAR here the `createValidatorRight` step below
-      // may fail, leaving the SVC app unitialized, which currently also means
-      // that none of the SV apps can boot.
       automation = new SvcAutomationService(
         clock,
         config,

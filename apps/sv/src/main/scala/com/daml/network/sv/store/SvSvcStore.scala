@@ -89,6 +89,20 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         .findContractOnDomainWithOffset(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
     )
 
+  def lookupCoinRulesV1TestWithOffset(
+  ): Future[
+    QueryResult[Option[
+      Contract[v1testcc.coin.CoinRulesV1Test.ContractId, v1testcc.coin.CoinRulesV1Test]
+    ]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .findContractOnDomainWithOffset(v1testcc.coin.CoinRulesV1Test.COMPANION)(
+          _,
+          (_: Any) => true,
+        )
+    )
+
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 

@@ -8,6 +8,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.http.HttpAdminHandler
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
@@ -41,6 +42,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
+import com.daml.network.environment.DedupOffset
 
 class SvApp(
     override val name: InstanceName,
@@ -539,6 +541,11 @@ class SvApp(
       _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.validatorLifecyclePackage)
       _ <- ledgerConnection.uploadDarFile(SvApp.directoryPackage)
+      _ <-
+        if (config.enableCoinRulesUpgrade)
+          ledgerConnection.uploadDarFile(SvApp.coinV1TestPackage)
+        else
+          Future.successful(())
     } yield ()
   }
 
@@ -614,7 +621,59 @@ class SvApp(
               )
           }
       }
+      _ <- createUpgradedCoinRulesIfEnabled(store, ledgerConnection, foundingConfig, domainId)
     } yield ()
+  }
+
+  private def createUpgradedCoinRulesIfEnabled(
+      store: SvSvcStore,
+      ledgerConnection: CNLedgerConnection,
+      foundingConfig: SvBootstrapConfig.FoundCollective,
+      domainId: DomainId,
+  ): Future[Unit] =
+    for {
+      _ <-
+        if (config.enableCoinRulesUpgrade) {
+          createUpgradedCoinRules(store, ledgerConnection, foundingConfig, domainId)
+        } else {
+          Future.successful(())
+        }
+    } yield ()
+
+  private def createUpgradedCoinRules(
+      store: SvSvcStore,
+      connection: CNLedgerConnection,
+      foundingConfig: SvBootstrapConfig.FoundCollective,
+      domainId: DomainId,
+  ): Future[Unit] = {
+    val svcParty = store.key.svcParty
+    for {
+      _ <- store.lookupCoinRulesV1TestWithOffset().flatMap {
+        case result @ MultiDomainAcsStore.QueryResult(_, None) =>
+          connection.submitWithResult(
+            actAs = Seq(svcParty),
+            readAs = Seq.empty,
+            update = new ccV1Test.coin.CoinRulesV1Test(
+              svcParty.toProtoPrimitive,
+              defaultCoinConfigSchedule(
+                foundingConfig.initialTickDuration,
+                foundingConfig.initialMaxNumInputs,
+              ),
+              defaultEnabledChoices,
+              config.isDevNet,
+            ).create(),
+            commandId = CNLedgerConnection.CommandId(
+              "com.daml.network.svc.initiateCoinRulesUpgrade",
+              Seq(svcParty),
+            ),
+            deduplicationConfig = DedupOffset(result.deduplicationOffset),
+            domainId = domainId,
+          )
+        case MultiDomainAcsStore.QueryResult(_, Some(_)) =>
+          logger.info("Upgraded CoinRules (V1Test) contract already exists")
+          Future.successful(())
+      }
+    } yield logger.debug("Created an upgraded CoinRules (V1Test) contract")
   }
 
   private def waiveSvcRights(
@@ -950,6 +1009,11 @@ object SvApp {
 
     // See `Compile / resourceGenerators` in build.sbt
     lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
+  }
+  val coinV1TestPackage: UploadablePackage = new UploadablePackage {
+    lazy val packageId: String = ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
+
+    lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
   }
   val svcGovernancePackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId

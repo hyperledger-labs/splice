@@ -74,6 +74,7 @@ case class LocalSvAppConfig(
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     bootstrap: SvBootstrapConfig = SvBootstrapConfig.JoinViaSvcApp(),
+    enableCoinRulesUpgrade: Boolean = false,
 ) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "SV"
 
