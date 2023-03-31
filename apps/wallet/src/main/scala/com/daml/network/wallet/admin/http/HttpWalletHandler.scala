@@ -527,8 +527,8 @@ class HttpWalletHandler(
   override def userStatus(respond: r0.UserStatusResponse.type)()(
       user: String
   ): Future[r0.UserStatusResponse] = withNewTrace(workflowId) { _ => _ =>
+    val optWallet = walletManager.lookupUserWallet(user)
     for {
-      optInstall <- store.lookupInstallByName(user)
       hasFeaturedAppRight <- walletManager.lookupUserWallet(user) match {
         case None => Future(false)
         case Some(wallet) =>
@@ -536,8 +536,8 @@ class HttpWalletHandler(
       }
     } yield {
       d0.UserStatusResponse(
-        partyId = optInstall.fold("")(co => co.payload.endUserParty),
-        userOnboarded = optInstall.isDefined,
+        partyId = optWallet.fold("")(_.store.key.endUserParty.toProtoPrimitive),
+        userOnboarded = optWallet.isDefined,
         hasFeaturedAppRight = hasFeaturedAppRight,
       )
     }

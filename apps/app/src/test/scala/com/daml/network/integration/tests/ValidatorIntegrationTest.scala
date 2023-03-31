@@ -214,28 +214,18 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     )
 
     aliceWallet.tap(100.0)
+    aliceWallet.userStatus().userOnboarded shouldBe true
 
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      actAndCheck(
-        "Offboard a user",
-        aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
-      )(
-        "Wait for the validator to report the user offboarded",
-        _ => {
-          // Wait for the user to no longer be listed in the validator's users list, but this
-          // does not yet guarantee their wallet services have been closed.
-          val usernames = aliceValidatorClient.listUsers()
-          usernames should contain theSameElementsAs (testUsers ++
-            Seq(aliceValidator.config.validatorWalletUser.value))
-        },
-      ),
-      entries => {
-        forAtLeast(1, entries)(
-          // Wait for the wallet to log that it has completed offboarding of the user
-          _.message should include(
-            s"offboarded user ${aliceWallet.config.ledgerApiUser} from wallet"
-          )
-        )
+    actAndCheck(
+      "Offboard a user",
+      aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
+    )(
+      "Wait for the validator and wallet to report the user offboarded",
+      _ => {
+        val usernames = aliceValidatorClient.listUsers()
+        usernames should contain theSameElementsAs (testUsers ++
+          Seq(aliceValidator.config.validatorWalletUser.value))
+        aliceWallet.userStatus().userOnboarded shouldBe false
       },
     )
 
