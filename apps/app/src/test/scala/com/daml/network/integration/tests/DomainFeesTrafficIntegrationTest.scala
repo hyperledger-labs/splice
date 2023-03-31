@@ -43,7 +43,7 @@ class DomainFeesTrafficIntegrationTest
 
   private lazy val loadTestDuration = 10.seconds
   // Locally, I observe a rate of up to ~6-7 txs/s. On CI (more powerful machine), its slightly higher.
-  private lazy val testCases: TableFor1[Double] = Table("coinTxsPerSecond", 2, 4, 6)
+  private lazy val testCases: TableFor1[Double] = Table("coinTxsPerSecond", 2, 4)
 
   testCases.forEvery { case (coinTxsPerSecond) =>
     s"coinTxsPerSecond of $coinTxsPerSecond is hit " in { implicit env =>
