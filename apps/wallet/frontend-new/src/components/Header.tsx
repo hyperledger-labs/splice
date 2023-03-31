@@ -60,9 +60,7 @@ const Header: React.FC = () => {
         ))}
       </Stack>
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Typography id="logged-in-user">
-          <CurrentUser />
-        </Typography>
+        <CurrentUser />
         <FeaturedAppRight />
         <Divider orientation="vertical" variant="middle" flexItem />
         <Button id="logout-button" onClick={logout} color="inherit">

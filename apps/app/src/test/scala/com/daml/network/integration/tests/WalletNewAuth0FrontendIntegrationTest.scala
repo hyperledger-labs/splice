@@ -9,7 +9,7 @@ import monocle.macros.syntax.lens.*
 
 import java.net.URL
 
-class WalletAuth0FrontendIntegrationTest
+class WalletNewAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("randomUser")
     with FrontendLoginUtil {
 
@@ -34,11 +34,11 @@ class WalletAuth0FrontendIntegrationTest
 
     "allow login via auth0 and persist user name on refresh" taggedAs LocalAuth0Test in {
       implicit env =>
-        withAuth0LoginCheck("randomUser", 3000) { (userPartyId, wd) =>
+        withAuth0LoginCheck("randomUser", 3007) { (userPartyId, wd) =>
           implicit val webDriver: WebDriverType = wd
           actAndCheck(
             "The user reloads the page", {
-              go to s"http://localhost:3000"
+              go to s"http://localhost:3007"
             },
           )(
             "The user is automatically logged in",

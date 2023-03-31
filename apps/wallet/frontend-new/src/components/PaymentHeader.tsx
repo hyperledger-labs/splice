@@ -38,11 +38,9 @@ const PaymentHeader: React.FC = () => {
           Canton Coin Wallet
         </Typography>
         <Stack spacing={2} alignItems="center">
-          <Typography className="payment-current-user">
-            <b>
-              <CurrentUser />
-            </b>
-          </Typography>
+          <span className="payment-current-user">
+            <CurrentUser />
+          </span>
           <Typography className="available-balance">
             Total Available Balance:{' '}
             <AmountDisplay amount={walletBalance.availableCC.toString()} currency="CC" /> /{' '}

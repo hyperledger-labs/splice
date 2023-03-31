@@ -6,25 +6,28 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant, LocalDateTime, ZoneOffset}
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
 
 class WalletNewTransfersFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
     with FrontendLoginUtil {
 
+  private val coinPrice = 2
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withCoinPrice(2)
+      .withCoinPrice(coinPrice)
 
   "A wallet UI" should {
     val aliceWalletNewPort = 3007
+    val bobWalletNewPort = 3008
 
     "create a p2p transfer" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
@@ -48,24 +51,10 @@ class WalletNewTransfersFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
-        click on "navlink-transfer"
 
         actAndCheck(
           "alice creates transfer offer", {
-            click on "create-offer-receiver"
-            textField("create-offer-receiver").underlying.sendKeys(bobUserParty.toProtoPrimitive)
-
-            click on "create-offer-cc-amount"
-            numberField("create-offer-cc-amount").value = ""
-            numberField("create-offer-cc-amount").underlying.sendKeys(transferAmount.toString())
-
-            click on "create-offer-expiration-days"
-            singleSel("create-offer-expiration-days").value = expiryDays.toString
-
-            click on "create-offer-description"
-            textArea("create-offer-description").underlying.sendKeys("by party ID")
-
-            click on "create-offer-submit-button"
+            createTransferOffer(bobUserParty, transferAmount, expiryDays)
           },
         )(
           "bob observes transfer offer",
@@ -82,6 +71,37 @@ class WalletNewTransfersFrontendIntegrationTest
 
             // Allowing 1 min of correctness in the transfer dates
             assertInRange(BigDecimal(timeDiff), (BigDecimal(0), BigDecimal(1)))
+          },
+        )
+      }
+
+      withFrontEnd("bob") { implicit webDriver =>
+        actAndCheck(
+          "Bob goes to his wallet", {
+            browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+          },
+        )(
+          "He sees the transfer offer",
+          _ => {
+            val offerCards = findAll(className("transfer-offer")).toList
+
+            offerCards.size shouldBe 1
+
+            inside(offerCards) { case Seq(offerCard) =>
+              offerCard.childElement(className("transfer-offer-sender")).text should matchText(
+                expectedCns(aliceUserParty, aliceDirectoryName)
+              )
+
+              offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
+                s"+ $transferAmount CC"
+              )
+
+              offerCard
+                .childElement(className("transfer-offer-usd-amount-rate"))
+                .text should matchText(
+                s"7 USD @ ${BigDecimal(1) / coinPrice} CC/USD"
+              )
+            }
           },
         )
       }
@@ -196,7 +216,6 @@ class WalletNewTransfersFrontendIntegrationTest
       val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
-      val transferExpiry = CantonTimestamp.now().plus(Duration.ofDays(5))
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
 
@@ -209,13 +228,10 @@ class WalletNewTransfersFrontendIntegrationTest
       // transfer from bob to alice
       actAndCheck(
         "bob creates transfer offer",
-        bobWallet.createTransferOffer(
-          aliceUserParty,
-          transferAmount,
-          "Bob transferring to Alice",
-          transferExpiry,
-          UUID.randomUUID().toString,
-        ),
+        withFrontEnd("bob") { implicit webDriver =>
+          browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+          createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
+        },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -248,7 +264,6 @@ class WalletNewTransfersFrontendIntegrationTest
       val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
-      val transferExpiry = CantonTimestamp.now().plus(Duration.ofDays(5))
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
 
@@ -260,14 +275,11 @@ class WalletNewTransfersFrontendIntegrationTest
 
       // transfer from bob to alice
       actAndCheck(
-        " bob creates transfer offer",
-        bobWallet.createTransferOffer(
-          aliceUserParty,
-          transferAmount,
-          "Bob transferring to Alice",
-          transferExpiry,
-          UUID.randomUUID().toString,
-        ),
+        "bob creates transfer offer",
+        withFrontEnd("bob") { implicit webDriver =>
+          browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+          createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
+        },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -291,5 +303,25 @@ class WalletNewTransfersFrontendIntegrationTest
         )
       }
     }
+  }
+
+  private def createTransferOffer(receiver: PartyId, transferAmount: BigDecimal, expiryDays: Int)(
+      implicit driver: WebDriverType
+  ) = {
+    click on "navlink-transfer"
+    click on "create-offer-receiver"
+    textField("create-offer-receiver").underlying.sendKeys(receiver.toProtoPrimitive)
+
+    click on "create-offer-cc-amount"
+    numberField("create-offer-cc-amount").value = ""
+    numberField("create-offer-cc-amount").underlying.sendKeys(transferAmount.toString())
+
+    click on "create-offer-expiration-days"
+    singleSel("create-offer-expiration-days").value = expiryDays.toString
+
+    click on "create-offer-description"
+    textArea("create-offer-description").underlying.sendKeys("by party ID")
+
+    click on "create-offer-submit-button"
   }
 }

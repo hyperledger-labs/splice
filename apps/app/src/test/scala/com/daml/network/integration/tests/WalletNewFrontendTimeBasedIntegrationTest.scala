@@ -89,16 +89,16 @@ class WalletNewFrontendTimeBasedIntegrationTest
       }
     }
 
-    "show no user details after login if user has no cns entry" in { implicit env =>
+    "show party id after login if user has no cns entry" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
 
-      onboardWalletUser(aliceWallet, aliceValidator)
+      val alicePartyId = onboardWalletUser(aliceWallet, aliceValidator)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToWallet(aliceWalletNewPort, aliceDamlUser)
         eventually() {
           val loggedInUser = find(id("logged-in-user")).value.text.trim
-          loggedInUser shouldBe ""
+          loggedInUser shouldBe alicePartyId.toProtoPrimitive
         }
       }
     }

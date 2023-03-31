@@ -1,4 +1,7 @@
 import * as React from 'react';
+import { PartyId } from 'common-frontend';
+
+import Typography from '@mui/material/Typography';
 
 import { useCurrentUser } from '../contexts/CurrentUserContext';
 
@@ -7,10 +10,10 @@ export const CurrentUser: React.FC = () => {
 
   if (currentUser.state === 'onboarded') {
     if (currentUser.directoryEntry) {
-      return <>{currentUser.directoryEntry}</>;
+      return <Typography id="logged-in-user">{currentUser.directoryEntry}</Typography>;
     } else {
       // show no user details after login if user has no cns entry
-      return <></>;
+      return <PartyId partyId={currentUser.primaryParty} id="logged-in-user" />;
     }
   } else {
     return <>Not Onboarded</>;

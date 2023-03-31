@@ -25,18 +25,39 @@ class WalletNewFrontendIntegrationTest
 
     "tap" should {
 
-      "show updated balances after tapping" in { implicit env =>
-        val aliceDamlUser = aliceWallet.config.ledgerApiUser
-        onboardWalletUser(aliceWallet, aliceValidator)
-
+      def onboardAndTapTest(damlUser: String) = {
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
-            "Alice taps balance in the wallet", {
-              browseToWallet(aliceWalletNewPort, aliceDamlUser)
+            "User logs in", {
+              // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
+              login(aliceWalletNewPort, damlUser)
+            },
+          )(
+            "User sees the onboarding page",
+            _ => {
+              // After a short delay, the UI should realize that the user is not onboarded,
+              // and switch to the onbaording page.
+              waitForQuery(id("onboard-button"))
+            },
+          )
+
+          actAndCheck(
+            "User onboards themselves", {
+              click on "onboard-button"
+            },
+          )(
+            "User is logged in and onboarded",
+            _ => {
+              userIsLoggedIn()
+            },
+          )
+
+          actAndCheck(
+            "User taps balance in the wallet", {
               tapCoins(2)
             },
           )(
-            "Alice sees the updated balance",
+            "User sees the updated balance",
             _ => {
               val ccText = find(id("wallet-balance-cc")).value.text.trim
               val usdText = find(id("wallet-balance-usd")).value.text.trim
@@ -54,6 +75,18 @@ class WalletNewFrontendIntegrationTest
             },
           )
         }
+      }
+
+      "allow a random user to onboard themselves and show updated balances after tapping" in {
+        implicit env =>
+          val aliceDamlUser = aliceWallet.config.ledgerApiUser
+          onboardAndTapTest(aliceDamlUser)
+      }
+
+      "allow a random user with uppercase characters to onboard themselves, then tap and list coins" in {
+        implicit env =>
+          val damlUser = "UPPERCASE" + aliceWallet.config.ledgerApiUser
+          onboardAndTapTest(damlUser)
       }
 
       "fail when trying to use more than 10 decimal points" in { implicit env =>
@@ -137,6 +170,47 @@ class WalletNewFrontendIntegrationTest
 
       }
 
+    }
+
+    "show logged in directory name" in { implicit env =>
+      // Create directory entry for alice
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val entryName = perTestCaseName("alice.cns")
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+
+      createDirectoryEntry(
+        aliceParty,
+        aliceDirectory,
+        entryName,
+        aliceWallet,
+      )
+      eventuallySucceeds() {
+        directory.lookupEntryByName(entryName)
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        actAndCheck(
+          "Alice browses to the wallet", {
+            browseToWallet(aliceWalletNewPort, aliceDamlUser)
+          },
+        )(
+          "Alice sees her directory entry name",
+          _ => {
+            find(id("logged-in-user")).value.text should matchText(entryName)
+          },
+        )
+
+        actAndCheck(
+          "Alice refreshes the page", {
+            webDriver.navigate().refresh()
+          },
+        )(
+          "The name is still there",
+          _ => {
+            find(id("logged-in-user")).value.text should matchText(entryName)
+          },
+        )
+      }
     }
 
   }

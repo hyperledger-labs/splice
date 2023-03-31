@@ -19,7 +19,12 @@ const Onboarding: React.FC = () => {
   const onOnboardUser = async () => {
     setOnboardClicked(true);
     await validatorService.registerUser();
-    const status = await walletService.userStatus();
+    let status = await walletService.userStatus();
+    // it may take a while for the wallet to realize the user is onboarded, so we retry
+    while (!status.userOnboarded) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      status = await walletService.userStatus();
+    }
     updateStatus(status);
   };
 
