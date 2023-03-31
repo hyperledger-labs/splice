@@ -116,6 +116,28 @@ class HttpSvHandler(
       }
     }
 
+  def approveSvIdentity(
+      respond: v0.SvResource.ApproveSvIdentityResponse.type
+  )(body: definitions.ApproveSvIdentityRequest): Future[v0.SvResource.ApproveSvIdentityResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvApp
+        .approveSvIdentity(
+          body.candidateName,
+          body.candidateKey,
+          svStore,
+          ledgerConnection,
+          globalDomain,
+          logger,
+        )
+        .map {
+          case Left(reason) =>
+            v0.SvResource.ApproveSvIdentityResponseBadRequest(
+              s"Bad request: $reason"
+            )
+          case Right(()) => v0.SvResource.ApproveSvIdentityResponseOK
+        }
+    }
+
   def onboardSv(
       respond: v0.SvResource.OnboardSvResponse.type
   )(body: definitions.OnboardSvRequest): Future[v0.SvResource.OnboardSvResponse] =

@@ -898,7 +898,7 @@ object SvApp {
     } yield res
   }
 
-  private def approveSvIdentity(
+  private[sv] def approveSvIdentity(
       name: String,
       key: String,
       svStore: SvSvStore,

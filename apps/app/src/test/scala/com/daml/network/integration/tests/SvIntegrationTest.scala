@@ -197,6 +197,30 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )
   }
 
+  "SV Identity can be approved at runtime" in { implicit env =>
+    initSvc()
+    svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
+        sv1.getDebugInfo().svParty
+      ) should have length 2
+    val svXName = "svX"
+    val svXKey =
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
+    sv1.approveSvIdentity(svXName, svXKey)
+    inside(
+      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getDebugInfo().svParty)
+    ) {
+      case approvedSvIds => {
+        approvedSvIds should have size 3
+        val maybeSvXApprovedSvId = approvedSvIds.find(_.data.candidateName == svXName)
+        inside(maybeSvXApprovedSvId) { case Some(svXApprovedSvId) =>
+          svXApprovedSvId.data.candidateKey shouldBe svXKey
+        }
+      }
+    }
+  }
+
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV2 has created as many ValidatorOnboarding contracts as it's configured to.") {

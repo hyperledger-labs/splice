@@ -126,6 +126,26 @@ object HttpSvAppClient {
     }
   }
 
+  case class ApproveSvIdentity(candidateName: String, candidateKey: String)
+      extends BaseCommand[http.ApproveSvIdentityResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ApproveSvIdentityResponse] =
+      client.approveSvIdentity(
+        body = definitions.ApproveSvIdentityRequest(candidateName, candidateKey),
+        headers = headers,
+      )
+
+    override def handleResponse(response: http.ApproveSvIdentityResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Unit] = response match {
+      case http.ApproveSvIdentityResponse.OK => Right(())
+      case http.ApproveSvIdentityResponse.BadRequest(e) => Left(e)
+    }
+  }
+
   case class OnboardSv(token: String) extends BaseCommand[http.OnboardSvResponse, Unit] {
 
     override def submitRequest(

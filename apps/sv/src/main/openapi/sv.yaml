@@ -71,6 +71,27 @@ paths:
             text/plain:
               schema:
                 type: string
+  /admin/sv/identity/approve:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv
+      operationId: "approveSvIdentity"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ApproveSvIdentityRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /onboard/sv:
     post:
       tags: [sv]
@@ -234,6 +255,17 @@ components:
         party_id:
           type: string
         secret:
+          type: string
+
+    ApproveSvIdentityRequest:
+      type: object
+      required:
+        - candidateName
+        - candidateKey
+      properties:
+        candidateName:
+          type: string
+        candidateKey:
           type: string
 
     OnboardSvRequest:
