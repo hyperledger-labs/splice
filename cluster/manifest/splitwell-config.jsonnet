@@ -117,8 +117,8 @@ local deployments(config) = [
 
   c.deployment(config, "wallet-app", [
     {
-      name: "sw-wal-http",
-      port: 6004,
+      name: "sw-wal-api",
+      port: 5004,
       // Internal, we proxy this under /v0/wallet in the UI.
       internalOnly: true,
     },

@@ -2424,8 +2424,8 @@
                         "name": "wallet-app",
                         "ports": [
                            {
-                              "containerPort": 6004,
-                              "name": "val1-wal-http"
+                              "containerPort": 5004,
+                              "name": "val1-wal-api"
                            }
                         ],
                         "resources": {
@@ -2459,8 +2459,8 @@
          "spec": {
             "ports": [
                {
-                  "name": "val1-wal-http",
-                  "port": 6004,
+                  "name": "val1-wal-api",
+                  "port": 5004,
                   "protocol": "TCP"
                }
             ],
@@ -3663,8 +3663,8 @@
                         "name": "wallet-app",
                         "ports": [
                            {
-                              "containerPort": 6004,
-                              "name": "sw-wal-http"
+                              "containerPort": 5004,
+                              "name": "sw-wal-api"
                            }
                         ],
                         "resources": {
@@ -3698,8 +3698,8 @@
          "spec": {
             "ports": [
                {
-                  "name": "sw-wal-http",
-                  "port": 6004,
+                  "name": "sw-wal-api",
+                  "port": 5004,
                   "protocol": "TCP"
                }
             ],

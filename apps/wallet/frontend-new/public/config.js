@@ -16,7 +16,7 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the wallet app HTTP API
-      url: 'http://localhost:6004',
+      url: 'http://localhost:5004',
     },
     validator: {
       // URL of the validator app HTTP API

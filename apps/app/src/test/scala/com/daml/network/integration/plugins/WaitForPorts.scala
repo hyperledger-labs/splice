@@ -10,7 +10,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import scala.concurrent.duration.*
 import scala.util.Try
 import sys.process.*
-import com.digitalasset.canton.config.RequireTypes
 
 /** A plugin that waits for a set of ports to become available. By default, waits for all ports
   * relevent to the app backends defined in the environment configuration.
@@ -33,7 +32,7 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     )
     config.svApps.foreach(sv => waitForPort(sv._1, sv._2.adminApi.port.unwrap))
     config.walletAppBackends.foreach(wallet =>
-      waitForPortAndHttpPort(wallet._1, wallet._2.adminApi.port)
+      waitForPort(wallet._1, wallet._2.adminApi.port.unwrap)
     )
     config.splitwellApps.foreach(sw => waitForPort(sw._1, sw._2.adminApi.port.unwrap))
     config.directoryApp.foreach(directory =>
@@ -44,21 +43,6 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     )
     extraPortsToWaitFor.foreach(p => waitForPort(InstanceName.tryCreate(p._1), p._2))
     config
-  }
-
-  private def waitForPortAndHttpPort(
-      instanceName: InstanceName,
-      adminPort: RequireTypes.Port,
-  ): Unit = {
-    waitForPort(instanceName, adminPort.unwrap)
-    waitForHttpPort(instanceName, adminPort.unwrap)
-  }
-
-  /** Bumps the port by 1000 before waiting for it, to match the http ports used by most of our apps
-    * TODO(#2019) -- remove during grpc cleanup
-    */
-  private def waitForHttpPort(instanceName: InstanceName, adminPort: Int): Unit = {
-    waitForPort(InstanceName.tryCreate(s"${instanceName}-http"), adminPort + 1000)
   }
 
   private def waitForPort(instanceName: InstanceName, port: Int): Unit = {

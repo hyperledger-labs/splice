@@ -2,9 +2,10 @@ package com.daml.network.console
 
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{CNHttpClientConfig, LocalCNNodeConfig}
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.digitalasset.canton.config.{NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.commands.{
   HealthAdministration,
@@ -21,7 +22,7 @@ import com.digitalasset.canton.console.{
   RemoteParticipantReference,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
-import com.digitalasset.canton.health.admin.data.SimpleStatus
+import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -110,6 +111,44 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
       httpCommand,
       headers,
       httpClientConfig,
+    )
+
+  @Help.Summary("Health and diagnostic related commands (HTTP)")
+  @Help.Group("HTTP Health")
+  def httpHealth = {
+    consoleEnvironment.run {
+      // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
+      // TODO(#3467) see if we still need this after the initialization order is fixed
+      ConsoleCommandResult.fromEither(
+        Right(
+          httpCommand(
+            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
+          ).toEither.fold(err => NodeStatus.Failure(err), success => success)
+        )
+      )
+    }
+  }
+
+  // Override topology to avoid using grpc status check
+  private lazy val topology_ =
+    new TopologyAdministrationGroup(
+      this,
+      None,
+      consoleEnvironment,
+      loggerFactory,
+    )
+  @Help.Summary("Topology management related commands")
+  @Help.Group("Topology")
+  @Help.Description(
+    "This group contains access to the full set of topology management commands."
+  )
+  override def topology: TopologyAdministrationGroup = topology_
+
+  override def waitForInitialization(
+      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
+  ): Unit =
+    ConsoleMacros.utils.retry_until_true(timeout)(
+      httpHealth.successOption.map(_.active).getOrElse(false)
     )
 }
 

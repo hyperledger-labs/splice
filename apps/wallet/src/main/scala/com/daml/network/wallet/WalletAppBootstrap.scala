@@ -5,8 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBaseGrpc
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -36,7 +35,6 @@ class WalletAppBootstrap(
     metrics: WalletAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -44,7 +42,7 @@ class WalletAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBaseGrpc[
+) extends CNNodeBootstrapBase[
       WalletApp,
       WalletAppBackendConfig,
       SharedCNNodeAppParameters,
@@ -56,7 +54,6 @@ class WalletAppBootstrap(
       metrics,
       storageFactory,
       loggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ) {
 
@@ -94,7 +91,6 @@ object WalletAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      writeHealthDumpToFile: HealthDumpFunction,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -114,7 +110,6 @@ object WalletAppBootstrap {
           walletMetrics,
           new CommunityStorageFactory(walletConfig.storage),
           loggerFactory,
-          writeHealthDumpToFile,
           futureSupervisor,
           configuredOpenTelemetry,
         )

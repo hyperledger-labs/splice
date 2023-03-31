@@ -20,6 +20,7 @@ import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceRefere
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.config.CNHttpClientConfig
 
 abstract class WalletAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
@@ -358,10 +359,11 @@ abstract class WalletAppReference(
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
   */
-class WalletAppBackendReference(
-    val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
-    val name: String,
-) extends LocalCNNodeAppReference
+final class WalletAppBackendReference(
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val name: String,
+) extends WalletAppReference(cnNodeConsoleEnvironment, name)
+    with LocalCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Wallet"
@@ -371,6 +373,14 @@ class WalletAppBackendReference(
   @Help.Summary("Return wallet app backend config")
   def config: WalletAppBackendConfig =
     cnNodeConsoleEnvironment.environment.config.walletBackendsByString(name)
+
+  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
+    // For local references, we assume that they are reachable on localhost.
+    // TODO (#2019) Reconsider if we want these for local refs at all and if so
+    // if we should specify a url here.
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
+    config.clientAdminApi,
+  )
 
   /** Remote participant this wallet app is configured to interact with. */
   lazy val remoteParticipant =

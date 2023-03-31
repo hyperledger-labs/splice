@@ -2,18 +2,21 @@ package com.daml.network.wallet
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives.*
 import akka.http.scaladsl.model.HttpMethods
 import akka.stream.Materializer
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.admin.http.HttpAdminHandler
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
@@ -25,6 +28,7 @@ import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -150,6 +154,15 @@ class WalletApp(
         scanConnection,
         loggerFactory,
       )
+
+      // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
+      adminHandler = new HttpAdminHandler(
+        status
+          .map(CNNodeStatus.fromNodeStatus)
+          .map(NodeStatus.Success(_)),
+        loggerFactory,
+      )
+
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
           List(
@@ -164,22 +177,22 @@ class WalletApp(
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
-              WalletResource.routes(
-                handler,
-                AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+              concat(
+                WalletResource.routes(
+                  handler,
+                  AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                ),
+                CommonAdminResource.routes(adminHandler),
               )
             }
           }
         }
       }
-      httpConfig = config.adminApi.clientConfig.copy(
-        port = config.adminApi.port + 1000
-      )
-      _ = logger.info(s"Starting http server on ${httpConfig}")
+      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
       binding <- Http()
         .newServerAt(
-          httpConfig.address,
-          httpConfig.port.unwrap,
+          config.adminApi.clientConfig.address,
+          config.adminApi.clientConfig.port.unwrap,
         )
         .bind(
           routes

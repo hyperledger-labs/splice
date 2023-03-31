@@ -28,8 +28,8 @@ spec:
         imagePullPolicy: Always
         name: wallet-app
         ports:
-        - containerPort: 6004
-          name: wal-http
+        - containerPort: 5004
+          name: wal-api
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -44,10 +44,10 @@ spec:
   selector:
     app: wallet-app
   ports:
-  - name: wal-http
-    port: 6004
+  - name: wal-api
+    port: 5004
     protocol: TCP
-    targetPort: 6004
+    targetPort: 5004
 ---
 apiVersion: apps/v1
 kind: Deployment
