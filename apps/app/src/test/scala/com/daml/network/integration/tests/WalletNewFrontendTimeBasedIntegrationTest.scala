@@ -108,7 +108,10 @@ class WalletNewFrontendTimeBasedIntegrationTest
     "show balances after login" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
-      aliceWallet.tap(2)
+      actAndCheck("alice taps", aliceWallet.tap(2))(
+        "alice balance is bigger than 1",
+        _ => aliceWallet.balance().unlockedQty should be > BigDecimal(1.5),
+      )
       lockCoins(
         aliceWalletBackend,
         aliceParty,

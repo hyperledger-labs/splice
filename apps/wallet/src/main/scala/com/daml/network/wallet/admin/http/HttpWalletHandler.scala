@@ -69,15 +69,14 @@ class HttpWalletHandler(
     for {
       userStore <- getUserStore(user)
       currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-      acs <- userStore.defaultAcs
-      coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
-      lockedCoins <- acs.listContracts(
+      coins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
+      lockedCoins <- userStore.multiDomainAcsStore.listContracts(
         coinCodegen.LockedCoin.COMPANION
       )
     } yield r0.ListResponseOK(
       d0.ListResponse(
-        coins.map(coinToCoinPosition(_, currentRound)).toVector,
-        lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)).toVector,
+        coins.map(c => coinToCoinPosition(c.contract, currentRound)).toVector,
+        lockedCoins.map(c => lockedCoinToCoinPosition(c.contract, currentRound)).toVector,
       )
     )
   }
@@ -162,7 +161,10 @@ class HttpWalletHandler(
         subRequests <- userStore.listSubscriptionRequests()
       } yield {
         d0.ListSubscriptionRequestsResponse(subRequests.map { subRequest =>
-          d0.SubscriptionRequest(subRequest.subscription.toJson, subRequest.context.toJson)
+          d0.SubscriptionRequest(
+            subRequest.subscription.toJson,
+            subRequest.context.toJson,
+          )
         }.toVector)
       }
     }
@@ -245,9 +247,8 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
-        acs <- userStore.defaultAcs
-        contracts <- acs.listContracts(templateCompanion)
-      } yield mkResponse(contracts.map(_.toJson).toVector)
+        contracts <- userStore.multiDomainAcsStore.listContracts(templateCompanion)
+      } yield mkResponse(contracts.map(_.contract.toJson).toVector)
     }
 
   override def selfGrantFeatureAppRight(
@@ -436,19 +437,22 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit tc => _ =>
       for {
         userStore <- getUserStore(user)
-        acs <- userStore.defaultAcs
-        coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
-        lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
+        coins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
+        lockedCoins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.LockedCoin.COMPANION)
         now = clock.now
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       } yield {
         val unlockedHoldingFees =
-          coins.view.map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, currentRound))).sum
+          coins.view
+            .map(c => BigDecimal(CNNodeUtil.holdingFee(c.contract.payload, currentRound)))
+            .sum
         val unlockedQty =
-          coins.view.map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, currentRound))).sum
+          coins.view
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.contract.payload, currentRound)))
+            .sum
         val lockedQty =
           lockedCoins.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.coin, currentRound)))
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.contract.payload.coin, currentRound)))
             .sum
 
         d0.GetBalanceResponse(

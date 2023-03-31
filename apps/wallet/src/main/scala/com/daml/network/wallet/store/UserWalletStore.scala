@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.automation.ExpiredContractTrigger
+import com.daml.network.automation.MultiDomainExpiredContractTrigger
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
@@ -21,6 +21,7 @@ import com.daml.network.codegen.java.cn.{
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory}
+import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
   AppPaymentRequest,
@@ -37,7 +38,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -53,48 +54,65 @@ trait UserWalletStore
     ]
     with NamedLogging {
 
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "UserWalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
+  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
   def getInstall()(implicit ec: ExecutionContext): Future[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] = for {
-    acs <- defaultAcs
-    ct <- acs
-      .findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
+    domainId <- defaultAcsDomainIdF
+    ct <- multiDomainAcsStore
+      .findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(domainId, (_: Any) => true)
   } yield ct.getOrElse(
     throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
   )
 
   def signalWhenIngestedOrShutdown(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    defaultAcs.flatMap(_.signalWhenIngestedOrShutdown(offset))
+    defaultAcsDomainIdF.flatMap(multiDomainAcsStore.signalWhenIngestedOrShutdown(_, offset))
 
-  import ExpiredContractTrigger.ListExpiredContracts
-  import AcsStore.listExpiredFromPayloadExpiry
+  import MultiDomainExpiredContractTrigger.ListExpiredContracts
 
   def listExpiredTransferOffers: ListExpiredContracts[
     transferOffersCodegen.TransferOffer.ContractId,
     transferOffersCodegen.TransferOffer,
-  ] = listExpiredFromPayloadExpiry(defaultAcs, transferOffersCodegen.TransferOffer.COMPANION)(
-    _.expiresAt
-  )
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(transferOffersCodegen.TransferOffer.COMPANION)(
+      _.expiresAt
+    )
 
   def listExpiredAcceptedTransferOffers: ListExpiredContracts[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ] =
-    listExpiredFromPayloadExpiry(defaultAcs, transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      transferOffersCodegen.AcceptedTransferOffer.COMPANION
+    )(
       _.expiresAt
     )
 
   def listAppPaymentRequests: Future[Seq[AppPaymentRequest]] = {
     for {
-      acs <- defaultAcs
-      contracts <- acs.listContracts(walletCodegen.AppPaymentRequest.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      contracts <- multiDomainAcsStore.listContractsOnDomain(
+        walletCodegen.AppPaymentRequest.COMPANION,
+        domainId,
+      )
       // there's a 1-1 mapping AppPaymentRequest-DeliveryOffer, so all should be included
       // This is racy: you can miss delivery offers if their state change concurrently.
       // This is okay since it'll just refresh in the UI.
-      deliveryOffer <- acs.listContractsI(walletCodegen.DeliveryOffer.INTERFACE)(_ => true)
+      deliveryOffer <- multiDomainAcsStore.listContractsOnDomain(
+        walletCodegen.DeliveryOffer.INTERFACE,
+        domainId,
+      )
     } yield {
       val deliveryOfferMap = deliveryOffer.map(offer => offer.contractId -> offer).toMap
       // We drop payment requests for which we can't find a corresponding delivery offer, which can be
@@ -109,10 +127,15 @@ trait UserWalletStore
       cid: walletCodegen.AppPaymentRequest.ContractId
   ): Future[AppPaymentRequest] = {
     for {
-      acs <- defaultAcs
-      appPaymentRequest <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
-      deliveryOffer <- acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
-        appPaymentRequest.payload.deliveryOffer
+      domainId <- defaultAcsDomainIdF
+      appPaymentRequest <- multiDomainAcsStore.getContractByIdOnDomain(
+        walletCodegen.AppPaymentRequest.COMPANION
+      )(domainId, cid)
+      deliveryOffer <- multiDomainAcsStore.getContractByIdOnDomain(
+        walletCodegen.DeliveryOffer.INTERFACE
+      )(
+        domainId,
+        appPaymentRequest.payload.deliveryOffer,
       )
     } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)
   }
@@ -121,38 +144,49 @@ trait UserWalletStore
     walletCodegen.AppPaymentRequest.ContractId,
     walletCodegen.AppPaymentRequest,
   ] =
-    listExpiredFromPayloadExpiry(defaultAcs, walletCodegen.AppPaymentRequest.COMPANION)(_.expiresAt)
-
-  def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[
-    Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
-  ]] = {
-    def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
-      state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(walletCodegen.AppPaymentRequest.COMPANION)(
+      _.expiresAt
     )
 
-    for {
-      acs <- defaultAcs
-      cos <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-    } yield cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq
+  def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int): Future[Seq[
+    ReadyContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
+  ]] = {
+    def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
+      now.toInstant.isAfter(
+        state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
+      )
+
+    multiDomainAcsStore.listReadyContracts(
+      subsCodegen.SubscriptionIdleState.COMPANION,
+      (c: Contract[
+        subsCodegen.SubscriptionIdleState.ContractId,
+        subsCodegen.SubscriptionIdleState,
+      ]) => isReadyForPayment(c.payload),
+      Some(limit.toLong),
+    )
   }
 
   def listSubscriptions()(implicit ec: ExecutionContext): Future[Seq[Subscription]] = {
     // This is racy: you can miss subscriptions if their state change concurrently, i.e., you don't see them
     // as either idle or payment. This is okay since it'll just refresh in the UI.
     for {
-      acs <- defaultAcs
-      subscriptions <- acs.listContracts(subsCodegen.Subscription.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      subscriptions <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.Subscription.COMPANION,
+        domainId,
+      )
       // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      subscriptionContexts <- acs.listContractsI(subsCodegen.SubscriptionContext.INTERFACE)(_ =>
-        true
+      subscriptionContexts <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionContext.INTERFACE,
+        domainId,
       )
-      subscriptionIdleStates <- acs.listContracts(
-        subsCodegen.SubscriptionIdleState.COMPANION
+      subscriptionIdleStates <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionIdleState.COMPANION,
+        domainId,
       )
-      subscriptionPayments <- acs.listContracts(
-        subsCodegen.SubscriptionPayment.COMPANION
+      subscriptionPayments <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionPayment.COMPANION,
+        domainId,
       )
     } yield {
       val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
@@ -181,10 +215,18 @@ trait UserWalletStore
       cid: subsCodegen.SubscriptionRequest.ContractId
   )(implicit ec: ExecutionContext): Future[SubscriptionRequest] = {
     for {
-      acs <- defaultAcs
-      contract <- acs.getContractById(subsCodegen.SubscriptionRequest.COMPANION)(cid)
-      context <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-        contract.payload.subscriptionData.context
+      domainId <- defaultAcsDomainIdF
+      contract <- multiDomainAcsStore.getContractByIdOnDomain(
+        subsCodegen.SubscriptionRequest.COMPANION
+      )(
+        domainId,
+        cid,
+      )
+      context <- multiDomainAcsStore.getContractByIdOnDomain(
+        subsCodegen.SubscriptionContext.INTERFACE
+      )(
+        domainId,
+        contract.payload.subscriptionData.context,
       )
     } yield SubscriptionRequest(contract, context)
   }
@@ -193,10 +235,16 @@ trait UserWalletStore
       ec: ExecutionContext
   ): Future[Seq[SubscriptionRequest]] = {
     for {
-      acs <- defaultAcs
-      contracts <- acs.listContracts(subsCodegen.SubscriptionRequest.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      contracts <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionRequest.COMPANION,
+        domainId,
+      )
       // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      contexts <- acs.listContractsI(subsCodegen.SubscriptionContext.INTERFACE)(_ => true)
+      contexts <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionContext.INTERFACE,
+        domainId,
+      )
     } yield {
       val contextsMap = contexts.map(ctx => ctx.contractId -> ctx).toMap
       contracts.map { contract =>
@@ -213,8 +261,8 @@ trait UserWalletStore
       maxNumInputs: Int,
       submittingRound: Long,
   ): Future[Seq[(BigDecimal, InputCoin)]] = for {
-    acs <- defaultAcs
-    coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+    domainId <- defaultAcsDomainIdF
+    coins <- multiDomainAcsStore.listContractsOnDomain(coinCodegen.Coin.COMPANION, domainId)
   } yield coins
     .map(c =>
       (
@@ -253,8 +301,11 @@ trait UserWalletStore
     }
     // TODO(M3-83): use an index to access sorted rounds in the DB schema.
     for {
-      acs <- defaultAcs
-      rewards <- acs.listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      rewards <- multiDomainAcsStore.listContractsOnDomain(
+        coinCodegen.ValidatorRewardCoupon.COMPANION,
+        domainId,
+      )
     } yield rewards
       .filter(rw => filterActiveRounds(rw.payload.round.number))
       .sortBy(_.payload.round.number)
@@ -270,9 +321,12 @@ trait UserWalletStore
   ): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
-    acs <- defaultAcs
+    domainId <- defaultAcsDomainIdF
     // TODO(M3-83): use an index to access sorted rounds in the DB schema.
-    rewards <- acs.listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+    rewards <- multiDomainAcsStore.listContractsOnDomain(
+      coinCodegen.AppRewardCoupon.COMPANION,
+      domainId,
+    )
   } yield rewards
     .flatMap { rw =>
       val issuingO = issuingRoundsMap.get(rw.payload.round)
@@ -299,12 +353,16 @@ trait UserWalletStore
   def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] =
-    defaultAcs.flatMap(_.findContract(coinCodegen.FeaturedAppRight.COMPANION)(_ => true))
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(_, _ => true)
+    )
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   def getValidatorRightsWhereUserIsValidator()
       : Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
-    defaultAcs.flatMap(_.listContracts(coinCodegen.ValidatorRight.COMPANION))
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, _)
+    )
 
   def listTransactions(
       beginAfterEventId: Option[String],
@@ -325,7 +383,10 @@ trait UserWalletStore
 
 object UserWalletStore {
   type SubscriptionContextContract =
-    Contract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
+    Contract[
+      subsCodegen.SubscriptionContext.ContractId,
+      subsCodegen.SubscriptionContextView,
+    ]
 
   sealed trait SubscriptionState {
     val contract: Contract[?, ?]

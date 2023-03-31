@@ -1,7 +1,7 @@
 package com.daml.network.wallet.automation
 
 import com.daml.network.automation.{
-  ExpiredContractTrigger,
+  MultiDomainExpiredContractTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   subscriptions as subsCodegen,
 }
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -28,18 +28,18 @@ class SubscriptionReadyForPaymentTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       subsCodegen.SubscriptionIdleState.ContractId,
       subsCodegen.SubscriptionIdleState,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listSubscriptionStatesReadyForPayment,
       subsCodegen.SubscriptionIdleState.COMPANION,
     ) {
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        Contract[
+        ReadyContract[
           subsCodegen.SubscriptionIdleState.ContractId,
           subsCodegen.SubscriptionIdleState,
         ]
@@ -47,7 +47,7 @@ class SubscriptionReadyForPaymentTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     import com.daml.network.util.PrettyInstances.*
 
-    val stateCid = task.work.contractId
+    val stateCid = task.work.contract.contractId
     val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
     treasury
       .enqueueCoinOperation(operation)

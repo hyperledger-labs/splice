@@ -26,6 +26,26 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Option[ContractWithState[TCid, T]]]
 
+  /** Get a contract by id.
+    *
+    * Throws [[Status.NOT_FOUND]] if no such contract exists.
+    */
+  def getContractById[C, TCid <: ContractId[_], T](
+      companion: C
+  )(id: ContractId[_])(implicit
+      ec: ExecutionContext,
+      companionClass: ContractCompanion[C, TCid, T],
+  ): Future[ContractWithState[TCid, T]] =
+    lookupContractById(companion)(id).map(result =>
+      result.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
+          )
+          .asRuntimeException
+      )
+    )
+
   /** Variant of lookupContractById that will fail the future
     * if the contract is active but not in state ContractState.Assigned(domain).
     * This is particularly useful in automation where this will ensure it retries until
@@ -45,6 +65,26 @@ trait MultiDomainAcsStore extends AutoCloseable {
         .asRuntimeException()
     }
   })
+
+  /** Like `lookupContractByIdOnDomain` but
+    *
+    * Throws [[Status.NOT_FOUND]] if no such contract exists.
+    */
+  def getContractByIdOnDomain[C, TCid <: ContractId[_], T](
+      companion: C
+  )(domain: DomainId, id: ContractId[_])(implicit
+      ec: ExecutionContext,
+      companionClass: ContractCompanion[C, TCid, T],
+  ): Future[Contract[TCid, T]] =
+    lookupContractByIdOnDomain(companion)(domain, id).map(result =>
+      result.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
+          )
+          .asRuntimeException
+      )
+    )
 
   /** Find a contract that satisfies a predicate.
     *
@@ -78,11 +118,28 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[QueryResult[Option[Contract[TCid, T]]]]
 
+  def findContractOnDomain[C, TCid <: ContractId[_], T](
+      companion: C
+  )(
+      domain: DomainId,
+      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+  )(implicit
+      executionContext: ExecutionContext,
+      companionClass: ContractCompanion[C, TCid, T],
+  ): Future[Option[Contract[TCid, T]]] =
+    findContractOnDomainWithOffset(companion)(domain, p).map(_.value)
+
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Option[Long] = None,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
+
+  def listReadyContracts[C, TCid <: ContractId[_], T](
+      companion: C,
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+      limit: Option[Long] = None,
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]]
 
   /** Only contracts with state ContractState.Assigned(domain) are considered
     * so contracts are omitted if they have been transferred or are in-flight.
@@ -101,17 +158,13 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companion: C
   )(
       expiresAt: T => java.time.Instant
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      ec: ExecutionContext,
-  ): ListExpiredContracts[TCid, T] = (now, limit) =>
-    for {
-      contracts <- listContracts(companion)
-    } yield contracts.view
-      .collect(Function.unlift(_.toReadyContract))
-      .filter(co => now.toInstant isAfter expiresAt(co.contract.payload))
-      .take(limit)
-      .toSeq
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
+    (now, limit) =>
+      listReadyContracts(
+        companion = companion,
+        filter = co => now.toInstant isAfter expiresAt(co.payload),
+        limit = Some(limit.toLong),
+      )
 
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple

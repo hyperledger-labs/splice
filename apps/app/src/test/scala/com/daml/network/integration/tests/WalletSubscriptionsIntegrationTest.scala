@@ -70,10 +70,13 @@ class WalletSubscriptionsIntegrationTest
         aliceWallet.getSubscriptionRequest(requestId).subscriptionRequest.payload shouldBe request
       }
 
-      clue("Reject the subscription request") {
-        aliceWallet.rejectSubscriptionRequest(requestId)
-        aliceWallet.listSubscriptionRequests() shouldBe empty
-      }
+      actAndCheck(
+        "Alice rejects the subscription request",
+        aliceWallet.rejectSubscriptionRequest(requestId),
+      )(
+        "alice sees empty list of subscription requests",
+        _ => aliceWallet.listSubscriptionRequests() shouldBe empty,
+      )
     }
 
     // We put all of this in one test because assembling valid subscription instances

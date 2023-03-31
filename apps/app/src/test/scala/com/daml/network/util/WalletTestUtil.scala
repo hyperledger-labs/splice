@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.ledger.javaapi.data.ExercisedEvent
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -105,6 +106,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def p2pTransfer(
+      senderWalletBackend: WalletAppBackendReference,
       senderWallet: WalletAppClientReference,
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
@@ -124,9 +126,31 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         offer.contractId shouldBe transferOfferId
       )
     }
-    receiverWallet.acceptTransferOffer(transferOfferId)
-    // note that something like `receiverWallet.listAcceptedTransferOffers() should have size 1`
-    // is potentially racy (possible to circumvent this by being clever, but we chose the simple solution for now)
+    val offsetBefore =
+      senderWalletBackend.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+    val acceptedCid = receiverWallet.acceptTransferOffer(transferOfferId)
+
+    val senderParty = PartyId.tryFromProtoPrimitive(senderWallet.userStatus().party)
+
+    eventually() {
+      val offset = senderWalletBackend.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+      val transactions =
+        senderWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+          .treesJava(
+            Set(senderParty),
+            completeAfter = Int.MaxValue,
+            beginOffset = offsetBefore,
+            endOffset = Some(offset),
+          )
+      forExactly(1, transactions) { transaction =>
+        forExactly(1, transaction.getEventsById.asScala.values)(
+          inside(_) { case event: ExercisedEvent =>
+            event.getContractId shouldBe acceptedCid.contractId
+            event.getChoice shouldBe "AcceptedTransferOffer_Complete"
+          }
+        )
+      }
+    }
   }
 
   /** Collects an accepted app payment request without doing anything useful in return. */

@@ -654,10 +654,10 @@ class SvTimeBasedIntegrationTest
 
     actAndCheck(
       "Generate some reward coupons by executing a few direct transfers", {
-        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
-        p2pTransfer(bobWallet, aliceWallet, aliceParty, 10.0)
+        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceParty, 10.0)
+        p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceParty, 10.0)
       },
     )(
       "Wait for all reward coupons to be created",

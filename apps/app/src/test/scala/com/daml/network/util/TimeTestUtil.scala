@@ -107,62 +107,54 @@ trait TimeTestUtil extends CNNodeTestCommon {
       expiredDuration: Duration,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): Unit =
     clue(s"Locking $amount coins for $userParty") {
-      val coinOpt = coins.find(_.effectiveAmount >= amount)
+      val coin = coins.find(_.effectiveAmount >= amount).value
       val coinRules = scan.getCoinRules()
       val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
       val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
 
       val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
-      val expirationOpt = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros)
+      val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
-      (coinOpt, expirationOpt) match {
-        case (Some(coin), Right(expiration)) => {
-          userWallet.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
-            Seq(userParty, validatorParty),
-            optTimeout = None,
-            commands = transferContext.coinRules
-              .exerciseCoinRules_Transfer(
-                new v1.coin.Transfer(
+      userWallet.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+        Seq(userParty, validatorParty),
+        optTimeout = None,
+        commands = transferContext.coinRules
+          .exerciseCoinRules_Transfer(
+            new v1.coin.Transfer(
+              userParty.toProtoPrimitive,
+              userParty.toProtoPrimitive,
+              Seq[v1.coin.TransferInput](
+                new v1.coin.transferinput.InputCoin(
+                  coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+                )
+              ).asJava,
+              Seq[v1.coin.TransferOutput](
+                new TransferOutput(
                   userParty.toProtoPrimitive,
-                  userParty.toProtoPrimitive,
-                  Seq[v1.coin.TransferInput](
-                    new v1.coin.transferinput.InputCoin(
-                      coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+                  BigDecimal(0.0).bigDecimal,
+                  amount.bigDecimal,
+                  Some(
+                    new TimeLock(
+                      Seq(userParty.toProtoPrimitive).asJava,
+                      expiration.toInstant,
                     )
-                  ).asJava,
-                  Seq[v1.coin.TransferOutput](
-                    new TransferOutput(
-                      userParty.toProtoPrimitive,
-                      BigDecimal(0.0).bigDecimal,
-                      amount.bigDecimal,
-                      Some(
-                        new TimeLock(
-                          Seq(userParty.toProtoPrimitive).asJava,
-                          expiration.toInstant,
-                        )
-                      ).toJava,
-                    )
-                  ).asJava,
-                ),
-                new v1.coin.TransferContext(
-                  transferContext.openMiningRound,
-                  Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-                  Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
-                  // note: we don't provide a featured app right as sender == provider
-                  None.toJava,
-                ),
-              )
-              .commands
-              .asScala
-              .toSeq,
-            disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+                  ).toJava,
+                )
+              ).asJava,
+            ),
+            new v1.coin.TransferContext(
+              transferContext.openMiningRound,
+              Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
+              Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+              // note: we don't provide a featured app right as sender == provider
+              None.toJava,
+            ),
           )
-        }
-        case _ => {
-          coinOpt shouldBe a[Some[_]]
-          expirationOpt shouldBe a[Right[_, _]]
-        }
-      }
+          .commands
+          .asScala
+          .toSeq,
+        disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+      )
     }
 
   /** This function advances time by ~one tick and waits for the SVC round management automation for open, summarizing
@@ -258,22 +250,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorPartyId
     )
     .sortBy(_.data.round.number)
-
-  def p2pTransferAndTriggerAutomation(
-      senderWallet: WalletAppClientReference,
-      receiverWallet: WalletAppClientReference,
-      receiver: PartyId,
-      amount: BigDecimal,
-      advanceTimeBy: Duration = Duration.ofSeconds(1),
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    p2pTransfer(senderWallet, receiverWallet, receiver, amount)
-    eventually() {
-      // wait until we observe the accepted transfer offer
-      receiverWallet.listAcceptedTransferOffers() should have size 1
-    }
-    // ... before we advance time to trigger the automation.
-    advanceTime(advanceTimeBy)
-  }
 
   def createConfigSchedule(
       newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*

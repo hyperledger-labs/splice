@@ -108,7 +108,11 @@ class WalletTimeBasedIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
       aliceWallet.tap(50)
-      val startingBalance = aliceWallet.balance()
+      val startingBalance = eventually() {
+        val startingBalance = aliceWallet.balance()
+        startingBalance.unlockedQty shouldBe 50.0
+        startingBalance
+      }
       val lockedQty = 25
 
       advanceRoundsByOneTick
@@ -609,7 +613,7 @@ class WalletTimeBasedIntegrationTest
       }
 
       grantFeaturedAppRight(aliceValidatorWallet)
-      p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bobUserParty, 40.0)
+      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobUserParty, 40.0)
       eventually()({
         bobWallet.balance().unlockedQty should not be (BigDecimal(0.0))
         aliceValidatorWallet.listAppRewardCoupons() should have length (couponsBefore + 1)

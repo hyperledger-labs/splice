@@ -1,8 +1,7 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{
-  ExpiredContractTrigger,
+  MultiDomainExpiredContractTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -10,8 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -22,22 +21,21 @@ class ExpireAcceptedTransferOfferTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     connection: CNLedgerConnection,
-    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listExpiredAcceptedTransferOffers,
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
     ) {
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        Contract[
+        ReadyContract[
           transferOffersCodegen.AcceptedTransferOffer.ContractId,
           transferOffersCodegen.AcceptedTransferOffer,
         ]
@@ -45,34 +43,33 @@ class ExpireAcceptedTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
-      domainId <- store.domains.getDomainId(globalDomain)
       user = store.key.endUserParty.toProtoPrimitive
       _ <- user match {
-        case task.work.payload.sender =>
+        case task.work.contract.payload.sender =>
           val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-            task.work.contractId
+            task.work.contract.contractId
           )
           connection.submitWithResultNoDedup(
             Seq(store.key.walletServiceParty),
             Seq(store.key.validatorParty, store.key.endUserParty),
             cmd,
-            domainId,
+            task.work.domain,
           )
-        case task.work.payload.receiver =>
+        case task.work.contract.payload.receiver =>
           val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Withdraw(
-            task.work.contractId
+            task.work.contract.contractId
           )
           connection.submitWithResultNoDedup(
             Seq(store.key.walletServiceParty),
             Seq(store.key.validatorParty, store.key.endUserParty),
             cmd,
-            domainId,
+            task.work.domain,
           )
         case _ =>
           Future.failed(
             new StatusRuntimeException(
               Status.INTERNAL.withDescription(
-                s"User ($user) is unexpectedly neither sender ($task.work.payload.sender) nor receiver ($task.work.payload.receiver)"
+                s"User ($user) is unexpectedly neither sender ($task.work.contract.payload.sender) nor receiver ($task.work.contract.payload.receiver)"
               )
             )
           )

@@ -208,6 +208,18 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       }.take(limit.fold(Int.MaxValue)(_.intValue()))
     )
 
+  def listReadyContracts[C, TCid <: ContractId[_], T](
+      companion: C,
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+      limit: Option[Long] = None,
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
+    for {
+      contracts <- listContracts(companion, filter)(companionClass)
+    } yield contracts.view
+      .collect(Function.unlift(_.toReadyContract))
+      .take(limit.fold(Int.MaxValue)(_.intValue()))
+      .toSeq
+
   private def lookupContractById[T](
       fromCreatedEvent: CreatedEvent => Option[T]
   )(id: ContractId[_]): Future[Option[(T, ContractState)]] = Future {

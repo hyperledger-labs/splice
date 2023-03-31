@@ -221,54 +221,55 @@ class TreasuryService(
     * [[io.grpc.StatusRuntimeException]].
     * We execute `completeStaleOperations` after every batch that failed.
     */
-  private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
-    case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
-      for {
-        acs <- userStore.defaultAcs
-        subscriptionRequest <- acs.getContractById(
-          subsCodegen.SubscriptionRequest.COMPANION
-        )(op.contractIdValue)
-        _ <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionRequest.payload.subscriptionData.context
-        )
-      } yield ()
+  private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] =
+    userStore.domains.signalWhenConnected(userStore.defaultAcsDomain).flatMap { domainId =>
+      op0 match {
+        case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
+          for {
+            subscriptionRequest <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              subsCodegen.SubscriptionRequest.COMPANION
+            )(domainId, op.contractIdValue)
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              subsCodegen.SubscriptionContext.INTERFACE
+            )(domainId, subscriptionRequest.payload.subscriptionData.context)
+          } yield ()
 
-    case op: coinoperation.CO_SubscriptionMakePayment =>
-      for {
-        acs <- userStore.defaultAcs
-        subscriptionState <- acs.getContractById(
-          subsCodegen.SubscriptionIdleState.COMPANION
-        )(op.contractIdValue)
-        _ <- acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionState.payload.subscriptionData.context
-        )
-      } yield ()
+        case op: coinoperation.CO_SubscriptionMakePayment =>
+          for {
+            subscriptionState <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              subsCodegen.SubscriptionIdleState.COMPANION
+            )(domainId, op.contractIdValue)
+            _ <- userStore.multiDomainAcsStore
+              .getContractByIdOnDomain(subsCodegen.SubscriptionContext.INTERFACE)(
+                domainId,
+                subscriptionState.payload.subscriptionData.context,
+              )
+          } yield ()
 
-    case op: coinoperation.CO_AppPayment =>
-      for {
-        acs <- userStore.defaultAcs
-        paymentRequest <- acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(
-          op.contractIdValue
-        )
-        _ <- acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
-          paymentRequest.payload.deliveryOffer
-        )
-      } yield ()
+        case op: coinoperation.CO_AppPayment =>
+          for {
+            paymentRequest <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              walletCodegen.AppPaymentRequest.COMPANION
+            )(domainId, op.contractIdValue)
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              walletCodegen.DeliveryOffer.INTERFACE
+            )(domainId, paymentRequest.payload.deliveryOffer)
+          } yield ()
 
-    case op: coinoperation.CO_CompleteAcceptedTransfer =>
-      for {
-        acs <- userStore.defaultAcs
-        _ <- acs.getContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
-          op.contractIdValue
-        )
-      } yield ()
+        case op: coinoperation.CO_CompleteAcceptedTransfer =>
+          for {
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+              transferOffersCodegen.AcceptedTransferOffer.COMPANION
+            )(domainId, op.contractIdValue)
+          } yield ()
 
-    case _: coinoperation.CO_MergeTransferInputs => Future.unit
+        case _: coinoperation.CO_MergeTransferInputs => Future.unit
 
-    case _: coinoperation.CO_Tap => Future.unit
+        case _: coinoperation.CO_Tap => Future.unit
 
-    case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
-  }
+        case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
+      }
+    }
 
   /** In case of contention, the `executeBatch` function may fail. This function adds retries so that a single coin
     * operation, that failed due to contention, does not require a whole batch of coin operations to be resubmitted

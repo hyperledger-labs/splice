@@ -99,7 +99,7 @@ class WalletPaymentIntegrationTest
           aliceUserParty,
         )
 
-      eventually() {
+      eventuallySucceeds() {
         aliceWallet.getAppPaymentRequest(cid).appPaymentRequest.payload shouldBe reqC
       }
 
@@ -150,11 +150,11 @@ class WalletPaymentIntegrationTest
       }
 
       clue("Alice transfers 39") {
-        p2pTransfer(aliceWallet, bobWallet, bob, 39)
+        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 39)
         checkWallet(alice, aliceWallet, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
-        p2pTransfer(aliceWallet, bobWallet, bob, 19)
+        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 19)
         checkWallet(alice, aliceWallet, Seq((11, 12)))
       }
     }

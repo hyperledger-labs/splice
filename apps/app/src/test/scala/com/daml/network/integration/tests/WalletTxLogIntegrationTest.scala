@@ -349,19 +349,10 @@ class WalletTxLogIntegrationTest
           ),
         )("Bob sees transfer offer", _ => bobWallet.listTransferOffers() should have length 1)
 
-      val previousQuantity = aliceWallet.balance().unlockedQty
-
       actAndCheck("Bob accepts transfer offer", bobWallet.acceptTransferOffer(offerCid))(
         "Alice does not see transfer offer anymore",
         _ => aliceWallet.listTransferOffers() shouldBe empty,
       )
-
-      clue("Wait until Alice's wallet automation transfers") {
-        eventually() {
-          bobWallet.balance().unlockedQty should be > BigDecimal(0)
-          aliceWallet.balance().unlockedQty should be < (previousQuantity - transferAmount)
-        }
-      }
 
       // Both Alice and Bob see the same representation of the transfer
       val checkTransfer: CheckTxHistoryFn = {

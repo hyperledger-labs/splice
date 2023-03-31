@@ -1,10 +1,14 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.DomainAlias
 import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cc.coin.invalidtransferreason
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
@@ -13,7 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,43 +31,36 @@ class AcceptedTransferOfferTrigger(
     store: UserWalletStore,
     treasury: TreasuryService,
     connection: CNLedgerConnection,
-    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
     ) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
-  override protected val source: Source[Contract[
+  override protected val source: Source[ReadyContract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ], NotUsed] =
-    Source
-      .futureSource(
-        store.defaultAcs.map(
-          _.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
-            .filter(acceptedOffer =>
-              acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
-            )
-        )
+    store.multiDomainAcsStore
+      .streamReadyContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
+      .filter(acceptedOffer =>
+        acceptedOffer.contract.payload.sender == store.key.endUserParty.toProtoPrimitive
       )
-      .mapMaterializedValue { _: Future[NotUsed] => NotUsed }
 
   override def completeTask(
-      acceptedOffer: Contract[
+      acceptedOffer: ReadyContract[
         transferOffersCodegen.AcceptedTransferOffer.ContractId,
         transferOffersCodegen.AcceptedTransferOffer,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
+    val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contract.contractId)
     treasury
       .enqueueCoinOperation(operation)
       .flatMap {
@@ -91,21 +88,20 @@ class AcceptedTransferOfferTrigger(
   }
 
   private def abortAcceptedTransferOffer(
-      acceptedOffer: Contract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
+      acceptedOffer: ReadyContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
   ): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
-      domainId <- store.domains.getDomainId(globalDomain)
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-        acceptedOffer.contractId
+        acceptedOffer.contract.contractId
       )
       _ <- connection
         .submitWithResultNoDedup(
           Seq(store.key.walletServiceParty),
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
-          domainId,
+          acceptedOffer.domain,
         )
     } yield TaskSuccess(s"aborted accepted transfer offer, $reason")
   }

@@ -1,8 +1,7 @@
 package com.daml.network.wallet.automation
 
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{
-  ExpiredContractTrigger,
+  MultiDomainExpiredContractTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -10,8 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -21,39 +20,37 @@ class ExpireAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
     store: UserWalletStore,
     connection: CNLedgerConnection,
-    globalDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listExpiredAppPaymentRequests,
       paymentCodegen.AppPaymentRequest.COMPANION,
     ) {
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        Contract[
+        ReadyContract[
           paymentCodegen.AppPaymentRequest.ContractId,
           paymentCodegen.AppPaymentRequest,
         ]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.getDomainId(globalDomain)
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AppPaymentRequest_Expire(
-        task.work.contractId
+        task.work.contract.contractId
       )
       _ <- connection
         .submitWithResultNoDedup(
           Seq(store.key.walletServiceParty),
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
-          domainId,
+          task.work.domain,
         )
     } yield TaskSuccess("expired app payment request")
   }

@@ -59,9 +59,21 @@ class WalletNewTransactionHistoryIntegrationTest
             createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
             // charlie -> alice
             charlieWallet.tap(50)
-            p2pTransfer(charlieWallet, aliceWallet, aliceUserParty, BigDecimal("1.07"))
+            p2pTransfer(
+              aliceWalletBackend,
+              charlieWallet,
+              aliceWallet,
+              aliceUserParty,
+              BigDecimal("1.07"),
+            )
             // alice -> charlie
-            p2pTransfer(aliceWallet, charlieWallet, charlieUserParty, BigDecimal("1.18"))
+            p2pTransfer(
+              aliceWalletBackend,
+              aliceWallet,
+              charlieWallet,
+              charlieUserParty,
+              BigDecimal("1.18"),
+            )
             // one-time payment
             val (_, cid, _) = createPaymentRequest(
               aliceWalletBackend.remoteParticipantWithAdminToken,

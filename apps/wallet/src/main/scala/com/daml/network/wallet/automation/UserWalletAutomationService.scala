@@ -44,22 +44,22 @@ class UserWalletAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection, globalDomain))
+  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(
-    new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection, globalDomain)
+    new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection)
+  )
+  registerTrigger(
+    new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection)
   )
   registerTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))
   registerTrigger(
-    new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection, globalDomain)
+    new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
   )
   if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
     registerTrigger(
       new CollectRewardsAndMergeCoinsTrigger(triggerContext, treasury)
     )
   }
-  registerTrigger(
-    new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection, globalDomain)
-  )
 
   registerTrigger(
     new TransferOutTrigger.Template(
