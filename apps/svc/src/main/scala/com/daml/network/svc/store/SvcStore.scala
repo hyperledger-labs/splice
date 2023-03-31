@@ -2,15 +2,15 @@ package com.daml.network.svc.store
 
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,17 +22,23 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "SvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
+  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+
   protected[this] def domainConfig: SvcDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global
 
-  def lookupCoinRulesWithOffset(): Future[
-    QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
-  ] =
-    defaultAcs.flatMap(_.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true))
-
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
-    lookupCoinRulesWithOffset().map(_.value)
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, _ => true)
+    )
 
   // needed for round automation
   def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
@@ -45,68 +51,29 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
     )
 
   // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
-  def lookupSvcRulesWithOffset(
-  ): Future[
-    QueryResult[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
-  ] =
-    defaultAcs.flatMap(_.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)(_ => true))
-
-  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
   def lookupSvcRules()(implicit
       ec: ExecutionContext
   ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
-    lookupSvcRulesWithOffset().map(_.value)
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(cn.svcrules.SvcRules.COMPANION)(_, (_: Any) => true)
+    )
 
-  import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
-  import AcsStore.listExpiredFromPayloadExpiry
+  import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds
       : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
-    listExpiredFromPayloadExpiry(defaultAcs, cc.round.IssuingMiningRound.COMPANION)(
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
       _.targetClosesAt
     )
 
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
-    )
-
-  def lookupOldestClosedMiningRound(): Future[
-    Option[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
-  ] =
-    for {
-      acs <- defaultAcs
-      rounds <- acs.listContracts(cc.round.ClosedMiningRound.COMPANION)
-    } yield rounds.sortBy(_.payload.round.number).headOption
-
-  def listAppRewardCoupons(
-      round: Long,
-      limit: Option[Long] = None,
-  ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]] =
-    defaultAcs.flatMap(
-      _.listContracts(
-        cc.coin.AppRewardCoupon.COMPANION,
-        (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
-          co.payload.round.number == round,
-        limit,
-      )
-    )
-
-  def listValidatorRewardCoupons(
-      round: Long,
-      limit: Option[Long] = None,
-  ): Future[
-    Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
-  ] =
-    defaultAcs.flatMap(
-      _.listContracts(
-        cc.coin.ValidatorRewardCoupon.COMPANION,
-        (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
-          co.payload.round.number == round,
-        limit,
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(FeaturedAppRight.COMPANION)(
+        _,
+        co => co.payload.provider == provider,
       )
     )
 }

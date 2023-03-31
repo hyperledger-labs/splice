@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import com.daml.network.automation.{
-  ExpiredContractTrigger,
+  MultiDomainExpiredContractTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -10,8 +10,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -24,25 +24,25 @@ class ExpireIssuingMiningRoundTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       cc.round.IssuingMiningRound.ContractId,
       cc.round.IssuingMiningRound,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listExpiredIssuingMiningRounds,
       cc.round.IssuingMiningRound.COMPANION,
     ) {
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        Contract[IssuingMiningRound.ContractId, IssuingMiningRound]
+        ReadyContract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
       coinRules <- store.getCoinRules()
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      cmd = coinRules.contractId.exerciseCoinRules_MiningRound_Close(round.contractId)
+      cmd = coinRules.contractId.exerciseCoinRules_MiningRound_Close(round.contract.contractId)
       cid <- connection
         .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd, domainId)
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")

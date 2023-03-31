@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
 import com.daml.network.codegen.java.cc.coinconfig.USD
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, DedupOffset}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
@@ -64,7 +64,7 @@ class GrpcSvcAppService(
       val providerParty = PartyId.tryFromProtoPrimitive(request.appProvider)
       for {
         result <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
-          case QueryResult(off, None) =>
+          case result @ QueryResult(_, None) =>
             connection.submitWithResult(
               actAs = Seq(svcParty),
               readAs = Seq.empty,
@@ -76,7 +76,7 @@ class GrpcSvcAppService(
                 "com.daml.network.svc.grantFeaturedAppRight",
                 Seq(svcParty, providerParty),
               ),
-              deduplicationConfig = DedupOffset(off),
+              deduplicationConfig = DedupOffset(result.deduplicationOffset),
               domainId = globalDomain,
             )
           case QueryResult(_, Some(_)) =>
