@@ -451,7 +451,7 @@ file along with your dar changes.
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `dd75dc44144f884a8af512227a2b7b91fc8f274a`
+Current Canton commit: `23a397665a9702b16d4f44e4d3cb569028d3608a`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -482,16 +482,10 @@ Current Canton commit: `dd75dc44144f884a8af512227a2b7b91fc8f274a`
       1. The current Canton commit in this `README.md`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
       3. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same version.
-      4. Force a re-download of the Canton fork we pull in via `nix/canton.nix`:
-         1. In `nix/canton-sources.json` bump `version` to the desired canton version. You can find
-            that version by looking at the corresponding SDK
-            release. E.g.,
-            https://github.com/digital-asset/daml/releases/tag/v2.5.0-snapshot.20221010.10736.0.2f453a14
-            lists `canton-open-source-20221011.tar.gz` under the
-            artifacts so `20221011` is the Canton version.
-         2. Change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `shell.nix`, and then call `direnv reload`,
-            to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
-            Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
+      4. Change the JSON API hash in `jsonapi.nix`. To do so lhange a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `shell.nix`, and then call `direnv reload`,
+         to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
+         Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
+      4. Repeat the same with the sha256 of the protobufs in `shell.nix`.
    6. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
 5. Make a PR with your changes, so CI starts churning.
 6. Test whether things compile using `sbt Test/compile`.

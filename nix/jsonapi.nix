@@ -7,7 +7,7 @@ stdenv.mkDerivation rec {
 
   src = fetchurl {
     url = "https://github.com/digital-asset/daml/releases/download/v${version}/http-json-${version}.jar";
-    sha256 = "sha256-HFQ+PC1reQufCcZuM0EWl//mBm3oZpuMRc2ciH5W46M=";
+    sha256 = "sha256-SNnbCa3CsoqPcpMV93TO9FET6L1YsQTPzBXyJTtJAiE=";
   };
 
   nativeBuildInputs = [ makeWrapper ];

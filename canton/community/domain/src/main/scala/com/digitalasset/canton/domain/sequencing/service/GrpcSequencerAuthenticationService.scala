@@ -206,7 +206,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
 
     override protected def exposedViaApi: Boolean = false
 
-    case class ChallengeFailure(
+    final case class ChallengeFailure(
         member: String,
         supportedProtocol: Seq[String],
         response: Status,
@@ -217,7 +217,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
         )
         with CantonError
 
-    case class AuthenticationFailure(member: String, response: Status)(implicit
+    final case class AuthenticationFailure(member: String, response: Status)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
@@ -236,7 +236,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
 
     override protected def exposedViaApi: Boolean = false
 
-    case class ChallengeFailure(
+    final case class ChallengeFailure(
         member: String,
         supportedProtocol: Seq[String],
         response: Status,
@@ -247,7 +247,7 @@ object GrpcSequencerAuthenticationService extends GrpcSequencerAuthenticationErr
         )
         with CantonError
 
-    case class AuthenticationFailure(member: String, response: Status)(implicit
+    final case class AuthenticationFailure(member: String, response: Status)(implicit
         override val loggingContext: ErrorLoggingContext
     ) extends Alarm(
           cause =

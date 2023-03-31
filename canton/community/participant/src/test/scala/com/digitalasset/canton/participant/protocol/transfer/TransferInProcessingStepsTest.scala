@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.participant.protocol.transfer
 
+import cats.Eval
 import cats.implicits.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.*
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
@@ -24,7 +26,6 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferInValidatio
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
   NoSubmissionPermissionIn,
   ReceivedMultipleRequests,
-  ReceivedNoRequests,
   StakeholdersMismatch,
   SubmittingPartyMustBeStakeholderIn,
 }
@@ -89,6 +90,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
       submitter,
       LedgerApplicationId.assertFromString("tests"),
       participant.toLf,
+      LedgerCommandId.assertFromString("transfer-in-processing-steps-command-id"),
       None,
     )
   }
@@ -131,13 +133,14 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         pureCrypto,
         enableAdditionalConsistencyChecks = true,
         loggerFactory,
+        timeouts,
       )
     for {
       _ <- persistentState.parameterStore.setParameters(defaultStaticDomainParameters)
     } yield {
       val state = new SyncDomainEphemeralState(
         persistentState,
-        multiDomainEventLog,
+        Eval.now(multiDomainEventLog),
         new SingleDomainCausalTracker(
           globalTracker,
           new InMemorySingleDomainCausalDependencyStore(targetDomain, loggerFactory),
@@ -150,6 +153,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         DefaultProcessingTimeouts.testing,
         useCausalityTracking = true,
         loggerFactory = loggerFactory,
+        FutureSupervisor.Noop,
       )
       (persistentState, state)
     }
@@ -419,7 +423,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         inRequest <- inRequestF
         envelopes = NonEmpty(
           Seq,
-          OpenEnvelope(inRequest, RecipientsTest.testInstance, testedProtocolVersion),
+          OpenEnvelope(inRequest, RecipientsTest.testInstance)(testedProtocolVersion),
         )
         decrypted <- valueOrFail(transferInProcessingSteps.decryptViews(envelopes, cryptoSnapshot))(
           "decrypt request failed"
@@ -432,6 +436,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
             NonEmptyUtil.fromUnsafe(decrypted.views),
             Seq.empty,
             cryptoSnapshot,
+            MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
           )
         )("compute activeness set failed")
       } yield {
@@ -459,6 +464,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
             NonEmpty(Seq, (WithRecipients(inTree2, RecipientsTest.testInstance), None)),
             Seq.empty,
             cryptoSnapshot,
+            MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
           )
         )("compute activeness set did not return a left")
       } yield {
@@ -486,22 +492,13 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
             ),
             Seq.empty,
             cryptoSnapshot,
+            MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
           )
         )("compute activenss set did not return a left")
       } yield {
         result should matchPattern { case ReceivedMultipleRequests(Seq(_, _)) =>
         }
       }
-    }
-
-    "fail if there are not transfer-in view trees with the right root hash" in {
-      transferInProcessingSteps.pendingDataAndResponseArgsForMalformedPayloads(
-        CantonTimestamp.Epoch,
-        RequestCounter(1),
-        SequencerCounter(1),
-        Seq.empty,
-        cryptoSnapshot,
-      ) shouldBe Left(ReceivedNoRequests)
     }
   }
 
@@ -646,6 +643,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         transferringParticipant = false,
         transferId,
         contract.metadata.stakeholders,
+        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
       )
 
       for {
@@ -654,7 +652,10 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
 
         _result <- valueOrFail(
           transferInProcessingSteps.getCommitSetAndContractsToBeStoredAndEvent(
-            mock[SignedContent[Deliver[DefaultOpenEnvelope]]],
+            mock[Either[
+              EventWithErrors[Deliver[DefaultOpenEnvelope]],
+              SignedContent[Deliver[DefaultOpenEnvelope]],
+            ]],
             Right(inRes),
             pendingRequestData,
             state.pendingTransferInSubmissions,

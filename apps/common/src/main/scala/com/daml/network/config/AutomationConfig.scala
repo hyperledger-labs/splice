@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 case class AutomationConfig(
     /** How many automation tasks should be run in parallel per kind of task. */

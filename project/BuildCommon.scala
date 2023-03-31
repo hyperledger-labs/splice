@@ -144,7 +144,6 @@ object BuildCommon {
       // copied from the Canton OSS repo
       Global / excludeLintKeys += Compile / damlBuildOrder,
       Global / excludeLintKeys += `canton-functionmeta` / wartremoverErrors,
-      Global / excludeLintKeys += `canton-daml-fork` / wartremoverErrors,
       Global / excludeLintKeys += `canton-blake2b` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-app` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-common` / autoAPIMappings,
@@ -153,7 +152,6 @@ object BuildCommon {
       //      Global / excludeLintKeys += `demo` / autoAPIMappings,
       Global / excludeLintKeys += `canton-functionmeta` / autoAPIMappings,
       Global / excludeLintKeys += `canton-slick-fork` / autoAPIMappings,
-      Global / excludeLintKeys += `canton-daml-fork` / autoAPIMappings,
       Global / excludeLintKeys += Global / damlCodeGeneration,
     )
 
@@ -327,7 +325,7 @@ object BuildCommon {
           daml_tracing,
           daml_executors,
           daml_lf_data,
-          daml_lf_nonempty_cats,
+          daml_nonempty_cats,
           logback_classic,
           logback_core,
           scala_logging,
@@ -391,9 +389,11 @@ object BuildCommon {
     sbt.Project
       .apply("canton-community-app", file("canton/community/app"))
       .dependsOn(
+        `canton-community-app-base`,
         `canton-community-common` % "compile->compile;test->test",
         `canton-community-domain`,
         `canton-community-participant`,
+        `canton-community-integration-testing` % "test",
       )
       .enablePlugins(DamlPlugin)
       .settings(
@@ -418,7 +418,6 @@ object BuildCommon {
           akka_http_testkit % Test,
           pureconfig_cats,
           cats,
-          ammonite,
           daml_ledger_rxjava_client % Test,
           better_files,
           toxiproxy_java % Test,
@@ -449,6 +448,172 @@ object BuildCommon {
         //      JvmRulesPlugin.damlRepoHeaderSettings,
       )
   }
+
+  lazy val `canton-community-app-base` = {
+    import CantonDependencies.*
+    sbt.Project
+      .apply("canton-community-app-base", file("canton/community/app-base"))
+      .dependsOn(
+        `canton-community-domain`,
+        `canton-community-participant`,
+      )
+      .settings(
+        removeTestSources,
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          akka_http,
+          ammonite,
+          dropwizard_metrics_jmx,
+          jul_to_slf4j,
+          pureconfig_cats,
+        ),
+      )
+  }
+
+  // The purpose of this module is to collect `compile`-scoped classes shared by `community-testing` (which
+  // is in turn meant to be imported at `test` scope) as well as other projects which need it in `compile`
+  // scope. This is to avoid cyclic dependencies. As such, this module should _not_ depend on anything internal,
+  // possibly with the exception of `util-internal` and/or `util-external`.
+  // In principle this might be merged into `util-external` at a later time, but this is separate for the time
+  // being to ensure a clean separation of modules.
+  lazy val `canton-community-base` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-community-base", file("canton/community/base"))
+      .enablePlugins(BuildInfoPlugin)
+      .dependsOn(
+        `canton-functionmeta`,
+        `canton-slick-fork`,
+        `canton-util-external`,
+        `canton-ledger-common`,
+        // Canton depends on the Daml code via a git submodule and the two
+        // projects below. We instead depend on the artifacts released
+        // from the Daml repo listed in libraryDependencies below.
+        // `daml-copy-common`,
+        // No strictly internal dependencies on purpose so that this can be a foundational module and avoid circular dependencies
+      )
+      .settings(
+        removeTestSources,
+        sharedCantonSettings,
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        // JvmRulesPlugin.damlRepoHeaderSettings,
+        libraryDependencies ++= Seq(
+          better_files,
+          bouncycastle_bcpkix_jdk15on,
+          bouncycastle_bcprov_jdk15on,
+          cats,
+          chimney,
+          circe_core,
+          circe_generic,
+          flyway.excludeAll(ExclusionRule("org.apache.logging.log4j")),
+          grpc_services,
+          postgres,
+          pprint,
+          scaffeine,
+          daml_nonempty_cats,
+          daml_lf_value_java_proto % "protobuf", // needed for protobuf import
+          daml_lf_transaction,
+          CantonDependencies.grpc_services % "protobuf",
+          scalapb_runtime_grpc,
+          scalapb_runtime,
+          slick_hikaricp,
+        ),
+        Compile / PB.targets := Seq(
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+        ),
+        // Ensure the package scoped options will be picked up by sbt-protoc if used downstream
+        // See https://scalapb.github.io/docs/customizations/#publishing-package-scoped-options
+        Compile / packageBin / packageOptions += (
+          Package.ManifestAttributes(
+            "ScalaPB-Options-Proto" -> "com/digitalasset/canton/scalapb/package.proto"
+          )
+        ),
+        buildInfoKeys := Seq[BuildInfoKey](
+          BuildInfoKey("version", version), // hacked.
+          scalaVersion,
+          sbtVersion,
+          BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
+          BuildInfoKey("protocolVersions" -> List("3", "4")),
+        ),
+        buildInfoPackage := "com.digitalasset.canton.buildinfo",
+        buildInfoObject := "BuildInfo",
+        // commented out from Canton OS repo as we don't have code coverage (yet)
+        // excluded generated protobuf classes from code coverage
+        //   coverageExcludedPackages := formatCoverageExcludes(
+        //     """
+        //       |<empty>
+        //       |com\.digitalasset\.canton\.protocol\.v0\..*
+        //       |com\.digitalasset\.canton\.domain\.v0\..*
+        //       |com\.digitalasset\.canton\.identity\.v0\..*
+        //       |com\.digitalasset\.canton\.identity\.admin\.v0\..*
+        //       |com\.digitalasset\.canton\.domain\.api\.v0\..*
+        //       |com\.digitalasset\.canton\.v0\..*
+        //       |com\.digitalasset\.canton\.protobuf\..*
+        // """
+        //   ),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        // addProtobufFilesToHeaderCheck(Compile),
+      )
+  }
+
+  lazy val `canton-community-testing` = {
+    import CantonDependencies.*
+    sbt.Project
+      .apply("canton-community-testing", file("canton/community/testing"))
+      .disablePlugins(WartRemover)
+      .dependsOn(
+        `canton-community-base`
+      )
+      .settings(
+        removeTestSources,
+        sharedSettings,
+        // JvmRulesPlugin.damlRepoHeaderSettings,
+        libraryDependencies ++= Seq(
+          better_files,
+          cats,
+          cats_law,
+          daml_metrics_test_lib,
+          jul_to_slf4j,
+          mockito_scala,
+          opentelemetry_api,
+          scalatest,
+          scalatestScalacheck,
+          testcontainers,
+          testcontainers_postgresql,
+        ),
+
+        // This library contains a lot of testing helpers that previously existing in testing scope
+        // As such, in order to minimize the diff when creating this library, the same rules that
+        // applied to `test` scope are used here. This can be reviewed in the future.
+        scalacOptions --= JvmRulesPlugin.scalacOptionsToDisableForTests,
+      )
+  }
+
+  lazy val `canton-community-integration-testing` = {
+    import CantonDependencies.*
+    sbt.Project
+      .apply("canton-community-integration-testing", file("canton/community/integration-testing"))
+      .disablePlugins(WartRemover)
+      .dependsOn(
+        `canton-community-app-base`,
+        `canton-community-testing`,
+      )
+      .settings(
+        sharedCantonSettings,
+
+        // The dependency override is needed because `community-testing` depends transitively on
+        // `scalatest` and `community-app-base` depends transitively on `ammonite`, which in turn
+        // depend on incompatible versions of `scala-xml` -- not ideal but only causes possible
+        // runtime errors while testing and none have been found so far, so this should be fine for now
+        dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.0.1",
+
+        // This library contains a lot of testing helpers that previously existing in testing scope
+        // As such, in order to minimize the diff when creating this library, the same rules that
+        // applied to `test` scope are used here. This can be reviewed in the future.
+        scalacOptions --= JvmRulesPlugin.scalacOptionsToDisableForTests,
+      )
+  }
+
   lazy val `canton-community-common` = {
     import CantonDependencies._
     sbt.Project
@@ -456,6 +621,7 @@ object BuildCommon {
       .enablePlugins(BuildInfoPlugin, DamlPlugin)
       .dependsOn(
         `canton-blake2b`,
+        `canton-community-base`,
         `canton-functionmeta`,
         `canton-slick-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
@@ -463,7 +629,7 @@ object BuildCommon {
         `canton-util-internal` % "compile->compile;test->test",
       )
       .settings(
-        disableTests,
+        removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           akka_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.AkkaUtil.createActorSystem
@@ -474,9 +640,6 @@ object BuildCommon {
           daml_metrics,
           daml_error,
           daml_error_generator,
-          daml_participant_state, // needed for ReadService/Update classes by PrettyInstances
-          daml_ledger_api_common,
-          daml_ledger_api_client,
           daml_nonempty_cats,
           logback_classic,
           logback_core,
@@ -542,16 +705,6 @@ object BuildCommon {
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-        buildInfoKeys := Seq[BuildInfoKey](
-          BuildInfoKey("version", version), // hacked.
-          scalaVersion,
-          sbtVersion,
-          BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("vmbc" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("protocolVersions" -> List("2.0.0", "3.0.0")),
-        ),
-        buildInfoPackage := "com.digitalasset.canton.buildinfo",
-        buildInfoObject := "BuildInfo",
         // commented out from Canton OS repo as we don't have code coverage (yet)
         //    // excluded generated protobuf classes from code coverage
         //    coverageExcludedPackages := formatCoverageExcludes(
@@ -627,7 +780,10 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-community-participant", file("canton/community/participant"))
-      .dependsOn(`canton-community-common` % "compile->compile;test->test", `canton-daml-fork`)
+      .dependsOn(
+        `canton-community-common` % "compile->compile;test->test",
+        `canton-ledger-api-core` % "compile->compile;test->test",
+      )
       .enablePlugins(DamlPlugin)
       .settings(
         removeTestSources,
@@ -640,8 +796,6 @@ object BuildCommon {
           daml_lf_archive_reader,
           daml_lf_dev_archive_java_proto,
           daml_lf_engine,
-          daml_ledger_api_auth_client,
-          daml_participant_integration_api,
           logback_classic % Runtime,
           logback_core % Runtime,
           akka_stream,
@@ -816,6 +970,112 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      coverageEnabled := false,
         //      JvmRulesPlugin.damlRepoHeaderSettings,
+      )
+  }
+
+  lazy val `canton-ledger-common` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-ledger-common", file("canton/community/ledger/ledger-common"))
+      .disablePlugins(WartRemover, ScalafmtPlugin)
+      .dependsOn(
+      )
+      .settings(
+        removeTestSources,
+        sharedSettings,
+        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+        Compile / PB.targets := Seq(
+          PB.gens.java -> (Compile / sourceManaged).value / "protobuf",
+          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf",
+        ),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        //      addProtobufFilesToHeaderCheck(Compile),
+        libraryDependencies ++= Seq(
+          dropwizard_metrics_core,
+          opentelemetry_api,
+          akka_stream,
+          slf4j_api,
+          grpc_api,
+          reflections,
+          grpc_netty,
+          netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
+          netty_handler,
+          caffeine,
+          scalapb_runtime,
+          scalapb_runtime_grpc,
+          awaitility % Test,
+          logback_classic % Test,
+          scalatest % Test,
+          mockito_scala % Test,
+          scalatestMockito % Test,
+          akka_stream_testkit % Test,
+          scalacheck % Test,
+          opentelemetry_sdk_testing % Test,
+          scalatestScalacheck % Test,
+          daml_metrics,
+          daml_lf_data,
+          daml_lf_transaction,
+          daml_ledger_api_common,
+        ),
+        Test / fork := true,
+        Test / testForkedParallel := true,
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        //      coverageEnabled := false,
+        //      JvmRulesPlugin.damlRepoHeaderSettings,
+      )
+  }
+
+  lazy val `canton-ledger-api-core` = {
+    import CantonDependencies.*
+    sbt.Project
+      .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
+      .dependsOn(
+        `canton-ledger-common` % "compile->compile;test->test",
+        `canton-community-base`,
+      )
+      .disablePlugins(
+        WartRemover,
+        ScalafmtPlugin,
+      ) // to accommodate different daml repo coding style
+      .settings(
+        removeTestSources,
+        sharedSettings,
+        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+        Compile / PB.targets := Seq(
+          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
+        ),
+        libraryDependencies ++= Seq(
+          auth0_java,
+          auth0_jwks,
+          circe_core,
+          daml_ledger_api_client,
+          daml_jwt,
+          daml_ports,
+          daml_struct_spray_json,
+          netty_boring_ssl,
+          netty_handler,
+          hikaricp,
+          guava,
+          dropwizard_metrics_core,
+          bouncycastle_bcprov_jdk15on % Test,
+          bouncycastle_bcpkix_jdk15on % Test,
+          scalaz_scalacheck % Test,
+          grpc_netty,
+          grpc_services,
+          grpc_protobuf,
+          postgres,
+          h2,
+          flyway,
+          oracle,
+          anorm,
+          scalapb_runtime_grpc,
+          scalapb_json4s % Test,
+          scalapb_runtime,
+          testcontainers % Test,
+          testcontainers_postgresql % Test,
+        ),
+        Test / parallelExecution := true,
+        Test / fork := false,
       )
   }
 

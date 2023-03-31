@@ -37,7 +37,7 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationIdP,
       submissionIdP,
       workflowIdP,
-      _,
+      commandIdP,
     ) = request
     val res = for {
       sourceDomain <- mapErr(DomainAlias.create(sourceDomainP))
@@ -50,10 +50,13 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationId <- mapErr(ProtoConverter.parseLFApplicationId(applicationIdP))
       submissionId <- mapErr(ProtoConverter.parseLFSubmissionIdO(submissionIdP))
       workflowId <- mapErr(ProtoConverter.parseLFWorkflowIdO(workflowIdP))
+      commandId <- mapErr(ProtoConverter.parseCommandId(commandIdP))
+
       submitterMetadata = TransferSubmitterMetadata(
         submittingParty,
         applicationId,
         participantId.toLf,
+        commandId,
         submissionId,
       )
       transferId <- mapErr(
@@ -78,7 +81,7 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationIdP,
       submissionIdP,
       workflowIdP,
-      _,
+      commandIdP,
     ) = request
     val res = for {
       targetDomain <- mapErr(DomainAlias.create(targetDomainP))
@@ -90,10 +93,12 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
       applicationId <- mapErr(ProtoConverter.parseLFApplicationId(applicationIdP))
       submissionId <- mapErr(ProtoConverter.parseLFSubmissionIdO(submissionIdP))
       workflowId <- mapErr(ProtoConverter.parseLFWorkflowIdO(workflowIdP))
+      commandId <- mapErr(ProtoConverter.parseCommandId(commandIdP))
       submitterMetadata = TransferSubmitterMetadata(
         submittingParty,
         applicationId,
         participantId.toLf,
+        commandId,
         submissionId,
       )
       _result <- mapErr(
@@ -151,7 +156,7 @@ class GrpcTransferService(service: TransferService, participantId: ParticipantId
   }
 }
 
-case class TransferSearchResult(
+final case class TransferSearchResult(
     transferId: TransferId,
     submittingParty: String,
     targetDomain: String,

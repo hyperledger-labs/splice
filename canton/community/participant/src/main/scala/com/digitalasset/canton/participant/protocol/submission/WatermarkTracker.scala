@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.protocol.submission
 
 import com.digitalasset.canton.checked
+import com.digitalasset.canton.concurrent.{FutureSupervisor, SupervisedPromise}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -42,7 +43,8 @@ trait WatermarkLookup[Mark] {
 class WatermarkTracker[Mark: Pretty](
     initialWatermark: Mark,
     protected override val loggerFactory: NamedLoggerFactory,
-)(implicit private val ordering: Ordering[Mark])
+    futureSupervisor: FutureSupervisor,
+)(implicit private val ordering: Ordering[Mark], ec: ExecutionContext)
     extends WatermarkLookup[Mark]
     with NamedLogging {
   import WatermarkTracker.*
@@ -145,9 +147,11 @@ class WatermarkTracker[Mark: Pretty](
     *
     * @return The future completes after there are no running tasks with marks up to `mark` inclusive.
     */
-  def increaseWatermark(mark: Mark): Future[Unit] = withLock {
+  def increaseWatermark(mark: Mark)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = withLock {
     highWatermarkV = ordering.max(highWatermarkV, mark)
-    val promise = Promise[Unit]()
+    val promise = new SupervisedPromise[Unit]("increase-watermark", futureSupervisor)
     val previousO = Option(waitForTasksFinishing.put(mark, promise))
     previousO.foreach(_.completeWith(promise.future))
     drainAndNotify()
@@ -182,7 +186,7 @@ class WatermarkTracker[Mark: Pretty](
 object WatermarkTracker {
 
   /** The task's mark is lower than or equal to the high watermark */
-  case class MarkTooLow[A: Pretty](highWatermark: A) extends PrettyPrinting {
+  final case class MarkTooLow[A: Pretty](highWatermark: A) extends PrettyPrinting {
     override def pretty: Pretty[MarkTooLow.this.type] = prettyOfClass(
       param("high watermark", _.highWatermark)
     )

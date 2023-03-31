@@ -8,12 +8,12 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
-import com.daml.ledger.participant.state.v2.{SubmitterInfo, TransactionMeta}
 import com.daml.lf.data.ImmArray
 import com.daml.lf.transaction.ProcessedDisclosedContract
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.CryptoPureApi
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.ledger.participant.state.v2.{SubmitterInfo, TransactionMeta}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.PackageService
 import com.digitalasset.canton.participant.domain.DomainAliasManager
@@ -77,7 +77,7 @@ class DomainRouter(
         WellFormedTransaction[WithoutSuffixes],
         TraceContext,
         Map[LfContractId, SerializableContract],
-    ) => EitherT[Future, TransactionRoutingError, Future[TransactionSubmitted]],
+    ) => EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[TransactionSubmitted]],
     contractsTransferer: ContractsTransfer,
     snapshotProvider: DomainId => Either[TransactionRoutingError, TopologySnapshot],
     serializableContractAuthenticator: SerializableContractAuthenticator,
@@ -99,7 +99,7 @@ class DomainRouter(
       explicitlyDisclosedContracts: ImmArray[ProcessedDisclosedContract],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionRoutingError, Future[TransactionSubmitted]] = {
+  ): EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[TransactionSubmitted]] = {
 
     for {
       // do some sanity checks for invalid inputs (to not conflate these with broken nodes)
@@ -418,7 +418,7 @@ object DomainRouter {
       disclosedContracts: Map[LfContractId, SerializableContract],
   )(implicit
       ec: ExecutionContext
-  ): EitherT[Future, TransactionRoutingError, Future[TransactionSubmitted]] =
+  ): EitherT[Future, TransactionRoutingError, FutureUnlessShutdown[TransactionSubmitted]] =
     for {
       domain <- EitherT.fromEither[Future](
         connectedDomains

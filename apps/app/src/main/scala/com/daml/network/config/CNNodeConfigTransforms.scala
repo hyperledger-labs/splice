@@ -13,16 +13,9 @@ import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
-import com.digitalasset.canton.participant.config.{
-  AuthServiceConfig,
-  CommunityParticipantConfig,
-  LedgerApiServerConfig,
-  RemoteParticipantConfig,
-}
-import com.digitalasset.canton.time
+import com.digitalasset.canton.domain.config.CommunityDomainConfig
+import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
 
 import scala.collection.mutable
@@ -93,7 +86,7 @@ object CNNodeConfigTransforms {
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  def reducePollingInterval = setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(1))
+  def reducePollingInterval = setPollingInterval(NonNegativeFiniteDuration.ofSeconds(1))
 
   def updateAllAutomationConfigs(transform: AutomationConfigTransform): CNNodeConfigTransform = {
     config =>
@@ -109,7 +102,7 @@ object CNNodeConfigTransforms {
       transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CNNodeConfigTransform = {
+  def setPollingInterval(newInterval: NonNegativeFiniteDuration): CNNodeConfigTransform = {
     config =>
       def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig = {
         config.focus(_.pollingInterval).replace(newInterval)
@@ -144,7 +137,6 @@ object CNNodeConfigTransforms {
     Seq(
       makeAllTimeoutsBounded,
       ensureNovelDamlNames(),
-      enableLedgerApiAuthForLocalParticipants("test"),
       useSelfSignedTokensForLedgerApiAuth("test"),
       useSelfSignedTokensForWalletValidatorApiAuth("test"),
       reducePollingInterval,
@@ -295,14 +287,6 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform =
     updateAllDomainConfigs((_, config) => update(config))
 
-  def updateAllParticipantConfigs(
-      update: (String, CommunityParticipantConfig) => CommunityParticipantConfig
-  ): CNNodeConfigTransform =
-    cantonConfig =>
-      cantonConfig
-        .focus(_.participants)
-        .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
-
   def updateRemoteParticipantConfigs_(
       update: RemoteParticipantConfig => RemoteParticipantConfig
   ): CNNodeConfigTransform =
@@ -316,26 +300,9 @@ object CNNodeConfigTransforms {
         .focus(_.remoteParticipants)
         .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
 
-  def updateAllParticipantConfigs_(
-      update: CommunityParticipantConfig => CommunityParticipantConfig
-  ): CNNodeConfigTransform =
-    updateAllParticipantConfigs((_, config) => update(config))
-
   def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
 
     val transforms = Seq(
-      updateAllDomainConfigs_(
-        _.focus(_.adminApi)
-          .modify(portTransform(bump, _))
-          .focus(_.publicApi)
-          .modify(portTransform(bump, _))
-      ),
-      updateAllParticipantConfigs_(
-        _.focus(_.adminApi)
-          .modify(portTransform(bump, _))
-          .focus(_.ledgerApi)
-          .modify(portTransform(bump, _))
-      ),
       updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
       updateAllSvAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
       updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
@@ -381,23 +348,11 @@ object CNNodeConfigTransforms {
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
   }
 
-  private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + bump))
-
-  private def portTransform(
-      bump: Int,
-      c: CommunityPublicServerConfig,
-  ): CommunityPublicServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + bump))
-
   private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
     c.copy(port = c.port + bump)
 
   private def portTransform(bump: Int, c: CNLedgerApiClientConfig): CNLedgerApiClientConfig =
     c.focus(_.clientConfig).modify(portTransform(bump, _))
-
-  private def portTransform(bump: Int, c: LedgerApiServerConfig): LedgerApiServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + bump))
 
   private def portTransform(
       bump: Int,
@@ -407,15 +362,6 @@ object CNNodeConfigTransforms {
       .modify(portTransform(bump, _))
       .focus(_.ledgerApi)
       .modify(portTransform(bump, _))
-
-  /** All local participants require auth tokens for their ledger API.
-    * The tokens are expected to by signed by hmac256 with the given secret.
-    */
-  def enableLedgerApiAuthForLocalParticipants(secret: String): CNNodeConfigTransform =
-    updateAllParticipantConfigs { case (_, c) =>
-      c.focus(_.ledgerApi.authServices)
-        .replace(Seq(AuthServiceConfig.UnsafeJwtHmac256(NonEmptyString.tryCreate(secret))))
-    }
 
   /** Auth-enabled CN apps use self-signed tokens with the given secret for their ledger API connections.
     * Other CN apps use canton admin tokens for their ledger API connections.

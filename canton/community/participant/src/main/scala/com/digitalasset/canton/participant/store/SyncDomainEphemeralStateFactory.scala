@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton.participant.store
 
+import cats.Eval
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -29,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait SyncDomainEphemeralStateFactory {
   def createFromPersistent(
       persistentState: SyncDomainPersistentState,
-      multiDomainEventLog: MultiDomainEventLog,
+      multiDomainEventLog: Eval[MultiDomainEventLog],
       globalCausalOrderer: GlobalCausalOrderer,
       inFlightSubmissionTracker: InFlightSubmissionTracker,
       createTimeTracker: NamedLoggerFactory => DomainTimeTracker,
@@ -43,13 +45,14 @@ class SyncDomainEphemeralStateFactoryImpl(
     testingConfigInternal: TestingConfigInternal,
     useCausalityTracking: Boolean,
     override val loggerFactory: NamedLoggerFactory,
+    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
     extends SyncDomainEphemeralStateFactory
     with NamedLogging {
 
   override def createFromPersistent(
       persistentState: SyncDomainPersistentState,
-      multiDomainEventLog: MultiDomainEventLog,
+      multiDomainEventLog: Eval[MultiDomainEventLog],
       globalCausalOrderer: GlobalCausalOrderer,
       inFlightSubmissionTracker: InFlightSubmissionTracker,
       createTimeTracker: NamedLoggerFactory => DomainTimeTracker,
@@ -62,7 +65,7 @@ class SyncDomainEphemeralStateFactoryImpl(
         persistentState.requestJournalStore,
         persistentState.sequencerCounterTrackerStore,
         persistentState.sequencedEventStore,
-        multiDomainEventLog,
+        multiDomainEventLog.value,
       )
       _ <- SyncDomainEphemeralStateFactory.cleanupPersistentState(persistentState, startingPoints)
     } yield {
@@ -82,6 +85,7 @@ class SyncDomainEphemeralStateFactoryImpl(
         timeouts,
         useCausalityTracking,
         persistentState.loggerFactory,
+        futureSupervisor,
       )
     }
   }

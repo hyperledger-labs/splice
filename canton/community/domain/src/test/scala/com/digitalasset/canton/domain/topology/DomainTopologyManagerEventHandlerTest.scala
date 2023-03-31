@@ -8,6 +8,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.topology.store.InMemoryRegisterTopologyTransactionResponseStore
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.protocol.messages.{
   RegisterTopologyTransactionRequest,
   RegisterTopologyTransactionResponse,
@@ -95,7 +96,7 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
         when(
           sequencerSendResponse.apply(
             eqTo(
-              OpenEnvelope(response, Recipients.cc(response.requestedBy), testedProtocolVersion)
+              OpenEnvelope(response, Recipients.cc(response.requestedBy))(testedProtocolVersion)
             ),
             any[SendCallback],
           )
@@ -103,7 +104,7 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
           .thenAnswer(
             (_: OpenEnvelope[RegisterTopologyTransactionResponse.Result], callback: SendCallback) =>
               {
-                callback.apply(SendResult.Success(null))
+                callback.apply(UnlessShutdown.Outcome(SendResult.Success(null)))
                 EitherT.rightT[Future, SendAsyncClientError](())
               }
           )
@@ -122,10 +123,8 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
         val batch =
           Batch(
             List(
-              OpenEnvelope(
-                request,
-                Recipients.cc(DomainTopologyManagerId(response.domainId)),
-                testedProtocolVersion,
+              OpenEnvelope(request, Recipients.cc(DomainTopologyManagerId(response.domainId)))(
+                testedProtocolVersion
               )
             ),
             testedProtocolVersion,

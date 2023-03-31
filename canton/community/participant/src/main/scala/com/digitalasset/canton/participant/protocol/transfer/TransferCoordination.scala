@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.protocol.transfer
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.digitalasset.canton.LfWorkflowId
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, SyncCryptoApiProvider}
@@ -12,6 +13,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.transfer.TransferCoordination.DomainData
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
+  ApplicationShutdown,
   NoTimeProofFromDomain,
   TransferProcessorError,
   TransferStoreFailed,
@@ -71,7 +73,8 @@ class TransferCoordination(
   ): Either[TransferProcessorError, Option[Future[Unit]]] = {
     OptionUtil
       .zipWith(syncCryptoApi.forDomain(domain), inSubmissionById(domain)) { (cryptoApi, handle) =>
-        handle.timeTracker.requestTick(timestamp)
+        // we request a tick immediately only if the clock is a SimClock
+        handle.timeTracker.requestTick(timestamp, immediately = true)
         cryptoApi.awaitTimestamp(timestamp, waitForEffectiveTime)
       }
       .toRight(UnknownDomain(domain, "When waiting for timestamp"))
@@ -102,7 +105,9 @@ class TransferCoordination(
           transferId,
           sourceProtocolVersion,
         )
-        .semiflatMap(identity)
+        .mapK(FutureUnlessShutdown.outcomeK)
+        .semiflatMap(Predef.identity)
+        .onShutdown(Left(ApplicationShutdown))
     } yield submissionResult
   }
 
@@ -201,7 +206,7 @@ object TransferCoordination {
   /** It is likely not possible for the domain parameters to be missing from our store after successfully connecting */
   case object DomainParametersNotAvailable extends TimeProofSourceError
 
-  case class DomainData(
+  final case class DomainData(
       transferStore: TransferStore,
       recentTimeProofSource: () => EitherT[FutureUnlessShutdown, TimeProofSourceError, TimeProof],
   )
@@ -218,12 +223,8 @@ object TransferCoordination {
     ): NonNegativeFiniteDuration =
       if (transferTimeProofFreshnessProportion.unwrap == 0)
         NonNegativeFiniteDuration.Zero // always fetch time proof
-      else {
-        // divide the exclusivity timeout by the given proportion
-        NonNegativeFiniteDuration(
-          exclusivityTimeout.duration.dividedBy(transferTimeProofFreshnessProportion.unwrap.toLong)
-        )
-      }
+      else
+        exclusivityTimeout / transferTimeProofFreshnessProportion
 
     def domainDataFor(domain: DomainId): Option[DomainData] = {
       OptionUtil.zipWith(syncDomainPersistentStateManager.get(domain), submissionHandles(domain)) {
@@ -234,18 +235,12 @@ object TransferCoordination {
               syncCryptoApi.forDomain(domain).toRight(DomainParametersNotAvailable)
             )
 
-            /*
-              We use `findDynamicDomainParameters` rather than `findDynamicDomainParametersOrDefault`
-              because it makes no sense to progress if we don't manage to fetch domain parameters.
-              Also, the `findDynamicDomainParametersOrDefault` method expected protocol version
-              that we don't have here.
-             */
             parameters <- EitherT(
               FutureUnlessShutdown
                 .outcomeF(
                   crypto.ips.currentSnapshotApproximation.findDynamicDomainParameters()
                 )
-                .map(_.toRight(DomainParametersNotAvailable))
+                .map(_.leftMap(_ => DomainParametersNotAvailable))
             )
 
             exclusivityTimeout = parameters.transferExclusivityTimeout
@@ -289,7 +284,9 @@ trait TransferSubmissionHandle {
       targetProtocolVersion: TargetProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, Future[TransferOutProcessingSteps.SubmissionResult]]
+  ): EitherT[Future, TransferProcessorError, FutureUnlessShutdown[
+    TransferOutProcessingSteps.SubmissionResult
+  ]]
 
   def submitTransferIn(
       submitterMetadata: TransferSubmitterMetadata,
@@ -298,5 +295,7 @@ trait TransferSubmissionHandle {
       sourceProtocolVersion: SourceProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, Future[TransferInProcessingSteps.SubmissionResult]]
+  ): EitherT[Future, TransferProcessorError, FutureUnlessShutdown[
+    TransferInProcessingSteps.SubmissionResult
+  ]]
 }

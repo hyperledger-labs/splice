@@ -8,7 +8,6 @@ import com.daml.network.config.{
 }
 import com.digitalasset.canton.config.*
 import com.daml.network.config.CNHttpClientConfig
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 
 trait BaseScanAppConfig {}
 

@@ -24,13 +24,14 @@ import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -855,7 +856,7 @@ object SvApp {
     val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
       secret,
-      (clock.now + expiresIn).toInstant,
+      (clock.now + expiresIn.toInternal).toInstant,
     ).create.commands.asScala.toSeq
     for {
       res <- svStore.lookupUsedSecretWithOffset(secret).flatMap {

@@ -1,6 +1,8 @@
 package com.daml.network.metrics
 
 import com.codahale.metrics
+import com.daml.metrics.{HealthMetrics as DMHealth}
+import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -11,22 +13,24 @@ import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
-import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory}
+import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryType}
 import io.opentelemetry.api.metrics.Meter
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 import scala.collection.concurrent.TrieMap
 
 case class CNNodeMetricsFactory(
-    reporters: Seq[metrics.Reporter],
-    registry: metrics.MetricRegistry,
-    reportJVMMetrics: Boolean,
-    meter: Meter,
+    override val reporters: Seq[metrics.Reporter],
+    override val registry: metrics.MetricRegistry,
+    override val reportJVMMetrics: Boolean,
+    override val meter: Meter,
+    override val factoryType: MetricsFactoryType,
 ) extends MetricsFactory(
       reporters,
       registry,
       reportJVMMetrics,
       meter,
+      factoryType,
     ) {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svcs = TrieMap[String, SvcAppMetrics]()
@@ -43,11 +47,14 @@ case class CNNodeMetricsFactory(
     validators.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Validator", validators)
+        val metricsContext = MetricsContext("validator" -> name, "component" -> "validator")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new ValidatorAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "Validator"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "Validator"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -57,11 +64,14 @@ case class CNNodeMetricsFactory(
     svcs.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "SVC", svcs)
+        val metricsContext = MetricsContext("svc" -> name, "component" -> "svc")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new SvcAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "SVC"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "SVC"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -71,11 +81,14 @@ case class CNNodeMetricsFactory(
     svs.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "SV", svcs)
+        val metricsContext = MetricsContext("sv" -> name, "component" -> "sv")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new SvAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "SV"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "SV"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -85,11 +98,14 @@ case class CNNodeMetricsFactory(
     scans.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Scan", scans)
+        val metricsContext = MetricsContext("scan" -> name, "component" -> "scan")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new ScanAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "Scan"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "Scan"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -99,11 +115,14 @@ case class CNNodeMetricsFactory(
     wallets.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Wallet", wallets)
+        val metricsContext = MetricsContext("wallet" -> name, "component" -> "wallet")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new WalletAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "Wallet"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "Wallet"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -113,11 +132,14 @@ case class CNNodeMetricsFactory(
     directories.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Directory", directories)
+        val metricsContext = MetricsContext("directory" -> name, "component" -> "directory")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new DirectoryAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "Directory"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "Directory"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -127,11 +149,14 @@ case class CNNodeMetricsFactory(
     splitwells.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Splitwell", splitwells)
+        val metricsContext = MetricsContext("splitwell" -> name, "component" -> "splitwell")
+        val labeledMetricsFactory =
+          createLabeledMetricsFactory(metricsContext)
         new SplitwellAppMetrics(
           MetricsFactory.prefix,
           new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(openTelemetryFactory, "Splitwell"),
-          healthMetrics,
+          new DamlGrpcServerMetrics(labeledMetricsFactory, "Splitwell"),
+          new DMHealth(labeledMetricsFactory),
         )
       },
     )
@@ -139,7 +164,10 @@ case class CNNodeMetricsFactory(
 }
 
 object CNNodeMetricsFactory {
-  def forConfig(config: MetricsConfig): CNNodeMetricsFactory = {
+  def forConfig(
+      config: MetricsConfig,
+      metricsFactoryType: MetricsFactoryType,
+  ): CNNodeMetricsFactory = {
     val registry = new metrics.MetricRegistry()
     val meterProviderBuilder = SdkMeterProvider.builder()
     val reporter = registerReporter(config, registry)
@@ -149,6 +177,7 @@ object CNNodeMetricsFactory {
       registry,
       config.reportJvmMetrics,
       meterProvider.meterBuilder("daml").build(),
+      metricsFactoryType,
     )
   }
 }

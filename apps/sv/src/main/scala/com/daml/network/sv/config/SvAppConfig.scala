@@ -9,11 +9,10 @@ import com.daml.network.config.{
 }
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFiniteDurationT
 
 case class ExpectedOnboardingConfig(
     secret: String,
-    expiresIn: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofHours(1),
+    expiresIn: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 )
 object ExpectedOnboardingConfig {
   def hideConfidential(config: ExpectedOnboardingConfig): ExpectedOnboardingConfig = {
@@ -33,7 +32,7 @@ sealed trait SvBootstrapConfig {
 object SvBootstrapConfig {
   case class FoundCollective(
       name: String,
-      initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
+      initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       // TODO(#2168): test edge cases.
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,

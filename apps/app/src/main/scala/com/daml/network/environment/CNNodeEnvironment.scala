@@ -37,7 +37,8 @@ trait CNNodeEnvironment extends Environment {
   override type Console = CNNodeConsoleEnvironment
 
   // TODO(tech-debt): check that the CNNodeMetrics factory is used in all of this trait's methods.
-  val cnNodeMetrics = CNNodeMetricsFactory.forConfig(config.monitoring.metrics)
+  val cnNodeMetrics =
+    CNNodeMetricsFactory.forConfig(config.monitoring.metrics, testingConfig.metricsFactoryType)
 
   protected def createValidator(
       name: String,
@@ -48,7 +49,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       validatorConfig,
       config.tryValidatorAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forValidator(name),
       testingConfig,
       futureSupervisor,
@@ -80,7 +81,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       svcConfig,
       config.trySvcAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forSvc(name),
       testingConfig,
       futureSupervisor,
@@ -113,7 +114,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       svConfig,
       config.trySvAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(SvAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forSv(name),
       testingConfig,
       appLoggerFactory,
@@ -145,7 +146,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       scanConfig,
       config.tryScanAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(ScanAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forScan(name),
       testingConfig,
       futureSupervisor,
@@ -177,7 +178,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       walletConfig,
       config.tryWalletAppBackendParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forWallet(name),
       testingConfig,
       futureSupervisor,
@@ -210,7 +211,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       directoryConfig,
       config.tryDirectoryAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(DirectoryAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forDirectory(name),
       testingConfig,
       futureSupervisor,
@@ -241,7 +242,7 @@ trait CNNodeEnvironment extends Environment {
       name,
       splitwellConfig,
       config.trySplitwellAppParametersByString(name),
-      createClock(appLoggerFactory),
+      createClock(Some(SplitwellAppBootstrap.LoggerFactoryKeyName -> name)),
       cnNodeMetrics.forSplitwell(name),
       testingConfig,
       futureSupervisor,

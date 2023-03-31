@@ -4,12 +4,15 @@
 package com.digitalasset.canton.participant.protocol
 
 import akka.stream.Materializer
+import cats.Eval
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
-import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, Encrypted, TestHash}
+import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, Encrypted, SyncCryptoApi, TestHash}
 import com.digitalasset.canton.data.PeanoQueue.{BeforeHead, NotInserted}
-import com.digitalasset.canton.data.{CantonTimestamp, PeanoQueue}
+import com.digitalasset.canton.data.{CantonTimestamp, ConfirmingParty, PeanoQueue}
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.config.ParticipantStoreConfig
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
@@ -42,9 +45,11 @@ import com.digitalasset.canton.participant.sync.{
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   DynamicDomainParameters,
+  DynamicDomainParametersWithValidity,
   RequestAndRootHashMessage,
   RequestId,
   RootHash,
+  TestDomainParameters,
   ViewHash,
 }
 import com.digitalasset.canton.resource.MemoryStorage
@@ -60,6 +65,11 @@ import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.store.{CursorPrehead, IndexedDomain}
 import com.digitalasset.canton.time.{DomainTimeTracker, NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.{
+  ParticipantAttributes,
+  ParticipantPermission,
+  TrustLevel,
+}
 import com.digitalasset.canton.{
   BaseTest,
   DiscardOps,
@@ -80,8 +90,19 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
   private val participant = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("participant::participant")
   )
+  private val party = PartyId(UniqueIdentifier.tryFromProtoPrimitive("party::participant"))
   private val domain = DefaultTestIdentities.domainId
-  private val crypto = TestingIdentityFactory(loggerFactory).forOwnerAndDomain(participant, domain)
+  private val topology: TestingTopology = TestingTopology(
+    Set(domain),
+    Map(
+      party.toLf -> Map(
+        participant -> ParticipantAttributes(ParticipantPermission.Submission, TrustLevel.Ordinary)
+      )
+    ),
+  )
+  private val crypto =
+    TestingIdentityFactory(topology, loggerFactory, TestDomainParameters.defaultDynamic)
+      .forOwnerAndDomain(participant, domain)
   private val mockSequencerClient = mock[SequencerClient]
   when(
     mockSequencerClient.sendAsync(
@@ -103,14 +124,16 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
           callback: SendCallback,
       ) => {
         callback(
-          Success(
-            Deliver.create(
-              SequencerCounter(0),
-              CantonTimestamp.Epoch,
-              domain,
-              Some(messageId),
-              Batch.filterOpenEnvelopesFor(batch, participant),
-              testedProtocolVersion,
+          UnlessShutdown.Outcome(
+            Success(
+              Deliver.create(
+                SequencerCounter(0),
+                CantonTimestamp.Epoch,
+                domain,
+                Some(messageId),
+                Batch.filterOpenEnvelopesFor(batch, participant),
+                testedProtocolVersion,
+              )
             )
           )
         )
@@ -125,13 +148,19 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
   private val trm = mock[TransactionResultMessage]
   when(trm.pretty).thenAnswer(Pretty.adHocPrettyInstance[TransactionResultMessage])
   when(trm.verdict).thenAnswer(Verdict.Approve(testedProtocolVersion))
+  when(trm.rootHash).thenAnswer(rootHash)
+  when(trm.domainId).thenAnswer(DefaultTestIdentities.domainId)
 
   private val requestId = RequestId(CantonTimestamp.Epoch)
   private val requestSc = SequencerCounter(0)
   private val resultSc = SequencerCounter(1)
   private val rc = RequestCounter(0)
-  private val parameters =
-    DynamicDomainParameters.initialValues(NonNegativeFiniteDuration.Zero, testedProtocolVersion)
+  private val parameters = DynamicDomainParametersWithValidity(
+    DynamicDomainParameters.initialValues(NonNegativeFiniteDuration.Zero, testedProtocolVersion),
+    CantonTimestamp.MinValue,
+    None,
+    domain,
+  )
 
   private type TestInstance =
     ProtocolProcessor[
@@ -157,6 +186,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         crypto.crypto.pureCrypto,
         enableAdditionalConsistencyChecks = true,
         loggerFactory,
+        timeouts,
       )
     val syncDomainPersistentStates: SyncDomainPersistentStateLookup =
       new SyncDomainPersistentStateLookup {
@@ -168,9 +198,9 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     val clock = new WallClock(timeouts, loggerFactory)
     implicit val mat = mock[Materializer]
     val nodePersistentState = timeouts.default.await("creating node persistent state")(
-      ParticipantNodePersistentState(
+      ParticipantNodePersistentState.create(
         syncDomainPersistentStates,
-        new MemoryStorage(loggerFactory),
+        new MemoryStorage(loggerFactory, timeouts),
         clock,
         None,
         uniqueContractKeysO = Some(false),
@@ -211,18 +241,18 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
 
     val eventPublisher = new ParticipantEventPublisher(
       participant,
-      nodePersistentState.participantEventLog,
-      mdel,
+      Eval.now(nodePersistentState.participantEventLog),
+      Eval.now(mdel),
       clock,
-      Duration.ofDays(1L),
+      Eval.now(Duration.ofDays(1L)),
       timeouts,
       loggerFactory,
     )
     val inFlightSubmissionTracker = new InFlightSubmissionTracker(
-      nodePersistentState.inFlightSubmissionStore,
+      Eval.now(nodePersistentState.inFlightSubmissionStore),
       eventPublisher,
       new NoCommandDeduplicator(),
-      mdel,
+      Eval.now(mdel),
       _ =>
         Option(ephemeralState.get())
           .map(InFlightSubmissionTrackerDomainState.fromSyncDomainState(persistentState, _)),
@@ -234,7 +264,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     ephemeralState.set(
       new SyncDomainEphemeralState(
         persistentState,
-        multiDomainEventLog,
+        Eval.now(multiDomainEventLog),
         domainCausalTracker,
         inFlightSubmissionTracker,
         startingPoints,
@@ -243,12 +273,14 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         timeouts,
         useCausalityTracking = true,
         loggerFactory,
-      )(parallelExecutionContext)
+        FutureSupervisor.Noop,
+      )
     )
 
     val steps = new TestProcessingSteps(
       pendingSubmissionMap = pendingSubmissionMap,
       overrideConstructedPendingRequestData,
+      informeesOfView = _ => Set(ConfirmingParty(party.toLf, 1)),
     )
 
     val sut: ProtocolProcessor[
@@ -265,10 +297,13 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         crypto,
         sequencerClient,
         loggerFactory,
+        FutureSupervisor.Noop,
       )(
         directExecutionContext: ExecutionContext,
         TransactionResultMessage.transactionResultMessageCast,
       ) {
+        override def participantId: ParticipantId = participant
+
         override def timeouts = ProtocolProcessorTest.this.timeouts
       }
 
@@ -294,9 +329,9 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     TestViewType,
     SerializedRootHashMessagePayload.empty,
   )
-  lazy val someRecipients = Recipients.cc(DefaultTestIdentities.participant1)
+  lazy val someRecipients = Recipients.cc(participant)
   lazy val someRequestBatch = RequestAndRootHashMessage(
-    NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients, testedProtocolVersion)),
+    NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients)(testedProtocolVersion)),
     rootHashMessage,
     DefaultTestIdentities.mediator,
   )
@@ -306,7 +341,12 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     "succeed without errors" in {
       val submissionMap = TrieMap[Int, Unit]()
       val (sut, _persistent, _ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
-      sut.submit(0).valueOrFailShutdown("submission").futureValue.futureValue shouldBe (())
+      sut
+        .submit(0)
+        .valueOrFailShutdown("submission")
+        .futureValue
+        .failOnShutdown("shutting down while test is running")
+        .futureValue shouldBe (())
       submissionMap.get(0) shouldBe Some(()) // store the pending submission
     }
 
@@ -340,9 +380,14 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val submissionMap = TrieMap[Int, Unit]()
       val (sut, _persistent, _ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
 
-      sut.submit(1).valueOrFailShutdown("submission").futureValue.futureValue shouldBe (())
+      sut
+        .submit(1)
+        .valueOrFailShutdown("submission")
+        .futureValue
+        .failOnShutdown("shutting down while test is running")
+        .futureValue shouldBe (())
       submissionMap.get(1) shouldBe Some(())
-      val afterDecisionTime = parameters.decisionTimeFor(CantonTimestamp.Epoch).plusMillis(1)
+      val afterDecisionTime = parameters.decisionTimeFor(CantonTimestamp.Epoch).value.plusMillis(1)
       val () =
         sut
           .processRequest(afterDecisionTime, rc, requestSc, someRequestBatch)
@@ -357,7 +402,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val crypto2 = TestingIdentityFactory(
         TestingTopology(mediators = Set.empty),
         loggerFactory,
-        parameters,
+        parameters.parameters,
       ).forOwnerAndDomain(participant, domain)
       val (sut, persistent, ephemeral) = testProcessingSteps(crypto = crypto2)
       val res = sut.submit(1).onShutdown(fail("submission shutdown")).value.futureValue
@@ -378,7 +423,12 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "transit to confirmed" in {
-      val pd = TestPendingRequestData(rc, requestSc, Set.empty)
+      val pd = TestPendingRequestData(
+        rc,
+        requestSc,
+        Set.empty,
+        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+      )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
       val before = ephemeral.requestJournal.query(rc).value.futureValue
@@ -394,7 +444,12 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "leave the request state unchanged when doing a clean replay" in {
-      val pendingData = TestPendingRequestData(rc, requestSc, Set.empty)
+      val pendingData = TestPendingRequestData(
+        rc,
+        requestSc,
+        Set.empty,
+        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+      )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(
           overrideConstructedPendingRequestData = Some(pendingData),
@@ -423,7 +478,12 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "trigger a timeout when the result doesn't arrive" in {
-      val pd = TestPendingRequestData(rc, requestSc, Set.empty)
+      val pd = TestPendingRequestData(
+        rc,
+        requestSc,
+        Set.empty,
+        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+      )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
 
@@ -449,7 +509,10 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       }
 
       // Trigger the timeout for the request
-      ephemeral.requestTracker.tick(requestSc + 1, parameters.decisionTimeFor(requestId.unwrap))
+      ephemeral.requestTracker.tick(
+        requestSc + 1,
+        parameters.decisionTimeFor(requestId.unwrap).value,
+      )
 
       eventually() {
         val state = journal.query(rc).value.futureValue
@@ -472,8 +535,8 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val requestBatchWrongRH = RequestAndRootHashMessage(
         NonEmpty(
           Seq,
-          OpenEnvelope(viewMessage, someRecipients, testedProtocolVersion),
-          OpenEnvelope(viewMessageWrongRH, someRecipients, testedProtocolVersion),
+          OpenEnvelope(viewMessage, someRecipients)(testedProtocolVersion),
+          OpenEnvelope(viewMessageWrongRH, someRecipients)(testedProtocolVersion),
         ),
         rootHashMessage,
         DefaultTestIdentities.mediator,
@@ -505,7 +568,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val requestBatchDecryptError = RequestAndRootHashMessage(
         NonEmpty(
           Seq,
-          OpenEnvelope(viewMessageDecryptError, someRecipients, testedProtocolVersion),
+          OpenEnvelope(viewMessageDecryptError, someRecipients)(testedProtocolVersion),
         ),
         rootHashMessage,
         DefaultTestIdentities.mediator,
@@ -529,7 +592,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     "check the declared mediator ID against the root hash message mediator" in {
       val otherMediatorId = MediatorId(UniqueIdentifier.tryCreate("mediator", "other"))
       val requestBatch = RequestAndRootHashMessage(
-        NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients, testedProtocolVersion)),
+        NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients)(testedProtocolVersion)),
         rootHashMessage,
         otherMediatorId,
       )
@@ -574,6 +637,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     def setUpOrFail(
         persistent: SyncDomainPersistentState,
         ephemeral: SyncDomainEphemeralState,
+        decisionTime: CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(60),
     ): Unit = {
 
       val setupF = for {
@@ -584,7 +648,15 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       } yield ephemeral.phase37Synchronizer.markConfirmed(TestPendingRequestDataType)(
         rc,
         requestId,
-        WrappedPendingRequestData(TestPendingRequestData(rc, requestSc, Set.empty)),
+        decisionTime,
+        WrappedPendingRequestData(
+          TestPendingRequestData(
+            rc,
+            requestSc,
+            Set.empty,
+            MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+          )
+        ),
       )
       setupF.futureValue
     }
@@ -592,17 +664,28 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     def performResultProcessing(
         timestamp: CantonTimestamp,
         sut: TestInstance,
-    ): EitherT[Future, sut.steps.ResultError, Unit] =
+    ): EitherT[Future, sut.steps.ResultError, Unit] = {
+      val mockSignedProtocolMessage = mock[SignedProtocolMessage[TransactionResultMessage]]
+      when(mockSignedProtocolMessage.message).thenReturn(trm)
+      when(
+        mockSignedProtocolMessage
+          .verifySignature(any[SyncCryptoApi], any[Member])
+      )
+        .thenReturn(EitherT.rightT(()))
       sut
         .performResultProcessing(
-          mock[SignedContent[Deliver[DefaultOpenEnvelope]]],
-          Right(trm),
+          mock[Either[
+            EventWithErrors[Deliver[DefaultOpenEnvelope]],
+            SignedContent[Deliver[DefaultOpenEnvelope]],
+          ]],
+          Right(mockSignedProtocolMessage),
           requestId,
           timestamp,
           resultSc,
         )
         .map(_.onShutdown(fail("Unexpected shutdown")))
         .flatMap(identity)
+    }
 
     "succeed without errors and transit to clean" in {
       val (sut, persistent, ephemeral) = testProcessingSteps()
@@ -653,6 +736,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "succeed without errors on clean replay, not changing the request state" in {
+
       val (sut, _persistent, ephemeral) = testProcessingSteps(
         startingPoints = ProcessingStartingPoints.tryCreate(
           MessageProcessingStartingPoint(rc, requestSc, CantonTimestamp.Epoch.minusSeconds(1)),
@@ -670,7 +754,13 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       ephemeral.phase37Synchronizer.markConfirmed(TestPendingRequestDataType)(
         rc,
         requestId,
-        CleanReplayData(rc, requestSc, Set.empty),
+        CantonTimestamp.Epoch.plusSeconds(60),
+        CleanReplayData(
+          rc,
+          requestSc,
+          Set.empty,
+          MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+        ),
       )
 
       val before = ephemeral.requestJournal.query(rc).value.futureValue

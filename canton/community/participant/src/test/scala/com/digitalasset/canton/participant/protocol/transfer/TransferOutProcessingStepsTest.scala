@@ -3,8 +3,10 @@
 
 package com.digitalasset.canton.participant.protocol.transfer
 
+import cats.Eval
 import cats.implicits.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
@@ -29,7 +31,6 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferOutRequestV
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
   NoSubmissionPermissionOut,
-  ReceivedNoRequests,
   SubmittingPartyMustBeStakeholderOut,
 }
 import com.digitalasset.canton.participant.protocol.{
@@ -58,6 +59,7 @@ import com.digitalasset.canton.{
   BaseTest,
   HasExecutorService,
   LedgerApplicationId,
+  LedgerCommandId,
   LedgerTransactionId,
   LfPartyId,
   LfWorkflowId,
@@ -103,6 +105,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       submitter,
       LedgerApplicationId.assertFromString("tests"),
       submittingParticipant.toLf,
+      LedgerCommandId.assertFromString("transfer-out-processing-steps-command-id"),
       None,
     )
   }
@@ -120,6 +123,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       pureCrypto,
       enableAdditionalConsistencyChecks = true,
       loggerFactory,
+      timeouts,
     )
   private val globalTracker = new GlobalCausalOrderer(
     submittingParticipant,
@@ -132,7 +136,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
   private def mkState: SyncDomainEphemeralState =
     new SyncDomainEphemeralState(
       persistentState,
-      multiDomainEventLog,
+      Eval.now(multiDomainEventLog),
       new SingleDomainCausalTracker(
         globalTracker,
         new InMemorySingleDomainCausalDependencyStore(sourceDomain, loggerFactory),
@@ -145,7 +149,8 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       DefaultProcessingTimeouts.testing,
       useCausalityTracking = true,
       loggerFactory,
-    )(executorService)
+      FutureSupervisor.Noop,
+    )
 
   private val damle =
     DAMLeTestInstance(submittingParticipant, signatories = Set(party1), stakeholders = Set(party1))(
@@ -536,7 +541,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         envelopes =
           NonEmpty(
             Seq,
-            OpenEnvelope(encryptedOutRequest, RecipientsTest.testInstance, testedProtocolVersion),
+            OpenEnvelope(encryptedOutRequest, RecipientsTest.testInstance)(testedProtocolVersion),
           )
         decrypted <- valueOrFail(outProcessingSteps.decryptViews(envelopes, cryptoSnapshot))(
           "decrypt request failed"
@@ -549,22 +554,13 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
             NonEmptyUtil.fromUnsafe(decrypted.views),
             Seq.empty,
             cryptoSnapshot,
+            MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
           )
         )("compute activeness set failed")
       } yield {
         decrypted.decryptionErrors shouldBe Seq.empty
         checkSuccessful(result)
       }
-    }
-
-    "fail if there are not transfer-out requests with the right root hash" in {
-      outProcessingSteps.pendingDataAndResponseArgsForMalformedPayloads(
-        CantonTimestamp.Epoch,
-        RequestCounter(1),
-        SequencerCounter(1),
-        Seq.empty,
-        cryptoSnapshot,
-      ) shouldBe Left(ReceivedNoRequests)
     }
   }
 
@@ -639,6 +635,15 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           Verdict.Approve(testedProtocolVersion),
           testedProtocolVersion,
         )
+
+      val domainParameters = DynamicDomainParametersWithValidity(
+        DynamicDomainParameters
+          .defaultValues(testedProtocolVersion),
+        CantonTimestamp.MinValue,
+        None,
+        targetDomain,
+      )
+
       for {
         signedResult <- SignedProtocolMessage.tryCreate(
           transferResult,
@@ -661,10 +666,11 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           deliver,
           SymbolicCrypto.emptySignature,
           None,
+          testedProtocolVersion,
         )
-        transferInExclusivity = DynamicDomainParameters
-          .defaultValues(testedProtocolVersion)
+        transferInExclusivity = domainParameters
           .transferExclusivityLimitFor(timeEvent.timestamp)
+          .value
         pendingOut = PendingTransferOut(
           RequestId(CantonTimestamp.Epoch),
           RequestCounter(1),
@@ -680,11 +686,12 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           Set(party1),
           timeEvent,
           Some(transferInExclusivity),
+          MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
         )
         _ <- valueOrFail(
           outProcessingSteps
             .getCommitSetAndContractsToBeStoredAndEvent(
-              signedContent,
+              Right(signedContent),
               Right(transferResult),
               pendingOut,
               state.pendingTransferOutSubmissions,

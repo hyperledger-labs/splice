@@ -21,6 +21,7 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.MonadUtil.sequentialTraverse_
+import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{BaseTest, SequencerCounter}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -28,11 +29,12 @@ import org.scalatest.wordspec.AsyncWordSpec
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest {
+class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with HasTestCloseContext {
+  self =>
   private lazy val domainId = DefaultTestIdentities.domainId
   private lazy val mediatorId = DefaultTestIdentities.mediator
   private lazy val mediatorMetrics = DomainTestMetrics.mediator
-  private lazy val participantResponseTimeout = NonNegativeFiniteDuration.ofSeconds(10)
+  private lazy val participantResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(10)
   private lazy val factory = new ExampleTransactionFactory()(domainId = domainId)
   private lazy val fullInformeeTree = factory.MultipleRootsAndViewNestings.fullInformeeTree
   private lazy val alwaysReadyCheck = MediatorReadyCheck.alwaysReady(loggerFactory)
@@ -58,7 +60,7 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest {
 
     val state = new MediatorState(
       new InMemoryFinalizedResponseStore(loggerFactory),
-      new InMemoryMediatorDeduplicationStore(loggerFactory),
+      new InMemoryMediatorDeduplicationStore(loggerFactory, timeouts),
       mock[Clock],
       mediatorMetrics,
       timeouts,
@@ -141,7 +143,7 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest {
     )
 
     val signedConfirmationResponse =
-      SignedProtocolMessage(mediatorResponse, mock[Signature], testedProtocolVersion)
+      SignedProtocolMessage.from(mediatorResponse, testedProtocolVersion, Signature.noSignature)
     when(signedConfirmationResponse.message.domainId).thenReturn(domainId)
     val informeeMessageWithWrongDomainId = mock[InformeeMessage]
     when(informeeMessageWithWrongDomainId.domainId)
@@ -218,14 +220,14 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest {
           CantonTimestamp.Epoch,
           Some(CantonTimestamp.ofEpochSecond(5)),
           initialDomainParameters.tryUpdate(participantResponseTimeout =
-            NonNegativeFiniteDuration.ofSeconds(4)
+            NonNegativeFiniteDuration.tryOfSeconds(4)
           ),
         ),
         DomainParameters.WithValidity(
           CantonTimestamp.ofEpochSecond(5),
           None,
           initialDomainParameters.tryUpdate(participantResponseTimeout =
-            NonNegativeFiniteDuration.ofSeconds(6)
+            NonNegativeFiniteDuration.tryOfSeconds(6)
           ),
         ),
       )

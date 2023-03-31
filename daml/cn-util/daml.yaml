@@ -1,4 +1,4 @@
-sdk-version: 2.6.0-snapshot.20230210.11415.0.5c00481a
+sdk-version: 2.7.0-snapshot.20230327.11615.0.9aa586fb
 name: cn-util
 source: daml
 version: 0.1.0

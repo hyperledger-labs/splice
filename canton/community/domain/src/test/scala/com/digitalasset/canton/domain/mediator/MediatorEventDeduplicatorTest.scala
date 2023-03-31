@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton.domain.mediator
 
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.mediator.TestVerdictSender.Result
@@ -41,7 +43,8 @@ class MediatorEventDeduplicatorTest extends BaseTestWordSpec with HasExecutionCo
 
   def mkDeduplicator()
       : (MediatorEventDeduplicator, TestVerdictSender, MediatorDeduplicationStore) = {
-    val store: MediatorDeduplicationStore = new InMemoryMediatorDeduplicationStore(loggerFactory)
+    val store: MediatorDeduplicationStore =
+      new InMemoryMediatorDeduplicationStore(loggerFactory, timeouts)
     store.initialize(CantonTimestamp.MinValue).futureValue
 
     val verdictSender = new TestVerdictSender
@@ -93,13 +96,13 @@ class MediatorEventDeduplicatorTest extends BaseTestWordSpec with HasExecutionCo
   }
 
   def mkDefaultOpenEnvelope[A <: ProtocolMessage](protocolMessage: A): OpenEnvelope[A] =
-    OpenEnvelope(protocolMessage, Recipients.cc(mediator), testedProtocolVersion)
+    OpenEnvelope(protocolMessage, Recipients.cc(mediator))(testedProtocolVersion)
 
   lazy val response: DefaultOpenEnvelope = {
     val message =
       SignedProtocolMessage(
-        mock[MediatorResponse],
-        SymbolicCrypto.emptySignature,
+        mock[TypedSignedProtocolMessageContent[MediatorResponse]],
+        NonEmpty(Seq, SymbolicCrypto.emptySignature),
         testedProtocolVersion,
       )
     mkDefaultOpenEnvelope(message)
@@ -356,6 +359,8 @@ class MediatorEventDeduplicatorTest extends BaseTestWordSpec with HasExecutionCo
       override protected def prunePersistentData(upToInclusive: CantonTimestamp)(implicit
           traceContext: TraceContext
       ): Future[Unit] = Future.unit
+
+      override protected val timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
     }
     store.initialize(CantonTimestamp.MinValue).futureValue
 

@@ -38,7 +38,9 @@ class SvcTimeBasedIntegrationTest
     aliceWallet.tap(5)
     clue("schedule a config change, so the coinrules change, invalidating the cache.") {
       val configSchedule =
-        createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(maxNumInputs = 101)))
+        createConfigSchedule(
+          (defaultTickDuration.asJavaApproximation, mkCoinConfig(maxNumInputs = 101))
+        )
       svcClient.setConfigSchedule(configSchedule)
     }
 

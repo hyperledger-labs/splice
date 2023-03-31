@@ -12,9 +12,13 @@ BuildCommon.sbtSettings
 
 // sbt insists on these re-declarations
 lazy val `canton-community-app` = BuildCommon.`canton-community-app`
+lazy val `canton-community-app-base` = BuildCommon.`canton-community-app-base`
+lazy val `canton-community-base` = BuildCommon.`canton-community-base`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
 lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
+lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
+lazy val `canton-community-testing` = BuildCommon.`canton-community-testing`
 lazy val `canton-research-services` = BuildCommon.`canton-research-services`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
 lazy val `canton-functionmeta` = BuildCommon.`canton-functionmeta`
@@ -24,6 +28,8 @@ lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extens
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-akka-fork` = BuildCommon.`canton-akka-fork`
+lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
+lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 
 inThisBuild(
   List(
@@ -59,16 +65,21 @@ lazy val root = (project in file("."))
     `svc-governance-daml`,
     `svc-governance-v1test-daml`,
     `validator-lifecycle-daml`,
+    `canton-community-base`,
     `canton-community-common`,
+    `canton-community-integration-testing`,
+    `canton-community-testing`,
     `canton-research-services`,
     `canton-blake2b`,
     `canton-slick-fork`,
-    `canton-daml-fork`,
     `canton-functionmeta`,
     `canton-wartremover-extension`,
     `canton-community-app`,
+    `canton-community-app-base`,
     `canton-community-domain`,
     `canton-community-participant`,
+    `canton-ledger-common`,
+    `canton-ledger-api-core`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -215,6 +226,7 @@ lazy val `apps-common` =
     .dependsOn(
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
+      `canton-community-testing` % "test",
       `canton-coin-daml`,
       `canton-coin-v1test-daml`,
       `canton-research-services`,
@@ -815,6 +827,8 @@ lazy val `apps-app` =
       `apps-wallet`,
       `canton-coin-api-daml`,
       `canton-community-app` % "compile->compile;test->test",
+      `canton-community-base`,
+      `canton-community-integration-testing` % "test",
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-7" % "3.2.15.0" % "test",

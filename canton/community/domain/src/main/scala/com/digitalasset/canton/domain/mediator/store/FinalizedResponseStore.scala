@@ -9,6 +9,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.mediator.ResponseAggregation
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.TimedLoadGauge
 import com.digitalasset.canton.protocol.RequestId
@@ -34,27 +35,33 @@ private[mediator] trait FinalizedResponseStore extends AutoCloseable {
     * should behave in an idempotent manner.
     * TODO(#4335): If there is an existing value ensure that it matches the value we want to insert
     */
-  def store(request: ResponseAggregation)(implicit traceContext: TraceContext): Future[Unit]
+  def store(
+      request: ResponseAggregation
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit]
 
   /** Fetch previously stored finalized mediator response aggregation by requestId.
     */
   def fetch(requestId: RequestId)(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      overrideCloseContext: CloseContext,
   ): OptionT[Future, ResponseAggregation]
 
   /** Remove all responses up to and including the provided timestamp. */
-  def prune(timestamp: CantonTimestamp)(implicit traceContext: TraceContext): Future[Unit]
+  def prune(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit]
 
   /** Count how many finalized responses we have stored.
     * Primarily used for testing mediator pruning.
     */
-  def count()(implicit traceContext: TraceContext): Future[Long]
+  def count()(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Long]
 
   /** Locate a timestamp relative to the earliest available finalized response
     * Useful to monitor the progress of pruning and for pruning in batches.
     */
   def locatePruningTimestamp(skip: Int)(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
   ): Future[Option[CantonTimestamp]]
 }
 
@@ -66,11 +73,18 @@ private[mediator] object FinalizedResponseStore {
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): FinalizedResponseStore = storage match {
     case _: MemoryStorage => new InMemoryFinalizedResponseStore(loggerFactory)
     case jdbc: DbStorage =>
-      new DbFinalizedResponseStore(jdbc, cryptoApi, protocolVersion, timeouts, loggerFactory)
+      new DbFinalizedResponseStore(
+        jdbc,
+        cryptoApi,
+        protocolVersion,
+        timeouts,
+        loggerFactory,
+      )
   }
 }
 
@@ -86,13 +100,14 @@ private[mediator] class InMemoryFinalizedResponseStore(
 
   override def store(
       request: ResponseAggregation
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit] = {
     finalizedRequests.putIfAbsent(request.requestId.unwrap, request).discard
     Future.unit
   }
 
   override def fetch(requestId: RequestId)(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      overrideCloseContext: CloseContext,
   ): OptionT[Future, ResponseAggregation] =
     OptionT.fromOption[Future](
       finalizedRequests.get(requestId.unwrap)
@@ -100,19 +115,25 @@ private[mediator] class InMemoryFinalizedResponseStore(
 
   override def prune(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit] =
     Future.successful {
       finalizedRequests.keys
         .filterNot(_.isAfter(timestamp))
         .foreach(finalizedRequests.remove(_).discard[Option[ResponseAggregation]])
     }
 
-  override def count()(implicit traceContext: TraceContext): Future[Long] =
+  override def count()(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): Future[Long] =
     Future.successful(finalizedRequests.size.toLong)
 
   override def locatePruningTimestamp(
       skip: Int
-  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
+  )(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): Future[Option[CantonTimestamp]] = {
     Future.successful {
       import cats.Order.*
       val sortedSet =
@@ -130,7 +151,7 @@ private[mediator] class DbFinalizedResponseStore(
     protocolVersion: ProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit val ec: ExecutionContext)
+)(implicit val ec: ExecutionContext, implicit val traceContext: TraceContext)
     extends FinalizedResponseStore
     with DbStore {
   import storage.api.*
@@ -161,20 +182,20 @@ private[mediator] class DbFinalizedResponseStore(
   )
   implicit val setParameterMediatorRequest: SetParameter[MediatorRequest] =
     (r: MediatorRequest, pp: PositionedParameters) =>
-      pp >> EnvelopeContent(r, protocolVersion).toByteArray
+      pp >> EnvelopeContent.tryCreate(r, protocolVersion).toByteArray
 
   private val processingTime: TimedLoadGauge =
     storage.metrics.loadGaugeM("finalized-response-store")
 
   override def store(
       request: ResponseAggregation
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit] =
     processingTime.event {
       request.state match {
         case Left(verdict) =>
           val insert = storage.profile match {
             case _: DbStorage.Profile.Oracle =>
-              sqlu"""insert 
+              sqlu"""insert
                      /*+  IGNORE_ROW_ON_DUPKEY_INDEX ( response_aggregations ( request_id ) ) */
                      into response_aggregations(request_id, mediator_request, version, verdict, request_trace_context)
                      values (
@@ -189,63 +210,91 @@ private[mediator] class DbFinalizedResponseStore(
                      ) on conflict do nothing"""
           }
 
-          storage.update_(
-            insert,
-            operationName = s"${this.getClass}: store request ${request.requestId}",
-          )
+          CloseContext.withCombinedContextF(callerCloseContext, closeContext, timeouts, logger) {
+            closeContext =>
+              storage.update_(
+                insert,
+                operationName = s"${this.getClass}: store request ${request.requestId}",
+              )(
+                traceContext,
+                closeContext,
+              )
+          }
+
         case Right(_) =>
           throw new IllegalArgumentException(s"Given request has not been finalized")
       }
     }
 
   override def fetch(requestId: RequestId)(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
   ): OptionT[Future, ResponseAggregation] =
     processingTime.optionTEvent {
-      storage.querySingle(
-        sql"""select request_id, mediator_request, version, verdict, request_trace_context 
+      CloseContext.withCombinedContextOT(callerCloseContext, closeContext, timeouts, logger) {
+        closeContext =>
+          storage.querySingle(
+            sql"""select request_id, mediator_request, version, verdict, request_trace_context
               from response_aggregations where request_id=${requestId.unwrap}
            """
-          .as[(RequestId, MediatorRequest, CantonTimestamp, Verdict, SerializableTraceContext)]
-          .map {
-            _.headOption.map {
-              case (reqId, mediatorRequest, version, verdict, requestTraceContext) =>
-                ResponseAggregation(reqId, mediatorRequest, version, Left(verdict))(
-                  protocolVersion,
-                  requestTraceContext.unwrap,
-                )(loggerFactory)
-            }
-          },
-        operationName = s"${this.getClass}: fetch request $requestId",
-      )
+              .as[(RequestId, MediatorRequest, CantonTimestamp, Verdict, SerializableTraceContext)]
+              .map {
+                _.headOption.map {
+                  case (reqId, mediatorRequest, version, verdict, requestTraceContext) =>
+                    ResponseAggregation(reqId, mediatorRequest, version, Left(verdict))(
+                      protocolVersion,
+                      requestTraceContext.unwrap,
+                    )(loggerFactory)
+                }
+              },
+            operationName = s"${this.getClass}: fetch request $requestId",
+          )(traceContext, closeContext)
+      }
     }
 
   override def prune(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      removedCount <- storage.update(
-        sqlu"delete from response_aggregations where request_id <= ${timestamp}",
-        functionFullName,
-      )
-    } yield logger.debug(s"Removed $removedCount finalized responses")
-  }
+  )(implicit traceContext: TraceContext, callerCloseContext: CloseContext): Future[Unit] =
+    CloseContext.withCombinedContextF(callerCloseContext, closeContext, timeouts, logger) {
+      closeContext =>
+        for {
+          removedCount <- storage.update(
+            sqlu"delete from response_aggregations where request_id <= ${timestamp}",
+            functionFullName,
+          )(traceContext, closeContext)
+        } yield logger.debug(s"Removed $removedCount finalized responses")
+    }
 
-  override def count()(implicit traceContext: TraceContext): Future[Long] =
-    storage.query(
-      sql"select count(request_id) from response_aggregations".as[Long].head,
-      functionFullName,
-    )
+  override def count()(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): Future[Long] = {
+    CloseContext.withCombinedContextF(callerCloseContext, closeContext, timeouts, logger) {
+      closeContext =>
+        storage.query(
+          sql"select count(request_id) from response_aggregations".as[Long].head,
+          functionFullName,
+        )(traceContext, closeContext)
+    }
+  }
 
   override def locatePruningTimestamp(
       skip: Int
-  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] =
-    storage
-      .query(
-        sql"select request_id from response_aggregations order by request_id asc #${storage.limit(1, skip.toLong)}"
-          .as[CantonTimestamp]
-          .headOption,
-        functionFullName,
-      )
+  )(implicit
+      traceContext: TraceContext,
+      callerCloseContext: CloseContext,
+  ): Future[Option[CantonTimestamp]] = {
+    CloseContext.withCombinedContextF(callerCloseContext, closeContext, timeouts, logger) {
+      closeContext =>
+        storage
+          .query(
+            sql"select request_id from response_aggregations order by request_id asc #${storage
+                .limit(1, skip.toLong)}"
+              .as[CantonTimestamp]
+              .headOption,
+            functionFullName,
+          )(traceContext, closeContext)
+    }
+  }
 
 }

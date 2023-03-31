@@ -9,12 +9,13 @@ import com.digitalasset.canton.config.{
   LoggingConfig,
   NodeConfig,
   NodeMonitoringConfig,
+  NonNegativeFiniteDuration,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
 }
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -51,7 +52,7 @@ abstract class RemoteCNNodeConfig extends NodeConfig {}
   */
 case class SharedCNNodeAppParameters(
     override val tracing: TracingConfig,
-    override val delayLoggingThreshold: NonNegativeFiniteDuration,
+    val delayLoggingThreshold_ : NonNegativeFiniteDuration,
     override val loggingConfig: LoggingConfig,
     override val logQueryCost: Option[QueryCostMonitoringConfig],
     override val processingTimeouts: ProcessingTimeout,
@@ -64,4 +65,6 @@ case class SharedCNNodeAppParameters(
     override val devVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
     override val initialProtocolVersion: ProtocolVersion,
-) extends CantonNodeParameters
+) extends CantonNodeParameters {
+  override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
+}

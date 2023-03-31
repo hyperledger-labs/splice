@@ -17,11 +17,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.PackageService
 import com.digitalasset.canton.participant.store.ContractAndKeyLookup
 import com.digitalasset.canton.participant.util.DAMLe.{ContractWithMetadata, PackageResolver}
+import com.digitalasset.canton.platform.apiserver.execution.AuthorityResolver
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{LfCommand, LfCreateCommand, LfKeyResolver, LfPartyId, LfVersioned}
 
 import java.nio.file.Path
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -54,7 +58,7 @@ object DAMLe {
     */
   type PackageResolver = PackageId => TraceContext => Future[Option[Package]]
 
-  case class ContractWithMetadata(
+  final case class ContractWithMetadata(
       instance: LfContractInst,
       signatories: Set[LfPartyId],
       stakeholders: Set[LfPartyId],
@@ -89,6 +93,8 @@ object DAMLe {
   */
 class DAMLe(
     resolvePackage: PackageResolver,
+    authorityResolver: AuthorityResolver,
+    domainId: Option[DomainId],
     engine: Engine,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -228,7 +234,14 @@ class DAMLe(
 
   private[this] def handleResult[A](contracts: ContractAndKeyLookup, result: Result[A])(implicit
       traceContext: TraceContext
-  ): Future[Either[Error, A]] =
+  ): Future[Either[Error, A]] = {
+    @tailrec
+    def iterateOverInterrupts(continue: () => Result[A]): Result[A] =
+      continue() match {
+        case ResultInterruption(continue) => iterateOverInterrupts(continue)
+        case otherResult => otherResult
+      }
+
     result match {
       case ResultNeedPackage(packageId, resume) =>
         resolvePackage(packageId)(traceContext).transformWith {
@@ -257,5 +270,25 @@ class DAMLe(
           .value
           .flatMap(optInst => handleResult(contracts, resume(optInst)))
       case ResultError(err) => Future.successful(Left(err))
+      case ResultInterruption(continue) =>
+        handleResult(contracts, iterateOverInterrupts(continue))
+      case ResultNeedAuthority(holding, requesting, resume) =>
+        authorityResolver
+          .resolve(
+            AuthorityResolver
+              .AuthorityRequest(holding, requesting, domainId.map(_.toString))
+          )
+          .flatMap {
+            case AuthorityResolver.AuthorityResponse.Authorized =>
+              handleResult(contracts, resume(true))
+            case AuthorityResolver.AuthorityResponse.MissingAuthorisation(parties) =>
+              val receivedAuthorityFor = parties -- requesting
+              logger.debug(
+                show"Authorisation failed. Missing authority: [$parties]. Received authority: [$receivedAuthorityFor]"
+              )
+              handleResult(contracts, resume(false))
+          }
     }
+  }
+
 }

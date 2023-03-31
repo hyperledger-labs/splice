@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol.transfer
 
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.ViewType.TransferOutViewType
@@ -24,7 +25,7 @@ import scala.concurrent.ExecutionContext
 
 class TransferOutProcessor(
     domainId: DomainId,
-    participantId: ParticipantId,
+    override val participantId: ParticipantId,
     damle: DAMLe,
     transferCoordination: TransferCoordination,
     inFlightSubmissionTracker: InFlightSubmissionTracker,
@@ -35,6 +36,7 @@ class TransferOutProcessor(
     override protected val timeouts: ProcessingTimeout,
     sourceProtocolVersion: SourceProtocolVersion,
     loggerFactory: NamedLoggerFactory,
+    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
     extends ProtocolProcessor[
       TransferOutProcessingSteps.SubmissionParam,
@@ -57,4 +59,5 @@ class TransferOutProcessor(
       domainCrypto,
       sequencerClient,
       loggerFactory,
+      futureSupervisor,
     )

@@ -1,8 +1,6 @@
 package com.daml.network.console
 
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
-import com.daml.ledger.client.binding.Primitive as P
-import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.javaapi
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
@@ -14,6 +12,7 @@ import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
@@ -23,6 +22,7 @@ import com.digitalasset.canton.console.{
   Help,
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
+import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import java.time.Instant
@@ -60,7 +60,7 @@ trait LedgerApiExtensions {
             submissionId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
-            applicationId: String = LedgerApiCommands.defaultApplicationId,
+            applicationId: String = LedgerApiCommands.applicationId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): JavaTransactionTree = {
           val tx = ledgerApi.consoleEnvironment.run {
@@ -240,7 +240,7 @@ trait LedgerApiExtensions {
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
           val javaTemplateId = templateCompanion.TEMPLATE_ID
-          val templateId = P.TemplateId(
+          val templateId = TemplateId(
             javaTemplateId.getPackageId,
             javaTemplateId.getModuleName,
             javaTemplateId.getEntityName,

@@ -46,7 +46,12 @@ trait CNNodeAppReference extends InstanceReference {
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
-    new HealthAdministration[SimpleStatus](this, consoleEnvironment, SimpleStatus.fromProtoV0)
+    new HealthAdministration[SimpleStatus](
+      this,
+      consoleEnvironment,
+      SimpleStatus.fromProtoV0,
+      topology_,
+    )
 
   @Help.Summary(
     "Yields the globally unique id of this participant. " +

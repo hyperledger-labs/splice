@@ -5,6 +5,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 
 import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.health.HealthReporting.ComponentStatus
 import com.digitalasset.canton.topology.UniqueIdentifier
 import java.time.Duration
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -23,6 +24,9 @@ case class CNNodeStatus(
     ports: Map[String, Port],
     active: Boolean,
 ) extends NodeStatus.Status {
+  // TODO(#3859) Set this to something useful.
+  override def components: Seq[ComponentStatus] = Seq.empty
+
   private[environment] def portsString(ports: Map[String, Port]): String =
     multiline(ports.map { case (portDescription, port) =>
       s"$portDescription: ${port.unwrap}"
@@ -49,6 +53,7 @@ case class CNNodeStatus(
       ByteString.EMPTY,
       active,
       None,
+      components.map(_.toProtoV0),
     )
 
   def toJsonV0: jsonV0.Status =

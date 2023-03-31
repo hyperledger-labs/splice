@@ -158,6 +158,8 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       ports = ports,
       active = isActive,
       topologyQueue = TopologyQueueStatus(0, 0, 0),
+      // TODO(#3859) Set this to something useful.
+      components = Seq.empty,
     )
     Future.successful(status)
   }

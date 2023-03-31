@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.telemetry
 
+import com.digitalasset.canton.metrics.OnDemandMetricsReader
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProviderBuilder
 
@@ -10,9 +11,10 @@ import io.opentelemetry.sdk.trace.SdkTracerProviderBuilder
   * The [[tracerProviderBuilder]] is the same one used to create the [[openTelemetry]] instance. We can use it to
   * piggy back on the already configured tracer provider and add resource attributes.
   */
-case class ConfiguredOpenTelemetry(
+final case class ConfiguredOpenTelemetry(
     openTelemetry: OpenTelemetrySdk,
     tracerProviderBuilder: SdkTracerProviderBuilder,
+    onDemandMetricsReader: OnDemandMetricsReader,
 ) extends AutoCloseable {
   override def close(): Unit = {
     openTelemetry.getSdkMeterProvider.close()

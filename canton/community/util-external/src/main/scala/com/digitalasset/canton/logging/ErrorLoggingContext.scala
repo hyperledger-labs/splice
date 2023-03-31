@@ -22,7 +22,7 @@ import org.slf4j.event.Level
   * @see [[NamedLoggingContext]] for another variant where the logger name is not fixed
   * @see [[NamedLogging.errorLoggingContext]] converts
   */
-case class ErrorLoggingContext(
+final case class ErrorLoggingContext(
     logger: TracedLogger,
     properties: Map[String, String],
     traceContext: TraceContext,
@@ -71,6 +71,13 @@ case class ErrorLoggingContext(
   override def error(message: String): Unit = logger.error(message)(traceContext)
   override def error(message: String, throwable: Throwable): Unit =
     logger.error(message, throwable)(traceContext)
+
+  def debug(message: String): Unit = logger.debug(message)(traceContext)
+  def debug(message: String, throwable: Throwable): Unit =
+    logger.debug(message, throwable)(traceContext)
+  def trace(message: String): Unit = logger.trace(message)(traceContext)
+  def trace(message: String, throwable: Throwable): Unit =
+    logger.trace(message, throwable)(traceContext)
 }
 
 object ErrorLoggingContext {

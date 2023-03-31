@@ -44,7 +44,7 @@ import com.digitalasset.canton.console.{
   FeatureFlag,
   Help,
   LocalDomainReference,
-  LocalInstanceReference,
+  LocalInstanceReferenceCommon,
   LocalParticipantReference,
   NodeReferences,
   StandardConsoleOutput,
@@ -411,7 +411,7 @@ class CNNodeConsoleEnvironment(
   override def health: CantonHealthAdministration[CommunityCantonStatus] =
     health_
 
-  override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int =
+  override protected def startupOrderPrecedence(instance: LocalInstanceReferenceCommon): Int =
     instance match {
       case _: LocalDomainReference => 1
       case _: LocalParticipantReference => 2

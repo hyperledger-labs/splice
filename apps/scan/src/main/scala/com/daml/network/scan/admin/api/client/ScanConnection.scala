@@ -130,7 +130,12 @@ final class ScanConnection(
         } yield {
 
           coinRulesCache.set(
-            Some(CachedCoinRules(now.add(config.coinRulesCacheTimeToLive.duration), coinRules))
+            Some(
+              CachedCoinRules(
+                now.add(config.coinRulesCacheTimeToLive.asJavaApproximation),
+                coinRules,
+              )
+            )
           )
           coinRules
         }

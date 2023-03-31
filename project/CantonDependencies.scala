@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.6.0-snapshot.20230210.11415.0.5c00481a"
+  val version: String = "2.7.0-snapshot.20230327.11615.0.9aa586fb"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -15,16 +15,20 @@ object CantonDependencies {
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.9"
+  lazy val scala_version = "2.13.10"
   lazy val scala_version_short = "2.13"
 
+  lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val akka_version = "2.6.18"
   lazy val akka_http_version = "10.2.8"
+  lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
+  lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
+  lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
   lazy val grpc_version = "1.44.0"
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "2.5.4-34-1c7b3c38"
+  lazy val ammonite_version = "2.5.5"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.3.3"
@@ -35,6 +39,8 @@ object CantonDependencies {
   lazy val circe_version = "0.13.0"
 
   lazy val scalatest_version = "3.2.9"
+
+  lazy val netty_version = "4.1.72.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.9.12"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -53,6 +59,7 @@ object CantonDependencies {
   lazy val ammonite = "com.lihaoyi" % "ammonite" % ammonite_version cross CrossVersion.full
   lazy val pprint = "com.lihaoyi" %% "pprint" % pprint_version
 
+  lazy val hikaricp = "com.zaxxer" % "HikariCP" % "3.2.0"
   lazy val h2 = "com.h2database" % "h2" % "2.1.210"
   lazy val postgres = "org.postgresql" % "postgresql" % "42.2.25"
   lazy val flyway = "org.flywaydb" % "flyway-core" % "8.4.0"
@@ -76,7 +83,6 @@ object CantonDependencies {
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
   lazy val daml_lf_interpreter = "com.daml" %% "daml-lf-interpreter" % daml_libraries_version
-  lazy val daml_lf_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_lf_value_java_proto =
     "com.daml" % "daml-lf-value-java-proto" % daml_libraries_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
@@ -85,23 +91,21 @@ object CantonDependencies {
 
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_ledger_api_common = "com.daml" %% "ledger-api-common" % daml_libraries_version
-  lazy val daml_ledger_api_auth_client =
-    "com.daml" % "ledger-api-auth-client" % daml_libraries_version
   lazy val daml_ledger_api_client = "com.daml" %% "ledger-api-client" % daml_libraries_version
-  lazy val daml_participant_integration_api =
-    "com.daml" %% "participant-integration-api" % daml_libraries_version
   lazy val daml_caching = "com.daml" %% "caching" % daml_libraries_version
   lazy val daml_error = "com.daml" %% "error" % daml_libraries_version
   lazy val daml_error_generator = "com.daml" %% "error-generator-lib" % daml_libraries_version
   lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
-  lazy val daml_participant_state = "com.daml" %% "participant-state" % daml_libraries_version
   lazy val daml_resources_akka = "com.daml" %% "resources-akka" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
+  lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
+  lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
+  lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
@@ -110,11 +114,13 @@ object CantonDependencies {
 
   lazy val javax_annotations = "javax.annotation" % "javax.annotation-api" % "1.3.2"
 
+  lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
   lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
   lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.46.Final"
+  lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
 
@@ -134,6 +140,8 @@ object CantonDependencies {
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % "1.16.3"
   lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % (scalatest_version + ".0")
 
+  // it should be kept up-to-date with the scaffeine version to avoid incompatibilities
+  lazy val caffeine = "com.github.ben-manes.caffeine" % "caffeine" % "3.1.2"
   lazy val scaffeine = "com.github.blemale" %% "scaffeine" % "5.1.2"
 
   lazy val slf4j_api = "org.slf4j" % "slf4j-api" % slf4j_version
@@ -164,6 +172,7 @@ object CantonDependencies {
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
   lazy val circe_parser = "io.circe" %% "circe-parser" % circe_version
 
+  lazy val guava = "com.google.guava" % "guava" % "31.1-jre"
   lazy val tink = "com.google.crypto.tink" % "tink" % "1.3.0" excludeAll (
     ExclusionRule(organization = "com.google.guava", name = "guava-jdk5"),
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
@@ -193,6 +202,8 @@ object CantonDependencies {
     "io.opentelemetry" % "opentelemetry-sdk-logs" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_sdk_metrics =
     "io.opentelemetry" % "opentelemetry-sdk-metrics" % s"$opentelemetry_version-alpha"
+  lazy val opentelemetry_sdk_testing =
+    "io.opentelemetry" % "opentelemetry-sdk-testing" % opentelemetry_version
   lazy val opentelemetry_sdk_trace =
     "io.opentelemetry" % "opentelemetry-sdk-trace" % opentelemetry_version
   lazy val opentelemetry_prometheus =
@@ -262,4 +273,8 @@ object CantonDependencies {
     "org.wartremover" % "wartremover" % wartremover.Wart.PluginVersion cross CrossVersion.full
 
   lazy val scala_csv = "com.github.tototoshi" %% "scala-csv" % "1.3.10"
+
+  lazy val scalaz_scalacheck =
+    "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
+  lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
 }

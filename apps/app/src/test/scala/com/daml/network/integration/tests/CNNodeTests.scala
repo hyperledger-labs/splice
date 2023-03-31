@@ -17,13 +17,12 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.BeforeAndAfterEach
 
 import scala.annotation.nowarn
 import scala.language.implicitConversions
-import java.time.Duration
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import com.daml.network.util.CNNodeUtil
@@ -79,7 +78,6 @@ object CNNodeTests {
     // We append this to configured Daml user names for isolation across test cases.
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     @volatile
-    @nowarn("cat=unused-params")
     private var testCaseId: Int = 0
 
     override def beforeEach(): Unit = {
@@ -173,7 +171,7 @@ object CNNodeTests {
       with CommonCNNodeAppInstanceReferences
       with LedgerApiExtensions {
 
-    lazy val defaultTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(150))
+    lazy val defaultTickDuration = NonNegativeFiniteDuration.ofSeconds(150)
 
     protected def mkCoinConfig(
         tickDuration: NonNegativeFiniteDuration = defaultTickDuration,

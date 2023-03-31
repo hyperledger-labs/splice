@@ -4,8 +4,9 @@ import com.daml.network.config.CNNodeConfigTransforms.setPollingInterval
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.{HasExecutionContext, time}
+import com.digitalasset.canton.HasExecutionContext
 import org.slf4j.event.Level
 
 import java.time.Duration
@@ -21,7 +22,7 @@ class TimeBasedTreasuryIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // for testing non-automation-based coin merging.
-        setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(30))(config)
+        setPollingInterval(NonNegativeFiniteDuration.ofSeconds(30))(config)
       )
   }
 

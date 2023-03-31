@@ -48,6 +48,7 @@ import com.digitalasset.canton.config.{
   DeprecatedConfigUtils,
   MonitoringConfig,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDuration.*
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{

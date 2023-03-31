@@ -17,10 +17,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.{Contract, SvTestUtil, TimeTestUtil, WalletTestUtil}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.EnrichedDurations.*
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
@@ -118,9 +119,11 @@ class SvTimeBasedIntegrationTest
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     initSvc()
 
-    val doubledTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(300))
+    val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
     svcClient.setConfigSchedule(
-      createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(doubledTickDuration)))
+      createConfigSchedule(
+        (defaultTickDuration.asJavaApproximation, mkCoinConfig(doubledTickDuration))
+      )
     )
     advanceRoundsByOneTick
 
@@ -133,9 +136,9 @@ class SvTimeBasedIntegrationTest
       rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
       rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
 
-      rounds.latestOpen.data.opensAt shouldBe (now + doubledTickDuration).toInstant
+      rounds.latestOpen.data.opensAt shouldBe (now + doubledTickDuration.toInternal).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
-        now + doubledTickDuration + doubledTickDuration + doubledTickDuration
+        now + doubledTickDuration.toInternal + doubledTickDuration.toInternal + doubledTickDuration.toInternal
       ).toInstant
     })
 
@@ -143,7 +146,7 @@ class SvTimeBasedIntegrationTest
       // First IssuingRounds is active
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration
+          0L -> defaultTickDuration.asJavaApproximation
         )
       )
 
@@ -158,8 +161,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 5") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration,
-          1L -> defaultTickDuration.duration,
+          0L -> defaultTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJavaApproximation,
         )
       )
 
@@ -177,8 +180,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 6") {
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.duration,
-          2L -> defaultTickDuration.duration,
+          1L -> defaultTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJavaApproximation,
         )
       )
 
@@ -196,8 +199,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 7") {
       assertTickDurationOfIssuingRound(
         Map(
-          2L -> defaultTickDuration.duration,
-          3L -> doubledTickDuration.duration,
+          2L -> defaultTickDuration.asJavaApproximation,
+          3L -> doubledTickDuration.asJavaApproximation,
         )
       )
 
@@ -211,9 +214,11 @@ class SvTimeBasedIntegrationTest
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     initSvc()
 
-    val reducedTickDuration = NonNegativeFiniteDuration(Duration.ofSeconds(75))
+    val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     svcClient.setConfigSchedule(
-      createConfigSchedule((defaultTickDuration.duration, mkCoinConfig(reducedTickDuration)))
+      createConfigSchedule(
+        (defaultTickDuration.asJavaApproximation, mkCoinConfig(reducedTickDuration))
+      )
     )
     advanceRoundsByOneTick
 
@@ -226,9 +231,9 @@ class SvTimeBasedIntegrationTest
       rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
       rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
 
-      rounds.latestOpen.data.opensAt shouldBe (now + reducedTickDuration).toInstant
+      rounds.latestOpen.data.opensAt shouldBe (now + reducedTickDuration.toInternal).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
-        now + reducedTickDuration + reducedTickDuration + reducedTickDuration
+        now + reducedTickDuration.toInternal + reducedTickDuration.toInternal + reducedTickDuration.toInternal
       ).toInstant
     })
 
@@ -236,7 +241,7 @@ class SvTimeBasedIntegrationTest
       // First IssuingRounds is active
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration
+          0L -> defaultTickDuration.asJavaApproximation
         )
       )
 
@@ -256,8 +261,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 5") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration,
-          1L -> defaultTickDuration.duration,
+          0L -> defaultTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJavaApproximation,
         )
       )
 
@@ -278,9 +283,9 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 6") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration,
-          1L -> defaultTickDuration.duration,
-          2L -> defaultTickDuration.duration,
+          0L -> defaultTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJavaApproximation,
         )
       )
 
@@ -302,10 +307,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.duration,
-          1L -> defaultTickDuration.duration,
-          2L -> defaultTickDuration.duration,
-          3L -> reducedTickDuration.duration,
+          0L -> defaultTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJavaApproximation,
+          3L -> reducedTickDuration.asJavaApproximation,
         )
       )
 
@@ -321,10 +326,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.duration,
-          2L -> defaultTickDuration.duration,
-          3L -> reducedTickDuration.duration,
-          4L -> reducedTickDuration.duration,
+          1L -> defaultTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJavaApproximation,
+          3L -> reducedTickDuration.asJavaApproximation,
+          4L -> reducedTickDuration.asJavaApproximation,
         )
       )
 
@@ -340,11 +345,11 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.duration,
-          2L -> defaultTickDuration.duration,
-          3L -> reducedTickDuration.duration,
-          4L -> reducedTickDuration.duration,
-          5L -> reducedTickDuration.duration,
+          1L -> defaultTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJavaApproximation,
+          3L -> reducedTickDuration.asJavaApproximation,
+          4L -> reducedTickDuration.asJavaApproximation,
+          5L -> reducedTickDuration.asJavaApproximation,
         )
       )
 
@@ -360,10 +365,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          2L -> defaultTickDuration.duration,
-          4L -> reducedTickDuration.duration,
-          5L -> reducedTickDuration.duration,
-          6L -> reducedTickDuration.duration,
+          2L -> defaultTickDuration.asJavaApproximation,
+          4L -> reducedTickDuration.asJavaApproximation,
+          5L -> reducedTickDuration.asJavaApproximation,
+          6L -> reducedTickDuration.asJavaApproximation,
         )
       )
 
@@ -885,6 +890,6 @@ class SvTimeBasedIntegrationTest
   }
 
   private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
-    duration.toScala.toMicros
+    duration.toInternal.toScala.toMicros
   )
 }

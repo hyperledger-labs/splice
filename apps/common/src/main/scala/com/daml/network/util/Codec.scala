@@ -75,7 +75,7 @@ object Codec {
 
   implicit val partyValue: Codec[PartyId, String] = new Codec[PartyId, String] {
     def encode(d: PartyId) = d.filterString
-    def decode(e: String) = PartyId.fromString(e)
+    def decode(e: String) = PartyId.fromProtoPrimitive(e)
   }
 
   object Party extends CodecCompanion[PartyId] {

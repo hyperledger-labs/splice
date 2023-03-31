@@ -36,6 +36,9 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Changed default log file name to `log/canton_network.clog` and `log/canton_network_test.clog`
 * Changed default JSON logger configuration to try to shorten logger names to 30 characters
 * Added `resetRetriesAfter` option to `Backoff` retry policy
+* Switched FlagCloseable to append shutdown tasks so they get run in the order they're added
+  rather than inverse order.
+* Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

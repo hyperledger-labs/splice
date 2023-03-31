@@ -10,11 +10,12 @@ import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, ConfirmingParty, ViewType}
 import com.digitalasset.canton.domain.mediator.store.MediatorState
 import com.digitalasset.canton.error.MediatorError
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.protocol.messages.*
@@ -26,12 +27,14 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.TrustLevel
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{EitherTUtil, EitherUtil, MonadUtil}
+import com.digitalasset.canton.util.{EitherTUtil, EitherUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
+import org.slf4j.event.Level
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -48,9 +51,12 @@ private[mediator] class ConfirmationResponseProcessor(
     val mediatorState: MediatorState,
     protocolVersion: ProtocolVersion,
     protected val loggerFactory: NamedLoggerFactory,
+    override val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, tracer: Tracer)
     extends NamedLogging
-    with Spanning {
+    with Spanning
+    with FlagCloseable
+    with HasCloseContext {
 
   /** Handle events for a single request-id.
     * Callers should ensure all events are for the same request and ordered by sequencer time.
@@ -60,15 +66,19 @@ private[mediator] class ConfirmationResponseProcessor(
       events: Seq[Traced[MediatorEvent]],
       callerTraceContext: TraceContext,
   ): HandlerResult = {
+
+    val requestTs = requestId.unwrap
+
     val future = for {
       // FIXME(M40): do not block if requestId is far in the future
       snapshot <- crypto.ips.awaitSnapshot(requestId.unwrap)(callerTraceContext)
-      domainParameters <- snapshot.findDynamicDomainParametersOrDefault(protocolVersion)(
-        callerTraceContext
-      )
-      participantResponseDeadline =
-        domainParameters.participantResponseDeadlineFor(requestId.unwrap)
-      decisionTime = domainParameters.decisionTimeFor(requestId.unwrap)
+
+      domainParameters <- snapshot
+        .findDynamicDomainParameters()(callerTraceContext)
+        .flatMap(_.toFuture(new IllegalStateException(_)))
+
+      participantResponseDeadline <- domainParameters.participantResponseDeadlineForF(requestTs)
+      decisionTime <- domainParameters.decisionTimeForF(requestTs)
 
       _ <- MonadUtil.sequentialTraverse_(events) {
         _.withTraceContext { implicit traceContext =>
@@ -318,7 +328,7 @@ private[mediator] class ConfirmationResponseProcessor(
         if (rootHash == expectedRootHash) None else Some(rootHash)
       }.distinct
 
-    case class WrongMembers(
+    final case class WrongMembers(
         missingInformeeParticipants: Set[Member],
         superfluousMembers: Set[Member],
     )
@@ -577,12 +587,10 @@ private[mediator] class ConfirmationResponseProcessor(
       span.setAttribute("counter", counter.toString)
       val response = signedResponse.message
 
-      val bytes = response.getCryptographicEvidence
-      val hash = crypto.pureCrypto.digest(response.hashPurpose, bytes)
       (for {
         snapshot <- OptionT.liftF(crypto.awaitSnapshot(response.requestId.unwrap))
-        _ <- snapshot
-          .verifySignature(hash, response.sender, signedResponse.signature)
+        _ <- signedResponse
+          .verifySignature(snapshot, response.sender)
           .leftMap(err =>
             MediatorError.MalformedMessage
               .Reject(
@@ -622,13 +630,19 @@ private[mediator] class ConfirmationResponseProcessor(
 
           OptionT.none
         }
-
-        snapshot <- OptionT.liftF(crypto.ips.awaitSnapshot(response.requestId.unwrap))
-        nextResponseAggregation <- responseAggregation.progress(ts, response, snapshot)
+        nextResponseAggregation <- responseAggregation.progress(ts, response, snapshot.ipsSnapshot)
         _unit <- mediatorState.replace(responseAggregation, nextResponseAggregation)
-
-        _ <- OptionT.liftF(sendResultIfDone(nextResponseAggregation, decisionTime))
-      } yield ()).value.map(_ => ())
+      } yield {
+        // we can send the result asynchronously, as there is no need to reply in
+        // order and there is no need to guarantee delivery of verdicts
+        FutureUtil.doNotAwait(
+          performUnlessClosingF("send-result-if-done")(
+            sendResultIfDone(nextResponseAggregation, decisionTime)
+          ).onShutdown(()),
+          s"send-result-if-done failed for request ${response.requestId}",
+          level = Level.WARN,
+        )
+      }).value.map(_ => ())
     }
 
   private def sendResultIfDone(

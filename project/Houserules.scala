@@ -100,4 +100,9 @@ object JvmRulesPlugin extends AutoPlugin {
       // to allow notifications and alerts during test runs (like slowpokes^)
       Test / logBuffered := false,
     )
+
+  lazy val scalacOptionsToDisableForTests = Seq(
+    "-Ywarn-value-discard",
+    "-Wnonunit-statement",
+  ) // disable value discard and non-unit statement checks on tests
 }

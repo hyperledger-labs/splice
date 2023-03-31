@@ -122,12 +122,21 @@ class DbActiveContractStore(
         _ <- bulkInsert(contractIds, toc, ChangeType.Activation, remoteDomain = None)
         _ <-
           if (enableAdditionalConsistencyChecks) {
-            contractIds.parTraverse_ { contractId =>
-              for {
-                _ <- checkCreateArchiveAtUnique(contractId, toc, ChangeType.Activation)
-                _ <- checkChangesBeforeCreation(contractId, toc)
-                _ <- checkTocAgainstEarliestArchival(contractId, toc)
-              } yield ()
+            performUnlessClosingCheckedT(
+              "additional-consistency-check",
+              Checked.result[AcsError, AcsWarning, Unit](
+                logger.debug(
+                  "Could not perform additional consistency check because node is shutting down"
+                )
+              ),
+            ) {
+              contractIds.parTraverse_ { contractId =>
+                for {
+                  _ <- checkCreateArchiveAtUnique(contractId, toc, ChangeType.Activation)
+                  _ <- checkChangesBeforeCreation(contractId, toc)
+                  _ <- checkTocAgainstEarliestArchival(contractId, toc)
+                } yield ()
+              }
             }
           } else {
             CheckedT.resultT[Future, AcsError, AcsWarning](())
@@ -143,12 +152,21 @@ class DbActiveContractStore(
         _ <- bulkInsert(contractIds, toc, ChangeType.Deactivation, remoteDomain = None)
         _ <-
           if (enableAdditionalConsistencyChecks) {
-            contractIds.parTraverse_ { contractId =>
-              for {
-                _ <- checkCreateArchiveAtUnique(contractId, toc, ChangeType.Deactivation)
-                _ <- checkChangesAfterArchival(contractId, toc)
-                _ <- checkTocAgainstLatestCreation(contractId, toc)
-              } yield ()
+            performUnlessClosingCheckedT(
+              "additional-consistency-check",
+              Checked.result[AcsError, AcsWarning, Unit](
+                logger.debug(
+                  "Could not perform additional consistency check because node is shutting down"
+                )
+              ),
+            ) {
+              contractIds.parTraverse_ { contractId =>
+                for {
+                  _ <- checkCreateArchiveAtUnique(contractId, toc, ChangeType.Deactivation)
+                  _ <- checkChangesAfterArchival(contractId, toc)
+                  _ <- checkTocAgainstLatestCreation(contractId, toc)
+                } yield ()
+              }
             }
           } else {
             CheckedT.resultT[Future, AcsError, AcsWarning](())
