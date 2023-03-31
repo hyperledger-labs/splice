@@ -131,11 +131,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/get-round-of-latest-data:
     get:
       tags: [scan]
@@ -149,11 +145,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/top-providers-by-app-rewards:
     get:
       tags: [scan]
@@ -180,11 +172,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/top-validators-by-validator-rewards:
     get:
       tags: [scan]
@@ -211,11 +199,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/get-validator-credit:
     get:
       tags: [scan]
@@ -229,11 +213,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetValidatorCreditResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/check-and-update-validator-credit:
     get:
       tags: [scan]
@@ -247,11 +227,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/CheckAndUpdateValidatorCreditResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
 
 components:
   schemas:
@@ -406,12 +382,4 @@ components:
         provider:
           type: string
         rewards:
-          type: string
-
-    ErrorResponse:
-      type: object
-      required:
-        - error
-      properties:
-        error:
           type: string

@@ -81,11 +81,7 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
 
 components:
   schemas:
@@ -137,11 +133,3 @@ components:
           type: array
           items:
             type: string
-
-    ErrorResponse:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string

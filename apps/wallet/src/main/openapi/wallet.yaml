@@ -18,17 +18,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserStatusResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /coins:
     get:
       tags: [wallet]
@@ -42,17 +34,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /tap:
     post:
       tags: [wallet]
@@ -71,36 +55,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TapResponse"
-        "429":
-          description: "too many requests"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "400":
-          description: "failed precondition"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "503":
-          description: "unavailable"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/429"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/503"
 
   /self-grant-feature-app-right:
     post:
@@ -120,17 +84,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/SelfGrantFeaturedAppRightResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /balance:
     get:
       tags: [wallet]
@@ -144,17 +100,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetBalanceResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /app-payment-requests:
     get:
       tags: [wallet]
@@ -168,20 +116,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListAppPaymentRequestsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /app-payment-requests/{contract_id}:
     get:
-      tags: [ wallet ]
+      tags: [wallet]
       x-jvm-package: wallet
       operationId: "getAppPaymentRequest"
       parameters:
@@ -198,17 +138,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/AppPaymentRequest"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /app-payment-requests/{contract_id}/accept:
     post:
       tags: [wallet]
@@ -227,36 +159,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcceptAppPaymentRequestResponse"
-        "429":
-          description: "too many requests"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "400":
-          description: "failed precondition"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "503":
-          description: "unavailable"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/429"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/503"
   /app-payment-requests/{contract_id}/reject:
     post:
       tags: [wallet]
@@ -272,17 +184,9 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /accepted-app-payments:
     get:
       tags: [wallet]
@@ -296,17 +200,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListAcceptedAppPaymentsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /subscription-requests:
     get:
       tags: [wallet]
@@ -320,17 +216,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListSubscriptionRequestsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /subscription-initial-payments:
     get:
       tags: [wallet]
@@ -344,17 +232,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListSubscriptionInitialPaymentsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /subscriptions:
     get:
       tags: [wallet]
@@ -368,17 +248,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListSubscriptionsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /subscription-requests/{contract_id}/accept:
     post:
       tags: [wallet]
@@ -397,36 +269,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AcceptSubscriptionRequestResponse"
-        "429":
-          description: "too many requests"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "400":
-          description: "failed precondition"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "503":
-          description: "unavailable"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/429"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/503"
   /subscription-requests/{contract_id}/reject:
     post:
       tags: [wallet]
@@ -442,20 +294,12 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /subscription-requests/{contract_id}:
     get:
-      tags: [ wallet ]
+      tags: [wallet]
       x-jvm-package: wallet
       operationId: "getSubscriptionRequest"
       parameters:
@@ -472,17 +316,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/SubscriptionRequest"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
     delete:
       tags: [wallet]
       x-jvm-package: wallet
@@ -497,17 +333,9 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /transfer-offers:
     post:
       tags: [wallet]
@@ -527,19 +355,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/CreateTransferOfferResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "409":
-          description: duplicate_command
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -552,17 +372,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListTransferOffersResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /transfer-offers/{contract_id}/reject:
     post:
       tags: [wallet]
@@ -578,17 +390,9 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /transfer-offers/{contract_id}/accept:
     post:
       tags: [wallet]
@@ -608,17 +412,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/AcceptTransferOfferResponse"
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /transfer-offers/{contract_id}/withdraw:
     post:
       tags: [wallet]
@@ -634,17 +430,9 @@ paths:
         "200":
           description: ok
         "404":
-          description: not_found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /accepted-transfer-offers:
     get:
       tags: [wallet]
@@ -658,17 +446,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListAcceptedTransferOffersResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /app-reward-coupons:
     get:
       tags: [wallet]
@@ -682,17 +462,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListAppRewardCouponsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /validator-reward-coupons:
     get:
       tags: [wallet]
@@ -706,17 +478,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListValidatorRewardCouponsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /cancel-featured-app-rights:
     delete:
       tags: [wallet]
@@ -726,11 +490,7 @@ paths:
         "200":
           description: ok
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /transactions:
     post:
       tags: [wallet]
@@ -750,25 +510,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListTransactionsResponse"
         "404":
-          description: "not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
-          description: "internal error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
 components:
   schemas:
     UserStatusResponse:
       type: object
       required:
-      - party_id
-      - user_onboarded
-      - has_featured_app_right
+        - party_id
+        - user_onboarded
+        - has_featured_app_right
       properties:
         party_id:
           type: string
@@ -780,8 +532,8 @@ components:
     ListResponse:
       type: object
       required:
-      - coins
-      - locked_coins
+        - coins
+        - locked_coins
       properties:
         coins:
           type: array
@@ -795,10 +547,10 @@ components:
     CoinPosition:
       type: object
       required:
-      - contract
-      - round
-      - accrued_holding_fee
-      - effective_amount
+        - contract
+        - round
+        - accrued_holding_fee
+        - effective_amount
       properties:
         contract:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
@@ -813,7 +565,7 @@ components:
     TapRequest:
       type: object
       required:
-      - amount
+        - amount
       properties:
         amount:
           type: string
@@ -821,7 +573,7 @@ components:
     TapResponse:
       type: object
       required:
-      - contract_id
+        - contract_id
       properties:
         contract_id:
           type: string
@@ -841,10 +593,10 @@ components:
     GetBalanceResponse:
       type: object
       required:
-      - round
-      - effective_unlocked_qty
-      - effective_locked_qty
-      - total_holding_fees
+        - round
+        - effective_unlocked_qty
+        - effective_locked_qty
+        - total_holding_fees
       properties:
         round:
           type: integer
@@ -945,9 +697,9 @@ components:
     Subscription:
       type: object
       required:
-      - subscription
-      - state
-      - context
+        - subscription
+        - state
+        - context
       properties:
         subscription:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
@@ -1121,10 +873,3 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListTransactionsResponseItem"
-    ErrorResponse:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string

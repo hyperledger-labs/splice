@@ -8,7 +8,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.admin.http.HttpAdminHandler
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -310,17 +310,19 @@ class ValidatorApp(
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            concat(
-              ValidatorResource.routes(
-                handler,
-                AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
-              ),
-              ValidatorAdminResource.routes(
-                adminHandler,
-                _ => provide(()),
-              ),
-              CommonAdminResource.routes(commonAdminHandler),
-            )
+            HttpErrorHandler(loggerFactory)(traceContext) {
+              concat(
+                ValidatorResource.routes(
+                  handler,
+                  AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+                ),
+                ValidatorAdminResource.routes(
+                  adminHandler,
+                  _ => provide(()),
+                ),
+                CommonAdminResource.routes(commonAdminHandler),
+              )
+            }
           }
         }
       }

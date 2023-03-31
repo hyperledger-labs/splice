@@ -1,4 +1,4 @@
-package com.daml.network.wallet.admin.http
+package com.daml.network.admin.http
 
 import akka.http.scaladsl.model.{
   ContentTypes,
@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{
   MediaTypes,
 }
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
-import akka.http.scaladsl.server.{Directive0, ExceptionHandler}
+import akka.http.scaladsl.server.{Directive0, ExceptionHandler, StandardRoute}
 import akka.http.scaladsl.server.Directives.withRequestTimeoutResponse
 import akka.http.scaladsl.server.Directives.{complete, extractUri, handleExceptions}
 import akka.util.ByteString
@@ -19,18 +19,37 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.circe.syntax.*
 import io.circe.Printer
 import com.daml.network.http.v0.definitions as d0
+import scala.util.{Try, Success, Failure}
 
-object HttpWalletErrorHandler {
+case class CustomHttpError(code: Status.Code, message: String) extends Exception
+
+object HttpErrorHandler {
   def apply(loggerFactory: NamedLoggerFactory)(implicit traceContext: TraceContext): Directive0 =
-    new HttpWalletErrorHandler(
+    new HttpErrorHandler(
       loggerFactory
     ).directive
+
+  def onGrpcNotFound[T](message: String): Try[T] => Try[T] =
+    (t: Try[T]) => {
+      t match {
+        case Success(value) => Success(value)
+        case Failure(exception) => {
+          exception match {
+            case e: StatusRuntimeException
+                if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+              Failure(new CustomHttpError(e.getStatus.getCode, message))
+            case x => Failure(x)
+          }
+        }
+      }
+    }
 }
-final class HttpWalletErrorHandler(
+
+final class HttpErrorHandler(
     override val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging {
 
-  def mapToStatusCode(grpcCode: Status.Code): StatusCode = {
+  private def mapToStatusCode(grpcCode: Status.Code): StatusCode = {
     grpcCode match {
       case Status.Code.NOT_FOUND => StatusCodes.NotFound
       case Status.Code.ABORTED => StatusCodes.TooManyRequests
@@ -42,41 +61,48 @@ final class HttpWalletErrorHandler(
     }
   }
 
+  private def completeErrorResponse(httpCode: StatusCode, message: String): StandardRoute =
+    complete(
+      HttpResponse(
+        httpCode,
+        entity = HttpEntity(
+          ContentTypes.`application/json`,
+          d0.ErrorResponse
+            .encodeErrorResponse(d0.ErrorResponse(message))
+            .toString,
+        ),
+      )
+    )
+
+  private def completeErrorResponse(grpcCode: Status.Code, message: String): StandardRoute =
+    completeErrorResponse(mapToStatusCode(grpcCode), message)
+
   def directive(implicit traceContext: TraceContext) = exceptionsDirective & timeoutDirective
 
   def exceptionsDirective(implicit traceContext: TraceContext) = {
     val handler = ExceptionHandler {
+      case e: CustomHttpError =>
+        extractUri { uri =>
+          logger.info(
+            s"Request to $uri resulted in an HTTP exception: ${e.message}",
+            e,
+          )
+          completeErrorResponse(e.code, e.message)
+        }
       case e: StatusRuntimeException =>
         extractUri { uri =>
           logger.info(
             s"Request to $uri resulted in a gRPC StatusRuntimeException: ${e.getMessage}",
             e,
           )
-          complete(
-            HttpResponse(
-              mapToStatusCode(e.getStatus.getCode),
-              entity = HttpEntity(
-                ContentTypes.`application/json`,
-                d0.ErrorResponse
-                  .encodeErrorResponse(d0.ErrorResponse(e.getStatus.getDescription))
-                  .toString,
-              ),
-            )
-          )
+          completeErrorResponse(e.getStatus.getCode, e.getStatus.getDescription)
         }
       case e: Throwable =>
         extractUri { uri =>
           logger.error(s"Request to $uri resulted in an unexpected exception: ${e.getMessage}", e)
-          complete(
-            HttpResponse(
-              InternalServerError,
-              entity = HttpEntity(
-                ContentTypes.`application/json`,
-                d0.ErrorResponse
-                  .encodeErrorResponse(d0.ErrorResponse("An unexpected error occurred."))
-                  .toString,
-              ),
-            )
+          completeErrorResponse(
+            InternalServerError,
+            "An unexpected error occurred.",
           )
         }
     }
@@ -102,5 +128,4 @@ final class HttpWalletErrorHandler(
       )
     })
   }
-
 }

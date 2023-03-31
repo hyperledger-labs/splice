@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
@@ -19,7 +20,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import io.grpc.StatusRuntimeException
 
 class HttpScanHandler(
     store: ScanStore,
@@ -223,12 +223,7 @@ class HttpScanHandler(
             )
           )
         )
-        .recover({
-          // TODO(#3641): refactor this repeated error handling
-          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-            v0.ScanResource.GetCoinConfigForRoundResponse
-              .NotFound(definitions.ErrorResponse(s"Round ${round} not found"))
-        })
+        .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
 
   def getRoundOfLatestData(
@@ -242,12 +237,7 @@ class HttpScanHandler(
             definitions.GetRoundOfLatestDataResponse(round)
           )
         )
-        .recover({
-          // TODO(#3641): refactor this repeated error handling
-          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-            v0.ScanResource.GetRoundOfLatestDataResponse
-              .NotFound(definitions.ErrorResponse("No data has been made available yet"))
-        })
+        .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))
     }
 
   def getTopProvidersByAppRewards(
@@ -269,15 +259,9 @@ class HttpScanHandler(
               )
           )
         )
-        .recover({
-          // TODO(#3641): refactor this repeated error handling
-          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-            v0.ScanResource.GetTopProvidersByAppRewardsResponse
-              .NotFound(
-                definitions
-                  .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")
-              )
-        })
+        .transform(
+          HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
+        )
     }
 
   def getTopValidatorsByValidatorRewards(
@@ -299,15 +283,9 @@ class HttpScanHandler(
               )
           )
         )
-        .recover({
-          // TODO(#3641): refactor this repeated error handling
-          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse
-              .NotFound(
-                definitions
-                  .ErrorResponse(s"Data for round ${asOfEndOfRound} not yet computed")
-              )
-        })
+        .transform(
+          HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
+        )
     }
 
   def getValidatorCredit(

@@ -31,7 +31,7 @@ import com.daml.network.http.v0.scan.ScanResource
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
-import com.daml.network.admin.http.HttpAdminHandler
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.daml.network.environment.CNNodeStatus
 
@@ -107,10 +107,12 @@ class ScanApp(
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            concat(
-              ScanResource.routes(handler),
-              CommonAdminResource.routes(adminHandler),
-            )
+            HttpErrorHandler(loggerFactory)(traceContext) {
+              concat(
+                ScanResource.routes(handler),
+                CommonAdminResource.routes(adminHandler),
+              )
+            }
           }
         }
       }

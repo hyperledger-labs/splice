@@ -34,7 +34,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
-import com.daml.network.admin.http.HttpAdminHandler
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.environment.CNNodeStatus
 import com.digitalasset.canton.health.admin.data.NodeStatus
 
@@ -135,7 +135,9 @@ class DirectoryApp(
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            concat(DirectoryResource.routes(handler), CommonAdminResource.routes(adminHandler))
+            HttpErrorHandler(loggerFactory)(traceContext) {
+              concat(DirectoryResource.routes(handler), CommonAdminResource.routes(adminHandler))
+            }
           }
         }
       }

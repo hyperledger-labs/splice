@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
-import com.daml.network.admin.http.HttpAdminHandler
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
@@ -126,13 +126,15 @@ class SvApp(
       routes = cors() {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            concat(
-              // TODO(M3-46) add client authentication via `AuthExtractor`
-              SvResource.routes(
-                handler
-              ),
-              CommonAdminResource.routes(adminHandler),
-            )
+            HttpErrorHandler(loggerFactory)(traceContext) {
+              concat(
+                // TODO(M3-46) add client authentication via `AuthExtractor`
+                SvResource.routes(
+                  handler
+                ),
+                CommonAdminResource.routes(adminHandler),
+              )
+            }
           }
         }
 

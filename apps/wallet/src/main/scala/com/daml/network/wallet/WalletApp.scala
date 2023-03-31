@@ -9,6 +9,7 @@ import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -17,7 +18,7 @@ import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.wallet.admin.http.{HttpWalletErrorHandler, HttpWalletHandler}
+import com.daml.network.wallet.admin.http.HttpWalletHandler
 import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
@@ -163,7 +164,7 @@ class WalletApp(
       ) {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
-            HttpWalletErrorHandler(loggerFactory)(traceContext) {
+            HttpErrorHandler(loggerFactory)(traceContext) {
               WalletResource.routes(
                 handler,
                 AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
