@@ -205,7 +205,7 @@ class PostgresTestContainerSetup(
   override protected def prepareDatabase(): Unit = {
     // up the connection limit to deal with everyone using connection pools in tests that can run concurrently.
     // we also have a matching max connections limit set in the CircleCI postgres executor (`.circle/config.yml`)
-    val command = postgresContainer.getCommandParts.toSeq :+ "-c" :+ "max_connections=500"
+    val command = postgresContainer.getCommandParts.toSeq :+ "-c" :+ "max_connections=1000"
     postgresContainer.setCommandParts(command.toArray)
     noTracingLogger.debug(s"Starting postgres container with $command")
 

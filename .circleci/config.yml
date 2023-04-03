@@ -842,7 +842,7 @@ jobs:
     docker:
       - image: cimg/base:2021.04
       - image: postgres:11
-        command: postgres -c max_connections=500
+        command: postgres -c max_connections=1000
         environment:
           POSTGRES_INITDB_ARGS: -A scram-sha-256
           POSTGRES_PASSWORD: postgres

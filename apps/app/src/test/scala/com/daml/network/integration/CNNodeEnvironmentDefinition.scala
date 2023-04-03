@@ -149,7 +149,7 @@ case class CNNodeEnvironmentDefinition(
           ConfigFactory.parseString(
             """
               |akka.http.host-connection-pool {
-              |  max-connections = 500
+              |  max-connections = 1000
               |  min-connections = 20
               |  max-open-requests = 1024
               |}

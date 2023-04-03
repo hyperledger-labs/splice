@@ -26,7 +26,7 @@ function docker_start() {
     -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
     -p 5432:5432 \
     postgres:11 \
-    postgres -c max_connections=500 \
+    postgres -c max_connections=1000 \
     >> "$LOG_FILE"
 }
 
