@@ -355,10 +355,19 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
 
   private def completeOptionalAuth0Authorization(
       completedWhen: () => Boolean
-  )(implicit webDriver: WebDriver) = {
+  )(implicit webDriver: WebDriverType) = {
     clue("Auth0 authorization") {
       // the authorization prompt takes a while to appear sometimes
-      eventually()(if (!completedWhen()) click on xpath("//button[@value='accept']"))
+      try {
+        eventually()(
+          if (!completedWhen()) click on xpath("//button[@value='accept']")
+        )
+      } catch {
+        case e: Throwable =>
+          logger.warn("Failed auth0 authorization, taking a screenshot before rethrowing")
+          screenshot()
+          throw e
+      }
     }
   }
 
