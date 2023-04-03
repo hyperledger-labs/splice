@@ -52,7 +52,7 @@ class WalletRewardsTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       eventually()(bobValidatorWallet.listAppRewardCoupons() should have size 0)
-      bobValidatorWallet.listValidatorRewardCoupons() should have size 0
+      eventually()(bobValidatorWallet.listValidatorRewardCoupons() should have size 0)
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.
       checkWallet(
