@@ -26,7 +26,7 @@ function tmux_cmd() {
   else
     tmux new-window -t "$t" -n "$title"
   fi
-  tmux send-keys -t "$t" "nix-shell" C-m
+  tmux send-keys -t "$t" "nix develop" C-m
   tmux send-keys -t "$t" "cd $wd" C-m
   tmux send-keys -t "$t" "$cmd" C-m
   tmux_window=$((tmux_window+1))

@@ -41,7 +41,7 @@ object BuildCommon {
   val grpcWebGen = {
     // While the error claims that being in PATH is sufficient, the error is lying. It really
     // needs to be an absolute path. Since some people also like starting
-    // SBT outside of the nix-shell we query nix directly for the PATH.
+    // SBT outside of the nix develop we query nix directly for the PATH.
     val processLogger = new BuildUtil.BufferedLogger
     val exitCode = scala.sys.process
       .Process(
