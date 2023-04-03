@@ -1,7 +1,13 @@
 package com.daml.network.config
 
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{ClientConfig, KeepAliveClientConfig, TlsClientConfig}
+import com.digitalasset.canton.config.{
+  ClientConfig,
+  KeepAliveClientConfig,
+  NonNegativeDuration,
+  TlsClientConfig,
+}
+import scala.concurrent.duration.*
 
 /** Extension of ClientConfig that supports specifying a URL
   * which is used for http requests.
@@ -12,6 +18,8 @@ case class CNHttpClientConfig(
     url: String,
     tls: Option[TlsClientConfig] = None,
     keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
+    healthStatusTimeout: NonNegativeDuration = CNHttpClientConfig.defaultHealthStatusTimeout,
+    healthStatusMaxBackoff: NonNegativeDuration = CNHttpClientConfig.defaultHealthStatusMaxBackoff,
 ) {
 
   def clientConfig: ClientConfig = ClientConfig(
@@ -31,4 +39,8 @@ object CNHttpClientConfig {
       config.tls,
       config.keepAliveClient,
     )
+  private val defaultHealthStatusTimeout: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(2.minute)
+  private val defaultHealthStatusMaxBackoff: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(5.seconds)
 }

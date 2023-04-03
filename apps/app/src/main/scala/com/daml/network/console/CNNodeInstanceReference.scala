@@ -28,6 +28,9 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 
+import scala.concurrent.duration.*
+import scala.util.control.NonFatal
+
 /** Copy of Canton ParticipantReference */
 trait CNNodeAppReference extends InstanceReference {
 
@@ -80,11 +83,18 @@ trait CNNodeAppReference extends InstanceReference {
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
-      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
+      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded,
+      maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(10.seconds),
   ): Unit =
-    ConsoleMacros.utils.retry_until_true(timeout)(
-      health.status.successOption.map(_.active).getOrElse(false)
-    )
+    try {
+      ConsoleMacros.utils.retry_until_true(timeout, maxBackoff)(
+        health.status.successOption.exists(_.active)
+      )
+    } catch {
+      case NonFatal(e) =>
+        noTracingLogger.error(s"Timeout while waiting for initialization of ${name}", e)
+        throw e
+    }
 
   // TODO(#736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.
@@ -145,11 +155,21 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   override def topology: TopologyAdministrationGroup = topology_
 
   override def waitForInitialization(
-      timeout: NonNegativeDuration = cnNodeConsoleEnvironment.commandTimeouts.bounded
+      timeout: NonNegativeDuration = httpClientConfig.healthStatusTimeout,
+      maxBackoff: NonNegativeDuration = httpClientConfig.healthStatusMaxBackoff,
   ): Unit =
-    ConsoleMacros.utils.retry_until_true(timeout)(
-      httpHealth.successOption.map(_.active).getOrElse(false)
-    )
+    try {
+      ConsoleMacros.utils.retry_until_true(
+        timeout,
+        maxBackoff,
+      )(
+        httpHealth.successOption.exists(_.active)
+      )
+    } catch {
+      case NonFatal(e) =>
+        noTracingLogger.error(s"Timeout while waiting for initialization of ${name}", e)
+        throw e
+    }
 }
 
 trait LocalCNNodeAppReference extends CNNodeAppReference with LocalInstanceReference {
