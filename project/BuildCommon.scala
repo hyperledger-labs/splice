@@ -45,18 +45,17 @@ object BuildCommon {
     val processLogger = new BuildUtil.BufferedLogger
     val exitCode = scala.sys.process
       .Process(
-        Seq("nix-build", "-E", "(import nix/default.nix {}).protoc-gen-grpc-web", "--no-out-link"),
+        Seq("nix", "build", ".#protoc-gen-grpc-web", "--no-link", "--print-out-paths"),
         None,
       ) ! processLogger
-    val output = processLogger.output()
     if (exitCode != 0) {
       val errorMsg =
-        s"Running command returned non-zero exit code: $exitCode $output}"
+        s"Running command returned non-zero exit code: $exitCode ${processLogger.output()}}"
       throw new IllegalStateException(errorMsg)
     }
     PB.gens.plugin(
       name = "grpc-web",
-      path = s"$output/bin/protoc-gen-grpc-web",
+      path = s"${processLogger.outputStdout()}/bin/protoc-gen-grpc-web",
     )
   }
 

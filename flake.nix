@@ -1,0 +1,27 @@
+{
+  description = "my project description";
+
+  inputs = {
+    nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem
+      (system:
+        let pkgs = import nixpkgs { inherit system; overlays = import ./nix/overlays.nix; };
+            x86Pkgs =
+              if system == "aarch64-darwin"
+              then import nixpkgs { system = "x86_64-darwin"; overlays = import ./nix/overlays.nix; }
+              else pkgs;
+
+        in
+        {
+          packages = {
+            # Forwarded so we can get the path from sbt.
+            protoc-gen-grpc-web = pkgs.protoc-gen-grpc-web;
+          };
+          devShells.default = import ./shell.nix { inherit pkgs x86Pkgs; };
+        }
+      );
+}

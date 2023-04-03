@@ -53,7 +53,7 @@ commands:
         name: Make Nix cache key
         command: |
           set -euo pipefail
-          git log -n1 --format=%H nix shell.nix > /tmp/nix-cache-key
+          git ls-files flake.nix flake.lock shell.nix nix/ | grep -v '[.]md$' | LANG=C sort | xargs sha256sum -b > /tmp/nix-cache-key
           sudo mkdir /nix
           sudo chown $USER /nix
     - restore_cache:
@@ -74,6 +74,7 @@ commands:
          cat \<<EOF > ~/.config/nix/nix.conf
          sandbox = false
          netrc-file = /home/circleci/.config/nix/netrc
+         extra-experimental-features = nix-command flakes
          EOF
          sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
          cat \<<EOF > ~/.config/nix/netrc
@@ -82,9 +83,10 @@ commands:
          password $ARTIFACTORY_PASSWORD
          EOF
          . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-         nix-build --out-link "$HOME/.nix-shell" -A inputDerivation shell.nix
+         echo "Building nix env"
+         nix develop -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+         echo "Garbage collecting to reduce cache size"
          nix-store --gc
-         nix-shell shell.nix --run 'echo "Done loading all packages."'
     - save_cache:
         key: nix-{{ checksum "/tmp/nix-cache-key" }}
         paths:
@@ -411,11 +413,15 @@ commands:
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
 
-            nix-shell shell.nix \
-              --pure \
-              --keep CI $ADDITIONAL_NIX_ARGS \
+            nix develop \
+              --ignore-environment \
+              --keep USER \
+              --keep HOME \
+              --keep TERM \
+              --keep CI \
               --keep RUN_SPLITTED_TESTS_CMD \
-              --run bash \<<'EOF'
+              $ADDITIONAL_NIX_ARGS \
+              --command bash \<<'EOF'
 
               set -euo pipefail
 

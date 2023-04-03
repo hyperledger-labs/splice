@@ -53,3 +53,4 @@ canton-simtime.tokens
 canton-classpath
 openapi-ts-client
 /cluster/manifest/test-results/actual.json
+.direnv

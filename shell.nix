@@ -1,24 +1,7 @@
+{ pkgs, x86Pkgs }:
 let
   inherit (pkgs) stdenv fetchzip;
-  pkgs = import ./nix/default.nix {};
-  # pyopenssl is currently broken on M1 due to
-  # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
-  # To work around this we fetch some packages via rosetta.
-  x86Pkgs = if builtins.currentSystem == "aarch64-darwin" then import ./nix/default.nix { system = "x86_64-darwin"; } else pkgs;
   sources = builtins.fromJSON (builtins.readFile ./nix/canton-sources.json);
-
-  daml_pbs = stdenv.mkDerivation rec {
-    name = "daml-protobufs";
-    sdk_version = sources.daml_version;
-    src = fetchzip {
-      url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/protobufs-${sdk_version}.zip";
-      sha256="sha256-FhGRiWK900zwI4ADLLwiGiMc0dP7AyN3mOrFLHrd4s8=";
-    };
-    installPhase = ''
-      mkdir -p $out/protos-${sdk_version}
-      cp -r * $out/protos-${sdk_version}
-    '';
-  };
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox iproute2 ];
@@ -81,7 +64,7 @@ in pkgs.mkShell {
     zip
   ] ++ linuxOnly;
 
-  DAML_PROTOBUFS = "${daml_pbs}";
+  DAML_PROTOBUFS = "${pkgs.daml_pbs}";
   CANTON = "${pkgs.canton}";
-  SDK_VERSION = "${daml_pbs.sdk_version}";
+  SDK_VERSION = "${pkgs.daml_pbs.sdk_version}";
 }

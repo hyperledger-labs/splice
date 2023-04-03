@@ -71,7 +71,13 @@ clusters.)
 
 1. Install [direnv](https://direnv.net/#basic-installation).
 2. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
-3. Configure artifactory credentials so Nix can download `canton-research`.
+3. Enable support for nix flakes and the nix command by adding to the
+   following to your nix config (either `/etc/nix/nix.conf` if you
+   have a multi-user install or `~/.config/nix/nix.conf`):
+```
+extra-experimental-features = nix-command flakes
+```
+4. Configure artifactory credentials so Nix can download `canton-research`.
    To do so, add the following to `/etc/nix/netrc` (you might need to create that directory as root):
    ```
    machine digitalasset.jfrog.io
@@ -81,12 +87,12 @@ clusters.)
    You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
-4. After switching to the CC repo you should see a line like
+5. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-coin/.envrc is blocked. Run `direnv allow` to approve its content
    ```
-5. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
-6. If you get an authorization exception, like the following:
+6. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
+7. If you get an authorization exception, like the following:
    ```
    direnv: using nix
    error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-20230106.tar.gz': HTTP error 401 ('Unauthorized')
@@ -110,7 +116,7 @@ clusters.)
       ```
       nix-shell --debug --verbose --pure
       ```
-4. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
+8. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
    ```
    pre-commit install
    # or:
@@ -127,7 +133,7 @@ project dependencies on its `PATH`.
 
 If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
-1. On MacOS, please install the following globally:
+9. On MacOS, please install the following globally:
    1. Envoy, by running: `brew update ; brew install envoy`
    2. Firefox, by following the process here: <https://www.firefox.com>
 
