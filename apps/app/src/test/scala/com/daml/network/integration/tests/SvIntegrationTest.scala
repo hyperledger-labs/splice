@@ -1,7 +1,14 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSv}
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.console.{CNRemoteParticipantReference, LocalCNNodeAppReference}
+import com.daml.network.console.{
+  CNRemoteParticipantReference,
+  LocalCNNodeAppReference,
+  SvAppBackendReference,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -497,6 +504,51 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       )
   }
 
+  "At most 4 SV confirmations are required in devnet" in { implicit env =>
+    clue("Initialize SVC with 4 SVs") {
+      initSvc()
+      eventually() {
+        getSvcRules().data.members should have size 4
+      }
+    }
+
+    actAndCheck(
+      "Add 6 phantom SVs to SVC", {
+        for { i <- 1 to 6 } {
+          val name = s"phantom sv$i"
+          val partyId = allocateRandomSvParty(name)
+          addSvMember(partyId, name)
+        }
+      },
+    )(
+      "There should be 10 SVC members in total now",
+      _ => {
+        getSvcRules().data.members should have size 10
+      },
+    )
+
+    actAndCheck(
+      "SV1 to SV4 create confirmation to Confirm SV5", {
+        val svcRules = getSvcRules()
+        val newMemberName = "svX"
+        val newMemberPartyId = allocateRandomSvParty(newMemberName)
+        createSvConfirmedConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
+        createSvConfirmedConfirmation(svcRules, sv2, newMemberPartyId, newMemberName)
+        createSvConfirmedConfirmation(svcRules, sv3, newMemberPartyId, newMemberName)
+        createSvConfirmedConfirmation(svcRules, sv4, newMemberPartyId, newMemberName)
+      },
+    )(
+      "There are 10 SVC members in total but only 4 confirmations are required to confirm a SV",
+      _ =>
+        inside(
+          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svonboarding.SvConfirmed.COMPANION)(svcParty)
+        ) { case Seq(svConfirmed) =>
+          svConfirmed.data.svName shouldBe "svX"
+        },
+    )
+  }
+
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       initSvc()
@@ -635,4 +687,26 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       foundCoinRules should have length 1
       foundCoinRules.head
     }
+
+  private def createSvConfirmedConfirmation(
+      svcRules: SvcRules.Contract,
+      svApp: SvAppBackendReference,
+      newMemberParty: PartyId,
+      newMemberName: String,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val svParty = svApp.getDebugInfo().svParty
+    svApp.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+      svApp.config.ledgerApiUser,
+      actAs = Seq(svParty),
+      readAs = Seq(svcParty),
+      update = svcRules.id.exerciseSvcRules_ConfirmAction(
+        svParty.toProtoPrimitive,
+        new ARC_SvcRules(
+          new SRARC_ConfirmSv(
+            new SvcRules_ConfirmSv(newMemberParty.toProtoPrimitive, newMemberName, "because")
+          )
+        ),
+      ),
+    )
+  }
 }

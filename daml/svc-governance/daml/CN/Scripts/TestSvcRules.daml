@@ -325,6 +325,46 @@ testSvMemberOverwriteInDevNet = do
 
   pure ()
 
+testRequiredNumOfConfirmationInDevNet : Script ()
+testRequiredNumOfConfirmationInDevNet = do
+  (_, svc, (sv1, sv2, sv3, sv4)) <- initCollective(True)
+
+  -- add 6 phamton SVs
+  forA_ [5 .. 10] $ \i -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    let svName = "sv" <> show i
+    phamtonSv <- allocateParty $ svName
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName "because"
+
+  [(_, svcRules)] <- query @SvcRules svc
+
+  Map.size svcRules.members === 10
+
+  svX <- allocateParty "svX"
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  -- create 4 confirmations
+  forA_ [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = ARC_SvcRules with
+        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  -- There are 10 SVC members in total but only 4 confirmations are required to confirm a SV in devnet
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_ConfirmSv svX "svX" "because"
+
+  [(_, svConfirmed)] <- query @SvConfirmed svc
+  svConfirmed.svParty === svX
+  svConfirmed.svName === "svX"
+
+  pure ()
+
 
 -- Utils
 --------

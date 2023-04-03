@@ -303,7 +303,10 @@ template SvcRules with
       controller leader
       do
         let s = summarizeCollective this
-        require "Enough confirmations" (length confirmationCids >= s.requiredNumConfirmations)
+        let requiredNumConfirmations = if (isDevNet)
+            then min 4 s.requiredNumConfirmations
+            else s.requiredNumConfirmations
+        require "Enough confirmations" (length confirmationCids >= requiredNumConfirmations)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetch confirmationCid
           archive confirmationCid

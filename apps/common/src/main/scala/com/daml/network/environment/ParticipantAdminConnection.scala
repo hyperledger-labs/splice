@@ -115,6 +115,7 @@ class ParticipantAdminConnection(
       chunkSize: Option[PositiveInt] = None,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     val requestComplete = Promise[ByteString]()
+    // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
     val observer = new GrpcByteChunksToByteArrayObserver[AcsSnapshotChunk](requestComplete)
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.Download(
