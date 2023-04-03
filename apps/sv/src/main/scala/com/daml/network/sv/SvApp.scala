@@ -73,6 +73,7 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
     for {
+      // TODO(#3856): find a better way to get the SVC party ID
       svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
 
       storeKey = SvStore.Key(svPartyId, svcPartyId)
@@ -183,12 +184,13 @@ class SvApp(
         getParticipantId(participantAdminConnection),
         logger,
       )
-      authorizedSvcPartyInParticipant <- svcPartyHosting.isAlreadyAuthorized(
+      svcPartyIsAuthorized <- svcPartyHosting.svcPartyIsAuthorized(
         globalDomain,
         participantId,
       )
       (svcStore, svcAutomation) <-
-        if (authorizedSvcPartyInParticipant) {
+        if (svcPartyIsAuthorized) {
+          logger.info("SVC party is authorized to our participant.")
           val svcStore = newSvcStore(svStore.key)
           val svcAutomation =
             newSvSvcAutomationService(svStore, svcStore, ledgerClient, participantAdminConnection)
@@ -203,7 +205,7 @@ class SvApp(
                 )
                 Future.successful(())
               } else {
-                logger.info("Not yet bootstrapped, starting bootstrapping")
+                logger.info("Starting bootstrapping (without SVC party migration).")
                 startBootstrappingWithSvcPartyHosted(
                   svStore,
                   svcStore,
@@ -214,7 +216,8 @@ class SvApp(
           } yield (svcStore, svcAutomation)
         } else {
           logger.info(
-            "Assuming that we're not yet bootstrapped because the SVC party is not yet authorized for our canton participant. Start bootstrapping."
+            "The SVC party is not authorized to our participant. " +
+              "Starting bootstrapping with SVC party migration."
           )
           startBootstrappingWithSvcPartyMigration(
             svStore,

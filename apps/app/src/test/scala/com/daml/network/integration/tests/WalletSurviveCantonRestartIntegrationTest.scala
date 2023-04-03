@@ -28,7 +28,7 @@ class WalletSurviveCantonRestartIntegrationTest
     "-c",
     (validatorPath / "validator-participant.conf").toString,
     "-c",
-    (testResourcesPath / "self-hosted-participant-postgres-storage.conf").toString,
+    (testResourcesPath / "self-hosted-validator-participant-postgres-storage.conf").toString,
     "-c",
     (testResourcesPath / "storage-postgres.conf").toString,
     "-C",

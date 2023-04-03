@@ -38,12 +38,18 @@ class SvcPartyHosting(
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends NamedLogging {
-  def isAlreadyAuthorized(
+
+  def svcPartyIsAuthorized(
       domainId: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] = for {
-    mappings <- listSvcPartyAuthorizedMappings(domainId, participantId, None)
-  } yield mappings.nonEmpty
+    mappings <- listActiveSvcPartyMappings(domainId, participantId, None)
+  } yield {
+    logger.info("SVC party mappings to our participant: " + mappings.map(_.item))
+    mappings.exists(_.item.side == RequestSide.Both) || (mappings.exists(
+      _.item.side == RequestSide.To
+    ) && mappings.exists(_.item.side == RequestSide.From))
+  }
 
   def start(domainId: DomainId, participantId: ParticipantId)(implicit
       traceContext: TraceContext
@@ -101,7 +107,7 @@ class SvcPartyHosting(
     )
   }
 
-  def listSvcPartyAuthorizedMappings(
+  def listActiveSvcPartyMappings(
       domain: DomainId,
       participantId: ParticipantId,
       side: Option[RequestSide],
@@ -111,9 +117,10 @@ class SvcPartyHosting(
         filterStore = domain.toProtoPrimitive,
         operation = Some(TopologyChangeOp.Add),
         filterParty = svcParty.toProtoPrimitive,
-        filterParticipant = participantId.uid.id.unwrap,
+        filterParticipant = participantId.uid.toProtoPrimitive,
         filterRequestSide = side,
       )
+      .map(_.filter(_.item.permission.isActive))
 
   def authorizeSvcPartyToParticipant(
       domain: DomainId,
@@ -121,7 +128,7 @@ class SvcPartyHosting(
       side: RequestSide,
   )(implicit traceContext: TraceContext): Future[Instant] =
     // check if svc party has already been authorized to be hosted by the participant
-    listSvcPartyAuthorizedMappings(domain, participantId, Some(side)).flatMap {
+    listActiveSvcPartyMappings(domain, participantId, Some(side)).flatMap {
       case Seq() =>
         for {
           _ <- participantAdminConnection
@@ -156,7 +163,7 @@ class SvcPartyHosting(
       side: RequestSide,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
     "wait for svc party to participant authorization to complete", {
-      listSvcPartyAuthorizedMappings(domain, participantId, Some(side)).map {
+      listActiveSvcPartyMappings(domain, participantId, Some(side)).map {
         case Seq(mapping) =>
           mapping.context.validFrom
         case Seq() =>

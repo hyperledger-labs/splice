@@ -65,6 +65,7 @@ case class LocalSvAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
     remoteParticipant: CNRemoteParticipantConfig,
+    // TODO(#3856): consider if we can remove this already
     remoteSvc: SvcAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,

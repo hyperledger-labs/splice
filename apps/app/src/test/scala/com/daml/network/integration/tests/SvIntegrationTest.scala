@@ -51,7 +51,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   // A test to make debugging bootstrap problems easier
   "SV apps can start one by one" in { implicit env =>
     clue("Starting SVC app and SV1 app") {
-      // TODO(#2130) don't start SVC app here once we don't use it anymore for getting the svcParty
+      // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
       svc.start()
       sv1.startSync()
       svc.waitForInitialization()
@@ -643,7 +643,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       clue("sv5 can restart") {
         sv5.stop()
         sv5.startSync()
-
       }
   }
 
