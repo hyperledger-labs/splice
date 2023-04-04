@@ -33,7 +33,4 @@ class SvcAutomationService(
       ledgerClient,
       participantAdminConnection,
       retryProvider,
-    ) {
-
-  registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, store, connection))
-}
+    ) {}

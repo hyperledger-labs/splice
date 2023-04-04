@@ -37,7 +37,6 @@ data ActionRequiringConfirmation
 data CoinRules_ActionRequiringConfirmation
   = CRARC_Bootstrap_Rounds CoinRules_Bootstrap_Rounds
   | CRARC_MiningRound_StartIssuing CoinRules_MiningRound_StartIssuing
-  | CRARC_MiningRound_Close CoinRules_MiningRound_Close
   | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
     -- ^ Confirmation ensures that it is only closed when there are no expired rewards left.
   deriving (Eq, Show)
@@ -504,6 +503,14 @@ template SvcRules with
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
         exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
 
+    nonconsuming choice SvcRules_MiningRound_Close
+      : ContractId ClosedMiningRound
+      with
+        coinRulesCid : ContractId CoinRules
+        issuingRoundCid : ContractId IssuingMiningRound
+      controller leader
+      do
+        exercise coinRulesCid CoinRules_MiningRound_Close with ..
 
 -- Utility functions
 --------------------
@@ -525,7 +532,6 @@ executeActionRequiringConfirmation svcRulesCid act = case act of
     case coinRulesAction of
       CRARC_Bootstrap_Rounds choiceArg -> void $ exercise coinRulesCid choiceArg
       CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
-      CRARC_MiningRound_Close choiceArg -> void $ exercise coinRulesCid choiceArg
       CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
   ARC_SvcRules with .. ->
     case svcAction of

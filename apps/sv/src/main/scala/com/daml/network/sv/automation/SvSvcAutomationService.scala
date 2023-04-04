@@ -52,4 +52,5 @@ class SvSvcAutomationService(
     registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svcStore, connection))
   }
   registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svcStore, connection))
 }

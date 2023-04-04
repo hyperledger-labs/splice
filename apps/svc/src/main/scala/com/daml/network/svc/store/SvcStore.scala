@@ -58,15 +58,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.findContractOnDomain(cn.svcrules.SvcRules.COMPANION)(_, (_: Any) => true)
     )
 
-  import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-
-  /** List issuing mining rounds past their targetClosesAt */
-  def listExpiredIssuingMiningRounds
-      : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
-      _.targetClosesAt
-    )
-
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =

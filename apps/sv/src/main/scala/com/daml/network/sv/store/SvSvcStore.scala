@@ -465,6 +465,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         Some(limit),
       )
     } yield svOnboardings
+
+  /** List issuing mining rounds past their targetClosesAt */
+  def listExpiredIssuingMiningRounds
+      : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
+      _.targetClosesAt
+    )
 }
 
 object SvSvcStore {
