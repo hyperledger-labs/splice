@@ -2,7 +2,12 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
@@ -10,9 +15,8 @@ import com.daml.network.directory.DirectoryUtil
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -28,21 +32,21 @@ class SubscriptionPaymentTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       subsCodegen.SubscriptionPayment.ContractId,
       subsCodegen.SubscriptionPayment,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       subsCodegen.SubscriptionPayment.COMPANION,
     ) {
 
   override def completeTask(
-      payment: Contract[
+      paymentReady: ReadyContract[
         subsCodegen.SubscriptionPayment.ContractId,
         subsCodegen.SubscriptionPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val ReadyContract(payment, domainId) = paymentReady
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
@@ -50,7 +54,6 @@ class SubscriptionPaymentTrigger(
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        domainId: DomainId,
         disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
         log: String => Unit = logger.warn(_),
     ) = {
@@ -71,9 +74,8 @@ class SubscriptionPaymentTrigger(
           directoryCodegen.DirectoryEntry.ContractId,
           directoryCodegen.DirectoryEntry,
         ],
-        offset: String,
+        deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
-        domainId: DomainId,
         disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       val cmd =
@@ -91,17 +93,18 @@ class SubscriptionPaymentTrigger(
             readAs = Seq.empty,
             commands = cmd.asScala.toSeq,
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
-            deduplicationOffset = offset,
+            deduplicationOffset = deduplicationOffset,
             domainId = domainId,
             disclosedContracts = disclosedContracts,
           )
       } yield TaskSuccess("renewed directory entry.")
     }
     for {
-      domainId <- getDomainId()
-      acs <- store.acs(domainId)
-      directoryEntryContext <- acs
-        .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
+      directoryEntryContext <- store.multiDomainAcsStore
+        .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
+          domainId,
+          contextId,
+        )
         .map(
           _.getOrElse(
             throw new IllegalStateException(
@@ -119,12 +122,17 @@ class SubscriptionPaymentTrigger(
           val entryName = directoryEntryContext.payload.name
           // check whether the entry exists
           store.lookupEntryByNameWithOffset(entryName).flatMap {
-            case QueryResult(off, Some(entry)) =>
+            case result @ QueryResult(_, Some(entry)) =>
               // collect the payment and renew the entry
-              collectPayment(entry, off, transferContext, domainId, disclosedContracts)
+              collectPayment(
+                entry,
+                result.deduplicationOffset,
+                transferContext,
+                disclosedContracts,
+              )
             case QueryResult(_, None) => {
               if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
-                rejectPayment("entry doesn't exist.", transferContext, domainId, disclosedContracts)
+                rejectPayment("entry doesn't exist.", transferContext, disclosedContracts)
               } else {
                 // If the entry doesn't exist, and the payment is now past due, then
                 // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
@@ -133,7 +141,6 @@ class SubscriptionPaymentTrigger(
                 rejectPayment(
                   "entry has already been expired",
                   transferContext,
-                  domainId,
                   disclosedContracts,
                   logger.info(_),
                 )
@@ -147,7 +154,6 @@ class SubscriptionPaymentTrigger(
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
                 transferContext,
-                domainId,
                 disclosedContracts,
               )
             }

@@ -1,13 +1,17 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -23,12 +27,11 @@ class DirectoryInstallRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       directoryCodegen.DirectoryInstallRequest.ContractId,
       directoryCodegen.DirectoryInstallRequest,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       directoryCodegen.DirectoryInstallRequest.COMPANION,
     ) {
 
@@ -43,15 +46,15 @@ class DirectoryInstallRequestTrigger(
   )
 
   override def completeTask(
-      req: Contract[
+      reqReady: ReadyContract[
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val ReadyContract(req, domainId) = reqReady
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {
-      domainId <- getDomainId()
       queryResult <- store.lookupInstallByUserWithOffset(user)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
@@ -62,7 +65,7 @@ class DirectoryInstallRequestTrigger(
             .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq, domainId)
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
-        case QueryResult(off, None) =>
+        case result @ QueryResult(_, None) =>
           val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
             store.svcParty.toProtoPrimitive,
             entryFee.bigDecimal,
@@ -80,7 +83,7 @@ class DirectoryInstallRequestTrigger(
                 "com.daml.network.directory.createDirectoryInstall",
                 Seq(provider, user),
               ),
-              deduplicationOffset = off,
+              deduplicationOffset = result.deduplicationOffset,
               domainId = domainId,
             )
             .map(_ => TaskSuccess("accepted install request."))

@@ -2,7 +2,12 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.{
+  OnReadyContractTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
@@ -10,9 +15,7 @@ import com.daml.network.directory.DirectoryUtil
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.DomainId
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -28,28 +31,27 @@ class SubscriptionInitialPaymentTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnCreateTrigger.Template[
+) extends OnReadyContractTrigger.Template[
       subsCodegen.SubscriptionInitialPayment.ContractId,
       subsCodegen.SubscriptionInitialPayment,
     ](
       store,
-      () => store.domains.signalWhenConnected(store.defaultAcsDomain),
       subsCodegen.SubscriptionInitialPayment.COMPANION,
     ) {
 
   override def completeTask(
-      payment: Contract[
+      readyPayment: ReadyContract[
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val ReadyContract(payment, domainId) = readyPayment
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        domainId: DomainId,
         disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
@@ -66,9 +68,8 @@ class SubscriptionInitialPaymentTrigger(
     }
     def collectPayment(
         entryName: String,
-        offset: String,
+        deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
-        domainId: DomainId,
         disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
     ) = {
       val cmd =
@@ -85,17 +86,18 @@ class SubscriptionInitialPaymentTrigger(
             readAs = Seq.empty,
             commands = cmd.asScala.toSeq,
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
-            deduplicationOffset = offset,
+            deduplicationOffset = deduplicationOffset,
             domainId = domainId,
             disclosedContracts = disclosedContracts,
           )
       } yield TaskSuccess("created directory entry.")
     }
     for {
-      domainId <- getDomainId()
-      acs <- store.acs(domainId)
-      context <- acs
-        .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
+      context <- store.multiDomainAcsStore
+        .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
+          domainId,
+          contextId,
+        )
         .map(
           _.getOrElse(
             throw new IllegalStateException(
@@ -117,12 +119,16 @@ class SubscriptionInitialPaymentTrigger(
               rejectPayment(
                 s"entry already exists and owned by ${entry.payload.user}.",
                 transferContext,
-                domainId,
                 disclosedContracts,
               )
-            case QueryResult(off, None) =>
+            case result @ QueryResult(_, None) =>
               // collect the payment and create the entry
-              collectPayment(entryName, off, transferContext, domainId, disclosedContracts)
+              collectPayment(
+                entryName,
+                result.deduplicationOffset,
+                transferContext,
+                disclosedContracts,
+              )
           }
 
         case Left(err) =>
@@ -132,7 +138,6 @@ class SubscriptionInitialPaymentTrigger(
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
                 transferContext,
-                domainId,
                 disclosedContracts,
               )
             }

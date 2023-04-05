@@ -293,8 +293,10 @@ object OnCreateTrigger {
 /** A trigger for processing contract create events.
   * This trigger assumes that the created contract is archived as part of processing it.
   */
+// TODO (#3899) remove
+@deprecated("no longer works; use OnReadyContractTrigger instead", since = "2023-03-31")
 abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
-    store: CNNodeAppStore[_, _],
+    store: CNNodeAppStore[_, _] & CNNodeAppStore.RemovedAcs[?, ?],
     protected val getDomainId: () => Future[DomainId],
     companion: C,
 )(implicit

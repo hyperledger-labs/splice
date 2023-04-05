@@ -21,7 +21,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  // TODO (M3-19) Remove this
+  // TODO (#3899) remove
   override final def defaultAcsDomain =
     sys.error("Splitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead")
 

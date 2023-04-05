@@ -6,7 +6,12 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{
+  AcsStore,
+  CNNodeAppStore,
+  CNNodeAppStoreWithoutHistory,
+  MultiDomainAcsStore,
+}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -23,9 +28,15 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
+trait DirectoryStore
+    extends CNNodeAppStoreWithoutHistory
+    with CNNodeAppStore.RemovedAcsWithoutHistory {
 
-  import AcsStore.QueryResult
+  import MultiDomainAcsStore.QueryResult
+
+  override protected[this] final def removedAcsAppName = "DirectoryStore"
+
+  private[directory] def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
@@ -45,10 +56,12 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   ): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
   ]]] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(co =>
-        co.payload.user == user.toProtoPrimitive
-      )
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .findContractOnDomainWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(
+          _,
+          co => co.payload.user == user.toProtoPrimitive,
+        )
     )
 
   /** Lookup a directory entry by name. */
@@ -57,9 +70,10 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   ): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    defaultAcs.flatMap(
-      _.findContractWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(co =>
-        co.payload.name == name
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(
+        _,
+        co => co.payload.name == name,
       )
     )
 
@@ -76,9 +90,10 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   ): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
-    defaultAcs.flatMap(
-      _.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
-        co.payload.user == partyId.toProtoPrimitive
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(directoryCodegen.DirectoryEntry.COMPANION)(
+        _,
+        co => co.payload.user == partyId.toProtoPrimitive,
       )
     )
 
@@ -89,9 +104,10 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
     for {
-      acs <- defaultAcs
-      list <- acs.listContracts(
+      domainId <- defaultAcsDomainIdF
+      list <- multiDomainAcsStore.listContractsOnDomain(
         directoryCodegen.DirectoryEntry.COMPANION,
+        domainId,
         (entry: Contract[
           directoryCodegen.DirectoryEntry.ContractId,
           directoryCodegen.DirectoryEntry,
@@ -99,33 +115,38 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
       )
     } yield list.take(pageSize)
 
-  import com.daml.network.automation.ExpiredContractTrigger.ListExpiredContracts
-  import AcsStore.listExpiredFromPayloadExpiry
+  import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 
   def listExpiredDirectoryEntries: ListExpiredContracts[
     directoryCodegen.DirectoryEntry.ContractId,
     directoryCodegen.DirectoryEntry,
   ] =
-    listExpiredFromPayloadExpiry(defaultAcs, directoryCodegen.DirectoryEntry.COMPANION)(_.expiresAt)
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(directoryCodegen.DirectoryEntry.COMPANION)(
+      _.expiresAt
+    )
 
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
       limit: Int,
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     for {
-      acs <- defaultAcs
-      allSubscriptions <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-      dueSubscriptions = allSubscriptions.filter(e =>
-        now.toInstant.isAfter(e.payload.nextPaymentDueAt)
+      domainId <- defaultAcsDomainIdF
+      dueSubscriptions <- multiDomainAcsStore.listContractsOnDomain(
+        subsCodegen.SubscriptionIdleState.COMPANION,
+        domainId,
+        filter = { e: Contract[?, subsCodegen.SubscriptionIdleState] =>
+          now.toInstant.isAfter(e.payload.nextPaymentDueAt)
+        },
       )
       // Join with the DirectoryEntryContexts
       subscriptionsWithContext <- dueSubscriptions.toList
         .traverse { subscription =>
-          acs
-            .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
+          multiDomainAcsStore
+            .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
+              domainId,
               directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
                 subscription.payload.subscriptionData.context
-              )
+              ),
             )
             .map(context => (subscription, context))
         }

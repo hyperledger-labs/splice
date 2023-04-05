@@ -27,9 +27,11 @@ trait CNNodeAppStore[
 
   def defaultAcsDomain: DomainAlias
 
+  // TODO (#3899) remove
   lazy val defaultAcs: Future[AcsStore] =
     domains.signalWhenConnected(defaultAcsDomain).flatMap(acs(_))
 
+  // TODO (#3899) remove
   def acs(domain: DomainId): Future[AcsStore]
 
   def domains: DomainStore
@@ -91,6 +93,31 @@ object CNNodeAppStore {
 
     override def acs(domain: DomainId) = fetchState(domain).future map storeAcs
   }
+
+  trait RemovedAcs[
+      TXI <: TxLogStore.IndexRecord,
+      TXE <: TxLogStore.Entry[TXI],
+  ] extends CNNodeAppStore[TXI, TXE] {
+    protected[this] def removedAcsAppName: String
+
+    @deprecated("acs will always fail; use `multiDomainAcsStore` instead", since = "2023-03-31")
+    override final def acs(domain: DomainId): Future[AcsStore] =
+      Future.failed(
+        new RuntimeException(
+          s"$removedAcsAppName has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+        )
+      )
+
+    @deprecated(
+      "defaultAcs will always fail; use `multiDomainAcsStore` instead",
+      since = "2023-03-31",
+    )
+    override final lazy val defaultAcs =
+      domains.signalWhenConnected(defaultAcsDomain).flatMap(acs(_))
+  }
+
+  type RemovedAcsWithoutHistory =
+    RemovedAcs[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]]
 }
 
 /** A coin app store whose TxLog is always empty.

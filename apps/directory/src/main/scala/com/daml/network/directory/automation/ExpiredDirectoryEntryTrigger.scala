@@ -1,7 +1,7 @@
 package com.daml.network.directory.automation
 
 import com.daml.network.automation.{
-  ExpiredContractTrigger,
+  MultiDomainExpiredContractTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -24,23 +24,24 @@ class ExpiredDirectoryEntryTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ExpiredContractTrigger[
+) extends MultiDomainExpiredContractTrigger.Template[
       directoryCodegen.DirectoryEntry.ContractId,
       directoryCodegen.DirectoryEntry,
     ](
-      store.defaultAcs,
+      store.multiDomainAcsStore,
       store.listExpiredDirectoryEntries,
       directoryCodegen.DirectoryEntry.COMPANION,
     ) {
 
   override protected def completeTask(
-      co: ScheduledTaskTrigger.ReadyTask[Contract[
+      co: ScheduledTaskTrigger.ReadyTask[ReadyContract[
         directoryCodegen.DirectoryEntry.ContractId,
         directoryCodegen.DirectoryEntry,
       ]]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
-      co.work.contractId.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
+      co.work.contract.contractId
+        .exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
     store.domains.signalWhenConnected(store.defaultAcsDomain).flatMap { domainId =>
       connection
         .submitCommandsNoDedup(
