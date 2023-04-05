@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
@@ -50,6 +50,7 @@ class HttpWalletHandler(
     clock: Clock,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -335,15 +336,19 @@ class HttpWalletHandler(
       val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
         contractId
       )
-      exerciseWalletCoinAction(
-        new coinoperation.CO_AppPayment(requestCid),
-        user,
-        (outcome: COO_AcceptedAppPayment) =>
-          r0.AcceptAppPaymentRequestResponse.OK(
-            d0.AcceptAppPaymentRequestResponse(
-              Codec.encodeContractId(outcome.contractIdValue)
-            )
-          ),
+      retryProvider.retryForClientCalls(
+        "Accept app payment request",
+        exerciseWalletCoinAction(
+          new coinoperation.CO_AppPayment(requestCid),
+          user,
+          (outcome: COO_AcceptedAppPayment) =>
+            r0.AcceptAppPaymentRequestResponse.OK(
+              d0.AcceptAppPaymentRequestResponse(
+                Codec.encodeContractId(outcome.contractIdValue)
+              )
+            ),
+        ),
+        logger,
       )
     }
 
@@ -389,13 +394,17 @@ class HttpWalletHandler(
         Codec.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
           contractId
         )
-      exerciseWalletCoinAction(
-        new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
-        user,
-        (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
-          d0.AcceptSubscriptionRequestResponse(
-            Codec.encodeContractId(outcome.contractIdValue)
-          ),
+      retryProvider.retryForClientCalls(
+        "Accept subscription and make initial payment",
+        exerciseWalletCoinAction(
+          new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
+          user,
+          (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
+            d0.AcceptSubscriptionRequestResponse(
+              Codec.encodeContractId(outcome.contractIdValue)
+            ),
+        ),
+        logger,
       )
     }
 
@@ -530,15 +539,20 @@ class HttpWalletHandler(
   ): Future[r0.UserStatusResponse] = withNewTrace(workflowId) { _ => _ =>
     val optWallet = walletManager.lookupUserWallet(user)
     for {
-      hasFeaturedAppRight <- walletManager.lookupUserWallet(user) match {
+      hasFeaturedAppRight <- optWallet match {
         case None => Future(false)
         case Some(wallet) =>
           wallet.store.lookupFeaturedAppRight().map(_.isDefined)
       }
+      optInstall <- optWallet match {
+        case None =>
+          Future(None)
+        case Some(w) => w.store.lookupInstall()
+      }
     } yield {
       d0.UserStatusResponse(
         partyId = optWallet.fold("")(_.store.key.endUserParty.toProtoPrimitive),
-        userOnboarded = optWallet.isDefined,
+        userOnboarded = optInstall.isDefined,
         hasFeaturedAppRight = hasFeaturedAppRight,
       )
     }

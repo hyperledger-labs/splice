@@ -66,19 +66,22 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceWalletBackend.name))
 
-    loggerFactory.assertThrowsAndLogs[CommandFailure](
+    loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
       aliceWallet.tap(2),
-      _.errorMessage should include("The server is taking too long to respond"),
+      entries => {
+        forAtLeast(1, entries)(
+          _.message should include(
+            "failed because of java.net.ConnectException: Connection refused"
+          )
+        )
+      },
     )
 
     toxiproxy.enableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceWalletBackend.name))
 
     aliceWallet.tap(3)
-    eventually() { // Note that we check that we see 2 coins in the wallet, because we retry the `StreamTcpException`
-      // we receive indefinitely,  so the `tap(2)` that we started earlier and saw fail due to the Akka HTTP timeout
-      // eventually succeeds once we re-establish the connection via the proxies.
-      aliceWallet.list().coins should have length 2
+    eventually() {
+      aliceWallet.list().coins should have length 1
     }
-
   }
 }

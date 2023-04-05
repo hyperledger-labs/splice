@@ -28,6 +28,7 @@ import scala.util.control.NonFatal
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
 import org.scalatest.matchers.Matcher
+import org.scalatest.AppendedClues
 
 /** Analogue to Canton's CommunityTests */
 object CNNodeTests {
@@ -169,7 +170,8 @@ object CNNodeTests {
   trait CNNodeTestCommon
       extends BaseTest
       with CommonCNNodeAppInstanceReferences
-      with LedgerApiExtensions {
+      with LedgerApiExtensions
+      with AppendedClues {
 
     lazy val defaultTickDuration = NonNegativeFiniteDuration.ofSeconds(150)
 

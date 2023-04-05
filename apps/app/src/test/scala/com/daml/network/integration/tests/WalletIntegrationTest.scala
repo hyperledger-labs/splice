@@ -23,6 +23,7 @@ import com.typesafe.config.ConfigFactory
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
+import scala.util.Try
 
 class WalletIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -82,7 +83,9 @@ class WalletIntegrationTest
         )._2
       aliceWallet.rejectAppPaymentRequest(request)
 
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      // The action is completed before the batch is skipped, so we need an eventuallyLogs here
+      // to make sure we wait for the message.
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
           def submitRequest() =
             try {
@@ -92,9 +95,6 @@ class WalletIntegrationTest
               case _: CommandFailure =>
             }
 
-          submitRequest()
-          // Without this second request, the walletBackend would shut down too quickly, and we would not see
-          // the message about an empty batch in the logs.
           submitRequest()
         },
         entries => {
@@ -195,92 +195,46 @@ class WalletIntegrationTest
         (createdCoinsInTx zip createdLockedCoinsInTx).foreach { case (cc, clc) => cc shouldBe clc }
       }
 
-      "fail operations early and independently that don't pass the activeness lookup checks" in {
-        implicit env =>
-          val alice = onboardWalletUser(aliceWallet, aliceValidator)
-
-          // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
-          aliceWallet.tap(10)
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-            .awaitJava(coinCodegen.Coin.COMPANION)(alice)
-          // creating payment request
-          val request =
-            createSelfPaymentRequest(
-              aliceValidator.remoteParticipantWithAdminToken,
-              aliceWallet.config.ledgerApiUser,
-              alice,
-            )._2
-          // Reject it so that we have a reference to an already archived app payment request
-          aliceWallet.rejectAppPaymentRequest(request)
-
-          // solo tap will kick off batch, which usually contains only one coin operation
-          val tap1F = Future(aliceWallet.tap(10))
-
-          // following three commands will usually end up in one batch
-          val tap2F = Future(aliceWallet.tap(10))
-          // fails because we don't have a payment request - so removed from batch & error is reported back
-          val failedAcceptF = Future(
-            loggerFactory.assertThrowsAndLogs[CommandFailure](
-              aliceWallet.acceptAppPaymentRequest(request),
-              _.errorMessage should include regex ("(AppPaymentRequest|DeliveryOffer)"),
-            )
-          )
-          val tap3F = Future(aliceWallet.tap(10))
-          // Wait for all futures to complete
-          tap1F.futureValue
-          tap2F.futureValue
-          tap3F.futureValue
-
-          failedAcceptF.futureValue
-
-          eventually() {
-            // all four taps went through
-            // but no money was deducted as the app payment failed
-            checkBalance(aliceWallet, 1, (39, 40), exactly(0), exactly(0))
-          }
-      }
-
-      "retry a batch if it fails due to contention" in { implicit env =>
+      "filter stale actions from batches, and complete the rest" in { implicit env =>
         val alice = onboardWalletUser(aliceWallet, aliceValidator)
-        aliceWallet.tap(10)
 
+        aliceWallet.tap(1)
+        // creating payment request
         val request =
           createSelfPaymentRequest(
             aliceValidator.remoteParticipantWithAdminToken,
             aliceWallet.config.ledgerApiUser,
             alice,
           )._2
-        eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
+        // Reject it so that we have a reference to an already archived app payment request
+        aliceWallet.rejectAppPaymentRequest(request)
 
-        val rejectF = Future(aliceWallet.rejectAppPaymentRequest(request))
+        loggerFactory.suppressErrors({
 
-        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          {
-            // to simulate contention, accept the payment request immediately after rejecting it
-            // that the activeness lookup on the payment request still goes through but the lookup inside the ledger fails.
-            // this leads to a retry..
-            val _ =
-              try aliceWallet.acceptAppPaymentRequest(request)
-              catch {
-                case _: CommandFailure => ()
-              }
-            // Execute a successful tap here so that we see the recovery of the coin-operation batch executor.
-            // Without that one, the shutdown would initiate before recovery starts.
-            aliceWallet.tap(666)
-          },
-          entries => {
-            forAtLeast(1, entries)( // however, before failing, we see one retry in the logs
-              _.message should include(
-                "The operation 'execute coin operation batch' has failed with an exception. Retrying after 200 milliseconds."
-              )
-            )
-          },
-        )
+          val tapsBefore = Range(0, 3).map(_ => Future(Try(aliceWallet.tap(10))))
 
-        // eventually, the rejection goes through
-        rejectF.futureValue
-        eventually()(aliceWallet.listAppPaymentRequests() shouldBe empty)
-        checkBalance(aliceWallet, 1, (675, 676), exactly(0), exactly(0))
+          // fails because we don't have a payment request - so removed from batch & error is reported back
+          val failedAcceptF = Future(Try(aliceWallet.acceptAppPaymentRequest(request)))
+
+          val tapsAfter = Range(0, 3).map(_ => Future(Try(aliceWallet.tap(10))))
+
+          // Wait for all futures to complete
+          val successfulTaps = (tapsBefore ++ tapsAfter).map(_.futureValue).count(_.isSuccess)
+          if (failedAcceptF.futureValue.isSuccess)
+            fail("The AcceptTransferOffer action unexpectedly succeeded")
+
+          successfulTaps should be(
+            (tapsBefore ++ tapsAfter).length
+          ) withClue ("All taps should succeed")
+
+          checkBalance(
+            aliceWallet,
+            1,
+            (1 + successfulTaps * 10 - 1, 1 + successfulTaps * 10),
+            exactly(0),
+            exactly(0),
+          )
+        })
       }
     }
 

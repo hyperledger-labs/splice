@@ -59,12 +59,18 @@ trait UserWalletStore
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  def getInstall()(implicit ec: ExecutionContext): Future[
-    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+  def lookupInstall()(implicit ec: ExecutionContext): Future[
+    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ] = for {
     domainId <- defaultAcsDomainIdF
     ct <- multiDomainAcsStore
       .findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(domainId, (_: Any) => true)
+  } yield ct
+
+  def getInstall()(implicit ec: ExecutionContext): Future[
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+  ] = for {
+    ct <- lookupInstall()
   } yield ct.getOrElse(
     throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
   )

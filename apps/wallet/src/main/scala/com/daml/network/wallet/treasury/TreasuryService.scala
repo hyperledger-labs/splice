@@ -4,7 +4,6 @@ import akka.Done
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
-import cats.syntax.traverse.*
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.api.v1
@@ -68,7 +67,8 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.util.{Failure, Success}
+import scala.util.Failure
+import scala.util.Success
 
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
   * that concurrent manipulations don't conflict.
@@ -104,7 +104,7 @@ class TreasuryService(
         (batch, operation) => batch.addCOToBatch(operation)
       )
       // Execute the batches sequentially to avoid contention
-      .mapAsync(1)(executeBatchWithRetry)
+      .mapAsync(1)(filterAndExecuteBatch)
       .toMat(
         Sink.onComplete(result0 => {
           val result =
@@ -155,9 +155,12 @@ class TreasuryService(
       operation: installCodegen.CoinOperation
   )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
     val p = Promise[installCodegen.CoinOperationOutcome]()
+    logger.debug(
+      show"Received operation (queue size before adding this: ${queue.size()}): $operation"
+    )
     queue.offer(EnqueuedCoinOperation(operation, p, tc)) match {
       case Enqueued =>
-        logger.debug(show"Received operation (queue size: ${queue.size()}): $operation")
+        logger.debug(show"Operation $operation enqueued successfully")
         p.future
       case Dropped =>
         Future.failed(
@@ -183,44 +186,7 @@ class TreasuryService(
       )
       .asRuntimeException
 
-  /** Find all operations that have become stale and complete them with their failure.
-    * This effectively removes these operations from the next retry of executing the batch.
-    */
-  private def completeStaleOperations(
-      batch: CoinOperationBatch
-  )(implicit tc: TraceContext): Future[Done] = {
-    batch.operationsToRun
-      .traverse { op =>
-        tryLookupCoinOperation(op.operation)
-          .transform {
-            case Failure(ex) =>
-              logger.debug(show"Failing operation due to failed lookup: $op", ex)
-              // if the lookup fails, complete the promise with the failed future
-              op.outcomePromise.failure(ex)
-              Success(Done)
-            case Success(_) =>
-              Success(Done)
-          }
-      }
-      .map(_ => Done)
-  }
-
-  /** Background behind lookups:
-    * Inside the treasury service, we want to avoid a batch being aborted for anything other
-    * than contention errors. Some errors can be caught within Daml to avoid aborting the transaction. However, contract
-    * activeness cannot be caught in Daml. Therefore, we check that certain contracts required for the operation
-    * are active via lookups. That way, we know that if a batch failed it can only be due to contention and
-    * we can safely resubmit it.
-    *
-    * Note that we don't check that contracts managed by the SVC (CoinRules, IssuanceState, OpenMiningRound etc.) are
-    * active. These contracts should always be active (even under contention) and a non-SVC CN user isn't able
-    * to make changes to his system that would lead to these contracts being active on the next submission.
-    *
-    * Implementation:
-    * If a required contract is not found, the future should fail with an appropriate
-    * [[io.grpc.StatusRuntimeException]].
-    * We execute `completeStaleOperations` after every batch that failed.
-    */
+  // Try looking up the contracts relevant for identifying operation staleness. Will throw a [[io.grpc.StatusRuntimeException]] if not found.
   private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] =
     userStore.domains.signalWhenConnected(userStore.defaultAcsDomain).flatMap { domainId =>
       op0 match {
@@ -271,124 +237,124 @@ class TreasuryService(
       }
     }
 
-  /** In case of contention, the `executeBatch` function may fail. This function adds retries so that a single coin
-    * operation, that failed due to contention, does not require a whole batch of coin operations to be resubmitted
-    * to the wallet app.
-    */
-  private def executeBatchWithRetry(
-      batch: CoinOperationBatch
-  ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
-    withSpan("executeBatchWithRetry") { implicit tc => _ =>
-      def completeWithFailure(
-          op: EnqueuedCoinOperation,
-          exception: installCodegen.CoinOperation => StatusRuntimeException,
-      ) =
-        // Need to use tryComplete as some of them might have been completed already due to being stale
-        op.outcomePromise.tryComplete(
-          Failure(
-            exception(op.operation)
-          )
-        )
-
-      def internal(op: installCodegen.CoinOperation) =
-        Status.INTERNAL
-          .withDescription(show"Unexpected coin operation execution failure of operation $op.")
-          .asRuntimeException()
-
-      retryProvider
-        .retryForAutomation(
-          "execute coin operation batch",
-          executeBatch(batch)(tc),
-          logger,
-        )
-        .recover(ex => {
-          val failure = if (retryProvider.isShuttingDown) {
-            // TODO(tech-debt): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
-            logger.info("Ignoring batch execution failure, as we are shutting down", ex)
-            closingException(_)
-          } else {
-            logger.error("Skipping batch due to unexpected execution failure", ex)
-            internal(_)
-          }
-          // Complete all operations of this batch
-          batch.nonMergeOperations.foreach(completeWithFailure(_, failure))
-          batch.mergeOperationOpt.foreach(completeWithFailure(_, failure))
-          Done
-        })
-    }
-  })
-
   private def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean =
     outcome match {
       case _: installCodegen.coinoperationoutcome.COO_Error => true
       case _ => false
     }
 
-  private def executeBatch(
-      unfilteredBatch: CoinOperationBatch
-  )(implicit tc: TraceContext): Future[Done] = {
+  // Checks an operation for staleness. If it is stale - completes it with a failure, and returns None.
+  // Otherwise, returns the operation.
+  private def completeIfStale(
+      op: EnqueuedCoinOperation
+  )(implicit tc: TraceContext): Future[Option[EnqueuedCoinOperation]] =
+    for {
+      res <- tryLookupCoinOperation(op.operation).transform {
+        case Failure(ex) =>
+          logger.debug(show"Failing operation due to failed lookup: $op", ex)
+          // if the lookup fails, complete the promise with the failed future
+          op.outcomePromise.failure(ex)
+          Success(None)
+        case Success(_) =>
+          Success(Some(op))
+      }
+    } yield res
 
+  // Due to contention, an operation may get queued for a while, and become stale. Since a DB lookup is significantly cheaper than
+  // a failed batch, we filter out stale operations before submitting the batch.
+  private def filterBatch(
+      unfilteredBatch: CoinOperationBatch
+  )(implicit tc: TraceContext): Future[CoinOperationBatch] =
+    for {
+      filteredNonMergeOperations <- Future.traverse(unfilteredBatch.nonMergeOperations)(
+        completeIfStale(_)
+      )
+
+    } yield CoinOperationBatch(
+      unfilteredBatch.mergeOperationOpt,
+      filteredNonMergeOperations
+        .filter(_.isDefined)
+        .map(_.getOrElse(throw new RuntimeException("Unexpected None value"))),
+    )
+
+  private def filterAndExecuteBatch(
+      unfilteredBatch: CoinOperationBatch
+  ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
+    withSpan("executeBatch") { implicit tc => _ =>
+      for {
+        filteredBatch <- filterBatch(unfilteredBatch)
+        res <- executeBatch(filteredBatch)
+      } yield res
+    }
+  })
+
+  private def executeBatch(
+      batch: CoinOperationBatch
+  )(implicit tc: TraceContext): Future[Done] = {
     // Remove all operations from the batch whose promise has already been completed.
     // We use this approach as the retry infrastructure retries a fixed operation, and we want to avoid
     // introducing more mutable state that can go awry.
     // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
-    val filteredBatch = unfilteredBatch.computeFilteredBatch
     logger.debug(
-      show"Running batch of coin operations:\n$filteredBatch"
+      show"Running batch of coin operations:\n$batch"
     )
 
-    if (filteredBatch.isEmpty) {
+    def completeWithFailure(
+        op: EnqueuedCoinOperation,
+        throwable: Throwable,
+    ) = {
+      op.outcomePromise.complete(
+        Failure(throwable)
+      )
+    }
+
+    if (batch.isEmpty) {
       logger.debug("Coin operation batch was empty after filtering. ")
       Future.successful(Done)
     } else {
+
       val now = clock.now
       val batchExecutionF = for {
         install <- userStore.getInstall()
         contextAndInputsOpt <- getTransferContextAndInputs(
           now,
-          filteredBatch.isMergeOnly,
-          filteredBatch.numTapOperations,
+          batch.isMergeOnly,
+          batch.numTapOperations,
         )
         res <-
           contextAndInputsOpt match {
-            // if we returned None previously, this is (1) a batch that only contains a "merge" operation, but
+            // if we returned None from getTransferContextAndInputs, this is (1) a batch that only contains a "merge" operation, but
             // (2) there is nothing to merge (e.g. only 1 coin + no rewards already, or rewards are too small)
             // in this case, we just complete the merge-operation immediately without sending any data to the ledger.
             case None =>
-              filteredBatch.mergeOperationOpt.foreach(
+              batch.mergeOperationOpt.foreach(
                 _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
               )
               Future.successful(Done)
             case Some((inputs, readAs, transferContext, disclosedContracts)) =>
-              executeFilteredBatch(
+              doExecuteBatch(
                 install,
                 transferContext,
                 inputs,
-                filteredBatch,
+                batch,
                 readAs,
                 disclosedContracts,
               )
           }
       } yield res
-      batchExecutionF.recoverWith(ex => {
-        logger.info("Checking staleness of coin operations, as batch execution failed", ex)
-        completeStaleOperations(filteredBatch).transform {
-          case Failure(exStale) =>
-            logger.error("Ignoring unexpected exception during staleness check", exStale)
-            throw ex
-          case Success(_) =>
-            throw ex
-        }
+      batchExecutionF.recover(ex => {
+        logger.info(s"Batch failed with ${ex.getMessage()}, failing all operations")
+        // Fail all operations of this batch
+        batch.nonMergeOperations.foreach(completeWithFailure(_, ex))
+        batch.mergeOperationOpt.foreach(completeWithFailure(_, ex))
+        Done
       })
     }
   }
 
-  /** Helper method to execute a batch that already has been filtered to only contain uncompleted operations.
-    * Note that for performance reasons, we assume that all operations in a batch are uncompleted on its initial
-    * submission and only look for stale operations that can be marked as complete after the initial batch execution
-    * submission failed.
+  /** Helper method to execute a batch.
     */
-  private def executeFilteredBatch(
+  private def doExecuteBatch(
       install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
       transferContext: PaymentTransferContext,
       inputs: Seq[TransferInput],
@@ -397,13 +363,11 @@ class TreasuryService(
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   )(implicit tc: TraceContext): Future[Done] = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
-    logger.debug(s"executing filtered batch $batch with inputs $inputs")
+    logger.debug(s"executing batch $batch with inputs $inputs")
     for {
       domainId <- userStore.domains.getDomainId(globalDomain)
       (offset, outcomes) <- connection
-        // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
-        // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
-        // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
+        // The only operation that is not self-conflicting is Tap, therefore batch execution w/o command dedup is safe.
         .submitWithResultAndOffsetNoDedup(
           Seq(walletManager.store.key.walletServiceParty),
           walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
@@ -411,22 +375,27 @@ class TreasuryService(
           domainId,
           disclosedContracts,
         )
-      // return all outcomes to the callers
-      _ = batch.completeBatchOperations(outcomes)(logger, tc)
 
-      // wait for store to ingest the new coin holdings *provided* they were updated
-      _ <-
-        if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
-          // We must not wait in this case, as the store won't see that offset until the next action comes,
-          // as the transaction filter is in the way
-          // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
-          Future.unit
-        } else {
-          logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-          userStore.signalWhenIngestedOrShutdown(offset)
-        }
+      // wait for store to ingest the new coin holdings *provided* they were updated, then return all outcomes to the callers
+      _ <- waitForIngestion(offset, outcomes).map(_ =>
+        batch.completeBatchOperations(outcomes)(logger, tc)
+      )
     } yield Done
   }
+
+  private def waitForIngestion(
+      offset: String,
+      outcomes: Exercised[java.util.List[CoinOperationOutcome]],
+  )(implicit tc: TraceContext): Future[Unit] =
+    if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+      // We must not wait in this case, as the store won't see that offset until the next action comes,
+      // as the transaction filter is in the way
+      // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+      Future.unit
+    } else {
+      logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+      userStore.signalWhenIngestedOrShutdown(offset)
+    }
 
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
@@ -714,13 +683,6 @@ object TreasuryService {
     }
 
     lazy val isEmpty: Boolean = operationsToRun.isEmpty
-
-    def computeFilteredBatch: CoinOperationBatch = {
-      CoinOperationBatch(
-        mergeOperationOpt,
-        nonMergeOperations.filter(!_.outcomePromise.isCompleted),
-      )
-    }
 
     def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
 

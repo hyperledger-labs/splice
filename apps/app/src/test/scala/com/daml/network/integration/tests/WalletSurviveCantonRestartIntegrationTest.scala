@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{CantonProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.console.CommandFailure
 
 import scala.util.Using
 import scala.concurrent.duration.*
@@ -61,10 +62,7 @@ class WalletSurviveCantonRestartIntegrationTest
       aliceWalletBackend.start()
 
       Using.resource(startCanton(cantonArgs)) { _ =>
-        // A failed request will usually run into the 20s akka timeout since the backend retries forever.
-        // That means that in practice even with 40s timeouts we only have 2 attempts. Therefore we use an absurdly high timeout atm.
-        // We may no longer need this with different retry logic in the treasury service
-        eventuallySucceeds(timeUntilSuccess = 80.seconds) {
+        eventuallySucceeds(timeUntilSuccess = 40.seconds) {
           aliceWalletBackend.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
         }
@@ -78,18 +76,21 @@ class WalletSurviveCantonRestartIntegrationTest
       }
 
       Using.resource(startCanton(cantonArgs)) { _ =>
-        eventuallySucceeds(timeUntilSuccess = 80.seconds) {
+        eventuallySucceeds() {
           aliceWallet.tap(2)
         }
         aliceWallet.list()
       }
 
       // Make sure we're connecting to the right (now disconnected) participant
-      assertThrowsAndLogsCommandFailures(
-        aliceWallet.tap(3),
-        _.message should include(
-          "The server is taking too long to respond"
-        ),
+      // This tap will fail in one of two ways:
+      // 1. If this tap hits the first batch in the wallet after the disconnect, it will fail immediately with an IO exception.
+      // 2. Alternatively, sometimes the wallet tries to merge the coins before we kill canton, but we then kill it, which causes the
+      //    treasury service to be blocked waiting for ingestion of the merge. In this case, this tap will just get queued and eventually
+      //    time out at the akka-http server.
+      // Both failures lead to a CommandFailure exception here.
+      loggerFactory.suppressErrors(
+        an[CommandFailure] should be thrownBy aliceWallet.tap(3)
       )
     }
 

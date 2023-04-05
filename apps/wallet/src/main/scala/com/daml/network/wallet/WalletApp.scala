@@ -153,6 +153,7 @@ class WalletApp(
         clock,
         scanConnection,
         loggerFactory,
+        retryProvider,
       )
 
       // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap

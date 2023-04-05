@@ -95,13 +95,9 @@ class DomainFeesTrafficIntegrationTest
         },
         lines => {
           forAll(lines) { line =>
-            line.message should (include regex (
-              """'execute coin operation batch' failed with a non-retryable error(.|\n)*statusCode=ABORTED"""
-            ) or include(
-              "Skipping batch due to unexpected execution failure"
-            ) or include(
-              "Unexpected coin operation execution failure of operation CO_Tap"
-            ))
+            line.message should include(
+              "Aborted operation - insufficient validator credit to create coins"
+            )
           }
         },
       )
