@@ -2,7 +2,7 @@ package com.daml.network.svc.store
 
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
@@ -10,7 +10,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,13 +21,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "SvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -103,11 +96,11 @@ object SvcStore {
     }
 
   /** Contract filter of an svc acs store for a specific acs party. */
-  def contractFilter(svcParty: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(svcParty: PartyId): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),

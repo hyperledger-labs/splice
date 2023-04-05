@@ -29,7 +29,7 @@ import com.daml.network.environment.ledger.api.{
   TransferUpdate,
   TreeUpdate,
 }
-import com.daml.network.store.AcsStore.IngestionFilter
+import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.CreatedEventImplicits.*
 import com.daml.network.util.{Trees, UploadablePackage}

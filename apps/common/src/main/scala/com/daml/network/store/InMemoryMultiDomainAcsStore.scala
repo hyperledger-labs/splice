@@ -27,7 +27,7 @@ import scala.concurrent.*
 
 class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
-    contractFilter: AcsStore.ContractFilter,
+    contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     futureSupervisor: FutureSupervisor,
     retryProvider: RetryProvider,

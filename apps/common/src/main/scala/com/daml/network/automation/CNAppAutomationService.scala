@@ -5,7 +5,6 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.store.CNNodeAppStore
-import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.opentelemetry.api.trace.Tracer
@@ -28,32 +27,6 @@ abstract class CNNodeAppAutomationService(
   protected val connection = registerResource(
     ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
   )
-
-  private[this] def registerDomainAcs(
-      store: CNNodeAppStore[?, ?],
-      domain: DomainId,
-      perDomainTriggerContext: TriggerContext,
-  ) = {
-    val stores = store.installNewPerDomainStore(domain, perDomainTriggerContext.loggerFactory)
-    val ingestionService = new LegacyUpdateIngestionService(
-      store.getClass.getSimpleName,
-      store.storesIngestionSink(stores),
-      domain,
-      connection,
-      perDomainTriggerContext.retryProvider,
-      perDomainTriggerContext.loggerFactory,
-      perDomainTriggerContext.timeouts,
-    )
-    import com.daml.network.util.HasHealth
-    new HasHealth with AutoCloseable {
-      override def isHealthy = ingestionService.isHealthy
-
-      override def close() = {
-        store.uninstallPerDomainStore(domain)
-        Lifecycle.close(ingestionService)(logger)
-      }
-    }
-  }
 
   def newUpdateIngestionService(
       store: CNNodeAppStore[?, ?],
@@ -81,13 +54,7 @@ abstract class CNNodeAppAutomationService(
     val domainAcsOrchestrator = DomainOrchestrator(
       triggerContext,
       store.domains,
-      DomainOrchestrator.multipleServices(
-        Seq(
-          (da, triggerContext) => registerDomainAcs(store, da.domainId, triggerContext),
-          (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
-        ),
-        loggerFactory,
-      ),
+      (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
     )
     registerTrigger(domainAcsOrchestrator)
   })

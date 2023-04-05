@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -26,7 +26,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
@@ -43,13 +43,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   override final def defaultAcsDomain = domainConfig.global
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "SvSvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   def lookupSvcRulesWithOffset(
   ): Future[
@@ -490,12 +483,12 @@ object SvSvcStore {
     }
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(svcParty: PartyId, svParty: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(svcParty: PartyId, svParty: PartyId): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
     val sv = svParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
         mkFilter(cn.svcrules.AgreedCoinPrice.COMPANION)(co => co.payload.svc == svc),

@@ -4,12 +4,12 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory, StoreWithOpenMiningRounds}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithHistory}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.environment.CNLedgerConnection
@@ -17,17 +17,12 @@ import com.digitalasset.canton.tracing.TraceContext
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
-    extends CNNodeAppStoreWithHistory[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
-    with StoreWithOpenMiningRounds {
+    extends CNNodeAppStoreWithHistory[
+      ScanTxLogParser.TxLogIndexRecord,
+      ScanTxLogParser.TxLogEntry,
+    ] {
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "UserWalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -89,11 +84,11 @@ object ScanStore {
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
-  def contractFilter(svcParty: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(svcParty: PartyId): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),

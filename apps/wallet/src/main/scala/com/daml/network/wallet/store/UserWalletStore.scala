@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.{
   splitwell as splitwellCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithHistory}
+import com.daml.network.store.CNNodeAppStoreWithHistory
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -38,7 +38,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -53,13 +53,6 @@ trait UserWalletStore
       UserWalletTxLogParser.TxLogEntry,
     ]
     with NamedLogging {
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "UserWalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -481,12 +474,11 @@ object UserWalletStore {
   }
 
   /** Contract of a wallet store for a specific wallet-service party. */
-  def contractFilter(key: Key): AcsStore.ContractFilter = {
-    import AcsStore.{InterfaceImplementation, mkFilter}
+  def contractFilter(key: Key): ContractFilter = {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    SimpleContractFilter(
       key.endUserParty,
       Map(
         // Install

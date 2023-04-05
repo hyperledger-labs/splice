@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight, Valid
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.DomainAlias
@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 import cats.syntax.traverseFilter.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,13 +28,6 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "WalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -127,13 +120,13 @@ object WalletStore {
   }
 
   /** Contract of a wallet store for a specific wallet-service party. */
-  def contractFilter(key: Key): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val walletService = key.walletServiceParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       key.validatorParty,
       Map(
         mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>

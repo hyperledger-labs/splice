@@ -1,20 +1,17 @@
 package com.daml.network.automation
 
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
-import com.daml.ledger.javaapi.data.Template as CodegenTemplate
-import com.daml.ledger.javaapi.data.codegen.{InterfaceCompanion, ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStore, MultiDomainAcsStore}
+import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import MultiDomainAcsStore.{ContractState, ReadyContract}
 import com.daml.network.util.{HasHealth, Contract}
-import Contract.Companion.Template as TemplateCompanion
 import com.daml.network.environment.ledger.api.TransferEvent
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -258,70 +255,6 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 
 }
 
-object OnCreateTrigger {
-  trait Companion[-C, TCid <: ContractId[_], T] {
-    def streamContracts(acs: AcsStore)(companion: C): Source[Contract[TCid, T], NotUsed]
-    def lookupContractById(acs: AcsStore)(companion: C)(id: TCid): Future[Option[Contract[TCid, T]]]
-  }
-
-  implicit def templateCompanion[TCid <: ContractId[
-    T
-  ], T <: CodegenTemplate]: Companion[TemplateCompanion[TCid, T], TCid, T] =
-    new Companion[TemplateCompanion[TCid, T], TCid, T] {
-      override def streamContracts(acs: AcsStore)(companion: TemplateCompanion[TCid, T]) =
-        acs.streamContracts(companion)
-      override def lookupContractById(acs: AcsStore)(companion: TemplateCompanion[TCid, T])(
-          id: TCid
-      ): Future[Option[Contract[TCid, T]]] =
-        acs.lookupContractById(companion)(id)
-    }
-
-  implicit def interfaceCompanion[I, Id <: ContractId[I], View <: DamlRecord[View]] =
-    new Companion[InterfaceCompanion[I, Id, View], Id, View] {
-      override def streamContracts(acs: AcsStore)(companion: InterfaceCompanion[I, Id, View]) =
-        acs.streamContracts(companion)
-      override def lookupContractById(acs: AcsStore)(companion: InterfaceCompanion[I, Id, View])(
-          id: Id
-      ): Future[Option[Contract[Id, View]]] =
-        acs.lookupContractById(companion)(id)
-    }
-
-  type Template[TCid <: ContractId[T], T <: CodegenTemplate] =
-    OnCreateTrigger[TemplateCompanion[TCid, T], TCid, T]
-}
-
-/** A trigger for processing contract create events.
-  * This trigger assumes that the created contract is archived as part of processing it.
-  */
-// TODO (#3899) remove
-@deprecated("no longer works; use OnReadyContractTrigger instead", since = "2023-03-31")
-abstract class OnCreateTrigger[C, TCid <: ContractId[_], T](
-    store: CNNodeAppStore[_, _] & CNNodeAppStore.RemovedAcs[?, ?],
-    protected val getDomainId: () => Future[DomainId],
-    companion: C,
-)(implicit
-    ec: ExecutionContext,
-    mat: Materializer,
-    tracer: Tracer,
-    companionClass: OnCreateTrigger.Companion[C, TCid, T],
-) extends SourceBasedTrigger[Contract[TCid, T]] {
-
-  private val acsFuture: Future[AcsStore] =
-    getDomainId().flatMap(store.acs(_))
-
-  override protected val source: Source[Contract[TCid, T], NotUsed] =
-    Source
-      .lazyFutureSource(() => acsFuture.map(companionClass.streamContracts(_)(companion)))
-      .mapMaterializedValue(_ => NotUsed)
-
-  override final def isStaleTask(
-      task: Contract[TCid, T]
-  )(implicit tc: TraceContext): Future[Boolean] =
-    acsFuture
-      .flatMap(companionClass.lookupContractById(_)(companion)(task.contractId))
-      .map(_.isEmpty)
-}
-
 /** A trigger for processing ready contracts. Note that the trigger
   * can get called multiple times for the same contract as it gets transferred betweend domains.
   */
@@ -549,41 +482,6 @@ object ScheduledTaskTrigger {
       prettyOfClass(param("readyAt", _.readyAt), param("work", _.work))
     }
   }
-}
-
-/** A trigger for processing expired contracts whose expiry archives exactly them.
-  *
-  * Use [[ScheduledTaskTrigger]] for more complex expiry choices.
-  */
-// TODO(tech-debt): if we happen to find LOTS of instances that just expire the contract based on its expiry date, then we should consider introducing a Daml-level interface 'ExpiringContract' and handle all of them using single trigger.
-abstract class ExpiredContractTrigger[
-    TCid <: ContractId[T],
-    T <: CodegenTemplate,
-](
-    acs: Future[AcsStore],
-    listExpiredContracts: ExpiredContractTrigger.ListExpiredContracts[TCid, T],
-    templateCompanion: TemplateCompanion[TCid, T],
-)(implicit
-    ec: ExecutionContext,
-    tracer: Tracer,
-) extends ScheduledTaskTrigger[Contract[TCid, T]] {
-
-  override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[TCid, T]]] =
-    listExpiredContracts(now, limit)
-
-  override final protected def isStaleTask(
-      task: ScheduledTaskTrigger.ReadyTask[Contract[TCid, T]]
-  )(implicit tc: TraceContext): Future[Boolean] = for {
-    acs <- acs
-    ct <- acs.lookupContractById(templateCompanion)(task.work.contractId)
-  } yield ct.isEmpty
-}
-
-object ExpiredContractTrigger {
-  type ListExpiredContracts[TCid <: ContractId[_], T] =
-    (CantonTimestamp, Int) => Future[Seq[Contract[TCid, T]]]
 }
 
 /** A trigger for processing expired contracts whose expiry archives exactly them.

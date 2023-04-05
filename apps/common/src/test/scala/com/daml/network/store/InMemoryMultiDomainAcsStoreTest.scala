@@ -28,7 +28,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryMultiDomainAcsStoreTest")
 
   import MultiDomainAcsStore.*
-  import AcsStore.InterfaceImplementation
+  import MultiDomainAcsStore.InterfaceImplementation
 
   private var offsetCounter = 0
 
@@ -45,10 +45,10 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     id
   }
 
-  private val txFilter: AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  private val txFilter: MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       templateFilters = Map(
         mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)

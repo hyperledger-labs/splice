@@ -3,7 +3,7 @@ package com.daml.network.sv.store
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
@@ -11,7 +11,6 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -23,13 +22,6 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   override final def defaultAcsDomain = domainConfig.global
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    Future.failed(
-      new RuntimeException(
-        "SvSvcStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
-      )
-    )
 
   def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
@@ -126,11 +118,11 @@ object SvSvStore {
     }
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(key: SvStore.Key): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val sv = key.svParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       key.svParty,
       Map(
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),

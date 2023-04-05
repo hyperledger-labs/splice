@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.{AcsStore, MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -21,12 +21,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  // TODO (#3899) remove
-  override final def defaultAcsDomain =
-    sys.error("Splitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead")
-
-  override final def acs(domain: DomainId): Future[AcsStore] =
-    sys.error("Splitwell has been migrated to new ACS store, use `multiDomainAcsStore` instead")
+  override final def defaultAcsDomain = domainConfig.splitwell.preferred
 
   def lookupInstallWithOffset(
       domainId: DomainId,
@@ -129,11 +124,11 @@ object SplitwellStore {
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
-  def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val provider = providerPartyId.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
         mkFilter(splitwellCodegen.SplitwellInstallRequest.COMPANION)(co =>

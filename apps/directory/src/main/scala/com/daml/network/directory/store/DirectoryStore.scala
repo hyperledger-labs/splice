@@ -6,12 +6,7 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  AcsStore,
-  CNNodeAppStore,
-  CNNodeAppStoreWithoutHistory,
-  MultiDomainAcsStore,
-}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -28,13 +23,9 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore
-    extends CNNodeAppStoreWithoutHistory
-    with CNNodeAppStore.RemovedAcsWithoutHistory {
+trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   import MultiDomainAcsStore.QueryResult
-
-  override protected[this] final def removedAcsAppName = "DirectoryStore"
 
   private[directory] def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -202,11 +193,11 @@ object DirectoryStore {
   }
 
   /** Contract filter of a directory app store for a specific provider. */
-  def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val provider: String = providerPartyId.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
         mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),

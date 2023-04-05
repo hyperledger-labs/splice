@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{AcsStore, CNNodeAppStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -20,14 +20,10 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore
-    extends CNNodeAppStoreWithoutHistory
-    with CNNodeAppStore.RemovedAcsWithoutHistory {
+trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
-
-  override protected[this] final def removedAcsAppName = "ValidatorStore"
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -137,13 +133,13 @@ object ValidatorStore {
   }
 
   /** Contract of a wallet store for a specific validator party. */
-  def contractFilter(key: Key): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
+    import MultiDomainAcsStore.mkFilter
     val walletService = key.walletServiceParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    MultiDomainAcsStore.SimpleContractFilter(
       key.validatorParty,
       Map(
         mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
