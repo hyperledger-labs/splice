@@ -27,6 +27,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.research.participant.multidomain.{
   command_completion_service as mdcpl,
@@ -413,6 +414,19 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       req,
       stateSnapshotServiceStub.getInFlightTransfers,
     ) map LedgerClient.GetInFlightTransfersResponse.fromProto
+  }
+
+  def getConnectedDomains(
+      party: PartyId
+  ): Future[Map[DomainAlias, DomainId]] = {
+    val req = snapshotsvc.GetConnectedDomainsRequest(
+      party = party.toProtoPrimitive
+    )
+    stateSnapshotServiceStub.getConnectedDomains(req).map { resp =>
+      resp.connectedDomains.map { cd =>
+        DomainAlias.tryCreate(cd.domainAlias) -> DomainId.tryFromString(cd.domainId)
+      }.toMap
+    }
   }
 }
 

@@ -9,7 +9,6 @@ import akka.http.scaladsl.server.Directive0
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CNRemoteParticipantConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.HasHealth
@@ -166,7 +165,6 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
 
   def initialize(
       ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[State]
 
@@ -222,16 +220,8 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     )
   }
 
-  private def createParticipantAdminConnection(): ParticipantAdminConnection =
-    new ParticipantAdminConnection(
-      remoteParticipant.adminApi,
-      timeouts,
-      loggerFactory,
-    )
-
   private def initializeNode(
-      ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
+      ledgerClient: CNLedgerClient
   ) = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
@@ -252,14 +242,13 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(connection)
     _ = logger.info(s"Packages available, running app-specific init")
-    state <- initialize(ledgerClient, participantAdminConnection, serviceParty)
+    state <- initialize(ledgerClient, serviceParty)
   } yield state
 
   logger.info(s"Starting initialization")
   private val ledgerClientF = createLedgerClient()
-  private val participantAdminConnection = createParticipantAdminConnection()
   private val initializeF = ledgerClientF.flatMap { client =>
-    initializeNode(client, participantAdminConnection)
+    initializeNode(client)
   }
 
   initializeF.onComplete { _ =>
@@ -303,10 +292,6 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         s"$name Ledger API connection",
         ledgerClientF.map(_.close()),
         closingTimeout,
-      ),
-      SyncCloseable(
-        s"$name Participant Admin connection",
-        participantAdminConnection.close(),
       ),
       AsyncCloseable(
         "http pool",

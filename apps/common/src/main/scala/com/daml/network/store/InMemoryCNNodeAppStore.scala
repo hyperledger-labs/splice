@@ -27,7 +27,8 @@ abstract class InMemoryCNNodeAppStore[
 
   override def txLog = multiDomainAcsStore
 
-  override lazy val domains: InMemoryDomainStore = new InMemoryDomainStore(loggerFactory)
+  override lazy val domains: DomainStore =
+    new InMemoryDomainStore(acsContractFilter.ingestionFilter.primaryParty, loggerFactory)
 
   override lazy val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
 

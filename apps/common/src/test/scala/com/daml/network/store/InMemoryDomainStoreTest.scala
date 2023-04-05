@@ -3,6 +3,7 @@ package com.daml.network.store
 import akka.actor.ActorSystem
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{BaseTest, DomainAlias}
+import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -15,11 +16,13 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
 
   private def domainId(s: String) = DomainId.tryFromString(s"domain::$s")
   private def domainAlias(s: String) = DomainAlias.tryCreate(s)
+  private val alice = PartyId.tryFromProtoPrimitive("alice::alice")
 
   def mkStore(): Future[InMemoryDomainStore] =
     Future.successful(
       new InMemoryDomainStore(
-        loggerFactory
+        alice,
+        loggerFactory,
       )
     )
 

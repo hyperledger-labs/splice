@@ -5,7 +5,7 @@ import akka.stream.scaladsl.Source
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -13,8 +13,8 @@ import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
-class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFactory)(implicit
-    ec: ExecutionContext
+class InMemoryDomainStore(party: PartyId, override protected val loggerFactory: NamedLoggerFactory)(
+    implicit ec: ExecutionContext
 ) extends DomainStore
     with NamedLogging {
   @volatile
@@ -98,6 +98,8 @@ class InMemoryDomainStore(override protected val loggerFactory: NamedLoggerFacto
   }
 
   val ingestionSink: DomainStore.IngestionSink = new DomainStore.IngestionSink {
+    override val ingestionFilter: PartyId = party
+
     override def ingestConnectedDomains(
         domains: Map[DomainAlias, DomainId]
     )(implicit traceContext: TraceContext): Future[Unit] =

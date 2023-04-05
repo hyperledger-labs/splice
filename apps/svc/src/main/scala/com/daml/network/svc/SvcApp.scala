@@ -2,7 +2,6 @@ package com.daml.network.svc
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
@@ -51,7 +50,6 @@ class SvcApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
@@ -71,7 +69,6 @@ class SvcApp(
         config,
         store,
         ledgerClient,
-        participantAdminConnection,
         retryProvider,
         loggerFactory,
         timeouts,

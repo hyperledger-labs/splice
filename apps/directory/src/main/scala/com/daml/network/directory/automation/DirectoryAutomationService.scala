@@ -1,7 +1,6 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
@@ -21,7 +20,6 @@ class DirectoryAutomationService(
     store: DirectoryStore,
     ledgerClient: CNLedgerClient,
     scanConnection: ScanConnection,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -34,7 +32,6 @@ class DirectoryAutomationService(
       clock,
       Map(store.providerParty -> store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {
 

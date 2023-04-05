@@ -3,7 +3,6 @@ package com.daml.network.splitwell
 import cats.syntax.traverse.*
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNNode}
@@ -59,7 +58,6 @@ class SplitwellApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
       party: PartyId,
   ): Future[SplitwellApp.State] = for {
     store <- Future.successful(
@@ -81,7 +79,6 @@ class SplitwellApp(
       store,
       ledgerClient,
       scanConnection,
-      participantAdminConnection,
       retryProvider,
       loggerFactory,
       timeouts,

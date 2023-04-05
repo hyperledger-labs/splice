@@ -33,6 +33,7 @@ import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.CreatedEventImplicits.*
 import com.daml.network.util.{Trees, UploadablePackage}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonErrorResource
@@ -395,6 +396,9 @@ class CNLedgerConnection(
       )
       .mapConcat(_.transferOuts)
       .runWith(Sink.seq)
+
+  def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
+    client.getConnectedDomains(party)
 
   // TODO (#2706)
   // This is a hacked up wrapper that transforms transaction trees into flat transactions.

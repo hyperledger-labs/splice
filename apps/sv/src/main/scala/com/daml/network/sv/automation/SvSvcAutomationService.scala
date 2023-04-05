@@ -1,7 +1,6 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.sv.config.LocalSvAppConfig
@@ -19,7 +18,6 @@ class SvSvcAutomationService(
     svStore: SvSvStore,
     svcStore: SvSvcStore,
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -32,7 +30,6 @@ class SvSvcAutomationService(
       clock,
       Map(svcStore.key.svcParty -> svcStore),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {
 

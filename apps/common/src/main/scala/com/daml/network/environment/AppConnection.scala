@@ -71,6 +71,7 @@ abstract class AppConnection(
     config: ClientConfig,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
+    enableVersionCompatCheck: Boolean = true,
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(timeouts, loggerFactory)
     with FlagCloseableAsync
@@ -80,7 +81,9 @@ abstract class AppConnection(
     logger,
     s"$serviceName connection",
   )
-  runVersionCompatCheck()
+  if (enableVersionCompatCheck) {
+    runVersionCompatCheck()
+  }
 
   private def runVersionCompatCheck() = {
     val _ = for {

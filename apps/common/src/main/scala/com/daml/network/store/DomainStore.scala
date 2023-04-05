@@ -4,12 +4,10 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 abstract class DomainStore extends AutoCloseable {
   def listConnectedDomains(): Future[Map[DomainAlias, DomainId]]
@@ -24,6 +22,8 @@ abstract class DomainStore extends AutoCloseable {
     * see the addition you will also see a removal if it happens.
     */
   def streamEvents(): Source[DomainStore.DomainConnectionEvent, NotUsed]
+
+  def ingestionSink: DomainStore.IngestionSink
 }
 
 object DomainStore {
@@ -45,6 +45,8 @@ object DomainStore {
 
   trait IngestionSink {
 
+    def ingestionFilter: PartyId
+
     /** Ingest the set of connected domains. This fully
       * replaces the previously ingested domains.
       */
@@ -52,14 +54,4 @@ object DomainStore {
         traceContext: TraceContext
     ): Future[Unit]
   }
-
-  def apply(storage: Storage, loggerFactory: NamedLoggerFactory)(implicit
-      ec: ExecutionContext
-  ): DomainStore =
-    storage match {
-      case _: MemoryStorage => new InMemoryDomainStore(loggerFactory)(ec)
-      // TODO(M3-83) Support persistence (or convince ourselves that this
-      // can always be in-memory.
-      case _: DbStorage => throw new RuntimeException("Not implemented")
-    }
 }

@@ -35,10 +35,16 @@ class ParticipantAdminConnection(
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor)
-    extends AppConnection(config, timeouts, loggerFactory) {
+    extends AppConnection(
+      config,
+      timeouts,
+      loggerFactory,
+      // The version endpoint is only injected into our own apps so we cannot run this against the admin API.
+      enableVersionCompatCheck = false,
+    ) {
   override val serviceName = "Canton Participant Admin API"
 
-  def listConnectedDomains()(implicit
+  private def listConnectedDomains()(implicit
       traceContext: TraceContext
   ): Future[Seq[ListConnectedDomainsResult]] = {
     runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())

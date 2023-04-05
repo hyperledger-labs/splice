@@ -74,7 +74,6 @@ class UserWalletService(
     treasury,
     ledgerClient,
     globalDomain,
-    walletManager.participantAdminConnection,
     automationConfig,
     clock,
     retryProvider,

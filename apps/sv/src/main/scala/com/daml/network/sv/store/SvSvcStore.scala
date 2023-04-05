@@ -38,6 +38,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def key: SvStore.Key
 
+  protected[this] def svStore: SvSvStore
+
+  // TODO(#3936) Remove this workaround once Canton emits domains with observation permissions.
+  override lazy val domains = svStore.domains
+
   protected[this] def domainConfig: SvDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global
@@ -470,6 +475,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 object SvSvcStore {
   def apply(
       key: SvStore.Key,
+      svStore: SvSvStore,
       storage: Storage,
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
@@ -478,7 +484,14 @@ object SvSvcStore {
   )(implicit ec: ExecutionContext): SvSvcStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySvSvcStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
+        new InMemorySvSvcStore(
+          key,
+          svStore,
+          domains,
+          loggerFactory,
+          futureSupervisor,
+          retryProvider,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

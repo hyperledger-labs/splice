@@ -1,7 +1,6 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -19,7 +18,6 @@ class WalletAutomationService(
     clock: Clock,
     walletManager: UserWalletManager,
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     implicit protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -32,7 +30,6 @@ class WalletAutomationService(
       clock,
       Map(walletManager.store.key.validatorParty -> walletManager.store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {
 

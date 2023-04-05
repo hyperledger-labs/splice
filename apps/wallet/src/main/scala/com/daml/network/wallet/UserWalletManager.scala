@@ -1,7 +1,6 @@
 package com.daml.network.wallet
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
@@ -32,7 +31,6 @@ import com.digitalasset.canton.lifecycle.RunOnShutdown
 class UserWalletManager(
     ledgerClient: CNLedgerClient,
     val globalDomain: DomainAlias,
-    private[wallet] val participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
     automationConfig: AutomationConfig,
     clock: Clock,

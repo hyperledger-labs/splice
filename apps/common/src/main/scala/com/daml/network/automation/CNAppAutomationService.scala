@@ -1,7 +1,6 @@
 package com.daml.network.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.store.CNNodeAppStore
@@ -16,7 +15,6 @@ abstract class CNNodeAppAutomationService(
     clock: Clock,
     stores: Map[PartyId, CNNodeAppStore[?, ?]],
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,
@@ -47,7 +45,7 @@ abstract class CNNodeAppAutomationService(
     registerTrigger(
       new DomainIngestionService(
         store.domainIngestionSink,
-        participantAdminConnection,
+        connection,
         triggerContext,
       )
     )

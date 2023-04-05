@@ -1,7 +1,6 @@
 package com.daml.network.validator.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -18,7 +17,6 @@ class ValidatorAutomationService(
     clock: Clock,
     store: ValidatorStore,
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -31,6 +29,5 @@ class ValidatorAutomationService(
       clock,
       Map(store.key.validatorParty -> store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {}

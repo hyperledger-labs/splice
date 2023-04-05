@@ -2,7 +2,6 @@ package com.daml.network.splitwell.automation
 
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferInTrigger,
@@ -28,7 +27,6 @@ class SplitwellAutomationService(
     store: SplitwellStore,
     ledgerClient: CNLedgerClient,
     scanConnection: ScanConnection,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -41,7 +39,6 @@ class SplitwellAutomationService(
       clock,
       Map(store.providerParty -> store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {
 

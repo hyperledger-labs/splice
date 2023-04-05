@@ -3,7 +3,6 @@ package com.daml.network.wallet.automation
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferInTrigger,
@@ -25,7 +24,6 @@ class UserWalletAutomationService(
     treasury: TreasuryService,
     ledgerClient: CNLedgerClient,
     globalDomain: DomainAlias,
-    participantAdminConnection: ParticipantAdminConnection,
     automationConfig: AutomationConfig,
     clock: Clock,
     retryProvider: RetryProvider,
@@ -40,7 +38,6 @@ class UserWalletAutomationService(
       clock,
       Map(store.key.endUserParty -> store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {
 

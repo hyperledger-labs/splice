@@ -27,7 +27,12 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  SyncCloseable,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -40,6 +45,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 import scala.jdk.CollectionConverters.*
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
@@ -67,9 +73,25 @@ class SvApp(
       tracerProvider,
     ) {
 
-  override def initialize(
-      ledgerClient: CNLedgerClient,
+  override def initialize(ledgerClient: CNLedgerClient, svPartyId: PartyId): Future[SvApp.State] = {
+    val participantAdminConnection = new ParticipantAdminConnection(
+      config.remoteParticipant.adminApi,
+      timeouts,
+      loggerFactory,
+    )
+    initialize(participantAdminConnection, ledgerClient, svPartyId).transform {
+      case Success(s) => Success(s)
+      case Failure(err) =>
+        // TODO(#3474) Replace this by a more general solution for closing resources on
+        // init failures.
+        participantAdminConnection.close()
+        Failure(err)
+    }
+  }
+
+  private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
+      ledgerClient: CNLedgerClient,
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
     for {
@@ -81,7 +103,6 @@ class SvApp(
       svAutomation = newSvSvAutomationService(
         svStore,
         ledgerClient,
-        participantAdminConnection,
       )
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global)
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
@@ -153,6 +174,7 @@ class SvApp(
       _ = logger.info(s"SV App is initialized")
     } yield {
       SvApp.State(
+        participantAdminConnection,
         storage,
         svStore,
         svcStore,
@@ -191,9 +213,9 @@ class SvApp(
       (svcStore, svcAutomation) <-
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
-          val svcStore = newSvcStore(svStore.key)
+          val svcStore = newSvcStore(svStore.key, svStore)
           val svcAutomation =
-            newSvSvcAutomationService(svStore, svcStore, ledgerClient, participantAdminConnection)
+            newSvSvcAutomationService(svStore, svcStore, ledgerClient)
           for {
             domainId <- waitForDomainConnection(svcStore.domains, config.domains.global)
             _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
@@ -225,7 +247,6 @@ class SvApp(
             globalDomain,
             ledgerClient,
             ledgerConnection,
-            participantAdminConnection,
             svcPartyHosting,
           )
         }
@@ -239,7 +260,6 @@ class SvApp(
       globalDomain: DomainId,
       ledgerClient: CNLedgerClient,
       ledgerConnection: CNLedgerConnection,
-      participantAdminConnection: ParticipantAdminConnection,
       svcPartyHosting: SvcPartyHosting,
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
     config.bootstrap match {
@@ -262,12 +282,11 @@ class SvApp(
                 participantId,
                 svcPartyHosting,
               )
-              svcStore = newSvcStore(svStore.key)
+              svcStore = newSvcStore(svStore.key, svStore)
               svcAutomation = newSvSvcAutomationService(
                 svStore,
                 svcStore,
                 ledgerClient,
-                participantAdminConnection,
               )
               _ <- waitForDomainConnection(svcStore.domains, config.domains.global)
               _ <- addMemberToSvc(
@@ -369,8 +388,9 @@ class SvApp(
     retryProvider,
   )
 
-  private def newSvcStore(key: SvStore.Key) = SvSvcStore(
+  private def newSvcStore(key: SvStore.Key, svStore: SvSvStore) = SvSvcStore(
     key,
+    svStore,
     storage,
     config.domains,
     loggerFactory,
@@ -381,14 +401,12 @@ class SvApp(
   private def newSvSvAutomationService(
       svStore: SvSvStore,
       ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
   ) =
     new SvSvAutomationService(
       clock,
       config,
       svStore,
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
       loggerFactory,
       timeouts,
@@ -398,7 +416,6 @@ class SvApp(
       svStore: SvSvStore,
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
-      participantAdminConnection: ParticipantAdminConnection,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -406,7 +423,6 @@ class SvApp(
       svStore,
       svcStore,
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
       loggerFactory,
       timeouts,
@@ -817,6 +833,7 @@ class SvApp(
 
 object SvApp {
   case class State(
+      participantAdminConnection: ParticipantAdminConnection,
       storage: Storage,
       svStore: SvSvStore,
       svcStore: SvSvcStore,
@@ -826,24 +843,28 @@ object SvApp {
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
   )(implicit el: ErrorLoggingContext)
-      extends AutoCloseable
+      extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
       storage.isActive && svAutomation.isHealthy && svcAutomation.isHealthy
 
-    override def close(): Unit =
-      Lifecycle.close(
+    override def closeAsync(): Seq[AsyncOrSyncCloseable] =
+      Seq(
         AsyncCloseable(
           "http binding",
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
           timeouts.shutdownNetwork.unwrap,
         ),
-        storage,
-        svStore,
-        svcStore,
-        svAutomation,
-        svcAutomation,
-      )(logger)
+        SyncCloseable("storage", storage.close()),
+        SyncCloseable("sv store", svStore.close()),
+        SyncCloseable("svc store", svcStore.close()),
+        SyncCloseable("sv automation", svAutomation.close()),
+        SyncCloseable("svc automation", svcAutomation.close()),
+        SyncCloseable(
+          s"Participant Admin connection",
+          participantAdminConnection.close(),
+        ),
+      )
   }
 
   def prepareValidatorOnboarding(

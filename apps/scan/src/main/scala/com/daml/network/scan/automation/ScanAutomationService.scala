@@ -1,7 +1,6 @@
 package com.daml.network.scan.automation
 
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -18,7 +17,6 @@ class ScanAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     protected val timeouts: ProcessingTimeout,
@@ -32,6 +30,5 @@ class ScanAutomationService(
       clock,
       Map(store.svcParty -> store),
       ledgerClient,
-      participantAdminConnection,
       retryProvider,
     ) {}
