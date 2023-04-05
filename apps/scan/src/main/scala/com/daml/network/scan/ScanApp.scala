@@ -6,7 +6,6 @@ import akka.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNNode}
@@ -89,7 +88,7 @@ class ScanApp(
         store,
       )
       domainId <- waitForDomainConnection(store.domains, config.domains.global)
-      _ <- store.acs(domainId).flatMap(_.signalWhenIngestedOrShutdown(OpenMiningRound.COMPANION))
+      _ <- waitForAcsIngestion(store.multiDomainAcsStore, domainId)
 
       handler = new HttpScanHandler(
         store,

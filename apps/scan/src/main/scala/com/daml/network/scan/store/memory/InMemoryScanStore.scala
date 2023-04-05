@@ -35,12 +35,15 @@ class InMemoryScanStore(
   override def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)] = {
     for {
       // TODO(#2930): This is a very naive preliminary implementation that will be completely replaced soon
-      acs <- defaultAcs
-      coins <- acs.listContracts(coinCodegen.Coin.COMPANION)
+      domainId <- defaultAcsDomainIdF
+      coins <- multiDomainAcsStore.listContractsOnDomain(coinCodegen.Coin.COMPANION, domainId)
       totalCoins = coins.foldLeft(BigDecimal(0.0))((b, coin) =>
         b + coin.payload.amount.initialAmount
       )
-      lockedCoins <- acs.listContracts(coinCodegen.LockedCoin.COMPANION)
+      lockedCoins <- multiDomainAcsStore.listContractsOnDomain(
+        coinCodegen.LockedCoin.COMPANION,
+        domainId,
+      )
       totalLockedCoins = lockedCoins.foldLeft(BigDecimal(0.0))((b, lockedCoin) =>
         b + lockedCoin.payload.coin.amount.initialAmount
       )

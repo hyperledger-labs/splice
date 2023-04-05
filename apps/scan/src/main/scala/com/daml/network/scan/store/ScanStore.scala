@@ -9,7 +9,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.environment.CNLedgerConnection
@@ -22,6 +22,15 @@ trait ScanStore
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
+  override final def acs(domain: DomainId): Future[AcsStore] =
+    Future.failed(
+      new RuntimeException(
+        "UserWalletStore has been migrated to new ACS store, use `multiDomainAcsStore` instead"
+      )
+    )
+
+  def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
@@ -30,7 +39,9 @@ trait ScanStore
   override final def defaultAcsDomain = domainConfig.global
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
-    defaultAcs.flatMap(_.findContract(cc.coin.CoinRules.COMPANION)(_ => true))
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
+    )
 
   def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)]
 

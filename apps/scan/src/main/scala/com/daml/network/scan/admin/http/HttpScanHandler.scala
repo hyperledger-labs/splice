@@ -52,10 +52,19 @@ class HttpScanHandler(
   ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        acs <- store.defaultAcs
-        issuingRounds <- acs.listContracts(IssuingMiningRound.COMPANION)
-        openRounds <- acs.listContracts(OpenMiningRound.COMPANION)
-        summarizingRounds <- acs.listContracts(SummarizingMiningRound.COMPANION)
+        domainId <- store.defaultAcsDomainIdF
+        issuingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
+          IssuingMiningRound.COMPANION,
+          domainId,
+        )
+        openRounds <- store.multiDomainAcsStore.listContractsOnDomain(
+          OpenMiningRound.COMPANION,
+          domainId,
+        )
+        summarizingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
+          SummarizingMiningRound.COMPANION,
+          domainId,
+        )
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
         issuingRoundsResponseMap = selectRoundsToRespondWith(
@@ -152,8 +161,11 @@ class HttpScanHandler(
   )(): Future[v0.ScanResource.GetClosedRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        acs <- store.defaultAcs
-        rounds <- acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
+        domainId <- store.defaultAcsDomainIdF
+        rounds <- store.multiDomainAcsStore.listContractsOnDomain(
+          roundCodegen.ClosedMiningRound.COMPANION,
+          domainId,
+        )
       } yield {
         val filteredRounds = rounds.sortBy(_.payload.round.number)
         definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toJson))
@@ -165,8 +177,11 @@ class HttpScanHandler(
   )(): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        acs <- store.defaultAcs
-        apps <- acs.listContracts(coinCodegen.FeaturedAppRight.COMPANION)
+        domainId <- store.defaultAcsDomainIdF
+        apps <- store.multiDomainAcsStore.listContractsOnDomain(
+          coinCodegen.FeaturedAppRight.COMPANION,
+          domainId,
+        )
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toJson))
       }
@@ -179,9 +194,13 @@ class HttpScanHandler(
   ] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        acs <- store.defaultAcs
-        right <- acs.findContract(coinCodegen.FeaturedAppRight.COMPANION)(co =>
-          co.payload.provider == providerPartyId
+        domainId <- store.defaultAcsDomainIdF
+        right <- store.multiDomainAcsStore.findContractOnDomain(
+          coinCodegen.FeaturedAppRight.COMPANION
+        )(
+          domainId,
+          (co: Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
+            co.payload.provider == providerPartyId,
         )
       } yield {
         definitions.LookupFeaturedAppRightResponse(right.map(r => r.toJson))
