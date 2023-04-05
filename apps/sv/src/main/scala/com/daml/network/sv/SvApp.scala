@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
@@ -43,7 +43,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
-import com.daml.network.environment.DedupOffset
+import com.daml.network.environment.ledger.api.DedupOffset
 
 class SvApp(
     override val name: InstanceName,

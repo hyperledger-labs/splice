@@ -12,7 +12,8 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{Transfer, TransferEvent}
+import com.daml.network.environment.ledger.api.Transfer
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp

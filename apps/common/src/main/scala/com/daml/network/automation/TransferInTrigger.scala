@@ -15,7 +15,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.environment.{CNLedgerConnection, LedgerClient}
+import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.ledger.api.LedgerClient
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -36,7 +38,7 @@ class TransferInTrigger(
     ) {
 
   override protected def completeTask(
-      transferOut: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      transferOut: TransferEvent.Out
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       outcome <-

@@ -3,7 +3,6 @@ package com.daml.network.automation
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
-import com.daml.network.environment.LedgerClient
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
@@ -16,6 +15,7 @@ import com.daml.network.store.{AcsStore, CNNodeAppStore, MultiDomainAcsStore}
 import MultiDomainAcsStore.{ContractState, ReadyContract}
 import com.daml.network.util.{HasHealth, Contract}
 import Contract.Companion.Template as TemplateCompanion
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
@@ -359,14 +359,13 @@ abstract class OnReadyForTransferInTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out] {
+) extends SourceBasedTrigger[TransferEvent.Out] {
 
-  override protected val source
-      : Source[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out, NotUsed] =
+  override protected val source: Source[TransferEvent.Out, NotUsed] =
     store.multiDomainAcsStore.streamReadyForTransferIn()
 
   override final protected def isStaleTask(
-      task: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out
+      task: TransferEvent.Out
   )(implicit tc: TraceContext): Future[Boolean] = {
     import MultiDomainAcsStore.TransferId
     store.multiDomainAcsStore.isReadyForTransferIn(TransferId.fromTransferOut(task)).map(!_)

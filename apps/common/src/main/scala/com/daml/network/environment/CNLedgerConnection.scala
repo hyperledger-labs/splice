@@ -19,7 +19,16 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.TreeUpdate
+import com.daml.network.environment.ledger.api.{
+  DedupConfig,
+  DedupOffset,
+  LedgerClient,
+  NoDedup,
+  TransactionTreeUpdate,
+  TransferEvent,
+  TransferUpdate,
+  TreeUpdate,
+}
 import com.daml.network.store.AcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.CreatedEventImplicits.*
@@ -377,7 +386,7 @@ class CNLedgerConnection(
       source: DomainId,
       party: PartyId,
       offset: Option[LedgerOffset.Absolute],
-  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out]] =
+  ): Future[Seq[TransferEvent.Out]] =
     client
       .getInFlightTransfers(
         Seq(party),
@@ -424,12 +433,12 @@ class CNLedgerConnection(
   private def treesAsTransactions
       : Flow[LedgerClient.GetTreeUpdatesResponse, AcsTransaction, NotUsed] =
     Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).map {
-      case LedgerClient.GetTreeUpdatesResponse.TransactionTreeUpdate(tree) => flattenTree(tree)
-      case LedgerClient.GetTreeUpdatesResponse.TransferUpdate(transfer) =>
+      case TransactionTreeUpdate(tree) => flattenTree(tree)
+      case TransferUpdate(transfer) =>
         val ev = transfer.event match {
-          case in: LedgerClient.GetTreeUpdatesResponse.TransferEvent.In =>
+          case in: TransferEvent.In =>
             AcsEvent.Created(in.createdEvent)
-          case out: LedgerClient.GetTreeUpdatesResponse.TransferEvent.Out =>
+          case out: TransferEvent.Out =>
             AcsEvent.Archived(
               out.contractId.contractId
             )

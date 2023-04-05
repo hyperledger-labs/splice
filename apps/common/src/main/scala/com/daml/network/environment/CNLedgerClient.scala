@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.daml.network.admin.api.client.ApiClientRequestLogger
+import com.daml.network.environment.ledger.api.LedgerClient
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}

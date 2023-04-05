@@ -7,7 +7,8 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
 import com.daml.network.codegen.java.cc.coinconfig.USD
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, DedupOffset}
+import com.daml.network.environment.ledger.api.DedupOffset
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.{

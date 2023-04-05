@@ -3,7 +3,7 @@ package com.daml.network.sv.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import akka.util.ByteString
-import com.daml.network.admin.api.client.HttpAppConnection
+import com.daml.network.environment.HttpAppConnection
 import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient

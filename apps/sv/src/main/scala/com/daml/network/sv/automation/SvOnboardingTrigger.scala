@@ -15,7 +15,8 @@ import com.daml.network.codegen.java.cn.svcrules.{
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
-import com.daml.network.environment.{CNLedgerConnection, DedupOffset}
+import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract

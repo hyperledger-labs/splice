@@ -2,13 +2,13 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
+import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   Transfer,
-  TransferEvent,
   TransferUpdate,
   TreeUpdate,
 }
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
 import com.daml.network.environment.RetryProvider

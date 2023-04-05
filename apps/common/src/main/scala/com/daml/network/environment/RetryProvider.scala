@@ -5,7 +5,7 @@ import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
-import com.daml.network.admin.api.client.BaseAppConnection
+import com.daml.network.environment.BaseAppConnection
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{

@@ -2,7 +2,7 @@ package com.daml.network.svc.admin.api.client
 
 // TODO(#2241) we can probably remove this file entirely once we have proper bootstrap in place
 
-import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.environment.AppConnection
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory

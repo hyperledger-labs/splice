@@ -9,11 +9,8 @@ import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
-  TransferEvent,
-  TransferUpdate,
-  TransactionTreeUpdate,
-}
+import com.daml.network.environment.ledger.api.{TransferUpdate, TransactionTreeUpdate}
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract

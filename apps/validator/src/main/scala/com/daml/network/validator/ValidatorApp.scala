@@ -7,7 +7,7 @@ import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCNNodeAppParameters

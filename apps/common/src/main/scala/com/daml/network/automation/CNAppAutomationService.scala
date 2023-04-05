@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.store.CNNodeAppStore

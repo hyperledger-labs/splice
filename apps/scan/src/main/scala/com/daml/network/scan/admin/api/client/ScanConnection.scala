@@ -25,7 +25,7 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
-import com.daml.network.admin.api.client.HttpAppConnection
+import com.daml.network.environment.HttpAppConnection
 import com.daml.network.environment.RetryProvider
 
 /** Connection to the admin API of CC Scan. This is used by other apps

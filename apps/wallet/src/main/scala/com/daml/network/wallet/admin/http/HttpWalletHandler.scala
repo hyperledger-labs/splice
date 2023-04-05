@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, DedupConfig, DedupDuration}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
@@ -32,6 +32,7 @@ import io.opentelemetry.api.trace.Tracer
 import com.daml.network.util.{Codec, CNNodeUtil, Contract}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.util.ErrorUtil

@@ -1,6 +1,6 @@
 package com.daml.network.automation
 
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext

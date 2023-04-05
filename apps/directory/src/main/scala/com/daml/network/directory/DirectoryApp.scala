@@ -9,7 +9,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatcher}
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCNNodeAppParameters

@@ -1,4 +1,4 @@
-package com.daml.network.environment
+package com.daml.network.environment.ledger.api
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
@@ -12,7 +12,6 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserRequest,
   CreateUserResponse,
-  CreatedEvent,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
   GetLedgerEndResponse,
@@ -27,22 +26,20 @@ import com.daml.ledger.javaapi.data.{
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.util.PrettyInstances.*
+import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.digitalasset.canton.research.participant.multidomain.{
   command_completion_service as mdcpl,
-  transfer as xfr,
+  state_snapshot_service as snapshotsvc,
   transfer_command as xfrcmd,
   transfer_submission_service as xfrsvc,
-  state_snapshot_service as snapshotsvc,
   update_service as upsvc,
 }
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, Duration}
-import io.grpc.{Channel, Status as GrpcStatus, StatusRuntimeException}
+import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
@@ -71,12 +68,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     elc: ErrorLoggingContext,
 ) extends Closeable {
 
-  import LedgerClient.{
-    GetTreeUpdatesResponse,
-    GetUpdatesRequest,
-    CompletionStreamResponse,
-    scalapbToJava,
-  }
+  import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, scalapbToJava}
 
   private val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
     withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
@@ -176,7 +168,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     }
   }
 
-  def updates(request: GetUpdatesRequest): Source[GetTreeUpdatesResponse, NotUsed] = {
+  def updates(request: GetUpdatesRequest): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
     ClientAdapter
       .serverStreaming(request.toProto, updateServiceStub.getTreeUpdates)
       .map(GetTreeUpdatesResponse.fromProto)
@@ -451,7 +443,7 @@ object LedgerClient {
 
   final case class GetInFlightTransfersResponse(
       offset: LedgerOffset.Absolute,
-      transferOuts: Seq[GetTreeUpdatesResponse.TransferEvent.Out],
+      transferOuts: Seq[TransferEvent.Out],
   )
 
   object GetInFlightTransfersResponse {
@@ -460,7 +452,7 @@ object LedgerClient {
     ): GetInFlightTransfersResponse =
       GetInFlightTransfersResponse(
         new LedgerOffset.Absolute(proto.offset),
-        proto.transferOuts.map(GetTreeUpdatesResponse.TransferEvent.Out.fromProto(_)),
+        proto.transferOuts.map(TransferEvent.Out.fromProto(_)),
       )
   }
 
@@ -484,117 +476,10 @@ object LedgerClient {
   }
 
   final case class GetTreeUpdatesResponse(
-      updates: Seq[GetTreeUpdatesResponse.TreeUpdate]
+      updates: Seq[TreeUpdate]
   )
 
   object GetTreeUpdatesResponse {
-    sealed abstract class TreeUpdate extends Product with Serializable
-
-    final case class TransactionTreeUpdate(tree: TransactionTree) extends TreeUpdate
-
-    final case class TransferUpdate(transfer: Transfer[TransferEvent]) extends TreeUpdate
-
-    final case class Transfer[+E](
-        updateId: String,
-        offset: LedgerOffset.Absolute,
-        event: E & TransferEvent,
-    ) extends PrettyPrinting {
-      override def pretty: Pretty[this.type] =
-        prettyOfClass(
-          param("updateId", (x: this.type) => x.updateId)(PrettyInstances.prettyString),
-          param("offset", (x: this.type) => x.offset.getOffset)(PrettyInstances.prettyString),
-          param("event", _.event),
-        )
-    }
-
-    object Transfer {
-      private[LedgerClient] def fromProto(proto: xfr.Transfer): Transfer[TransferEvent] = {
-        val offset = new LedgerOffset.Absolute(proto.offset)
-        val event = proto.event match {
-          case xfr.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
-          case xfr.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
-          case xfr.Transfer.Event.Empty =>
-            throw new IllegalArgumentException("uninitialized transfer event")
-        }
-        Transfer(
-          proto.updateId,
-          offset,
-          event,
-        )
-      }
-    }
-
-    sealed trait TransferEvent extends Product with Serializable with PrettyPrinting {
-      def submitter: PartyId
-      def source: DomainId
-      def target: DomainId
-    }
-
-    object TransferEvent {
-      private case class TransferOutId(s: String) extends PrettyPrinting {
-        override def pretty: Pretty[this.type] = prettyOfString(_.s)
-      }
-
-      final case class Out(
-          override val submitter: PartyId,
-          override val source: DomainId,
-          override val target: DomainId,
-          transferOutId: String,
-          contractId: ContractId[_],
-      ) extends TransferEvent {
-        def pretty: Pretty[this.type] =
-          prettyOfClass(
-            param("submitter", _.submitter),
-            param("source", _.source),
-            param("target", _.target),
-            param("transferOutId", o => TransferOutId(o.transferOutId)),
-            param("contractId", _.contractId),
-          )
-      }
-
-      object Out {
-        private[LedgerClient] def fromProto(proto: xfr.TransferredOutEvent): Out = {
-          Out(
-            submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
-            source = DomainId.tryFromString(proto.source),
-            target = DomainId.tryFromString(proto.target),
-            transferOutId = proto.transferOutId,
-            contractId = new ContractId(proto.contractId),
-          )
-        }
-      }
-
-      final case class In(
-          override val submitter: PartyId,
-          override val source: DomainId,
-          override val target: DomainId,
-          transferOutId: String,
-          createdEvent: CreatedEvent,
-      ) extends TransferEvent {
-        def pretty: Pretty[this.type] =
-          prettyOfClass(
-            param("submitter", _.submitter),
-            param("source", _.source),
-            param("target", _.target),
-            param("transferOutId", i => TransferOutId(i.transferOutId)),
-            param("createdEvent", _.createdEvent),
-          )
-      }
-
-      object In {
-        private[LedgerClient] def fromProto(proto: xfr.TransferredInEvent): In = {
-          import com.daml.ledger.api.v1.event as scalaEvent
-          In(
-            submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
-            source = DomainId.tryFromString(proto.source),
-            target = DomainId.tryFromString(proto.target),
-            transferOutId = proto.transferOutId,
-            createdEvent =
-              CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
-          )
-        }
-      }
-    }
 
     import upsvc.TreeUpdate.TreeUpdate as TU
 
@@ -605,7 +490,8 @@ object LedgerClient {
         _.treeUpdate match {
           case TU.TransactionTree(tree) =>
             TransactionTreeUpdate(TransactionTree fromProto scalapbToJava(tree)(_.companion))
-          case TU.Transfer(x) => TransferUpdate(GetTreeUpdatesResponse.Transfer.fromProto(x))
+          case TU.Transfer(x) =>
+            TransferUpdate(Transfer.fromProto(x))
           case TU.Empty => sys.error("uninitialized update service result")
         }
       })
@@ -675,7 +561,8 @@ object LedgerClient {
       CompletionStreamResponse(spb.completions map Completion.fromProto)
   }
 
-  import com.daml.error.utils.ErrorDetails, ErrorDetails.ErrorDetail
+  import com.daml.error.utils.ErrorDetails
+  import ErrorDetails.ErrorDetail
 
   final case class Completion(
       applicationId: String,

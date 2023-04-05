@@ -1,7 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, sv as v0}

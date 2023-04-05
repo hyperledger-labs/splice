@@ -2,7 +2,7 @@ package com.daml.network.sv
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.admin.api.client.SvConnection

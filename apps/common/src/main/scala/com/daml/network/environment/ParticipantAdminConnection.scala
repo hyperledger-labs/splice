@@ -1,6 +1,5 @@
-package com.daml.network.admin.api.client
+package com.daml.network.environment
 
-import com.daml.network.environment.GrpcByteChunksToByteArrayObserver
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -24,6 +23,7 @@ import com.digitalasset.canton.topology.transaction.{
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 

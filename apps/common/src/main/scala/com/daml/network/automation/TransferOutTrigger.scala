@@ -8,12 +8,13 @@ import akka.stream.Materializer
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.{CNLedgerConnection, LedgerClient}
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{ContractTypeCompanion, DamlRecord, ContractId}
+import com.daml.network.environment.ledger.api.LedgerClient
 
 import scala.concurrent.{ExecutionContext, Future}
 

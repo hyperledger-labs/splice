@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse
+import com.daml.network.environment.ledger.api.{Transfer, TransferEvent, TreeUpdate}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
@@ -285,12 +285,12 @@ object AcsStore {
 
     /** Ingest a transfer in/out served by the update stream. */
     def ingestTransfer(
-        transfer: GetTreeUpdatesResponse.Transfer[GetTreeUpdatesResponse.TransferEvent]
+        transfer: Transfer[TransferEvent]
     )(implicit
         traceContext: TraceContext
     ): Future[Unit]
 
-    def ingestUpdate(transfer: GetTreeUpdatesResponse.TreeUpdate)(implicit
+    def ingestUpdate(transfer: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit]
   }

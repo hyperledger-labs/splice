@@ -2,7 +2,8 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{TreeUpdate, TransferEvent}
+import com.daml.network.environment.ledger.api.TreeUpdate
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts

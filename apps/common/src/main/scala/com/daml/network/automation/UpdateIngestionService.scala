@@ -2,10 +2,7 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
-import com.daml.network.environment.LedgerClient.GetTreeUpdatesResponse.{
-  TransactionTreeUpdate,
-  TransferUpdate,
-}
+import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferUpdate}
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout

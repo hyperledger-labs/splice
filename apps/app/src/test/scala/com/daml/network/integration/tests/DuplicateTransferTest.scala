@@ -8,7 +8,7 @@ import com.digitalasset.canton.tracing.TracerProvider
 import com.daml.network.automation.TransferInTrigger
 import com.daml.network.codegen.java.cc.coin.ValidatorRight
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
-import com.daml.network.environment.LedgerClient.TransferCommand
+import com.daml.network.environment.ledger.api.LedgerClient.TransferCommand
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.WalletTestUtil
