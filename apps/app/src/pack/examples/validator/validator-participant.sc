@@ -10,13 +10,13 @@ val domainUrl = sys.env.get("DOMAIN_URL") match {
 // Note: the validator user name is defined in validator.conf or validator-secure.conf
 val validatorUserName = System.getProperty("VALIDATOR_USER_NAME", "validator_user")
 
-println("Starting participant node")
+logger.info("Starting participant node")
 validatorParticipant.start()
 
-println(s"Connecting self-hosted validator to the domain $domainUrl")
+logger.info(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("global", domainUrl)
 
-println(s"Creating validator user: " + validatorUserName)
+logger.info(s"Creating validator user: " + validatorUserName)
 val validatorParty = validatorParticipant.ledger_api.parties
   .allocate("validator_service_user", "validator_service_user")
   .party
@@ -28,4 +28,4 @@ validatorParticipant.ledger_api.users.create(
   primaryParty = Some(validatorParty),
   participantAdmin = true,
 )
-println("Validator participant bootstrap finished")
+logger.info("Validator participant bootstrap finished")

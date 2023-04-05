@@ -29,6 +29,7 @@ trait CantonProcessTestUtil {
     Seq(
       "canton",
       "daemon",
+      "--log-level-canton=DEBUG",
       "--log-level-stdout",
       "OFF",
       "--log-encoder",
