@@ -63,6 +63,7 @@ class CNNodeConsoleEnvironment(
       "dar/directory-service-0.1.0.dar",
       "dar/validator-lifecycle-0.1.0.dar",
       "dar/wallet-0.1.0.dar",
+      "dar/canton-coin-0.1.1.dar",
     )
   )
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)

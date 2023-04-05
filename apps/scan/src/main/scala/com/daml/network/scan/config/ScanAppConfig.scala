@@ -18,6 +18,7 @@ case class ScanAppBackendConfig(
     override val remoteParticipant: CNRemoteParticipantConfig,
     domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    enableCoinRulesUpgrade: Boolean = false,
 ) extends LocalCNNodeConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

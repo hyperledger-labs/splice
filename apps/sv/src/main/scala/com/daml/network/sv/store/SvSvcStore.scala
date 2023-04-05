@@ -512,8 +512,7 @@ object SvSvcStore {
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
-        // TODO(#3707): For now we just filter on the V1Test version of CoinRules, without using it anywhere.
-        // This serves as a basic sanity test that codegen worked for this version, and did not interfere with anything else.
+        // TODO(#3707): consider putting the filter also behind a config parameter
         mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ),

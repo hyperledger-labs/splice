@@ -27,6 +27,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 import com.daml.network.environment.HttpAppConnection
 import com.daml.network.environment.RetryProvider
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -140,6 +141,17 @@ final class ScanConnection(
           coinRules
         }
     }
+  }
+
+  def getCoinRulesV1Test()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]] = {
+    // TODO(#3707): Consider whether we want to add a cache here, probably not really needed for the upgrade test
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetCoinRulesV1Test(None),
+    )
   }
 
   def getLatestOpenMiningRound()(implicit

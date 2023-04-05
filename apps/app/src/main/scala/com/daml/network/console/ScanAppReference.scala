@@ -16,6 +16,7 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -60,6 +61,14 @@ abstract class ScanAppReference(
   def getCoinRules(): Contract[CoinRules.ContractId, CoinRules] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCoinRules(None))
+    }
+
+  @Help.Summary(
+    "Returns an upgraded CoinRules (for testing upgrades)"
+  )
+  def getCoinRulesV1Test(): Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetCoinRulesV1Test(None))
     }
 
   @Help.Summary(

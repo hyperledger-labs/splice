@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
 object HttpScanAppClient {
 
@@ -177,6 +178,40 @@ object HttpScanAppClient {
         case http.GetCoinRulesResponse.OK(response) =>
           for {
             coinRules <- Contract.handleMaybeCachedContract(coinCodegen.CoinRules.COMPANION)(
+              cachedCoinRules,
+              response.coinRulesUpdate,
+            )
+          } yield coinRules
+      }
+  }
+
+  case class GetCoinRulesV1Test(
+      cachedCoinRules: Option[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
+  ) extends BaseCommand[
+        http.GetCoinRulesV1TestResponse,
+        Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesV1TestResponse] = {
+      client.getCoinRulesV1Test(
+        GetCoinRulesRequest(cachedCoinRules.map(_.contractId.contractId)),
+        headers,
+      )
+    }
+
+    override def handleResponse(
+        response: http.GetCoinRulesV1TestResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[
+      String,
+      Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test],
+    ] =
+      response match {
+        case http.GetCoinRulesV1TestResponse.OK(response) =>
+          for {
+            coinRules <- Contract.handleMaybeCachedContract(CoinRulesV1Test.COMPANION)(
               cachedCoinRules,
               response.coinRulesUpdate,
             )

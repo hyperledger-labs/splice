@@ -1,6 +1,7 @@
 package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
@@ -36,6 +37,14 @@ trait ScanStore
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
+    )
+
+  def lookupCoinRulesV1Test(): Future[
+    Option[Contract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .findContractOnDomain(ccV1Test.coin.CoinRulesV1Test.COMPANION)(_, (_: Any) => true)
     )
 
   def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)]
@@ -99,6 +108,8 @@ object ScanStore {
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
+        // TODO(#3707): consider putting the filter also behind a config parameter
+        mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

@@ -57,6 +57,7 @@ final class HttpErrorHandler(
       case Status.Code.INTERNAL => StatusCodes.InternalServerError
       case Status.Code.FAILED_PRECONDITION => StatusCodes.BadRequest
       case Status.Code.INVALID_ARGUMENT => StatusCodes.BadRequest
+      case Status.Code.UNIMPLEMENTED => StatusCodes.BadRequest
       case _ => StatusCodes.InternalServerError
     }
   }
