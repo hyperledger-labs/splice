@@ -34,7 +34,7 @@ local deployments(config) = [
                cpuRequest=config.participantCpu,
                memoryLimitMiB=config.participantMemoryMib,
                jsonApi=c.jsonApiConfig(config),
-               proxyToGrpcWeb=["val1-lg-api", "val1-adm-api"],
+               proxyToGrpcWeb=["val1-lg-api"],
                extraEnvVars=c.appUserNameEnvBinding("validator") + [
                  { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
                  { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },

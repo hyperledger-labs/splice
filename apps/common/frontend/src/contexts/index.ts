@@ -1,9 +1,9 @@
 export { DirectoryClientProvider, useDirectoryClient } from './DirectoryServiceContext';
 export { ScanClientProvider, useScanClient } from './ScanServiceContext';
 export {
-  DomainConnectivityClientProvider,
-  useDomainConnectivityClient,
-} from './DomainConnectivityContext';
+  StateSnapshotServiceClientProvider,
+  useStateSnapshotServiceClient,
+} from './StateSnapshotService';
 
 export {
   buildLedgerApiClientInterface,

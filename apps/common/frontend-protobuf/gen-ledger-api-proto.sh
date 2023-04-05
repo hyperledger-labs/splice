@@ -15,12 +15,9 @@ rm -rf "$DIR/protos-$SDK_VERSION/com/daml"/daml_lf_*
 
 cp -r "${REPO_ROOT}/3rdparty/protobuf/google" "$DIR/protos-$SDK_VERSION/google"
 
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/participant/admin/v0/"
-cp "${CANTON}/protobuf/participant/com/digitalasset/canton/participant/admin/v0/domain_connectivity.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/participant/admin/v0/domain_connectivity.proto"
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/time/admin/v0/"
-cp "${CANTON}/protobuf/community/com/digitalasset/canton/time/admin/v0/time_tracker_config.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/time/admin/v0/"
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/domain/api/v0/"
-cp "${CANTON}/protobuf/community/com/digitalasset/canton/domain/api/v0/sequencer_connection.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/domain/api/v0/"
+mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain"
+cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/transfer.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/transfer.proto"
+cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto"
 
 mkdir "$DIR/ts"
 

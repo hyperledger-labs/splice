@@ -21,10 +21,6 @@ window.canton_network_config = {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
       url: 'http://localhost:6201',
     },
-    participantAdmin: {
-      // URL of the gRPC-Web envoy proxy, proxying the user’s participant's admin API
-      url: 'http://localhost:6202',
-    },
     // BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
     splitwell: {
       // URL of the splitwell backend.

@@ -2075,39 +2075,6 @@
                         }
                      },
                      {
-                        "env": [
-                           {
-                              "name": "GRPC_ADDRESS",
-                              "value": "127.0.0.1"
-                           },
-                           {
-                              "name": "GRPC_PORT",
-                              "value": "5002"
-                           },
-                           {
-                              "name": "GRPC_WEB_PORT",
-                              "value": "6002"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "envoy-proxy-val1-adm-api",
-                        "ports": [
-                           {
-                              "containerPort": 6002,
-                              "name": "val1-adm-api-gw"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "256Mi"
-                           },
-                           "requests": {
-                              "memory": "256Mi"
-                           }
-                        }
-                     },
-                     {
                         "image": "region-docker.pkg.dev/project/repo/json-api:tag",
                         "imagePullPolicy": "Always",
                         "name": "json-api",
@@ -2168,11 +2135,6 @@
                {
                   "name": "val1-lg-api-gw",
                   "port": 6001,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-adm-api-gw",
-                  "port": 6002,
                   "protocol": "TCP"
                }
             ],
@@ -4234,10 +4196,6 @@
                               "name": "val1-lg-api-gw"
                            },
                            {
-                              "containerPort": 6102,
-                              "name": "val1-adm-api-gw"
-                           },
-                           {
                               "containerPort": 5108,
                               "name": "swd-pub-api"
                            },
@@ -4431,11 +4389,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-adm-api-gw",
-                  "port": 6102,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "swd-pub-api",
                   "port": 5108,
                   "protocol": "TCP"
@@ -4607,11 +4560,6 @@
                {
                   "name": "val1-lg-api-gw",
                   "port": 6101,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-adm-api-gw",
-                  "port": 6102,
                   "protocol": "TCP"
                },
                {
