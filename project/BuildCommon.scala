@@ -1230,10 +1230,6 @@ object BuildCommon {
         val packageJsonContent = packageJson.contentAsString
         val doc: Json =
           parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
-        val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
-          obj.add("check", s"echo '[${npmProjectName}] no-op'".asJson)
-        )(doc)
-        packageJson.overwrite(updated.spaces2)
 
         ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
       }

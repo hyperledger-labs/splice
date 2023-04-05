@@ -464,7 +464,7 @@ lazy val `apps-common-frontend` = {
       npmLint := {
         val log = streams.value.log
         runCommand(
-          Seq("npm", "run", "check", "--workspaces"),
+          Seq("npm", "run", "check", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
@@ -473,7 +473,7 @@ lazy val `apps-common-frontend` = {
       npmFix := {
         val log = streams.value.log
         runCommand(
-          Seq("npm", "run", "fix", "--workspaces"),
+          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
