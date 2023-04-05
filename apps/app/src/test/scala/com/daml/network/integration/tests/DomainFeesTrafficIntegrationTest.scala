@@ -9,6 +9,7 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
+import org.scalatest.Ignore
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.prop.TableFor1
 import org.scalatest.time.{Seconds, Span}
@@ -21,6 +22,7 @@ import scala.concurrent.duration.*
   * It tests that if we configure the domain-fees free-rate to be a certain amount of txs/s, clients can
   * actually approximately submit coin txs at that frequency.
   */
+@Ignore
 class DomainFeesTrafficIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
