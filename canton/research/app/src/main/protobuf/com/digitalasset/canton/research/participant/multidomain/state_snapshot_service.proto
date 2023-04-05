@@ -7,6 +7,8 @@ syntax = "proto3";
 package com.digitalasset.canton.research.participant.multidomain;
 
 import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
+import "com/daml/ledger/api/v1/active_contracts_service.proto";
+import "com/daml/ledger/api/v1/transaction_filter.proto";
 
 option java_outer_classname = "UpdateServiceOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
@@ -31,6 +33,12 @@ service StateSnapshotService {
     Note that 2. may not be valid at the time of the query if topology was changed.
    */
   rpc GetInFlightTransfers (GetInFlightTransfersRequest) returns (stream GetInFlightTransfersResponse);
+
+  // Returns a stream of the snapshot of the active contracts at a ledger offset.
+  // If there are no active contracts, the stream returns a single response message with the offset at which the snapshot has been taken.
+  // Clients SHOULD use the offset in the last GetActiveContractsResponse message to continue streaming transactions with the transaction service.
+  // Clients SHOULD NOT assume that the set of active contracts they receive reflects the state at the ledger end.
+  rpc GetActiveContracts (GetActiveContractsRequest) returns (stream com.daml.ledger.api.v1.GetActiveContractsResponse);
 
   // Get the list of connected domains to which the party has the rights to submit to and the
   // participant is connected to.
@@ -68,6 +76,36 @@ message GetInFlightTransfersResponse {
   // No guarantees are made with respect to synchronization on transfer-ins on other domains.
   // You should attempt to transfer in all in-flight transfers and handle errors where the contract has already been transferred in.
   repeated TransferredOutEvent transfer_outs = 2;
+}
+
+message GetActiveContractsRequest {
+
+  // Must correspond to the ledger ID reported by the Ledger Identification Service.
+  // Must be a valid LedgerString (as described in ``value.proto``).
+  // Optional
+  string ledger_id = 1;
+
+  // Templates to include in the served snapshot, per party.
+  // Note: interface filter is not supported
+  // Required
+  com.daml.ledger.api.v1.TransactionFilter filter = 2;
+
+  // If enabled, values served over the API will contain more information than strictly necessary to interpret the data.
+  // In particular, setting the verbose flag to true triggers the ledger to include labels for record fields.
+  // Note: only false is currently supported
+  // Optional
+  bool verbose = 3;
+
+  // The offset at which the snapshot of the active contracts will be computed.
+  // Must be no greater than the current ledger end offset.
+  // Must be greater than or equal to the last pruning offset.
+  // If not set the current ledger end offset will be used.
+  // Optional
+  string active_at_offset = 4;
+
+  // Must be a valid domain ID
+  // Required
+  string domain_id = 5;
 }
 
 message GetConnectedDomainsRequest {

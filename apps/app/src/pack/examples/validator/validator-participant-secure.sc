@@ -25,11 +25,10 @@ validatorParticipant.domains.connect("global", domainUrl)
 println("Secure validator participant bootstrap finished")
 
 println(s"Creating validator user: " + validatorUserName)
-val validatorParty = PartyId.tryFromProtoPrimitive(
+val validatorParty =
   validatorParticipant.ledger_api.parties
     .allocate("validator_service_user", "validator_service_user")
     .party
-)
 
 validatorParticipant.ledger_api.users.create(
   id = validatorUserName,

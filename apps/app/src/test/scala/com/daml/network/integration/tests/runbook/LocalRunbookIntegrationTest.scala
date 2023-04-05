@@ -57,7 +57,7 @@ class LocalRunbookIntegrationTest
       |svc_participant.domains.connect("global", "http://localhost:9008")
       |val svcUserName = "svc"
       |println("Allocating svc party")
-      |val svcParty = PartyId.tryFromProtoPrimitive(svc_participant.ledger_api.parties.allocate(svcUserName, svcUserName).party)
+      |val svcParty = svc_participant.ledger_api.parties.allocate(svcUserName, svcUserName).party
       |println("Creating svc user")
       |svc_participant.ledger_api.users.create(
       |  id = svcUserName,
@@ -68,7 +68,7 @@ class LocalRunbookIntegrationTest
       |)
       |Seq("sv1", "sv2", "sv3", "sv4").foreach(svUserName => {
       |  println("Allocating " + svUserName + " party")
-      |  val svParty = PartyId.tryFromProtoPrimitive(svc_participant.ledger_api.parties.allocate(svUserName, svUserName).party)
+      |  val svParty = svc_participant.ledger_api.parties.allocate(svUserName, svUserName).party
       |  println("Creating " + svUserName + " user")
       |  val foundCollective = svUserName == "sv1" // we configure sv1 to `found-collective`
       |  svc_participant.ledger_api.users.create(

@@ -110,7 +110,7 @@ JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g"
 
 if [ $wallclocktime -eq 1 ]; then
   tmux_cmd canton-wallclocktime \
-    "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" canton \
+    "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" canton \
       -c ./apps/app/src/test/resources/simple-topology-canton.conf \
       --log-level-canton=DEBUG \
       --log-encoder json \
@@ -120,7 +120,7 @@ fi
 
 if [ $simtime -eq 1 ]; then
   tmux_cmd canton-simtime \
-    "CLASSPATH=$PWD/canton-classpath CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\"  canton \
+    "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\"  canton \
       -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
       --log-level-canton=DEBUG \
       --log-encoder json \

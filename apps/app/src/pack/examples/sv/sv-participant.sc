@@ -21,9 +21,8 @@ svParticipant.domains.connect("global", domainUrl)
 if (Try(svParticipant.ledger_api.users.get(svUserName)).isFailure) {
 
   println(s"Creating SV user: " + svUserName)
-  val svParty = PartyId.tryFromProtoPrimitive(
+  val svParty =
     svParticipant.ledger_api.parties.allocate("sv_service_user", "sv_service_user").party
-  )
 
   svParticipant.ledger_api.users.create(
     id = svUserName,

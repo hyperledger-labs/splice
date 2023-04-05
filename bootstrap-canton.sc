@@ -7,23 +7,31 @@ import com.digitalasset.canton.topology.PartyId
 
 println("Running canton bootstrap script...")
 
-Seq(global, splitwell,splitwellUpgrade).foreach(domain =>
+Seq(global, splitwell, splitwellUpgrade).foreach(domain =>
   // Reduce participant response timeout to force faster timeouts in particular around time changes in simtime.
   // See #3186
   domain.service.update_dynamic_domain_parameters(
-    _.update(participantResponseTimeout = NonNegativeFiniteDuration.ofSeconds(10)))
+    _.update(participantResponseTimeout = NonNegativeFiniteDuration.ofSeconds(10))
+  )
 )
 
 println("Connecting all participants to global domain...")
 participants.all.domains.connect_local(global)
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
-Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(_.domains.connect_local(splitwell))
+Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(
+  _.domains.connect_local(splitwell)
+)
 // We only connect splitwell by default since we want to simulate users connecting gradually to the domain.
 println("Connecting splitwell to upgraded domain...")
 splitwellParticipant.domains.connect_local(splitwellUpgrade)
 
-def createUser(participant: ParticipantReference, user: String, additionalActAsParties: Set[PartyId] = Set(), readAsParties: Set[PartyId] = Set()) = {
-  val party = PartyId.tryFromProtoPrimitive(participant.ledger_api.parties.allocate(user, user).party)
+def createUser(
+    participant: ParticipantReference,
+    user: String,
+    additionalActAsParties: Set[PartyId] = Set(),
+    readAsParties: Set[PartyId] = Set(),
+) = {
+  val party = participant.ledger_api.parties.allocate(user, user).party
   participant.ledger_api.users.create(
     id = user,
     actAs = Set(party) ++ additionalActAsParties,
@@ -43,22 +51,22 @@ Seq(
   createUser(participant, user)
 }
 
-val svcParty = createUser(svcParticipant,"svc_shared_service_user")
+val svcParty = createUser(svcParticipant, "svc_shared_service_user")
 Seq(
   "sv1",
   "sv2",
   "sv3",
   "sv4",
 ).foreach { user =>
-  createUser(svcParticipant,user, additionalActAsParties = Set(svcParty))
+  createUser(svcParticipant, user, additionalActAsParties = Set(svcParty))
 }
 
 svcParticipant.ledger_api.users.create(
-    id = "directory_provider",
-    actAs = Set(svcParty),
-    primaryParty = Some(svcParty),
-    readAs = Set(),
-    participantAdmin = false,
+  id = "directory_provider",
+  actAs = Set(svcParty),
+  primaryParty = Some(svcParty),
+  readAs = Set(),
+  participantAdmin = false,
 )
 
 println(s"Collecting admin tokens...")
@@ -73,7 +81,8 @@ if (tokenFile == null) {
   sys.error("Environment variable CANTON_TOKEN_FILENAME was not set")
 }
 println(s"Writing admin tokens file to $tokenFile...")
-val adminTokensContent = adminTokensData.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())
+val adminTokensContent =
+  adminTokensData.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())
 Files.write(Paths.get(tokenFile), adminTokensContent.getBytes(StandardCharsets.UTF_8))
 
 println("Canton bootstrap script done.")
