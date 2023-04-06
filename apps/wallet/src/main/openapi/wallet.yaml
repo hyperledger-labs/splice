@@ -520,11 +520,14 @@ components:
       required:
         - party_id
         - user_onboarded
+        - user_wallet_installed
         - has_featured_app_right
       properties:
         party_id:
           type: string
         user_onboarded:
+          type: boolean
+        user_wallet_installed:
           type: boolean
         has_featured_app_right:
           type: boolean

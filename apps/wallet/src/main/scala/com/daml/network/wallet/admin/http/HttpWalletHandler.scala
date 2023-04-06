@@ -552,7 +552,8 @@ class HttpWalletHandler(
     } yield {
       d0.UserStatusResponse(
         partyId = optWallet.fold("")(_.store.key.endUserParty.toProtoPrimitive),
-        userOnboarded = optInstall.isDefined,
+        userOnboarded = optWallet.isDefined,
+        userWalletInstalled = optInstall.isDefined,
         hasFeaturedAppRight = hasFeaturedAppRight,
       )
     }

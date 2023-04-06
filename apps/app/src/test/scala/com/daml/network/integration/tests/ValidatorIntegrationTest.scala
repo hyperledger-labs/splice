@@ -214,7 +214,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     )
 
     aliceWallet.tap(100.0)
-    aliceWallet.userStatus().userOnboarded shouldBe true
+    userIsFullyOnboarded(aliceWallet) shouldBe true
 
     actAndCheck(
       "Offboard a user",
@@ -225,7 +225,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
         val usernames = aliceValidatorClient.listUsers()
         usernames should contain theSameElementsAs (testUsers ++
           Seq(aliceValidator.config.validatorWalletUser.value))
-        aliceWallet.userStatus().userOnboarded shouldBe false
+        userIsFullyOffboarded(aliceWallet) shouldBe true
       },
     )
 

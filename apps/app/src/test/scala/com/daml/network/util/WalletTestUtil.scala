@@ -84,6 +84,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     }
   }
 
+  def userIsFullyOnboarded(
+      walletAppClient: WalletAppClientReference
+  ): Boolean = {
+    val status = walletAppClient.userStatus()
+    status.userOnboarded && status.userWalletInstalled
+  }
+
+  def userIsFullyOffboarded(
+      walletAppClient: WalletAppClientReference
+  ): Boolean = {
+    val status = walletAppClient.userStatus()
+    !status.userOnboarded && !status.userWalletInstalled
+  }
+
   /** The wallet is not immediately usable by an onboarded user, specifically, the wallet
     * app backend needs to ingest the wallet install contract first. This function waits for
     * that to complete.
@@ -93,7 +107,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       walletAppClient: WalletAppClientReference
   ) = {
     eventually() {
-      walletAppClient.userStatus().userOnboarded shouldBe true
+      userIsFullyOnboarded(walletAppClient) shouldBe true
     }
   }
 

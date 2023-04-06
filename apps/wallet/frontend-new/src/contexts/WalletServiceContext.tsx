@@ -264,7 +264,11 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
 
       userStatus: async () => {
         const res = await walletClient.userStatus();
-        return { userOnboarded: res.userOnboarded, partyId: res.partyId };
+        return {
+          userOnboarded: res.userOnboarded,
+          userWalletInstalled: res.userWalletInstalled,
+          partyId: res.partyId,
+        };
       },
       selfGrantFeaturedAppRights: async () => {
         await walletClient.selfGrantFeatureAppRight();

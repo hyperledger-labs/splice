@@ -15,7 +15,7 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (primaryPartyId) {
-      updateStatus({ userOnboarded: true, partyId: primaryPartyId });
+      updateStatus({ userOnboarded: true, userWalletInstalled: true, partyId: primaryPartyId });
     }
   }, [primaryPartyId, updateStatus]);
 

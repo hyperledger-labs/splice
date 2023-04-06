@@ -149,6 +149,7 @@ object HttpWalletAppClient {
   final case class UserStatusData(
       party: String,
       userOnboarded: Boolean,
+      userWalletInstalled: Boolean,
       hasFeaturedAppRight: Boolean,
   )
   sealed trait SubscriptionStateContract
@@ -987,7 +988,12 @@ object HttpWalletAppClient {
       response match {
         case http.UserStatusResponse.OK(response) =>
           Right(
-            UserStatusData(response.partyId, response.userOnboarded, response.hasFeaturedAppRight)
+            UserStatusData(
+              response.partyId,
+              response.userOnboarded,
+              response.userWalletInstalled,
+              response.hasFeaturedAppRight,
+            )
           )
         case http.UserStatusResponse.NotFound(ErrorResponse(errorMsg)) =>
           Left(errorMsg)

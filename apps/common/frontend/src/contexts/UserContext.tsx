@@ -147,10 +147,12 @@ export const UserProvider: React.FC<{
         userId,
         userAccessToken,
         primaryPartyId,
-        updateStatus: ({ userOnboarded, partyId }) => {
-          setOnboardedStatus(
-            userOnboarded ? OnboardedStatus.Onboarded : OnboardedStatus.NotOnboarded
-          );
+        updateStatus: ({ userOnboarded, userWalletInstalled, partyId }) => {
+          if (userOnboarded && userWalletInstalled) {
+            setOnboardedStatus(OnboardedStatus.Onboarded);
+          } else {
+            setOnboardedStatus(OnboardedStatus.NotOnboarded);
+          }
           setPrimaryPartyId(partyId);
         },
         loginWithSst,
@@ -190,6 +192,7 @@ export const useUserState: () => UserState = () => {
 
 export interface UserStatusResponse {
   userOnboarded: boolean;
+  userWalletInstalled: boolean;
   partyId: string;
 }
 
