@@ -16,6 +16,7 @@ import com.daml.ledger.javaapi.data.{
   FiltersByParty,
   Identifier,
   InclusiveFilter,
+  NoFilter,
   Template,
   TransactionFilter,
 }
@@ -384,6 +385,13 @@ object MultiDomainAcsStore {
           partyString -> new InclusiveFilter(templateIds.asJava, interfaceIdsJava)
         ).asJava
       )
+    }
+
+    // TODO (#3956) callers should use `toTransactionFilter` instead when
+    // snapshotsvc supports real filters
+    def toTransactionFilterAllContracts: TransactionFilter = {
+      val partyString: String = primaryParty.toProtoPrimitive
+      new FiltersByParty(Map[String, Filter](partyString -> NoFilter.instance).asJava)
     }
   }
 

@@ -11,6 +11,7 @@ import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exer
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
+  GetActiveContractsRequest,
   ExercisedEvent,
   Identifier,
   LedgerOffset,
@@ -24,15 +25,12 @@ import com.daml.network.environment.ledger.api.{
   DedupOffset,
   LedgerClient,
   NoDedup,
-  TransactionTreeUpdate,
   TransferEvent,
-  TransferUpdate,
   TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.CreatedEventImplicits.*
-import com.daml.network.util.{Trees, UploadablePackage}
+import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -58,7 +56,6 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.Seq
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -318,41 +315,32 @@ class CNLedgerConnection(
   def activeContractsWithOffset(
       domain: DomainId,
       filter: IngestionFilter,
-      offsetO: Option[LedgerOffset] = None,
-  ): Future[(Seq[CreatedEvent], LedgerOffset)] =
+      offsetO: Option[LedgerOffset.Absolute] = None,
+  ): Future[(Seq[CreatedEvent], LedgerOffset)] = {
+    val activeContractsRequest = client.activeContracts(
+      new GetActiveContractsRequest("", filter.toTransactionFilterAllContracts, false),
+      domain,
+      offsetO,
+    )
     for {
-      offset <- offsetO match {
-        case None => client.ledgerEnd(domain)
-        case Some(o) => Future.successful(o)
-      }
-      req = LedgerClient.GetUpdatesRequest(
-        LedgerOffset.LedgerBegin.getInstance,
-        Some(offset),
-        filter.primaryParty,
-        domain,
-      )
-      filterCreates = interpretCreateFilter(filter)
-      acsMap <- client
-        .updates(req)
-        .via(treesAsTransactions)
-        .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
-          val (creates, archives) = tx.events.partitionMap {
-            case AcsEvent.Created(ce) => Left((ce.getContractId, ce))
-            case AcsEvent.Archived(cid) => Right(cid)
-          }
-          val tpIdFilteredCreates = creates.view filter { case (_, ce) => filterCreates(ce) }
-          cidCe ++ tpIdFilteredCreates -- archives
-        })
-    } yield (acsMap.values.toSeq, offset)
-
-  private def interpretCreateFilter(filter: IngestionFilter): CreatedEvent => Boolean = {
-    val IngestionFilter(primaryParty, templateIds, interfaceIds) = filter
-    ce =>
-      ce.hasStakeholder(primaryParty) &&
-        (templateIds(ce.getTemplateId) ||
-          Seq(ce.getInterfaceViews, ce.getFailedInterfaceViews).exists(
-            _.keySet.asScala exists interfaceIds
-          ))
+      responseSequence <- activeContractsRequest runWith Sink.seq
+      offset =
+        if (responseSequence.isEmpty) LedgerOffset.LedgerBegin.getInstance()
+        else
+          new LedgerOffset.Absolute(
+            responseSequence
+              .map(_.getOffset.toScala)
+              .lastOption
+              .flatten
+              // according to spec, should always be defined in last message of stream
+              .getOrElse(
+                throw new RuntimeException(
+                  "Expected to have offset in the last message of the acs stream but didn't have one!"
+                )
+              )
+          )
+      active = responseSequence.flatMap(_.getCreatedEvents.asScala)
+    } yield (active, offset)
   }
 
   def activeContractsWithOffset[TCid <: ContractId[
@@ -372,7 +360,7 @@ class CNLedgerConnection(
   def activeContracts(
       domain: DomainId,
       filter: IngestionFilter,
-      offset: Option[LedgerOffset] = None,
+      offset: Option[LedgerOffset.Absolute] = None,
   ): Future[Seq[CreatedEvent]] =
     activeContractsWithOffset(domain, filter, offset).map(_._1)
 
@@ -431,46 +419,6 @@ class CNLedgerConnection(
       retryProvider,
       timeouts,
       baseLoggerFactory.append("subsClient", clientName),
-    )
-  }
-
-  private def treesAsTransactions
-      : Flow[LedgerClient.GetTreeUpdatesResponse, AcsTransaction, NotUsed] =
-    Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).map {
-      case TransactionTreeUpdate(tree) => flattenTree(tree)
-      case TransferUpdate(transfer) =>
-        val ev = transfer.event match {
-          case in: TransferEvent.In =>
-            AcsEvent.Created(in.createdEvent)
-          case out: TransferEvent.Out =>
-            AcsEvent.Archived(
-              out.contractId.contractId
-            )
-        }
-        AcsTransaction(
-          Seq(ev)
-        )
-    }
-
-  private def flattenTree(tree: TransactionTree): AcsTransaction = {
-    val events: mutable.Buffer[AcsEvent] = mutable.ListBuffer()
-    Trees.traverseTree(
-      tree,
-      onCreate = (ev, _) => {
-        events.append(AcsEvent.Created(ev))
-      },
-      onExercise = (ev, _) => {
-        if (ev.isConsuming) {
-          events.append(
-            AcsEvent.Archived(
-              ev.getContractId
-            )
-          )
-        }
-      },
-    )
-    AcsTransaction(
-      events.toSeq
     )
   }
 
@@ -829,24 +777,6 @@ class CNLedgerSubscription[S](
 }
 
 object CNLedgerConnection {
-
-  // TODO(#2699) Remove this once we have a proper ACS endpoint
-
-  /** This represents an update to the ACS that we got through the update stream.
-    * We also represent transfer in/out as AcsTransactions here not just
-    * regular Daml transactions.
-    */
-  final case class AcsTransaction(
-      events: Seq[AcsEvent]
-  )
-
-  sealed abstract class AcsEvent extends Product with Serializable
-
-  object AcsEvent {
-    final case class Created(event: CreatedEvent) extends AcsEvent
-
-    final case class Archived(contractId: String) extends AcsEvent
-  }
 
   /** Abstract representation of a command-id for deduplication.
     *

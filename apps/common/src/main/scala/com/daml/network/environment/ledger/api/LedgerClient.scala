@@ -71,8 +71,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
 
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, scalapbToJava}
 
-  private val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
-    withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
     withCredentials(CommandServiceGrpc.newStub(channel), token)
   private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
@@ -130,11 +128,24 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   }
 
   def activeContracts(
-      request: GetActiveContractsRequest
+      request: GetActiveContractsRequest,
+      domainId: DomainId,
+      offsetO: Option[LedgerOffset.Absolute] = None,
   ): Source[GetActiveContractsResponse, NotUsed] = {
+    val oldProto = active_contracts_service.GetActiveContractsRequest fromJavaProto request.toProto
+    // convert ACService req to snapshot service req
+    val proto = snapshotsvc.GetActiveContractsRequest(
+      ledgerId = oldProto.ledgerId,
+      filter = oldProto.filter,
+      verbose = oldProto.verbose,
+      activeAtOffset = offsetO.fold(oldProto.activeAtOffset)(_.getOffset),
+      domainId = domainId.toProtoPrimitive,
+    )
     ClientAdapter
-      .serverStreaming(request.toProto, activeContractsServiceStub.getActiveContracts)
-      .map(GetActiveContractsResponse.fromProto)
+      .serverStreaming(proto, stateSnapshotServiceStub.getActiveContracts)
+      .map { scalaProto =>
+        GetActiveContractsResponse fromProto scalapbToJava(scalaProto)(_.companion)
+      }
   }
 
   def tryGetTransactionTreeById(
