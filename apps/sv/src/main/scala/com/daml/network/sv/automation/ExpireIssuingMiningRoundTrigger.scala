@@ -65,7 +65,9 @@ class ExpireIssuingMiningRoundTrigger(
       .lookupSvcRules()
       .flatMap({
         case None =>
-          logger.debug("SvcRules contract not found")
+          logger.warn(
+            "Unexpected ledger state: there is an IssuingMiningRound to expire, but no SvcRules contract."
+          )
           Future.successful(
             TaskSuccess(
               s"ignoring mining round ${PrettyContractId(task.work.contract)}, SvcRules contract not found"

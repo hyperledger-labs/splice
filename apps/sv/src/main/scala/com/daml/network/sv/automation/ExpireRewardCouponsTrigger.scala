@@ -101,7 +101,9 @@ class ExpireRewardCouponsTrigger(
       .lookupCoinRules()
       .flatMap({
         case None =>
-          logger.debug("CoinRules contract not found")
+          logger.warn(
+            "Unexpected ledger state: SvcRules exist, but there is no CoinRules contract of the right version."
+          )
           Future.successful(false)
         case Some(coinRules) =>
           store
