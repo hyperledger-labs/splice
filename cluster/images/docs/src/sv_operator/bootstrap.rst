@@ -12,6 +12,30 @@ The availability of an onboarded and fully operational validator node under your
 Make sure you have completed the steps in :ref:`self_hosted_validator`,
 including the steps to setup a Canton participant node.
 
+SV nodes must be connected to a Canton participant node that is configured to use persistent storage via a PostgreSQL database:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv/sv-participant.conf
+    :start-after: participants
+    :end-before: supply
+
+At this moment, this documentation does not cover setting up a Canton participant with persistent storage via PostgreSQL.
+Please refer to the `Canton documentation on persistence`_.
+Assuming that you have extended the ``examples/sv/sv-participant.conf`` to match your PostgreSQL deployment, start the participant using:
+
+.. parsed-literal::
+
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/sv/sv-participant.conf --bootstrap examples/sv/sv-participant.sc
+
+..
+  For manually running this runbook using the PostgreSQL setup from `./start-canton.sh`: run
+  `./start-canton.sh` followed by `pkill -f simple-topology-canton` (this leaves only the postgres stuff running).
+  Then run the canton command above, appending the following to the end ($REPO_ROOT should point to the root of our repo):
+  ```
+  --config $REPO_ROOT/apps/app/src/test/resources/include/storage-postgres.conf --config $REPO_ROOT/apps/app/src/test/resources/include/self-hosted-sv-participant-postgres-storage.conf
+  ```
+
+.. _Canton documentation on persistence: https://docs.daml.com/canton/usermanual/persistence.html
+
 Like for hosting a validator, you also need to enable the GCP DA Canton DevNet VPN.
 If you can view this documentation, you already enabled the VPN successfully.
 
@@ -38,23 +62,57 @@ Use the following shell commands to generate a keypair in the format expected by
   # Clean up
   rm sv-keys.pem
 
+..
+  Based on `scripts/generate-sv-keys.sh`
+
 These commands should result in an output similar to ::
 
   public-key = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
   private-key = "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBsFuFa7Eumkdg4dcf/vxIXgAje2ULVz+qTKP3s/tHqKw=="
 
 Store both keys in a safe location.
+You will be using them every time you want to deploy a new SV node, i.e., also when deploying an SV node to a different deployment of the Canton Network and for redeploying an SV node after a (test-)network reset.
 
-The `public-key` and your desired SV name need to be approved by a threshold of currently active SVs in order for you to be able to join the network as a SV.
-For DevNet, send the `public-key` and your desired SV name to your point of contact at Digital Asset and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
+The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
+For DevNet, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
 Configure your SV node
 ----------------------
 
-..
-  TODO(#3593) Finish this
+An example SV node configuration with defaults that match the Canton participant configuration used above is provided in ``examples/sv/sv.conf``.
+While this configuration is sufficient to operate an already bootstrapped SV node, an additional *bootstrapping* configuration is required for initializing your SV on its first start.
+Edit the example ``examples/sv/sv-bootstrap.conf`` to:
 
-1) Configure your SV name, public key and private key.
-   (Note: Additional forms of SV authentication / private key storage will be available in the future.)
-2) Configure the address of a SV sponsor. (Note: For DevNet, this is always DA's own "SV1".)
-3) Start the SV node software for the first time and wait for bootstrapping to complete automatically.
+- (optional) Chose a different existing SV as an onboarding sponsor (via the ``remote-sv`` key).
+  This SV is going to play a key role in orchestrating the initialization of your SV into a fully operational SV.
+  SV1 is operated by DA and is a safe default choice here, assuming that it has been configured to approve your SV (see previous step).
+
+- Configure the exact same SV ``name`` and ``public_key`` that you submitted for approval in the previous step,
+  as well as the matching ``private_key`` returned by the key generation commands above. [#]_
+
+.. [#] Note that alternative forms of SV authentication and private key storage will be available in the future.
+   As a workaround for increasing the security of your SV private key,
+   the SV bootstrapping config can be removed from running nodes once bootstrapping has been completed.
+
+Start the SV app
+----------------
+
+If your configuration is sound and your SV identity has been approved by a sufficient number of currently active SVs,
+starting the SV node software (the *SV app*) for the first time will automatically bootstrap your SV into a fully operational status.
+To start the SV app, run the following command:
+
+.. parsed-literal::
+
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-bootstrap.conf --bootstrap examples/sv/sv.sc
+
+Once the SV app has started and you can access the CN console, you can confirm that your SV node is fully operational by querying its debug endpoint: ::
+
+  @ sv.getDebugInfo
+
+Troubleshooting
+---------------
+
+If your SV node is unable to complete its first startup (after waiting for up to 2 minutes), consult the logs recorded to ``log/canton.log`` for hints about potential reasons.
+You can also inspect these logs to confirm that your SV node is actively performing its service to the network, once bootstrapped. [#]_
+
+.. [#] More sophisticated means of monitoring SV nodes will be made available soon.
