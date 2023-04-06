@@ -47,6 +47,7 @@ Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
+  (svcParticipant, "sv1_validator_user")
 ).foreach { case (participant, user) =>
   createUser(participant, user)
 }
