@@ -1,6 +1,12 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, useInterval, useUserState } from 'common-frontend';
+import {
+  AmountDisplay,
+  RateDisplay,
+  DirectoryEntry,
+  useInterval,
+  useUserState,
+} from 'common-frontend';
 import formatISO from 'date-fns/formatISO';
 import { useCallback, useState } from 'react';
 
@@ -238,22 +244,22 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({
 
   // TODO (#3623): this should be the exchange rate at the time of the transaction,
   //              but it's not included in the response
-  const totalUSDAmount = amountCC.times(coinPrice);
+  // const totalUSDAmount = amountCC.times(coinPrice);
 
   return (
     <Stack direction="column">
       <Typography className="tx-amount-cc">
         {sign}
-        <AmountDisplay amount={amountCC.toString()} />
+        <AmountDisplay amount={amountCC} currency="CC" />
       </Typography>
       <Stack direction="row" spacing={0.5}>
         <Typography variant="caption" className="tx-amount-usd">
           {sign}
-          <AmountDisplay amount={totalUSDAmount.toString()} currency="USD" />
+          <AmountDisplay amount={amountCC} currency="CC" convert="CCtoUSD" coinPrice={coinPrice} />
         </Typography>
         <Typography variant="caption">@</Typography>
         <Typography variant="caption" className="tx-amount-rate">
-          <AmountDisplay amount={BigNumber(1).div(coinPrice).toString()} currency="CC/USD" />
+          <RateDisplay base="CC" quote="USD" coinPrice={coinPrice} />
         </Typography>
       </Stack>
     </Stack>

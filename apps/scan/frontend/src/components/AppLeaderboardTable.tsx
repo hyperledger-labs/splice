@@ -1,11 +1,16 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import { AmountDisplay, TitledTable } from 'common-frontend';
 
 import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
 export const AppLeaderboardTable: React.FC = () => {
   const apps = new Array(20).fill(1).map((_, i) => {
-    return { name: 'SVS.cns', totalTransfers: '12345.12345', totalRewards: '12345.12345' };
+    return {
+      name: 'SVS.cns',
+      totalTransfers: BigNumber(12345.12345),
+      totalRewards: BigNumber(12345.12345),
+    };
   });
   return (
     <TitledTable title="App Leaderboard">
@@ -28,7 +33,7 @@ export const AppLeaderboardTable: React.FC = () => {
 export default AppLeaderboardTable;
 
 const AppRow: React.FC<{
-  app: { name: string; totalTransfers: string; totalRewards: string };
+  app: { name: string; totalTransfers: BigNumber; totalRewards: BigNumber };
 }> = ({ app }) => {
   const { name, totalRewards, totalTransfers } = app;
   return (

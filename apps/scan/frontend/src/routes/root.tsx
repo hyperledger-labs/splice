@@ -1,4 +1,5 @@
 import * as React from 'react';
+import BigNumber from 'bignumber.js';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { Grid, Tab, Tabs, Typography, Box } from '@mui/material';
@@ -18,8 +19,8 @@ const Root: React.FC = () => {
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
 
-  const totalCoinBalance = '1,234,567.324567523'; // mock data
-  const totalRewardsIssued = '1,234,567.324567523'; // mock data
+  const totalCoinBalance = BigNumber(1234567.324567523); // mock data
+  const totalRewardsIssued = BigNumber(1234567.324567523); // mock data
 
   return (
     <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>

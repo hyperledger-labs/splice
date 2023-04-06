@@ -7,6 +7,7 @@ import FeaturedAppRight from './FeaturedAppRight';
 import IntervalDisplay from './IntervalDisplay';
 import Login from './Login';
 import PartyId from './PartyId';
+import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
 
 export {
@@ -18,6 +19,7 @@ export {
   DirectoryField,
   FeaturedAppRight,
   AmountDisplay,
+  RateDisplay,
   TitledTable,
   IntervalDisplay,
 };

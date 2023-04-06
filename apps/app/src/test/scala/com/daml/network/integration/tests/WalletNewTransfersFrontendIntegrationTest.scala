@@ -156,7 +156,7 @@ class WalletNewTransfersFrontendIntegrationTest
             )
 
             offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
-              "+ 1.0 CC"
+              "+ 1 CC"
             )
 
             offerCard

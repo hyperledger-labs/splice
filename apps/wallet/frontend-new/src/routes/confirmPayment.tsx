@@ -173,7 +173,7 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
     <Stack alignItems="center" spacing={1}>
       <SendPaymentIcon />
       <Typography variant="h5" className="payment-amount">
-        Send <AmountDisplay amount={amount.amount} currency={amount.currency} /> to{' '}
+        Send <AmountDisplay amount={BigNumber(amount.amount)} currency={amount.currency} /> to{' '}
       </Typography>
       <DirectoryEntry
         partyId={receiver}
@@ -223,15 +223,12 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
                 </TableCell>
                 <TableCell>
                   <Typography variant="h6" className="receiver-amount">
-                    <AmountDisplay amount={amount} currency={currency} />
+                    <AmountDisplay amount={BigNumber(amount)} currency={currency} />
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="caption" className="receiver-amount-converted">
-                    <AmountDisplay
-                      amount={converted.amount.toString()}
-                      currency={converted.currency}
-                    />
+                    <AmountDisplay amount={converted.amount} currency={converted.currency} />
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -287,12 +284,12 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
             <Typography variant="h5" className="payment-total-cc">
-              <AmountDisplay amount={totalCC.toString()} currency={'CC'} />
+              <AmountDisplay amount={totalCC} currency={'CC'} />
             </Typography>
             <Typography variant="body2" className="payment-compute">
-              <AmountDisplay amount={ccAmount.toString()} currency={'CC'} /> +{' '}
-              <AmountDisplay amount={fee.toString()} currency={'CC'} /> fee /{' '}
-              <AmountDisplay amount={totalUSD.toString()} currency={'USD'} />
+              <AmountDisplay amount={ccAmount} currency={'CC'} /> +{' '}
+              <AmountDisplay amount={fee} currency={'CC'} /> fee /{' '}
+              <AmountDisplay amount={totalUSD} currency={'USD'} />
             </Typography>
           </Stack>
           <ConfirmPaymentButton contractId={contractId} />

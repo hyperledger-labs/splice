@@ -95,13 +95,12 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
           <Typography variant="body1">Subscription Details</Typography>
           <Stack alignItems="center">
             <Typography variant="h6" className="sub-request-price">
-              <AmountDisplay amount={amount.toString()} currency={currency} /> per{' '}
+              <AmountDisplay amount={amount} currency={currency} /> per{' '}
               <IntervalDisplay microseconds={payData.paymentInterval.microseconds} />
             </Typography>
             <Typography variant="body2" className="sub-request-price-converted">
-              <AmountDisplay amount={converted.amount.toString()} currency={converted.currency} /> @{' '}
-              <AmountDisplay amount={coinPrice.toString()} currency={currency} />/
-              {converted.currency}
+              <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
+              <AmountDisplay amount={coinPrice} currency={currency} />/{converted.currency}
             </Typography>
           </Stack>
           <Stack alignItems="center">

@@ -43,10 +43,12 @@ const PaymentHeader: React.FC = () => {
           </span>
           <Typography className="available-balance">
             Total Available Balance:{' '}
-            <AmountDisplay amount={walletBalance.availableCC.toString()} currency="CC" /> /{' '}
+            <AmountDisplay amount={walletBalance.availableCC} currency="CC" /> /{' '}
             <AmountDisplay
-              amount={walletBalance.availableCC.times(coinPrice).toString()}
-              currency="USD"
+              amount={walletBalance.availableCC}
+              currency="CC"
+              convert="CCtoUSD"
+              coinPrice={coinPrice}
             />
           </Typography>
         </Stack>

@@ -168,12 +168,12 @@ const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
         className="sub-price"
       >
         <Typography variant="h6">
-          <AmountDisplay amount={amount.toString()} currency={currency} />
+          <AmountDisplay amount={amount} currency={currency} />
         </Typography>
         per <IntervalDisplay microseconds={perPeriod.microseconds} />
       </Box>
       <Typography variant="caption" className="sub-coin-price">
-        <AmountDisplay amount={converted.amount.toString()} currency={converted.currency} /> @{' '}
+        <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
         {converted.coinPriceToShow.toString()}
         {currency}/{converted.currency}
       </Typography>

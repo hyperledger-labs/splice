@@ -112,12 +112,12 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         </Stack>
         <Stack direction="column" alignItems="flex-end">
           <Typography className="transfer-offer-cc-amount">
-            + <AmountDisplay amount={offer.ccAmount} />
+            + <AmountDisplay amount={BigNumber(offer.ccAmount)} currency="CC" />
           </Typography>
           <Typography className="transfer-offer-usd-amount-rate">
             <>
               <AmountDisplay
-                amount={offer.convertedCurrency.amount.toString()}
+                amount={offer.convertedCurrency.amount}
                 currency={offer.convertedCurrency.currency}
               />{' '}
               @ {offer.convertedCurrency.coinPriceToShow.toString()} CC/USD
