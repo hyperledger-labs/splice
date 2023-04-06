@@ -717,25 +717,53 @@ function subcmd_obliterate_state() {
 
 ###
 
-subcommand_whitelist[ciapply]='Run only by CircleCI'
+subcommand_whitelist[ci_apply]='Run only by CircleCI'
 
-function subcmd_ciapply() {
+function subcmd_ci_apply() {
     _assert_lock --for-ci
 
-    # A CI specific variant of 'cncluster apply' that removes the need
+    # A CI-specific variant of 'cncluster apply' that removes the need
     # for manual confirmation and ensures that all pods are deleted
     # and recreated during the apply. With current (September 2022)
     # DevNet, the ledger is stored in memory and the pod reset
     # has the effect of clearing out all ledger state.
 
     if [ -z "${CI-}" ]; then
-        _error "This subcommand available to CI jobs only."
+        _error "This subcommand is available to CI jobs only."
         exit 1
     fi
 
     _cluster_show
     _cluster_reset
     _cluster_apply "${SOURCE_IMAGE_TAG}"
+}
+
+###
+
+subcommand_whitelist[ci_reset_unlock]='Run only by CircleCI'
+
+function subcmd_ci_reset_unlock() {
+    # A CI-specific variant of 'cncluster reset' and 'cncluster unlock' that
+    # removes the need for manual confirmation and is executed only on shared
+    # clusters (like scratchnet).
+
+    if [ -z "${CI-}" ]; then
+        _error "This subcommand is available to CI jobs only."
+        exit 1
+    fi
+
+    if [ -z "${SHARED_CLUSTER:-}" ]; then
+        _info "Not resetting and unlocking because not on a shared cluster (like scratchnet)."
+        return
+    fi
+
+    _cluster_reset
+    if lockholder=$(_current_lockholder); then
+        _unlock
+        _info "Cluster unlocked. Former lockholder was: ${lockholder}"
+    else
+        _info "Cluster was not locked."
+    fi
 }
 
 ###
@@ -1197,12 +1225,16 @@ function subcmd_lock() {
 
 subcommand_whitelist[unlock]="Release the lock on a cluster"
 
+function _unlock() {
+  kubectl delete secret cluster-lock > /dev/null
+}
+
 function subcmd_unlock() {
     _assert_lock
 
     if lockholder=$(_current_lockholder); then
         if [ "${lockholder}" = "$(whoami)" ]; then
-            kubectl delete secret cluster-lock > /dev/null
+            _unlock
             _info "Cluster lock successfully released."
 
             _info "(Don't forget to reset the cluster with 'cncluster reset')"
@@ -1222,7 +1254,7 @@ function subcmd_unlock_force() {
     _prompt_to_confirm --no-lock
 
     if lockholder=$(_current_lockholder); then
-        kubectl delete secret cluster-lock > /dev/null
+        _unlock
         _warning "Cluster forcibly unlocked, please let former lockholder know: ${lockholder}"
     else
         _info "Cluster was not locked."

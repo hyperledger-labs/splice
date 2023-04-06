@@ -945,7 +945,7 @@ jobs:
           cmd: |
             set -eou pipefail
             cncluster activate
-            cncluster ciapply
+            cncluster ci_apply
           cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -1011,6 +1011,15 @@ jobs:
       - download_gcloud_logs:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
+      - run_bash_command_in_nix:
+          when: always
+          cmd_name: reset cluster and free lock (if on scratch*)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            # TODO(#3902) remove the `|| true` once the updated cncluster command is available for all of our clusters
+            cncluster ci_reset_unlock || true
+          cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
