@@ -726,6 +726,7 @@ commands:
         enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
+          when: always
           cmd_name: Download gcloud logs
           cluster: << parameters.cluster >>
           gce_authenticate: true
@@ -759,6 +760,7 @@ commands:
               echo "Downloading logs for $app '$query'"
               cncluster gcloud_logs --download-only $app "$query"
             done
+            mkdir -p $REPO_ROOT/log
             mv *.clog $REPO_ROOT/log/
             # never fail so we don't unnecessarily annoy ourselves with CI failures
             true
