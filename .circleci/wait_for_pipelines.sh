@@ -6,7 +6,12 @@ WORKFLOW_NAMES="$2"
 fetch() {
     url=$1
     target=$2
-    curl -sSL --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" -o "${target}" "${url}"
+    # Retry in case of network flakiness
+    curl -sSL \
+        --retry 5 \
+        --retry-all-errors \
+        --retry-max-time 120 \
+        --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" -o "${target}" "${url}"
 }
 
 pipeline_workflows_complete() {

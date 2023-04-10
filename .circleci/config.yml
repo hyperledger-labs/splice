@@ -1071,6 +1071,7 @@ jobs:
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            make build
+         cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
