@@ -5,7 +5,6 @@ import * as postgres from "./postgres";
 import {
   auth0UserNameEnvVar,
   installAuth0Secret,
-  installAuth0UISecret,
 } from "./auth0";
 
 import { exactNamespace, installCNHelmChart } from "./utils";

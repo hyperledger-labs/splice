@@ -63,7 +63,7 @@ function loadYamlFromFile(path: PathLike): any {
 
 function stripJsonComments(rawText: string): string {
   const JSON_COMMENT_REGEX =
-    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|\#.*)/g;
+    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
 
   return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? "" : m));
 }

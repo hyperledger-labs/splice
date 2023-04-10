@@ -1,14 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
-import * as postgres from "./postgres";
-
-import {
-  auth0UserNameEnvVar,
-  installAuth0Secret,
-  installAuth0UISecret,
-} from "./auth0";
-
 import { ExactNamespace, installCNHelmChart } from "./utils";
 
 export function installDomain(

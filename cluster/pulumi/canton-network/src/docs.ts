@@ -5,8 +5,6 @@ import { exactNamespace, installCNHelmChart } from "./utils";
 export function installDocs(): k8s.helm.v3.Release {
   const xns = exactNamespace("docs");
 
-  const nsName = xns.ns.metadata.name;
-
   const dependsOn = [xns.ns];
 
   return installCNHelmChart(xns, "docs", "cn-docs", {}, dependsOn);

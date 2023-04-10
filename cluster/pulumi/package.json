@@ -26,8 +26,8 @@
         "check": "npm run format:check && npm run lint:check",
         "format:fix": "prettier --write canton-network/src",
         "format:check": "prettier --check canton-network/src",
-        "lint:fix": "eslint src --fix",
-        "lint:check": "eslint src --max-warnings=0"
+        "lint:fix": "eslint canton-network/src --fix",
+        "lint:check": "eslint canton-network/src --max-warnings=0"
     },
     "workspaces": [
         "canton-network"

@@ -47,8 +47,7 @@ export function installValidator(
   const dependsOn = [
     svc,
     xns.ns,
-    directoryWebUI,
-    splitwellWebUI,
+    participant,
     installAuth0Secret(xns, "validator", "validator"),
     installAuth0Secret(xns, "wallet", "wallet"),
 

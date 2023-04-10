@@ -14,7 +14,7 @@ const privateNetwork = gcp.compute.Network.get(
 
 function installCloudPostgres(
   xns: ExactNamespace,
-  name: String
+  name: string
 ): pulumi.Output<string> {
   const logicalName = xns.logicalName + "-" + name;
   const pgSvc = new gcp.sql.DatabaseInstance(logicalName, {
@@ -39,7 +39,7 @@ function installCloudPostgres(
     },
   });
 
-  const db = new gcp.sql.Database(
+  new gcp.sql.Database(
     `db-${logicalName}`,
     {
       instance: pgSvc.name,
@@ -50,7 +50,7 @@ function installCloudPostgres(
     }
   );
 
-  const users = new gcp.sql.User(
+  new gcp.sql.User(
     `user-${logicalName}`,
     {
       instance: pgSvc.name,
@@ -85,7 +85,7 @@ function installCNPostgres(
     }
   );
 
-  return pg.id.apply((_) => `${name}.${xns.logicalName}.svc.cluster.local`);
+  return pg.id.apply(() => `${name}.${xns.logicalName}.svc.cluster.local`);
 }
 
 // toplevel

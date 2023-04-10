@@ -1,5 +1,3 @@
-import { installDomain, installParticipant } from "./ledger";
-
 import { installSplitwell } from "./splitwell";
 import { installValidator } from "./validator";
 
@@ -23,7 +21,7 @@ function installCluster() {
   const splitwell = installSplitwell(svc);
 
   const docs = installDocs();
-  //installClusterIngress(validator, splitwell, docs);
+  installClusterIngress(validator, splitwell, docs);
 }
 
 //configureNetwork();

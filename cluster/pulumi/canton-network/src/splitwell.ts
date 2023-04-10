@@ -10,7 +10,6 @@ import {
 
 import { exactNamespace, installCNHelmChart } from "./utils";
 import { installDomain, installParticipant } from "./ledger";
-import { installClusterIngress } from "./ingress";
 
 export function installSplitwell(
   svc: k8s.helm.v3.Release
@@ -71,7 +70,7 @@ export function installSplitwell(
       postgres: postgresDb,
       additionalUsers: [
         auth0UserNameEnvVar("splitwell"),
-        auth0UserNameEnvVar("ledger"),
+        auth0UserNameEnvVar("wallet"),
       ],
       additionalConfig: [
         "  canton.validator-apps.validator_backend.app-instances.splitwise = {",
