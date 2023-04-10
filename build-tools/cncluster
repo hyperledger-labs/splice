@@ -1229,15 +1229,26 @@ function _unlock() {
   kubectl delete secret cluster-lock > /dev/null
 }
 
+function _check_reset_and_unlock() {
+    s=$(kubectl get StatefulSets -A --no-headers 2>/dev/null)
+    if [ -n "$s" ]; then
+        echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
+        read -r -p '[y/n]: '
+        if [ "${REPLY}" != 'n' ]; then
+            _cluster_reset
+            echo "Done resetting, unlocking.."
+        fi
+    fi
+    _unlock
+}
+
 function subcmd_unlock() {
     _assert_lock
 
     if lockholder=$(_current_lockholder); then
         if [ "${lockholder}" = "$(whoami)" ]; then
-            _unlock
+            _check_reset_and_unlock
             _info "Cluster lock successfully released."
-
-            _info "(Don't forget to reset the cluster with 'cncluster reset')"
         else
             _error "You cannot unlock cluster locked by: ${lockholder}"
         fi
@@ -1254,7 +1265,7 @@ function subcmd_unlock_force() {
     _prompt_to_confirm --no-lock
 
     if lockholder=$(_current_lockholder); then
-        _unlock
+        _check_reset_and_unlock
         _warning "Cluster forcibly unlocked, please let former lockholder know: ${lockholder}"
     else
         _info "Cluster was not locked."
