@@ -9,7 +9,6 @@ fetch() {
     # Retry in case of network flakiness
     curl -sSL \
         --retry 5 \
-        --retry-all-errors \
         --retry-max-time 120 \
         --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" -o "${target}" "${url}"
 }
