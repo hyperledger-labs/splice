@@ -45,7 +45,7 @@ object BuildCommon {
     val processLogger = new BuildUtil.BufferedLogger
     val exitCode = scala.sys.process
       .Process(
-        Seq("nix", "build", ".#protoc-gen-grpc-web", "--no-link", "--print-out-paths"),
+        Seq("nix", "build", "path:nix#protoc-gen-grpc-web", "--no-link", "--print-out-paths"),
         None,
       ) ! processLogger
     if (exitCode != 0) {

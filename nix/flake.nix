@@ -9,10 +9,10 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
       (system:
-        let pkgs = import nixpkgs { inherit system; overlays = import ./nix/overlays.nix; };
+        let pkgs = import nixpkgs { inherit system; overlays = import ./overlays.nix; };
             x86Pkgs =
               if system == "aarch64-darwin"
-              then import nixpkgs { system = "x86_64-darwin"; overlays = import ./nix/overlays.nix; }
+              then import nixpkgs { system = "x86_64-darwin"; overlays = import ./overlays.nix; }
               else pkgs;
 
         in

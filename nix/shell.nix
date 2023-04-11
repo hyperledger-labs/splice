@@ -1,7 +1,7 @@
 { pkgs, x86Pkgs }:
 let
   inherit (pkgs) stdenv fetchzip;
-  sources = builtins.fromJSON (builtins.readFile ./nix/canton-sources.json);
+  sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox iproute2 ];

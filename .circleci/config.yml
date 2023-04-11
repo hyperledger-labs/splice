@@ -53,6 +53,7 @@ commands:
         name: Make Nix cache key
         command: |
           set -euo pipefail
+          # TODO(#3953) Remove files outside of /nix
           git ls-files flake.nix flake.lock shell.nix nix/ | grep -v '[.]md$' | LANG=C sort | xargs sha256sum -b > /tmp/nix-cache-key
           sudo mkdir /nix
           sudo chown $USER /nix
@@ -84,7 +85,12 @@ commands:
          EOF
          . /home/circleci/.nix-profile/etc/profile.d/nix.sh
          echo "Building nix env"
-         nix develop -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+         # TODO(#3953) Remove workaround
+         NIX_TARGET="path:nix"
+         if [[ -f flake.nix ]]; then
+           NIX_TARGET="./"
+         fi
+         nix develop $NIX_TARGET -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
          echo "Garbage collecting to reduce cache size"
          nix-store --gc
     - save_cache:
@@ -413,7 +419,14 @@ commands:
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
 
+            # TODO(#3953) Remove workaround
+            NIX_TARGET="path:nix"
+            if [[ -f flake.nix ]]; then
+              NIX_TARGET="./"
+            fi
+
             nix develop \
+              $NIX_TARGET \
               --ignore-environment \
               --keep USER \
               --keep HOME \

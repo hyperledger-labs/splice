@@ -114,7 +114,7 @@ extra-experimental-features = nix-command flakes
    4. If the authorization exception isn't resolved, investigate further with additional logging
       by running the following command at the root of the CC repo :
       ```
-      nix develop --debug --verbose
+      nix develop --debug --verbose path:nix
       ```
 8. (optional) Enable [pre-commit](https://pre-commit.com/) to enforce format rules automatically:
    ```
