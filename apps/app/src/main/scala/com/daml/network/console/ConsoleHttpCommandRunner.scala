@@ -25,6 +25,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.console.{
+  CommandErrors,
   ConsoleCommandResult,
   StringErrorEitherToCommandResultExtensions,
 }
@@ -34,7 +35,7 @@ import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, TimeoutException}
 
 /** HTTP version of Canton’s GrpcAdminCommandRunner
   */
@@ -84,15 +85,20 @@ class ConsoleHttpCommandRunner(
       )
       // TODO(#2019): after all apps are HTTP-only, construct host from clientConfig.address + clientConfig.port. Then we can drop CNHttpClientConfig.
       val host = clientConfig.url
-      val apiResult =
-        awaitTimeout.await(
-          s"Running on ${instanceName} command ${command} against ${clientConfig}"
-        )(
-          httpRunner
-            .run(host, command, headers)
-            .value
-        )
-      apiResult.toResult
+      try {
+        val apiResult =
+          awaitTimeout.await(
+            s"Running on ${instanceName} command ${command} against ${clientConfig}"
+          )(
+            httpRunner
+              .run(host, command, headers)
+              .value
+          )
+        apiResult.toResult
+      } catch {
+        case _: TimeoutException =>
+          CommandErrors.ConsoleTimeout.Error(awaitTimeout.asJavaApproximation)
+      }
     }
 
   override def close(): Unit =
