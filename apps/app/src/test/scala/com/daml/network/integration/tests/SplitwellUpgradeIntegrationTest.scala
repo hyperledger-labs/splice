@@ -15,7 +15,6 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import org.slf4j.event.Level
 import scala.util.Try
@@ -34,10 +33,8 @@ class SplitwellUpgradeIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(darPath)
+        bobValidator.remoteParticipant.dars.upload(darPath)
       })
-
-  private val splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
-  private val splitwellAlias = DomainAlias.tryCreate("splitwell")
 
   "splitwell with upgraded domain" should {
     "report both domains" in { implicit env =>
@@ -61,19 +58,9 @@ class SplitwellUpgradeIntegrationTest
             },
         )
 
-      val upgradeConfig =
-        providerSplitwellBackend.remoteParticipant.domains.config(splitwellUpgradeAlias).value
-
-      val url = upgradeConfig.sequencerConnection
-        .asInstanceOf[GrpcSequencerConnection]
-        .endpoints
-        .head
-        .toURI(false)
-        .toString
-
       bracket(
-        aliceValidator.remoteParticipant.domains.connect(splitwellUpgradeAlias, url),
-        aliceValidator.remoteParticipant.domains.disconnect(splitwellUpgradeAlias),
+        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
       ) {
         // domains.connect syncs such that the domain shows up in
         // domains.list_connected but does not sync such that the party
@@ -118,6 +105,68 @@ class SplitwellUpgradeIntegrationTest
             )
           },
         )
+      }
+    }
+    "balance update and invite contracts follow group" in { implicit env =>
+      val alice = onboardWalletUser(aliceWallet, aliceValidator)
+      val bob = onboardWalletUser(bobWallet, bobValidator)
+      createSplitwellInstalls(aliceSplitwell, alice)
+      createSplitwellInstalls(bobSplitwell, bob)
+      val (_, group) = actAndCheck("create 'group1'", aliceSplitwell.requestGroup("group1"))(
+        "Alice sees 'group1'",
+        _ =>
+          inside(aliceSplitwell.listGroups()) { case Seq(group) =>
+            group
+          },
+      )
+      val invite = aliceSplitwell.createGroupInvite(
+        "group1"
+      )
+      val acceptedInvite = bobSplitwell.acceptInvite(invite)
+      val contractDomains =
+        providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+          group.contractId,
+          invite.contractId,
+          acceptedInvite,
+        )
+      contractDomains shouldBe Seq[LfContractId](
+        group.contractId,
+        invite.contractId,
+        acceptedInvite,
+      ).map(cid => cid -> splitwellAlias.unwrap).toMap
+      bracket(
+        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+      ) {
+        bracket(
+          connectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
+          disconnectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
+        ) {
+          val tfId = providerSplitwellBackend.remoteParticipant.transfer.out(
+            providerSplitwellBackend.getProviderPartyId(),
+            group.contractId,
+            splitwellAlias,
+            splitwellUpgradeAlias,
+          )
+          providerSplitwellBackend.remoteParticipant.transfer.in(
+            providerSplitwellBackend.getProviderPartyId(),
+            tfId,
+            splitwellUpgradeAlias,
+          )
+          eventually() {
+            val contractDomains =
+              providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+                group.contractId,
+                invite.contractId,
+                acceptedInvite,
+              )
+            contractDomains shouldBe Seq[LfContractId](
+              group.contractId,
+              invite.contractId,
+              acceptedInvite,
+            ).map(cid => cid -> splitwellUpgradeAlias.unwrap).toMap
+          }
+        }
       }
     }
   }

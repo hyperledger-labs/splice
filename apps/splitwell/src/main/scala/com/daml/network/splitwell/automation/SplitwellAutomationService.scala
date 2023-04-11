@@ -4,11 +4,10 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import akka.stream.Materializer
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
+  TransferFollowTrigger,
   TransferInTrigger,
-  TransferOutTrigger,
 }
 import com.daml.network.config.AutomationConfig
-import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
@@ -22,7 +21,6 @@ import scala.concurrent.ExecutionContextExecutor
 /** Manages background automation that runs on an splitwell app. */
 class SplitwellAutomationService(
     automationConfig: AutomationConfig,
-    domainConfig: SplitwellDomainConfig,
     clock: Clock,
     store: SplitwellStore,
     ledgerClient: CNLedgerClient,
@@ -62,18 +60,7 @@ class SplitwellAutomationService(
   )
 
   registerTrigger(
-    new GroupRequestTrigger(triggerContext, store, connection, domainConfig.splitwell.preferred)
-  )
-
-  registerTrigger(
-    new TransferOutTrigger.Template(
-      triggerContext,
-      store,
-      connection,
-      domainConfig.splitwell.preferred,
-      store.providerParty,
-      splitwellCodegen.BalanceUpdate.COMPANION,
-    )
+    new GroupRequestTrigger(triggerContext, store, connection)
   )
 
   registerTrigger(
@@ -82,6 +69,42 @@ class SplitwellAutomationService(
       store,
       connection,
       store.providerParty,
+    )
+  )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.providerParty,
+      splitwellCodegen.Group.COMPANION,
+      splitwellCodegen.BalanceUpdate.COMPANION,
+      () => store.listLaggingBalanceUpdates(),
+    )
+  )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.providerParty,
+      splitwellCodegen.Group.COMPANION,
+      splitwellCodegen.GroupInvite.COMPANION,
+      () => store.listLaggingGroupInvites(),
+    )
+  )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.providerParty,
+      splitwellCodegen.Group.COMPANION,
+      splitwellCodegen.AcceptedGroupInvite.COMPANION,
+      () => store.listLaggingAcceptedGroupInvites(),
     )
   )
 }

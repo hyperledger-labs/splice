@@ -1,5 +1,6 @@
 package com.daml.network.splitwell.store
 
+import com.daml.network.automation.TransferFollowTrigger
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.RetryProvider
@@ -91,6 +92,36 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
       splitwellCodegen.SplitwellInstall.COMPANION,
       c => c.payload.user == user.toProtoPrimitive,
     )
+
+  /** List balance updates that are lagging behind the corresponding group contract meaning the
+    * have not yet transferred to the same domain.
+    */
+  def listLaggingBalanceUpdates(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.BalanceUpdate.ContractId,
+    splitwellCodegen.BalanceUpdate,
+  ]]]
+
+  /** List group invites that are lagging behind the corresponding group contract meaning the
+    * have not yet transferred to the same domain.
+    */
+  def listLaggingGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.GroupInvite.ContractId,
+    splitwellCodegen.GroupInvite,
+  ]]]
+
+  /** List accepted group invites that are lagging behind the corresponding group contract meaning the
+    * have not yet transferred to the same domain.
+    */
+  def listLaggingAcceptedGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.AcceptedGroupInvite.ContractId,
+    splitwellCodegen.AcceptedGroupInvite,
+  ]]]
 
   private def groupMembers(group: splitwellCodegen.Group): Set[String] =
     group.members.asScala.toSet + group.owner

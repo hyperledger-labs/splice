@@ -1,14 +1,18 @@
 package com.daml.network.splitwell.store.memory
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.automation.TransferFollowTrigger
+import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
+import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class InMemorySplitwellStore(
     override val providerParty: PartyId,
@@ -19,6 +23,71 @@ class InMemorySplitwellStore(
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with SplitwellStore {
+
+  private def listLaggingContracts[LeaderC, LeaderTCid <: ContractId[
+    _
+  ], LeaderT, FollowerC, FollowerTCid <: ContractId[_], FollowerT, Id](
+      leaderCompanion: LeaderC,
+      followerCompanion: FollowerC,
+      getLeaderId: LeaderT => Id,
+      getFollowerId: FollowerT => Id,
+  )(implicit
+      leaderCompanionClass: ContractCompanion[LeaderC, LeaderTCid, LeaderT],
+      followerCompanionClass: ContractCompanion[FollowerC, FollowerTCid, FollowerT],
+  ) =
+    for {
+      followerContracts <- multiDomainAcsStore.listReadyContracts(
+        followerCompanion
+      )
+      leaderContracts <- multiDomainAcsStore.listReadyContracts(leaderCompanion)
+    } yield {
+      val leaderContractsById = leaderContracts.map(c => getLeaderId(c.contract.payload) -> c).toMap
+      followerContracts.collect(Function.unlift { c =>
+        leaderContractsById
+          .get(getFollowerId(c.contract.payload))
+          .filter(_.domain != c.domain)
+          .map(
+            TransferFollowTrigger.Task(_, c)
+          )
+      })
+    }
+
+  override def listLaggingBalanceUpdates(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.BalanceUpdate.ContractId,
+    splitwellCodegen.BalanceUpdate,
+  ]]] =
+    listLaggingContracts(
+      splitwellCodegen.Group.COMPANION,
+      splitwellCodegen.BalanceUpdate.COMPANION,
+      _.id,
+      _.group.id,
+    )
+
+  override def listLaggingGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.GroupInvite.ContractId,
+    splitwellCodegen.GroupInvite,
+  ]]] = listLaggingContracts(
+    splitwellCodegen.Group.COMPANION,
+    splitwellCodegen.GroupInvite.COMPANION,
+    _.id,
+    _.group.id,
+  )
+
+  override def listLaggingAcceptedGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+    splitwellCodegen.Group.ContractId,
+    splitwellCodegen.Group,
+    splitwellCodegen.AcceptedGroupInvite.ContractId,
+    splitwellCodegen.AcceptedGroupInvite,
+  ]]] = listLaggingContracts(
+    splitwellCodegen.Group.COMPANION,
+    splitwellCodegen.AcceptedGroupInvite.COMPANION,
+    _.id,
+    _.groupKey.id,
+  )
 
   override lazy val acsContractFilter = SplitwellStore.contractFilter(providerParty)
 }

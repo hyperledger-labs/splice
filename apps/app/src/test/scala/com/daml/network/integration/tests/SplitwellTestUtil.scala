@@ -7,11 +7,49 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.console.SplitwellAppClientReference
-import com.daml.network.console.WalletAppClientReference
+import com.daml.network.console.{
+  CNRemoteParticipantReference,
+  SplitwellAppClientReference,
+  WalletAppClientReference,
+}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
+  protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
+  protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
+  protected def connectSplitwellUpgradeDomain(
+      participant: CNRemoteParticipantReference
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val upgradeConfig =
+      providerSplitwellBackend.remoteParticipant.domains.config(splitwellUpgradeAlias).value
+
+    import com.daml.nonempty.+-:
+    val url = inside(upgradeConfig.sequencerConnection) {
+      case GrpcSequencerConnection(topEndpoint +-: _, _, _) =>
+        topEndpoint.toURI(false).toString
+    }
+
+    participant.domains.connect(splitwellUpgradeAlias, url)
+  }
+
+  protected def disconnectSplitwellUpgradeDomain(participant: CNRemoteParticipantReference) =
+    participant.domains.disconnect(splitwellUpgradeAlias)
+
+  protected def createSplitwellInstalls(splitwell: SplitwellAppClientReference, party: PartyId) = {
+    actAndCheck("Creating splitwell requests", splitwell.createInstallRequests())(
+      "Wait for splitwell installs",
+      requests => {
+        splitwell.listSplitwellInstalls().keys shouldBe requests.keys
+        splitwell.ledgerApi.ledger_api_extensions.acs
+          .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(
+            party
+          ) should have size requests.size.toLong
+      },
+    )
+  }
+
   def initSplitwellTest()(implicit
       env: CNNodeTestConsoleEnvironment
   ) = clue("setup splitwell users and contracts") {
@@ -31,9 +69,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
         (bobSplitwell, bobUserParty),
         (charlieSplitwell, charlieUserParty),
       ).foreach { case (splitwell, party) =>
-        splitwell.createInstallRequests()
-        splitwell.ledgerApi.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
+        createSplitwellInstalls(splitwell, party)
       }
     }
 

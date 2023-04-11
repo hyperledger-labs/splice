@@ -6,14 +6,13 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import CNNodeTests.BracketSynchronous.*
-import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
-import com.digitalasset.canton.DomainAlias
+import com.daml.network.util.{FrontendLoginUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 class SplitwellUpgradeFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("aliceSplitwell")
     with FrontendLoginUtil
+    with SplitwellTestUtil
     with WalletTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
@@ -27,22 +26,8 @@ class SplitwellUpgradeFrontendIntegrationTest
         aliceValidator.remoteParticipant.dars.upload(darPath)
       })
 
-  private val splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
-
-//  private val splitwellAlias = DomainAlias.tryCreate("splitwell")
-
   "splitwell frontend with upgraded domain" should {
     "create per domain install contracts" in { implicit env =>
-      val upgradeConfig =
-        providerSplitwellBackend.remoteParticipant.domains.config(splitwellUpgradeAlias).value
-
-      val url = upgradeConfig.sequencerConnection
-        .asInstanceOf[GrpcSequencerConnection]
-        .endpoints
-        .head
-        .toURI(false)
-        .toString
-
       val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
       val oldSplitwellDomain = inside(splitwellDomains.others) { case Seq(d) =>
         d
@@ -59,8 +44,8 @@ class SplitwellUpgradeFrontendIntegrationTest
       }
 
       bracket(
-        aliceValidator.remoteParticipant.domains.connect(splitwellUpgradeAlias, url),
-        aliceValidator.remoteParticipant.domains.disconnect(splitwellUpgradeAlias),
+        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
       ) {
         withFrontEnd("aliceSplitwell") { implicit webDriver =>
           reloadPage()

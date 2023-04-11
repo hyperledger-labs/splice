@@ -74,7 +74,6 @@ class SplitwellApp(
       )
     automation = new SplitwellAutomationService(
       config.automation,
-      config.domains,
       clock,
       store,
       ledgerClient,

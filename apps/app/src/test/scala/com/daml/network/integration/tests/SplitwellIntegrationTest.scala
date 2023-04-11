@@ -44,9 +44,7 @@ class SplitwellIntegrationTest
 
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
-        aliceSplitwell.createInstallRequests()
-        aliceSplitwell.ledgerApi.ledger_api_extensions.acs
-          .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
+        createSplitwellInstalls(aliceSplitwell, aliceUserParty)
 
         def createGroup() = {
           val groupRequest = aliceSplitwell.requestGroup("group1")
@@ -82,16 +80,12 @@ class SplitwellIntegrationTest
     }
 
     "use its own app domain" in { implicit env =>
-      val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
+      val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
 
       aliceWallet.tap(50)
 
-      val install = aliceSplitwell.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(aliceUserParty)
-      aliceValidator.remoteParticipant.transfer
-        .lookup_contract_domain(install.id) shouldBe Map(
-        javaToScalaContractId(install.id) -> "splitwell"
-      )
+      val installs = aliceSplitwell.listSplitwellInstalls()
+      installs.keySet.map(_.uid.id) shouldBe Set("splitwell")
 
       val (_, paymentRequest) = actAndCheck(
         "alice initiates transfer on splitwell domain",
@@ -132,9 +126,7 @@ class SplitwellIntegrationTest
 
     "domain disconnect" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
-      aliceSplitwell.createInstallRequests()
-      aliceSplitwell.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
+      createSplitwellInstalls(aliceSplitwell, alice)
       actAndCheck("alice creates group1", aliceSplitwell.requestGroup("group1"))(
         "alice observes group",
         _ => aliceSplitwell.listGroups() should have size 1,

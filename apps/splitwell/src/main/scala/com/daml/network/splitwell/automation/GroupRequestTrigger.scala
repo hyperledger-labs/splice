@@ -1,6 +1,5 @@
 package com.daml.network.splitwell.automation
 
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.automation.{
   OnReadyContractTrigger,
@@ -23,7 +22,6 @@ class GroupRequestTrigger(
     override protected val context: TriggerContext,
     store: SplitwellStore,
     connection: CNLedgerConnection,
-    splitwellDomain: DomainAlias,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -46,8 +44,6 @@ class GroupRequestTrigger(
     val user = PartyId.tryFromProtoPrimitive(req.contract.payload.group.owner)
     val groupId = req.contract.payload.group.id
     for {
-      // TODO(M3-19) Use latest domain user has an install contract for.
-      domainId <- store.domains.getDomainId(splitwellDomain)
       queryResult <- store.lookupGroupWithOffset(user, groupId)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
@@ -56,7 +52,7 @@ class GroupRequestTrigger(
           )
           val cmd = req.contract.contractId.exerciseGroupRequest_Reject()
           connection
-            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, domainId)
+            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
             .map(_ => TaskSuccess("rejected request for already existing group."))
 
         case result @ QueryResult(_, None) =>
@@ -73,7 +69,7 @@ class GroupRequestTrigger(
                 groupId.unpack,
               ),
               deduplicationOffset = result.deduplicationOffset,
-              domainId = domainId,
+              domainId = req.domain,
             )
             .map(_ => TaskSuccess("accepted group request."))
       }

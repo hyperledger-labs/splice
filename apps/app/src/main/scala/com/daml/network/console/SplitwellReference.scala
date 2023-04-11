@@ -96,20 +96,14 @@ final class SplitwellAppClientReference(
   lazy val context =
     GrpcSplitwellAppClient.SplitwellContext(getUserPrimaryParty())
 
-  private def getSplitwellInstall(): splitwellCodegen.SplitwellInstall.ContractId = {
-    val providerParty = getProviderPartyId()
+  private def getSplitwellInstall(): (DomainId, splitwellCodegen.SplitwellInstall.ContractId) = {
     val userParty = getUserPrimaryParty()
-    val installs =
-      ledgerApi.ledger_api_extensions.acs.filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(
-        userParty,
-        (install: splitwellCodegen.SplitwellInstall.Contract) =>
-          install.data.user == userParty.toProtoPrimitive && install.data.provider == providerParty.toProtoPrimitive,
-      )
-    installs match {
-      case Seq(install) => install.id
+    val installs = listSplitwellInstalls()
+    installs.toList match {
+      case Seq((domain, install)) => (domain, install)
       case _ =>
         throw new IllegalStateException(
-          s"Expected exactly one DirectoryInstall contract for user $userParty but got $installs"
+          s"Expected exactly one SplitwellInstall contract for user $userParty but got $installs"
         )
     }
   }
@@ -199,10 +193,11 @@ final class SplitwellAppClientReference(
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
     val svc = remoteScan.getSvcPartyId()
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_RequestGroup(
+      install.exerciseSplitwellInstall_RequestGroup(
         new splitwellCodegen.Group(
           party.toProtoPrimitive,
           svc.toProtoPrimitive,
@@ -212,6 +207,7 @@ final class SplitwellAppClientReference(
           acceptDuration,
         )
       ),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
@@ -222,15 +218,17 @@ final class SplitwellAppClientReference(
       id: String
   ): Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
+    val (domain, install) = getSplitwellInstall()
     ledgerApi.ledger_api_extensions.commands.submitWithCreate(
       splitwellCodegen.GroupInvite.COMPANION
     )(
       userId,
       Seq(party),
       Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_CreateInvite(
+      install.exerciseSplitwellInstall_CreateInvite(
         getGroup(groupKey_(party, id))
       ),
+      domainId = Some(domain),
     )
   }
 
@@ -244,13 +242,15 @@ final class SplitwellAppClientReference(
         party,
         (c: splitwellCodegen.AcceptedGroupInvite.Contract) => c.id == acceptedGroupInvite,
       )
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_Join(
+      install.exerciseSplitwellInstall_Join(
         getGroup(acceptedInvite.data.groupKey),
         acceptedGroupInvite,
       ),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
@@ -261,13 +261,15 @@ final class SplitwellAppClientReference(
       groupInvite: Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
   ): splitwellCodegen.AcceptedGroupInvite.ContractId = {
     val party = getUserPrimaryParty()
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_AcceptInvite(
+      install.exerciseSplitwellInstall_AcceptInvite(
         groupInvite.contractId
       ),
       disclosedContracts = Seq(groupInvite.toDisclosedContract),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
@@ -282,14 +284,16 @@ final class SplitwellAppClientReference(
       description: String,
   ): splitwellCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_EnterPayment(
+      install.exerciseSplitwellInstall_EnterPayment(
         getGroup(key.toPrim),
         amount.bigDecimal,
         description,
       ),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
@@ -299,13 +303,15 @@ final class SplitwellAppClientReference(
       receiverAmounts: Seq[walletCodegen.ReceiverCCAmount],
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_InitiateTransfer(
+      install.exerciseSplitwellInstall_InitiateTransfer(
         getGroup(key.toPrim),
         receiverAmounts.asJava,
       ),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
@@ -330,13 +336,15 @@ final class SplitwellAppClientReference(
           java.math.BigDecimal,
         ]).asJava
       }.asJava
+    val (domain, install) = getSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      getSplitwellInstall().exerciseSplitwellInstall_Net(
+      install.exerciseSplitwellInstall_Net(
         getGroup(key.toPrim),
         balanceChangesPrim,
       ),
+      domainId = Some(domain),
     ).exerciseResult
   }
 
