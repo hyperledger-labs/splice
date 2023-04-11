@@ -177,6 +177,13 @@ function _current_lockholder() {
     kubectl get secret cluster-lock -o jsonpath='{.data.lockholder}' 2>/dev/null | base64 --decode
 }
 
+function _current_lock_age() {
+    lock_timestamp=$(kubectl get secret cluster-lock -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null | xargs -0 -I X date -d X +%s)
+    current_timestamp=$(date +%s)
+    diff="$((current_timestamp-lock_timestamp))"
+    date -d @${diff} +"%d day(s), %H hour(s), %M minute(s)" -u
+}
+
 function _assert_lock() {
     if [ -z "${SHARED_CLUSTER:-}" ]; then
         return
@@ -1213,7 +1220,7 @@ function subcmd_lock() {
         if [ "${lockholder}" = "$(whoami)" ]; then
             _info "Cluster is already locked to you."
         else
-            _error "Cluster already locked by: ${lockholder}"
+            _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age)."
         fi
     else
         kubectl create secret generic cluster-lock --from-literal=lockholder="$(whoami)" > /dev/null
