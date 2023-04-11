@@ -142,17 +142,13 @@ class SplitwellUpgradeIntegrationTest
           connectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
           disconnectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
         ) {
-          val tfId = providerSplitwellBackend.remoteParticipant.transfer.out(
+          providerSplitwellBackend.remoteParticipant.transfer.out(
             providerSplitwellBackend.getProviderPartyId(),
             group.contractId,
             splitwellAlias,
             splitwellUpgradeAlias,
           )
-          providerSplitwellBackend.remoteParticipant.transfer.in(
-            providerSplitwellBackend.getProviderPartyId(),
-            tfId,
-            splitwellUpgradeAlias,
-          )
+          // Transfer in is submitted by the TransferInTrigger.
           eventually() {
             val contractDomains =
               providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
