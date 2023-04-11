@@ -8,6 +8,7 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
 import com.daml.lf.data.{Decimal, Numeric}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.LfTimestamp
 import io.grpc.{Status, StatusRuntimeException}
@@ -111,6 +112,17 @@ object Codec {
   object Timestamp extends CodecCompanion[CantonTimestamp] {
     type Enc = Long
     def instance = timestampValue
+  }
+
+  implicit val domainIdValue: Codec[topology.DomainId, String] =
+    new Codec[topology.DomainId, String] {
+      def encode(d: topology.DomainId) = d.toProtoPrimitive
+      def decode(e: String) = topology.DomainId.fromString(e)
+    }
+
+  object DomainId extends CodecCompanion[topology.DomainId] {
+    type Enc = String
+    def instance = domainIdValue
   }
 
   // TODO (#3819): use a different exception

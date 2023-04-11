@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 
 service SplitwellService {
   // Read-only
+  rpc ListSplitwellInstalls (ListSplitwellInstallsRequest) returns (ListSplitwellInstallsResponse);
   rpc ListGroups (ListGroupsRequest) returns (ListGroupsResponse);
   rpc ListGroupInvites (ListGroupInvitesRequest) returns (ListGroupInvitesResponse);
   rpc ListAcceptedGroupInvites (ListAcceptedGroupInvitesRequest) returns (ListAcceptedGroupInvitesResponse);
@@ -89,4 +90,17 @@ message ListConnectedDomainsResponse {
 message GetSplitwellDomainIdsResponse {
   string preferred_domain_id = 1;
   repeated string other_domain_ids = 2;
+}
+
+message ListSplitwellInstallsRequest {
+  SplitwellContext context = 1;
+}
+
+message SplitwellInstall {
+  string contract_id = 1;
+  string domain_id = 2;
+}
+
+message ListSplitwellInstallsResponse {
+  repeated SplitwellInstall installs = 1;
 }

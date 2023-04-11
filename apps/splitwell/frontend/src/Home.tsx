@@ -1,10 +1,13 @@
 import {
-  Contract,
   usePrimaryParty,
   useUserState,
   useStateSnapshotServiceClient,
   StateSnapshotServiceClientProvider,
 } from 'common-frontend';
+import {
+  ListSplitwellInstallsRequest,
+  SplitwellContext,
+} from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 import { GetConnectedDomainsRequest } from 'common-protobuf/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useState, useEffect } from 'react';
@@ -12,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { Container, Stack, Typography } from '@mui/material';
 
 import { SplitwellInstall, SplitwellInstallRequest } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { ContractId } from '@daml/types';
 
 import GroupSetup from './GroupSetup';
 import Groups from './Groups';
@@ -21,6 +25,11 @@ import {
 } from './contexts/SplitwellLedgerApiContext';
 import { useSplitwellClient } from './contexts/SplitwellServiceContext';
 import { config } from './utils/config';
+
+type SplitwellDomains = {
+  preferred: string;
+  others: string[];
+};
 
 const HomeWithContext: React.FC<{
   userId: string;
@@ -32,8 +41,9 @@ const HomeWithContext: React.FC<{
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
-  const [install, setInstall] = useState<Contract<SplitwellInstall> | undefined>();
-  const [splitwellDomainId, setSplitwellDomainId] = useState<string | undefined>();
+  const [installs, setInstalls] = useState<Map<string, ContractId<SplitwellInstall>>>(new Map());
+  const [splitwellDomainIds, setSplitwellDomainIds] = useState<SplitwellDomains | undefined>();
+  const [connectedDomainIds, setConnectedDomainIds] = useState<string[]>([]);
 
   const primaryPartyId = usePrimaryParty(ledgerApiClient);
 
@@ -55,68 +65,127 @@ const HomeWithContext: React.FC<{
     const querySplitwellDomain = async () => {
       console.debug('Querying backend for splitwell domain');
       const domainsResponse = await splitwellClient.getSplitwellDomainIds(new Empty(), undefined);
-      const domainId = domainsResponse.getPreferredDomainId();
-      console.debug(`Using splitwell domain id ${domainId}`);
-      setSplitwellDomainId(domainId);
+      const domains: SplitwellDomains = {
+        preferred: domainsResponse.getPreferredDomainId(),
+        others: domainsResponse.getOtherDomainIdsList(),
+      };
+      console.debug(`Splitwell domains from provider: ${JSON.stringify(domains)}`);
+      setSplitwellDomainIds(domains);
     };
 
     querySplitwellDomain();
   }, [splitwellClient]);
 
-  // We don’t expect to have console-based auth in Q4 so we
-  // generate the install contract from the frontend rather than the backend.
   useEffect(() => {
-    const getParticipantDomains = async (partyId: string) => {
+    const queryConnectedDomains = async (partyId: string) => {
       const req = new GetConnectedDomainsRequest().setParty(partyId);
-      return stateSnapshotServiceClient.getConnectedDomains(req);
+      console.debug('Querying for connected domains');
+      const domains = await stateSnapshotServiceClient.getConnectedDomains(req);
+      const domainIds = domains.getConnectedDomainsList().map(domain => domain.getDomainId());
+      setConnectedDomainIds(domainIds);
+      console.debug(`Connected domains: ${domainIds}`);
+    };
+    if (primaryPartyId) {
+      queryConnectedDomains(primaryPartyId);
+    }
+  }, [stateSnapshotServiceClient, primaryPartyId]);
+
+  useEffect(() => {
+    const queryInstall = async (
+      user: string,
+      domainId: string
+    ): Promise<ContractId<SplitwellInstall> | undefined> => {
+      const installs = await splitwellClient.listSplitwellInstalls(
+        new ListSplitwellInstallsRequest().setContext(new SplitwellContext().setUserPartyId(user))
+      );
+      const install = installs
+        .getInstallsList()
+        .find(install => install.getDomainId() === domainId);
+      if (install) {
+        return install.getContractId() as ContractId<SplitwellInstall>;
+      }
+      return install;
+    };
+    let effectCancelled = false;
+    const setupInstallContractForDomain = async (
+      user: string,
+      provider: string,
+      domainId: string
+    ) => {
+      console.debug(`Searching for SplitwellInstall on domain ${domainId}`);
+      const install = await queryInstall(user, domainId);
+      if (effectCancelled) {
+        return;
+      }
+      if (install) {
+        console.debug(`SplitwellInstall found for domain ${domainId}`);
+        setInstalls(prev => new Map(prev).set(domainId, install));
+      } else {
+        console.debug(
+          `SplitwellInstall not found for domain ${domainId}, creating SplitwellInstallRequest`
+        );
+        await ledgerApiClient.create(
+          [user],
+          SplitwellInstallRequest,
+          {
+            user: user,
+            provider: provider,
+          },
+          domainId
+        );
+        console.debug('Created SplitwellInstallRequest, waiting for SplitwellInstall');
+        setTimeout(() => {
+          const maxRetries = 30;
+          const querySplitwellInstall = async (n: number) => {
+            const install = await queryInstall(user, domainId);
+            if (effectCancelled) {
+              return;
+            }
+            if (install) {
+              console.debug(`SplitwellInstall found for domain ${domainId}`);
+              setInstalls(prev => new Map(prev).set(domainId, install));
+            } else if (n > 0) {
+              console.debug(
+                `SplitwellInstall not found for domain ${domainId}, waiting before retrying`
+              );
+              setTimeout(() => querySplitwellInstall(n - 1), 500);
+            } else {
+              throw new Error(
+                `SplitwellInstall not found for domain ${domainId} after ${maxRetries} retries, giving up`
+              );
+            }
+          };
+          querySplitwellInstall(maxRetries);
+          return () => {
+            effectCancelled = true;
+          };
+        }, 500);
+      }
     };
 
-    const setupInstallContract = async () => {
-      if (primaryPartyId && provider && splitwellDomainId) {
-        console.debug('Searching for SplitwellInstall');
-        const install = await ledgerApiClient.querySplitwellInstall(primaryPartyId, provider);
-        const participantDomains = await getParticipantDomains(primaryPartyId);
-        console.debug(`The participant is connected to domains: ${participantDomains}`);
-        if (install) {
-          console.debug('SplitwellInstall found');
-          setInstall(install);
-        } else {
-          console.debug('SplitwellInstall not found, creating SplitwellInstallRequest');
-          await ledgerApiClient.create(
-            [primaryPartyId],
-            SplitwellInstallRequest,
-            {
-              user: primaryPartyId,
-              provider: provider,
-            },
-            splitwellDomainId
-          );
-          console.debug('Created SplitwellInstallRequest, waiting for SplitwellInstall');
-          setTimeout(() => {
-            const maxRetries = 30;
-            const querySplitwellInstall = async (n: number) => {
-              const install = await ledgerApiClient.querySplitwellInstall(primaryPartyId, provider);
-              if (install) {
-                console.debug('SplitwellInstall found');
-                setInstall(install);
-              } else if (n > 0) {
-                console.debug('SplitwellInstall not found, waiting before retrying');
-                setTimeout(() => querySplitwellInstall(n - 1), 500);
-              } else {
-                throw new Error(
-                  `SplitwellInstall not found after ${maxRetries} retries, giving up`
-                );
-              }
-            };
-            querySplitwellInstall(maxRetries);
-          }, 500);
+    const setupInstallContracts = async () => {
+      if (primaryPartyId && provider && splitwellDomainIds && connectedDomainIds) {
+        const connectedSplitwellDomainIds = connectedDomainIds.filter(
+          d => splitwellDomainIds.preferred === d || splitwellDomainIds.others.includes(d)
+        );
+        console.debug(`Connected splitwell domain ids: ${connectedSplitwellDomainIds}`);
+        for (const domain of connectedSplitwellDomainIds) {
+          await setupInstallContractForDomain(primaryPartyId, provider, domain);
         }
       }
     };
-    setupInstallContract();
-  }, [primaryPartyId, provider, ledgerApiClient, splitwellDomainId, stateSnapshotServiceClient]);
+    setupInstallContracts();
+  }, [
+    primaryPartyId,
+    provider,
+    ledgerApiClient,
+    splitwellClient,
+    splitwellDomainIds,
+    connectedDomainIds,
+    stateSnapshotServiceClient,
+  ]);
 
-  if (provider && primaryPartyId && svc && install && splitwellDomainId) {
+  if (provider && primaryPartyId && svc && splitwellDomainIds && installs.size > 0) {
     return (
       <Container>
         <Stack spacing={3}>
@@ -124,9 +193,13 @@ const HomeWithContext: React.FC<{
             party={primaryPartyId}
             provider={provider}
             svc={svc}
-            domainId={splitwellDomainId}
+            domainId={splitwellDomainIds.preferred}
           />
-          <Groups party={primaryPartyId} provider={provider} domainId={splitwellDomainId} />
+          <Groups
+            party={primaryPartyId}
+            provider={provider}
+            domainId={splitwellDomainIds.preferred}
+          />
         </Stack>
       </Container>
     );

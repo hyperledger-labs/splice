@@ -4,7 +4,7 @@ import cats.implicits.*
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
-import com.daml.network.util.{Contract, Codec, CodecCompanion}
+import com.daml.network.util.{Contract, Codec}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
@@ -184,14 +184,6 @@ object GrpcSplitwellAppClient {
       preferred: DomainId,
       others: Seq[DomainId],
   )
-  object DomainIdCompanion extends CodecCompanion[DomainId] {
-    type Enc = String
-    def instance = new Codec[DomainId, String] {
-      def encode(d: DomainId) = d.toProtoPrimitive
-      def decode(e: String) = DomainId.fromString(e)
-    }
-  }
-
   case class GetSplitwellDomainIds(
   ) extends BaseCommand[Empty, v0.GetSplitwellDomainIdsResponse, SplitwellDomains] {
     override def createRequest(): Either[String, Empty] =
@@ -206,8 +198,36 @@ object GrpcSplitwellAppClient {
         response: v0.GetSplitwellDomainIdsResponse
     ): Either[String, SplitwellDomains] =
       for {
-        preferred <- Codec.decode(DomainIdCompanion)(response.preferredDomainId)
-        others <- response.otherDomainIds.traverse(id => Codec.decode(DomainIdCompanion)(id))
+        preferred <- Codec.decode(Codec.DomainId)(response.preferredDomainId)
+        others <- response.otherDomainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
       } yield SplitwellDomains(preferred, others)
+  }
+
+  case class ListSplitwellInstalls(context: SplitwellContext)
+      extends BaseCommand[
+        v0.ListSplitwellInstallsRequest,
+        v0.ListSplitwellInstallsResponse,
+        Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId],
+      ] {
+    override def createRequest(): Either[String, v0.ListSplitwellInstallsRequest] =
+      Right(v0.ListSplitwellInstallsRequest(Some(context.toProtoV0)))
+    override def submitRequest(
+        service: SplitwellServiceStub,
+        request: v0.ListSplitwellInstallsRequest,
+    ): Future[v0.ListSplitwellInstallsResponse] = service.listSplitwellInstalls(request)
+
+    override def handleResponse(
+        response: v0.ListSplitwellInstallsResponse
+    ): Either[String, Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId]] =
+      for {
+        installs <- response.installs.traverse(install =>
+          for {
+            domain <- Codec.decode(Codec.DomainId)(install.domainId)
+            cid <- Codec.decodeJavaContractId(splitwellCodegen.SplitwellInstall.COMPANION)(
+              install.contractId
+            )
+          } yield domain -> cid
+        )
+      } yield installs.toMap
   }
 }

@@ -381,6 +381,11 @@ final class SplitwellAppClientReference(
       adminCommand(GrpcSplitwellAppClient.ListBalances(key, context))
     }
 
+  def listSplitwellInstalls(): Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwellAppClient.ListSplitwellInstalls(context))
+    }
+
   override val remoteScanConfig = config.remoteScan
 }
 

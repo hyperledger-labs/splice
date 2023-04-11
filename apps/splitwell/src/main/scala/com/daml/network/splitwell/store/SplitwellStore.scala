@@ -6,6 +6,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
 import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -81,6 +82,14 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
       c =>
         groupMembers(c.payload.group).contains(user.toProtoPrimitive) &&
           groupKey(c.payload.group) == key,
+    )
+
+  def listSplitwellInstalls(user: PartyId): Future[Seq[
+    ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
+  ]] =
+    multiDomainAcsStore.listReadyContracts(
+      splitwellCodegen.SplitwellInstall.COMPANION,
+      c => c.payload.user == user.toProtoPrimitive,
     )
 
   private def groupMembers(group: splitwellCodegen.Group): Set[String] =

@@ -167,6 +167,25 @@ class GrpcSplitwellService(
       }
     }
 
+  override def listSplitwellInstalls(
+      request: v0.ListSplitwellInstallsRequest
+  ): Future[v0.ListSplitwellInstallsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
+      val userParty = Codec.tryDecode(Codec.Party)(request.getContext.userPartyId)
+      for {
+        installs <- store.listSplitwellInstalls(userParty)
+      } yield {
+        v0.ListSplitwellInstallsResponse(
+          installs.map(c =>
+            v0.SplitwellInstall(
+              Codec.encodeContractId(c.contract.contractId),
+              Codec.encode(c.domain),
+            )
+          )
+        )
+      }
+    }
+
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => span =>
       Future.successful(v0.GetProviderPartyIdResponse(Codec.encode(providerParty)))
