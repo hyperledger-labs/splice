@@ -1,6 +1,8 @@
 package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.api.v1 as ccV1Api
+import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.config.ScanDomainConfig
@@ -66,6 +68,13 @@ trait ScanStore
   def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
+
+  // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
+  def lookupValidatorTraffic: Future[
+    Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
+  ]
+
+  def getValidatorExtraTrafficLimit()(implicit tc: TraceContext): Future[BigDecimal]
 }
 
 object ScanStore {
@@ -110,6 +119,7 @@ object ScanStore {
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         // TODO(#3707): consider putting the filter also behind a config parameter
         mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(ccV1Api.validatortraffic.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

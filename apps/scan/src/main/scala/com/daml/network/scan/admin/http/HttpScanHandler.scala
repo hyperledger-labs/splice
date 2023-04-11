@@ -15,22 +15,23 @@ import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{Codec, Contract, ContractMetadataUtil}
+import com.daml.network.util.{Codec, Contract, ContractMetadataUtil, RateLimiterWithExtraTraffic}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.RateLimiter
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.scan.config.ScanAppBackendConfig
+import com.digitalasset.canton.time.Clock
 import io.grpc.StatusRuntimeException
 
 class HttpScanHandler(
     store: ScanStore,
     config: ScanAppBackendConfig,
+    clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -41,10 +42,13 @@ class HttpScanHandler(
   private val workflowId = this.getClass.getSimpleName
 
   // TODO(#3816): Temporarily added state to mock the sequencer QoS as part of the DomainFees PoC until the Canton functionality is implemented
-  private val defaultThroughputRateLimiter = {
+  private val rateLimiterWithExtraTraffic =
     // default throughput of 2 transactions per second with a max burst of 2 transactions
-    new RateLimiter(NonNegativeNumeric.tryCreate(2.0), PositiveNumeric.tryCreate(1.0))
-  }
+    new RateLimiterWithExtraTraffic(
+      NonNegativeNumeric.tryCreate(2.0),
+      PositiveNumeric.tryCreate(1.0),
+      clock,
+    )
 
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
@@ -354,14 +358,19 @@ class HttpScanHandler(
   def getValidatorCredit(
       response: v0.ScanResource.GetValidatorCreditResponse.type
   )(): Future[v0.ScanResource.GetValidatorCreditResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
-      Future.successful {
-        val validatorCredit = defaultThroughputRateLimiter.getCurrentAllowance.toLong
-        v0.ScanResource.GetValidatorCreditResponse.OK(
-          definitions.GetValidatorCreditResponse(validatorCredit)
-        )
-      }
+      store
+        .getValidatorExtraTrafficLimit()
+        .map(limit => {
+          val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
+          val extraTrafficBalance =
+            rateLimiterWithExtraTraffic.getExtraTrafficBalance(extraTrafficLimit)
+          v0.ScanResource.GetValidatorCreditResponse.OK(
+            definitions.GetValidatorCreditResponse(extraTrafficBalance)
+          )
+        })
+
     }
 
   def checkAndUpdateValidatorCredit(
@@ -369,15 +378,14 @@ class HttpScanHandler(
   )(): Future[v0.ScanResource.CheckAndUpdateValidatorCreditResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
-      Future.successful {
-        // consume traffic credits from default traffic allowance
-        val approved = defaultThroughputRateLimiter.checkAndUpdateRate()
-        logger.debug(
-          s"Remaining free throughput allowance is ${defaultThroughputRateLimiter.getCurrentAllowance}"
-        )
-        v0.ScanResource.CheckAndUpdateValidatorCreditResponse.OK(
-          definitions.CheckAndUpdateValidatorCreditResponse(approved)
-        )
-      }
+      store
+        .getValidatorExtraTrafficLimit()
+        .map(limit => {
+          val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
+          val approved = rateLimiterWithExtraTraffic.checkAndUpdate(extraTrafficLimit)
+          v0.ScanResource.CheckAndUpdateValidatorCreditResponse.OK(
+            definitions.CheckAndUpdateValidatorCreditResponse(approved)
+          )
+        })
     }
 }

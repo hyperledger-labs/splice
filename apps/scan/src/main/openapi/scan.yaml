@@ -369,8 +369,8 @@ components:
       required: ["validatorCredit"]
       properties:
         validatorCredit:
-          type: integer
-          format: int64
+          type: number
+          format: double
     CheckAndUpdateValidatorCreditResponse:
       type: object
       required: ["approved"]

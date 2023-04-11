@@ -460,7 +460,7 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetValidatorCredit() extends BaseCommand[http.GetValidatorCreditResponse, Long] {
+  case class GetValidatorCredit() extends BaseCommand[http.GetValidatorCreditResponse, Double] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
@@ -469,7 +469,7 @@ object HttpScanAppClient {
 
     override def handleResponse(
         response: http.GetValidatorCreditResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Long] =
+    )(implicit decoder: TemplateJsonDecoder): Either[String, Double] =
       response match {
         case http.GetValidatorCreditResponse.OK(response) =>
           Right(response.validatorCredit)

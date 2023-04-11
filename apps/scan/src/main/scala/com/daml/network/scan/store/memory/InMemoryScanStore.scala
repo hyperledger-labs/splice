@@ -13,10 +13,13 @@ import scala.concurrent.*
 import com.daml.network.environment.CNLedgerConnection
 import io.grpc.Status
 import com.digitalasset.canton.tracing.TraceContext
+
 import scala.collection.immutable.Map
 import cats.implicits.*
 import cats.kernel.Monoid
+import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
 import com.daml.network.store.TxLogStore
+import com.daml.network.util.Contract
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
@@ -182,6 +185,21 @@ class InMemoryScanStore(
         case _ => false
       }),
     )
+
+  // TODO(#3734): Accept validator as argument. Right now, this assumes there is only 1 validator.
+  override def lookupValidatorTraffic: Future[
+    Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(_, _ => true)
+    )
+
+  override def getValidatorExtraTrafficLimit()(implicit tc: TraceContext): Future[BigDecimal] = {
+    lookupValidatorTraffic.map {
+      case None => BigDecimal(0.0)
+      case Some(validatorTraffic) => validatorTraffic.payload.amount
+    }
+  }
 
   override def close(): Unit = {
     super.close()

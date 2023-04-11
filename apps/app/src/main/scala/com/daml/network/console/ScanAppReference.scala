@@ -166,7 +166,7 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary("Get the available credit for a validator")
-  def getValidatorCredit(): Long =
+  def getValidatorCredit(): Double =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetValidatorCredit())
     }
