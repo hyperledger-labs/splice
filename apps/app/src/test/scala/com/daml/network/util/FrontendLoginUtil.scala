@@ -72,9 +72,12 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
       withFrontEnd(frontendDriverName) { implicit webDriver =>
         actAndCheck(
           "The user logs in with OAauth2 and completes all Auth0 login prompts", {
-            go to s"http://localhost:$localHostPort"
-            click on "oidc-login-button"
-            completeAuth0LoginWithAuthorization(user.email, user.password)
+            completeAuth0LoginWithAuthorization(
+              s"http://localhost:$localHostPort",
+              user.email,
+              user.password,
+              userPartyId,
+            )
           },
         )(
           "The user sees his own party ID in the app",

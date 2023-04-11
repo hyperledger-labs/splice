@@ -8,10 +8,12 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.Event
-import org.openqa.selenium.bidi.log.{Log, LogLevel, LogEntry}
+import org.openqa.selenium.bidi.log.{Log, LogEntry, LogLevel}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.openqa.selenium.{
   JavascriptExecutor,
@@ -33,6 +35,8 @@ import java.time.Duration
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
+import org.slf4j.event.Level
+
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -320,11 +324,24 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
-  protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
+  protected def completeAuth0LoginWithAuthorization(
+      url: String,
+      username: String,
+      password: String,
+      userPartyId: PartyId,
+  )(implicit
       webDriver: WebDriverType
   ) = {
-    completeAuth0Login(username, password)
-    completeOptionalAuth0Authorization(() => false)
+    eventually() {
+      go to url
+      click on "oidc-login-button"
+      assertPartyOnboarded(
+        userPartyId, {
+          completeAuth0Login(username, password)
+          completeOptionalAuth0Authorization(() => false)
+        },
+      )
+    }
   }
 
   /* Works independently of which prompts Auth0 shows you exactly.
@@ -383,6 +400,31 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
+  private def assertPartyOnboarded(expectedParty: PartyId, withIn: => Unit): Unit = {
+    var isNetworkError = false
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      withIn,
+      lines => {
+        if (
+          lines.exists { line =>
+            line.level == Level.ERROR && line.loggerName.contains("web-frontend") && line.message
+              .contains("[JsonService] postForm: Network error")
+          }
+        ) {
+          isNetworkError = true
+          succeed
+        } else {
+          forAtLeast(1, lines) { line =>
+            line.loggerName should include("web-frontend")
+            line.message should include(
+              s", primaryParty: ${expectedParty.toProtoPrimitive}, isAuthenticated: true"
+            )
+          }
+        }
+      },
+    )
+    if (isNetworkError) fail("Network error is observed")
+  }
 }
 
 object FrontendIntegrationTest {

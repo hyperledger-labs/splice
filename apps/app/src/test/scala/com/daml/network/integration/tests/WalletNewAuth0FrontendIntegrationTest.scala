@@ -31,7 +31,6 @@ class WalletNewAuth0FrontendIntegrationTest
   }
 
   "A wallet UI with a backend configured to accept auth0 tokens" should {
-
     "allow login via auth0 and persist user name on refresh" taggedAs LocalAuth0Test in {
       implicit env =>
         withAuth0LoginCheck("randomUser", 3007) { (userPartyId, wd) =>
