@@ -1,5 +1,5 @@
 import { ConfigReader } from 'common-frontend';
-import { authSchema, directorySchema, testAuthSchema } from 'common-frontend/lib/config/schema';
+import { authSchema, serviceSchema, testAuthSchema } from 'common-frontend/lib/config/schema';
 import { z } from 'zod';
 
 const reader = new ConfigReader(
@@ -10,7 +10,8 @@ const reader = new ConfigReader(
       wallet: z.object({
         uiUrl: z.string().url(),
       }),
-      directory: directorySchema,
+      directory: serviceSchema,
+      jsonApi: serviceSchema,
     }),
   })
 );

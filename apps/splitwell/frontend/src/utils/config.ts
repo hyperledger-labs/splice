@@ -14,6 +14,7 @@ const reader = new ConfigReader(
       directory: serviceSchema,
       splitwell: serviceSchema,
       ledgerApi: serviceSchema,
+      jsonApi: serviceSchema,
     }),
   })
 );

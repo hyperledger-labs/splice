@@ -17,11 +17,14 @@ window.canton_network_config = {
     directory: {
       // URL of the directory backend.
       url: `https://directory.${cluster}`,
-      jsonApiUrl: "https://" + window.location.hostname + "/api/json-api/",
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
       uiUrl: window.location.origin.replace("directory", "wallet"),
+    },
+    jsonApi: {
+      // URL of the JSON API for the participant
+      url: "https://" + window.location.hostname + "/api/json-api/",
     },
   },
 };

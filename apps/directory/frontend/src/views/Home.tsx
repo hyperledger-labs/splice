@@ -41,7 +41,7 @@ const HomeWithContexts: React.FC = () => {
   const { userAccessToken, userId } = useUserState();
   return (
     <LedgerApiClientProvider
-      jsonApiUrl={config.services.directory.jsonApiUrl}
+      jsonApiUrl={config.services.jsonApi.url}
       userId={userId!}
       token={userAccessToken!}
     >
