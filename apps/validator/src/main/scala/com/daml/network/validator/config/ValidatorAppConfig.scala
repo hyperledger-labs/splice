@@ -54,6 +54,7 @@ case class ValidatorAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],
+    enableCoinRulesUpgrade: Boolean = false,
 ) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

@@ -64,10 +64,11 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
 
   protected val packages = Seq("dar/canton-coin-0.1.0.dar")
 
-  private val packageSignatures =
+  lazy private val packageSignatures = {
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
+  }
 
-  protected implicit val templateDecoder: TemplateJsonDecoder =
+  lazy protected implicit val templateDecoder: TemplateJsonDecoder =
     new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
   private val httpExt = Http()(ac)

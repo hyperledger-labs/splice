@@ -425,6 +425,21 @@ class TreasuryService(
     }
   }
 
+  private def getCoinRules()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ) =
+    if (treasuryConfig.enableCoinRulesUpgrade) {
+      logger.debug("Using upgraded coinRules")
+      for {
+        rules <- scanConnection.getCoinRulesV1Test()
+      } yield (rules.toDisclosedContract, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+    } else {
+      for {
+        rules <- scanConnection.getCoinRules()
+      } yield (rules.toDisclosedContract, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+    }
+
   /** Select transfer inputs and transfer context to satisfy the coin operations.
     * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
     * It checks that if the coin-operation batch only consists of a merge operation, it makes
@@ -445,9 +460,9 @@ class TreasuryService(
         v1.coin.PaymentTransferContext,
         Seq[CommandsOuterClass.DisclosedContract],
     )
-  ]] =
+  ]] = {
     for {
-      coinRules <- scanConnection.getCoinRules()
+      (disclosedCoinRules, coinRulesInterface) <- getCoinRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
       tapsApproved <-
         if (treasuryConfig.enableValidatorCreditChecks) {
@@ -533,7 +548,7 @@ class TreasuryService(
         )
         val contractsToDisclose =
           Seq(
-            coinRules.toDisclosedContract,
+            disclosedCoinRules,
             openRound.toDisclosedContract,
           ) ++ openIssuingRounds.map(_.toDisclosedContract)
         Some(
@@ -541,7 +556,7 @@ class TreasuryService(
             inputs,
             validatorRewardCouponUsers,
             new PaymentTransferContext(
-              coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+              coinRulesInterface,
               transferContext,
             ),
             contractsToDisclose,
@@ -550,6 +565,7 @@ class TreasuryService(
       }
 
     }
+  }
 
   /** Selects the transfer inputs. Uses a heuristics that aims to:
     * - minimize fees,

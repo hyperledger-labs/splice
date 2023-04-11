@@ -19,4 +19,5 @@ case class TreasuryConfig(
     queueSize: Int = 20,
     // TODO(#3816): Temporarily added flag as part of the DomainFees PoC
     enableValidatorCreditChecks: Boolean = false,
+    enableCoinRulesUpgrade: Boolean = false,
 )

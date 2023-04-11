@@ -284,6 +284,7 @@ lazy val `apps-validator` =
       `apps-scan` % "compile->compile;test->test",
       `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
+      `canton-coin-v1test-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors),
@@ -588,6 +589,7 @@ lazy val `apps-wallet` =
       `apps-scan` % "compile->compile;test->test",
       `apps-validator` % "compile->compile;test->test",
       `wallet-daml`,
+      `canton-coin-v1test-daml`,
       // TODO (#2676) Remove this once we have multi-domain interface support.
       `directory-daml`,
       `splitwell-daml`,
@@ -818,6 +820,7 @@ lazy val `apps-app` =
     .dependsOn(
       `wallet-payments-daml`,
       `wallet-daml`,
+      `wallet-v1test-daml`,
       `apps-splitwell`,
       `apps-directory`,
       `apps-validator`,

@@ -11,6 +11,7 @@ import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.validator.ValidatorResource
@@ -104,6 +105,19 @@ class ValidatorApp(
         // See `Compile / resourceGenerators` in build.sbt
         lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
       })
+      _ <-
+        if (config.enableCoinRulesUpgrade) {
+          logger.info("Upgrades enabled on this validator, uploading also cc v1test")
+          connection.uploadDarFile(new UploadablePackage {
+            // should be the same as package dependency in wallet app
+            lazy val packageId: String =
+              ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
+
+            // See `Compile / resourceGenerators` in build.sbt
+            lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
+          })
+        } else
+          Future.successful(())
       party <- connection.getOrAllocateParty(config.walletServiceUser)
       // Note: need to immediately grant right to act as wallet service user in order to install wallet install contract
       // TODO(#713): remove this workaround for missing act-as-any-party rights

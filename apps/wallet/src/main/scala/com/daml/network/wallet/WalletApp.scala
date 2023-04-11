@@ -65,6 +65,13 @@ class WalletApp(
       tracerProvider,
     ) {
 
+  override protected val packages = Seq("dar/canton-coin-0.1.0.dar") ++
+    (if (config.treasury.enableCoinRulesUpgrade) {
+       Seq("dar/canton-coin-0.1.1.dar")
+     } else {
+       Seq.empty
+     })
+
   override def initialize(
       ledgerClient: CNLedgerClient,
       walletServiceParty: PartyId,

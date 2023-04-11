@@ -101,6 +101,10 @@ trait CommonCNNodeAppInstanceReferences {
     "sv1Wallet"
   )
 
+  def sv1WalletBackend(implicit env: CNNodeTestConsoleEnvironment): WalletAppBackendReference = wb(
+    "sv1WalletBackend"
+  )
+
   def bobValidatorWallet(implicit
       env: CNNodeTestConsoleEnvironment
   ): WalletAppClientReference = wc(
