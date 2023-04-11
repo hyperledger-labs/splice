@@ -118,15 +118,6 @@ class SplitwellUpgradeIntegrationTest
             )
           },
         )
-        // Wait for all install requests to get rejected. Otherwise, we disconnect the user’s participant too soon and
-        // the provider’s backend automation times out on the reject call which can break shutdown.
-        clue("Install requests get rejected") {
-          val contracts = providerSplitwellBackend.remoteParticipant.ledger_api_extensions.acs
-            .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
-              providerSplitwellBackend.getProviderPartyId()
-            )
-          contracts shouldBe empty
-        }
       }
     }
   }

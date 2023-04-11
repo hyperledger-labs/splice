@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -69,6 +70,17 @@ class SplitwellUpgradeFrontendIntegrationTest
             oldSplitwellDomain,
             splitwellDomains.preferred,
           )
+        }
+        // Wait for all install requests to get rejected. Otherwise, we disconnect the user’s participant too soon and
+        // the provider’s backend automation times out on the reject call which can break shutdown.
+        clue("Install requests get rejected") {
+          eventually() {
+            val contracts = providerSplitwellBackend.remoteParticipant.ledger_api_extensions.acs
+              .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
+                providerSplitwellBackend.getProviderPartyId()
+              )
+            contracts shouldBe empty
+          }
         }
       }
     }
