@@ -15,7 +15,7 @@ repos:
         require_serial: true
         entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
         types: [scala]
-        exclude: '/bootstrap.scala$'
+        exclude: '/bootstrap\.scala|/.*\.sc$'
       - id: shellcheck
         name: shellcheck
         language: system
