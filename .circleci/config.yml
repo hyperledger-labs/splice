@@ -1067,8 +1067,7 @@ jobs:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
-            # TODO(#3902) remove the `|| true` once the updated cncluster command is available for all of our clusters
-            cncluster ci_reset_unlock || true
+            cncluster ci_reset_unlock
           cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
