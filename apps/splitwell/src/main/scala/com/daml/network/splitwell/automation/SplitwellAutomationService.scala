@@ -60,6 +60,10 @@ class SplitwellAutomationService(
   )
 
   registerTrigger(
+    new UpgradeGroupTrigger(triggerContext, store, connection)
+  )
+
+  registerTrigger(
     new GroupRequestTrigger(triggerContext, store, connection)
   )
 

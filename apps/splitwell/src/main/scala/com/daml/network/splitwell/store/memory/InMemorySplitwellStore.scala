@@ -8,9 +8,10 @@ import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -23,6 +24,42 @@ class InMemorySplitwellStore(
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with SplitwellStore {
+
+  override def listTransferrableGroups()
+      : Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]] = for {
+    // find all groups still on 'others' domains
+    othersGroups <- Future
+      .traverse(domainConfig.splitwell.others) { otherDomain =>
+        for {
+          otherDomainId <- domains.signalWhenConnected(otherDomain)
+          groups <- multiDomainAcsStore.listContractsOnDomain(
+            splitwellCodegen.Group.COMPANION,
+            otherDomainId,
+          )
+        } yield otherDomainId -> groups
+      }
+      .map(_.view.filter(_._2.nonEmpty).toMap)
+    allGroupMembers = othersGroups.view
+      .flatMap(_._2.view.flatMap(co => groupMembers(co.payload)))
+      .toSet
+    preferredId <- domains.signalWhenConnected(domainConfig.splitwell.preferred)
+    // find members of 'othersGroups' with install contracts on 'preferred'
+    preferredInstalledMembers <- multiDomainAcsStore
+      .listContractsOnDomain(
+        splitwellCodegen.SplitwellInstall.COMPANION,
+        preferredId,
+        { co: Contract[?, splitwellCodegen.SplitwellInstall] =>
+          allGroupMembers(co.payload.user)
+        },
+      )
+      .map(_.view.map(_.payload.user).toSet)
+  } yield othersGroups.collect(Function unlift { case (otherId, groups) =>
+    val transferrable = groups.collect {
+      // only respond with groups where every member is installed on 'preferred'
+      case co if groupMembers(co.payload) subsetOf preferredInstalledMembers => co.contractId
+    }
+    Option.when(transferrable.nonEmpty)(otherId -> transferrable)
+  })
 
   private def listLaggingContracts[LeaderC, LeaderTCid <: ContractId[
     _

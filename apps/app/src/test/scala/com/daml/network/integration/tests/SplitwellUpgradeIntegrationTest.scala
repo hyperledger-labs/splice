@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.console.SplitwellAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -15,6 +16,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.topology.PartyId
 
 import org.slf4j.event.Level
 import scala.util.Try
@@ -42,59 +44,68 @@ class SplitwellUpgradeIntegrationTest
       splitwellDomains.preferred.uid.id shouldBe "splitwellUpgrade"
       splitwellDomains.others.map(_.uid.id) shouldBe Seq("splitwell")
     }
+
+    def installFirstAlice(alice: PartyId)(implicit env: FixtureParam) =
+      actAndCheck("alice creates install requests", aliceSplitwell.createInstallRequests())(
+        "alice sees one install contracts",
+        _ =>
+          inside(
+            aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+              .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
+              .toList
+          ) { case Seq(domain) =>
+            domain
+          },
+      )
+
+    // domains.connect syncs such that the domain shows up in
+    // domains.list_connected but does not sync such that the party
+    // will be allocated on the domain so we retry until it eventually succeds.
+    def createInstalls(splitwells: SplitwellAppClientReference*) = for {
+      splitwell <- splitwells
+    } eventually() {
+      loggerFactory
+        .assertLogsSeqWithResult[Try[Unit]](SuppressionRule.LevelAndAbove(Level.WARN))(
+          Try(splitwell.createInstallRequests()),
+          { case (r, logs) =>
+            if (r.isFailure) {
+              forExactly(1, logs)(
+                _.errorMessage should include(
+                  "Not all informee are on the specified domainID: splitwellUpgrade"
+                )
+              )
+            } else {
+              logs shouldBe empty
+            }
+          },
+        )
+        .toEither
+        .valueOr(fail(_))
+    }
+
+    def twoInstalls(alice: PartyId, install: splitwellCodegen.SplitwellInstall.Contract)(implicit
+        env: FixtureParam
+    ) = {
+      val contracts = aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+        .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
+      inside(contracts.partition(_.id == install.id)) { case (Seq(`install`), Seq(newInstall)) =>
+        (contracts, newInstall)
+      }
+    }
+
     "create per domain install contracts" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
       // val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
-      val (_, install) =
-        actAndCheck("alice creates install requests", aliceSplitwell.createInstallRequests())(
-          "alice sees one install contracts",
-          _ =>
-            inside(
-              aliceSplitwell.ledgerApi.ledger_api_extensions.acs
-                .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
-                .toList
-            ) { case Seq(domain) =>
-              domain
-            },
-        )
+      val (_, install) = installFirstAlice(alice)
 
       bracket(
         connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
         disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
       ) {
-        // domains.connect syncs such that the domain shows up in
-        // domains.list_connected but does not sync such that the party
-        // will be allocated on the domain so we retry until it eventually succeds.
-        def createInstalls() =
-          eventually() {
-            loggerFactory
-              .assertLogsSeqWithResult[Try[Unit]](SuppressionRule.LevelAndAbove(Level.WARN))(
-                Try(aliceSplitwell.createInstallRequests()),
-                { case (r, logs) =>
-                  if (r.isFailure) {
-                    forExactly(1, logs)(
-                      _.errorMessage should include(
-                        "Not all informee are on the specified domainID: splitwellUpgrade"
-                      )
-                    )
-                  } else {
-                    logs shouldBe empty
-                  }
-                },
-              )
-              .toEither
-              .valueOr(fail(_))
-          }
-        actAndCheck("alice creates install requests", createInstalls())(
+        actAndCheck("alice creates install requests", createInstalls(aliceSplitwell))(
           "alice sees one install contracts",
           _ => {
-            val contracts = aliceSplitwell.ledgerApi.ledger_api_extensions.acs
-              .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
-            contracts should have size 2
-            contracts should contain(install)
-            val newInstall = inside(contracts.filter(_.id != install.id)) { case Seq(c) =>
-              c
-            }
+            val (contracts, newInstall) = twoInstalls(alice, install)
             val contractDomains =
               aliceValidator.remoteParticipant.transfer.lookup_contract_domain(
                 contracts.map[LfContractId](_.id): _*
@@ -107,7 +118,8 @@ class SplitwellUpgradeIntegrationTest
         )
       }
     }
-    "balance update and invite contracts follow group" in { implicit env =>
+
+    "balance update and invite contracts follow group, which follows installs" in { implicit env =>
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
       val bob = onboardWalletUser(bobWallet, bobValidator)
       createSplitwellInstalls(aliceSplitwell, alice)
@@ -142,26 +154,27 @@ class SplitwellUpgradeIntegrationTest
           connectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
           disconnectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
         ) {
-          providerSplitwellBackend.remoteParticipant.transfer.out(
-            providerSplitwellBackend.getProviderPartyId(),
-            group.contractId,
-            splitwellAlias,
-            splitwellUpgradeAlias,
-          )
-          // Transfer in is submitted by the TransferInTrigger.
-          eventually() {
-            val contractDomains =
-              providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+          actAndCheck(
+            "new installs for alice and bob",
+            createInstalls(aliceSplitwell, bobSplitwell),
+          )(
+            "group, balance update, and invite contracts all follow",
+            { _ =>
+              // group is transferred out by UpgradeGroupTrigger,
+              // and in by the TransferInTrigger.
+              val contractDomains =
+                providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+                  group.contractId,
+                  invite.contractId,
+                  acceptedInvite,
+                )
+              contractDomains shouldBe Seq[LfContractId](
                 group.contractId,
                 invite.contractId,
                 acceptedInvite,
-              )
-            contractDomains shouldBe Seq[LfContractId](
-              group.contractId,
-              invite.contractId,
-              acceptedInvite,
-            ).map(cid => cid -> splitwellUpgradeAlias.unwrap).toMap
-          }
+              ).map(cid => cid -> splitwellUpgradeAlias.unwrap).toMap
+            },
+          )
         }
       }
     }

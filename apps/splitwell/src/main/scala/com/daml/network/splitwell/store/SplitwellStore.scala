@@ -85,6 +85,17 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
           groupKey(c.payload.group) == key,
     )
 
+  /** Contract IDs of groups that can be transferred from
+    * [[com.daml.network.splitwell.config.SplitwellDomains#others]] because all
+    * of their members are installed on
+    * [[com.daml.network.splitwell.config.SplitwellDomains#preferred]], grouped
+    * by the domain they are currently installed on.
+    *
+    * @note Invariant: every key is an ID associated with `others`
+    * @note Invariant: every value is non-empty
+    */
+  def listTransferrableGroups(): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
+
   def listSplitwellInstalls(user: PartyId): Future[Seq[
     ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]] =
@@ -123,7 +134,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
     splitwellCodegen.AcceptedGroupInvite,
   ]]]
 
-  private def groupMembers(group: splitwellCodegen.Group): Set[String] =
+  protected[this] def groupMembers(group: splitwellCodegen.Group): Set[String] =
     group.members.asScala.toSet + group.owner
 
   private def groupKey(owner: PartyId, id: String): splitwellCodegen.GroupKey =
