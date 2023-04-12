@@ -181,7 +181,7 @@ function _current_lock_age() {
     lock_timestamp=$(kubectl get secret cluster-lock -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null | xargs -0 -I X date -d X +%s)
     current_timestamp=$(date +%s)
     diff="$((current_timestamp-lock_timestamp))"
-    date -d @${diff} +"%d day(s), %H hour(s), %M minute(s)" -u
+    echo "$((diff / 86400)) days(s), $(((diff % 86400) / 3600)) hour(s), $(((diff % 3600) / 60)) minute(s)"
 }
 
 function _assert_lock() {
