@@ -90,7 +90,7 @@ function installCNPostgres(
 
 // toplevel
 
-const ENABLE_CLOUD_SQL = false;
+const ENABLE_CLOUD_SQL = "true" === (process.env.ENABLE_CLOUD_SQL ?? "false");
 
 export function installPostgres(
   xns: ExactNamespace,
