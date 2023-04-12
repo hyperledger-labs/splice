@@ -2,7 +2,7 @@ package com.daml.network.history
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{Coin, CoinRules, CoinRules_DevNet_Tap, CoinRules_Mint}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 
@@ -28,44 +28,48 @@ object Transfer extends ExerciseNodeCompanion {
   override def resToValue(res: v1.coin.TransferResult) = res.toValue
 }
 
-case class Tap(node: ExerciseNode[CoinRules_DevNet_Tap, Coin.ContractId])
+case class Tap(node: ExerciseNode[coinCodegen.CoinRules_DevNet_Tap, coinCodegen.Coin.ContractId])
 
 object Tap extends ExerciseNodeCompanion {
-  override type Tpl = CoinRules
-  override type Arg = CoinRules_DevNet_Tap
-  override type Res = v1.coin.MintSummary[Coin.ContractId]
+  override type Tpl = coinCodegen.CoinRules
+  override type Arg = coinCodegen.CoinRules_DevNet_Tap
+  override type Res = v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(CoinRules.COMPANION)
-  override val choice = CoinRules.CHOICE_CoinRules_DevNet_Tap
+  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_DevNet_Tap
 
-  override val argDecoder = CoinRules_DevNet_Tap.valueDecoder()
-  override def argToValue(arg: CoinRules_DevNet_Tap) = arg.toValue
+  override val argDecoder = coinCodegen.CoinRules_DevNet_Tap.valueDecoder()
+  override def argToValue(arg: coinCodegen.CoinRules_DevNet_Tap) = arg.toValue
 
   override val resDecoder =
-    v1.coin.MintSummary.valueDecoder(cid => new Coin.ContractId(cid.asContractId().get().getValue))
+    v1.coin.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
+    )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
 
 object Mint extends ExerciseNodeCompanion {
-  override type Tpl = CoinRules
-  override type Arg = CoinRules_Mint
-  override type Res = v1.coin.MintSummary[Coin.ContractId]
+  override type Tpl = coinCodegen.CoinRules
+  override type Arg = coinCodegen.CoinRules_Mint
+  override type Res = v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(CoinRules.COMPANION)
-  override val choice = CoinRules.CHOICE_CoinRules_Mint
+  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_Mint
 
-  override val argDecoder = CoinRules_Mint.valueDecoder()
+  override val argDecoder = coinCodegen.CoinRules_Mint.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.MintSummary.valueDecoder(cid => new Coin.ContractId(cid.asContractId().get().getValue))
+    v1.coin.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
+    )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
 
 object LockedCoinUnlock extends ExerciseNodeCompanion {
   override type Tpl = v1.coin.LockedCoin
   override type Arg = v1.coin.LockedCoin_Unlock
-  override type Res = v1.coin.MintSummary[v1.coin.Coin.ContractId]
+  override type Res = v1.coin.CoinCreateSummary[v1.coin.Coin.ContractId]
 
   override val templateOrInterface = Right(v1.coin.LockedCoin.INTERFACE)
   override val choice = v1.coin.LockedCoin.CHOICE_LockedCoin_Unlock
@@ -74,7 +78,7 @@ object LockedCoinUnlock extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.MintSummary.valueDecoder(cid =>
+    v1.coin.CoinCreateSummary.valueDecoder(cid =>
       new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
@@ -83,7 +87,7 @@ object LockedCoinUnlock extends ExerciseNodeCompanion {
 object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
   override type Tpl = v1.coin.LockedCoin
   override type Arg = v1.coin.LockedCoin_OwnerExpireLock
-  override type Res = v1.coin.MintSummary[v1.coin.Coin.ContractId]
+  override type Res = v1.coin.CoinCreateSummary[v1.coin.Coin.ContractId]
 
   override val templateOrInterface = Right(v1.coin.LockedCoin.INTERFACE)
   override val choice = v1.coin.LockedCoin.CHOICE_LockedCoin_OwnerExpireLock
@@ -92,31 +96,61 @@ object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.MintSummary.valueDecoder(cid =>
+    v1.coin.CoinCreateSummary.valueDecoder(cid =>
       new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
 
+object LockedCoinExpireCoin extends ExerciseNodeCompanion {
+  override type Tpl = coinCodegen.LockedCoin
+  override type Arg = coinCodegen.LockedCoin_ExpireCoin
+  override type Res = String
+
+  override val templateOrInterface = Left(coinCodegen.LockedCoin.COMPANION)
+  override val choice = coinCodegen.LockedCoin.CHOICE_LockedCoin_ExpireCoin
+
+  override val argDecoder = coinCodegen.LockedCoin_ExpireCoin.valueDecoder()
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = _.asParty().get().getValue
+  override def resToValue(res: Res) = new com.daml.ledger.javaapi.data.Party(res)
+}
+
 object CoinArchive {
   // Matches on any consuming exercise on a coin
   def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
-    if (event.getTemplateId == Coin.COMPANION.TEMPLATE_ID && event.isConsuming) {
+    if (event.getTemplateId == coinCodegen.Coin.COMPANION.TEMPLATE_ID && event.isConsuming) {
       Some(event)
     } else None
 }
 
 object CoinCreate {
-  type TCid = Coin.ContractId
-  type T = Coin
+  type TCid = coinCodegen.Coin.ContractId
+  type T = coinCodegen.Coin
   type ContractType = Contract[TCid, T]
-  val companion = Coin.COMPANION
+  val companion = coinCodegen.Coin.COMPANION
 
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
     Contract.fromCreatedEvent(companion)(event)
   }
+}
+
+object CoinExpire extends ExerciseNodeCompanion {
+  override type Tpl = coinCodegen.Coin
+  override type Arg = coinCodegen.Coin_Expire
+  override type Res = String
+
+  override val templateOrInterface = Left(coinCodegen.Coin.COMPANION)
+  override val choice = coinCodegen.Coin.CHOICE_Coin_Expire
+
+  override val argDecoder = coinCodegen.Coin_Expire.valueDecoder()
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = _.asParty().get().getValue
+  override def resToValue(res: Res) = new com.daml.ledger.javaapi.data.Party(res)
 }
 
 // TODO(#2930): This is not really a Coin event - consider either renaming the file, or splitting it into different ones based on event "types"

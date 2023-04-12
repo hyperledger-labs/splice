@@ -306,7 +306,7 @@ template SvcRulesV1Test with
     -- Coin management driven directly by the leader
     --------------------------------------------------
 
-    nonconsuming choice SvcRulesV1Test_Coin_Expire : ()
+    nonconsuming choice SvcRulesV1Test_Coin_Expire : Party
       with
         cid : ContractId Coin
         choiceArg : Coin_Expire
@@ -314,7 +314,7 @@ template SvcRulesV1Test with
       do
         exercise cid choiceArg
 
-    nonconsuming choice SvcRulesV1Test_LockedCoin_ExpireCoin : ()
+    nonconsuming choice SvcRulesV1Test_LockedCoin_ExpireCoin : Party
       with
         cid : ContractId LockedCoin
         choiceArg : LockedCoin_ExpireCoin

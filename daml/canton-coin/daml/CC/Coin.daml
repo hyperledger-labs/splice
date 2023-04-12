@@ -48,7 +48,7 @@ template Coin
     interface instance API.Coin for Coin where
       view = API.CoinView with ..
 
-    choice Coin_Expire : ()
+    choice Coin_Expire : Party
       with
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
@@ -57,6 +57,7 @@ template Coin
       do coinRules <- view <$> fetch coinRulesCid
          requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          requireCoinExpiredForAllOpenRounds roundCid this
+         return owner
 
 template LockedCoin
   with
@@ -78,7 +79,7 @@ template LockedCoin
         t <- getTime
         require "Lock is expired" (lock.expiresAt < t)
         coinCid <- toInterfaceContractId <$> create coin
-        return API.MintSummary with
+        return API.CoinCreateSummary with
           coin = coinCid
           coinPrice = openMiningRound.coinPrice
 
@@ -87,11 +88,11 @@ template LockedCoin
         openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         coinCid <- toInterfaceContractId <$> create coin
-        return API.MintSummary with
+        return API.CoinCreateSummary with
           coin = coinCid
           coinPrice = openMiningRound.coinPrice
 
-    choice LockedCoin_ExpireCoin : ()
+    choice LockedCoin_ExpireCoin : Party
       with
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
@@ -103,6 +104,7 @@ template LockedCoin
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          requireCoinExpiredForAllOpenRounds roundCid coin
+         return coin.owner
 
 -- Contracts to implement reward issuance
 -- ======================================
@@ -302,7 +304,7 @@ template CoinRules
 
     -- A choice for the SVC to mint coin for the cases where the
     -- collective rules allow for that; e.g., when redeeming SVC rewards.
-    nonconsuming choice CoinRules_Mint: API.MintSummary (ContractId Coin)
+    nonconsuming choice CoinRules_Mint: API.CoinCreateSummary (ContractId Coin)
       with
         receiver: Party
         amount: Decimal
@@ -319,12 +321,12 @@ template CoinRules
                   owner = receiver
                   amount = expiringAmount
                   ..
-        return API.MintSummary with
+        return API.CoinCreateSummary with
                   coin
                   coinPrice = openRound.coinPrice
 
 
-    nonconsuming choice CoinRules_DevNet_Tap: API.MintSummary (ContractId Coin)
+    nonconsuming choice CoinRules_DevNet_Tap: API.CoinCreateSummary (ContractId Coin)
       with
         receiver: Party
         amount: Decimal

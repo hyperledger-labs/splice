@@ -22,17 +22,17 @@ data LockedCoinView = LockedCoinView with
 interface LockedCoin where
   viewtype LockedCoinView
 
-  lockedCoin_Unlock : ContractId CoinRules -> ContractId OpenMiningRound -> Update (MintSummary (ContractId Coin))
-  lockedCoin_OwnerExpireLock : ContractId CoinRules -> ContractId OpenMiningRound -> Update (MintSummary (ContractId Coin))
+  lockedCoin_Unlock : ContractId CoinRules -> ContractId OpenMiningRound -> Update (CoinCreateSummary (ContractId Coin))
+  lockedCoin_OwnerExpireLock : ContractId CoinRules -> ContractId OpenMiningRound -> Update (CoinCreateSummary (ContractId Coin))
 
-  choice LockedCoin_Unlock : MintSummary (ContractId Coin)
+  choice LockedCoin_Unlock : CoinCreateSummary (ContractId Coin)
     with
       coinRulesCid : ContractId CoinRules
       openRoundCid : ContractId OpenMiningRound
     controller let v = view this in v.coin.owner :: v.lock.holders
     do lockedCoin_Unlock this coinRulesCid openRoundCid
 
-  choice LockedCoin_OwnerExpireLock : MintSummary (ContractId Coin)
+  choice LockedCoin_OwnerExpireLock : CoinCreateSummary (ContractId Coin)
     with
       coinRulesCid : ContractId CoinRules
       openRoundCid : ContractId OpenMiningRound
@@ -171,10 +171,11 @@ data TransferSummary = TransferSummary with
     coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
   deriving (Eq, Show)
 
--- | Result of an operation that minted a new coin
-data MintSummary coinCointractId = MintSummary with
-    coin : coinCointractId -- ^ The new coin that was minted
-    coinPrice : Decimal -- ^ The coin price at the round the coin was minted
+-- | Result of an operation that created a new coin, e.g.,
+-- by minting a fresh coin, or by unlocking a locked coin.
+data CoinCreateSummary coinCointractId = CoinCreateSummary with
+    coin : coinCointractId -- ^ The new coin that was created
+    coinPrice : Decimal -- ^ The coin price at the round the coin was created
   deriving (Eq, Show)
 
 data CreatedCoin

@@ -503,11 +503,11 @@ getTransferContext app user featuredAppRight = do
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
-  mintSummary <- submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
+  ccsum <- submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
     receiver = user.primaryParty
     amount
     openRound
-  return mintSummary.coin
+  return ccsum.coin
 
 featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do

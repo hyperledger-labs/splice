@@ -7,7 +7,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
-import com.daml.network.wallet.store.UserWalletTxLogParser
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 
@@ -42,8 +42,6 @@ class WalletTxLogIntegrationTest
 
   "A wallet" should {
 
-    // TODO(#2837) Extend these tests
-
     "handle tap" in { implicit env =>
       onboardWalletUser(aliceWallet, aliceValidator)
 
@@ -55,11 +53,13 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq(
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 12.0
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 11.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -81,7 +81,8 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         sv1Wallet,
         Seq(
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Mint
             logEntry.amount shouldBe 47.0
             logEntry.coinPrice shouldBe coinPrice
           }
@@ -134,8 +135,9 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq(
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Second part of collecting the payment: Transferring the coin to ourselves.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentCollected
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(selfPaymentAmount - smallAmount, selfPaymentAmount)
@@ -144,9 +146,10 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 10CC locked coin,
             // leading to a net loss of slightly over 10CC because of fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
@@ -155,15 +158,18 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 30.0
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 20.0
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 10.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -216,13 +222,15 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq(
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the accepted self-payment request returned the 10CC locked coin.
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.AppPaymentRejected
             logEntry.amount should beWithin(selfPaymentAmount, selfPaymentAmount + smallAmount)
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 10CC locked coin,
             // leading to a net loss of slightly over 10CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
@@ -231,15 +239,18 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 30.0
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 20.0
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 10.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -304,8 +315,9 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq(
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-            // Second part of collecting the payment: Transferring the coin to the receivers
+          { case logEntry: walletLogEntry.Transfer =>
+            // Collecting the payment: Transferring the coin to the receivers
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentCollected
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount shouldBe BigDecimal(0)
@@ -320,9 +332,10 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the payment request created a locked coin,
             // leading to a net loss because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(
@@ -334,7 +347,8 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -370,27 +384,28 @@ class WalletTxLogIntegrationTest
       )
 
       // Both Alice and Bob see the same representation of the transfer
-      val checkTransfer: CheckTxHistoryFn = {
-        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-          inside(logEntry.sender) { case (sender, amount) =>
-            sender shouldBe aliceUserParty.toProtoPrimitive
-            amount should beWithin(-transferAmount - smallAmount, -transferAmount)
-          }
+      val checkTransfer: CheckTxHistoryFn = { case logEntry: walletLogEntry.Transfer =>
+        logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.P2PPaymentCompleted
+        inside(logEntry.sender) { case (sender, amount) =>
+          sender shouldBe aliceUserParty.toProtoPrimitive
+          amount should beWithin(-transferAmount - smallAmount, -transferAmount)
+        }
 
-          inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-            receiver shouldBe bobUserParty.toProtoPrimitive
-            amount shouldBe transferAmount
-          }
+        inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+          receiver shouldBe bobUserParty.toProtoPrimitive
+          amount shouldBe transferAmount
+        }
 
-          logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          logEntry.coinPrice shouldBe coinPrice
+        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
         aliceWallet,
         Seq(
           checkTransfer,
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -471,34 +486,35 @@ class WalletTxLogIntegrationTest
       )
 
       // All parties see the same representation of the transfer
-      val checkTransfer: CheckTxHistoryFn = {
-        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
-          // This is the actual payment, transferring the unlocked coin to
-          // the receivers
-          inside(logEntry.sender) { case (sender, amount) =>
-            sender shouldBe aliceUserParty.toProtoPrimitive
-            amount shouldBe BigDecimal(0)
-          }
+      val checkTransfer: CheckTxHistoryFn = { case logEntry: walletLogEntry.Transfer =>
+        // This is the actual payment, transferring the unlocked coin to
+        // the receivers
+        logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentCollected
+        inside(logEntry.sender) { case (sender, amount) =>
+          sender shouldBe aliceUserParty.toProtoPrimitive
+          amount shouldBe BigDecimal(0)
+        }
 
-          inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
-            receiver1 shouldBe bobUserParty.toProtoPrimitive
-            amount1 shouldBe 20
+        inside(logEntry.receivers) { case Seq((receiver1, amount1), (receiver2, amount2)) =>
+          receiver1 shouldBe bobUserParty.toProtoPrimitive
+          amount1 shouldBe 20
 
-            receiver2 shouldBe charlieUserParty.toProtoPrimitive
-            amount2 shouldBe 30
-          }
+          receiver2 shouldBe charlieUserParty.toProtoPrimitive
+          amount2 shouldBe 30
+        }
 
-          logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          logEntry.coinPrice shouldBe coinPrice
+        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
         aliceWallet,
         Seq[CheckTxHistoryFn](
           checkTransfer,
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 50CC locked coin,
             // leading to a net loss of slightly over 50CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.AppPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-50 - smallAmount, -50)
@@ -507,7 +523,8 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -612,10 +629,11 @@ class WalletTxLogIntegrationTest
       )
 
       // All parties see the same representation of the transfer
-      val checkSubscriptionPaymentTransfer: CheckTxHistoryFn = {
-        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+      def checkSubscriptionPaymentTransfer(transactionType: String): CheckTxHistoryFn = {
+        case logEntry: walletLogEntry.Transfer =>
           // This is the actual payment, transferring the unlocked coin to
           // the receivers
+          logEntry.transactionSubtype shouldBe transactionType
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
             amount shouldBe BigDecimal(0)
@@ -633,10 +651,13 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq[CheckTxHistoryFn](
-          checkSubscriptionPaymentTransfer,
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionPaymentCollected
+          ),
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
             // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
@@ -645,10 +666,13 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          checkSubscriptionPaymentTransfer,
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
+          ),
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
             // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionInitialPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
@@ -657,7 +681,8 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -666,7 +691,14 @@ class WalletTxLogIntegrationTest
 
       checkTxHistory(
         charlieWallet,
-        Seq(checkSubscriptionPaymentTransfer, checkSubscriptionPaymentTransfer),
+        Seq(
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionPaymentCollected
+          ),
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
+          ),
+        ),
       )
     }
 
@@ -729,13 +761,15 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq[CheckTxHistoryFn](
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the accepted subscription request returned the 42CC locked coin.
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SubscriptionInitialPaymentRejected
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
             // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionInitialPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
@@ -744,7 +778,8 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -846,10 +881,11 @@ class WalletTxLogIntegrationTest
       )
 
       // All parties see the same representation of the transfer
-      val checkSubscriptionPaymentTransfer: CheckTxHistoryFn = {
-        case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+      def checkSubscriptionPaymentTransfer(transactionType: String): CheckTxHistoryFn = {
+        case logEntry: walletLogEntry.Transfer =>
           // This is the actual payment, transferring the unlocked coin to
           // the receivers
+          logEntry.transactionSubtype shouldBe transactionType
           inside(logEntry.sender) { case (sender, amount) =>
             sender shouldBe aliceUserParty.toProtoPrimitive
             amount shouldBe BigDecimal(0)
@@ -867,14 +903,16 @@ class WalletTxLogIntegrationTest
       checkTxHistory(
         aliceWallet,
         Seq[CheckTxHistoryFn](
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the second payment returned the 42CC locked coin.
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SubscriptionPaymentRejected
             logEntry.amount should beWithin(subscriptionPrice, subscriptionPrice + smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
             // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
@@ -883,10 +921,13 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          checkSubscriptionPaymentTransfer,
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
+          ),
+          { case logEntry: walletLogEntry.Transfer =>
             // Accepting the self-payment request created a 42CC locked coin,
             // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionInitialPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
@@ -895,7 +936,8 @@ class WalletTxLogIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
             logEntry.amount shouldBe 100.0
             logEntry.coinPrice shouldBe coinPrice
           },
@@ -904,7 +946,11 @@ class WalletTxLogIntegrationTest
 
       checkTxHistory(
         charlieWallet,
-        Seq(checkSubscriptionPaymentTransfer),
+        Seq(
+          checkSubscriptionPaymentTransfer(
+            walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
+          )
+        ),
       )
     }
   }

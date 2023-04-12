@@ -22,6 +22,7 @@ export interface WalletBalance {
   availableCC: BigNumber;
 }
 
+// TODO(#3981): Improve the classification of transactions
 export type Transaction = Transfer | BalanceChange | Automation;
 export interface Transfer {
   id: string;

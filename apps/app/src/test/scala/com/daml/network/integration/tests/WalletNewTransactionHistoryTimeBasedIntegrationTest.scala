@@ -99,7 +99,7 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
         )
         matchTransaction(lockForDirectory)(
           coinPrice = 2,
-          expectedAction = "Automation",
+          expectedAction = "Sent",
           expectedParty = None,
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )

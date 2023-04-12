@@ -6,10 +6,17 @@ import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.*
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.MintSummary
+import com.daml.network.codegen.java.cc.api.v1.coin.CoinCreateSummary
+import com.daml.network.codegen.java.cn.wallet.install.CoinOperationOutcome
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
+  COO_Error,
+  COO_MergeTransferInputs,
+}
 import com.daml.network.history.{
   CoinArchive,
   CoinCreate,
+  CoinExpire,
+  LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
   LockedCoinUnlock,
   Mint,
@@ -19,11 +26,13 @@ import com.daml.network.history.{
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.{Instant, ZoneOffset}
 import scala.collection.immutable
+import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
@@ -44,81 +53,246 @@ class UserWalletTxLogParser(
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
+
           // ------------------------------------------------------------------
-          // Transferring coins
+          // Treasury service
           // ------------------------------------------------------------------
+
+          // We are inspecting the WalletAppInstall_ExecuteBatch event in order to distinguish the wallet automation
+          // merging coins and collecting rewards from manually triggered transfers where the user sends coin to themselves.
+          case WalletAppInstall_ExecuteBatch(node) =>
+            assert(
+              node.argument.value.operations.size() == node.result.value.size(),
+              "WalletAppInstall_ExecuteBatch should return exactly one CoinOperationOutcome for each CoinOperation",
+            )
+
+            // Unfortunately there is not a 1:1 correspondence between CoinOperationOutcome and child events in the
+            // transaction tree:
+            // - COO_Error does not produce any child event
+            // - all other outcomes produce exactly one child exercise event
+            val outputsWithChildEvent =
+              node.result.value.asScala.foldLeft(
+                Queue.empty[(CoinOperationOutcome, ExercisedEvent)]
+              )((state, r) => {
+                r match {
+                  case _: COO_Error => state
+                  case outcome =>
+                    val nextChildEventId = state.length
+                    val childEvent =
+                      tree.getEventsById.get(exercised.getChildEventIds.get(nextChildEventId))
+                    childEvent match {
+                      case e: ExercisedEvent => state.appended(outcome -> e)
+                      case _ =>
+                        throw new RuntimeException(
+                          "All child events of WalletAppInstall_ExecuteBatch should be exercise events"
+                        )
+                    }
+                }
+              })
+
+            val result = outputsWithChildEvent.foldMap {
+              case (_: COO_MergeTransferInputs, childEvent) =>
+                parseTree(tree, childEvent)
+                  .setTransferSubtype(TxLogEntry.Transfer.WalletAutomation)
+              case (_, childEvent) => parseTree(tree, childEvent)
+            }
+
+            result
+
+          // ------------------------------------------------------------------
+          // P2P transfers
+          // ------------------------------------------------------------------
+
+          case AcceptedTransferOffer_Complete(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).setTransferSubtype(TxLogEntry.Transfer.P2PPaymentCompleted)
+
+          // ------------------------------------------------------------------
+          // App payments
+          // ------------------------------------------------------------------
+
+          // Accepting app payment = locking a coin for the provider
+          case AppPaymentRequest_Accept(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).setTransferSubtype(TxLogEntry.Transfer.AppPaymentAccepted)
 
           // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
           case AcceptedAppPayment_Collect(_) =>
             parseTrees(
               tree,
               exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer()
+            ).mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.AppPaymentCollected)
+
+          case AcceptedAppPayment_Reject(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.AppPaymentRejected,
+            )
+
+          case AcceptedAppPayment_Expire(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.AppPaymentExpired,
+            )
+
+          // ------------------------------------------------------------------
+          // Subscriptions
+          // ------------------------------------------------------------------
+
+          // Accepting subscription = locking a coin for the provider
+          case SubscriptionRequest_AcceptAndMakePayment(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).setTransferSubtype(TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted)
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionInitialPayment_Collect(_) =>
             parseTrees(
               tree,
               exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer()
+            ).mergeBalanceChangesIntoTransfer(
+              TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
+            )
+
+          case SubscriptionInitialPayment_Reject(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.SubscriptionInitialPaymentRejected,
+            )
+
+          case SubscriptionInitialPayment_Expire(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.SubscriptionInitialPaymentExpired,
+            )
+
+          case SubscriptionIdleState_MakePayment(_) =>
+            parseTrees(
+              tree,
+              exercised.getChildEventIds.asScala.toList,
+            ).setTransferSubtype(TxLogEntry.Transfer.SubscriptionPaymentAccepted)
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionPayment_Collect(_) =>
             parseTrees(
               tree,
               exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer()
+            ).mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.SubscriptionPaymentCollected)
+
+          case SubscriptionPayment_Reject(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value._2,
+              BalanceChange.SubscriptionPaymentRejected,
+            )
+
+          case SubscriptionPayment_Expire(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value._2,
+              BalanceChange.SubscriptionPaymentExpired,
+            )
+
+          // ------------------------------------------------------------------
+          // Other transfers
+          // ------------------------------------------------------------------
 
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            State.fromTransfer(tree, root, node)
+            State.fromTransfer(tree, root, node, TxLogEntry.Transfer.Transfer)
 
           // ------------------------------------------------------------------
           // Minting new coins
           // ------------------------------------------------------------------
 
           case Tap(node) =>
-            State.fromMintSummary(tree, root, node.result.value)
+            State.fromCoinCreateSummary(tree, root, node.result.value, BalanceChange.Tap)
 
           case SvcRules_CollectSvReward(node) =>
-            State.fromMintSummary(tree, root, node.result.value)
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.SvRewardCollected,
+            )
 
           case Mint(node) =>
-            State.fromMintSummary(tree, root, node.result.value)
+            State.fromCoinCreateSummary(tree, root, node.result.value, BalanceChange.Mint)
 
           // ------------------------------------------------------------------
           // Unlocking locked coins
           // ------------------------------------------------------------------
 
           case LockedCoinUnlock(node) =>
-            State.fromMintSummary(tree, root, node.result.value)
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.LockedCoinUnlocked,
+            )
 
           case LockedCoinOwnerExpireLock(node) =>
-            State.fromMintSummary(tree, root, node.result.value)
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              BalanceChange.LockedCoinExpired,
+            )
+
+          // ------------------------------------------------------------------
+          // Removing coins with zero value
+          // ------------------------------------------------------------------
+
+          case CoinExpire(node) =>
+            State.fromCoinExpire(tree, exercised, node.result.value, BalanceChange.CoinExpired)
+
+          case LockedCoinExpireCoin(node) =>
+            State.fromCoinExpire(
+              tree,
+              exercised,
+              node.result.value,
+              BalanceChange.LockedCoinExpired,
+            )
 
           // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
 
+          // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
+          // all possible exercise events that archive coins.
           case CoinArchive(_) =>
-            // TODO (#2845) Fix all uses of this.
-            logger.info(
-              "Coin archive events are not included in the transaction history."
-                + " Make sure to handle the parent event to avoid having to fetch the coin."
+            // Using a warning to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
+            logger.warn(
+              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
             State.empty
+
           case _ =>
             parseTrees(tree, exercised.getChildEventIds.asScala.toList)
         }
 
       case created: CreatedEvent =>
         created match {
-          // A coin create that is not a child of the above exercise events.
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that produce new coins.
           case CoinCreate(coin) =>
-            // Using an error to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
-            logger.error(
+            // Using a warning to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
+            logger.warn(
               s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
             )
             State.empty
@@ -156,7 +330,7 @@ object UserWalletTxLogParser {
   ) extends TxLogStore.IndexRecord
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {
-    def toJson: httpDef.ListTransactionsResponseItem
+    def toResonseItem: httpDef.ListTransactionsResponseItem
   }
 
   object TxLogEntry {
@@ -166,6 +340,7 @@ object UserWalletTxLogParser {
     // and exchange rate at the time.
     final case class Transfer(
         indexRecord: TxLogIndexRecord,
+        transactionSubtype: String,
         date: Instant,
         provider: String,
         sender: (String, BigDecimal),
@@ -173,9 +348,10 @@ object UserWalletTxLogParser {
         senderHoldingFees: BigDecimal,
         coinPrice: BigDecimal,
     ) extends TxLogEntry {
-      override def toJson: httpDef.ListTransactionsResponseItem =
+      override def toResonseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
-          transactionType = Transfer.transaction_type,
+          transactionType = Transfer.TransactionType,
+          transactionSubtype = transactionSubtype,
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
@@ -188,21 +364,32 @@ object UserWalletTxLogParser {
         )
     }
     object Transfer {
-      val transaction_type = "transfer"
+      val TransactionType = "transfer"
+      val P2PPaymentCompleted = "p2p_payment_completed"
+      val AppPaymentAccepted = "app_payment_accepted"
+      val AppPaymentCollected = "app_payment_collected"
+      val SubscriptionInitialPaymentAccepted = "subscription_initial_payment_accepted"
+      val SubscriptionInitialPaymentCollected = "subscription_initial_payment_collected"
+      val SubscriptionPaymentAccepted = "subscription_payment_accepted"
+      val SubscriptionPaymentCollected = "subscription_payment_collected"
+      val WalletAutomation = "wallet_automation"
+      val Transfer = "unknown_transfer"
     }
 
     /** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
     // TODO(M3-04) Include more context info here to distinguish different balance changes.
     final case class BalanceChange(
         indexRecord: TxLogIndexRecord,
+        transactionSubtype: String,
         date: Instant,
         receiver: String,
         amount: BigDecimal,
         coinPrice: BigDecimal,
     ) extends TxLogEntry {
-      override def toJson: httpDef.ListTransactionsResponseItem =
+      override def toResonseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
-          transactionType = BalanceChange.transaction_type,
+          transactionType = BalanceChange.TransactionType,
+          transactionSubtype = transactionSubtype,
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
@@ -214,55 +401,78 @@ object UserWalletTxLogParser {
         )
     }
     object BalanceChange {
-      val transaction_type = "balance_change"
+      val TransactionType = "balance_change"
+      val Tap = "tap"
+      val Mint = "mint"
+      val SvRewardCollected = "sv_reward_collected"
+      val AppPaymentRejected = "app_payment_rejected"
+      val AppPaymentExpired = "app_payment_expired"
+      val SubscriptionInitialPaymentRejected = "subscription_initial_payment_rejected"
+      val SubscriptionInitialPaymentExpired = "subscription_initial_payment_expired"
+      val SubscriptionPaymentRejected = "subscription_payment_rejected"
+      val SubscriptionPaymentExpired = "subscription_payment_expired"
+      val LockedCoinUnlocked = "locked_coin_unlock"
+      val LockedCoinExpired = "locked_coin_expired"
+      val CoinExpired = "coin_expired"
     }
 
-    // Note: deserialization is only needed for the Canton console,
-    // that's why this function doesn't do any proper error handling.
-    def fromJson(item: httpDef.ListTransactionsResponseItem): Either[String, TxLogEntry] = {
+    private def transferFromResponseItem(
+        item: httpDef.ListTransactionsResponseItem
+    ): Either[String, TxLogEntry.Transfer] = {
+      val indexRecord = TxLogIndexRecord(
+        offset = item.offset,
+        eventId = item.eventId,
+      )
+      for {
+        provider <- item.provider.toRight("Provider missing")
+        sender <- item.sender.toRight("Sender missing")
+        senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
+        receivers <- item.receivers.toRight("Receivers missing")
+        receivers <- receivers.traverse(r =>
+          Codec.decode(Codec.BigDecimal)(r.amount).map(amount => r.party -> amount)
+        )
+        holdingFees <- item.holdingFees.toRight("Holding fees missing")
+        senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
+        coinPriceStr <- item.coinPrice.toRight("Coin price missing")
+        coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
+      } yield TxLogEntry.Transfer(
+        indexRecord = indexRecord,
+        transactionSubtype = item.transactionSubtype,
+        date = item.date.toInstant,
+        provider = provider,
+        sender = sender.party -> senderAmount,
+        receivers = receivers,
+        senderHoldingFees = senderHoldingFees,
+        coinPrice = coinPrice,
+      )
+    }
+
+    private def balanceChangeFromResponseItem(
+        item: httpDef.ListTransactionsResponseItem
+    ): Either[String, TxLogEntry.BalanceChange] = {
+      val indexRecord = TxLogIndexRecord(
+        offset = item.offset,
+        eventId = item.eventId,
+      )
+      for {
+        receiverAndAmount <- item.receivers.flatMap(_.headOption).toRight("No receivers")
+        coinPriceStr <- item.coinPrice.toRight("Coin price missing")
+        coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
+      } yield TxLogEntry.BalanceChange(
+        transactionSubtype = item.transactionSubtype,
+        indexRecord = indexRecord,
+        date = item.date.toInstant,
+        receiver = receiverAndAmount.party,
+        amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
+        coinPrice = coinPrice,
+      )
+    }
+
+    // Note: deserialization is only needed for the Canton console
+    def fromResponseItem(item: httpDef.ListTransactionsResponseItem): Either[String, TxLogEntry] = {
       item.transactionType match {
-        case BalanceChange.transaction_type =>
-          val indexRecord = TxLogIndexRecord(
-            offset = item.offset,
-            eventId = item.eventId,
-          )
-          for {
-            receiverAndAmount <- item.receivers.flatMap(_.headOption).toRight("No receivers")
-            coinPriceStr <- item.coinPrice.toRight("Coin price missing")
-            coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
-          } yield TxLogEntry.BalanceChange(
-            indexRecord = indexRecord,
-            date = item.date.toInstant,
-            receiver = receiverAndAmount.party,
-            amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-            coinPrice = coinPrice,
-          )
-        case Transfer.transaction_type =>
-          val indexRecord = TxLogIndexRecord(
-            offset = item.offset,
-            eventId = item.eventId,
-          )
-          for {
-            provider <- item.provider.toRight("Provider missing")
-            sender <- item.sender.toRight("Sender missing")
-            senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
-            receivers <- item.receivers.toRight("Receivers missing")
-            receivers <- receivers.traverse(r =>
-              Codec.decode(Codec.BigDecimal)(r.amount).map(amount => r.party -> amount)
-            )
-            holdingFees <- item.holdingFees.toRight("Holding fees missing")
-            senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
-            coinPriceStr <- item.coinPrice.toRight("Coin price missing")
-            coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
-          } yield TxLogEntry.Transfer(
-            indexRecord = indexRecord,
-            date = item.date.toInstant,
-            provider = provider,
-            sender = sender.party -> senderAmount,
-            receivers = receivers,
-            senderHoldingFees = senderHoldingFees,
-            coinPrice = coinPrice,
-          )
+        case TxLogEntry.Transfer.TransactionType => transferFromResponseItem(item)
+        case TxLogEntry.BalanceChange.TransactionType => balanceChangeFromResponseItem(item)
         case _ => Left(s"Unknown item $item")
       }
     }
@@ -287,13 +497,24 @@ object UserWalletTxLogParser {
       }
     )
 
+    /** Sets the transaction type of all transfer events to the given type */
+    def setTransferSubtype(transactionSubtype: String): State = {
+      State(
+        entries = entries.map {
+          case b: TxLogEntry.Transfer =>
+            b.copy(transactionSubtype = transactionSubtype)
+          case other => other
+        }
+      )
+    }
+
     /** Given a parsing state where the parser has encountered exactly one transfer and zero or more balance changes,
       * returns a parsing state where all the balance changes have been merged into the transfer event.
       *
       * This is useful for app payments where the payment collection first unlocks locked coins and immediately uses
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
-    def mergeBalanceChangesIntoTransfer(): State = {
+    def mergeBalanceChangesIntoTransfer(transactionSubtype: String): State = {
       val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
         entry match {
           case b: TxLogEntry.BalanceChange =>
@@ -313,6 +534,7 @@ object UserWalletTxLogParser {
         case t: TxLogEntry.Transfer =>
           Some(
             t.copy(
+              transactionSubtype = transactionSubtype,
               sender = netAmount(t.sender._1, t.sender._2),
               receivers = t.receivers.map { case (receiver, amount) =>
                 netAmount(receiver, amount)
@@ -337,16 +559,39 @@ object UserWalletTxLogParser {
       override def combine(a: State, b: State) =
         a.appended(b)
     }
+    def fromCoinExpire(
+        tx: TransactionTree,
+        event: TreeEvent,
+        owner: String,
+        transactionSubtype: String,
+    ): State = {
+      val newEntry = TxLogEntry.BalanceChange(
+        indexRecord = TxLogIndexRecord(
+          offset = tx.getOffset,
+          eventId = event.getEventId,
+        ),
+        transactionSubtype = transactionSubtype,
+        date = tx.getEffectiveAt,
+        amount = BigDecimal(0),
+        receiver = owner,
+        coinPrice = BigDecimal(0),
+      )
+      State(
+        entries = immutable.Queue(newEntry)
+      )
+    }
     def fromTransfer(
         tx: TransactionTree,
         event: TreeEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
+        transactionSubtype: String,
     ): State = {
       val newEntry = TxLogEntry.Transfer(
         indexRecord = TxLogIndexRecord(
           offset = tx.getOffset,
           eventId = event.getEventId,
         ),
+        transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         provider = node.argument.value.transfer.provider,
         sender = parseSender(node.argument.value, node.result.value),
@@ -363,16 +608,17 @@ object UserWalletTxLogParser {
     /** State from a choice that returns a `MintSummary`.
       * These are choices that create exactly one new coin in their transaction subtree.
       */
-    def fromMintSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
         event: TreeEvent,
-        msum: MintSummary[T],
+        ccsum: CoinCreateSummary[T],
+        transactionSubtype: String,
     ): State = {
-      // Note: MintSummary only contains the contract id of the new coin, but not the coin payload.
+      // Note: CoinCreateSummary only contains the contract id of the new coin, but not the coin payload.
       // However, the new coin is always created in the same transaction.
-      // Instead of including the coin price and owner in MintSummary,
+      // Instead of including the coin price and owner in CoinCreateSummary,
       // we locate the corresponding coin create event in the transaction tree.
-      val coinCid = msum.coin.contractId
+      val coinCid = ccsum.coin.contractId
       val coin = tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == coinCid =>
@@ -381,7 +627,7 @@ object UserWalletTxLogParser {
         .flatten
         .getOrElse(
           throw new RuntimeException(
-            s"The coin contract $coinCid referenced by MintSummary was not found in transaction ${tx.getTransactionId}"
+            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getTransactionId}"
           )
         )
       val newEntry = TxLogEntry.BalanceChange(
@@ -389,30 +635,11 @@ object UserWalletTxLogParser {
           offset = tx.getOffset,
           eventId = event.getEventId,
         ),
+        transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         amount = coin.amount.initialAmount,
         receiver = coin.owner,
-        coinPrice = msum.coinPrice,
-      )
-      State(
-        entries = immutable.Queue(newEntry)
-      )
-    }
-    // TODO(#2845) Remove this once we stop matching on create/archive events
-    def fromCoinCreate(
-        tx: TransactionTree,
-        event: TreeEvent,
-        coin: CoinCreate.ContractType,
-    ): State = {
-      val newEntry = TxLogEntry.BalanceChange(
-        indexRecord = TxLogIndexRecord(
-          offset = tx.getOffset,
-          eventId = event.getEventId,
-        ),
-        date = tx.getEffectiveAt,
-        amount = coin.payload.amount.initialAmount,
-        receiver = coin.payload.owner,
-        coinPrice = BigDecimal(0),
+        coinPrice = ccsum.coinPrice,
       )
       State(
         entries = immutable.Queue(newEntry)

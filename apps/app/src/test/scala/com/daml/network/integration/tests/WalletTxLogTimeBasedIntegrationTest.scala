@@ -4,10 +4,8 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
-import com.daml.network.wallet.store.UserWalletTxLogParser
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level
 
 class WalletTxLogTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -47,7 +45,8 @@ class WalletTxLogTimeBasedIntegrationTest
       checkTxHistory(
         sv1Wallet,
         Seq[CheckTxHistoryFn](
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SvRewardCollected
             logEntry.amount should be > BigDecimal(0)
           }
         ),
@@ -99,9 +98,10 @@ class WalletTxLogTimeBasedIntegrationTest
       checkTxHistory(
         bobWallet,
         Seq[CheckTxHistoryFn](
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
             // TODO(#3525): this transfer should show the rewards used
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.P2PPaymentCompleted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceValidator.getValidatorPartyId().toProtoPrimitive
               amount should beWithin(-10 - smallAmount, BigDecimal(-10))
@@ -113,8 +113,9 @@ class WalletTxLogTimeBasedIntegrationTest
             logEntry.senderHoldingFees should be > BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
-          { case logEntry: UserWalletTxLogParser.TxLogEntry.Transfer =>
+          { case logEntry: walletLogEntry.Transfer =>
             // Alice sending 40CC to Bob
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.P2PPaymentCompleted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive
               amount should beWithin(-40 - smallAmount, -40)
@@ -133,33 +134,89 @@ class WalletTxLogTimeBasedIntegrationTest
     "handle expired coins in a transaction history" in { implicit env =>
       onboardWalletUser(aliceWallet, aliceValidator)
 
-      actAndCheck("Tap to get some coins", aliceWallet.tap(0.000005))(
-        "Wait for tap to appear in history",
-        _ =>
-          aliceWallet.listTransactions(None, 5) should matchPattern {
-            case Seq(_: UserWalletTxLogParser.TxLogEntry.BalanceChange) =>
+      actAndCheck(
+        "Tap to get a small coin",
+        aliceWallet.tap(0.000005),
+      )(
+        "Wait for coin to appear",
+        _ => aliceWallet.list().coins.size shouldBe 1,
+      )
+
+      actAndCheck(
+        "Advance 4 ticks to expire the coin",
+        Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "Wait for coin to disappear",
+        _ => aliceWallet.list().coins.size shouldBe 0,
+      )
+
+      checkTxHistory(
+        aliceWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.CoinExpired
           },
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+          },
+        ),
       )
 
-      aliceWallet.list().coins should have size 1
+    }
 
-      // advance 4 ticks to expire the coin
-      // TODO (#2845) Adapt this once we properly handle expired coins.
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-        {
-          Range(0, 4).foreach(_ => advanceRoundsByOneTick)
+    "handle expired locked coins in a transaction history" in { implicit env =>
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
-          eventually() {
-            aliceWallet.list().coins should have size 0
-          }
-        },
-        entries =>
-          forAtLeast(1, entries)(
-            _.message should include(
-              "Coin archive events are not included in the transaction history."
-            )
-          ),
+      actAndCheck(
+        "Tap to get some coin",
+        aliceWallet.tap(100),
+      )(
+        "Wait for coin to appear",
+        _ => aliceWallet.list().coins.size shouldBe 1,
       )
+
+      actAndCheck(
+        "Lock a small coin",
+        lockCoins(
+          aliceWalletBackend,
+          aliceParty,
+          aliceValidatorParty,
+          aliceWallet.list().coins,
+          BigDecimal(0.000005),
+          scan,
+          java.time.Duration.ofMinutes(5),
+        ),
+      )(
+        "Wait for locked coin to appear",
+        _ => aliceWallet.list().lockedCoins.size shouldBe 1,
+      )
+
+      actAndCheck(
+        "Advance 4 ticks to expire the locked coin",
+        Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "Wait for locked coin to disappear",
+        _ => aliceWallet.list().lockedCoins.size shouldBe 0,
+      )
+
+      checkTxHistory(
+        aliceWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.LockedCoinExpired
+          },
+          { case logEntry: walletLogEntry.Transfer =>
+            // The `lockCoins` utility function directly exercises the `CoinRules_Transfer` choice.
+            // This will appear as the catch-all "unknown transfer" in the history.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.Transfer
+          },
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+          },
+        ),
+      )
+
     }
   }
 

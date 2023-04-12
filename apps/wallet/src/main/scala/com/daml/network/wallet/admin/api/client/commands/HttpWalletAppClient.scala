@@ -1038,7 +1038,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Seq[UserWalletTxLogParser.TxLogEntry]] =
       response.fold(
-        ok => ok.items.traverse(UserWalletTxLogParser.TxLogEntry.fromJson),
+        ok => ok.items.traverse(UserWalletTxLogParser.TxLogEntry.fromResponseItem),
         notFound => Left(notFound.error),
         internal => Left(internal.error),
       )

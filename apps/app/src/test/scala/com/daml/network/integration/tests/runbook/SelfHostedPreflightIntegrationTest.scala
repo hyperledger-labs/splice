@@ -110,6 +110,7 @@ class SelfHostedPreflightIntegrationTest
           pageTitle shouldBe ""
         }
       }
+
       // Stop nodes before Canton is shutdown
       env.coinNodes.local.foreach(_.stop())
     }

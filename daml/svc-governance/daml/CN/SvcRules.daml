@@ -12,7 +12,7 @@ import DA.Time
 import CN.Util.Assert
 import CC.Coin
 import CC.Round
-import CC.API.V1.Coin (MintSummary(..))
+import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.API.V1.ValidatorTraffic (ValidatorTraffic(..))
 
@@ -403,7 +403,7 @@ template SvcRules with
     -- Coin management driven directly by the leader
     --------------------------------------------------
 
-    nonconsuming choice SvcRules_Coin_Expire : ()
+    nonconsuming choice SvcRules_Coin_Expire : Party
       with
         cid : ContractId Coin
         choiceArg : Coin_Expire
@@ -411,7 +411,7 @@ template SvcRules with
       do
         exercise cid choiceArg
 
-    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : ()
+    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : Party
       with
         cid : ContractId LockedCoin
         choiceArg : LockedCoin_ExpireCoin
@@ -462,7 +462,7 @@ template SvcRules with
             round = reward.round
             amount = issuancePerSV
 
-    nonconsuming choice SvcRules_CollectSvReward : MintSummary (ContractId Coin)
+    nonconsuming choice SvcRules_CollectSvReward : CoinCreateSummary (ContractId Coin)
       with
         sv : Party
         rewardCid : ContractId SvReward

@@ -523,7 +523,7 @@ class WalletNewPaymentFrontendIntegrationTest
       balanceChangeForSender: BigDecimal,
   )(implicit driver: WebDriverType) = {
     inside(findAll(className("tx-row")).toList) { case paymentTx :: lockTx :: _ =>
-      matchTransaction(lockTx)(coinPrice, "Automation", None, expectedLockedAmount)
+      matchTransaction(lockTx)(coinPrice, "Sent", None, expectedLockedAmount)
 
       matchTransaction(paymentTx)(
         coinPrice,

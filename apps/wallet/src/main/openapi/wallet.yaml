@@ -839,6 +839,7 @@ components:
       type: object
       required:
         - transaction_type
+        - transaction_subtype
         - event_id
         - offset
         - date
@@ -848,6 +849,8 @@ components:
         # - 'transfer', with fields: provider, sender, receivers, holding_fees, coin_price
         # - 'balance_change', with fields: receivers, coin_price
         transaction_type:
+          type: string
+        transaction_subtype:
           type: string
         event_id:
           type: string

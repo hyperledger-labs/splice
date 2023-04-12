@@ -39,7 +39,7 @@ template Escrow
          payment <- fetch paymentCoin
          require "SVC matches payment coin" (payment.svc == this.svc)
          require "owner matches payment coin" (payment.owner == this.p)
-         API.MintSummary cid _ <- exercise (toInterfaceContractId @API.LockedCoin lockedCoin) (API.LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+         API.CoinCreateSummary cid _ <- exercise (toInterfaceContractId @API.LockedCoin lockedCoin) (API.LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
          let transfer = API.Transfer with
                sender = p
                provider = arbiter

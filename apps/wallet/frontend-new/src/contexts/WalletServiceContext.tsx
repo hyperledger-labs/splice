@@ -130,9 +130,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             };
             return [balanceChange];
           } else if (item.transactionType === 'transfer') {
-            const isAutomation = receivers.length === 0;
+            const isAutomation = item.transactionSubtype === 'wallet_automation';
             if (isAutomation) {
-              // TODO (#3616): this should be properly returned by the BE
               const automation: Automation = {
                 transactionType: 'automation',
                 id,

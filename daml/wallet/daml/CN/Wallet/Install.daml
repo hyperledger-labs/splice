@@ -43,8 +43,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         result <- catchAll (API.exercisePaymentTransfer context transfer)
         handleResultMergeInputs result
     CO_Tap tapAmount -> do
-      mintSummary <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_DevNet_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
-      handleResultTap mintSummary
+      ccsum <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_DevNet_Tap endUserP tapAmount (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
+      handleResultTap ccsum
   where
     handle : Choice t c (r, Optional (ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
@@ -66,11 +66,11 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         let inputCoins = optional [] (\coin -> [API.InputCoin coin]) senderChange
         executeCoinOperationRec endUserP validatorP context inputCoins (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
 
-    handleResultTap : Either InvalidTransferReason (API.MintSummary (ContractId CC.Coin.Coin)) -> Update [CoinOperationOutcome]
+    handleResultTap : Either InvalidTransferReason (API.CoinCreateSummary (ContractId CC.Coin.Coin)) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right mintSummary -> do
-        let tappedCoin = toInterfaceContractId @API.Coin mintSummary.coin
+      Right ccsum -> do
+        let tappedCoin = toInterfaceContractId @API.Coin ccsum.coin
         executeCoinOperationRec endUserP validatorP context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]

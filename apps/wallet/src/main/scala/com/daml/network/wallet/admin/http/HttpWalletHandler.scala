@@ -236,7 +236,7 @@ class HttpWalletHandler(
         transactions <- userStore.listTransactions(beginAfterId, request.pageSize.toInt)
       } yield v0.WalletResource.ListTransactionsResponse.OK(
         d0.ListTransactionsResponse(
-          items = transactions.map(_.toJson).toVector
+          items = transactions.map(_.toResonseItem).toVector
         )
       )
     }

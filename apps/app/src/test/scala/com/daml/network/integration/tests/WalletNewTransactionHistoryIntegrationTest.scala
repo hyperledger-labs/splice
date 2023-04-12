@@ -100,7 +100,7 @@ class WalletNewTransactionHistoryIntegrationTest
           case otp +: sent +: received +: directoryCreation +: lockForDirectory +: balanceChange +: Nil =>
             matchTransaction(otp)(
               coinPrice = 2,
-              expectedAction = "Automation", // Actually OTP, but we cannot distinguish
+              expectedAction = "Sent",
               expectedParty = None,
               expectedAmountCC = BigDecimal("-1.31415"),
             )
@@ -130,7 +130,7 @@ class WalletNewTransactionHistoryIntegrationTest
             )
             matchTransaction(lockForDirectory)(
               coinPrice = 2,
-              expectedAction = "Automation",
+              expectedAction = "Sent",
               expectedParty = None,
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
