@@ -460,42 +460,43 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetValidatorCredit() extends BaseCommand[http.GetValidatorCreditResponse, Double] {
+  case class GetValidatorTrafficBalance()
+      extends BaseCommand[http.GetValidatorTrafficBalanceResponse, Double] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorCreditResponse] =
-      client.getValidatorCredit(headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorTrafficBalanceResponse] =
+      client.getValidatorTrafficBalance(headers)
 
     override def handleResponse(
-        response: http.GetValidatorCreditResponse
+        response: http.GetValidatorTrafficBalanceResponse
     )(implicit decoder: TemplateJsonDecoder): Either[String, Double] =
       response match {
-        case http.GetValidatorCreditResponse.OK(response) =>
-          Right(response.validatorCredit)
-        case http.GetValidatorCreditResponse.NotFound(value) =>
+        case http.GetValidatorTrafficBalanceResponse.OK(response) =>
+          Right(response.validatorTrafficBalance)
+        case http.GetValidatorTrafficBalanceResponse.NotFound(value) =>
           Left(value.error)
       }
   }
 
-  case class CheckAndUpdateValidatorCredit()
-      extends BaseCommand[http.CheckAndUpdateValidatorCreditResponse, Boolean] {
+  case class CheckAndUpdateValidatorTrafficBalance()
+      extends BaseCommand[http.CheckAndUpdateValidatorTrafficBalanceResponse, Boolean] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.CheckAndUpdateValidatorCreditResponse] =
-      client.checkAndUpdateValidatorCredit(headers)
+    ], http.CheckAndUpdateValidatorTrafficBalanceResponse] =
+      client.checkAndUpdateValidatorTrafficBalance(headers)
 
     override def handleResponse(
-        response: http.CheckAndUpdateValidatorCreditResponse
+        response: http.CheckAndUpdateValidatorTrafficBalanceResponse
     )(implicit decoder: TemplateJsonDecoder): Either[String, Boolean] =
       response match {
-        case http.CheckAndUpdateValidatorCreditResponse.OK(response) =>
+        case http.CheckAndUpdateValidatorTrafficBalanceResponse.OK(response) =>
           Right(response.approved)
-        case http.CheckAndUpdateValidatorCreditResponse.NotFound(value) =>
+        case http.CheckAndUpdateValidatorTrafficBalanceResponse.NotFound(value) =>
           Left(value.error)
       }
 

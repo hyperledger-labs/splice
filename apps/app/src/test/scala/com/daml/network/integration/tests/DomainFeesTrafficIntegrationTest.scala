@@ -40,7 +40,7 @@ class DomainFeesTrafficIntegrationTest
       )
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllWalletAppBackendConfigs_(walletConfig =>
-          walletConfig.focus(_.treasury.enableValidatorCreditChecks).replace(true)
+          walletConfig.focus(_.treasury.enableValidatorTrafficBalanceChecks).replace(true)
         )(cnNodeConfig)
       )
   }

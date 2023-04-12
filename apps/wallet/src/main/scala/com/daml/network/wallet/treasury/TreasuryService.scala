@@ -465,7 +465,7 @@ class TreasuryService(
       (disclosedCoinRules, coinRulesInterface) <- getCoinRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
       tapsApproved <-
-        if (treasuryConfig.enableValidatorCreditChecks) {
+        if (treasuryConfig.enableValidatorTrafficBalanceChecks) {
           scanConnection.approveTaps(numTapOperations)
         } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)

@@ -217,7 +217,7 @@ final class ScanConnection(
   ): Future[Boolean] = {
     Future.foldLeft(
       (1 to numTapOperations).map(_ =>
-        runHttpCmd(config.adminApi.url, HttpScanAppClient.CheckAndUpdateValidatorCredit())
+        runHttpCmd(config.adminApi.url, HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance())
       )
     )(true)(_ && _)
   }

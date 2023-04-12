@@ -165,18 +165,18 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.getTopValidatorsByValidatorRewards(round, limit))
     }
 
-  @Help.Summary("Get the available credit for a validator")
-  def getValidatorCredit(): Double =
+  @Help.Summary("Get the available traffic balance for a validator")
+  def getValidatorTrafficBalance(): Double =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetValidatorCredit())
+      httpCommand(HttpScanAppClient.GetValidatorTrafficBalance())
     }
 
   @Help.Summary(
-    "Atomically check if the validator has any credits available and if so, consume 1 credit"
+    "Atomically check if the validator has any traffic balance available and if so, consume 1 unit"
   )
-  def checkAndUpdateValidatorCredit(): Boolean =
+  def checkAndUpdateValidatorTrafficBalance(): Boolean =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.CheckAndUpdateValidatorCredit())
+      httpCommand(HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance())
     }
 }
 

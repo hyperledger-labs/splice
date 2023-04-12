@@ -355,9 +355,9 @@ class HttpScanHandler(
         )
     }
 
-  def getValidatorCredit(
-      response: v0.ScanResource.GetValidatorCreditResponse.type
-  )(): Future[v0.ScanResource.GetValidatorCreditResponse] =
+  def getValidatorTrafficBalance(
+      response: v0.ScanResource.GetValidatorTrafficBalanceResponse.type
+  )(): Future[v0.ScanResource.GetValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
       store
@@ -366,16 +366,16 @@ class HttpScanHandler(
           val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
           val extraTrafficBalance =
             rateLimiterWithExtraTraffic.getExtraTrafficBalance(extraTrafficLimit)
-          v0.ScanResource.GetValidatorCreditResponse.OK(
-            definitions.GetValidatorCreditResponse(extraTrafficBalance)
+          v0.ScanResource.GetValidatorTrafficBalanceResponse.OK(
+            definitions.GetValidatorTrafficBalanceResponse(extraTrafficBalance)
           )
         })
 
     }
 
-  def checkAndUpdateValidatorCredit(
-      response: v0.ScanResource.CheckAndUpdateValidatorCreditResponse.type
-  )(): Future[v0.ScanResource.CheckAndUpdateValidatorCreditResponse] =
+  def checkAndUpdateValidatorTrafficBalance(
+      response: v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.type
+  )(): Future[v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
       store
@@ -383,8 +383,8 @@ class HttpScanHandler(
         .map(limit => {
           val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
           val approved = rateLimiterWithExtraTraffic.checkAndUpdate(extraTrafficLimit)
-          v0.ScanResource.CheckAndUpdateValidatorCreditResponse.OK(
-            definitions.CheckAndUpdateValidatorCreditResponse(approved)
+          v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
+            definitions.CheckAndUpdateValidatorTrafficBalanceResponse(approved)
           )
         })
     }

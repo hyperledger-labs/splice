@@ -218,32 +218,32 @@ paths:
                 "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/get-validator-credit:
+  /api/v0/get-validator-traffic-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getValidatorCredit"
+      operationId: "getValidatorTrafficBalance"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetValidatorCreditResponse"
+                "$ref": "#/components/schemas/GetValidatorTrafficBalanceResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/check-and-update-validator-credit:
+  /api/v0/check-and-update-validator-traffic-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "checkAndUpdateValidatorCredit"
+      operationId: "checkAndUpdateValidatorTrafficBalance"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/CheckAndUpdateValidatorCreditResponse"
+                "$ref": "#/components/schemas/CheckAndUpdateValidatorTrafficBalanceResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
 
@@ -364,14 +364,14 @@ components:
         round:
           type: integer
           format: int64
-    GetValidatorCreditResponse:
+    GetValidatorTrafficBalanceResponse:
       type: object
-      required: ["validatorCredit"]
+      required: ["validatorTrafficBalance"]
       properties:
-        validatorCredit:
+        validatorTrafficBalance:
           type: number
           format: double
-    CheckAndUpdateValidatorCreditResponse:
+    CheckAndUpdateValidatorTrafficBalanceResponse:
       type: object
       required: ["approved"]
       properties:

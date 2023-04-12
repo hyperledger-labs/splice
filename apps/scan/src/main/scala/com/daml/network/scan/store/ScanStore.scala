@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.config.ScanDomainConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithHistory}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
