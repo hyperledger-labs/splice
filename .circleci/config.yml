@@ -65,6 +65,7 @@ commands:
        name: Setup Nix
        command: |
          set -euo pipefail
+         echo 'source ~/.nix-profile/etc/profile.d/nix.sh' >> "$BASH_ENV"
          if [ -f ~/.config/nix/nix.conf ]; then
              exit 0
          fi
@@ -816,6 +817,7 @@ commands:
            make docker-build -j
 
 jobs:
+
   # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
     docker:
@@ -962,6 +964,41 @@ jobs:
           cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+
+  pulumi_preview:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchnet", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+      PULUMI_CONFIG_PASSPHRASE: ""
+    steps:
+      - checkout
+      - setup_vpn
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Pulumi preview << parameters.cluster >>
+          additional_nix_args: "--keep PULUMI_BACKEND_URL --keep PULUMI_CONFIG_PASSPHRASE"
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            make cluster/pulumi/install
+            if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
+              export PULUMI_BACKEND_URL=gs://da-cn-pulumi-dev-stacks
+              export GOOGLE_CREDENTIALS="$GCP_DA_CN_DEVNET_KEY"
+            fi
+            if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
+              export PULUMI_BACKEND_URL=gs://da-cn-pulumi-stacks
+              export GOOGLE_CREDENTIALS="$GCP_DA_CN_SCRATCHNET_KEY"
+            fi
+            pulumi preview --show-sames --stack "infra.${GCP_CLUSTER_BASENAME}" -C cluster/pulumi/infrastructure
 
   preflight_check:
     parameters:
@@ -1273,6 +1310,54 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster
+
+  pulumi:
+    jobs:
+      - run_preview:
+          type: approval
+      - pulumi_preview:
+          name: preview devnet
+          cluster: devnet
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+      - pulumi_preview:
+          name: preview scratchnet
+          cluster: scratchnet
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+      - pulumi_preview:
+          name: preview scratchnetb
+          cluster: scratchnetb
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+      - pulumi_preview:
+          name: preview scratchnetc
+          cluster: scratchnetc
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+      - pulumi_preview:
+          name: preview staging
+          cluster: staging
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+      - pulumi_preview:
+          name: preview testnet
+          cluster: testnet
+          context:
+            - canton-network-vpn
+          requires:
+            - run_preview
+
 
   deploy_scratchnet_B:
     when:

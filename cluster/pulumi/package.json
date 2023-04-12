@@ -30,6 +30,7 @@
         "lint:check": "eslint canton-network/src --max-warnings=0"
     },
     "workspaces": [
-        "canton-network"
+        "canton-network",
+        "infrastructure"
     ]
 }

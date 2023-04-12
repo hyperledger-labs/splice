@@ -1213,6 +1213,31 @@ function subcmd_prefresh() {
 
 ###
 
+subcommand_whitelist[infra_pulumi]="Run pulumi for the infrastructure project"
+
+function subcmd_infra_pulumi() {
+  # Use an empty passphrase until we manage secrets
+  local -x PULUMI_CONFIG_PASSPHRASE=''
+  local -a args=( --cwd "${REPO_ROOT}/cluster/pulumi/infrastructure" )
+
+  # some pulumi commands / sub-commands do not support the --stack flag
+  if [[ "$1" != stack || "$2" != export ]]; then
+    args+=( --stack "infra.${GCP_CLUSTER_BASENAME}" )
+  fi
+
+  local -x PULUMI_BACKEND_URL
+
+  if [[ "$GCP_CLUSTER_BASENAME" == @(dev|test) ]]; then
+    PULUMI_BACKEND_URL=gs://da-cn-pulumi-dev-stacks
+  else
+    PULUMI_BACKEND_URL=gs://da-cn-pulumi-stacks
+  fi
+
+  pulumi "${args[@]}" "$@"
+}
+
+###
+
 subcommand_whitelist[lock]="Attempt to claim the lock on a cluster."
 
 function subcmd_lock() {

@@ -4,13 +4,10 @@ import { installValidator } from "./validator";
 import { installSVC, installSvNode } from "./sv";
 import { installDocs } from "./docs";
 import { installClusterIngress } from "./ingress";
-import { configureNetwork } from "./network";
 
 /// Toplevel Chart Installs
 
 function installCluster() {
-  //configureDNS();
-
   const svc = installSVC();
 
   installSvNode(svc, "sv-1");
@@ -24,5 +21,4 @@ function installCluster() {
   installClusterIngress(validator, splitwell, docs);
 }
 
-//configureNetwork();
 installCluster();

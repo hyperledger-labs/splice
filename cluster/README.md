@@ -838,6 +838,28 @@ chart based deployment strategy that's managed using Pulumi
 scripts. While this work is not complete, the beginnings of it are
 already committed and are available as a prototype for testing.
 
+As of the time of this writing, there are two separate Pulumi projects:
+
+1. [`infrastructure`](pulumi/infrastructure)
+2. [`canton-network`](pulumi/canton-network)
+
+The former can be useful to manage the underlying infrastructure used by
+the applications deployed to the kubernetes cluster (e.g. to set up DNS entries
+and configure IP addresses).
+
+There is a `cncluster` sub command called `infra_pulumi` which can be run from
+inside a deployment directory in order to call arbitrary Pulumi commands:
+
+```console
+$ cd cluster/deployment/scratchnet
+$ cncluster infra_pulumi preview
+...
+$ cncluster infra_pulumi up
+```
+
+The "canton-network" Pulumi project is used in order to deploy the canton-network
+applications to the cloud.
+
 The current Pulumi deployment is in an interim state, and can manage
 the cluster ingress and documentation server. Note that in the
 short-run, you'll need to manually reduce the number of endpoints

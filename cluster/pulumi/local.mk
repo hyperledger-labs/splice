@@ -1,7 +1,8 @@
 dir := $(call current_dir)
 
 $(dir)/install: $(dir)/package.json
-	cd $(@D) && npm install && touch install
+	cd $(@D) && if [ -v CI ]; then npm ci; else npm install; fi
+	touch $@
 
 .PHONY: $(dir)/clean
 $(dir)/clean:
