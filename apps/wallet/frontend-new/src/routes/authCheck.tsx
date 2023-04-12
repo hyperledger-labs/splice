@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Login, useUserState } from 'common-frontend';
+import { Login, useUserState, useInterval } from 'common-frontend';
 import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
 import { OnboardedStatus } from 'common-frontend/lib/contexts/UserContext';
-import { useEffect } from 'react';
+import { useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import Loading from '../components/Loading';
@@ -17,11 +17,13 @@ interface AuthCheckProps {
 const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => {
   const { isAuthenticated, onboardedStatus, updateStatus } = useUserState();
   const { userStatus } = useWalletClient();
-  useEffect(() => {
-    if (onboardedStatus === OnboardedStatus.Loading && isAuthenticated) {
+  const updateStatusWhenAuthenticated = useCallback(() => {
+    if (isAuthenticated) {
       userStatus().then(status => updateStatus(status));
     }
-  }, [isAuthenticated, onboardedStatus, userStatus, updateStatus]);
+  }, [isAuthenticated, userStatus, updateStatus]);
+
+  useInterval(updateStatusWhenAuthenticated);
 
   if (isAuthenticated) {
     if (onboardedStatus === OnboardedStatus.Onboarded) {
