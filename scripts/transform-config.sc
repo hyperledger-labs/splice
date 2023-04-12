@@ -11,7 +11,8 @@ object TransformConfig extends App {
   mode match {
     case "useSelfSignedTokensForLedgerApiAuth" =>
       val inputConfig = CNNodeConfig.parseAndLoadOrThrow(Seq(inputFileName.toFile))
-      val outputConfig = CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
+      val outputConfig =
+        CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
       // Deliberately leaking secrets to file
       CNNodeConfig.writeToFile(outputConfig, outputFileName, confidential = false)
     case _ =>

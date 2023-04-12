@@ -3,7 +3,7 @@ import $file.tools
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 
 final case class EnvSubst(
-  env: String
+    env: String
 )
 
 sealed trait PrimaryParty
@@ -20,9 +20,11 @@ def main() {
     tools.createUser(participant, user)
   }
 
-  val domains = decode[Seq[tools.DomainDef]](sys.env.get("CANTON_PARTICIPANT_EXTRA_DOMAINS").getOrElse("[]")).getOrElse(
-    sys.error("Failed to parse domains config")
-  )
+  val domains =
+    decode[Seq[tools.DomainDef]](sys.env.get("CANTON_PARTICIPANT_EXTRA_DOMAINS").getOrElse("[]"))
+      .getOrElse(
+        sys.error("Failed to parse domains config")
+      )
   domains.foreach { domain =>
     tools.connectDomain(participant, domain)
   }
