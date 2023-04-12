@@ -1,0 +1,39 @@
+package com.daml.network.automation
+
+import cats.syntax.parallel.*
+import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
+import io.opentelemetry.api.trace.Tracer
+
+import scala.concurrent.{ExecutionContext, Future}
+
+/** A trigger that regularly polls for new tasks and executes them in parallel.
+  *
+  * Unless you implement an one-off trigger, you likely want to write or use a specialization of this trigger as a base
+  * trigger implementation.
+  */
+abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
+    ec: ExecutionContext,
+    tracer: Tracer,
+) extends TaskbasedTrigger[T]
+    with PollingTrigger {
+
+  /** Override with how to retrieve the list of tasks that should be processed in parallel right now.
+    *
+    * The DB queries underlying it SHOULD be efficient enough to run in a loop.
+    */
+  // TODO(M3-83): consider retrieving a Source of tasks so that the Source can run down an index and thus avoid
+  // expensive queries in Postgres due to having to skip deleted, but not yet VACUUMED tuples!
+  // This can be done using the seek method from https://use-the-index-luke.com/sql/partial-results/fetch-next-page
+  protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]]
+
+  /** Returns whether some useful work was done, i.e., at least one task completed. */
+  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+    for {
+      tasks <- retrieveTasks()
+      // TODO(M3-83): review our triggers for whether the task retrieval for time-based triggers performs sufficiently well
+      // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
+      tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
+    } yield tasksSucceeded.exists(succeeded => succeeded)
+}
