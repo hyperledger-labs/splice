@@ -1,22 +1,29 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNLedgerConnection,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
+import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{SvApp, SvcPartyHosting}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.{SvApp, SvcPartyHosting}
 import com.daml.network.util.{Codec, Contract}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
-import com.digitalasset.canton.topology.transaction.RequestSide
 
 import java.security.SecureRandom
 import java.util.Base64
@@ -180,59 +187,41 @@ class HttpSvHandler(
 
   def getSvOnboardingStatus(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
-  )(svPartyIdS: String): Future[v0.SvResource.GetSvOnboardingStatusResponse] = {
-
-    PartyId.fromProtoPrimitive(svPartyIdS) match {
+  )(svPartyOrName: String): Future[SvResource.GetSvOnboardingStatusResponse] = {
+    PartyId.fromProtoPrimitive(svPartyOrName) match {
       case Left(error) =>
-        Future.successful(
-          v0.SvResource.GetSvOnboardingStatusResponseBadRequest(
-            s"Could not decode party ID $svPartyIdS; error: $error"
-          )
-        )
+        for {
+          svcRules <- svcStore.getSvcRules()
+          result <- OptionT
+            .fromOption[Future](
+              isCompleted(svPartyOrName, svcRules)
+            )
+            .orElse(isConfirmed(svPartyOrName, svcStore))
+            .orElse(isOnboarded(svPartyOrName, svcRules))
+            .value
+        } yield result match {
+          case Some(result) => result
+          case None =>
+            if (svPartyOrName.nonEmpty) {
+              definitions.GetSvOnboardingStatusResponse(state = "unknown")
+            } else {
+              v0.SvResource.GetSvOnboardingStatusResponseBadRequest(
+                s"Could not find any party ID or name matching: $svPartyOrName; error: $error"
+              )
+            }
+        }
       case Right(svPartyId) =>
         for {
           svcRules <- svcStore.getSvcRules()
           result <- OptionT
             .fromOption[Future](
-              Option.when(SvApp.isSvcMemberParty(svPartyId, svcRules))(
-                definitions.GetSvOnboardingStatusResponse(
-                  state = "completed",
-                  name = Some(svcRules.payload.members.get(svPartyId.toProtoPrimitive).name),
-                  contractId = Some(Codec.encodeContractId(svcRules.contractId)),
-                )
-              )
+              isCompleted(svPartyId, svcRules)
             )
             .orElse(
-              OptionT(
-                svcStore
-                  .lookupSvConfirmed(svPartyId)
-              ).map(svConfirmed =>
-                definitions.GetSvOnboardingStatusResponse(
-                  state = "confirmed",
-                  name = Some(svConfirmed.payload.svName),
-                  contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
-                )
-              )
+              isConfirmed(svPartyId, svcStore)
             )
             .orElse(
-              for {
-                svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateParty(svPartyId))
-                confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboarding))
-                confirmedBy = confirmations
-                  .map(c =>
-                    svcRules.payload.members.asScala.get(c.payload.confirmer) match {
-                      case Some(member) => member.name
-                      case None => c.payload.confirmer
-                    }
-                  )
-                  .toVector
-              } yield definitions.GetSvOnboardingStatusResponse(
-                state = "onboarding",
-                name = Some(svOnboarding.payload.candidateName),
-                contractId = Some(Codec.encodeContractId(svOnboarding.contractId)),
-                confirmedBy = Some(confirmedBy),
-                requiredNumConfirmations = Some(SvUtil.requiredNumConfirmations(svcRules)),
-              )
+              isOnboarded(svPartyId, svcRules)
             )
             .value
         } yield result match {
@@ -290,6 +279,107 @@ class HttpSvHandler(
         svcRulesContractId = svcRules.contractId.toString,
       )
     }
+
+  private def isCompleted(
+      svParty: PartyId,
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+  ): Option[definitions.GetSvOnboardingStatusResponse] = {
+    Option.when(SvApp.isSvcMemberParty(svParty, svcRules))(
+      definitions.GetSvOnboardingStatusResponse(
+        state = "completed",
+        name = Some(svcRules.payload.members.get(svParty.toProtoPrimitive).name),
+        contractId = Some(Codec.encodeContractId(svcRules.contractId)),
+      )
+    )
+  }
+
+  private def isCompleted(
+      svParty: String,
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+  ): Option[definitions.GetSvOnboardingStatusResponse] = {
+    Option.when(SvApp.isSvcMemberName(svParty, svcRules))(
+      definitions.GetSvOnboardingStatusResponse(
+        state = "completed",
+        name = Some(svParty),
+        contractId = Some(Codec.encodeContractId(svcRules.contractId)),
+      )
+    )
+  }
+
+  private def isOnboarded(
+      svParty: PartyId,
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+    for {
+      svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateParty(svParty))
+      result <- getOnboardedStatus(svOnboarding, svcRules)
+    } yield result
+  }
+
+  private def isOnboarded(
+      svParty: String,
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+    for {
+      svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateName(svParty))
+      result <- getOnboardedStatus(svOnboarding, svcRules)
+    } yield result
+  }
+
+  private def getOnboardedStatus(
+      svOnboarding: Contract[SvOnboarding.ContractId, SvOnboarding],
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+  ) = {
+    for {
+      confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboarding))
+      confirmedBy = confirmations
+        .map(c =>
+          svcRules.payload.members.asScala.get(c.payload.confirmer) match {
+            case Some(member) => member.name
+            case None => c.payload.confirmer
+          }
+        )
+        .toVector
+    } yield definitions.GetSvOnboardingStatusResponse(
+      state = "onboarding",
+      name = Some(svOnboarding.payload.candidateName),
+      contractId = Some(Codec.encodeContractId(svOnboarding.contractId)),
+      confirmedBy = Some(confirmedBy),
+      requiredNumConfirmations = Some(SvUtil.requiredNumConfirmations(svcRules)),
+    )
+  }
+
+  private def isConfirmed(
+      svParty: PartyId,
+      svcStore: SvSvcStore,
+  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+    OptionT(
+      svcStore
+        .lookupSvConfirmedByParty(svParty)
+    ).map(svConfirmed =>
+      definitions.GetSvOnboardingStatusResponse(
+        state = "confirmed",
+        name = Some(svConfirmed.payload.svName),
+        contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
+      )
+    )
+  }
+
+  private def isConfirmed(
+      svName: String,
+      svcStore: SvSvcStore,
+  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+    OptionT(
+      svcStore
+        .lookupSvConfirmedByName(svName)
+    ).map(svConfirmed =>
+      definitions.GetSvOnboardingStatusResponse(
+        state = "confirmed",
+        name = Some(svConfirmed.payload.svName),
+        contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
+      )
+    )
+  }
 
   private def generateRandomOnboardingSecret(): String = {
     val rng = new SecureRandom();

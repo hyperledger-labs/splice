@@ -37,6 +37,11 @@ abstract class SvAppReference(
 
   def getSvOnboardingStatus(candidate: PartyId): HttpSvAppClient.SvOnboardingStatus =
     consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.getSvOnboardingStatus(candidate.toProtoPrimitive))
+    }
+
+  def getSvOnboardingStatus(candidate: String): HttpSvAppClient.SvOnboardingStatus =
+    consoleEnvironment.run {
       httpCommand(HttpSvAppClient.getSvOnboardingStatus(candidate))
     }
 

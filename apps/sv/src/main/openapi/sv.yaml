@@ -118,13 +118,13 @@ paths:
             text/plain:
               schema:
                 type: string
-  /onboard/sv/status/{candidate_party_id}:
+  /onboard/sv/status/{candidate_party_id_or_name}:
     get:
       tags: [sv]
       x-jvm-package: sv
       operationId: "getSvOnboardingStatus"
       parameters:
-        - name: "candidate_party_id"
+        - name: "candidate_party_id_or_name"
           in: "path"
           required: true
           schema:

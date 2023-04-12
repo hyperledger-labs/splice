@@ -166,14 +166,15 @@ object HttpSvAppClient {
     }
   }
 
-  case class getSvOnboardingStatus(candidate: PartyId)
+  case class getSvOnboardingStatus(candidate: String)
       extends BaseCommand[http.GetSvOnboardingStatusResponse, SvOnboardingStatus] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvOnboardingStatusResponse] =
-      client.getSvOnboardingStatus(candidatePartyId = candidate.toProtoPrimitive, headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvOnboardingStatusResponse] = {
+      client.getSvOnboardingStatus(candidatePartyIdOrName = candidate, headers = headers)
+    }
 
     override def handleResponse(
         response: http.GetSvOnboardingStatusResponse

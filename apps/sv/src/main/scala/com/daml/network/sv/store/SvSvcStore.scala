@@ -353,23 +353,17 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupSvOnboardingByCandidatePartyWithOffset(
-      candidateParty: PartyId
-  ): Future[
-    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
-        _,
-        co => co.payload.candidateParty == candidateParty.toProtoPrimitive,
-      )
-    )
-
   def lookupSvOnboardingByCandidateParty(
       candidateParty: PartyId
   ): Future[
     Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]
   ] = lookupSvOnboardingByCandidatePartyWithOffset(candidateParty).map(_.value)
+
+  def lookupSvOnboardingByCandidateName(
+      candidateName: String
+  ): Future[
+    Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]
+  ] = lookupSvOnboardingByCandidateNameWithOffset(candidateName).map(_.value)
 
   def listExpiredSvOnboardings: ListExpiredContracts[so.SvOnboarding.ContractId, so.SvOnboarding] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboarding.COMPANION)(
@@ -381,24 +375,19 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.expiresAt
     )
 
-  def lookupSvConfirmedWithOffset(
-      svParty: PartyId
-  ): Future[
-    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
-        _,
-        co => co.payload.svParty == svParty.toProtoPrimitive,
-      )
-    )
-
-  def lookupSvConfirmed(
+  def lookupSvConfirmedByParty(
       svParty: PartyId
   ): Future[
     Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
   ] =
-    lookupSvConfirmedWithOffset(svParty).map(_.value)
+    lookupSvConfirmedByPartyWithOffset(svParty).map(_.value)
+
+  def lookupSvConfirmedByName(
+      svName: String
+  ): Future[
+    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+  ] =
+    lookupSvConfirmedByNameWithOffset(svName).map(_.value)
 
   def listSvOnboardingConfirmations(
       svOnboarding: Contract[so.SvOnboarding.ContractId, so.SvOnboarding]
@@ -469,6 +458,54 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
       _.targetClosesAt
+    )
+
+  private def lookupSvOnboardingByCandidatePartyWithOffset(
+      candidateParty: PartyId
+  ): Future[
+    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+        _,
+        co => co.payload.candidateParty == candidateParty.toProtoPrimitive,
+      )
+    )
+
+  private def lookupSvOnboardingByCandidateNameWithOffset(
+      candidateName: String
+  ): Future[
+    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+        _,
+        co => co.payload.candidateName == candidateName,
+      )
+    )
+
+  private def lookupSvConfirmedByPartyWithOffset(
+      svParty: PartyId
+  ): Future[
+    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+        _,
+        co => co.payload.svParty == svParty.toProtoPrimitive,
+      )
+    )
+
+  private def lookupSvConfirmedByNameWithOffset(
+      svName: String
+  ): Future[
+    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+        _,
+        co => co.payload.svName == svName,
+      )
     )
 }
 

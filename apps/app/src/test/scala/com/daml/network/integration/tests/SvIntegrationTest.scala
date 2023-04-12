@@ -377,10 +377,10 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           status.svOnboardingCid shouldBe svOnboardingCid
           status.confirmedBy.sorted shouldBe Vector("sv1")
           status.requiredNumConfirmations shouldBe 2
+          sv1.getSvOnboardingStatus("sv4") shouldBe sv1.getSvOnboardingStatus(sv4Party)
         }
       })
     }
-
     actAndCheck("SV2 comes back online", sv2.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
@@ -389,12 +389,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive)
       },
     )
-
     clue("SV4's onboarding status is reported as completed.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
           status.name shouldBe "sv4"
           status.svcRulesCid shouldBe getSvcRules().id
+          sv1.getSvOnboardingStatus("sv4") shouldBe sv1.getSvOnboardingStatus(sv4Party)
         }
       })
     }
@@ -424,7 +424,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         .value
 
       clue("Unknown parties have unknown SV onboarding status") {
-        inside(sv1.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() => () }
+        inside(sv1.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>
+          sv1.getSvOnboardingStatus("sv2") shouldBe sv1.getSvOnboardingStatus(sv2Party)
+        }
       }
       actAndCheck(
         "Moving sv2 to confirmed state",
@@ -448,6 +450,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             case status: SvOnboardingStatus.Confirmed => {
               status.name shouldBe "sv2"
               status.svConfirmedCid shouldBe svConfirmedCid
+              sv1.getSvOnboardingStatus("sv2") shouldBe sv1.getSvOnboardingStatus(sv2Party)
             }
           },
       )
