@@ -160,6 +160,7 @@ function start_local_frontends() {
   start_frontend   scan      3006 scan    "scan"  "false"           "none"
   start_frontend   wallet    3007 alice   "alice" $enable_test_auth "rs-256" "http://localhost" "frontend-new"
   start_frontend   wallet    3008 bob     "bob"   $enable_test_auth "rs-256" "http://localhost" "frontend-new"
+  start_frontend   sv        3010 sv1     "sv1"   "false"           "none"
   start_json_api 5201 "--allow-insecure-tokens"
 }
 

@@ -7,6 +7,7 @@
     "scan/frontend",
     "scan/openapi-ts-client",
     "splitwell/frontend",
+    "sv/frontend",
     "validator/openapi-ts-client",
     "wallet/frontend",
     "wallet/frontend-new",
