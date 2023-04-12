@@ -69,7 +69,14 @@ function stripJsonComments(rawText: string): string {
 }
 
 function loadJsonFromFile(path: PathLike): any {
-  return JSON.parse(stripJsonComments(fs.readFileSync(path, "utf8")));
+  try {
+    const content = stripJsonComments(fs.readFileSync(path, "utf8"));
+
+    return JSON.parse(content);
+  } catch (e) {
+    pulumi.log.error(`could not read JSON from: ${path}`);
+    throw e;
+  }
 }
 
 export function cnChartValues(

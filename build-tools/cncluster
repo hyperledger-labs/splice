@@ -678,8 +678,11 @@ function subcmd_reset() {
 subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
 
 function _delete_cert_manager_objects() {
-    if objects=$(kubectl get "$2" -n "$1"| grep cert-manager | gawk '{ print $1 }'); then
-        kubectl delete "$2" -n "$1" "${objects}"
+    local -a objects
+    readarray -t objects < <( kubectl get "$2" -n "$1"| grep cert-manager | gawk '{ print $1 }' )
+
+    if [[ ${#objects[@]} -gt 0 ]]; then
+        kubectl delete "$2" -n "$1" "${objects[@]}"
     else
         _info "No cert-manager objects of type $2 found in namespace $1."
     fi
