@@ -115,6 +115,17 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         }
       }
 
+    override def ingestOffset(domain: DomainId, offset: String)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] =
+      updateState(
+        _.ingestOffset(domain, offset)
+      ).map { case (offsetChanged, offsetIngestionsToSignal) =>
+        logger.debug(show"Advanced offset for domain $domain to offset $offset")
+        offsetIngestionsToSignal.foreach(_.success(()))
+        offsetChanged.success(())
+      }
+
     override def ingestUpdate(
         domain: DomainId,
         update: TreeUpdate,
@@ -658,12 +669,16 @@ object InMemoryMultiDomainAcsStore {
         offset: String,
     ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
+      ingestOffset(domain, offset)
+    }
+
+    def ingestOffset(
+        domain: DomainId,
+        offset: String,
+    ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
       val (newSt, offsetsToRemove) = removeOffsetSignalsBefore(domain, OffsetSignal.Offset(offset))
       (
-        newSt.copy(
-          offsets = offsets + (domain -> offset),
-          offsetChanged = Promise(),
-        ),
+        newSt.copy(offsets = offsets + (domain -> offset), offsetChanged = Promise()),
         (offsetChanged, offsetsToRemove.values),
       )
     }

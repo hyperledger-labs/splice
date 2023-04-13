@@ -106,7 +106,7 @@ tmux new-session -d -s "${tmux_session}"
 
 # Numbers chosen such that we don't run out of memory and CI runs are not measurably slower.
 # Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
-JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g"
+JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Dlogback.configurationFile=./scripts/canton-test-logback.xml"
 
 if [ $wallclocktime -eq 1 ]; then
   tmux_cmd canton-wallclocktime \

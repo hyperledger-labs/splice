@@ -16,7 +16,7 @@ abstract class InMemoryCNNodeAppStore[
 
   protected def retryProvider: RetryProvider
 
-  val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
+  override val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
     new InMemoryMultiDomainAcsStore(
       loggerFactory,
       acsContractFilter,
@@ -30,7 +30,7 @@ abstract class InMemoryCNNodeAppStore[
   override lazy val domains: DomainStore =
     new InMemoryDomainStore(acsContractFilter.ingestionFilter.primaryParty, loggerFactory)
 
-  override lazy val domainIngestionSink: DomainStore.IngestionSink = domains.ingestionSink
+  override val offset: OffsetStore = new OffsetStore(loggerFactory)
 
   override def close(): Unit = ()
 }

@@ -26,7 +26,7 @@ trait CNNodeAppStore[
   def multiDomainAcsStore: MultiDomainAcsStore
   def txLog: TxLogStore[TXI, TXE]
 
-  def domainIngestionSink: DomainStore.IngestionSink
+  def offset: OffsetStore
 
   protected def txLogParser: TxLogStore.Parser[TXI, TXE]
 }

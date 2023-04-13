@@ -517,6 +517,10 @@ object MultiDomainAcsStore {
         inFlight: Seq[TransferEvent.Out],
     )(implicit traceContext: TraceContext): Future[Unit]
 
+    def ingestOffset(domain: DomainId, offset: String)(implicit
+        traceContext: TraceContext
+    ): Future[Unit]
+
     def switchToIngestingUpdates(
         domain: DomainId,
         offset: String,

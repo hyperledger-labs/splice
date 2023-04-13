@@ -27,6 +27,12 @@ class ApiClientRequestLogger(
 
   private val cancelled: AtomicBoolean = new AtomicBoolean(false)
 
+  private val requestsToIgnore: Set[String] =
+    Set(
+      "com.digitalasset.canton.research.participant.multidomain.UpdateService/GetLedgerEnd",
+      "com.digitalasset.canton.research.participant.multidomain.StateSnapshotService/GetConnectedDomains",
+    )
+
   override def interceptCall[ReqT, RespT](
       method: MethodDescriptor[ReqT, RespT],
       callOptions: CallOptions,
@@ -37,11 +43,16 @@ class ApiClientRequestLogger(
     val receiver = next.authority()
     val methodName = method.getFullMethodName
 
-    def createLogMessage(message: String): String =
-      show"Request ${methodName.readableLoggerName(config.maxMethodLength)} to ${receiver.unquoted}: ${message.unquoted}"
-
     val clientCall = next.newCall(method, callOptions)
-    new LoggingClientCall(clientCall, createLogMessage, requestTraceContext)
+
+    if (requestsToIgnore.contains(methodName)) {
+      clientCall
+    } else {
+      def createLogMessage(message: String): String =
+        show"Request ${methodName.readableLoggerName(config.maxMethodLength)} to ${receiver.unquoted}: ${message.unquoted}"
+
+      new LoggingClientCall(clientCall, createLogMessage, requestTraceContext)
+    }
   }
 
   /** Intercepts events sent by the server.

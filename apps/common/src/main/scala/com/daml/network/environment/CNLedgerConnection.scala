@@ -388,6 +388,16 @@ class CNLedgerConnection(
   def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
     client.getConnectedDomains(party)
 
+  def updates(
+      beginOffset: LedgerOffset,
+      endOffset: LedgerOffset,
+      party: PartyId,
+      domain: DomainId,
+  ): Source[TreeUpdate, NotUsed] =
+    client
+      .updates(LedgerClient.GetUpdatesRequest(beginOffset, Some(endOffset), party, domain))
+      .mapConcat(_.updates)
+
   // TODO (#2706)
   // This is a hacked up wrapper that transforms transaction trees into flat transactions.
   // This is required because the update service initially only exposes transaction trees.

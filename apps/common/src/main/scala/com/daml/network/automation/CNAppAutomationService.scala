@@ -4,7 +4,8 @@ import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.store.CNNodeAppStore
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.opentelemetry.api.trace.Tracer
 
@@ -34,6 +35,7 @@ abstract class CNNodeAppAutomationService(
     new UpdateIngestionService(
       store.getClass.getSimpleName,
       store.multiDomainAcsStore.ingestionSink,
+      store.offset,
       domain,
       connection,
       perDomainTriggerContext.retryProvider,
@@ -44,9 +46,27 @@ abstract class CNNodeAppAutomationService(
   stores.values.foreach(store => {
     registerTrigger(
       new DomainIngestionService(
-        store.domainIngestionSink,
+        store.domains.ingestionSink,
         connection,
         triggerContext,
+      )
+    )
+    registerTrigger(
+      new OffsetIngestionService(
+        store.offset.ingestionSink,
+        store.domains,
+        connection,
+        // We want to always poll periodically and quickly even in simtime mode so we overwrite
+        // the polling interval and the clock.
+        triggerContext.copy(
+          config = triggerContext.config.copy(
+            pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
+          ),
+          clock = new WallClock(
+            triggerContext.timeouts,
+            triggerContext.loggerFactory,
+          ),
+        ),
       )
     )
     val domainAcsOrchestrator = DomainOrchestrator(
