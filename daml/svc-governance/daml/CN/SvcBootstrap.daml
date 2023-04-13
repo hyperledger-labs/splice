@@ -8,6 +8,7 @@ import CC.Schedule
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
 
+import qualified CN.CometBft as CometBft
 import CN.SvcRules
 
 -- | A template for bootstrapping the collective and CoinRules.
@@ -27,11 +28,15 @@ template SvcBootstrap with
     choice SvcBootstrap_Bootstrap : ()
       controller svc
       do
+        let founderInfo = MemberInfo with
+              name = founderName
+              joinedAsOfRound = Round 0
+              cometBftConfig = CometBft.emptySvNodeConfig
         _ <- create SvcRules with
           svc
           epoch = 0
           nextMiningRound = Round 1
-          members = Map.fromList [(founderParty, MemberInfo with name = founderName, joinedAsOfRound = Round 0)]
+          members = Map.fromList [(founderParty, founderInfo)]
           leader = founderParty
           config
           isDevNet

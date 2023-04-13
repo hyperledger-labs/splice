@@ -11,25 +11,27 @@ import qualified DA.Text as T
 import Daml.Script
 import DA.Time
 
-import CN.Util.Assert
 import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
 import CC.Round
 import CC.Schedule
+import CC.ValidatorLicense
+
 import CC.Scripts.Util
+import CC.Scripts.Parameters
+
+import CN.Util.Assert
+import qualified CN.CometBft as CometBft
 import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SvOnboarding
-import CC.ValidatorLicense
-
-import CC.Scripts.Parameters
 
 testLeaderElection : Script ()
 testLeaderElection = do
 
-  (app, svc, (mallory, sv2, sv3, sv4)) <- initCollective(False)
+  (app, svc, (mallory, sv2, sv3, sv4)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1, and mallory is the leader
 
   -- run an issuance
@@ -101,7 +103,7 @@ testLeaderElection = do
 
 testUnclaimedRewards : Script ()
 testUnclaimedRewards = do
-  (app, _, _) <- initCollective(True)
+  (app, _, _) <- initDevNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- onboard a validator
@@ -125,7 +127,7 @@ testUnclaimedRewards = do
 
 testOnboardValidator : Script ()
 testOnboardValidator = do
-  (app, svc, (_, sv2, _, _)) <- initCollective(False)
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- a new validator prepares his participant
@@ -147,7 +149,7 @@ testOnboardValidator = do
 
 testSvOnboarding : Script ()
 testSvOnboarding = do
-  (app, svc, (_, sv2, sv3, sv4)) <- initCollective(False)
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -198,15 +200,40 @@ testSvOnboarding = do
     sv = svX
     svConfirmedCid
 
-  [(_, svcRules)] <- query @SvcRules svc
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
   assert (svX `elem` Map.keys svcRules.members)
+
+  -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
+  -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
+  let cometBftConfig = CometBft.SvNodeConfig with
+        cometBftNodes = Map.fromList
+          [ ( "svX-node-id-1"
+            , CometBft.CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 0
+            )
+          , ( "svX-node-id-2"
+            , CometBft.CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 1
+            )
+          ]
+        governanceKeys = [CometBft.GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
+        sequencingKeys = []
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetCometBftConfig with
+    sv = svX
+    cometBftConfig
+
+  -- check that the config was actually set
+  [(_, svcRules)] <- query @SvcRules svc
+  fmap (.cometBftConfig) (Map.lookup svX svcRules.members) === Some cometBftConfig
 
   pure ()
 
 
 testSvOnboardingExpiry : Script ()
 testSvOnboardingExpiry = do
-  (app, _, (_, sv2, _, _)) <- initCollective(False)
+  (app, _, (_, sv2, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -233,7 +260,7 @@ testSvOnboardingExpiry = do
 
 testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember : Script ()
 testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember = do
-  (app, svc, (_, sv2, _, _)) <- initCollective(False)
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -262,7 +289,7 @@ testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember = do
 
 testSvConfirmedExpiry : Script ()
 testSvConfirmedExpiry = do
-  (app, svc, (_, sv2, sv3, sv4)) <- initCollective(False)
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   -- a new sv prepares his participant
@@ -278,6 +305,7 @@ testSvConfirmedExpiry = do
           newMemberParty = svX
           newMemberName = "svX"
           reason = "because"
+
   executeAllConfirmedActions app
 
   [(svConfirmedCid, _)] <- query @SvConfirmed svc
@@ -297,7 +325,7 @@ testSvConfirmedExpiry = do
 testSvNameUniquenessNotInDevNet : Script ()
 testSvNameUniquenessNotInDevNet = do
   -- When it is not in devnet, new member cannot be added to SVC if its name is already used by any existing member.
-  (_, svc, (_, sv2, _, _)) <- initCollective(False)
+  (_, svc, (_, sv2, _, _)) <- initMainNetCollective
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
@@ -309,7 +337,7 @@ testSvNameUniquenessNotInDevNet = do
 
 testSvMemberOverwriteInDevNet : Script ()
 testSvMemberOverwriteInDevNet = do
-  (_, svc, (sv1, sv2, _, _)) <- initCollective(True)
+  (_, svc, (sv1, sv2, _, _)) <- initDevNetCollective
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
@@ -327,7 +355,7 @@ testSvMemberOverwriteInDevNet = do
 
 testRequiredNumOfConfirmationInDevNet : Script ()
 testRequiredNumOfConfirmationInDevNet = do
-  (_, svc, (sv1, sv2, sv3, sv4)) <- initCollective(True)
+  (_, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
 
   -- add 6 phamton SVs
   forA_ [5 .. 10] $ \i -> do
@@ -369,6 +397,12 @@ testRequiredNumOfConfirmationInDevNet = do
 -- Utils
 --------
 
+initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
+initMainNetCollective = initCollective False
+
+initDevNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
+initDevNetCollective = initCollective True
+
 initCollective : Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
 initCollective isDevNet = do
   -- allocate users for the four founding members
@@ -378,7 +412,11 @@ initCollective isDevNet = do
   -- TODO(M3-46): make this a real collective party
   svc <- allocateParty "svc"
 
-  let config = SvcRulesConfig with numUnclaimedRewardsThreshold = 5, svOnboardingTimeout = hours 24, svConfirmedTimeout = hours 24
+  let config = SvcRulesConfig with
+        numUnclaimedRewardsThreshold = 5
+        svOnboardingTimeout = hours 24
+        svConfirmedTimeout = hours 24
+        cometBftConfigLimits = CometBft.defaultNetworkConfigLimits
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
 
   -- have mallory bootstrap the collective
@@ -397,7 +435,10 @@ initCollective isDevNet = do
   -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svParty svName "we want to"
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
+      newMemberParty = svParty
+      newMemberName = svName
+      reason = "Simon says!"
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 

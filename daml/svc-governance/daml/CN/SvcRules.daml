@@ -1,6 +1,6 @@
 module CN.SvcRules where
 
-import DA.Action (void)
+import DA.Action (void, unless)
 import DA.Foldable (forA_)
 import DA.List as List
 import DA.Optional (fromSome, isSome)
@@ -8,8 +8,6 @@ import qualified DA.Map as Map
 import qualified DA.Set as Set
 import DA.Time
 
--- TODO(tech-debt) factor this one out of CC into its own library
-import CN.Util.Assert
 import CC.Coin
 import CC.Round
 import CC.API.V1.Coin (CoinCreateSummary(..))
@@ -17,7 +15,10 @@ import CC.API.V1.Round (Round(..))
 import CC.API.V1.ValidatorTraffic (ValidatorTraffic(..))
 
 import CC.ValidatorLicense
+
+import qualified CN.CometBft as CometBft
 import CN.SvOnboarding
+import CN.Util.Assert
 
 -- Types
 ---------
@@ -51,6 +52,11 @@ data SvcRules_ActionRequiringConfirmation
 data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
     joinedAsOfRound : Round
+    cometBftConfig : CometBft.SvNodeConfig
+    -- ^ This is the config for the CometBFT nodes under control of this member.
+    -- We expect the SvApp to run a reconciliation loop that applies all changes to this
+    -- config to the actual CometBFT network config using the service defined here:
+    -- https://github.com/DACH-NY/the-real-canton-coin/pull/3896/files.
   deriving (Eq, Show)
 
 data CollectiveSummary = CollectiveSummary with
@@ -135,6 +141,8 @@ data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
     svOnboardingTimeout : RelTime -- ^ The time after contracts representing an incomplete onboarding are archived.
     svConfirmedTimeout : RelTime -- ^ The time after contracts representing a SV confirmation are archived.
+    cometBftConfigLimits : CometBft.NetworkConfigLimits
+    -- ^ Limits to enforce on the members' CometBft.SvNodeConfig's
   deriving (Eq, Show)
 
 -- SV Collective rules
@@ -172,11 +180,12 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        if (not isDevNet)
-          then
-            require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
-          else pure ()
-        let info = MemberInfo with name = newMemberName, joinedAsOfRound = nextMiningRound
+        unless isDevNet $ do
+          require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+        let info = MemberInfo with
+              name = newMemberName
+              joinedAsOfRound = nextMiningRound
+              cometBftConfig = CometBft.emptySvNodeConfig
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         create SvcRules with
           svc
@@ -220,6 +229,28 @@ template SvcRules with
           newMemberParty = sv
           newMemberName = svConfirmed.svName
           reason = svConfirmed.reason
+
+    -- CometBFT config management
+    -----------------------------
+
+    -- Every SV can change their own config within the configured limits.
+    choice SvcRules_SetCometBftConfig : ContractId SvcRules
+      with
+        sv : Party
+        cometBftConfig : CometBft.SvNodeConfig
+      controller sv
+      do
+        case Map.lookup sv members of
+          None -> error "SV is no member"
+          Some info -> do
+            -- check validity of config and constraint on voting power
+            require "Valid configuration" (CometBft.validSvNodeConfig config.cometBftConfigLimits cometBftConfig)
+            unless isDevNet $
+              require "At most one vote" (CometBft.totalVotingPower cometBftConfig <= 1)
+            -- update member info
+            let newInfo = info with cometBftConfig
+            create this with members = Map.insert sv newInfo this.members
+
 
     -- Leader election
     ------------------

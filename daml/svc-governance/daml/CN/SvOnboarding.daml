@@ -39,7 +39,7 @@ template SvConfirmed with
     svParty : Party
     svName : Text
     reason : Text
-    svc : Party 
+    svc : Party
     expiresAt : Time            -- ^ When this contract can be archived.
   where
     signatory svc

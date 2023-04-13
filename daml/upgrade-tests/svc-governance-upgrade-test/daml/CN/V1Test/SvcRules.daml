@@ -18,6 +18,7 @@ import CN.SvOnboarding
 
 import CC.V1Test.Coin
 import CN.SvcRules
+import qualified CN.CometBft as CometBft
 
 
 -- A version of SvcRules intended for testing upgrades. For now, we focus on an upgrade of the underlying CoinRules,
@@ -104,7 +105,10 @@ template SvcRulesV1Test with
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
         require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
-        let info = MemberInfo with name = newMemberName, joinedAsOfRound = nextMiningRound
+        let info = MemberInfo with
+              name = newMemberName
+              joinedAsOfRound = nextMiningRound
+              cometBftConfig = CometBft.emptySvNodeConfig
         create SvcRulesV1Test with
           svc
           epoch
@@ -437,4 +441,3 @@ executeActionRequiringConfirmationV1Test svcRulesCid act = case act of
 
 -- Functions implementing instant-runoff voting
 -----------------------------------------------
-
