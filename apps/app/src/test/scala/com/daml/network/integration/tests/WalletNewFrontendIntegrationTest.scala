@@ -5,6 +5,8 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletNewFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level.WARN
 
 class WalletNewFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -99,11 +101,19 @@ class WalletNewFrontendIntegrationTest
           actAndCheck(
             "Alice taps balance with more than 10 decimal places in the wallet", {
               browseToWallet(aliceWalletNewPort, aliceDamlUser)
-              loggerFactory.assertLogs(
-                tapCoins(BigDecimal(manyDigits)),
-                _.errorMessage should include(
-                  s"Failed to decode: Could not read Decimal string \\\"$manyDigits\\\""
-                ),
+              loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(WARN))(
+                {
+                  // Using tapCoins will fail the assertion within
+                  click on "tap-amount-field"
+                  numberField("tap-amount-field").underlying.sendKeys(manyDigits)
+                  click on "tap-button"
+                },
+                logs => {
+                  logs should have size 1
+                  logs.head.errorMessage should include(
+                    s"Failed to decode: Could not read Decimal string \\\"$manyDigits\\\""
+                  )
+                },
               )
             },
           )(

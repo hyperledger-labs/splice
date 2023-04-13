@@ -8,9 +8,22 @@ import org.scalatest.Assertion
 trait WalletNewFrontendTestUtil { self: FrontendTestCommon =>
 
   protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
+    val transactionsBefore = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+
     click on "tap-amount-field"
     numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString)
     click on "tap-button"
+
+    // Make sure the tap has been processed
+    // This will have to change if we add a reload button here instead of auto-refreshing transactions.
+    eventually() {
+      val transactionsAfter = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+      val newTxs = transactionsAfter.diff(transactionsBefore)
+      forExactly(1, newTxs) { balanceChange =>
+        balanceChange.action should matchText("Balance Change")
+        balanceChange.ccAmount should be(tapQuantity)
+      }
+    }
   }
 
   protected def matchBalance(balanceCC: String, balanceUSD: String)(implicit
