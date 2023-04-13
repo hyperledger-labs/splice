@@ -12,12 +12,12 @@ fi
 
 rm -f "$out_file"
 cd "$REPO_ROOT"
-dars=$(find daml -name "*.dar" | grep "/.daml/dist" | sort)
-for dar in $dars
-do
-    id=$($DAMLC inspect-dar "$dar" --json | jq -r '.main_package_id')
-    echo "$dar $id" >> "$out_file"
-done
+find daml -name "*.dar" |
+  grep "/.daml/dist" |
+  xargs -P 16 -I {} sh -c "
+    echo {} \$($DAMLC inspect-dar {} --json | jq -r \".main_package_id\")
+  " |
+  sort -s > "$out_file"
 
 if [ -n "${CI-}" ]; then
     are_diff=0
