@@ -189,6 +189,7 @@ final case class ConsoleCommandTimeout(
     ledgerCommand: NonNegativeDuration = ConsoleCommandTimeout.defaultLedgerCommandsTimeout,
     ping: NonNegativeDuration = ConsoleCommandTimeout.defaultPingTimeout,
     testingBong: NonNegativeDuration = ConsoleCommandTimeout.defaultTestingBongTimeout,
+    requestTimeout: NonNegativeDuration = ConsoleCommandTimeout.defaultRequestTimeout,
 )
 
 object ConsoleCommandTimeout {
@@ -199,6 +200,7 @@ object ConsoleCommandTimeout {
     NonNegativeDuration.tryFromDuration(1.minute)
   val defaultPingTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds)
   val defaultTestingBongTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(1.minute)
+  val defaultRequestTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds)
 }
 
 /** Timeout settings configuration */

@@ -16,7 +16,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "13"
+    default: "14"
   run-job:
     type: enum
     enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-staging-tokens]

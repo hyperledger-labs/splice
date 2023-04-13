@@ -7,10 +7,6 @@ import akka.http.scaladsl.model.*
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
-  DefaultBoundedTimeout,
-  TimeoutType,
-}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,8 +29,6 @@ trait HttpCommand[Res, Result] {
   ): EitherT[Future, Either[Throwable, HttpResponse], Res]
 
   def handleResponse(response: Res)(implicit decoder: TemplateJsonDecoder): Either[String, Result]
-
-  def timeoutType: TimeoutType = DefaultBoundedTimeout
 
   def fullName: String =
     // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions

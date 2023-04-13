@@ -1,11 +1,12 @@
 package com.daml.network.environment
 
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directive0
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
@@ -31,9 +32,11 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
+import javax.net.ssl.SSLContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Failure
 import scala.util.Success
+import scala.util.control.NonFatal
 
 /** A running instance of a canton node */
 abstract class CNNode[State <: AutoCloseable & HasHealth](
@@ -93,7 +96,35 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         }
       }
       logger.trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
-      httpExt.singleRequest(request).map { response =>
+      val host = request.uri.authority.host.address()
+      val port = request.uri.effectivePort
+      logger.trace(
+        s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
+      )
+      val connectionContext = request.uri.scheme match {
+        case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
+        case _ => ConnectionContext.noEncryption()
+      }
+      val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
+        Http()
+          .outgoingConnectionUsingContext(host, port, connectionContext)
+
+      // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
+      // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
+      def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
+        Source
+          .single(request)
+          .via(connectionFlow)
+          .completionTimeout(timeouts.default.asFiniteApproximation)
+          .runWith(Sink.head)
+          .recoverWith { case NonFatal(e) =>
+            logger.debug(msg("HTTP request failed"), e)(traceContext)
+            Future.failed(e)
+          }
+      val start = System.currentTimeMillis()
+      dispatchRequest(request).map { response =>
+        val end = System.currentTimeMillis()
+        logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))
         logger.debug(msg(s"Received response with status code: ${response.status}"))
         if (logPayload) {
           response.entity match {
