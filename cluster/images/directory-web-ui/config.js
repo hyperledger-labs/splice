@@ -20,7 +20,7 @@ window.canton_network_config = {
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: window.location.origin.replace("directory", "wallet"),
+      uiUrl: window.location.origin.replace("directory", "wallet-new"),
     },
     jsonApi: {
       // URL of the JSON API for the participant

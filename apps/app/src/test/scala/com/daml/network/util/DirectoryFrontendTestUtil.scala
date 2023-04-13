@@ -22,10 +22,6 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
     textField("entry-name-field").value = entryName
 
     click on "request-entry-with-sub-button"
-
-    eventually() {
-      findAll(className("sub-requests-table-row")) should have size 1
-    }
   }
 
   def reserveDirectoryNameFor(directoryUiLogin: () => Unit, entryName: String)(implicit

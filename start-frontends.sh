@@ -150,7 +150,7 @@ done
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {
-  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <frontend_dir_in_app>
+  # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address> <frontend_dir_in_app>
   start_frontend   wallet    3000 alice   "alice" $enable_test_auth
   start_frontend   wallet    3001 bob     "bob"   $enable_test_auth
   start_frontend   splitwell 3002 alice   "alice" $enable_test_auth
@@ -166,8 +166,8 @@ function start_local_frontends() {
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test
 function start_preflight_frontends() {
-  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
-  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address> <frontend_dir_in_app>
+  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}" "frontend-new"
   start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
   start_json_api ${PREFLIGHT_JSON_LEDGER_API_PORT} "--allow-insecure-tokens"
 }

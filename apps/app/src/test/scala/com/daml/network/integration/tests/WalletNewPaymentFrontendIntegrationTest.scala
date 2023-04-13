@@ -521,9 +521,14 @@ class WalletNewPaymentFrontendIntegrationTest
       receiverPartyId: PartyId,
       expectedEntryName: String,
       balanceChangeForSender: BigDecimal,
-  )(implicit driver: WebDriverType) = {
+  )(implicit driver: WebDriverType, env: CNNodeTestConsoleEnvironment) = {
     inside(findAll(className("tx-row")).toList) { case paymentTx :: lockTx :: _ =>
-      matchTransaction(lockTx)(coinPrice, "Sent", None, expectedLockedAmount)
+      matchTransaction(lockTx)(
+        coinPrice,
+        "Sent",
+        Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
+        expectedLockedAmount,
+      )
 
       matchTransaction(paymentTx)(
         coinPrice,

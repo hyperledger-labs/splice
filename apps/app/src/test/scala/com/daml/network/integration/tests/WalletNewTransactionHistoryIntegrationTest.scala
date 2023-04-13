@@ -38,7 +38,7 @@ class WalletNewTransactionHistoryIntegrationTest
       val charlieEntryName = perTestCaseName("charlie.cns")
       createDirectoryEntry(charlieUserParty, charlieDirectory, charlieEntryName, charlieWallet)
 
-      createDirectoryEntryForDirectoryItself
+      val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -101,22 +101,22 @@ class WalletNewTransactionHistoryIntegrationTest
             matchTransaction(otp)(
               coinPrice = 2,
               expectedAction = "Sent",
-              expectedParty = None,
+              expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
               coinPrice = 2,
               expectedAction = "Sent",
-              expectedParty = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
+              expectedPartyDescription = Some(
+                s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("-1.18"),
             )
             matchTransaction(received)(
               coinPrice = 2,
               expectedAction = "Received",
-              expectedParty = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via ${aliceValidatorParty}"
+              expectedPartyDescription = Some(
+                s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("1.07"),
             )
@@ -125,19 +125,19 @@ class WalletNewTransactionHistoryIntegrationTest
             matchTransaction(directoryCreation)(
               coinPrice = 2,
               expectedAction = "Sent",
-              expectedParty = None,
+              expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForDirectory)(
               coinPrice = 2,
               expectedAction = "Sent",
-              expectedParty = None,
+              expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(
               coinPrice = 2,
               expectedAction = "Balance Change",
-              expectedParty = None,
+              expectedPartyDescription = None,
               expectedAmountCC = BigDecimal(5),
             )
         }

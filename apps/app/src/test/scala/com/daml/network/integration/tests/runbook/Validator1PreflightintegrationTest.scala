@@ -5,18 +5,12 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{
-  Auth0User,
-  DirectoryFrontendTestUtil,
-  SplitwellFrontendTestUtil,
-  WalletFrontendTestUtil,
-}
+import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import scala.collection.mutable
 import scala.concurrent.duration.*
-import com.daml.network.util.FrontendLoginUtil
 
 /** Preflight test running against validator1.
   */
@@ -24,7 +18,7 @@ class Validator1PreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator1", "bob-validator1")
     with FrontendLoginUtil
     with DirectoryFrontendTestUtil
-    with WalletFrontendTestUtil
+    with WalletNewFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
   private val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
@@ -97,7 +91,7 @@ class Validator1PreflightIntegrationTest
   // differs from the latest one on your branch
 
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
     val aliceUser = auth0Users.get("alice-validator1").value
 
@@ -119,37 +113,49 @@ class Validator1PreflightIntegrationTest
     }
 
     withFrontEnd("alice-validator1") { implicit webDriver =>
-      tapAndListCoins(100)
+      tapCoins(100)
 
-      createTransferOffer(bobPartyId, "10", "p2ptransfer")
+      clue(s"Creating transfer offer for: $bobPartyId") {
+        createTransferOffer(
+          PartyId.tryFromProtoPrimitive(bobPartyId),
+          BigDecimal("10"),
+          90,
+          "p2ptransfer",
+        )
+      }
 
       click on "logout-button"
       waitForQuery(id("oidc-login-button"))
     }
 
     withFrontEnd("bob-validator1") { implicit webDriver =>
-      click on "transfer-offers-button"
-
       val acceptButton = eventually() {
-        findAll(className("transfer-offers-row")).toSeq.headOption match {
+        findAll(className("transfer-offer")).toSeq.headOption match {
           case Some(element) =>
-            element.childWebElement(className("transfer-offers-table-accept"))
+            element.childWebElement(className("transfer-offer-accept"))
           case None => fail("failed to find transfer offer")
         }
       }
 
-      acceptButton.click
+      acceptButton.click()
 
-      click on "coins-button"
+      click on "navlink-transactions"
 
-      // TODO(#1985) -- cluster is slow to display updated list of Coins for Bob
       eventually(60.seconds) {
-        val coinsTableRows = findAll(className("coins-table-row"))
-        coinsTableRows should have size 1
+        inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+          val transaction = readTransactionFromRow(tx)
+          transaction.action should matchText("Received")
+          val partyR = s"$alicePartyId\nvia\nvalidator1_validator_service_user::.*".r
+          partyR.matches(
+            transaction.partyDescription.getOrElse(fail("There should be a party."))
+          ) should be(
+            true
+          )
+          transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+          transaction.usdAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+          transaction.rate should matchText(s"1 CC/USD")
+        }
       }
-
-      val coinsTableRows = findAll(className("coins-table-row"))
-      coinsTableRows.toSeq.head.underlying.getText() contains ("10.0000000000CC")
 
       click on "logout-button"
       waitForQuery(id("oidc-login-button"))
@@ -163,7 +169,7 @@ class Validator1PreflightIntegrationTest
 
     val groupName = "troika"
 
-    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val splitwellUiUrl = s"https://splitwell.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val aliceUser = auth0Users.get("alice-validator1").value
     val bobUser = auth0Users.get("bob-validator1").value
@@ -171,12 +177,12 @@ class Validator1PreflightIntegrationTest
     withFrontEnd("bob-validator1") { implicit webDriver =>
       bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
 
-      tapAndListCoins(710)
+      tapCoins(710)
     }
 
     val invite = withFrontEnd("alice-validator1") { implicit webDriver =>
       aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
-      tapAndListCoins(60)
+      tapCoins(60)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
       createGroupAndInviteLink(groupName)
@@ -203,7 +209,12 @@ class Validator1PreflightIntegrationTest
       )
 
       // Bob is redirected to wallet ..
-      click on className("accept-button")
+      val acceptButton = eventually() {
+        findAll(className("payment-accept")).toSeq.headOption
+          .valueOrFail("Failed to find accept payment button.")
+      }
+
+      acceptButton.underlying.click()
 
       // And then back to splitwell, where he is already logged in
       eventually() {
@@ -232,7 +243,7 @@ class Validator1PreflightIntegrationTest
   }
 
   "test a directory entry allocation against validator1" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
@@ -241,7 +252,7 @@ class Validator1PreflightIntegrationTest
     withFrontEnd("alice-validator1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
 
-      tapAndListCoins(100)
+      tapCoins(100)
 
       allocateDirectoryEntry(
         () => auth0Login(aliceUser, directoryUiUrl, () => find(id("entry-name-field")).isDefined),
@@ -310,33 +321,6 @@ class Validator1PreflightIntegrationTest
       find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
         elm => elm.text
       )
-    }
-  }
-
-  private def createTransferOffer(receiverPartyId: String, amount: String, description: String)(
-      implicit webDriver: WebDriverType
-  ): Unit = {
-    clue(s"Creating transfer offer for: $receiverPartyId") {
-      click on "transfer-offers-button"
-
-      click on "create-offer-button"
-
-      setDirectoryField(textField("create-offer-receiver"), receiverPartyId, receiverPartyId)
-
-      click on "create-offer-amount"
-      numberField("create-offer-amount").underlying.sendKeys(amount)
-
-      click on "create-offer-description"
-      textField("create-offer-description").value = description
-
-      click on "create-offer-expiration-value"
-      numberField("create-offer-expiration-value").underlying.sendKeys("120")
-
-      click on "submit-create-offer-button"
-
-      eventually() {
-        findAll(className("transfer-offers-row")) should have size 1
-      }
     }
   }
 }

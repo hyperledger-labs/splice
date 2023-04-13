@@ -3,10 +3,9 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, WalletNewFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -16,6 +15,7 @@ import java.util.UUID
 class WalletNewTransfersFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
+    with WalletNewFrontendTestUtil
     with FrontendLoginUtil {
 
   private val coinPrice = 2
@@ -303,25 +303,5 @@ class WalletNewTransfersFrontendIntegrationTest
         )
       }
     }
-  }
-
-  private def createTransferOffer(receiver: PartyId, transferAmount: BigDecimal, expiryDays: Int)(
-      implicit driver: WebDriverType
-  ) = {
-    click on "navlink-transfer"
-    click on "create-offer-receiver"
-    textField("create-offer-receiver").underlying.sendKeys(receiver.toProtoPrimitive)
-
-    click on "create-offer-cc-amount"
-    numberField("create-offer-cc-amount").value = ""
-    numberField("create-offer-cc-amount").underlying.sendKeys(transferAmount.toString())
-
-    click on "create-offer-expiration-days"
-    singleSel("create-offer-expiration-days").value = expiryDays.toString
-
-    click on "create-offer-description"
-    textArea("create-offer-description").underlying.sendKeys("by party ID")
-
-    click on "create-offer-submit-button"
   }
 }

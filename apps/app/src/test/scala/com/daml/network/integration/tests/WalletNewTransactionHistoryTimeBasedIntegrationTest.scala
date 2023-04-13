@@ -33,7 +33,7 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
 
-      createDirectoryEntryForDirectoryItself
+      val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
       withFrontEnd("alice") { implicit webDriver =>
         createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
@@ -51,7 +51,7 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           },
         )
 
-        matchInitialTransactions(txsBefore)
+        matchInitialTransactions(txsBefore, directoryExpectedCns)
 
         val (_, txsAfter) = actAndCheck(
           "time passes for the next payment to happen", {
@@ -70,37 +70,42 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
           },
         )
 
-        matchLockUnlockDirectoryPayment(txsAfter.take(2))
-        matchInitialTransactions(txsAfter.drop(2))
+        matchLockUnlockDirectoryPayment(txsAfter.take(2), directoryExpectedCns)
+        matchInitialTransactions(txsAfter.drop(2), directoryExpectedCns)
       }
     }
 
-    def matchInitialTransactions(txs: Seq[Element]) = {
+    def matchInitialTransactions(txs: Seq[Element], directoryExpectedCns: String)(implicit
+        env: CNNodeTestConsoleEnvironment
+    ) = {
       inside(txs) { case rest :+ balanceChange =>
-        matchLockUnlockDirectoryPayment(rest)
+        matchLockUnlockDirectoryPayment(rest, directoryExpectedCns)
         matchTransaction(balanceChange)(
           coinPrice = 2,
           expectedAction = "Balance Change",
-          expectedParty = None,
+          expectedPartyDescription = None,
           expectedAmountCC = BigDecimal(5),
         )
       }
     }
 
-    def matchLockUnlockDirectoryPayment(txs: Seq[Element]) = {
+    def matchLockUnlockDirectoryPayment(txs: Seq[Element], directoryExpectedCns: String)(implicit
+        env: CNNodeTestConsoleEnvironment
+    ) = {
       inside(txs) { case directoryCreation +: lockForDirectory +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:
         // the input for the app payment is a locked coin that was unlocked in the same transaction.
         matchTransaction(directoryCreation)(
           coinPrice = 2,
           expectedAction = "Sent",
-          expectedParty = None,
+          expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForDirectory)(
           coinPrice = 2,
           expectedAction = "Sent",
-          expectedParty = None,
+          expectedPartyDescription =
+            Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )
       }

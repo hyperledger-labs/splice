@@ -10,7 +10,8 @@ import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
   CantonProcessTestUtil,
   DirectoryFrontendTestUtil,
-  WalletFrontendTestUtil,
+  FrontendLoginUtil,
+  WalletNewFrontendTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
@@ -22,7 +23,6 @@ import java.net.URI
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import scala.annotation.nowarn
 import scala.util.Using
-import com.daml.network.util.FrontendLoginUtil
 
 /** Preflight test that spins up a new validator following our runbook.
   */
@@ -31,7 +31,7 @@ class SelfHostedPreflightIntegrationTest
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
     with FrontendLoginUtil
-    with WalletFrontendTestUtil
+    with WalletNewFrontendTestUtil
     with DirectoryFrontendTestUtil {
 
   // We need to delay this until we started the validator. Otherwise we might
@@ -105,7 +105,7 @@ class SelfHostedPreflightIntegrationTest
 
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         login(walletUiPort, "alice")
-        tapAndListCoins(100)
+        tapCoins(100)
         reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
         // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
         go to "about:blank"
