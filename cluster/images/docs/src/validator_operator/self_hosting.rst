@@ -238,7 +238,16 @@ The Wallet UI is now accessible at http://wallet.localhost:3000, where you can l
 The Directory UI should be accessible at http://directory.localhost:3000.
 
 You can login there using the same method you used for the wallet (either username if using the default insecure test
-authentication, or through Auth0 if configured). To begin with - you will have no registered entries.
+authentication, or through Auth0 if configured).
+
+In case the page doesn't load after the login, please make sure that your local firewall rules allow you to proxy the JSON API endpoint running outside of Docker through the NGINX container that serves the UIs.
+On Linux, you can try the following command to update the firewall rules if you're using iptables: ::
+
+  sudo iptables -A INPUT -i docker0 -p tcp -m tcp --dport 7575:7575 -j ACCEPT
+
+After this change please restart the docker container.
+
+After logging in for the first time, you will have no registered entries.
 Insert a cns entry name of your choice, e.g. "alice.cns" in the "Request new entry" field, and click "Request Entry".
 You will be redirected to your wallet to confirm the Canton Coin payment for your directory entry (a subscription-based payment).
 Once confirmed, you will be redirected back to the directory UI, and should see your new entry listed.
