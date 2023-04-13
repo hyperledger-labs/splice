@@ -460,13 +460,13 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetValidatorTrafficBalance()
+  case class GetValidatorTrafficBalance(validatorParty: PartyId)
       extends BaseCommand[http.GetValidatorTrafficBalanceResponse, Double] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorTrafficBalanceResponse] =
-      client.getValidatorTrafficBalance(headers)
+      client.getValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
 
     override def handleResponse(
         response: http.GetValidatorTrafficBalanceResponse
@@ -479,7 +479,7 @@ object HttpScanAppClient {
       }
   }
 
-  case class CheckAndUpdateValidatorTrafficBalance()
+  case class CheckAndUpdateValidatorTrafficBalance(validatorParty: PartyId)
       extends BaseCommand[http.CheckAndUpdateValidatorTrafficBalanceResponse, Boolean] {
     override def submitRequest(
         client: http.ScanClient,
@@ -488,7 +488,7 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], http.CheckAndUpdateValidatorTrafficBalanceResponse] =
-      client.checkAndUpdateValidatorTrafficBalance(headers)
+      client.checkAndUpdateValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
 
     override def handleResponse(
         response: http.CheckAndUpdateValidatorTrafficBalanceResponse

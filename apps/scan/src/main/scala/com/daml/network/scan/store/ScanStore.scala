@@ -69,12 +69,19 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
 
-  // TODO(#3734): add per-validator state. right now, this just assumes there is only 1 validator
-  def lookupValidatorTraffic: Future[
+  def lookupValidatorTraffic(validatorParty: PartyId): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
-  ]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(
+        _,
+        contract => contract.payload.validator == validatorParty.toProtoPrimitive,
+      )
+    )
 
-  def getValidatorExtraTrafficLimit()(implicit tc: TraceContext): Future[BigDecimal]
+  def getValidatorExtraTrafficLimit(validatorParty: PartyId)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal]
 }
 
 object ScanStore {

@@ -466,7 +466,7 @@ class TreasuryService(
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
       tapsApproved <-
         if (treasuryConfig.enableValidatorTrafficBalanceChecks) {
-          scanConnection.approveTaps(numTapOperations)
+          scanConnection.approveTaps(userStore.key.validatorParty, numTapOperations)
         } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
       configUsd = openRound.payload.transferConfigUsd

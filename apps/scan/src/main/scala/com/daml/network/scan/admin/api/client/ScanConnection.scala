@@ -212,12 +212,15 @@ final class ScanConnection(
     }
   }
 
-  def approveTaps(numTapOperations: Int)(implicit
+  def approveTaps(validatorParty: PartyId, numTapOperations: Int)(implicit
       ec: ExecutionContext
   ): Future[Boolean] = {
     Future.foldLeft(
       (1 to numTapOperations).map(_ =>
-        runHttpCmd(config.adminApi.url, HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance())
+        runHttpCmd(
+          config.adminApi.url,
+          HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance(validatorParty),
+        )
       )
     )(true)(_ && _)
   }

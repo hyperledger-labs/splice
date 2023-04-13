@@ -19,9 +19,10 @@ class RateLimiterWithExtraTraffic(
     clock: Clock,
 ) {
 
-  private val currentState_ =
-    new AtomicReference[State](State(approvedLastRequest = false, 0, 0.0, 0.0))
-  val maxBurst: Double = maxBurstFactor.value * defaultMaxThroughput.value
+  private val currentState_ = new AtomicReference[State](
+    State(approvedLastRequest = false, 0, 0.0, 0.0)
+  )
+  private val maxBurst: Double = maxBurstFactor.value * defaultMaxThroughput.value
 
   private case class State(
       approvedLastRequest: Boolean,

@@ -223,6 +223,12 @@ paths:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getValidatorTrafficBalance"
+      parameters:
+        - in: query
+          name: validatorParty
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: ok
@@ -237,6 +243,12 @@ paths:
       tags: [scan]
       x-jvm-package: scan
       operationId: "checkAndUpdateValidatorTrafficBalance"
+      parameters:
+        - in: query
+          name: validatorParty
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: ok
