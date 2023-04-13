@@ -45,7 +45,6 @@ spec:
   - name: scan-api
     port: 5012
     protocol: TCP
-    targetPort: 5012
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -96,4 +95,3 @@ spec:
   - name: scan-ui
     port: 80
     protocol: TCP
-    targetPort: 80

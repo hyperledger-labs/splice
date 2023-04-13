@@ -74,12 +74,9 @@ spec:
   - name: cd-pub-api
     port: 5008
     protocol: TCP
-    targetPort: 5008
   - name: cd-adm-api
     port: 5009
     protocol: TCP
-    targetPort: 5009
   - name: cd-metrics
     port: 10013
     protocol: TCP
-    targetPort: 10013

@@ -64,8 +64,6 @@ spec:
   - name: sw-api
     port: 5213
     protocol: TCP
-    targetPort: 5213
   - name: sw-api-gw
     port: 6213
     protocol: TCP
-    targetPort: 6213

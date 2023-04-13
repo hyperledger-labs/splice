@@ -54,7 +54,7 @@ export function installClusterIngress(
     }
   );
 
-  const dependsOn = [certManager, xns.ns, dnsSaKey, validator, splitwell, docs];
+  const dependsOn = [certManager, dnsSaKey, validator, splitwell, docs];
 
   installCNHelmChart(
     xns,

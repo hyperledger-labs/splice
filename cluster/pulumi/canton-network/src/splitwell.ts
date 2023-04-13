@@ -42,7 +42,7 @@ export function installSplitwell(
     [domain]
   );
 
-  const splitwellApp = installCNHelmChart(
+  installCNHelmChart(
     xns,
     "splitwell-app",
     "cn-splitwell-app",
@@ -53,9 +53,7 @@ export function installSplitwell(
   );
 
   const dependsOn = [
-    xns.ns,
     svc,
-    splitwellApp,
     installAuth0Secret(xns, "splitwell", "splitwell"),
     installAuth0Secret(xns, "validator", "splitwell_validator"),
     installAuth0Secret(xns, "wallet", "splitwell_wallet"),

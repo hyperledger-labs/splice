@@ -45,4 +45,3 @@ spec:
   - name: svc-app-adm-api
     port: 5005
     protocol: TCP
-    targetPort: 5005

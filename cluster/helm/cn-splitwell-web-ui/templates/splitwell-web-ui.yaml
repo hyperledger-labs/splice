@@ -56,4 +56,3 @@ spec:
   - name: val1-sw-ui
     port: 80
     protocol: TCP
-    targetPort: 80

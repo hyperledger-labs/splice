@@ -45,4 +45,3 @@ spec:
   - name: dir-api
     port: 5010
     protocol: TCP
-    targetPort: 5010

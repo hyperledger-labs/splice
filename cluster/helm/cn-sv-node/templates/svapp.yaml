@@ -52,4 +52,3 @@ spec:
   - name: sv-api
     port: 5014
     protocol: TCP
-    targetPort: 5014

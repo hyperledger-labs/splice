@@ -64,4 +64,3 @@ spec:
   - name: val-http
     port: 5003
     protocol: TCP
-    targetPort: 5003

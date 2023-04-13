@@ -40,9 +40,12 @@ export function installValidator(
     [auth0UserNameEnvVar("validator")]
   );
 
-  installCNHelmChart(xns, "directory-web-ui", "cn-directory-web-ui");
-
-  installCNHelmChart(xns, "splitwell-web-ui", "cn-splitwell-web-ui");
+    installCNHelmChart(xns, "directory-web-ui", "cn-directory-web-ui", {}, [
+        installAuth0UISecret(xns, "directory", "directory"),
+    ]);
+    installCNHelmChart(xns, "splitwell-web-ui", "cn-splitwell-web-ui", {}, [
+        installAuth0UISecret(xns, "splitwell", "splitwell"),
+    ]);
 
   const dependsOn = [
     svc,
@@ -50,9 +53,6 @@ export function installValidator(
     participant,
     installAuth0Secret(xns, "validator", "validator"),
     installAuth0Secret(xns, "wallet", "wallet"),
-
-    installAuth0UISecret(xns, "directory", "directory"),
-    installAuth0UISecret(xns, "splitwell", "splitwell"),
     installAuth0UISecret(xns, "wallet", "wallet"),
   ];
 

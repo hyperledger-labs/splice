@@ -95,20 +95,15 @@ spec:
   - name: lg-adm-api
     port: 5002
     protocol: TCP
-    targetPort: 5002
   - name: lg-api
     port: 5001
     protocol: TCP
-    targetPort: 5001
   - name: metrics
     port: 10013
     protocol: TCP
-    targetPort: 10013
   - name: lg-api-gw
     port: 6001
     protocol: TCP
-    targetPort: 6001
   - name: lg-adm-api-gw
     port: 6002
     protocol: TCP
-    targetPort: 6002

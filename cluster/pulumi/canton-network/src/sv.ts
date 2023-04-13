@@ -117,7 +117,6 @@ export function installSVC(): k8s.helm.v3.Release {
   );
 
   const dependsOn = [
-    xns.ns,
     participant,
     installAuth0Secret(xns, "sv1", "sv-1"),
     installAuth0Secret(xns, "sv2", "sv-2"),
@@ -142,9 +141,10 @@ export function installSVC(): k8s.helm.v3.Release {
 export function installSvNode(svc: k8s.helm.v3.Release, nodename: string) {
   const xns = exactNamespace(nodename);
 
-  const auth0Secret = installAuth0Secret(xns, "sv", nodename);
-
-  const dependsOn = [svc, xns.ns, auth0Secret];
+    const dependsOn = [
+        svc,
+        installAuth0Secret(xns, "sv", nodename),
+    ];
 
   installCNHelmChart(
     xns,

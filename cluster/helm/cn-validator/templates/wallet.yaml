@@ -47,7 +47,6 @@ spec:
   - name: wal-api
     port: 5004
     protocol: TCP
-    targetPort: 5004
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -110,7 +109,6 @@ spec:
   - name: http
     port: 80
     protocol: TCP
-    targetPort: 80
 ---
 apiVersion: apps/v1
 kind: Deployment
