@@ -246,11 +246,11 @@ trait UserWalletStore
       )
     } yield {
       val contextsMap = contexts.map(ctx => ctx.contractId -> ctx).toMap
-      contracts.map { contract =>
-        SubscriptionRequest(
-          contract,
-          contextsMap(contract.payload.subscriptionData.context),
-        )
+      contracts.flatMap { contract =>
+        // If the context is missing, that means that the SubscriptionRequest was archived right after fetching it
+        contextsMap.get(contract.payload.subscriptionData.context).map { context =>
+          SubscriptionRequest(contract, context)
+        }
       }
     }
   }
