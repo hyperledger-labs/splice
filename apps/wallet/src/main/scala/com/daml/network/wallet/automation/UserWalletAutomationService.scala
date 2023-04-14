@@ -39,6 +39,7 @@ class UserWalletAutomationService(
       Map(store.key.endUserParty -> store),
       ledgerClient,
       retryProvider,
+      enableOffsetIngestionService = false,
     ) {
 
   registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))

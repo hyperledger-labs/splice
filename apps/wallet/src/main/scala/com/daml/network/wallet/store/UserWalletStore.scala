@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.{
   splitwell as splitwellCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.CNNodeAppStoreWithHistory
+import com.daml.network.store.{CNNodeAppStoreWithHistory, OffsetStore}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -440,6 +440,7 @@ object UserWalletStore {
       futureSupervisor: FutureSupervisor,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
+      offsetStore: OffsetStore,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =
@@ -452,6 +453,7 @@ object UserWalletStore {
           futureSupervisor,
           connection,
           retryProvider,
+          offsetStore,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }

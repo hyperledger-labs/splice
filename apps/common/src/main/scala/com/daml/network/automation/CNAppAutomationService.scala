@@ -17,6 +17,7 @@ abstract class CNNodeAppAutomationService(
     stores: Map[PartyId, CNNodeAppStore[?, ?]],
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
+    enableOffsetIngestionService: Boolean = true,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -51,24 +52,28 @@ abstract class CNNodeAppAutomationService(
         triggerContext,
       )
     )
-    registerTrigger(
-      new OffsetIngestionService(
-        store.offset.ingestionSink,
-        store.domains,
-        connection,
-        // We want to always poll periodically and quickly even in simtime mode so we overwrite
-        // the polling interval and the clock.
-        triggerContext.copy(
-          config = triggerContext.config.copy(
-            pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
+    // We allow disabling this because the offsets are shared across users and the polling can get pretty expensive
+    // so we want to make a reasonable effort at avoiding unnecessary polling.
+    if (enableOffsetIngestionService) {
+      registerTrigger(
+        new OffsetIngestionService(
+          store.offset.ingestionSink,
+          store.domains,
+          connection,
+          // We want to always poll periodically and quickly even in simtime mode so we overwrite
+          // the polling interval and the clock.
+          triggerContext.copy(
+            config = triggerContext.config.copy(
+              pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
+            ),
+            clock = new WallClock(
+              triggerContext.timeouts,
+              triggerContext.loggerFactory,
+            ),
           ),
-          clock = new WallClock(
-            triggerContext.timeouts,
-            triggerContext.loggerFactory,
-          ),
-        ),
+        )
       )
-    )
+    }
     val domainAcsOrchestrator = DomainOrchestrator(
       triggerContext,
       store.domains,

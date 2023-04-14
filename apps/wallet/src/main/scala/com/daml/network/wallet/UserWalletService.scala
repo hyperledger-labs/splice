@@ -54,6 +54,7 @@ class UserWalletService(
       futureSupervisor,
       connection,
       retryProvider,
+      walletManager.store.offset,
     )
 
   val treasury: TreasuryService = new TreasuryService(
