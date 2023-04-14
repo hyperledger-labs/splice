@@ -38,6 +38,7 @@ import org.openqa.selenium.firefox.GeckoDriverService
 import org.slf4j.event.Level
 
 import scala.collection.mutable
+import scala.concurrent.blocking
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -125,6 +126,11 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
+  private def registerWebDriver(name: String, webDriver: WebDriverType): Unit = blocking {
+    synchronized {
+      webDrivers += (name -> webDriver)
+    }
+  }
 
   protected def startWebDriver(name: String) = {
     if (!frontendNames.contains(name)) {
@@ -148,15 +154,17 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
           fail()
         }
+      logger.debug(s"FirefoxDriver started")
       val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
         logger.info(s"Failed to get BiDi connection to web driver. The error was $e")
         driver.quit()
         fail()
       }
+      logger.debug(s"BiDi connection acquired")
       (driver, bidi)
     }
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
-    webDrivers += (name -> webDriver)
+    registerWebDriver(name, webDriver)
     biDi.addListener[LogEntry](
       Log.entryAdded(),
       logEntry => {
