@@ -15,7 +15,8 @@ ts-proto branch.
 To update the tarball in this repository run:
 
 ```
-path/to/daml/repo/language-support/ts/extract-codegen-cabal.sh daml2ts-1.0.0.tar.gz
+cd path/to/daml/repo
+language-support/ts/extract-codegen-cabal.sh path/to/canton-coin/repo/nix/vendored/daml2ts-1.0.0.tar.gz
 ```
 
 If you change dependencies, you also need to run `cabal2nix daml2ts-1.0.0 > ../daml2ts.nix`.
@@ -23,7 +24,8 @@ If you change dependencies, you also need to run `cabal2nix daml2ts-1.0.0 > ../d
 To update the patched typescript libraries run:
 
 ```
-path/to/daml/repo/language-support/ts/extract-ts-libs.sh nix/vendored
+cd path/to/daml/repo
+language-support/ts/codegen/extract-ts-libs.sh path/to/canton-coin/repo/nix/vendored
 ```
 
 ## Bumping the TS Codegen fork

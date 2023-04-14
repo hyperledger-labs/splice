@@ -74,7 +74,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
         }
       }
     };
-    setupInstallContract();
+    setupInstallContract().catch(err => console.error('Failed to setup install contract: ', err));
   }, [primaryPartyId, providerPartyId, ledgerApiClient]);
 
   // Fetch user's directory entries
