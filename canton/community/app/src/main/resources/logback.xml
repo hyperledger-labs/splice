@@ -83,7 +83,7 @@
           <if condition='isDefined("LOG_FORMAT_JSON")'>
             <then>
               <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${LOG_FILE_NAME:-log/canton.log}</file>
+                <file>${LOG_FILE_NAME:-log/canton_network.log}</file>
                 <append>true</append>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
@@ -99,13 +99,13 @@
             </then>
             <else>
               <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${LOG_FILE_NAME:-log/canton.log}</file>
+                <file>${LOG_FILE_NAME:-log/canton_network.log}</file>
                 <append>true</append>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
                   <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
-                  <fileNamePattern>${LOG_FILE_NAME:-log/canton.log}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                  <fileNamePattern>${LOG_FILE_NAME:-log/canton_network.log}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
                   <!-- keep max 12 archived log files -->
                   <maxHistory>${LOG_FILE_HISTORY:-12}</maxHistory>
                 </rollingPolicy>
@@ -148,7 +148,7 @@
   <if condition='isDefined("LOG_LAST_ERRORS")'>
     <then>
       <appender name="FILE_LAST_ERRORS" class="ch.qos.logback.core.FileAppender">
-        <file>${LOG_LAST_ERRORS_FILE_NAME:-log/canton_errors.log}</file>
+        <file>${LOG_LAST_ERRORS_FILE_NAME:-log/canton_network_errors.log}</file>
         <append>${LOG_FILE_APPEND:-true}</append>
         <encoder>
           <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
