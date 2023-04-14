@@ -286,11 +286,12 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 4. Create an Auth0 Application for the validator backend:
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
-    b. Choose "Machine to Machine Applications", call it "Validator app backend", and click Create
+    b. Name it "Validator app backend", choose "Machine to Machine Applications", and click Create
     c. Choose the ``Daml Ledger API`` API you created in step 2 in the "Authorize Machine to Machine Application" dialog and click Authorize.
 
-5. Create an Auth0 Application for the wallet backend.
-   Repeat the steps used for creating the validator backend application, this time calling your application "Wallet app backend" and granting access to both ``Daml Ledger API`` and ``CN App API``.
+5. Create an Auth0 Application for the wallet backend named "Wallet app backend".
+   Repeat the steps used for creating the validator backend application and grant access to both ``Daml Ledger API`` and ``CN App API``.
+
 6. Create an Auth0 Application for the wallet web UI.
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
@@ -305,7 +306,9 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
     e. Save your application settings
 7. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://directory.localhost:3000``)
 
-8. Set the following environment variables on the system that will be running your wallet and validator app backends:
+8. Configure your system that will be running Canton, your wallet and validator app backends with the following variables:
+
+Note that on Linux and MacOs, you can simply use and fill in the above values in the provided file ``examples/env-private`` and run ``source examples/env-private`` in the two terminals you start Canton and the Validator in.
 
 ====================================  =====
 Name                                  Value
@@ -328,11 +331,17 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
 10. Now start the validator & the wallet again:
 
-.. parsed-literal::
+    a. generate the validator-onboarding.conf against your new Auth0 tenant:
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --bootstrap examples/validator/validator.sc
+    .. parsed-literal::
 
-Note that if your validator is not onboarded yet, you will need to extend this command with a `--config validator-onboarding.conf` as described in :ref:`validator_onboarding`.
+        curl -X POST https://dev.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+
+    b. start Canton Network:
+
+    .. parsed-literal::
+
+        NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 11. Upload the directory DAR.
 

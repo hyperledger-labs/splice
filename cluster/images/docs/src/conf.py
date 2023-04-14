@@ -15,12 +15,13 @@ import os
 # sys.path.insert(0, os.path.abspath('.'))
 
 import json
+from datetime import date
 
 
 # -- Project information -----------------------------------------------------
 
 project = u'Canton Network'
-copyright = u'2022, Digital Asset'
+copyright = f' {date.today().year}, Digital Asset'
 author = u'Digital Asset'
 
 
