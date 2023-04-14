@@ -52,7 +52,6 @@ export function installValidator(
     xns.ns,
     participant,
     installAuth0Secret(xns, "validator", "validator"),
-    installAuth0Secret(xns, "wallet", "wallet"),
     installAuth0UISecret(xns, "wallet", "wallet"),
   ];
 
@@ -62,7 +61,7 @@ export function installValidator(
     "cn-validator",
     {
       postgres: postgresDb,
-      additionalUsers: [auth0UserNameEnvVar("wallet")],
+      additionalUsers: [],
       appDars: [
         "cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar",
         "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar",

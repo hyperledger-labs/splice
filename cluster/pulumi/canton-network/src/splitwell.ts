@@ -56,7 +56,6 @@ export function installSplitwell(
     svc,
     installAuth0Secret(xns, "splitwell", "splitwell"),
     installAuth0Secret(xns, "validator", "splitwell_validator"),
-    installAuth0Secret(xns, "wallet", "splitwell_wallet"),
     installAuth0UISecret(xns, "wallet", "splitwell"),
   ];
 
@@ -68,7 +67,6 @@ export function installSplitwell(
       postgres: postgresDb,
       additionalUsers: [
         auth0UserNameEnvVar("splitwell"),
-        auth0UserNameEnvVar("wallet"),
       ],
       additionalConfig: [
         "  canton.validator-apps.validator_backend.app-instances.splitwise = {",

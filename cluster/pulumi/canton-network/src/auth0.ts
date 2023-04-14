@@ -5,14 +5,12 @@ import fetch from "node-fetch";
 import { ExactNamespace } from "./utils";
 
 const appToClientId = {
-  wallet: "KChYVPmxvHHUebLDXnNo3Z125WrxJiLb",
   validator: "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
   svc: "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC",
   scan: "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6",
   directory: "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
   splitwell: "ekPlYxilradhEnpWdS80WfW63z1nHvKy",
   splitwell_validator: "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW",
-  splitwell_wallet: "BMSnkJmJMGQqTQY8sabXNHVEzvNW5MMo",
   "sv-1": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
   "sv-2": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
   "sv-3": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
