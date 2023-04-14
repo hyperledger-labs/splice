@@ -369,7 +369,7 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
       algorithm: "rs-256",
       authority: "https://<NETWORK_AUTH_DOMAIN_URL>",
       client_id: "<NETWORK_AUTH_WALLET_UI_CLIENT_ID>",
-      token_audience: "https://cn_app.example.com",
+      token_audience: "https://cn_api.example.com",
     },
 
 ====================================  =====
@@ -380,15 +380,16 @@ NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" ap
 ====================================  =====
 
 13. Repeat step 12 for the directory UI configuration, at
-    ``web-uis/directory/config.js``.
-    The final section ``auth`` section should look close to this but the exact URLs and IDs will look slightly different.
+    ``web-uis/directory/config.js``.  The final section ``auth``
+    section should look close to this but you need to replace the
+    authority and client_id as explained for the wallet above.
 
   ::
 
     auth: {
       algorithm: "rs-256",
-      authority: "https://example-secure-validator.eu.auth0.com",
-      client_id: "d4tMBFslGeI3Nf3lDyryLIll7Y2SZo3J",
+      authority: "https://<NETWORK_AUTH_DOMAIN_URL>",
+      client_id: "<NETWORK_AUTH_WALLET_UI_CLIENT_ID>",
       token_audience: "https://ledger_api.example.com",
       token_scope: "daml_ledger_api",
     },
