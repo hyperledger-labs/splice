@@ -154,6 +154,8 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 90 co
 
   @ bobWallet.list()
 
+.. _configuring-wallet-ui:
+
 Configuring the Wallet UI
 -------------------------
 
@@ -166,6 +168,8 @@ For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     :end-before: END_WALLET_CLUSTER_BACKEND_CONFIG
+
+.. _configuring-directory-ui:
 
 Configuring the Directory UI
 ----------------------------
@@ -216,6 +220,8 @@ As the last step before you can start the frontend, open ``web-uis/splitwell/con
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
     :end-before: END_SPLITWELL_CLUSTER_BACKEND_CONFIG
+
+.. _hosting-the-uis:
 
 Hosting the UIs
 ---------------
@@ -349,7 +355,13 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
     validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
 
-12. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
+12. If you have not already done so, while trying out the insecure
+    setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`
+    and :ref:`configuring the directory UI <configuring-directory-ui>`. For the next steps, the occurences of
+    ``TARGET_CLUSTER`` in the ``config.js`` files should have been
+    replaced and the JSON API should be running.
+
+13. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
   ::
 
@@ -381,7 +393,8 @@ NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" ap
       token_scope: "daml_ledger_api",
     },
 
-14. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
+14. Start Nginx to host the static files as described in the :ref:`previous section on hosting the UIs <hosting-the-uis>`.
+15. Open the wallet UI at http://wallet.localhost:3000 and click the "Log in with OAuth2" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
