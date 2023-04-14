@@ -60,7 +60,7 @@ class WalletNewTransactionHistoryIntegrationTest
             // charlie -> alice
             charlieWallet.tap(50)
             p2pTransfer(
-              aliceWalletBackend,
+              aliceValidator,
               charlieWallet,
               aliceWallet,
               aliceUserParty,
@@ -68,7 +68,7 @@ class WalletNewTransactionHistoryIntegrationTest
             )
             // alice -> charlie
             p2pTransfer(
-              aliceWalletBackend,
+              aliceValidator,
               aliceWallet,
               charlieWallet,
               charlieUserParty,
@@ -76,7 +76,7 @@ class WalletNewTransactionHistoryIntegrationTest
             )
             // one-time payment
             val (_, cid, _) = createPaymentRequest(
-              aliceWalletBackend.remoteParticipantWithAdminToken,
+              aliceValidator.remoteParticipantWithAdminToken,
               aliceDamlUser,
               aliceUserParty,
               receiverAmounts = Seq(

@@ -11,7 +11,6 @@ import com.daml.network.console.{
   SvcAppClientReference,
   ValidatorAppBackendReference,
   WalletAppClientReference,
-  WalletAppBackendReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -55,11 +54,6 @@ trait CommonCNNodeAppInstanceReferences {
       )
     )
 
-  def aliceWalletBackend(implicit env: CNNodeTestConsoleEnvironment): WalletAppBackendReference =
-    wb(
-      "aliceWalletBackend"
-    )
-
   def aliceWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
   )
@@ -81,17 +75,6 @@ trait CommonCNNodeAppInstanceReferences {
       "aliceValidatorClient"
     )
 
-  def bobWalletBackend(implicit env: CNNodeTestConsoleEnvironment): WalletAppBackendReference = wb(
-    "bobWalletBackend"
-  )
-
-  def splitwellWalletBackend(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): WalletAppBackendReference =
-    wb(
-      "splitwellWalletBackend"
-    )
-
   def bobWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "bobWallet"
   )
@@ -99,10 +82,6 @@ trait CommonCNNodeAppInstanceReferences {
   // Note: this uses `wc` instead of `uwc` because we don't suffix the user names of SVs.
   def sv1Wallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = wc(
     "sv1Wallet"
-  )
-
-  def sv1WalletBackend(implicit env: CNNodeTestConsoleEnvironment): WalletAppBackendReference = wb(
-    "sv1WalletBackend"
   )
 
   def bobValidatorWallet(implicit
@@ -191,18 +170,13 @@ trait CommonCNNodeAppInstanceReferences {
       .find(_.name == name)
       .getOrElse(sys.error(s"sv [$name] not configured"))
 
-  def wb(name: String)(implicit env: CNNodeTestConsoleEnvironment): WalletAppBackendReference =
-    env.wallets.local
-      .find(_.name == name)
-      .getOrElse(sys.error(s"wallet [$name] not configured"))
-
   // "user wallet client"; we define this separately from wc so we can override it more conveniently
   def uwc(name: String)(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = wc(
     name
   )
 
   def wc(name: String)(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference =
-    env.wallets.remote
+    env.wallets
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))
 

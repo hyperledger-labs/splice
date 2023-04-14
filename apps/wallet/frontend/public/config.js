@@ -10,12 +10,12 @@ window.canton_network_config = {
   //   algorithm: 'rs-256',
   //   authority: "",
   //   client_id: "",
-  //   token_audience: "https://cn_api.network.global",
+  //   token_audience: "https://cn_api.example.com",
   // },
   services: {
     wallet: {
       // URL of the wallet app HTTP API
-      url: 'http://localhost:5004',
+      url: 'http://localhost:5003',
     },
     validator: {
       // URL of the validator app HTTP API

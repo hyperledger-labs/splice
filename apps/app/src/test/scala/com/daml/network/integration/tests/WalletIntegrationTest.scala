@@ -54,11 +54,6 @@ class WalletIntegrationTest
 
   "A wallet" should {
 
-    "restart cleanly" in { implicit env =>
-      aliceWalletBackend.stop()
-      aliceWalletBackend.startSync()
-    }
-
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
@@ -149,7 +144,7 @@ class WalletIntegrationTest
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
-        val batchSize = aliceWalletBackend.config.treasury.batchSize
+        val batchSize = aliceValidator.config.treasury.batchSize
         val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(1000)
 
@@ -249,7 +244,7 @@ class WalletIntegrationTest
 
       val invalidSignatureToken = JWT
         .create()
-        .withAudience(aliceWalletBackend.config.auth.audience)
+        .withAudience(aliceValidator.config.auth.audience)
         .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(Algorithm.HMAC256("wrong-secret"))
 

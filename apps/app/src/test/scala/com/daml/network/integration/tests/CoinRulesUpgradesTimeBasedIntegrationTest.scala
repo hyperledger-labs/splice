@@ -33,16 +33,7 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateScanAppConfig(_.copy(enableCoinRulesUpgrade = true))(config)
       )
-      // Upgrade validators and wallets for Alice, Bob and Splitwell Provider
-      .addConfigTransform((_, config) =>
-        config
-          .focus(_.walletAppBackends)
-          .modify(_.map {
-            case (dName, dConfig) if dName.toProtoPrimitive != "sv1WalletBackend" =>
-              (dName, dConfig.focus(_.treasury.enableCoinRulesUpgrade).replace(true))
-            case (dName, dConfig) => (dName, dConfig)
-          })
-      )
+      // Upgrade validators for Alice, Bob and Splitwell Provider
       .addConfigTransform((_, config) =>
         config
           .focus(_.validatorApps)
@@ -72,7 +63,7 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
 
     actAndCheck(
       "Transfer from SV1's (old) wallet to Alice's (new) wallet",
-      p2pTransfer(sv1WalletBackend, sv1Wallet, aliceWallet, alice, 90.0),
+      p2pTransfer(sv1Validator, sv1Wallet, aliceWallet, alice, 90.0),
     )(
       "Check balances",
       _ => {

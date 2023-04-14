@@ -12,6 +12,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
+import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -20,7 +21,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends CNNodeAppStoreWithoutHistory {
+trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
@@ -154,6 +155,9 @@ object ValidatorStore {
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
+        ),
+        mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+          co.payload.svc == svc && co.payload.provider == validator
         ),
         mkFilter(ValidatorTraffic.COMPANION)(co =>
           co.payload.validator == validator &&

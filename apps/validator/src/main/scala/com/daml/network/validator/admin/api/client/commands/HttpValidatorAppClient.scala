@@ -6,12 +6,17 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.http.v0.validator as http
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.network.validator.admin.api.client.UserInfo
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
 
+final case class UserInfo(
+    primaryParty: PartyId,
+    userName: String,
+)
+
 object HttpValidatorAppClient {
+
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ValidatorClient
 

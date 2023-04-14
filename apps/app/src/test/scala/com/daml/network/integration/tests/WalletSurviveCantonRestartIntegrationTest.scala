@@ -59,16 +59,14 @@ class WalletSurviveCantonRestartIntegrationTest
     "survive canton restarts" in { implicit env =>
       initSvc()
       aliceValidator.start()
-      aliceWalletBackend.start()
 
       Using.resource(startCanton(cantonArgs)) { _ =>
         eventuallySucceeds(timeUntilSuccess = 40.seconds) {
-          aliceWalletBackend.remoteParticipant.domains
+          aliceValidator.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
         }
         CNNodeEnvironmentDefinition.withAllocatedValidator(aliceValidator)
         aliceValidator.waitForInitialization()
-        aliceWalletBackend.waitForInitialization()
 
         onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(1)

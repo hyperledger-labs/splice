@@ -99,7 +99,6 @@ local deployments(config) = [
     },
   ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator", "validator") +
                                                              c.appUserNameEnvBinding("splitwell") +
-                                                             c.appUserNameEnvBinding("wallet") +
                                                              [
                                                                {
                                                                  name: "ADDITIONAL_CONFIG",
@@ -114,17 +113,6 @@ local deployments(config) = [
                                                                { name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }
                                                                { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
                                                              ]),
-
-  c.deployment(config, "wallet-app", [
-    {
-      name: "sw-wal-api",
-      port: 5004,
-      // Internal, we proxy this under /v0/wallet in the UI.
-      internalOnly: true,
-    },
-  ], image="wallet-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
-    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
-  ]),
 
   c.deployment(config, "wallet-web-ui", [
     {

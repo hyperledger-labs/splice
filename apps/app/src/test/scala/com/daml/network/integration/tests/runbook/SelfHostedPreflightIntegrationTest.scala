@@ -62,9 +62,6 @@ class SelfHostedPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
-      .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
-      )
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.sc` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))

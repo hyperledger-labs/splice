@@ -101,24 +101,24 @@ class ScanTimeBasedIntegrationTest
     }
 
     clue("Transfer some CC, to generate reward coupons")({
-      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobUserParty, 40.0)
-      p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceUserParty, 100.0)
+      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0)
+      p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceUserParty, 100.0)
     })
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
       advanceRoundsByOneTick
       grantFeaturedAppRight(aliceValidatorWallet)
-      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobUserParty, 41.0)
-      p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceUserParty, 101.0)
+      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 41.0)
+      p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsByOneTick
       advanceRoundsByOneTick
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
-      p2pTransfer(aliceWalletBackend, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
-      p2pTransfer(bobWalletBackend, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
+      p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
     })
     clue("No aggregate round data should be available yet")({
       assertThrowsAndLogsCommandFailures(
@@ -135,8 +135,8 @@ class ScanTimeBasedIntegrationTest
         },
     )
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
-      p2pTransfer(aliceWalletBackend, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
-      p2pTransfer(bobWalletBackend, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
+      p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
     })
 
     clue("Data for a later round does not yet exist")({

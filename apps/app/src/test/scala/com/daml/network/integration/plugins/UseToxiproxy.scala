@@ -87,7 +87,7 @@ case class UseToxiproxy(
     val scanAppConf =
       if (createScanAppProxies)
         lapiConf
-          .focus(_.walletAppBackends)
+          .focus(_.validatorApps)
           .modify(
             _.toSeq
               .sortBy(_._1.unwrap)

@@ -102,7 +102,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -122,7 +122,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice collects self-payment request",
         collectAcceptedAppPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty),
           acceptedPaymentCid,
@@ -189,7 +189,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -209,7 +209,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice rejects the self-payment request",
         rejectAcceptedAppPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           acceptedPaymentCid,
@@ -278,7 +278,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates payment request",
         createPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -302,7 +302,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Receivers collect the payment request",
         collectAcceptedAppPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
           acceptedPaymentCid,
@@ -560,7 +560,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -587,7 +587,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -617,7 +617,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the second payment",
         collectSubscriptionPayment(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -720,7 +720,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -748,7 +748,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the initial payment",
         rejectAcceptedSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           charlieUserId,
           charlieUserParty,
           initialPaymentCid,
@@ -810,7 +810,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -837,7 +837,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -867,7 +867,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the second payment",
         rejectSubscriptionPayment(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           charlieUserId,
           charlieUserParty,
           paymentCid,

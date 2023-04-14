@@ -66,23 +66,12 @@ local deployments(config) = [
                ],
                image="validator-app",
                namespace="validator1",
-               extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator") + c.appUserNameEnvBinding("wallet") +
+               extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator") +
                             [
                               { name: "CN_APP_VALIDATOR_WALLET_USER_NAME", value: "auth0|63e3d75ff4114d87a2c1e4f5" },
                               { name: "CN_APP_DARS", json: ["cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar", "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"] },
                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
                             ]),
-
-  c.deployment(config, "wallet-app", [
-    {
-      name: "val1-wal-api",
-      port: 5004,
-      // Internal, we proxy this under /v0/wallet in the UI.
-      internalOnly: true,
-    },
-  ], image="wallet-app", namespace="validator1", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "wallet") + [
-    { name: "CN_APP_WALLET_PARTICIPANT_ADDRESS", value: "participant" },
-  ]),
 
   c.deployment(config, "wallet-web-ui", [
     {

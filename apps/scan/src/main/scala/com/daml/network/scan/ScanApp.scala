@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.scan.automation.ScanAutomationService
@@ -20,6 +20,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -85,6 +86,19 @@ class ScanApp(
         store,
       )
       domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      _ <- retryProvider.retryForAutomation(
+        "wait for open mining round",
+        store.multiDomainAcsStore
+          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = Some(1))
+          .map { cs =>
+            if (cs.isEmpty) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription("No active open mining round")
+                .asRuntimeException()
+            }
+          },
+        logger,
+      )
       _ <- waitForAcsIngestion(store.multiDomainAcsStore, domainId)
 
       handler = new HttpScanHandler(

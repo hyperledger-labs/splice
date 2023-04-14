@@ -10,7 +10,7 @@ import com.daml.network.console.{
   CNRemoteParticipantReference,
   LocalCNNodeAppReference,
   ScanAppBackendReference,
-  WalletAppBackendReference,
+  ValidatorAppBackendReference,
   WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -98,7 +98,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   }
 
   def lockCoins(
-      userWallet: WalletAppBackendReference,
+      userValidator: ValidatorAppBackendReference,
       userParty: PartyId,
       validatorParty: PartyId,
       coins: Seq[HttpWalletAppClient.CoinPosition],
@@ -115,7 +115,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
       val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
-      userWallet.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+      userValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         optTimeout = None,
         commands = transferContext.coinRules

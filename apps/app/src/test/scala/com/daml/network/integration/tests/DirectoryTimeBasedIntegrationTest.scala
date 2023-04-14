@@ -144,19 +144,19 @@ class DirectoryTimeBasedIntegrationTest
           }
         },
       )
-      // Stop wallet so renewal does not happen
-      aliceWalletBackend.stop()
+      // Stop validator so renewal does not happen
+      aliceValidator.stop()
       advanceTime(Duration.ofDays(91))
       eventually() {
         aliceDirectory.listEntries("", 25) shouldBe empty
       }
       // Wait for subscription to be expired.
       eventually() {
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
-        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(codegen.DirectoryEntryContext.COMPANION)(aliceUserParty) shouldBe empty
       }
     }

@@ -140,7 +140,7 @@ class SplitwellIntegrationTest
               _.message.contains(
                 "Completed processing with outcome: Stopped service for splitwell::"
               )
-            ) should have size 5,
+            ) should have size 4,
         )
       } finally {
         providerSplitwellBackend.remoteParticipant.domains.reconnect(

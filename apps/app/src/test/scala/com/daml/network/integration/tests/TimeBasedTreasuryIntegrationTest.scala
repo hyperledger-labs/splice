@@ -35,7 +35,7 @@ class TimeBasedTreasuryIntegrationTest
     checkWallet(alice, aliceWallet, Seq(exactly(50)))
 
     // run a transfer such that alice's validator has some rewards
-    p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 40.0)
+    p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 40.0)
     eventually()(aliceValidatorWallet.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
@@ -74,7 +74,7 @@ class TimeBasedTreasuryIntegrationTest
       advanceRoundsByOneTick
 
       lockCoins(
-        aliceWalletBackend,
+        aliceValidator,
         aliceUserParty,
         aliceValidatorParty,
         aliceWallet.list().coins,
@@ -116,7 +116,7 @@ class TimeBasedTreasuryIntegrationTest
       }
       // ..so when she pays bob, she doesn't have to pay a transfer fee which
       // will result in alice validator's reward being small enough that its not worth it to collect the reward
-      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 0.00001)
+      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 0.00001)
       eventually() {
         aliceValidatorWallet.listAppRewardCoupons() should have length 1
         aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
@@ -146,7 +146,7 @@ class TimeBasedTreasuryIntegrationTest
           eventually() {
             aliceValidatorWallet.list().coins should have length 1
           }
-          advanceTimeByPollingInterval(aliceWalletBackend)
+          advanceTimeByPollingInterval(aliceValidator)
         },
         entries => {
           forAtLeast(

@@ -56,7 +56,7 @@ class WalletPaymentIntegrationTest
 
       val (_, cid, reqC) =
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           description = description,
@@ -94,7 +94,7 @@ class WalletPaymentIntegrationTest
 
       val (referenceId, cid, reqC) =
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         )
@@ -150,11 +150,11 @@ class WalletPaymentIntegrationTest
       }
 
       clue("Alice transfers 39") {
-        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 39)
+        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 39)
         checkWallet(alice, aliceWallet, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
-        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 19)
+        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 19)
         checkWallet(alice, aliceWallet, Seq((11, 12)))
       }
     }

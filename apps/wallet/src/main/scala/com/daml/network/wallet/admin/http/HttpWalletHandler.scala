@@ -60,8 +60,8 @@ class HttpWalletHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
   private val store = walletManager.store
-  private val walletServiceParty: PartyId = store.key.walletServiceParty
-  private val validatorParty: PartyId = store.key.validatorParty
+  private val walletServiceParty: PartyId = store.walletKey.walletServiceParty
+  private val validatorParty: PartyId = store.walletKey.validatorParty
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 

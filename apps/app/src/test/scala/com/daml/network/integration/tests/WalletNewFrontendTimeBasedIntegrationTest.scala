@@ -111,7 +111,7 @@ class WalletNewFrontendTimeBasedIntegrationTest
         _ => aliceWallet.balance().unlockedQty should be > BigDecimal(1.5),
       )
       lockCoins(
-        aliceWalletBackend,
+        aliceValidator,
         aliceParty,
         aliceValidator.getValidatorPartyId(),
         aliceWallet.list().coins,

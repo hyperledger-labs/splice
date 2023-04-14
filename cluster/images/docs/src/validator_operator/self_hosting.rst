@@ -13,8 +13,7 @@ Prerequisites
 To locally start a validator node that connects against the DevNet domain, you will need to run
 
 1) a Canton participant node, in order to host:
-2) the Daml validator app and
-3) the Daml wallet app
+2) the Daml validator app which also serves as the backend for the wallet
 
 Additionally, you'll also need to enable the GCP DA Canton DevNet VPN. If you can view
 this documentation, you already enabled the VPN successfully.
@@ -29,8 +28,8 @@ Please now extract Canton:
    tar xzvf canton-research-|canton_version|.tar.gz
 
 
-To obtain the Canton Network node binary (required to run validator
-and wallet apps), please download a release bundle here:
+To obtain the Canton Network node binary (required to run the validator app),
+please download a release bundle here:
 |bundle_download_link|. (Source is available by cloning the
 `the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_
 repository from GitHub.)
@@ -96,7 +95,7 @@ Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
 To use the wallet, you interact with the wallet setup in the previous section using a specific party user. In our example, ``aliceWallet`` has been
-configured to interact with the wallet app using the previously created user ``alice``.
+configured to interact with the validator app using the previously created user ``alice``.
 
 Using Alice’s wallet, you can create free coins like so: ::
 
@@ -160,7 +159,7 @@ Configuring the Wallet UI
 -------------------------
 
 The Wallet UI is distributed as static files that connect to the
-wallet backend that we started in the previous section.
+validator backend that we started in the previous section.
 
 Before we can deploy the Wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
 For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
@@ -267,7 +266,7 @@ user through the wallet first before you can use it in splitwell.
 Enabling Authentication
 -----------------------
 
-By default, the wallet and validator backends in your own validator node are configured to require authentication using JWT access tokens. However, all tokens are self-signed with a hardcoded secret.
+By default, the validator backend in your own validator node is configured to require authentication using JWT access tokens. However, all tokens are self-signed with a hardcoded secret.
 This setup is not secure, and should only be used when hosting a validator locally on your machine.
 
 For a secure production setup, set up an external OAuth 2.0 provider for authenticating your backends and end-users and change your config files accordingly.
@@ -295,10 +294,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
     b. Name it "Validator app backend", choose "Machine to Machine Applications", and click Create
     c. Choose the ``Daml Ledger API`` API you created in step 2 in the "Authorize Machine to Machine Application" dialog and click Authorize.
 
-5. Create an Auth0 Application for the wallet backend named "Wallet app backend".
-   Repeat the steps used for creating the validator backend application and grant access to both ``Daml Ledger API`` and ``CN App API``.
-
-6. Create an Auth0 Application for the wallet web UI.
+5. Create an Auth0 Application for the wallet web UI.
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
     b. Choose "Single Page Web Applications", call it "Wallet web UI", and click Create
@@ -310,9 +306,9 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
        - "Allowed Web Origins"
        - "Allowed Origins (CORS)"
     e. Save your application settings
-7. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://directory.localhost:3000``)
+6. Create an Auth0 Application for the directory web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://directory.localhost:3000``)
 
-8. Configure your system that will be running Canton, your wallet and validator app backends with the following variables:
+7. Configure your system that will be running Canton, your wallet and validator app backends with the following variables:
 
 Note that on Linux and MacOs, you can simply use and fill in the above values in the provided file ``examples/env-private`` and run ``source examples/env-private`` in the two terminals you start Canton and the Validator in.
 
@@ -324,18 +320,15 @@ NETWORK_AUTH_WELLKNOWN_URL            The "OpenID Configuration" endpoint of you
 NETWORK_AUTH_VALIDATOR_CLIENT_ID      The "Client ID" of your "Validator app backend" application (at the top of the application's settings page)
 NETWORK_AUTH_VALIDATOR_CLIENT_SECRET  The "Client Secret" of your "Validator app backend" application (at the top of the application's settings page)
 NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator app backend" application. Equal to the "Client ID" of the "Validator app backend" application with `@clients` appended.
-NETWORK_AUTH_WALLET_CLIENT_ID         The "Client ID" of your "Wallet app backend" application (at the top of the application's settings page)
-NETWORK_AUTH_WALLET_CLIENT_SECRET     The "Client Secret" of your "Wallet app backend" application (at the top of the application's settings page)
-NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app backend" application. Equal to the "Client ID" of the "Wallet app backend" application with `@clients` appended.
 ====================================  =====
 
-9. Start Canton and configure it to validate tokens against your new Auth0 tenant:
+8. Start Canton and configure it to validate tokens against your new Auth0 tenant:
 
 .. parsed-literal::
 
     DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
 
-10. Now start the validator & the wallet again:
+9. Now start the validator again:
 
     a. generate the validator-onboarding.conf against your new Auth0 tenant:
 
@@ -349,19 +342,19 @@ NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app
 
         NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
-11. Upload the directory DAR.
+10. Upload the directory DAR.
 
   ::
 
     validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
 
-12. If you have not already done so, while trying out the insecure
+11. If you have not already done so, while trying out the insecure
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`
     and :ref:`configuring the directory UI <configuring-directory-ui>`. For the next steps, the occurences of
     ``TARGET_CLUSTER`` in the ``config.js`` files should have been
     replaced and the JSON API should be running.
 
-13. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
+12. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
   ::
 
@@ -420,9 +413,9 @@ Name                                       Value
 NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to adminster the validator's wallet, e.g. auth0|63e3d75ff4114d87a2c1e4f5
 =========================================  =====
 
-4. Stop the validator and wallet that you started above
-5. Edit the examples/validator/validator-secure.conf file, locate the commented-out out line "validator-wallet-user = ${NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME}", and uncomment it. This will instruct the validator app to automatically onboard that user to the wallet, and allocate the validator app's primary party as the primary party of that user.
-6. Start the validator and wallet again:
+4. Stop the validator that you started above
+5. Edit the examples/validator/validator-secure.conf file, locate the commented-out out line "validator-wallet-user = ${NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME}", and uncomment it. This will instruct the validator app to automatically onboard that user as a wallet user, and allocate the validator app's primary party as the primary party of that user.
+6. Start the validator again:
 
 .. parsed-literal::
 

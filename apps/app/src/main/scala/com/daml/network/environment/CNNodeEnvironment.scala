@@ -15,8 +15,6 @@ import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.ValidatorAppBackendConfig
-import com.daml.network.wallet.WalletAppBootstrap
-import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -169,38 +167,6 @@ trait CNNodeEnvironment extends Environment {
     loggerFactory,
   )
 
-  protected def createWallet(
-      name: String,
-      walletConfig: WalletAppBackendConfig,
-  ): WalletAppBootstrap = {
-    val appLoggerFactory = loggerFactory.append(WalletAppBootstrap.LoggerFactoryKeyName, name)
-    WalletAppBootstrap(
-      name,
-      walletConfig,
-      config.tryWalletAppBackendParametersByString(name),
-      createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forWallet(name),
-      testingConfig,
-      futureSupervisor,
-      appLoggerFactory,
-      configuredOpenTelemetry,
-    )
-      .valueOr(err =>
-        throw new RuntimeException(
-          s"Failed to create participant bootstrap: $err"
-        )
-      )
-  }
-
-  lazy val wallets = new WalletApps(
-    createWallet,
-    migrationsFactory,
-    timeouts,
-    config.walletBackendsByString,
-    config.tryWalletAppBackendParametersByString,
-    loggerFactory,
-  )
-
   protected def createDirectory(
       name: String,
       directoryConfig: LocalDirectoryAppConfig,
@@ -274,7 +240,6 @@ trait CNNodeEnvironment extends Environment {
         svs.startAll.left.getOrElse(Seq.empty) ++
         scans.startAll.left.getOrElse(Seq.empty) ++
         validators.startAll.left.getOrElse(Seq.empty) ++
-        wallets.startAll.left.getOrElse(Seq.empty) ++
         directories.startAll.left.getOrElse(Seq.empty) ++
         splitwells.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
@@ -282,7 +247,7 @@ trait CNNodeEnvironment extends Environment {
 
   // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
   def allCNNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(svcs, svs, scans, validators, wallets, directories, splitwells)
+    List(svcs, svs, scans, validators, directories, splitwells)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCNNodes

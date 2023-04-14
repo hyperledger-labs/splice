@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.traverse.*
-import com.daml.network.config.CNNodeConfigTransforms.updateAllWalletAppBackendConfigs_
+import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
@@ -34,13 +34,12 @@ class DomainFeesTrafficIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withHttpSettingsForHigherThroughput
       .addConfigTransform((_, cnNodeConfig) =>
-        updateAllWalletAppBackendConfigs_(walletConfig =>
-          walletConfig.focus(_.treasury.batchSize).replace(1)
-        )(cnNodeConfig)
-      )
-      .addConfigTransform((_, cnNodeConfig) =>
-        updateAllWalletAppBackendConfigs_(walletConfig =>
-          walletConfig.focus(_.treasury.enableValidatorTrafficBalanceChecks).replace(true)
+        updateAllValidatorConfigs_(conf =>
+          conf
+            .focus(_.treasury.batchSize)
+            .replace(1)
+            .focus(_.treasury.enableValidatorTrafficBalanceChecks)
+            .replace(true)
         )(cnNodeConfig)
       )
   }

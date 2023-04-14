@@ -31,9 +31,6 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
       waitForPort(InstanceName.tryCreate("SVC"), svc.adminApi.port.unwrap)
     )
     config.svApps.foreach(sv => waitForPort(sv._1, sv._2.adminApi.port.unwrap))
-    config.walletAppBackends.foreach(wallet =>
-      waitForPort(wallet._1, wallet._2.adminApi.port.unwrap)
-    )
     config.splitwellApps.foreach(sw => waitForPort(sw._1, sw._2.adminApi.port.unwrap))
     config.directoryApp.foreach(directory =>
       waitForPort(InstanceName.tryCreate("Directory"), directory.adminApi.port.unwrap)

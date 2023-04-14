@@ -3,10 +3,10 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
-import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAppClient,
   HttpValidatorAdminAppClient,
+  UserInfo,
 }
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}

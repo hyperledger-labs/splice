@@ -50,7 +50,7 @@ class WalletSubscriptionsIntegrationTest
 
       val description = "this will be rejected"
       val request = createSelfSubscriptionRequest(
-        aliceWalletBackend.remoteParticipantWithAdminToken,
+        aliceValidator.remoteParticipantWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
         description = description,
@@ -98,7 +98,7 @@ class WalletSubscriptionsIntegrationTest
         val (request, requestId) = actAndCheck(
           "Create self-subscription request",
           createSelfSubscriptionRequest(
-            aliceWalletBackend.remoteParticipantWithAdminToken,
+            aliceValidator.remoteParticipantWithAdminToken,
             aliceWallet.config.ledgerApiUser,
             aliceUserParty,
             paymentInterval = Duration.ofMinutes(10),
@@ -140,7 +140,7 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),
@@ -172,7 +172,7 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),

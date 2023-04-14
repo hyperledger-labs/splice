@@ -14,13 +14,12 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
   ListResponse,
   UserStatusData,
 }
-import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
+import com.daml.network.wallet.config.WalletAppClientConfig
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.config.CNHttpClientConfig
 
 abstract class WalletAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
@@ -354,52 +353,6 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.ListTransactions(beginAfterId, pageSize))
     }
   }
-}
-
-/** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
-  * app reference.
-  */
-final class WalletAppBackendReference(
-    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
-    override val name: String,
-) extends WalletAppReference(cnNodeConsoleEnvironment, name)
-    with LocalCNNodeAppReference
-    with BaseInspection[ParticipantNode] {
-
-  override protected val instanceType = "Wallet"
-
-  protected val nodes = cnNodeConsoleEnvironment.environment.wallets
-
-  @Help.Summary("Return wallet app backend config")
-  def config: WalletAppBackendConfig =
-    cnNodeConsoleEnvironment.environment.config.walletBackendsByString(name)
-
-  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
-    // For local references, we assume that they are reachable on localhost.
-    // TODO (#2019) Reconsider if we want these for local refs at all and if so
-    // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
-    config.clientAdminApi,
-  )
-
-  /** Remote participant this wallet app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
-      cnNodeConsoleEnvironment,
-      s"remote participant for `$name``",
-      config.remoteParticipant.getRemoteParticipantConfig(),
-    )
-
-  /** Remote participant this wallet app is configured to interact with. Uses admin tokens to bypass auth. */
-  lazy val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
-      cnNodeConsoleEnvironment,
-      s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
-    )
-
-  /** secret, not publicly documented way to get the admin token */
-  def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
 /** Client (aka remote) reference to a wallet app in the style of CNRemoteParticipantReference, i.e.,

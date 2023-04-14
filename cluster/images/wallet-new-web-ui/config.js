@@ -15,7 +15,7 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the envoy proxy, proxying to the wallet app HTTP API
-      url: "https://" + window.location.hostname + "/api/v0/wallet",
+      url: "https://" + window.location.hostname + "/api/v0/validator",
     },
     validator: {
       // URL of the envoy proxy, proxying to the validator app HTTP API

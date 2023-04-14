@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets
 // Config - edit this part
 // --------------------------------------------------------------------------------------
 val ledgerApis = Seq(
-  aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api -> "aliceWalletBackend"
+  aliceValidator.remoteParticipantWithAdminToken.ledger_api -> "aliceValidator"
 )
 def includeParty(id: PartyId): Boolean = {
   id.toString.contains("_service")

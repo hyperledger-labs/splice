@@ -120,7 +120,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def p2pTransfer(
-      senderWalletBackend: WalletAppBackendReference,
+      senderValidator: ValidatorAppBackendReference,
       senderWallet: WalletAppClientReference,
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
@@ -141,15 +141,15 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       )
     }
     val offsetBefore =
-      senderWalletBackend.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+      senderValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
     val acceptedCid = receiverWallet.acceptTransferOffer(transferOfferId)
 
     val senderParty = PartyId.tryFromProtoPrimitive(senderWallet.userStatus().party)
 
     eventually() {
-      val offset = senderWalletBackend.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+      val offset = senderValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
       val transactions =
-        senderWalletBackend.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+        senderValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(senderParty),
             completeAfter = Int.MaxValue,

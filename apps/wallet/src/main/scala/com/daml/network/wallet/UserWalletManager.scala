@@ -88,9 +88,9 @@ class UserWalletManager(
       val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
       val key =
         UserWalletStore.Key(
-          svcParty = store.key.svcParty,
-          store.key.walletServiceParty,
-          store.key.validatorParty,
+          svcParty = store.walletKey.svcParty,
+          store.walletKey.walletServiceParty,
+          store.walletKey.validatorParty,
           endUserName,
           endUserParty,
         )

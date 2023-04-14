@@ -185,7 +185,6 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   "onboard, list and offboard users" in { implicit env =>
     initSvc()
     aliceValidator.startSync()
-    aliceWalletBackend.startSync()
 
     actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidator))(
       "Wait for user to be listed",

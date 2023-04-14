@@ -128,7 +128,8 @@ class UpdateIngestionService(
         Some(javaOffset),
       )
       _ <- ingestionSink.ingestAcsAndTransferOuts(domain, evs, tfs)
-      _ <- waitForOffset(javaOffset)
+      // Note that we cannot wait for the offset here since it may be an offset from a transfer
+      // which does not advance the participant offset.
       _ <- ingestionSink.switchToIngestingUpdates(domain, offset)
     } yield ()
   }

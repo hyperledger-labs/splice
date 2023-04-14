@@ -4,6 +4,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 
@@ -18,6 +19,12 @@ class InMemoryValidatorStore(
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with ValidatorStore {
+
+  override val walletKey = WalletStore.Key(
+    key.walletServiceParty,
+    key.validatorParty,
+    key.svcParty,
+  )
 
   override lazy val acsContractFilter = ValidatorStore.contractFilter(key)
 }

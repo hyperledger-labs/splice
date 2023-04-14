@@ -29,7 +29,6 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.config.{
   TreasuryConfig,
-  WalletAppBackendConfig,
   WalletAppClientConfig,
   WalletDomainConfig,
   WalletRemoteValidatorAppConfig,
@@ -78,7 +77,6 @@ case class CNNodeConfig(
     svAppClients: Map[InstanceName, RemoteSvAppConfig] = Map.empty,
     scanApp: Option[ScanAppBackendConfig] = None,
     ScanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
-    walletAppBackends: Map[InstanceName, WalletAppBackendConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     directoryApp: Option[LocalDirectoryAppConfig] = None,
     remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
@@ -262,44 +260,6 @@ case class CNNodeConfig(
     */
   def scansByString: Map[String, ScanAppBackendConfig] = scanApps.map { case (n, c) =>
     n.unwrap -> c
-  }
-
-  private lazy val walletAppBackendParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
-    walletAppBackends.fmap { walletConfig =>
-      SharedCNNodeAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
-        monitoring.logQueryCost,
-        parameters.timeouts.processing,
-        walletConfig.caching,
-        parameters.enableAdditionalConsistencyChecks,
-        features.enablePreviewCommands,
-        parameters.nonStandardConfig,
-        walletConfig.sequencerClient,
-        devVersionSupport = false,
-        dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
-      )
-    }
-
-  private[network] def walletAppBackendParameters(
-      appName: InstanceName
-  ): SharedCNNodeAppParameters =
-    nodeParametersFor(walletAppBackendParameters_, "wallet-app-backend", appName)
-
-  /** Use `WalletAppBackendParameters` instead!
-    */
-  def tryWalletAppBackendParametersByString(name: String): SharedCNNodeAppParameters =
-    walletAppBackendParameters(
-      InstanceName.tryCreate(name)
-    )
-
-  /** Use `wallets` instead!
-    */
-  def walletBackendsByString: Map[String, WalletAppBackendConfig] = walletAppBackends.map {
-    case (n, c) =>
-      n.unwrap -> c
   }
 
   // The config contains one optional unnamed directory app (because in M3, there can only be one)
@@ -497,18 +457,16 @@ object CNNodeConfig {
       deriveReader[SharedCNNodeAppParameters]
     implicit val validatorOnboardingConfigReader: ConfigReader[ValidatorOnboardingConfig] =
       deriveReader[ValidatorOnboardingConfig]
+    implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
+      deriveReader[TreasuryConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig]
     implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
       deriveReader[ValidatorAppClientConfig]
     implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
       deriveReader[WalletRemoteValidatorAppConfig]
-    implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
-      deriveReader[TreasuryConfig]
     implicit val walletDomainConfigReader: ConfigReader[WalletDomainConfig] =
       deriveReader[WalletDomainConfig]
-    implicit val walletBackendConfigReader: ConfigReader[WalletAppBackendConfig] =
-      deriveReader[WalletAppBackendConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
     implicit val directoryConfigReader: ConfigReader[LocalDirectoryAppConfig] =
@@ -622,8 +580,6 @@ object CNNodeConfig {
       deriveWriter[TreasuryConfig]
     implicit val walletDomainConfigWriter: ConfigWriter[WalletDomainConfig] =
       deriveWriter[WalletDomainConfig]
-    implicit val walletBackendConfigWriter: ConfigWriter[WalletAppBackendConfig] =
-      deriveWriter[WalletAppBackendConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
     implicit val directoryConfigWriter: ConfigWriter[LocalDirectoryAppConfig] =

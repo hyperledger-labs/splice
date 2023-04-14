@@ -10,6 +10,7 @@ import com.daml.network.config.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.RemoteSvAppConfig
+import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.config.*
 
 import java.nio.file.Path
@@ -46,7 +47,6 @@ case class ValidatorAppBackendConfig(
     // one, and validatorWalletUser to the login one. If not provided, the ledgerApiUser is onboarded
     // to the wallet automatically.
     validatorWalletUser: Option[String],
-    walletServiceUser: String,
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
     remoteParticipant: CNRemoteParticipantConfig,
@@ -55,6 +55,7 @@ case class ValidatorAppBackendConfig(
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],
     enableCoinRulesUpgrade: Boolean = false,
+    treasury: TreasuryConfig = TreasuryConfig(),
 ) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

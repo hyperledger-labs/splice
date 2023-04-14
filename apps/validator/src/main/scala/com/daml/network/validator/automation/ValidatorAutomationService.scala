@@ -5,6 +5,8 @@ import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -15,6 +17,7 @@ import scala.concurrent.ExecutionContextExecutor
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
+    walletManager: UserWalletManager,
     store: ValidatorStore,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
@@ -30,4 +33,7 @@ class ValidatorAutomationService(
       Map(store.key.validatorParty -> store),
       ledgerClient,
       retryProvider,
-    ) {}
+    ) {
+  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
+  registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager))
+}

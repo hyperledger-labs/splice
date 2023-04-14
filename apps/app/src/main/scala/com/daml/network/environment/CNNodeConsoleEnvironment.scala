@@ -20,7 +20,6 @@ import com.daml.network.console.{
   ValidatorAppBackendReference,
   ValidatorAppClientReference,
   ValidatorAppReference,
-  WalletAppBackendReference,
   WalletAppClientReference,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -139,8 +138,8 @@ class CNNodeConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
-    mergeLocalCNNodeInstances(validators.local, wallets.local),
-    mergeRemoteCNNodeInstances(validators.remote, wallets.remote),
+    validators.local,
+    mergeRemoteCNNodeInstances(validators.remote, wallets),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -187,12 +186,8 @@ class CNNodeConsoleEnvironment(
       environment.config.svAppClients.toSeq.map(createSvAppClientReference),
     )
 
-  lazy val wallets
-      : NodeReferences[CNNodeAppReference, WalletAppClientReference, WalletAppBackendReference] =
-    NodeReferences(
-      environment.config.walletBackendsByString.keys.map(createWalletBackendReference).toSeq,
-      environment.config.walletAppClients.toSeq.map(createWalletAppClientReference),
-    )
+  lazy val wallets: Seq[WalletAppClientReference] =
+    environment.config.walletAppClients.toSeq.map(createWalletAppClientReference)
 
   lazy val directories: NodeReferences[
     DirectoryAppReference,
@@ -250,9 +245,6 @@ class CNNodeConsoleEnvironment(
   ): SvAppClientReference =
     new SvAppClientReference(this, conf._1.unwrap, conf._2)
 
-  private def createWalletBackendReference(name: String): WalletAppBackendReference =
-    new WalletAppBackendReference(this, name)
-
   private def createWalletAppClientReference(
       conf: (InstanceName, WalletAppClientConfig)
   ): WalletAppClientReference =
@@ -304,20 +296,12 @@ class CNNodeConsoleEnvironment(
         svs.local,
         Seq("App References"),
       ) :++
-      wallets.local.map(wb =>
-        TopLevelValue(wb.name, helpText("wallet app backend", wb.name), wb, Seq("App References"))
-      ) :+ TopLevelValue(
-        "wallets",
-        helpText("All wallet app backend instances" + genericNodeReferencesDoc, "Wallet Backends"),
-        wallets.local,
-        Seq("App References"),
-      ) :++
-      wallets.remote.map(w =>
+      wallets.map(w =>
         TopLevelValue(w.name, helpText("wallet app user", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
         "remoteWallets",
         helpText("All wallet app user instances" + genericNodeReferencesDoc, "Wallet Users"),
-        wallets.remote,
+        wallets,
         Seq("App References"),
       ) :++
       directories.local.map(v =>

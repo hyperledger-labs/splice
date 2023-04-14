@@ -645,8 +645,6 @@ class SvTimeBasedIntegrationTest
     initSvc()
     Seq(aliceValidator, bobValidator).foreach(_.start())
     Seq(aliceValidator, bobValidator).foreach(_.waitForInitialization())
-    Seq(aliceWalletBackend, bobWalletBackend).foreach(_.start())
-    Seq(aliceWalletBackend, bobWalletBackend).foreach(_.waitForInitialization())
 
     val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
@@ -659,10 +657,10 @@ class SvTimeBasedIntegrationTest
 
     actAndCheck(
       "Generate some reward coupons by executing a few direct transfers", {
-        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobParty, 10.0)
-        p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceParty, 10.0)
-        p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, aliceParty, 10.0)
+        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobParty, 10.0)
+        p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceParty, 10.0)
+        p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceParty, 10.0)
       },
     )(
       "Wait for all reward coupons to be created",

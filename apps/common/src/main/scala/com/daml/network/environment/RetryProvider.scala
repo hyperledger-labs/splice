@@ -343,6 +343,17 @@ object RetryProvider {
           s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
+      // We encounter this with toxiproxy if the upstream is not yet up.
+      // The exception type is akka.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
+      // but akka-http does not expose that so we match on the message instead.
+      case Failure(ex: RuntimeException)
+          if ex.getMessage.contains(
+            "The http server closed the connection unexpectedly before delivering responses"
+          ) =>
+        val msg =
+          s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+        logger.info(msg)
+        TransientErrorKind
       case Failure(ex) =>
         logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
         FatalErrorKind

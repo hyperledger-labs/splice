@@ -2,9 +2,11 @@ package com.daml.network.validator
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -15,6 +17,7 @@ import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.validator.ValidatorResource
+import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -29,6 +32,8 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
+import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.admin.http.HttpWalletHandler
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -71,30 +76,15 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  private def getSvcPartyId(ledgerClient: CNLedgerClient): Future[PartyId] = {
-    // Via scan
-    for {
-      scanConnection <- ScanConnection(
-        ledgerClient,
-        config.remoteScan,
-        clock,
-        retryProvider,
-        coinAppParameters.processingTimeouts,
-        loggerFactory,
+  private def getSvcPartyId(scanConnection: ScanConnection): Future[PartyId] =
+    retryProvider
+      .retryForAutomation(
+        "getSvcPartyId",
+        scanConnection.getSvcPartyId(),
+        logger,
       )
 
-      partyId <- retryProvider
-        .retryForAutomation(
-          "getSvcPartyId",
-          scanConnection.getSvcPartyId(),
-          logger,
-        )
-        .andThen(_ => scanConnection.close())
-
-    } yield partyId
-  }
-
-  private def setupWallet(connection: CNLedgerConnection): Future[(PartyId, String)] = {
+  private def setupWallet(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
@@ -116,17 +106,11 @@ class ValidatorApp(
             // See `Compile / resourceGenerators` in build.sbt
             lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
           })
-        } else
-          Future.successful(())
-      party <- connection.getOrAllocateParty(config.walletServiceUser)
-      // Note: need to immediately grant right to act as wallet service user in order to install wallet install contract
-      // TODO(#713): remove this workaround for missing act-as-any-party rights
-      _ <- connection.grantUserRights(config.ledgerApiUser, Seq(party), Seq.empty)
+        } else Future.successful(())
     } yield {
       logger.info(
-        s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
+        s"Finished wallet setup"
       )
-      (party, config.walletServiceUser)
     }
   }
 
@@ -235,13 +219,21 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
-      svcParty <- getSvcPartyId(ledgerClient)
+      scanConnection <- ScanConnection(
+        ledgerClient,
+        config.remoteScan,
+        clock,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      )
+      svcParty <- getSvcPartyId(scanConnection)
       connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      (walletServiceParty, walletServiceUser) <- setupWallet(connection)
+      _ <- setupWallet(connection)
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
-        walletServiceParty = walletServiceParty,
+        walletServiceParty = validatorParty,
       )
       store = ValidatorStore(
         key,
@@ -251,9 +243,25 @@ class ValidatorApp(
         futureSupervisor,
         retryProvider,
       )
+      walletManager =
+        new UserWalletManager(
+          ledgerClient,
+          config.domains.global,
+          store,
+          config.automation,
+          clock,
+          config.treasury,
+          storage: Storage,
+          retryProvider,
+          scanConnection,
+          loggerFactory,
+          timeouts,
+          futureSupervisor,
+        )
       automation = new ValidatorAutomationService(
         config.automation,
         clock,
+        walletManager,
         store,
         ledgerClient,
         retryProvider,
@@ -269,7 +277,7 @@ class ValidatorApp(
           instance,
           validatorParty,
           store,
-          walletServiceUser,
+          config.ledgerApiUser,
           domainId,
         )
       })
@@ -279,7 +287,7 @@ class ValidatorApp(
         connection,
         store,
         validatorUserName = config.ledgerApiUser,
-        walletServiceUser,
+        config.ledgerApiUser,
         domainId,
         retryProvider,
         logger,
@@ -294,7 +302,7 @@ class ValidatorApp(
         ledgerClient,
         store,
         validatorUserName = config.ledgerApiUser,
-        walletServiceUser = walletServiceUser,
+        walletServiceUser = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
         loggerFactory,
@@ -304,7 +312,7 @@ class ValidatorApp(
         ledgerClient,
         store,
         validatorUserName = config.ledgerApiUser,
-        walletServiceUser = walletServiceUser,
+        walletServiceUser = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
         loggerFactory,
@@ -318,7 +326,26 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      routes = cors() {
+      walletHandler = new HttpWalletHandler(
+        walletManager,
+        ledgerClient,
+        clock,
+        scanConnection,
+        loggerFactory,
+        retryProvider,
+      )
+
+      routes = cors(
+        CorsSettings(ac).withAllowedMethods(
+          List(
+            HttpMethods.DELETE,
+            HttpMethods.GET,
+            HttpMethods.POST,
+            HttpMethods.HEAD,
+            HttpMethods.OPTIONS,
+          )
+        )
+      ) {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
@@ -326,6 +353,10 @@ class ValidatorApp(
                 ValidatorResource.routes(
                   handler,
                   AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+                ),
+                WalletResource.routes(
+                  walletHandler,
+                  AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
                 ),
                 ValidatorAdminResource.routes(
                   adminHandler,
@@ -350,6 +381,7 @@ class ValidatorApp(
 
     } yield {
       ValidatorApp.State(
+        scanConnection,
         storage,
         store,
         automation,
@@ -367,6 +399,7 @@ class ValidatorApp(
 
 object ValidatorApp {
   case class State(
+      scanConnection: ScanConnection,
       storage: Storage,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
@@ -388,6 +421,7 @@ object ValidatorApp {
         automation,
         store,
         storage,
+        scanConnection,
       )(logger)
   }
 }

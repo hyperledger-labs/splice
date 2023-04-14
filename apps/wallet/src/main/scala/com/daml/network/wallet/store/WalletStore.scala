@@ -1,19 +1,11 @@
 package com.daml.network.wallet.store
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight, ValidatorRight}
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.CNNodeAppStoreWithoutHistory
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.memory.InMemoryWalletStore
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
 import cats.syntax.traverseFilter.*
@@ -27,7 +19,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   protected implicit val ec: ExecutionContext
 
   /** The key identifying the parties considered by this store. */
-  def key: WalletStore.Key
+  def walletKey: WalletStore.Key
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -63,7 +55,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(
         _,
         (co: Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
-          co.payload.provider == key.validatorParty.toProtoPrimitive,
+          co.payload.provider == walletKey.validatorParty.toProtoPrimitive,
       )
     )
 
@@ -78,37 +70,11 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
 }
 
 object WalletStore {
-  def apply(
-      key: Key,
-      storage: Storage,
-      globalDomain: DomainAlias,
-      loggerFactory: NamedLoggerFactory,
-      timeouts: ProcessingTimeout,
-      futureSupervisor: FutureSupervisor,
-      retryProvider: RetryProvider,
-  )(implicit
-      ec: ExecutionContext
-  ): WalletStore =
-    storage match {
-      case _: MemoryStorage =>
-        new InMemoryWalletStore(
-          key,
-          globalDomain,
-          loggerFactory,
-          timeouts,
-          futureSupervisor,
-          retryProvider,
-        )
-      case _: DbStorage => throw new RuntimeException("Not implemented")
-    }
-
   case class Key(
       /** The party used by the wallet service user to act on behalf of it's users. */
       walletServiceParty: PartyId,
       /** The validator party. */
       validatorParty: PartyId,
-      /** The validator user name. */
-      validatorUserName: String,
       /** The party-id of the SVC issuing CC managed by this wallet. */
       svcParty: PartyId,
   ) extends PrettyPrinting {
@@ -118,35 +84,4 @@ object WalletStore {
       param("svcParty", _.svcParty),
     )
   }
-
-  /** Contract of a wallet store for a specific wallet-service party. */
-  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
-    import MultiDomainAcsStore.mkFilter
-    val walletService = key.walletServiceParty.toProtoPrimitive
-    val validator = key.validatorParty.toProtoPrimitive
-    val svc = key.svcParty.toProtoPrimitive
-
-    MultiDomainAcsStore.SimpleContractFilter(
-      key.validatorParty,
-      Map(
-        mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>
-          co.payload.walletServiceParty == walletService &&
-            co.payload.validatorParty == validator &&
-            co.payload.svcParty == svc
-        ),
-        mkFilter(OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(ValidatorRight.COMPANION)(co =>
-          // All validator rights that entitle this wallet's validator to collect rewards as a validator operator
-          co.payload.svc == svc &&
-            co.payload.validator == validator
-        ),
-        mkFilter(CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(FeaturedAppRight.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.provider == validator
-        ),
-      ),
-    )
-  }
-
 }

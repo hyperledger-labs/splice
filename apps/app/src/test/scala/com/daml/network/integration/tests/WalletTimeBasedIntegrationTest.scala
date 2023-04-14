@@ -64,7 +64,7 @@ class WalletTimeBasedIntegrationTest
       val startRound = aliceWallet.list().coins.head.round
 
       lockCoins(
-        aliceWalletBackend,
+        aliceValidator,
         aliceUserParty,
         aliceValidatorParty,
         aliceWallet.list().coins,
@@ -118,7 +118,7 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       lockCoins(
-        aliceWalletBackend,
+        aliceValidator,
         aliceUserParty,
         aliceValidatorParty,
         aliceWallet.list().coins,
@@ -185,7 +185,7 @@ class WalletTimeBasedIntegrationTest
             advanceTimeToRoundOpen
           }
         },
-        cancelAllSubscriptions(aliceWallet, aliceWalletBackend),
+        cancelAllSubscriptions(aliceWallet, aliceValidator),
       ) {
         bracket(
           clue("Stopping directory backend so that payments aren't collected.") {
@@ -227,7 +227,7 @@ class WalletTimeBasedIntegrationTest
       actAndCheck(
         "Create a payment request, which expires after 1 minute",
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           expirationTime = Duration.ofMinutes(1),
@@ -333,7 +333,7 @@ class WalletTimeBasedIntegrationTest
       val startRound = aliceWallet.list().coins.head.round
 
       lockCoins(
-        aliceWalletBackend,
+        aliceValidator,
         aliceUserParty,
         aliceValidatorParty,
         aliceWallet.list().coins,
@@ -397,7 +397,7 @@ class WalletTimeBasedIntegrationTest
       actAndCheck(
         "Alice creates a self-payment request",
         createSelfPaymentRequest(
-          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceValidator.remoteParticipantWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -553,7 +553,7 @@ class WalletTimeBasedIntegrationTest
           aliceWallet.tap(50.0)
           aliceWallet.acceptSubscriptionRequest(subReqId)
         },
-        cancelAllSubscriptions(aliceWallet, aliceWalletBackend),
+        cancelAllSubscriptions(aliceWallet, aliceValidator),
       ) {
         clue("Getting Alice's new entry") {
           eventuallySucceeds() {
@@ -613,7 +613,7 @@ class WalletTimeBasedIntegrationTest
       }
 
       grantFeaturedAppRight(aliceValidatorWallet)
-      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bobUserParty, 40.0)
+      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0)
       eventually()({
         bobWallet.balance().unlockedQty should not be (BigDecimal(0.0))
         aliceValidatorWallet.listAppRewardCoupons() should have length (couponsBefore + 1)

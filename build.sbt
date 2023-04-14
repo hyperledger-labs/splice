@@ -284,6 +284,7 @@ lazy val `apps-validator` =
       `apps-scan` % "compile->compile;test->test",
       `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
+      `apps-wallet`,
       `canton-coin-v1test-daml`,
     )
     .settings(
@@ -599,12 +600,12 @@ lazy val `apps-wallet` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
-      `apps-validator` % "compile->compile;test->test",
       `wallet-daml`,
       `canton-coin-v1test-daml`,
       // TODO (#2676) Remove this once we have multi-domain interface support.
       `directory-daml`,
       `splitwell-daml`,
+      `svc-governance-daml`,
     )
     .settings(
       BuildCommon.sharedAppSettings,

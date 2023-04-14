@@ -11,7 +11,7 @@ import com.daml.network.splitwell.config.{
 import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
-import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
+import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
@@ -61,7 +61,6 @@ object CNNodeConfigTransforms {
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           validatorWalletUser = c.validatorWalletUser.map(u => s"$u-$suffix"),
-          walletServiceUser = s"${c.walletServiceUser}-$suffix",
           appInstances = c.appInstances.view
             .mapValues(i =>
               i.copy(
@@ -72,7 +71,6 @@ object CNNodeConfigTransforms {
             .toMap,
         )
       ),
-      updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix")),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateDirectoryAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
@@ -95,7 +93,6 @@ object CNNodeConfigTransforms {
         updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateScanAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
-        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(transform)),
         updateDirectoryAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform)),
       )
@@ -138,7 +135,6 @@ object CNNodeConfigTransforms {
       makeAllTimeoutsBounded,
       ensureNovelDamlNames(),
       useSelfSignedTokensForLedgerApiAuth("test"),
-      useSelfSignedTokensForWalletValidatorApiAuth("test"),
       reducePollingInterval,
     )
   }
@@ -147,7 +143,6 @@ object CNNodeConfigTransforms {
   type DirectoryAppTransform = CnAppConfigTransform[LocalDirectoryAppConfig]
   type RemoteDirectoryAppTransform = CnAppConfigTransform[RemoteDirectoryAppConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
-  type WalletAppBackendTransform = CnAppConfigTransform[WalletAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type SvcAppTransform = CnAppConfigTransform[SvcAppBackendConfig]
   type ScanAppTransform = CnAppConfigTransform[ScanAppBackendConfig]
@@ -175,13 +170,6 @@ object CNNodeConfigTransforms {
       update: RemoteDirectoryAppTransform
   ): CNNodeConfigTransform =
     _.focus(_.remoteDirectoryApps).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
-
-  def updateAllWalletAppBackendConfigs_(
-      update: WalletAppBackendTransform
-  ): CNNodeConfigTransform =
-    _.focus(_.walletAppBackends).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -309,9 +297,6 @@ object CNNodeConfigTransforms {
       updateAllValidatorConfigs_(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
       ),
-      updateAllWalletAppBackendConfigs_(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-      ),
       updateDirectoryAppConfig(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
       ),
@@ -338,12 +323,9 @@ object CNNodeConfigTransforms {
 
   def bumpSelfHostedParticipantPortsBy(bump: Int): CNNodeConfigTransform = {
     val transforms = Seq(
-      updateAllWalletAppBackendConfigs_(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-      ),
       updateAllValidatorConfigs_(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-      ),
+      )
     )
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
   }
@@ -379,9 +361,6 @@ object CNNodeConfigTransforms {
       updateAllValidatorConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
-      updateAllWalletAppBackendConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.serviceUser, _))
-      }),
       updateSvcAppConfig(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
@@ -416,13 +395,6 @@ object CNNodeConfigTransforms {
     c.copy(
       authConfig = AuthTokenSourceConfig.Static(userToken, Some(adminToken))
     )
-  }
-
-  def useSelfSignedTokensForWalletValidatorApiAuth(secret: String): CNNodeConfigTransform = {
-    updateAllWalletAppBackendConfigs_(c => {
-      val userToken = AuthUtil.testToken(AuthUtil.testAudience, c.serviceUser, secret)
-      c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
-    })
   }
 
   def useSplitwellUpgradeDomain(): CNNodeConfigTransform =

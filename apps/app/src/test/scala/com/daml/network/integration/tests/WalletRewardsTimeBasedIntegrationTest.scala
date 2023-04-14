@@ -29,12 +29,12 @@ class WalletRewardsTimeBasedIntegrationTest
       // Tap coin and do a transfer from alice to bob
       aliceWallet.tap(50)
 
-      p2pTransfer(aliceWalletBackend, aliceWallet, bobWallet, bob, 40.0)
+      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 40.0)
 
       // Retrieve transferred coin in bob's wallet and transfer part of it back to alice;
       // bob's validator will receive some app rewards
       eventually()(bobWallet.list().coins should have size 1)
-      p2pTransfer(bobWalletBackend, bobWallet, aliceWallet, alice, 30.0)
+      p2pTransfer(bobValidator, bobWallet, aliceWallet, alice, 30.0)
 
       eventually() {
         bobValidatorWallet.listAppRewardCoupons() should have size 1
