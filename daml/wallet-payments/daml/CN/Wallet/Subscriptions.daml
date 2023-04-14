@@ -178,6 +178,7 @@ template SubscriptionInitialPayment
         transferContext : AppTransferContext
       controller actor
       do
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         archive subscriptionData.context
         exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
@@ -286,6 +287,7 @@ template SubscriptionPayment
         transferContext : AppTransferContext
       controller actor
       do
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with

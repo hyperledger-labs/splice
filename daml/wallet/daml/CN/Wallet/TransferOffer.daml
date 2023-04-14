@@ -1,10 +1,14 @@
 module CN.Wallet.TransferOffer where
 
 import DA.Text
-import CN.Util.Assert
-import CN.Wallet.Payment
+
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
+
+import CN.Util.Assert
+import CN.Util.ExpiringContract
+import CN.Wallet.Payment
+
 
 template TransferOffer
   with
@@ -18,6 +22,11 @@ template TransferOffer
     signatory sender
     observer receiver
     ensure (DA.Text.length description < 280)
+
+    -- TODO(#3822): implement trigger to expire TransferOffers
+    interface instance ExpiringContract for TransferOffer where
+      view = ExpiringContractView with
+        expiresAt
 
     choice TransferOffer_Accept : ContractId AcceptedTransferOffer
       with
@@ -48,6 +57,11 @@ template AcceptedTransferOffer
     expiresAt : Time
   where
     signatory sender, receiver
+
+    -- TODO(#3822): implement trigger to expire AcceptedTransferOffers
+    interface instance ExpiringContract for AcceptedTransferOffer where
+      view = ExpiringContractView with
+        expiresAt
 
     nonconsuming choice AcceptedTransferOffer_Complete
       : (API.TransferResult, Optional (ContractId API.Coin))

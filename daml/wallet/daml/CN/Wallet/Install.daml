@@ -9,6 +9,7 @@ import qualified CC.API.V1.ValidatorTraffic as API
 import CC.Round (OpenMiningRound)
 import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
 
+import CN.Util.ExpiringContract
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Wallet.TransferOffer
@@ -155,7 +156,7 @@ template WalletAppInstall
       with
         cid : ContractId AppPaymentRequest
       controller walletServiceParty
-      do exercise cid $ AppPaymentRequest_Expire with actor = endUserParty
+      do expireContractAs endUserParty cid
 
     nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
       with

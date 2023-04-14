@@ -1,0 +1,45 @@
+-- | Declaring and working with contracts that expire at a given time.
+--
+-- Where possible we aim to structure workflows using expiring contracts to
+-- guarantee that eventually all resources can be reclaimed even if the
+-- workflow gets stuck.
+module CN.Util.ExpiringContract where
+
+import CN.Util.Assert
+
+-- | Utility type representing when an `ExpiringContract` expires.
+data ExpiringContractView = ExpiringContractView with
+  expiresAt : Time
+
+-- | A contract that expires at a given time.
+interface ExpiringContract where
+  viewtype ExpiringContractView
+
+  choice ExpiringContract_Expire : ()
+    with
+      actor : Party
+    controller actor
+    do
+      now <- getTime
+      require "Contract has expired" ((view this).expiresAt <= now)
+      require "Actor is a stakeholder" (actor `elem` stakeholder this)
+
+
+-- | Fetch an `ExpiringContract` that has not yet expired.
+fetchNotExpired : (HasToInterface t ExpiringContract, HasFetch t) => ContractId t -> Update t
+fetchNotExpired cid = do
+  c <- fetch cid
+  ensureNotExpired c
+  pure c
+
+-- | Ensure that an `ExpiringContract` has not yet expired.
+ensureNotExpired : HasToInterface t ExpiringContract => t -> Update ()
+ensureNotExpired c = do
+  now <- getTime
+  let expiresAt = (view (toInterface @ExpiringContract c)).expiresAt
+  require "Contract has not yet expired" (expiresAt < now)
+
+-- | Expire an `ExpiringContract` as the given stakeholder of the contract.
+expireContractAs : HasToInterface t ExpiringContract => Party -> ContractId t -> Update ()
+expireContractAs actor cid  =
+  exercise (toInterfaceContractId @ExpiringContract cid) ExpiringContract_Expire with actor
