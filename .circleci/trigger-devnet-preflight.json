@@ -1,6 +1,6 @@
 {
     "name" : "DevNet Preflight",
-    "description" : "DevNet of TestNet",
+    "description" : "10-min Preflight of DevNet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
