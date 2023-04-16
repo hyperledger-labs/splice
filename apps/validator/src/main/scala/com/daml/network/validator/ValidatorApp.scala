@@ -120,7 +120,6 @@ class ValidatorApp(
       instance: AppInstance,
       validatorParty: PartyId,
       store: ValidatorStore,
-      walletServiceUser: String,
       domainId: DomainId,
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
@@ -137,7 +136,6 @@ class ValidatorApp(
           connection,
           store,
           validatorUserName = config.ledgerApiUser,
-          walletServiceUser,
           domainId,
           retryProvider,
           logger,
@@ -233,7 +231,6 @@ class ValidatorApp(
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
-        walletServiceParty = validatorParty,
       )
       store = ValidatorStore(
         key,
@@ -277,7 +274,6 @@ class ValidatorApp(
           instance,
           validatorParty,
           store,
-          config.ledgerApiUser,
           domainId,
         )
       })
@@ -287,7 +283,6 @@ class ValidatorApp(
         connection,
         store,
         validatorUserName = config.ledgerApiUser,
-        config.ledgerApiUser,
         domainId,
         retryProvider,
         logger,
@@ -302,7 +297,6 @@ class ValidatorApp(
         ledgerClient,
         store,
         validatorUserName = config.ledgerApiUser,
-        walletServiceUser = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
         loggerFactory,
@@ -312,7 +306,6 @@ class ValidatorApp(
         ledgerClient,
         store,
         validatorUserName = config.ledgerApiUser,
-        walletServiceUser = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
         loggerFactory,

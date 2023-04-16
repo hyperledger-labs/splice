@@ -21,7 +21,6 @@ class InMemoryValidatorStore(
     with ValidatorStore {
 
   override val walletKey = WalletStore.Key(
-    key.walletServiceParty,
     key.validatorParty,
     key.svcParty,
   )

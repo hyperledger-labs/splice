@@ -462,9 +462,6 @@ object UserWalletStore {
       /** The party-id of the SVC issuing CC managed by this end-user wallet. */
       svcParty: PartyId,
 
-      /** The party-id of the wallet's service party */
-      walletServiceParty: PartyId,
-
       /** The party-id of the wallet's validator */
       validatorParty: PartyId,
 
@@ -481,7 +478,7 @@ object UserWalletStore {
     )
   }
 
-  /** Contract of a wallet store for a specific wallet-service party. */
+  /** Contract of a wallet store for a specific user party. */
   def contractFilter(key: Key): ContractFilter = {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive

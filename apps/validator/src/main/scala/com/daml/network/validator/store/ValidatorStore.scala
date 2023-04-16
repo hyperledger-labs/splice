@@ -119,15 +119,12 @@ object ValidatorStore {
     }
 
   case class Key(
-      /** The party used by the wallet service user to act on behalf of it's users. */
-      walletServiceParty: PartyId,
       /** The validator party. */
       validatorParty: PartyId,
       /** The party-id of the SVC issuing CC managed by this wallet. */
       svcParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("walletServiceParty", _.walletServiceParty),
       param("validatorParty", _.validatorParty),
       param("svcParty", _.svcParty),
     )
@@ -136,7 +133,6 @@ object ValidatorStore {
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
-    val walletService = key.walletServiceParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
@@ -144,8 +140,7 @@ object ValidatorStore {
       key.validatorParty,
       Map(
         mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
-          co.payload.walletServiceParty == walletService &&
-            co.payload.validatorParty == validator &&
+          co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
         ),
         mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),

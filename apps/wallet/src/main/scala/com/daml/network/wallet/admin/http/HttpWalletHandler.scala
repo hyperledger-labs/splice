@@ -60,7 +60,6 @@ class HttpWalletHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
   private val store = walletManager.store
-  private val walletServiceParty: PartyId = store.walletKey.walletServiceParty
   private val validatorParty: PartyId = store.walletKey.validatorParty
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
@@ -623,7 +622,7 @@ class HttpWalletHandler(
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *
-    * The choice is always executed with the wallet service party as the submitter, and the
+    * The choice is always executed with the validator party as the submitter, and the
     * wallet user party as a readAs party.
     *
     * Additionally, the validator service party is also a readAs party (workaround for lack
@@ -678,7 +677,7 @@ class HttpWalletHandler(
 
   /** Executes a wallet action by calling a choice on the WalletInstall contract for the given user.
     *
-    * The choice is always executed with the wallet service party as the submitter, and the
+    * The choice is always executed with the validator party as the submitter, and the
     * wallet user party as a readAs party.
     *
     * Additionally, the validator service party is also a readAs party (workaround for lack
@@ -706,8 +705,8 @@ class HttpWalletHandler(
       result <- dedup match {
         case None =>
           connection.submitWithResultNoDedup(
-            Seq(walletServiceParty),
-            Seq(validatorParty, userParty),
+            Seq(validatorParty),
+            Seq(userParty),
             update,
             domainId,
             dislosedContracts,
@@ -715,8 +714,8 @@ class HttpWalletHandler(
         case Some((commandId, dedupConfig)) =>
           connection
             .submitWithResult(
-              Seq(walletServiceParty),
-              Seq(validatorParty, userParty),
+              Seq(validatorParty),
+              Seq(userParty),
               update,
               commandId,
               dedupConfig,

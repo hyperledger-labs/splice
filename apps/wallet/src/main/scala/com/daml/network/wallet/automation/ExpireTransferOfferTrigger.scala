@@ -51,8 +51,8 @@ class ExpireTransferOfferTrigger(
           )
           logger.debug("Withdrawing expired transfer offer as sender")
           connection.submitWithResultNoDedup(
-            Seq(store.key.walletServiceParty),
-            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq(store.key.validatorParty),
+            Seq(store.key.endUserParty),
             cmd,
             task.work.domain,
           )
@@ -62,8 +62,8 @@ class ExpireTransferOfferTrigger(
           )
           logger.debug("Rejecting expired transfer offer as receiver")
           connection.submitWithResultNoDedup(
-            Seq(store.key.walletServiceParty),
-            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq(store.key.validatorParty),
+            Seq(store.key.endUserParty),
             cmd,
             task.work.domain,
           )

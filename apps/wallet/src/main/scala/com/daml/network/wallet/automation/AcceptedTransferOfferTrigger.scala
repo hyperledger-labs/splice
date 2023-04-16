@@ -98,8 +98,8 @@ class AcceptedTransferOfferTrigger(
       )
       _ <- connection
         .submitWithResultNoDedup(
-          Seq(store.key.walletServiceParty),
-          Seq(store.key.validatorParty, store.key.endUserParty),
+          Seq(store.key.validatorParty),
+          Seq(store.key.endUserParty),
           cmd,
           acceptedOffer.domain,
         )

@@ -89,7 +89,6 @@ class UserWalletManager(
       val key =
         UserWalletStore.Key(
           svcParty = store.walletKey.svcParty,
-          store.walletKey.walletServiceParty,
           store.walletKey.validatorParty,
           endUserName,
           endUserParty,

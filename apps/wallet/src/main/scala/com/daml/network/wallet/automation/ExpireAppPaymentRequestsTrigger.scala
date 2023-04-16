@@ -47,8 +47,8 @@ class ExpireAppPaymentRequestsTrigger(
       )
       _ <- connection
         .submitWithResultNoDedup(
-          Seq(store.key.walletServiceParty),
-          Seq(store.key.validatorParty, store.key.endUserParty),
+          Seq(store.key.validatorParty),
+          Seq(store.key.endUserParty),
           cmd,
           task.work.domain,
         )

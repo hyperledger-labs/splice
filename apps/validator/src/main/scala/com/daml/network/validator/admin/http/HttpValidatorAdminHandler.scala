@@ -19,7 +19,6 @@ class HttpValidatorAdminHandler(
     ledgerClient: CNLedgerClient,
     store: ValidatorStore,
     validatorUserName: String,
-    walletServiceUser: String,
     domainId: DomainId,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -74,7 +73,6 @@ class HttpValidatorAdminHandler(
         connection,
         store,
         validatorUserName,
-        walletServiceUser,
         domainId,
         retryProvider,
         logger,
@@ -105,7 +103,6 @@ class HttpValidatorAdminHandler(
           connection.submitCommandsNoDedup(
             actAs = Seq(
               store.key.validatorParty,
-              store.key.walletServiceParty,
               PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
             ),
             readAs = Seq.empty,

@@ -129,11 +129,10 @@ template WalletAppInstall
   with
     svcParty : Party
     validatorParty : Party -- The validator operator, who will receive app rewards for the first (locking) leg of payments by this user
-    walletServiceParty : Party
     endUserName : Text -- The participant user name of the end-user
     endUserParty : Party -- The primary party of the end-user
   where
-    signatory walletServiceParty, endUserParty, validatorParty
+    signatory endUserParty, validatorParty
 
     -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
@@ -141,7 +140,7 @@ template WalletAppInstall
         context : API.PaymentTransferContext
         inputs : [API.TransferInput]
         operations : [CoinOperation]
-      controller walletServiceParty
+      controller validatorParty
       do
         accepted <- executeCoinOperationRec endUserParty validatorParty context inputs [] operations
         return $ reverse accepted
@@ -149,25 +148,25 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()
       with
         cid : ContractId AppPaymentRequest
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid AppPaymentRequest_Reject
 
     nonconsuming choice WalletAppInstall_AppPaymentRequest_Expire : ()
       with
         cid : ContractId AppPaymentRequest
-      controller walletServiceParty
+      controller validatorParty
       do expireContractAs endUserParty cid
 
     nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
       with
         cid : ContractId SubscriptionRequest
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid SubscriptionRequest_Reject
 
     nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : ()
       with
         cid : ContractId SubscriptionIdleState
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid SubscriptionIdleState_CancelSubscription
 
     nonconsuming choice WalletAppInstall_CreateTransferOffer : ContractId TransferOffer
@@ -176,7 +175,7 @@ template WalletAppInstall
         amount : PaymentAmount
         description : Text
         expiresAt: Time
-      controller walletServiceParty
+      controller validatorParty
       do
         create TransferOffer with
           sender = endUserParty
@@ -186,41 +185,41 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_TransferOffer_Accept : ContractId AcceptedTransferOffer
       with
         cid : ContractId TransferOffer
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid TransferOffer_Accept
 
     nonconsuming choice WalletAppInstall_TransferOffer_Reject : ()
       with
         cid : ContractId TransferOffer
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid TransferOffer_Reject
 
     nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : ()
       with
         cid : ContractId TransferOffer
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid TransferOffer_Withdraw
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : ()
       with
         cid : ContractId AcceptedTransferOffer
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid $ AcceptedTransferOffer_Abort
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : ()
       with
         cid : ContractId AcceptedTransferOffer
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid $ AcceptedTransferOffer_Withdraw
 
     nonconsuming choice WalletAppInstall_FeaturedAppRights_Cancel : ()
       with
         cid : ContractId FeaturedAppRight
-      controller walletServiceParty
+      controller validatorParty
       do exercise cid $ FeaturedAppRight_Cancel
 
     nonconsuming choice WalletAppInstall_FeaturedAppRights_SelfGrant : ContractId FeaturedAppRight
       with
         coinRulesCid : ContractId CoinRules
-      controller walletServiceParty
+      controller validatorParty
       do exercise coinRulesCid $ CoinRules_DevNet_FeatureApp endUserParty

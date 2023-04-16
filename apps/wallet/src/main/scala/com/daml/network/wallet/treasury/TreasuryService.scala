@@ -369,8 +369,8 @@ class TreasuryService(
       (offset, outcomes) <- connection
         // The only operation that is not self-conflicting is Tap, therefore batch execution w/o command dedup is safe.
         .submitWithResultAndOffsetNoDedup(
-          Seq(walletManager.store.walletKey.walletServiceParty),
-          walletManager.store.walletKey.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+          Seq(walletManager.store.walletKey.validatorParty),
+          userStore.key.endUserParty +: readAs.toSeq,
           cmd,
           domainId,
           disclosedContracts,

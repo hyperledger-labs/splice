@@ -16,8 +16,6 @@ private[validator] object ValidatorUtil {
 
   def installWalletForUser(
       validatorServiceParty: PartyId,
-      walletServiceUser: String,
-      walletServiceParty: PartyId,
       endUserParty: PartyId,
       endUserName: String,
       svcParty: PartyId,
@@ -31,22 +29,20 @@ private[validator] object ValidatorUtil {
       traceContext: TraceContext,
   ): Future[Unit] = {
     logger.debug(
-      s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, walletServiceParty=$walletServiceParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
+      s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
-      _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
       _ <- retryProvider.retryForAutomation(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case result @ QueryResult(_, None) =>
             connection
               .submitCommands(
-                actAs = Seq(validatorServiceParty, walletServiceParty, endUserParty),
+                actAs = Seq(validatorServiceParty, endUserParty),
                 readAs = Seq.empty,
                 commands = new walletCodegen.WalletAppInstall(
                   svcParty.toProtoPrimitive,
                   validatorServiceParty.toProtoPrimitive,
-                  walletServiceParty.toProtoPrimitive,
                   endUserName,
                   endUserParty.toProtoPrimitive,
                 ).create.commands.asScala.toSeq,
@@ -74,7 +70,6 @@ private[validator] object ValidatorUtil {
       connection: CNLedgerConnection,
       store: ValidatorStore,
       validatorUserName: String,
-      walletServiceUser: String,
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -97,8 +92,6 @@ private[validator] object ValidatorUtil {
       _ <- installWalletForUser(
         endUserParty = userPartyId,
         endUserName = endUserName,
-        walletServiceUser = walletServiceUser,
-        walletServiceParty = store.key.walletServiceParty,
         validatorServiceParty = store.key.validatorParty,
         svcParty = store.key.svcParty,
         connection = connection,

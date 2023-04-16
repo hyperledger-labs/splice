@@ -71,15 +71,12 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
 
 object WalletStore {
   case class Key(
-      /** The party used by the wallet service user to act on behalf of it's users. */
-      walletServiceParty: PartyId,
       /** The validator party. */
       validatorParty: PartyId,
       /** The party-id of the SVC issuing CC managed by this wallet. */
       svcParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("walletServiceParty", _.walletServiceParty),
       param("validatorParty", _.validatorParty),
       param("svcParty", _.svcParty),
     )
