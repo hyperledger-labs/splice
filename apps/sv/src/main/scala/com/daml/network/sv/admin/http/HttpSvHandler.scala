@@ -1,9 +1,9 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
+import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.{
   CNLedgerClient,
   CNLedgerConnection,
@@ -392,10 +392,7 @@ class HttpSvHandler(
   private def onboardValidator(
       candidateParty: PartyId,
       secret: String,
-      validatorOnboarding: Contract[
-        cn.validatoronboarding.ValidatorOnboarding.ContractId,
-        cn.validatoronboarding.ValidatorOnboarding,
-      ],
+      validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
   ): Future[Unit] =
     // TODO(#2241) Add check to ensure that a validator can't get onboarded twice
     for {
@@ -494,7 +491,11 @@ class HttpSvHandler(
             for {
               // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
               // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-              _ <- lockSvcRulesAndCoinRules()
+              _ <- retryProvider.retryForClientCalls(
+                "locking SvcRules and CoinRules contracts",
+                lockSvcRulesAndCoinRules(),
+                logger,
+              )
               _ = logger.info(
                 s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
               )
