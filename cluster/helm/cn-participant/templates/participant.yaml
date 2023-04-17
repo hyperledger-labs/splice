@@ -63,25 +63,18 @@ spec:
             memory: 256Mi
           requests:
             memory: 256Mi
-      - name: envoy-proxy-lg-adm-api
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+      - name: json-api
+        image: "{{ .Values.imageRepo }}/json-api:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
-        env:
-        - name: GRPC_ADDRESS
-          value: 127.0.0.1
-        - name: GRPC_PORT
-          value: "5002"
-        - name: GRPC_WEB_PORT
-          value: "6002"
         ports:
-        - containerPort: 6002
-          name: lg-adm-api-gw
+        - containerPort: 7575
+          name: json-api
           protocol: TCP
         resources:
           limits:
-            memory: 256Mi
+            memory: 512Mi
           requests:
-            memory: 256Mi
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -104,6 +97,6 @@ spec:
   - name: lg-api-gw
     port: 6001
     protocol: TCP
-  - name: lg-adm-api-gw
-    port: 6002
+  - name: json-api
+    port: 7575
     protocol: TCP

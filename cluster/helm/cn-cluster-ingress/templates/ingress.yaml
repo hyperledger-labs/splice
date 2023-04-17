@@ -105,9 +105,6 @@ spec:
   - name: val1-lg-api-gw
     port: 6101
     protocol: TCP
-  - name: val1-adm-api-gw
-    port: 6102
-    protocol: TCP
   - name: swd-pub-api
     port: 5108
     protocol: TCP
@@ -128,9 +125,6 @@ spec:
     protocol: TCP
   - name: sw-lg-api-gw
     port: 6201
-    protocol: TCP
-  - name: sw-adm-api-gw
-    port: 6202
     protocol: TCP
   - name: sw-api
     port: 5213
@@ -226,14 +220,8 @@ spec:
         - containerPort: 10113
           name: val1-metrics
           protocol: TCP
-        - containerPort: 7575
-          name: json-api
-          protocol: TCP
         - containerPort: 6101
           name: val1-lg-api-gw
-          protocol: TCP
-        - containerPort: 6102
-          name: val1-adm-api-gw
           protocol: TCP
         - containerPort: 5108
           name: swd-pub-api
@@ -255,9 +243,6 @@ spec:
           protocol: TCP
         - containerPort: 6201
           name: sw-lg-api-gw
-          protocol: TCP
-        - containerPort: 6202
-          name: sw-adm-api-gw
           protocol: TCP
         - containerPort: 5213
           name: sw-api
