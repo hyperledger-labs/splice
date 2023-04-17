@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.{GrpcVersionClient, HttpAdminAppClient}
-import com.daml.network.environment.BuildInfo
+import com.daml.network.config.CNHttpClientConfig.*
+import com.daml.network.environment.{BuildInfo, RetryProvider}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
@@ -18,8 +19,6 @@ import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.daml.network.config.CNHttpClientConfig
-import com.daml.network.environment.RetryProvider
 
 abstract class BaseAppConnection(
     override val timeouts: ProcessingTimeout,
@@ -149,7 +148,7 @@ abstract class AppConnection(
 /** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
   */
 abstract class HttpAppConnection(
-    config: CNHttpClientConfig,
+    config: ClientConfig,
     retryProvider: RetryProvider,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
@@ -163,10 +162,10 @@ abstract class HttpAppConnection(
     with FlagCloseableAsync
     with NamedLogging {
 
-  private def getHttpAppVersionInfo(scanAddress: String): Future[HttpAdminAppClient.VersionInfo] = {
+  private def getHttpAppVersionInfo(url: String): Future[HttpAdminAppClient.VersionInfo] = {
     retryProvider.retryForAutomation(
       "get version",
-      runHttpCmd(scanAddress, HttpAdminAppClient.GetVersion(), List()),
+      runHttpCmd(url, HttpAdminAppClient.GetVersion(), List()),
       logger,
     )
   }

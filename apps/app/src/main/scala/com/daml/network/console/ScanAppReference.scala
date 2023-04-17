@@ -4,12 +4,12 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CNNodeUtil, Contract}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
@@ -191,13 +191,7 @@ final class ScanAppBackendReference(
 
   override protected val instanceType = "Scan Backend"
 
-  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
-    // For local references, we assume that they are reachable on localhost.
-    // TODO (#2019) Reconsider if we want these for local refs at all and if so
-    // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
-    config.clientAdminApi,
-  )
+  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
 
   protected val nodes = cnNodeConsoleEnvironment.environment.scans
 

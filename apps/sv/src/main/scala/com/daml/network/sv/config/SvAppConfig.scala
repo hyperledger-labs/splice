@@ -2,7 +2,6 @@ package com.daml.network.sv.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNHttpClientConfig,
   CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
@@ -82,7 +81,7 @@ case class LocalSvAppConfig(
 }
 
 case class RemoteSvAppConfig(
-    adminApi: CNHttpClientConfig
+    adminApi: ClientConfig
 ) extends RemoteCNNodeConfig {
-  override def clientAdminApi: ClientConfig = adminApi.clientConfig
+  override def clientAdminApi: ClientConfig = adminApi
 }

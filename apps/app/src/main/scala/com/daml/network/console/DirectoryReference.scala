@@ -2,11 +2,11 @@ package com.daml.network.console
 
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
-import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.util.Contract
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -72,13 +72,7 @@ class LocalDirectoryAppReference(
   def config: LocalDirectoryAppConfig =
     consoleEnvironment.environment.config.directoriesByString(name)
 
-  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
-    // For local references, we assume that they are reachable on localhost.
-    // TODO (#2019) Reconsider if we want these for local refs at all and if so
-    // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
-    config.clientAdminApi,
-  )
+  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
 
   protected val nodes = consoleEnvironment.environment.directories
 

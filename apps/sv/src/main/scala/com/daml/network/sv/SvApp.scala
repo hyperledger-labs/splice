@@ -9,7 +9,8 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.CNHttpClientConfig.*
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
@@ -24,7 +25,7 @@ import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
@@ -708,7 +709,7 @@ class SvApp(
     } yield ()
 
   private def requestOnboarding(
-      sponsorConfig: CNHttpClientConfig,
+      sponsorConfig: ClientConfig,
       name: String,
       partyId: PartyId,
       publicKey: String,

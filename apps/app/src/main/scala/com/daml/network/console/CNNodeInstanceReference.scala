@@ -4,9 +4,9 @@ import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.{CNHttpClientConfig, LocalCNNodeConfig}
+import com.daml.network.config.LocalCNNodeConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
-import com.digitalasset.canton.config.{NodeConfig, NonNegativeDuration}
+import com.digitalasset.canton.config.{ClientConfig, NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.commands.{
   HealthAdministration,
   PartiesAdministrationGroup,
@@ -111,7 +111,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   def headers =
     token.map(t => List(Authorization(OAuth2BearerToken(t)))).getOrElse(List.empty[HttpHeader])
 
-  def httpClientConfig: CNHttpClientConfig
+  def httpClientConfig: ClientConfig
 
   override protected[console] def httpCommand[Result](
       httpCommand: HttpCommand[_, Result]
@@ -154,9 +154,14 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   )
   override def topology: TopologyAdministrationGroup = topology_
 
+  private val defaultHealthStatusTimeout: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(2.minute)
+  private val defaultHealthStatusMaxBackoff: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(5.seconds)
+
   override def waitForInitialization(
-      timeout: NonNegativeDuration = httpClientConfig.healthStatusTimeout,
-      maxBackoff: NonNegativeDuration = httpClientConfig.healthStatusMaxBackoff,
+      timeout: NonNegativeDuration = defaultHealthStatusTimeout,
+      maxBackoff: NonNegativeDuration = defaultHealthStatusMaxBackoff,
   ): Unit =
     try {
       ConsoleMacros.utils.retry_until_true(

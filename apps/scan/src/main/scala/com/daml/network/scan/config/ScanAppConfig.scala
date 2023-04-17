@@ -7,7 +7,6 @@ import com.daml.network.config.{
   RemoteCNNodeConfig,
 }
 import com.digitalasset.canton.config.*
-import com.daml.network.config.CNHttpClientConfig
 
 trait BaseScanAppConfig {}
 
@@ -25,11 +24,10 @@ case class ScanAppBackendConfig(
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
-
 }
 
 case class ScanAppClientConfig(
-    adminApi: CNHttpClientConfig,
+    adminApi: ClientConfig,
 
     /** Configures how long clients cache the CoinRules they receive from the ScanApp
       * before rehydrating their cached value. In general, clients have a mechanism to invalidate
@@ -40,5 +38,5 @@ case class ScanAppClientConfig(
     coinRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
 ) extends RemoteCNNodeConfig
     with BaseScanAppConfig {
-  override def clientAdminApi: ClientConfig = adminApi.clientConfig
+  override def clientAdminApi: ClientConfig = adminApi
 }

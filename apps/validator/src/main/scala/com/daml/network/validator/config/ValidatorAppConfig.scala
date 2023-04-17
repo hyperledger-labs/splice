@@ -3,7 +3,6 @@ package com.daml.network.validator.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
-  CNHttpClientConfig,
   CNRemoteParticipantConfig,
   LocalCNNodeConfig,
   RemoteCNNodeConfig,
@@ -65,7 +64,7 @@ case class ValidatorAppBackendConfig(
 }
 
 case class ValidatorAppClientConfig(
-    adminApi: CNHttpClientConfig
+    adminApi: ClientConfig
 ) extends RemoteCNNodeConfig {
-  override def clientAdminApi: ClientConfig = adminApi.clientConfig
+  override def clientAdminApi: ClientConfig = adminApi
 }

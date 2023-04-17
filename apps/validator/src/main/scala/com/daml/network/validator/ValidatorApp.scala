@@ -14,7 +14,8 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.config.{CNHttpClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.wallet.WalletResource
@@ -51,6 +52,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import akka.http.scaladsl.server.directives.BasicDirectives
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.digitalasset.canton.config.ClientConfig
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -191,7 +193,7 @@ class ValidatorApp(
   }
 
   private def requestOnboarding(
-      svConfig: CNHttpClientConfig,
+      svConfig: ClientConfig,
       validatorParty: PartyId,
       secret: String,
   ): Future[Unit] = {

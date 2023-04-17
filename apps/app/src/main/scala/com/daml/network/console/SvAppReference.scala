@@ -2,11 +2,11 @@ package com.daml.network.console
 
 import akka.util.ByteString
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.util.Contract
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -85,14 +85,7 @@ class SvAppBackendReference(
 
   override protected val instanceType = "SV"
 
-  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
-    // For local references, we assume that they are reachable on localhost.
-    // TODO (#2019) Reconsider if we want these for local refs at all and if so
-    // if we should specify a url here. Also remove the "+ 1000" once we
-    // disabled Canton's `CommunityAdminServer`.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
-    config.clientAdminApi,
-  )
+  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
 
   protected val nodes = consoleEnvironment.environment.svs
 

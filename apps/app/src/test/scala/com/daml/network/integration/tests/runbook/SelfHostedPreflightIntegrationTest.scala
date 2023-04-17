@@ -2,6 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import better.files.*
 import com.daml.network.LiveDevNetTest
+import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -146,7 +147,7 @@ class SelfHostedPreflightIntegrationTest
 
     val request = HttpRequest
       .newBuilder()
-      .uri(URI.create(url + "/admin/validator/onboarding/prepare"))
+      .uri(URI.create(s"$url/admin/validator/onboarding/prepare"))
       .header("content-type", "application/json")
       .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
       .build();

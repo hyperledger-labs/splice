@@ -1,7 +1,6 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.config.CNHttpClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAppClient,
@@ -9,6 +8,7 @@ import com.daml.network.validator.admin.api.client.commands.{
   UserInfo,
 }
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -102,13 +102,7 @@ final class ValidatorAppBackendReference(
     )
   }
 
-  override def httpClientConfig = CNHttpClientConfig.fromClientConfig(
-    // For local references, we assume that they are reachable on localhost.
-    // TODO (#2019) Reconsider if we want these for local refs at all and if so
-    // if we should specify a url here.
-    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap}",
-    config.clientAdminApi,
-  )
+  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
 
   protected val nodes = consoleEnvironment.environment.validators
 

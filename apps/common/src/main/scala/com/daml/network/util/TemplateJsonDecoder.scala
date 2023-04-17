@@ -91,7 +91,6 @@ class ResourceTemplateDecoder(
       entityName,
       typeLookup,
     )
-    // TODO(#2019) Switch to native JSON serialization in Java codegen once that has been added.
     val scalaApiValue = LfEngineToApi
       .lfValueToApiValue(verbose = false, lfValue)
       .valueOr(err =>

@@ -415,8 +415,6 @@ object CNNodeConfig {
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
-    implicit val cnNodeHttpClientConfigReader: ConfigReader[CNHttpClientConfig] =
-      deriveReader[CNHttpClientConfig]
     implicit val cnNodeLedgerApiClientConfigReader: ConfigReader[CNLedgerApiClientConfig] =
       deriveReader[CNLedgerApiClientConfig]
     implicit val cnNodeRemoteParticipantConfigReader: ConfigReader[CNRemoteParticipantConfig] =
@@ -526,8 +524,6 @@ object CNNodeConfig {
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
-    implicit val cnNodeHttpClientConfigWriter: ConfigWriter[CNHttpClientConfig] =
-      deriveWriter[CNHttpClientConfig]
     implicit val cnNodeLedgerApiClientConfigWriter: ConfigWriter[CNLedgerApiClientConfig] =
       deriveWriter[CNLedgerApiClientConfig]
     implicit val cnNodeRemoteParticipantConfigWriter: ConfigWriter[CNRemoteParticipantConfig] =

@@ -51,22 +51,20 @@ case class UseToxiproxy(
         extraPortBump: Int,
     ): ScanAppClientConfig = {
       val bump = 20000 + extraPortBump
-      val originalUrl = remoteScanApp.adminApi.url
 
-      val regex = raw"(http:\/\/)(.*):(\d{1,5})".r
-      originalUrl match { // need to grab host & port from the URL since we want to setup a HTTP proxy.
-        case regex(http, host, portStr) =>
-          val oldPort = portStr.toInt
-          val listenPort = oldPort + bump
-          val listen = s"localhost:$listenPort"
-          // need to remove http-prefix for toxiproxy
-          val upstream = s"$host:$oldPort"
-          addProxy(s"${instanceName}-scan-api", listen, upstream)
+      val originalAddress = remoteScanApp.adminApi.address
+      val originalPort = remoteScanApp.adminApi.port
 
-          remoteScanApp.focus(_.adminApi.url).replace(s"$http$listen")
-        case _ => sys.error(s"couldn't parse url $originalUrl")
-      }
+      val listenPort = originalPort + bump
+      val listen = s"localhost:$listenPort"
 
+      // need to remove http-prefix for toxiproxy
+      val (http, host) = (originalAddress.split("://")(0), originalAddress.split("://")(1))
+      val upstream = s"$host:$originalPort"
+
+      addProxy(s"${instanceName}-scan-api", listen, upstream)
+      remoteScanApp.focus(_.adminApi.address).replace(s"$http://localhost")
+      remoteScanApp.focus(_.adminApi.port).replace(listenPort)
     }
 
     val lapiConf =

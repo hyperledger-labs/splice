@@ -2,7 +2,6 @@ package com.daml.network.directory.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNHttpClientConfig,
   CNLedgerApiClientConfig,
   CNRemoteParticipantConfig,
   LocalCNNodeConfig,
@@ -27,8 +26,8 @@ case class LocalDirectoryAppConfig(
 
 case class RemoteDirectoryAppConfig(
     ledgerApiUser: String,
-    adminApi: CNHttpClientConfig,
+    adminApi: ClientConfig,
     ledgerApi: CNLedgerApiClientConfig,
 ) extends RemoteCNNodeConfig {
-  override def clientAdminApi: ClientConfig = adminApi.clientConfig
+  override def clientAdminApi: ClientConfig = adminApi
 }

@@ -10,10 +10,12 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.CNHttpClientConfig
+import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.CNNodeEnvironment
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
+
+import com.digitalasset.canton.config.{ClientConfig, ConsoleCommandTimeout, ProcessingTimeout}
+
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
@@ -53,7 +55,7 @@ class ConsoleHttpCommandRunner(
       instanceName: String,
       command: HttpCommand[_, Result],
       headers: List[HttpHeader],
-      clientConfig: CNHttpClientConfig,
+      clientConfig: ClientConfig,
   ): ConsoleCommandResult[Result] =
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
       span.setAttribute("instance_name", instanceName)
@@ -64,7 +66,6 @@ class ConsoleHttpCommandRunner(
       )
       val commandTimeout = commandTimeouts.bounded
 
-      // TODO(#2019): after all apps are HTTP-only, construct host from clientConfig.address + clientConfig.port. Then we can drop CNHttpClientConfig.
       implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) => {
         val host = request.uri.authority.host.address()
         val port = request.uri.effectivePort

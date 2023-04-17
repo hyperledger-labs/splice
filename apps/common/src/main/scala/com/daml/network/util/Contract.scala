@@ -68,8 +68,6 @@ final case class Contract[TCid, T](
       templateId =
         s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",
       contractId = contractId.contractId,
-      // TODO(#2019) Improve conversion between JSON libraries
-      // once we switched to the native JSON encoding in the Java codegen.
       payload = circe
         .parse(
           ApiCodecCompressed

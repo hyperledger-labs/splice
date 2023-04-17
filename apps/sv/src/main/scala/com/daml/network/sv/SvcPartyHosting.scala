@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.{RemoteSvAppConfig, SvBootstrapConfig}
