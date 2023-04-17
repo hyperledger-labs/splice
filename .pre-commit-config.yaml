@@ -27,4 +27,5 @@ repos:
         name: typescriptfmt
         language: system
         entry: "bash -c 'cd apps; npm run fix --workspaces --if-present'"
+        files: '^apps/'
         types_or: [javascript, jsx, ts, tsx]
