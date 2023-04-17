@@ -393,6 +393,35 @@ testRequiredNumOfConfirmationInDevNet = do
 
   pure ()
 
+testConfirmationExpiry : Script ()
+testConfirmationExpiry = do
+  (app, svc, (sv1, _, _, _)) <- initCollective(False)
+  -- we now have a collective with BFT for f = 1, and sv1 is the leader
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- create a single confirmation which will not suffice to initiate an action
+  svConfirmationCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+    confirmer = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_AddMember $ SvcRules_AddMember with
+        newMemberParty = svX
+        newMemberName = "svX"
+        reason = "because"
+
+  -- leader tries to expire the confirmation, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+  -- wait for the confirmation TTL to pass
+  passTime (minutes 5)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
 
 testLockAndUnlockSvcRulesCoinRules: Script ()
 testLockAndUnlockSvcRulesCoinRules = do
@@ -450,6 +479,7 @@ initCollective isDevNet = do
   let config = SvcRulesConfig with
         numUnclaimedRewardsThreshold = 5
         svOnboardingTimeout = hours 24
+        actionConfirmationTimeout = minutes 5
         svConfirmedTimeout = hours 24
         cometBftConfigLimits = CometBft.defaultNetworkConfigLimits
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []

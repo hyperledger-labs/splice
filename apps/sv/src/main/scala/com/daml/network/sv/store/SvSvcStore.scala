@@ -460,6 +460,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.targetClosesAt
     )
 
+  /** List stale confirmations past their expiresAt */
+  def listStaleConfirmations
+      : ListExpiredContracts[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.svcrules.Confirmation.COMPANION)(
+      _.expiresAt
+    )
+
   private def lookupSvOnboardingByCandidatePartyWithOffset(
       candidateParty: PartyId
   ): Future[

@@ -15,6 +15,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.{Contract, SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -25,6 +26,7 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
+import scala.math.pow
 import java.math.RoundingMode
 import java.time.{Duration, Instant}
 import scala.concurrent.duration.*
@@ -801,6 +803,87 @@ class SvTimeBasedIntegrationTest
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )
+  }
+
+  "expire stale `Confirmation` contracts" in { implicit env =>
+    clue("Initialize SVC with 4 SVs") {
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+        _.start()
+      )
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+        _.waitForInitialization()
+      )
+      getSvcRules().data.members should have size 4
+    }
+    clue(
+      "Stop three SVs so that actions can't gather enough confirmations"
+    ) {
+      sv2.stop()
+      sv3.stop()
+      sv4.stop()
+      getSvcRules().data.members should have size 4
+      // We now need 3 confirmations to execute an action, but only sv1 is active.
+    }
+
+    clue(
+      "Sync with background automation that onboards validator"
+    ) {
+      eventually()({
+        val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+        rounds should have size 3
+      })
+    }
+
+    val confirmationCid = actAndCheck(
+      "Wait for one tick",
+      advanceTime(java.time.Duration.ofSeconds(160)),
+    )(
+      "Find confirmation (for issuing rounds)",
+      _ => {
+        val contractList = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
+          .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
+        contractList should have length 1
+        contractList(0).id
+      },
+    )
+
+    val bufferDurationInSeconds = 20
+
+    actAndCheck(
+      "Wait for Confirmation TTL to elapse",
+      advanceTime(
+        java.time.Duration.ofSeconds(
+          (SvUtil
+            .defaultSvcRulesConfig()
+            .actionConfirmationTimeout
+            .microseconds / pow(10, 6)).toLong
+            + bufferDurationInSeconds
+        )
+      ),
+    )(
+      "The Confirmation expires and is archived",
+      _ => {
+        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
+          .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
+          .filter(_.id == confirmationCid) should have length 0
+      },
+    )
+
+    actAndCheck(
+      "Wait for one polling period",
+      advanceTimeByPollingInterval(sv1),
+    )(
+      "Find new confirmation (for issuing rounds)",
+      _ => {
+        val contractList = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
+          .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
+        contractList should have length 1
+      },
+    )
+
   }
 
   private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {

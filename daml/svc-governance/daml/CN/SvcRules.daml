@@ -106,7 +106,7 @@ template Confirmation with
     svc : Party
     confirmer : Party
     action : ActionRequiringConfirmation
-    -- TODO(M3-46): add expiry
+    expiresAt : Time
   where
     -- As for 'ElectionRequest' we only make the 'svc' a signatory.
     signatory svc
@@ -140,8 +140,9 @@ template AgreedCoinPrice
 -- TODO(M3-46): support changing the config
 data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
-    svOnboardingTimeout : RelTime -- ^ The time after contracts representing an incomplete onboarding are archived.
-    svConfirmedTimeout : RelTime -- ^ The time after contracts representing a SV confirmation are archived.
+    svOnboardingTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
+    actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
+    svConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
     cometBftConfigLimits : CometBft.NetworkConfigLimits
     -- ^ Limits to enforce on the members' CometBft.SvNodeConfig's
   deriving (Eq, Show)
@@ -334,10 +335,13 @@ template SvcRules with
       do
         requireUnlocked lock
         require "Confirmer is a collective member" (confirmer `Map.member` members)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.actionConfirmationTimeout
         create Confirmation with
           svc
           confirmer
           action
+          expiresAt
 
     nonconsuming choice SvcRules_ExecuteConfirmedAction : ()
       with
@@ -570,6 +574,16 @@ template SvcRules with
       do
         requireUnlocked lock
         exercise coinRulesCid CoinRules_MiningRound_Close with ..
+
+    nonconsuming choice SvcRules_ExpireStaleConfirmation : ()
+      with
+        staleConfirmationCid : ContractId Confirmation
+      controller leader
+      do
+        now <- getTime
+        staleConfirmation <- fetch staleConfirmationCid
+        require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        archive staleConfirmationCid
 
 
     -- Lock or Unlock Choices that could be observed by SVC
