@@ -1051,7 +1051,9 @@ jobs:
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
-            scripts/start-postgres-for-preflight.sh # needed for SV bootstrapping preflight check
+            # needed for SV bootstrapping preflight check
+            # TODO(#3560) remove the `|| true` once all clusters have this script
+            scripts/start-postgres-for-preflight.sh || true
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
           cmd: "\"apps-app/testOnly *PreflightIntegrationTest\""
