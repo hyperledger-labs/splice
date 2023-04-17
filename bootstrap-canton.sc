@@ -36,7 +36,7 @@ def createUser(
     id = user,
     actAs = Set(party) ++ additionalActAsParties,
     primaryParty = Some(party),
-    readAs = Set(),
+    readAs = readAsParties,
     participantAdmin = true,
   )
   party
@@ -47,6 +47,7 @@ Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
+  (splitwellParticipant, "splitwell_provider"),
   (svcParticipant, "sv1_validator_user"),
 ).foreach { case (participant, user) =>
   createUser(participant, user)
@@ -61,6 +62,8 @@ Seq(
 ).foreach { user =>
   createUser(svcParticipant, user, additionalActAsParties = Set(svcParty))
 }
+
+createUser(sv5Participant, "sv5", readAsParties = Set(svcParty))
 
 svcParticipant.ledger_api.users.create(
   id = "directory_provider",
