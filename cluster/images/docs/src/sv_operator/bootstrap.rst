@@ -27,8 +27,10 @@ Assuming that you have extended the ``examples/sv/sv-participant.conf`` to match
   DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/sv/sv-participant.conf --bootstrap examples/sv/sv-participant.sc
 
 ..
-  For manually running this runbook using the PostgreSQL setup from `./start-canton.sh`: run
-  `./start-canton.sh` followed by `pkill -f simple-topology-canton` (this leaves only the postgres stuff running).
+  For manually running this runbook using the same PostgreSQL setup we use for `./start-canton.sh`, run:
+  ```
+  scripts/start-postgres-for-preflight.sh
+  ```
   Then run the canton command above, appending the following to the end ($REPO_ROOT should point to the root of our repo):
   ```
   --config $REPO_ROOT/apps/app/src/test/resources/include/storage-postgres.conf --config $REPO_ROOT/apps/app/src/test/resources/include/self-hosted-sv-participant-postgres-storage.conf

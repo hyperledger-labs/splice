@@ -7,6 +7,7 @@ import com.daml.network.console.{
   SplitwellAppBackendReference,
   SplitwellAppClientReference,
   SvAppBackendReference,
+  SvAppClientReference,
   SvcAppBackendReference,
   SvcAppClientReference,
   ValidatorAppBackendReference,
@@ -46,6 +47,8 @@ trait CommonCNNodeAppInstanceReferences {
   def sv4(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
 
   def sv5(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv5")
+
+  def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = svcl("sv1")
 
   def scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference =
     env.scans.local.headOption.getOrElse(
@@ -167,6 +170,11 @@ trait CommonCNNodeAppInstanceReferences {
 
   def svb(name: String)(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference =
     env.svs.local
+      .find(_.name == name)
+      .getOrElse(sys.error(s"sv [$name] not configured"))
+
+  def svcl(name: String)(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference =
+    env.svs.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"sv [$name] not configured"))
 

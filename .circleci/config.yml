@@ -1050,7 +1050,9 @@ jobs:
           cmd_retry_count: 2
       - execute_sbt_command:
           pre_sbt_cmd: |
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars &&
+            set -eou pipefail
+            scripts/start-postgres-for-preflight.sh # needed for SV bootstrapping preflight check
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
           cmd: "\"apps-app/testOnly *PreflightIntegrationTest\""
           post_sbt_cmd: ./stop-frontends.sh
