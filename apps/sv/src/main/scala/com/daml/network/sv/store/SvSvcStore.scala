@@ -64,7 +64,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       : Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
-  def getSvcRules(): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
+  def getSvcRules(
+  ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
       _.getOrElse(
         throw new StatusRuntimeException(

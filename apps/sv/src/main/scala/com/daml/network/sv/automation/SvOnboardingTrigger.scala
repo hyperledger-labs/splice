@@ -59,12 +59,13 @@ class SvOnboardingTrigger(
     )
   )
 
-  override def completeTask(
+  private def attemptConfirmation(
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
       svOnboarding: ReadyContract[
         SvOnboarding.ContractId,
         SvOnboarding,
-      ]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+      ],
+  )(): Future[TaskOutcome] = {
     for {
       approval <- SvApp
         .isApprovedSvIdentity(
@@ -76,6 +77,7 @@ class SvOnboardingTrigger(
       (party, name) <- approval match {
         case Left(reason) => {
           // we fail so that the task is retried; it's possible that an approval happens eventually
+          // TODO(#4073) Add a warning log
           Future.failed(
             Status.NOT_FOUND
               .withDescription(s"Could not match with an approved SV identity; reason: $reason")
@@ -84,7 +86,6 @@ class SvOnboardingTrigger(
         }
         case Right((party, name)) => Future.successful((party, name))
       }
-      svcRules <- svcStore.getSvcRules()
       outcome <-
         if (SvApp.isSvcMember(name, party, svcRules)) {
           Future.successful(
@@ -106,6 +107,41 @@ class SvOnboardingTrigger(
           )
         } else {
           confirm(party, name, svOnboarding.contract.payload.token, svcRules, svOnboarding.domain)
+        }
+    } yield outcome
+  }
+
+  override def completeTask(
+      svOnboarding: ReadyContract[
+        SvOnboarding.ContractId,
+        SvOnboarding,
+      ]
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    for {
+      svcRules <- svcStore.getSvcRules()
+      isPartyOnboardingConfirmed <- svcStore
+        .lookupSvConfirmedByParty(
+          PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)
+        )
+        .flatMap(optionalConfirmation => Future(optionalConfirmation.isDefined))
+      outcome <-
+        if (
+          svParty == PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)
+        ) {
+          Future.successful(
+            TaskSuccess(
+              s"skipping as SV is the same as the one executing the trigger, with party ID $svParty"
+            )
+          )
+        } else if (isPartyOnboardingConfirmed) {
+          Future.successful(
+            TaskSuccess(
+              s"skipping as onboarding is already confirmed for SV ${PartyId
+                  .tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)}"
+            )
+          )
+        } else {
+          attemptConfirmation(svcRules, svOnboarding)()
         }
     } yield outcome
   }
