@@ -249,6 +249,7 @@ template CoinRules
     configSchedule : Schedule Time (CoinConfig USD)
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
+    lock : Bool
   where
     ensure validSchedule configSchedule validCoinConfig
 
@@ -275,6 +276,7 @@ template CoinRules
         extraTraffic : Decimal
       controller validator
       do
+        requireUnlocked lock
         traffic <- fetch trafficCid
         require "validator party and ValidatorTraffic match" (validator == traffic.validator)
         require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
@@ -311,6 +313,7 @@ template CoinRules
         openRound: ContractId OpenMiningRound
       controller svc, receiver
       do
+        requireUnlocked lock
         openRound <- fetch openRound
         let transferConfigCC = transferConfigCCFromOpenRound openRound
             expiringAmount = ExpiringAmount with
@@ -332,16 +335,20 @@ template CoinRules
         amount: Decimal
         openRound: ContractId OpenMiningRound
       controller receiver
-      do require "isDevNet flag is true" isDevNet
-         requireChoiceIsEnabled "CoinRules_DevNet_Tap" (\c -> c.enable_CoinRules_DevNet_Tap) (view $ toInterface @API.CoinRules this)
-         exercise self CoinRules_Mint with ..
+      do
+        requireUnlocked lock
+        require "isDevNet flag is true" isDevNet
+        requireChoiceIsEnabled "CoinRules_DevNet_Tap" (\c -> c.enable_CoinRules_DevNet_Tap) (view $ toInterface @API.CoinRules this)
+        exercise self CoinRules_Mint with ..
 
     nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
       with
         provider : Party
       controller provider
-      do require "isDevNet flag is true" isDevNet
-         create FeaturedAppRight with svc; provider
+      do
+        requireUnlocked lock
+        require "isDevNet flag is true" isDevNet
+        create FeaturedAppRight with svc; provider
 
     -- Bootstrap the open mining rounds by creating
     -- - one immediately open-mining-round with 1 tick left
@@ -354,6 +361,7 @@ template CoinRules
         coinPrice : Decimal
       controller svc
       do
+        requireUnlocked lock
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
@@ -393,6 +401,7 @@ template CoinRules
         latestRoundCid : ContractId OpenMiningRound
       controller svc
       do
+        requireUnlocked lock
         roundToArchive <- fetch roundToArchiveCid
         middleRound <- fetch middleRoundCid
         latestRound <- fetch latestRoundCid
@@ -440,6 +449,7 @@ template CoinRules
         summary : OpenMiningRoundSummary
       controller svc
       do
+        requireUnlocked lock
         -- archive summarizing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
@@ -481,6 +491,7 @@ template CoinRules
         issuingRoundCid : ContractId IssuingMiningRound
       controller svc
       do
+        requireUnlocked lock
         -- archive issuing mining round
         now <- getTime
         issuingRound <- fetch issuingRoundCid
@@ -502,6 +513,7 @@ template CoinRules
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
+        requireUnlocked lock
         -- archive closed mining round
         miningRound <- fetch closedRoundCid
         archive closedRoundCid
@@ -516,6 +528,7 @@ template CoinRules
         appCouponCids : [ContractId AppRewardCoupon]
       controller svc
       do
+        requireUnlocked lock
         -- retrieve round
         closedRound <- fetch closedRoundCid
         require "SVC matches" (closedRound.svc == svc)
@@ -549,6 +562,7 @@ template CoinRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
       controller svc
       do
+        requireUnlocked lock
         require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
 
         -- fetch and archive all given rewards
@@ -570,22 +584,50 @@ template CoinRules
       with
         p : Party
       controller p
-      do pure (self, this)
+      do
+        requireUnlocked lock
+        pure (self, this)
 
     choice CoinRules_SetEnabledChoices : ContractId CoinRules
       with
         newEnabledChoices : API.EnabledChoices
       controller svc
-      do create this with enabledChoices = newEnabledChoices
+      do
+        requireUnlocked lock
+        create this with enabledChoices = newEnabledChoices
 
     choice CoinRules_SetConfigSchedule : ContractId CoinRules
       with
         newConfigSchedule : Schedule Time (CoinConfig USD)
       controller svc
-      do forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
-           now <- getTime
-           require "Next change is not scheduled in the future" (now < t)
-         create this with configSchedule = newConfigSchedule
+      do
+        requireUnlocked lock
+        forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
+          now <- getTime
+          require "Next change is not scheduled in the future" (now < t)
+        create this with configSchedule = newConfigSchedule
+
+
+    -- Lock or Unlock Choices that could be observed by SVC
+    -------------------------------------------------------
+
+    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
+    choice CoinRules_Lock : ContractId CoinRules
+      controller svc
+      do
+        require "it is currently not locked" (not lock)
+        create CoinRules with
+          lock = True
+          ..
+
+    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
+    choice CoinRules_Unlock : ContractId CoinRules
+      controller svc
+      do
+        require "It is currently locked" lock
+        create CoinRules with
+          lock = False
+          ..
 
 
 -- Transfer logic

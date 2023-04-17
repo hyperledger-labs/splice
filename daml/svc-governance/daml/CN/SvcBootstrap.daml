@@ -40,11 +40,13 @@ template SvcBootstrap with
           leader = founderParty
           config
           isDevNet
+          lock = False
         coinRulesCid <- create CoinRules with
           svc
           configSchedule = coinConfigSchedule
           enabledChoices
           isDevNet
+          lock = False
         _ <- create AgreedCoinPrice with
           svc
           coinPrice

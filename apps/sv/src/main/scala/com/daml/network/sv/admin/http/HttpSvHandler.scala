@@ -492,11 +492,30 @@ class HttpSvHandler(
               ),
           participantId =>
             for {
+              // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
+              // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
+              _ <- lockSvcRulesAndCoinRules()
+              _ = logger.info(
+                s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
+              )
+
+              // this will wait until the PartyToParticipant state change completed
               authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
                 globalDomain,
                 participantId,
                 RequestSide.From,
               )
+
+              _ <- retryProvider.retryForClientCalls(
+                "unlocking SvcRules and CoinRules contracts",
+                unlockSvcRulesAndCoinRules(),
+                logger,
+              )
+
+              _ = logger.info(
+                s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
+              )
+
               acsBytes <- participantAdminConnection.downloadAcsSnapshot(
                 Set(svcParty),
                 filterDomainId = globalDomain.toProtoPrimitive,
@@ -507,4 +526,26 @@ class HttpSvHandler(
             } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded),
         )
     }
+
+  private def lockSvcRulesAndCoinRules() = for {
+    svcRules <- svcStore.getSvcRules()
+    coinRules <- svcStore.getCoinRules()
+    res <- ledgerConnection.submitWithResultNoDedup(
+      Seq(svParty),
+      Seq(svcParty),
+      svcRules.contractId.exerciseSvcRules_Lock(svParty.toProtoPrimitive, coinRules.contractId),
+      globalDomain,
+    )
+  } yield res
+
+  private def unlockSvcRulesAndCoinRules() = for {
+    svcRules <- svcStore.getSvcRules()
+    coinRules <- svcStore.getCoinRules()
+    res <- ledgerConnection.submitWithResultNoDedup(
+      Seq(svParty),
+      Seq(svcParty),
+      svcRules.contractId.exerciseSvcRules_Unlock(svParty.toProtoPrimitive, coinRules.contractId),
+      globalDomain,
+    )
+  } yield res
 }

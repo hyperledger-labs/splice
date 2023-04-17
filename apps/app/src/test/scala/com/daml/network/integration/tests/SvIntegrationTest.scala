@@ -20,14 +20,17 @@ import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
   TopologyChangeOp,
 }
+import org.slf4j.event.Level
 
 import java.time.Instant
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
@@ -35,6 +38,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
+
+  private val svcGovernanceDarPath =
+    "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -649,6 +655,50 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       }
   }
 
+  "sponsor participant is protected from crashing when command is submitted during PartyToParticipant state changes" in {
+    implicit env =>
+      // ensure the SVC is initialized, so there are some contracts in the name of the SVC party
+      initSvc()
+
+      val sv5Participant = sv5.remoteParticipant
+      val svcParticipant = svc.remoteParticipant
+
+      sv5Participant.ledger_api.packages.upload_dar(svcGovernanceDarPath)
+
+      val svcParty = svcClient.getDebugInfo().svcParty
+
+      svcParticipant.ledger_api.acs.of_party(svcParty) should not be empty
+      sv5Participant.ledger_api.acs.of_party(svcParty) shouldBe empty
+
+      clue("send mint commands to svc participant while sv5 is starting") {
+        val svcStartF =
+          Future {
+            // SV5 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
+            sv5.startSync()
+          }(env.executionContext)
+
+        // we should see error logs that svc participant rejects commands while authorization is in progress
+        // the participant is not crashed by those command
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+          {
+            eventually() {
+              noException should be thrownBy {
+                (0 to 30).foreach(_ => svcTap(svcParticipant, 1.0))
+              }
+            }
+          },
+          entries => {
+            forAtLeast(1, entries) { line =>
+              line.message should include(
+                "The requirement 'Contract is not locked' was not met."
+              )
+            }
+          },
+        )
+        svcStartF.futureValue
+      }
+  }
+
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
     BigDecimal(amount).bigDecimal,
     new cc.api.v1.round.Round(0L),
@@ -671,6 +721,31 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       readAs = Seq.empty,
       update = coin(amount, svcParty).create,
     )
+
+  private def svcTap(
+      participant: CNRemoteParticipantReference,
+      amount: Double,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val openRound = participant.ledger_api_extensions.acs
+      .filterJava(cc.round.OpenMiningRound.COMPANION)(
+        svcParty,
+        _.data.opensAt.isBefore(Instant.now),
+      )
+      .maxBy(_.data.round.number)
+    val coinRules = participant.ledger_api_extensions.acs
+      .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+      .head
+    participant.ledger_api_extensions.commands.submitWithResult(
+      svc.config.ledgerApiUser,
+      actAs = Seq(svcParty),
+      readAs = Seq.empty,
+      update = coinRules.id.exerciseCoinRules_DevNet_Tap(
+        svcParty.toProtoPrimitive,
+        BigDecimal(amount).bigDecimal,
+        openRound.id,
+      ),
+    )
+  }
 
   def getCoins(
       participant: CNRemoteParticipantReference,

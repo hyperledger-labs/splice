@@ -57,6 +57,7 @@ setupApp = do
     configSchedule = defaultCoinConfigSchedule
     enabledChoices = API.enableAllChoices
     isDevNet = True
+    lock = False
     ..
 
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with

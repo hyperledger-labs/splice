@@ -394,6 +394,41 @@ testRequiredNumOfConfirmationInDevNet = do
   pure ()
 
 
+testLockAndUnlockSvcRulesCoinRules: Script ()
+testLockAndUnlockSvcRulesCoinRules = do
+  (app, svc, (_, sv2, _, _)) <- initDevNetCollective
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(coinRulesCid, _)] <- query @CoinRules svc
+
+  -- lock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sponsor = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "because")
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMultiMustFail [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  -- unlock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sponsor = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "because")
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMulti [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  pure ()
+
+
 -- Utils
 --------
 
