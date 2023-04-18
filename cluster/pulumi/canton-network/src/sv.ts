@@ -2,10 +2,7 @@ import * as k8s from "@pulumi/kubernetes";
 
 import * as postgres from "./postgres";
 
-import {
-  auth0UserNameEnvVar,
-  installAuth0Secret,
-} from "./auth0";
+import { auth0UserNameEnvVar, installAuth0Secret } from "./auth0";
 
 import { exactNamespace, installCNHelmChart } from "./utils";
 import { installDomain, installParticipant } from "./ledger";
@@ -141,10 +138,7 @@ export function installSVC(): k8s.helm.v3.Release {
 export function installSvNode(svc: k8s.helm.v3.Release, nodename: string) {
   const xns = exactNamespace(nodename);
 
-    const dependsOn = [
-        svc,
-        installAuth0Secret(xns, "sv", nodename),
-    ];
+  const dependsOn = [svc, installAuth0Secret(xns, "sv", nodename)];
 
   installCNHelmChart(
     xns,

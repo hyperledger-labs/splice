@@ -65,9 +65,7 @@ export function installSplitwell(
     "cn-validator",
     {
       postgres: postgresDb,
-      additionalUsers: [
-        auth0UserNameEnvVar("splitwell"),
-      ],
+      additionalUsers: [auth0UserNameEnvVar("splitwell")],
       additionalConfig: [
         "  canton.validator-apps.validator_backend.app-instances.splitwise = {",
         "    service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}",

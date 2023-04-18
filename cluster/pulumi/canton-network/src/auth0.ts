@@ -44,12 +44,14 @@ function getAuth0(): Promise<Auth0SecretMap> {
     },
   })
     .then((response) => {
-        if (response.ok) {
-            return response.json();
-        }
+      if (response.ok) {
+        return response.json();
+      }
 
-        console.error("Error fetching secrets from Auth0: " + response.statusText);
-        process.exit(1);
+      console.error(
+        "Error fetching secrets from Auth0: " + response.statusText
+      );
+      process.exit(1);
     })
     .then((data: any) => {
       const secrets = new Map() as Auth0SecretMap;

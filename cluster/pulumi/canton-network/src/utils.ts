@@ -124,7 +124,7 @@ export function installCNHelmChart(
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
-        dependsOn: dependsOn.concat([xns.ns]),
+      dependsOn: dependsOn.concat([xns.ns]),
     }
   );
 }
