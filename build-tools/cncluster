@@ -1106,6 +1106,8 @@ function subcmd_papply() {
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
+    make -C "${REPO_ROOT}" cluster/helm/build
+
     # Use the existing secret to populate the secret needed in the
     # ingress namespace. Eventually, the secret management will be
     # done in Pulumi.
@@ -1141,6 +1143,8 @@ function subcmd_ppreview() {
         IMAGE_TAG=$1
        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
+
+    make -C "${REPO_ROOT}" cluster/helm/build
 
     # Use the existing secret to populate the secret needed in the
     # ingress namespace. Eventually, the secret management will be
