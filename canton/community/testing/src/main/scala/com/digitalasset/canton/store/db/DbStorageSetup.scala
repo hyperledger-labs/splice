@@ -176,7 +176,7 @@ class PostgresCISetup(
                 // it has already been created and a duplicate database error is thrown.
                 // We can safely ignore this error.
                 case ex: PSQLException
-                    if ex.getSQLState == "42P04" => // 42P04 means "duplicate_database" (source: https://www.postgresql.org/docs/current/errcodes-appendix.html)
+                    if ex.getSQLState == "23505" => // 23505 means "unique_violation" (source: https://www.postgresql.org/docs/current/errcodes-appendix.html)
                   ()
               }
           } else Future.unit
@@ -205,7 +205,7 @@ class PostgresTestContainerSetup(
   override protected def prepareDatabase(): Unit = {
     // up the connection limit to deal with everyone using connection pools in tests that can run concurrently.
     // we also have a matching max connections limit set in the CircleCI postgres executor (`.circle/config.yml`)
-    val command = postgresContainer.getCommandParts.toSeq :+ "-c" :+ "max_connections=1000"
+    val command = postgresContainer.getCommandParts.toSeq :+ "-c" :+ "max_connections=500"
     postgresContainer.setCommandParts(command.toArray)
     noTracingLogger.debug(s"Starting postgres container with $command")
 

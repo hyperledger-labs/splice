@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.admin.v0.InitializationServiceGrpc
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.empty.Empty
 
 import java.time.{Clock as JClock, Duration, Instant}
@@ -362,6 +363,9 @@ class SimClock(
   }
 
   override def toString: String = s"SimClock($now)"
+
+  @VisibleForTesting
+  def numberOfScheduledTasks: Int = tasks.size()
 }
 
 class RemoteClock(

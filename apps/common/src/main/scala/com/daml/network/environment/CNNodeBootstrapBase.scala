@@ -57,9 +57,8 @@ trait CNNodeBootstrap[+Node <: CantonNode]
   def getNode: Option[Node]
 
   // TODO(#736): following methods are only here because of the CantonNodeBootstrap trait
-  def initializeWithProvidedId(id: NodeId): EitherT[Future, String, Unit] = initialize
   def getId: Option[NodeId] = None
-  def crypto: Crypto = ???
+  def crypto: Option[Crypto] = ???
 
 }
 

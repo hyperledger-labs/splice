@@ -158,10 +158,9 @@ trait LedgerApiExtensions {
       object users {
         def getPrimaryParty(userId: String) = {
           val user = ledgerApi.ledger_api.users.get(userId)
-          val primaryParty = user.primaryParty.getOrElse(
+          user.primaryParty.getOrElse(
             throw new RuntimeException(s"User $userId has no primary party")
-          );
-          PartyId.tryFromLfParty(primaryParty)
+          )
         }
       }
 

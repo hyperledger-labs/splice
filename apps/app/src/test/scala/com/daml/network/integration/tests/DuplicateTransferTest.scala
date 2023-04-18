@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.digitalasset.canton.{DomainAlias, LfTimestamp}
-import com.digitalasset.canton.topology.PartyId
 
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TracerProvider
@@ -43,11 +42,9 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
   }
 
   "duplicate transfer in" in { implicit env =>
-    val alice = PartyId.tryFromLfParty(
-      aliceValidator.remoteParticipantWithAdminToken.ledger_api.parties
-        .allocate(aliceWallet.config.ledgerApiUser, aliceWallet.config.ledgerApiUser)
-        .party
-    )
+    val alice = aliceValidator.remoteParticipantWithAdminToken.ledger_api.parties
+      .allocate(aliceWallet.config.ledgerApiUser, aliceWallet.config.ledgerApiUser)
+      .party
     Using.resource(
       new CNLedgerClient(
         config = aliceValidator.remoteParticipantWithAdminToken.config.ledgerApi,

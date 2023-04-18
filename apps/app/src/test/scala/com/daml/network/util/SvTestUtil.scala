@@ -22,9 +22,7 @@ trait SvTestUtil extends CNNodeTestCommon {
 
   def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
-    PartyId
-      .fromLfParty(svc.remoteParticipant.ledger_api.parties.allocate(s"$name-$id", name).party)
-      .value
+    svc.remoteParticipant.ledger_api.parties.allocate(s"$name-$id", name).party
   }
 
   def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {

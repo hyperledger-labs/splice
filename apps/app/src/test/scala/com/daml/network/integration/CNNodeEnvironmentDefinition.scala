@@ -25,7 +25,6 @@ import monocle.macros.syntax.lens.*
 import org.scalatest.matchers.should.Matchers
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.topology.PartyId
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CNNodeEnvironmentDefinition(
@@ -63,12 +62,9 @@ case class CNNodeEnvironmentDefinition(
       this.preSetup(env)
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
-        val svcParty =
-          PartyId.tryFromLfParty(
-            svc.remoteParticipantWithAdminToken.ledger_api.parties
-              .allocate(svc.config.ledgerApiUser, svc.config.ledgerApiUser)
-              .party
-          )
+        val svcParty = svc.remoteParticipantWithAdminToken.ledger_api.parties
+          .allocate(svc.config.ledgerApiUser, svc.config.ledgerApiUser)
+          .party
         svc.remoteParticipantWithAdminToken.ledger_api.users.create(
           id = svc.config.ledgerApiUser,
           actAs = Set(svcParty),
@@ -77,12 +73,9 @@ case class CNNodeEnvironmentDefinition(
           participantAdmin = true,
         )
         svs.local.foreach(sv => {
-          val svParty =
-            PartyId.tryFromLfParty(
-              sv.remoteParticipantWithAdminToken.ledger_api.parties
-                .allocate(sv.config.ledgerApiUser, sv.config.ledgerApiUser)
-                .party
-            )
+          val svParty = sv.remoteParticipantWithAdminToken.ledger_api.parties
+            .allocate(sv.config.ledgerApiUser, sv.config.ledgerApiUser)
+            .party
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs = sv.config.bootstrap match {
@@ -269,12 +262,9 @@ object CNNodeEnvironmentDefinition {
     env.coinNodes.local.foreach(_.waitForInitialization())
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
-    val validatorParty =
-      PartyId.tryFromLfParty(
-        validator.remoteParticipantWithAdminToken.ledger_api.parties
-          .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
-          .party
-      )
+    val validatorParty = validator.remoteParticipantWithAdminToken.ledger_api.parties
+      .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
+      .party
     validator.remoteParticipantWithAdminToken.ledger_api.users.create(
       id = validator.config.ledgerApiUser,
       actAs = Set(validatorParty),

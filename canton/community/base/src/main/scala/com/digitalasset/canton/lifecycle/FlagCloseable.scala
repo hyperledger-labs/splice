@@ -77,14 +77,15 @@ trait FlagCloseable extends AutoCloseable {
       task: RunOnShutdown
   )(implicit traceContext: TraceContext): Unit = {
     // TODO(#8774) improve shutdown task merging (use thread safe linked list to avoid O(N) filter)
-    // Changed from Canton which prepends instead of appending
-    onShutdownTasks.updateAndGet { seq => seq.filterNot(_.done) :+ task }.discard
+    onShutdownTasks.updateAndGet { seq => task +: seq.filterNot(_.done) }.discard
     if (isClosing) runOnShutdownTasks()
   }
 
   private def runOnShutdownTasks()(implicit traceContext: TraceContext): Unit = {
     val tasks = onShutdownTasks.getAndSet(List())
-    tasks.foreach { task =>
+    // We reverse here to not pay the costs of the linear append
+    // on each call to runOnShutdown, while still running the tasks in the order they were added.
+    tasks.reverse.foreach { task =>
       if (!task.done) {
         Try { task.run() }.fold(
           t => logger.warn(s"Task ${task.name} failed on shutdown!", t),

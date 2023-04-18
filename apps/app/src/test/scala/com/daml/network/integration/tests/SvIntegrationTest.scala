@@ -95,8 +95,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       initSvc()
       svs.foreach(sv => {
         val rights = sv.remoteParticipant.ledger_api.users.rights.list(sv.config.ledgerApiUser)
-        rights.actAs should not contain (svcParty.toLf)
-        rights.readAs should contain(svcParty.toLf)
+        rights.actAs should not contain svcParty
+        rights.readAs should contain(svcParty)
       })
       actAndCheck(
         "creating a `ValidatorOnboarding` contract readable only by sv3", {
@@ -147,14 +147,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )._1
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
-      PartyId.tryFromLfParty(
-        bobValidator.remoteParticipantWithAdminToken.ledger_api.parties
-          .allocate(
-            name,
-            name,
-          )
-          .party
-      )
+      bobValidator.remoteParticipantWithAdminToken.ledger_api.parties
+        .allocate(
+          name,
+          name,
+        )
+        .party
 
     }
     clue("try to onboard with a wrong secret, which should fail") {
@@ -323,8 +321,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     val sv4Party = svc.remoteParticipant.ledger_api.users
       .get(sv4.config.ledgerApiUser)
       .primaryParty
-      .map(PartyId.fromLfParty(_))
-      .value
       .value
 
     val (token, svOnboardingCid) =
@@ -425,8 +421,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       val sv2Party = svc.remoteParticipant.ledger_api.users
         .get(sv2.config.ledgerApiUser)
         .primaryParty
-        .map(PartyId.fromLfParty(_))
-        .value
         .value
 
       clue("Unknown parties have unknown SV onboarding status") {

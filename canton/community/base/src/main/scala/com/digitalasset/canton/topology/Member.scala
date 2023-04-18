@@ -32,6 +32,7 @@ sealed trait Identity extends Product with Serializable with PrettyPrinting {
 
 sealed trait NodeIdentity extends Identity {
   def keyOwner: KeyOwner
+  def member: Member
 }
 
 sealed trait KeyOwnerCode {
@@ -214,6 +215,8 @@ final case class DomainId(uid: UniqueIdentifier) extends NodeIdentity {
 
   // The key owner of a domain identity is the domain topology manager
   override def keyOwner: KeyOwner = DomainTopologyManagerId(uid)
+
+  override def member: Member = DomainTopologyManagerId(uid)
 }
 
 object DomainId {
@@ -257,6 +260,8 @@ final case class ParticipantId(uid: UniqueIdentifier)
   def toLf: LedgerParticipantId = LedgerParticipantId.assertFromString(uid.toProtoPrimitive)
 
   override def keyOwner: KeyOwner = this
+
+  override def member: Member = this
 }
 
 object ParticipantId {
@@ -370,6 +375,8 @@ final case class MediatorId(uid: UniqueIdentifier) extends DomainMember with Nod
   override def code: AuthenticatedMemberCode = MediatorId.Code
 
   override def keyOwner: KeyOwner = this
+
+  override def member: Member = this
 }
 
 object MediatorId {
@@ -422,6 +429,8 @@ final case class SequencerId(uid: UniqueIdentifier) extends DomainMember with No
   override def code: AuthenticatedMemberCode = SequencerId.Code
 
   override def keyOwner: KeyOwner = this
+
+  override def member: Member = this
 }
 
 object SequencerId {

@@ -121,7 +121,7 @@ class SplitwellIntegrationTest
     "return the primary party of the user" in { implicit env =>
       val user = providerSplitwellBackend.remoteParticipantWithAdminToken.ledger_api.users
         .get(providerSplitwellBackend.config.providerUser)
-      Some(providerSplitwellBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
+      Some(providerSplitwellBackend.getProviderPartyId()) shouldBe user.primaryParty
     }
 
     "domain disconnect" in { implicit env =>
