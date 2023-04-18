@@ -887,7 +887,7 @@ function subcmd_wait() {
     _cluster_show
 
     _log "Waiting for all pods to become ready"
-    kubectl wait --for=condition=Ready --all pod --timeout=5m
+    kubectl wait --for=condition=Ready --all pod --timeout=5m --all-namespaces
 }
 
 ###
