@@ -1,5 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as gcp from "@pulumi/gcp";
+import { Output } from "@pulumi/pulumi";
 
 // statically assigned addresses from existing resources imported
 // using `pulumi import gcp:compute/address:Address NAME ID`
@@ -9,6 +10,8 @@ const CLUSTER_BASENAME = pulumi.getStack().replace(/.*[.]/, '');
 const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
 class CantonNetwork extends pulumi.ComponentResource {
+  ipAddress: Output<string>;
+
   constructor(
     name: string,
     opts: pulumi.ComponentResourceOptions | undefined = undefined
@@ -23,8 +26,10 @@ class CantonNetwork extends pulumi.ComponentResource {
         address: ipAddress,
         networkTier: "PREMIUM",
       },
-      { protect: true }
+      { protect: false }
     );
+
+    this.ipAddress = clusterAddress.address;
 
     new gcp.dns.RecordSet(CLUSTER_DNS_NAME, {
       name: CLUSTER_DNS_NAME + ".",
@@ -34,7 +39,7 @@ class CantonNetwork extends pulumi.ComponentResource {
       managedZone: "canton-global",
       rrdatas: [clusterAddress.address],
     }, {
-      protect: true,
+      protect: false,
     });
     new gcp.dns.RecordSet(
       CLUSTER_DNS_NAME + "-subdomains",
@@ -46,14 +51,15 @@ class CantonNetwork extends pulumi.ComponentResource {
         managedZone: "canton-global",
         rrdatas: [clusterAddress.address],
       },
-      { protect: true }
+      { protect: false, parent: this }
     );
-    this.registerOutputs({
-      clusterIp: clusterAddress,
-    });
+    this.registerOutputs();
   }
 }
 
-export function configureNetwork(): void {
-  new CantonNetwork(CLUSTER_BASENAME);
+export function configureNetwork(): CantonNetwork {
+  const network = new CantonNetwork(CLUSTER_BASENAME);
+
+  return network;
 }
+

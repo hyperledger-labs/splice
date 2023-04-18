@@ -582,32 +582,15 @@ function subcmd_create() {
         rm /tmp/key.json
     fi
 
-    #### Check for IP
+    subcmd_infra_pulumi up --yes
 
-    if [ -z "$(_cluster_ip)" ]; then
-        _log "Allocating IP address."
-        gcloud compute addresses create "${GCP_CLUSTER_NAME}-ip" --region="${CLOUDSDK_COMPUTE_REGION}"
-    fi
+    #### Check for IP
 
     IPADDR=$(_cluster_ip)
 
     if [ -z "${IPADDR}" ]; then
         _error "Could not determine cluster IP address."
     fi
-
-    gcloud dns record-sets create "${CLUSTER_DNS_NAME}" \
-           --project="${GCP_DNS_PROJECT}" \
-           --zone="canton-global" \
-           --type=A \
-           --ttl=60 \
-           --rrdatas="${IPADDR}"
-
-    gcloud dns record-sets create "*.${CLUSTER_DNS_NAME}" \
-           --project="${GCP_DNS_PROJECT}" \
-           --zone="canton-global" \
-           --type=A \
-           --ttl=60 \
-           --rrdatas="${IPADDR}"
 
     echo "Cluster at IP ${IPADDR}, applying configuration."
 
@@ -784,26 +767,7 @@ function subcmd_delete() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    if gcloud dns record-sets delete \
-              --project="${GCP_DNS_PROJECT}" \
-              --zone="canton-global" \
-              --type=A \
-              "${CLUSTER_DNS_NAME}"; then
-        _log "DNS record deleted for ${CLUSTER_DNS_NAME}"
-    else
-        _warning "No DNS record to delete for ${CLUSTER_DNS_NAME}"
-    fi
-
-    if gcloud dns record-sets delete \
-              --project="${GCP_DNS_PROJECT}" \
-              --zone="canton-global" \
-              --type=A \
-              "*.${CLUSTER_DNS_NAME}"; then
-        _log "DNS record deleted for *.${CLUSTER_DNS_NAME}"
-    else
-        _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
-    fi
-
+    subcmd_infra_pulumi down --yes
     gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
 
     echo "Cluster deleted."
@@ -1106,7 +1070,7 @@ function subcmd_help() {
 
 ###
 
-subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the current clustrt"
+subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the current cluster"
 
 function subcmd_pulumi() {
     _production_gate

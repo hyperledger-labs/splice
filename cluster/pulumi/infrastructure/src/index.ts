@@ -1,3 +1,3 @@
 import { configureNetwork } from "./network";
 
-configureNetwork();
+export const network = configureNetwork();
