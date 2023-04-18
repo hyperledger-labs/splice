@@ -24,10 +24,10 @@
     "scripts": {
         "fix": "npm run format:fix && npm run lint:fix",
         "check": "npm run format:check && npm run lint:check",
-        "format:fix": "prettier --write canton-network/src",
-        "format:check": "prettier --check canton-network/src",
-        "lint:fix": "eslint canton-network/src --fix",
-        "lint:check": "eslint canton-network/src --max-warnings=0"
+        "format:fix": "prettier --write canton-network/src && prettier --write infrastructure/src",
+        "format:check": "prettier --check canton-network/src && prettier --check infrastructure/src",
+        "lint:fix": "eslint canton-network/src --fix && eslint infrastructure/src --fix",
+        "lint:check": "eslint canton-network/src --max-warnings=0 && eslint infrastructure/src --max-warnings=0"
     },
     "workspaces": [
         "canton-network",
