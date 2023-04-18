@@ -262,6 +262,7 @@ class ValidatorApp(
         clock,
         walletManager,
         store,
+        scanConnection,
         ledgerClient,
         retryProvider,
         loggerFactory,

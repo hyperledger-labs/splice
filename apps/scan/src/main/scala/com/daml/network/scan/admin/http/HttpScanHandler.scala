@@ -15,8 +15,14 @@ import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{Codec, Contract, ContractMetadataUtil, RateLimiterWithExtraTraffic}
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
+import com.daml.network.util.{
+  Codec,
+  Contract,
+  ContractMetadataUtil,
+  DomainFeesConstants,
+  RateLimiterWithExtraTraffic,
+}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -358,8 +364,8 @@ class HttpScanHandler(
       .putIfAbsent(
         validatorParty,
         new RateLimiterWithExtraTraffic(
-          NonNegativeNumeric.tryCreate(2.0),
-          PositiveNumeric.tryCreate(1.0),
+          DomainFeesConstants.defaultThroughput,
+          DomainFeesConstants.defaultTrafficBurstWindow,
           clock,
         ),
       )
@@ -397,6 +403,12 @@ class HttpScanHandler(
         .map(limit => {
           val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
           val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
+          logger.debug(
+            s"Default traffic balance remaining: ${validatorTrafficRateLimiter.getDefaultTrafficBalance()}"
+          )
+          logger.debug(
+            s"Extra traffic balance remaining: ${validatorTrafficRateLimiter.getExtraTrafficBalance(extraTrafficLimit)}"
+          )
           val approved = validatorTrafficRateLimiter.checkAndUpdate(extraTrafficLimit)
           v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
             definitions.CheckAndUpdateValidatorTrafficBalanceResponse(approved)

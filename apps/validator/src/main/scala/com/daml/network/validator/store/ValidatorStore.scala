@@ -84,12 +84,10 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     )
 
   def lookupValidatorTraffic: Future[
-    QueryResult[
-      Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
-    ]
+    Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTraffic.COMPANION)(_, _ => true)
+      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(_, _ => true)
     )
 
   def listUsers(): Future[Seq[String]] = {

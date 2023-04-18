@@ -221,6 +221,15 @@ final class ScanConnection(
     )(true)(_ && _)
   }
 
+  def getValidatorTrafficBalance(
+      validatorParty: PartyId
+  )(implicit ec: ExecutionContext): Future[Double] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetValidatorTrafficBalance(validatorParty),
+    )
+  }
+
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       ec: ExecutionContext,
       mat: Materializer,

@@ -233,6 +233,8 @@ class TreasuryService(
 
         case _: coinoperation.CO_Tap => Future.unit
 
+        case _: coinoperation.CO_BuyExtraTraffic => Future.unit
+
         case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
       }
     }

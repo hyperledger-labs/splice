@@ -45,16 +45,22 @@ class RateLimiterWithExtraTraffic(
     }
 
     def update(now: Long, extraTrafficLimit: Double): State = {
-      val newApprovedRequests = computeApprovedRequests(now)
-      if (newApprovedRequests + 1 <= maxBurst) {
+      val adjustedApprovedRequests = computeApprovedRequests(now)
+      if (adjustedApprovedRequests + 1 <= maxBurst) {
         // if approving this request would not exceed the maxBurst threshold, the request is approved.
-        State(approvedLastRequest = true, now, newApprovedRequests + 1, extraTrafficUsed)
-      } else if (extraTrafficUsed + 1 <= extraTrafficLimit) {
-        // if approving this request would not exceed the supplied extraTrafficLimit, the request is approved.
-        State(approvedLastRequest = true, now, newApprovedRequests, extraTrafficUsed + 1)
+        State(approvedLastRequest = true, now, adjustedApprovedRequests + 1, extraTrafficUsed)
       } else {
-        // else the request is rejected
-        State(approvedLastRequest = false, now, newApprovedRequests, extraTrafficUsed)
+        val defaultTrafficBalance = maxBurst - adjustedApprovedRequests
+        // consume remaining default traffic balance
+        // and adjust the extra traffic used with the remaining amount
+        val adjustedExtraTrafficUsed = extraTrafficUsed - defaultTrafficBalance + 1
+        if (adjustedExtraTrafficUsed <= extraTrafficLimit) {
+          // if approving this request would not exceed the supplied extraTrafficLimit, the request is approved.
+          State(approvedLastRequest = true, now, maxBurst, adjustedExtraTrafficUsed)
+        } else {
+          // else the request is rejected
+          State(approvedLastRequest = false, now, adjustedApprovedRequests, extraTrafficUsed)
+        }
       }
     }
 
