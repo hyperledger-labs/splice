@@ -35,4 +35,7 @@ Could not verify JWT token: The provided Algorithm doesn't match the one defined
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
+# We can't do log suppression for Canton, so instead we ignore this.
+NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*invoked from sv-participant\.sc
+
 # Make sure to have a trailing newline
