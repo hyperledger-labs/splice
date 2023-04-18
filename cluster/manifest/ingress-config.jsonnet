@@ -1,7 +1,5 @@
 local c = import "./cluster.jsonnet";
 
-local tls = import "./tls.jsonnet";
-
 local externalService(config, ports) = {
   ports: [],
   deploymentObjects: [
@@ -10,6 +8,7 @@ local externalService(config, ports) = {
       kind: "Service",
       metadata: {
         name: "external",
+        namespace: "cluster-ingress",
         clusterName: config.clusterName,
         cnjClusterName: config.clusterName,
       },
@@ -40,6 +39,7 @@ local clusterVersionConfigMap(config, name) = {
       kind: "ConfigMap",
       metadata: {
         name: name,
+        namespace: "cluster-ingress",
       },
       data: {
         version: config.imageTag,
@@ -54,6 +54,7 @@ local deployments(config, deployments) =
                                       allPorts);
   local externalProxyPorts = std.map(function(p) { name: p.name, port: c.externalPort(p) }, nonInternalPorts);
 
+  // This certificate acquired and populated in Pulumi infrastructure stack.
   local tlsCertSecret = config.clusterName + "-tls";
 
   [
@@ -64,11 +65,10 @@ local deployments(config, deployments) =
       externalProxyPorts,
       memoryLimitMiB=512,
       mountConfig="cluster-manifest",
-      tlsCertSecret=tlsCertSecret
+      tlsCertSecret=tlsCertSecret,
+      namespace="cluster-ingress",
     ),
     externalService(config, externalProxyPorts),
-    tls.issuer(config),
-    tls.certificate(config, tlsCertSecret),
   ];
 
 {

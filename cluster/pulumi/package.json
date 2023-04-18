@@ -17,6 +17,7 @@
     "dependencies": {
         "@pulumi/gcp": "^6.0.0",
         "@pulumi/pulumi": "^3.0.0",
+        "@pulumi/kubernetes-cert-manager": "^0.0.5",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1"

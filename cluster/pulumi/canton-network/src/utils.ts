@@ -17,12 +17,10 @@ export const CLUSTER_BASENAME = config.require("CLUSTER_BASENAME");
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
-// retrieve existing cluster IP, not managed with Pulumi yet
-const clusterAddress = gcp.compute.getAddressOutput({
-  name: CLUSTER_NAME + "-ip",
-});
-
-export const clusterIp = pulumi.interpolate`${clusterAddress.address}`;
+// Refrence to upstream infrastructure stack.
+export const infraStack = new pulumi.StackReference(
+  `infra.${CLUSTER_BASENAME}`
+);
 
 /// Kubernetes Namespace
 
@@ -98,12 +96,35 @@ export function cnChartValues(
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         imageTag: config.require("IMAGE_TAG"),
-        ipAddress: clusterIp,
+        ipAddress: infraStack.getOutput("clusterIp"),
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
       },
     },
     overrideValues
+  );
+}
+
+export function installCNHelmChartByNamespaceName(
+  prefix: string,
+  nsName: pulumi.Output<string>,
+  name: string,
+  chartName: string,
+  values: { [key: string]: any } = {},
+  dependsOn: any = []
+): k8s.helm.v3.Release {
+  return new k8s.helm.v3.Release(
+    `helm-${prefix}-${name}`,
+    {
+      name,
+      namespace: nsName,
+      chart: process.env.REPO_ROOT + "/cluster/helm/" + chartName + "/",
+      values: cnChartValues(chartName, values),
+      timeout: GLOBAL_TIMEOUT_SEC,
+    },
+    {
+      dependsOn,
+    }
   );
 }
 

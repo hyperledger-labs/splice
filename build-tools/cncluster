@@ -90,9 +90,6 @@ function _needs_auth0_management_api_creds() {
 function _cluster_apply() {
     IMAGE_TAG=$1
 
-    # Apply cert-manager deployments
-    kubectl apply -f "$REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml"
-
     TOKEN_ARG=fixedTokens=false
 
     if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
@@ -1194,6 +1191,16 @@ function subcmd_infra_pulumi() {
   # some pulumi commands / sub-commands do not support the --stack flag
   if [[ "$1" != stack || "$2" != export ]]; then
     args+=( --stack "infra.${GCP_CLUSTER_BASENAME}" )
+  fi
+
+  if [[ "$1" == up ]]; then
+    # Use the existing secret to populate the secret needed in the
+    # ingress namespace. Eventually, the secret management will be
+    # done in Pulumi.
+    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
+                     | jq -r '.data["key.json"]')
+
+      args+=( -c "DNS_SA_KEY=${dns_sa_key}" )
   fi
 
   local -x PULUMI_BACKEND_URL

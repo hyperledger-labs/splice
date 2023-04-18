@@ -1,38 +1,3 @@
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: {{ .Values.cluster.networkSettings.tls.issuerName }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  acme:
-    email: team-canton-network@digitalasset.com
-    preferredChain: ""
-    privateKeySecretRef:
-      name: "{{ .Values.cluster.networkSettings.tls.issuerName }}-acme-account"
-    server: {{ .Values.cluster.networkSettings.tls.issuerServer }}
-    solvers:
-    - dns01:
-        cloudDNS:
-          project: da-gcp-canton-domain
-          serviceAccountSecretRef:
-            key: key.json
-            name: clouddns-dns01-solver-svc-acct
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: "cn-{{ .Values.cluster.basename }}-certificate"
-  namespace: {{ .Release.Namespace }}
-spec:
-  dnsNames:
-  - "{{ .Values.cluster.dnsName }}"
-  - "*.{{ .Values.cluster.dnsName }}"
-  - "*.validator1.{{ .Values.cluster.dnsName }}"
-  - "*.splitwell.{{ .Values.cluster.dnsName }}"
-  issuerRef:
-    name: letsencrypt-production
-  secretName: "cn-{{ .Values.cluster.basename }}-tls"
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -270,4 +235,4 @@ spec:
         secret:
           defaultMode: 420
           optional: false
-          secretName: "cn-{{ .Values.cluster.basename }}-tls"
+          secretName: "cn-{{ .Values.cluster.basename }}net-tls"

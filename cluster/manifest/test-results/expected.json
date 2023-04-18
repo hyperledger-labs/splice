@@ -3778,7 +3778,8 @@
          },
          "kind": "ConfigMap",
          "metadata": {
-            "name": "cluster-manifest"
+            "name": "cluster-manifest",
+            "namespace": "cluster-ingress"
          }
       },
       {
@@ -3791,7 +3792,8 @@
                "cnjClusterName": "cluster",
                "moduleName": "external-proxy"
             },
-            "name": "external-proxy"
+            "name": "external-proxy",
+            "namespace": "cluster-ingress"
          },
          "spec": {
             "replicas": 1,
@@ -3994,7 +3996,8 @@
             "labels": {
                "clusterName": "cluster"
             },
-            "name": "external-proxy"
+            "name": "external-proxy",
+            "namespace": "cluster-ingress"
          },
          "spec": {
             "ports": [
@@ -4160,7 +4163,8 @@
          "metadata": {
             "clusterName": "cluster",
             "cnjClusterName": "cluster",
-            "name": "external"
+            "name": "external",
+            "namespace": "cluster-ingress"
          },
          "spec": {
             "loadBalancerIP": "ipaddr",
@@ -4328,60 +4332,6 @@
                "app": "external-proxy"
             },
             "type": "LoadBalancer"
-         }
-      },
-      {
-         "apiVersion": "cert-manager.io/v1",
-         "kind": "Issuer",
-         "metadata": {
-            "name": "letsencrypt-production"
-         },
-         "spec": {
-            "acme": {
-               "email": "team-canton-network@digitalasset.com",
-               "privateKeySecretRef": {
-                  "name": "letsencrypt-production-acme-account"
-               },
-               "server": "https://acme-v02.api.letsencrypt.org/directory",
-               "solvers": [
-                  {
-                     "dns01": {
-                        "cloudDNS": {
-                           "project": "dns-project",
-                           "serviceAccountSecretRef": {
-                              "key": "key.json",
-                              "name": "dns-service-account"
-                           }
-                        }
-                     }
-                  }
-               ]
-            }
-         }
-      },
-      {
-         "apiVersion": "cert-manager.io/v1",
-         "kind": "Certificate",
-         "metadata": {
-            "name": "cluster-certificate",
-            "namespace": "default"
-         },
-         "spec": {
-            "dnsNames": [
-               "cluster.network.global",
-               "*.cluster.network.global",
-               "*.validator1.cluster.network.global",
-               "*.splitwell.cluster.network.global",
-               "*.svc.cluster.network.global",
-               "*.sv-1.svc.cluster.network.global",
-               "*.sv-2.svc.cluster.network.global",
-               "*.sv-3.svc.cluster.network.global",
-               "*.sv-4.svc.cluster.network.global"
-            ],
-            "issuerRef": {
-               "name": "letsencrypt-production"
-            },
-            "secretName": "cluster-tls"
          }
       }
    ],
