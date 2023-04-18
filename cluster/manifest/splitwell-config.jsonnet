@@ -2,6 +2,8 @@ local postgres = import "./postgres.jsonnet";
 
 local c = import "./cluster.jsonnet";
 
+local validatorConfigOverrides = import "../overrides/validator-app.json";
+
 local deployments(config) = [
   c.namespace("splitwell", config),
   postgres.database("postgres", config, namespace="splitwell"),
@@ -91,7 +93,7 @@ local deployments(config) = [
     ] },
   ]),
 
-  c.deployment(config, "validator-app", [
+  c.deployment(config + validatorConfigOverrides, "validator-app", [
     {
       name: "sw-val",
       port: 5003,

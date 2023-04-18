@@ -281,7 +281,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                   env: [
                     {
                       name: "JAVA_TOOL_OPTIONS",
-                      value: "-Xms%sM -Xmx%sM -Dscala.concurrent.context.minThreads=4" % [memoryLimitMiB * config.jvmHeapMemoryFactor, memoryLimitMiB * config.jvmHeapMemoryFactor],
+                      value: "-Xms%sM -Xmx%sM -Dscala.concurrent.context.minThreads=4" % [std.floor(memoryLimitMiB * config.jvmHeapMemoryFactor), std.floor(memoryLimitMiB * config.jvmHeapMemoryFactor)],
                     },
                   ] + expandEnvironment(extraEnvVars),
                   resources: {

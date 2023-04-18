@@ -2181,7 +2181,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms998M -Xmx998M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -3269,7 +3269,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms998M -Xmx998M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",

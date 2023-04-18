@@ -2,6 +2,8 @@ local postgres = import "./postgres.jsonnet";
 
 local c = import "./cluster.jsonnet";
 
+local validatorConfigOverrides = import "../overrides/validator-app.json";
+
 local deployments(config) = [
   c.namespace("validator1", config),
   postgres.database("postgres", config, namespace="validator1"),
@@ -55,7 +57,7 @@ local deployments(config) = [
                  ] },
                ]),
 
-  c.deployment(config,
+  c.deployment(config + validatorConfigOverrides,
                "validator-app",
                [
                  {
