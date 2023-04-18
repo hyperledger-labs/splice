@@ -979,14 +979,12 @@ jobs:
           cmd: |
             make cluster/pulumi/install
             if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
-              export PULUMI_BACKEND_URL=gs://da-cn-pulumi-dev-stacks
               export GOOGLE_CREDENTIALS="$GCP_DA_CN_DEVNET_KEY"
             fi
             if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
-              export PULUMI_BACKEND_URL=gs://da-cn-pulumi-stacks
               export GOOGLE_CREDENTIALS="$GCP_DA_CN_SCRATCHNET_KEY"
             fi
-            pulumi preview --show-sames --stack "infra.${GCP_CLUSTER_BASENAME}" -C cluster/pulumi/infrastructure
+            cncluster infra_pulumi preview --show-sames
 
   preflight_check:
     parameters:
