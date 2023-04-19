@@ -886,6 +886,72 @@ class SvTimeBasedIntegrationTest
 
   }
 
+  "detect an inactive leader" in { implicit env =>
+    clue("Initialize SVC with 4 SVs") {
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+        _.start()
+      )
+      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+        _.waitForInitialization()
+      )
+      getSvcRules().data.members should have size 4
+    }
+
+    clue(
+      "Wait for first three rounds to be opened"
+    ) {
+      eventually()({
+        val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+        rounds should have size 3
+      })
+    }
+
+    clue(
+      "Stop the leader so we can detect its inactivity later"
+    ) {
+      sv1.stop()
+      getSvcRules().data.members should have size 4
+    }
+
+    clue(
+      "Advance time such that a new round should be opened. The leader's inactivity is detected and logged"
+    ) {
+      // It doesn't really matter which sv we pick
+      val automationConfig = sv2.config.automation
+      val effectiveTimeout = automationConfig.leaderInactiveTimeout.asJavaApproximation.plus(
+        automationConfig.pollingInterval.asJavaApproximation
+      )
+      val bufferDuration = java.time.Duration.ofSeconds(5)
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          advanceTime(java.time.Duration.ofSeconds(160))
+        },
+        entries => {
+          forAtLeast(1, entries) { line =>
+            line.message should include(
+              "Starting check for leader inactivity"
+            )
+          }
+        },
+      )
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        {
+          advanceTime(effectiveTimeout.plus(bufferDuration))
+        },
+        entries => {
+          forAtLeast(1, entries) { line =>
+            line.message should include(
+              "The leader is inactive"
+            )
+          }
+        },
+      )
+
+    }
+  }
+
   private def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
     Ordering[Instant].max(
       rounds.oldestOpen.data.targetClosesAt,

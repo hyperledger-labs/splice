@@ -9,6 +9,7 @@ import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
@@ -69,9 +70,36 @@ class AdvanceOpenMiningRoundTrigger(
   override def completeTaskAsFollower(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(show"ignoring ${task.work}, as we're not the leader")
+    logger.debug(show"Starting check for leader inactivity for ${task.work}")
+
+    val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
+      context.clock
+        .scheduleAfter(
+          _ => {
+            isStaleTask(task).foreach { isStale =>
+              if (!isStale) {
+                logger.warn(show"The leader is inactive for ${task.work}")
+              }
+            }
+          },
+          context.config.leaderInactiveTimeout.asJavaApproximation
+            .plus(context.config.pollingInterval.asJavaApproximation),
+        )
     )
+    continueOrShutdownSignal.unwrap.flatMap {
+      case UnlessShutdown.AbortedDueToShutdown =>
+        Future.successful(
+          TaskSuccess(
+            show"Shutting down leader inactivity check for ${task.work}"
+          )
+        )
+      case UnlessShutdown.Outcome(()) =>
+        Future.successful(
+          TaskSuccess(
+            show"Leader inactivity check completed for ${task.work}"
+          )
+        )
+    }
   }
 
   override protected def isStaleTask(

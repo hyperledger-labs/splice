@@ -12,6 +12,9 @@ case class AutomationConfig(
     /** Interval at which time-based automation triggers
       */
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    /** Duration after which leader is considered to be inactive
+      */
+    leaderInactiveTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(70),
     /** Only intended for testing. Disables the polling trigger that periodically collects rewards
       * and merges coins.
       */
