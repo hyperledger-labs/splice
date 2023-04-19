@@ -32,10 +32,7 @@ function check_envoy_running() {
   # so we can't write out its PID in the same script we start it in
   ENVOY_PID=$(pgrep envoy)
   if [[ -z "$ENVOY_PID" ]] || [[ -z "$(ps -p "$ENVOY_PID" -o pid=)" ]]; then
-    echo "envoy is not running"
     return 1
-  else
-    echo "envoy is running"
   fi
 }
 
@@ -145,7 +142,11 @@ mkdir -p "${LOG_DIR}"
 
 start_envoy
 # envoy's startup is weird, so we check this here...
-sleep 2s && check_envoy_running
+sleep 2s
+if ! check_envoy_running; then
+  echo "envoy failed to start, exiting"
+  exit 1
+fi
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
