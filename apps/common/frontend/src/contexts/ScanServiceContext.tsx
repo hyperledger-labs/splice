@@ -7,7 +7,7 @@ import { Party } from '@daml/types';
 
 import { FeaturedAppRight } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { OpenMiningRound } from '../../daml.js/canton-coin-0.1.0/lib/CC/Round';
-import { Contract } from '../utils';
+import { Contract, OpenAPILoggingMiddleware } from '../utils';
 
 const ScanContext = React.createContext<ScanClient | undefined>(undefined);
 
@@ -31,6 +31,7 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
   const friendlyClient: ScanClient | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new openapi.ServerConfiguration(url, {}),
+      promiseMiddleware: [new OpenAPILoggingMiddleware('scan')],
     });
     const scanClient = new openapi.ScanApi(configuration);
 

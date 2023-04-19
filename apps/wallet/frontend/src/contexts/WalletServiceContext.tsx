@@ -1,4 +1,4 @@
-import { Contract, UserStatusResponse } from 'common-frontend';
+import { Contract, OpenAPILoggingMiddleware, UserStatusResponse } from 'common-frontend';
 import { useUserState } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useContext, useMemo } from 'react';
@@ -124,7 +124,10 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
   const friendlyClient: WalletClient | undefined = useMemo(() => {
     const configuration = createConfiguration({
       baseServer: new ServerConfiguration(url, {}),
-      promiseMiddleware: [new ApiMiddleware(userAccessToken)],
+      promiseMiddleware: [
+        new ApiMiddleware(userAccessToken),
+        new OpenAPILoggingMiddleware('wallet'),
+      ],
     });
 
     const walletClient = new WalletApi(configuration);

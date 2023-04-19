@@ -1,10 +1,12 @@
-import { Contract } from 'common-frontend';
+import { callWithLogging, Contract } from 'common-frontend';
 import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
 
 import { DirectoryEntry, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 import Ledger, { CreateEvent, LedgerOptions } from '@daml/ledger';
 import { Choice, ContractId, Template } from '@daml/types';
+
+const DIRECTORY_LEDGER_NAME = 'directory-ledger';
 
 // Uses the JSON API (via @daml/ledger) to connect to the ledger.
 export class LedgerApiClient {
@@ -15,7 +17,12 @@ export class LedgerApiClient {
     this.userId = userId;
   }
   async getPrimaryParty(): Promise<string> {
-    const user = await this.ledger.getUser(this.userId);
+    const user = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'getUser',
+      userId => this.ledger.getUser(userId),
+      this.userId
+    );
     return user.primaryParty!;
   }
 
@@ -92,7 +99,12 @@ export class LedgerApiClient {
     user: string,
     provider: string
   ): Promise<Contract<DirectoryInstall> | undefined> {
-    const response = await this.ledger.query(DirectoryInstall);
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'queryDirectoryInstall',
+      directoryInstall => this.ledger.query(directoryInstall),
+      DirectoryInstall
+    );
     return response
       .map(ev => this.toContract(ev))
       .find(c => c.payload.user === user && c.payload.provider === provider);
@@ -104,7 +116,12 @@ export class LedgerApiClient {
   ): Promise<Contract<DirectoryEntry>[]> {
     // We query through our own participant here, so we get filtering to entries visible only to us.
     // Alternatively, we could add a filtered API on the provider.
-    const response = await this.ledger.query(DirectoryEntry);
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'queryDirectoryEntries',
+      directoryEntry => this.ledger.query(directoryEntry),
+      DirectoryEntry
+    );
     return response
       .filter(c => c.payload.user === user && c.payload.provider === provider)
       .map(ev => this.toContract(ev));

@@ -10,7 +10,7 @@ import React, { useContext, useMemo } from 'react';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory/module';
 
-import { Contract } from '../utils';
+import { Contract, OpenAPILoggingMiddleware } from '../utils';
 
 const DirectoryContext = React.createContext<DirectoryClient | undefined>(undefined);
 
@@ -32,6 +32,7 @@ export const DirectoryClientProvider: React.FC<React.PropsWithChildren<Directory
   const friendlyClient: DirectoryClient | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new ServerConfiguration(url, {}),
+      promiseMiddleware: [new OpenAPILoggingMiddleware('directory')],
     });
     const directoryClient = new openapi.DirectoryApi(configuration);
 

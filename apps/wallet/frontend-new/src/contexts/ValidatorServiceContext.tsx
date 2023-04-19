@@ -1,4 +1,4 @@
-import { useUserState } from 'common-frontend';
+import { OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
   Middleware,
@@ -33,7 +33,10 @@ export const ValidatorClientProvider: React.FC<React.PropsWithChildren<Validator
   const friendlyClient: ValidatorClient | undefined = useMemo(() => {
     const configuration = createConfiguration({
       baseServer: new ServerConfiguration(url, {}),
-      promiseMiddleware: [new ApiMiddleware(userAccessToken)],
+      promiseMiddleware: [
+        new ApiMiddleware(userAccessToken),
+        new OpenAPILoggingMiddleware('validator'),
+      ],
     });
 
     const validatorClient = new ValidatorApi(configuration);

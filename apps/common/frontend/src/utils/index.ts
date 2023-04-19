@@ -2,3 +2,5 @@ export * from './auth';
 export * from './helpers';
 export * from './hooks';
 export * from './interfaces';
+export * from './OpenAPILoggingMiddleware';
+export * from './logging';
