@@ -16,6 +16,32 @@
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
           <level>${LOG_LEVEL_STDOUT:-WARN}</level>
         </filter>
+        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+          <evaluator>
+            <matcher>
+              <Name>hacoordinator_logger</Name>
+              <regex>ha\.(HaCoordinator|PollingChecker)</regex>
+            </matcher>
+            <matcher>
+              <Name>hacoordinator_message</Name>
+              <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
+            </matcher>
+            <matcher>
+              <Name>requestlogger_logger</Name>
+              <regex>ApiRequestLogger</regex>
+            </matcher>
+            <matcher>
+              <Name>requestlogger_message</Name>
+              <regex>(UpdateService/GetLedgerEnd|StateSnapshotService/GetConnectedDomains)</regex>
+            </matcher>
+            <expression>
+              hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
+              requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+            </expression>
+          </evaluator>
+          <OnMismatch>NEUTRAL</OnMismatch>
+          <OnMatch>DENY</OnMatch>
+        </filter>
       </appender>
     </then>
     <else>

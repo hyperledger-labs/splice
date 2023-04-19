@@ -8,6 +8,10 @@ EXE=$(readlink -f cn-image-bin)
 
 declare -a ARGS=( daemon --no-tty --log-encoder=json --log-level-stdout=DEBUG --log-level-canton=DEBUG --log-file-appender=off )
 
+if [ -f /app/logback.xml ]; then
+   export JAVA_TOOL_OPTIONS="-Dlogback.configurationFile=/app/logback.xml ${JAVA_TOOL_OPTIONS:-}"
+fi
+
 if [ -f /app/pre-bootstrap.sh ]; then
   json_log "Running /app/pre-bootstrap.sh" "entrypoint.sh"
   /app/pre-bootstrap.sh
