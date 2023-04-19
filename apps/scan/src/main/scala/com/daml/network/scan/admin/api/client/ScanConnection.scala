@@ -146,7 +146,7 @@ final class ScanConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]] = {
-    // TODO(#3707): Consider whether we want to add a cache here, probably not really needed for the upgrade test
+    // Note that we did not implement caching here as part of this upgrade PoC
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetCoinRulesV1Test(None))
   }
 

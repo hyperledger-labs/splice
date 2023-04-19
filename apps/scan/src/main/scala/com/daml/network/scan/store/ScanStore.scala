@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.api.v1 as ccV1Api
 import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.environment.RetryProvider
-import com.daml.network.scan.config.ScanDomainConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
 import com.daml.network.util.Contract
@@ -32,9 +32,9 @@ trait ScanStore
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  protected[this] def domainConfig: ScanDomainConfig
+  protected[this] def scanConfig: ScanAppBackendConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = scanConfig.domains.global
 
   def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     defaultAcsDomainIdF.flatMap(
@@ -88,7 +88,7 @@ object ScanStore {
   def apply(
       svcParty: PartyId,
       storage: Storage,
-      domainConfig: ScanDomainConfig,
+      scanConfig: ScanAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
       connection: CNLedgerConnection,
@@ -100,7 +100,7 @@ object ScanStore {
       case _: MemoryStorage =>
         new InMemoryScanStore(
           svcParty = svcParty,
-          domainConfig,
+          scanConfig,
           loggerFactory,
           futureSupervisor,
           connection,
@@ -109,7 +109,10 @@ object ScanStore {
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
-  def contractFilter(svcParty: PartyId): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(
+      svcParty: PartyId,
+      scanConfig: ScanAppBackendConfig,
+  ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
 
@@ -124,10 +127,11 @@ object ScanStore {
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        // TODO(#3707): consider putting the filter also behind a config parameter
-        mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
         mkFilter(ccV1Api.validatortraffic.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
-      ),
+      ) ++
+        (if (scanConfig.enableCoinRulesUpgrade)
+           Map(mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
+         else Map.empty),
     )
   }
 }

@@ -24,7 +24,7 @@ import qualified CN.CometBft as CometBft
 -- A version of SvcRules intended for testing upgrades. For now, we focus on an upgrade of the underlying CoinRules,
 -- so the changes here compared to SvcRules are only those required for running against the upgraded
 -- CoinRulesV1Test.
--- TODO(#3707): We currently do not tackle the coordination required for all SVs to upgrade to this version,
+-- TODO(#4152): We currently do not tackle the coordination required for all SVs to upgrade to this version,
 -- and instead assume they all start with this version loaded already (if configured to support the upgrade tests).
 
 -- Types

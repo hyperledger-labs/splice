@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
 import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
-import com.daml.network.sv.config.SvDomainConfig
+import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -43,9 +43,9 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   // TODO(#3936) Remove this workaround once Canton emits domains with observation permissions.
   override lazy val domains = svStore.domains
 
-  protected[this] def domainConfig: SvDomainConfig
+  protected[this] def appConfig: LocalSvAppConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = appConfig.domains.global
 
   private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
 
@@ -522,7 +522,7 @@ object SvSvcStore {
       key: SvStore.Key,
       svStore: SvSvStore,
       storage: Storage,
-      domains: SvDomainConfig,
+      config: LocalSvAppConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
@@ -532,7 +532,7 @@ object SvSvcStore {
         new InMemorySvSvcStore(
           key,
           svStore,
-          domains,
+          config,
           loggerFactory,
           futureSupervisor,
           retryProvider,
@@ -541,7 +541,11 @@ object SvSvcStore {
     }
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(svcParty: PartyId, svParty: PartyId): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(
+      svcParty: PartyId,
+      svParty: PartyId,
+      appConfig: LocalSvAppConfig,
+  ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
     val sv = svParty.toProtoPrimitive
@@ -570,10 +574,11 @@ object SvSvcStore {
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
-        // TODO(#3707): consider putting the filter also behind a config parameter
-        mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
-      ),
+      ) ++
+        (if (appConfig.enableCoinRulesUpgrade)
+           Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
+         else Map.empty),
     )
   }
 

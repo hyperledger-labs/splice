@@ -393,7 +393,7 @@ class SvApp(
     key,
     svStore,
     storage,
-    config.domains,
+    config,
     loggerFactory,
     futureSupervisor,
     retryProvider,

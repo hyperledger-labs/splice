@@ -2,7 +2,7 @@ package com.daml.network.scan.store.memory
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.scan.config.ScanDomainConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.InMemoryCNNodeAppStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -21,7 +21,7 @@ import com.daml.network.store.TxLogStore
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
-    override protected[this] val domainConfig: ScanDomainConfig,
+    override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
     override protected val connection: CNLedgerConnection,
@@ -31,7 +31,7 @@ class InMemoryScanStore(
 ) extends InMemoryCNNodeAppStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
     with ScanStore {
 
-  override lazy val acsContractFilter = ScanStore.contractFilter(svcParty)
+  override lazy val acsContractFilter = ScanStore.contractFilter(svcParty, scanConfig)
 
   override def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)] = {
     for {

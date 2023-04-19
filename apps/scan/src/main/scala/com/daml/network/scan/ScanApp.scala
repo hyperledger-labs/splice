@@ -69,7 +69,7 @@ class ScanApp(
         ScanStore(
           svcParty,
           storage,
-          config.domains,
+          config,
           loggerFactory,
           futureSupervisor,
           ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),

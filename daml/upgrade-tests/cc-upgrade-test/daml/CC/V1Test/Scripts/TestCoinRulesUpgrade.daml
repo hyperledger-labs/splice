@@ -113,8 +113,8 @@ testUpgrade = do
   received === transferAmount
 
 
--- TODO(#3707): everything below is copied from other places, replacing all CoinRules with CoinRulesV1Test.
--- Consider cleaning this up and reducing code duplication here.
+-- Note that everything below is copied from other places, replacing all CoinRules with CoinRulesV1Test.
+
 
 tapThroughV1Test : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tapThroughV1Test app user amount = do
