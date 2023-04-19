@@ -27,13 +27,13 @@
 1. [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
    1. [Gaining Access to a Cluster](#gaining-access-to-a-cluster)
       1. [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
+   1. [Cluster Infrastructure Setup](#cluster-infrastructure-setup)
    1. [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
    1. [Update a Single Component in a Cluster](#update-a-single-component-in-a-cluster)
    1. [Add a Component to the Build](#add-a-component-to-the-build)
    1. [Memory Settings](#memory-settings)
 1. [TLS Certificate Provisioning](#tls-certificate-provisioning)
-   1. [First-time Infra Setup](#first-time-infra-setup)
-   1. [Cluster Configuration](#cluster-configuration)
+    1. [Cluster Configuration](#cluster-configuration)
    1. [Adding TLS to `{insert-service-here}`](#adding-tls-to-insert-service-here)
    1. [Force-updating the certificate](#force-updating-the-certificate)
 1. [Auth0 secrets](#auth0-secrets)
@@ -601,6 +601,25 @@ e.g. `cluster/deployment/staging`:
 cncluster activate
 ```
 
+### Cluster Infrastructure Setup
+
+We manage cluster infrastructure using a Pulumi stack separately
+applied to each cluster. This stack manages aspects of a cluster's
+configuration that have a longer lifecycle than any one deployment of
+the Canton Network software. This configuration includes the cluster
+ingress IP address, DNS records, and the certificate used for incoming
+traffic. From within a deployment directory for a cluster, this stack
+can be manged with `cncluster infra_pulumi`. The following commands
+cover the typical lifecycle of a Canton Network cluster.
+
+* `cncluster infra_pulumi up` - Apply the infrastructure configuration
+  to the cluster..
+* `cncluster infra_pulumi down` - Remove the configured infrastructure
+  for the cluster.
+* `cncluster infra_pulumi refresh` - Refresh Pulumi's infrastructure
+  state database based on the current cluster infrastructure. This
+  is useful when a cluster configuration is updated externally.
+
 ### Deploy a Build to a Cluster
 
 1. Scratchnet is used for ad-hoc testing, and we have a limited number
@@ -683,31 +702,31 @@ may be adjusted there. There are also settings for the network whitelist.
 
 ## TLS Certificate Provisioning
 
-### First-time Infra Setup
+Certificates are issued and renewed in the cluster automatically by
+`cert-manager`. `cert-manager` is installed by the infrastructure
+Pulumi scripts as described above and configured through Kubernetes
+CRD objects installed with the same Pulumi script.
 
-Certificates are issued and renewed in the cluster automatically by `cert-manager`. There is some setup to configure specific versioned releases of `cert-manager` ready for deployment in our clusters.
+`cert-manager` installs the the TLS certificate into a Kubernetes
+secret that is then mounted into the `external-proxy` Pod for use by
+`nginx` to terminate inbound HTTPS. The state of the certificate
+acquisition process is modeled in several additional Kuberneted CRD
+types that can be inspected with `kubectl`.
 
-In particular, because we operate a private GKE cluster, we need to mirror `cert-manager`'s images to our internal image repository. We also need to rewrite the `cert-manager` manifest to point to our mirror instead of the default `quay.io` hosted images.
-
-Both of these actions can be executed automatically by the `update-cert-manager.sh` script located in the `manifest/cert-manager` directory.
-
-Currently we run `cert-manager` v1.10.0, the latest stable release at time of writing. The update script doesn't have to be re-run unless a new version of `cert-manager` is released and upgrading to it is critical, such as for addressing security vulnerabilities.
-
-### Cluster Configuration
-
-When the `cert-manager.yaml` manifest is applied to a cluster, a couple of deployments are started up in the `cert-manager` namespace. These services carry out the process of requesting and storing certificates when the appropriate custom kubernetes resources are created.
-
-Use `kubectl get pods --namespace cert-manager` to check on the status of these deployments.
-
-Of note, we create an `Issuer` resource in our `cluster.jsonnet` manifest that contains configuration for the entity that will issue us certs. We also create a `Certificate` resource to request the cert itself and declare the secret to store it in.
-
-Use `kubectl get issuers` and `kubectl get certificates` to check the status of these resources.
-
-Finally, we set up `external-proxy`, our nginx cluster ingress, to be ready to serve as a TLS termination point. This is achieved by mounting the certificate from the secret into the filesystem, and referencing the certificate from within the nginx config.
+If there is an issue acquiring a certificate, the first obvious
+symptom is usually that `external-proxy` gets stuck in
+`ContainerCreating` state. This happens because the `external-proxy`
+Pod cannot be started until the certificate has been acquired, and the
+TLS made available as a secret to be mounted in the `external-proxy`
+pod. If you observe this behavior, `cert-manager` has detailed
+[troubleshooting documentation](https://cert-manager.io/docs/troubleshooting/)
+on its website.
 
 ### Adding TLS to {insert-service-here}
 
-Ultimately your service is likely being proxied through some `external-proxy` config file. The only thing required to enable TLS termination for a new service is to add a block like
+Ultimately your service is likely being proxied through some
+`external-proxy` config file. The only thing required to enable TLS
+termination for a new service is to add a block like
 
 ```
 server {
