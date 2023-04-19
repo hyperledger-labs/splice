@@ -326,9 +326,18 @@ lazy val `apps-svc` =
 lazy val `apps-sv` =
   project
     .in(file("apps/sv"))
-    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-svc`,
+      `directory-daml`,
+      `validator-lifecycle-daml`,
+    )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors),
+      BuildCommon.TS.openApiSettings(
+        npmName = "sv-openapi",
+        openApiSpec = "sv.yaml",
+      ),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
         List(
@@ -343,11 +352,6 @@ lazy val `apps-sv` =
             framework = "akka-http",
           ),
         ),
-    )
-    .dependsOn(
-      `apps-svc`,
-      `directory-daml`,
-      `validator-lifecycle-daml`,
     )
 
 lazy val `apps-scan` =
@@ -394,6 +398,7 @@ lazy val `apps-common-frontend` = {
           (`wallet-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`directory-daml` / Compile / damlBuild).value ++
+          (`svc-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
@@ -407,6 +412,10 @@ lazy val `apps-common-frontend` = {
           (
             (`apps-directory` / Compile / compile).value,
             (`apps-directory` / Compile / baseDirectory).value,
+          ),
+          (
+            (`apps-sv` / Compile / compile).value,
+            (`apps-sv` / Compile / baseDirectory).value,
           ),
           (
             (`apps-wallet` / Compile / compile).value,
@@ -440,6 +449,11 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runBuildCommand(
               npmRootDir.value,
               "directory/openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "sv/openapi-ts-client",
               log,
             )
             BuildCommon.TS.runBuildCommand(
@@ -566,6 +580,7 @@ lazy val `apps-common-frontend-protobuf` = {
     .dependsOn(
       `apps-common` % "compile->protocGenerate",
       `apps-directory` % "compile->protocGenerate",
+      `apps-sv` % "compile->protocGenerate",
       `apps-wallet` % "compile->protocGenerate",
       `apps-splitwell` % "compile->protocGenerate",
       `apps-validator` % "compile->protocGenerate",

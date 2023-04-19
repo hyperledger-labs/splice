@@ -8,6 +8,7 @@
     "scan/openapi-ts-client",
     "splitwell/frontend",
     "sv/frontend",
+    "sv/openapi-ts-client",
     "validator/openapi-ts-client",
     "wallet/frontend",
     "wallet/frontend-new",

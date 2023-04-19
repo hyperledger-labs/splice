@@ -15,7 +15,6 @@ class SvFrontendIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withManualStart
 
   "A SV UI" should {
 
@@ -27,5 +26,28 @@ class SvFrontendIntegrationTest
         )
       }
     }
+
+    "display sv debug infos" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "We open SV1's web UI", {
+            go to s"http://localhost:3010"
+          },
+        )(
+          "We see a table with sv1 as SV Name",
+          _ => {
+            val rows = findAll(className("value-name")).toSeq
+            rows should have length 5
+            forExactly(1, rows)(
+              _.text should matchText(sv1.getDebugInfo().svUser)
+            )
+            forExactly(1, rows)(
+              _.text should matchText(sv1.getDebugInfo().svParty.toProtoPrimitive)
+            )
+          },
+        )
+      }
+    }
+
   }
 }
