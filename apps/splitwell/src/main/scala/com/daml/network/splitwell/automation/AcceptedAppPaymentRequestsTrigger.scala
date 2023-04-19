@@ -69,7 +69,7 @@ class AcceptedAppPaymentRequestsTrigger(
         case Right((transferContext, disclosedContracts)) =>
           for {
             transferInProgress <- store.multiDomainAcsStore
-              .lookupContractByIdOnDomain(splitwellCodegen.TransferInProgress.COMPANION)(
+              .lookupContractByIdOnDomainOrRetry(splitwellCodegen.TransferInProgress.COMPANION)(
                 payment.domain,
                 transferInProgressId,
               )

@@ -15,6 +15,17 @@ rm -rf "$DIR/protos-$SDK_VERSION/com/daml"/daml_lf_*
 
 cp -r "${REPO_ROOT}/3rdparty/protobuf/google" "$DIR/protos-$SDK_VERSION/google"
 
+mkdir -p "$DIR/protos-$SDK_VERSION/scalapb"
+cp "${REPO_ROOT}/canton/research/app/target/protobuf_external/scalapb/scalapb.proto" "$DIR/protos-$SDK_VERSION/scalapb/scalapb.proto"
+
+mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/crypto/v0"
+mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0"
+mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0"
+cp "$CANTON/protobuf/community/com/digitalasset/canton/crypto/v0/crypto.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/crypto/v0/crypto.proto"
+cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/topology.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0/topology.proto"
+cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/sequencing.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0/sequencing.proto"
+cp "$CANTON/protobuf/community/com/digitalasset/canton/v0/trace_context.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0/trace_context.proto"
+
 mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain"
 cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/transfer.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/transfer.proto"
 cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto"

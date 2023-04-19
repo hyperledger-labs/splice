@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.research.participant.multidomain.transfer as xfr
+import com.digitalasset.canton.research.participant.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 sealed trait TransferEvent extends Product with Serializable with PrettyPrinting {
@@ -38,7 +38,7 @@ object TransferEvent {
   }
 
   object Out {
-    private[api] def fromProto(proto: xfr.TransferredOutEvent): Out = {
+    private[api] def fromProto(proto: multidomain.TransferredOutEvent): Out = {
       Out(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),
@@ -67,7 +67,7 @@ object TransferEvent {
   }
 
   object In {
-    private[api] def fromProto(proto: xfr.TransferredInEvent): In = {
+    private[api] def fromProto(proto: multidomain.TransferredInEvent): In = {
       import com.daml.ledger.api.v1.event as scalaEvent
       In(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),

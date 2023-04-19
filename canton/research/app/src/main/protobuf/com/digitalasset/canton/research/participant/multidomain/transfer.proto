@@ -1,5 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates
-//
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 syntax = "proto3";
@@ -56,26 +55,35 @@ message TransferredOutEvent {
   // Required
   string contract_id = 2;
 
+  //  The template of the transferred contract.
+  //  Required
+  string template_id = 3;
+
   // The ID of the source domain
   // Must be a valid domain ID
   // Required
-  string source = 3;
+  string source = 4;
 
   // The ID of the target domain
   // Must be a valid domain ID
   // Required
-  string target = 4;
+  string target = 5;
 
   // Party on whose behalf the transfer command was executed.
   // Must be a valid PartyIdString (as described in ``value.proto``).
   // Required
-  string submitter = 5;
+  string submitter = 6;
 
   // Transfer-in exclusivity
   // Before this time (measured on the target domain), only the submitter of the transfer-out can initiate the transfer-in
   // Missing for everyone except on the submitting participant
   // optional
-  google.protobuf.Timestamp transfer_in_exclusivity = 6;
+  google.protobuf.Timestamp transfer_in_exclusivity = 7;
+
+  // The parties that are notified of this event.
+  // Return the ``submitter`` if it's a stakeholder of the contract (i.e. either signatories or observers).
+  // Required
+  repeated string witness_parties = 8;
 }
 
 // Records that a contract has been transferred-in, and it becomes usable on the target domain

@@ -7,6 +7,5 @@ dependencies:
   - daml-stdlib
 data-dependencies: []
 build-options:
-  - --target=1.dev
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

@@ -29,13 +29,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.research.participant.multidomain.{
-  command_completion_service as mdcpl,
-  state_snapshot_service as snapshotsvc,
-  transfer_command as xfrcmd,
-  transfer_submission_service as xfrsvc,
-  update_service as upsvc,
-}
+import com.digitalasset.canton.research.participant.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.empty.Empty
@@ -84,17 +78,17 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
   private val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
-  private val updateServiceStub: upsvc.UpdateServiceGrpc.UpdateServiceStub =
-    withCredentials(upsvc.UpdateServiceGrpc.stub(channel), token)
+  private val updateServiceStub: multidomain.UpdateServiceGrpc.UpdateServiceStub =
+    withCredentials(multidomain.UpdateServiceGrpc.stub(channel), token)
   private val transferSubmissionServiceStub
-      : xfrsvc.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
-    withCredentials(xfrsvc.TransferSubmissionServiceGrpc.stub(channel), token)
+      : multidomain.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
+    withCredentials(multidomain.TransferSubmissionServiceGrpc.stub(channel), token)
   private val multidomainCompletionServiceStub
-      : mdcpl.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
-    withCredentials(mdcpl.CommandCompletionServiceGrpc.stub(channel), token)
+      : multidomain.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
+    withCredentials(multidomain.CommandCompletionServiceGrpc.stub(channel), token)
   private val stateSnapshotServiceStub
-      : snapshotsvc.StateSnapshotServiceGrpc.StateSnapshotServiceStub =
-    withCredentials(snapshotsvc.StateSnapshotServiceGrpc.stub(channel), token)
+      : multidomain.StateSnapshotServiceGrpc.StateSnapshotServiceStub =
+    withCredentials(multidomain.StateSnapshotServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -114,7 +108,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   override def close(): Unit = GrpcChannel.close(channel)
 
   def ledgerEnd(domain: DomainId): Future[LedgerOffset] = {
-    val req = upsvc.GetLedgerEndRequest(domainId = domain.toProtoPrimitive)
+    val req = multidomain.GetLedgerEndRequest(domainId = domain.toProtoPrimitive)
     updateServiceStub.getLedgerEnd(req).map { resp =>
       LedgerOffset.fromProto(scalapbToJava(resp.getOffset)(_.companion))
     }
@@ -134,7 +128,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   ): Source[GetActiveContractsResponse, NotUsed] = {
     val oldProto = active_contracts_service.GetActiveContractsRequest fromJavaProto request.toProto
     // convert ACService req to snapshot service req
-    val proto = snapshotsvc.GetActiveContractsRequest(
+    val proto = multidomain.GetActiveContractsRequest(
       ledgerId = oldProto.ledgerId,
       filter = oldProto.filter,
       verbose = oldProto.verbose,
@@ -401,7 +395,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       domain: DomainId,
   ): Source[CompletionStreamResponse, NotUsed] =
     ClientAdapter.serverStreaming(
-      mdcpl.CompletionStreamRequest(
+      multidomain.CompletionStreamRequest(
         ledgerId = "",
         applicationId = applicationId,
         parties = parties.map(_.toProtoPrimitive),
@@ -416,7 +410,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       source: DomainId,
       offset: Option[LedgerOffset.Absolute],
   ): Source[LedgerClient.GetInFlightTransfersResponse, NotUsed] = {
-    val req = snapshotsvc.GetInFlightTransfersRequest(
+    val req = multidomain.GetInFlightTransfersRequest(
       sourceDomainId = source.toProtoPrimitive,
       validAtOffset = offset.fold("")(_.getOffset),
       stakeholders = parties.map(_.toProtoPrimitive),
@@ -430,7 +424,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   def getConnectedDomains(
       party: PartyId
   ): Future[Map[DomainAlias, DomainId]] = {
-    val req = snapshotsvc.GetConnectedDomainsRequest(
+    val req = multidomain.GetConnectedDomainsRequest(
       party = party.toProtoPrimitive
     )
     stateSnapshotServiceStub.getConnectedDomains(req).map { resp =>
@@ -473,7 +467,7 @@ object LedgerClient {
 
   object GetInFlightTransfersResponse {
     private[LedgerClient] def fromProto(
-        proto: snapshotsvc.GetInFlightTransfersResponse
+        proto: multidomain.GetInFlightTransfersResponse
     ): GetInFlightTransfersResponse =
       GetInFlightTransfersResponse(
         new LedgerOffset.Absolute(proto.offset),
@@ -490,8 +484,8 @@ object LedgerClient {
 
     import com.daml.ledger.api.v1.ledger_offset as sclo
 
-    private[LedgerClient] def toProto: upsvc.GetUpdatesRequest =
-      upsvc.GetUpdatesRequest(
+    private[LedgerClient] def toProto: multidomain.GetUpdatesRequest =
+      multidomain.GetUpdatesRequest(
         ledgerId = "",
         begin = Some(sclo.LedgerOffset.fromJavaProto(begin.toProto)),
         end = end.map(lc => sclo.LedgerOffset.fromJavaProto(lc.toProto)),
@@ -506,10 +500,10 @@ object LedgerClient {
 
   object GetTreeUpdatesResponse {
 
-    import upsvc.TreeUpdate.TreeUpdate as TU
+    import multidomain.TreeUpdate.TreeUpdate as TU
 
     private[LedgerClient] def fromProto(
-        proto: upsvc.GetTreeUpdatesResponse
+        proto: multidomain.GetTreeUpdatesResponse
     ): GetTreeUpdatesResponse =
       GetTreeUpdatesResponse(proto.updates map {
         _.treeUpdate match {
@@ -530,8 +524,8 @@ object LedgerClient {
         source: DomainId,
         target: DomainId,
     ) extends TransferCommand {
-      def toProto: xfrcmd.TransferOutCommand =
-        xfrcmd.TransferOutCommand(
+      def toProto: multidomain.TransferOutCommand =
+        multidomain.TransferOutCommand(
           contractId = contractId.contractId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
@@ -543,8 +537,8 @@ object LedgerClient {
         source: DomainId,
         target: DomainId,
     ) extends TransferCommand {
-      def toProto: xfrcmd.TransferInCommand =
-        xfrcmd.TransferInCommand(
+      def toProto: multidomain.TransferInCommand =
+        multidomain.TransferInCommand(
           transferOutId = transferOutId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
@@ -559,8 +553,8 @@ object LedgerClient {
       submitter: PartyId,
       command: TransferCommand,
   ) {
-    def toProto: xfrsvc.SubmitRequest = {
-      val baseCommand = xfrcmd.TransferCommand(
+    def toProto: multidomain.SubmitRequest = {
+      val baseCommand = multidomain.TransferCommand(
         applicationId = applicationId,
         commandId = commandId,
         submissionId = submissionId,
@@ -572,7 +566,7 @@ object LedgerClient {
         case in: TransferCommand.In =>
           baseCommand.withTransferInCommand(in.toProto)
       }
-      xfrsvc.SubmitRequest(
+      multidomain.SubmitRequest(
         Some(updatedCommand)
       )
     }
@@ -581,7 +575,7 @@ object LedgerClient {
   final case class CompletionStreamResponse(completions: Seq[Completion])
 
   object CompletionStreamResponse {
-    def fromProto(spb: mdcpl.CompletionStreamResponse): CompletionStreamResponse =
+    def fromProto(spb: multidomain.CompletionStreamResponse): CompletionStreamResponse =
       // ignoring checkpoint
       CompletionStreamResponse(spb.completions map Completion.fromProto)
   }

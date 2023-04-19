@@ -1,5 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates
-//
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 syntax = "proto3";
@@ -9,6 +8,7 @@ package com.digitalasset.canton.research.participant.multidomain;
 import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
 import "com/daml/ledger/api/v1/active_contracts_service.proto";
 import "com/daml/ledger/api/v1/transaction_filter.proto";
+import "com/digitalasset/canton/protocol/v0/topology.proto";
 
 option java_outer_classname = "UpdateServiceOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
@@ -61,7 +61,7 @@ message GetInFlightTransfersRequest {
   // Return only transfers of contracts which have at least one stakeholder included in this list.
   // Must be a non-empty list of valid PartyIdString (as described in ``value.proto``).
   // Required
-  repeated string stakeholders = 5;
+  repeated string stakeholders = 3;
 }
 
 // When returning the GetInFlightTransfersResponse as a stream, then
@@ -113,6 +113,8 @@ message GetConnectedDomainsRequest {
   // Must be a valid PartyIdString (as described in ``value.proto``).
   // Required
   string party = 1;
+
+  ConnectedDomainsFilter connected_domain_filter = 2;
 }
 
 message GetConnectedDomainsResponse {
@@ -121,6 +123,16 @@ message GetConnectedDomainsResponse {
     string domain_alias = 1;
     // The ID of the domain
     string domain_id = 2;
+    // The permission on the domain
+    com.digitalasset.canton.protocol.v0.ParticipantPermission permission = 3;
   }
   repeated ConnectedDomain connected_domains = 1;
+}
+
+message ConnectedDomainsFilter {
+  // If empty, domains with all permissions are returned.
+  // Only the domains with the requested ParticipantPermission are returned.
+  // E.g if the permissions are set to Observation and the participant has Submission rights, the result will be empty.
+  // Passing the same permission twice is accepted and they are deduplicated.
+  repeated com.digitalasset.canton.protocol.v0.ParticipantPermission permissions = 1;
 }

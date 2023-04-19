@@ -11,6 +11,5 @@ data-dependencies:
 - ../canton-coin/.daml/dist/canton-coin-0.1.0.dar
 - ../cn-util/.daml/dist/cn-util-0.1.0.dar
 build-options:
-  - --target=1.dev
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

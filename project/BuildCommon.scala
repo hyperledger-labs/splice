@@ -841,6 +841,9 @@ object BuildCommon {
     sbt
       .Project("canton-research-services", file("canton/research/app"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
+      .dependsOn(
+        `canton-community-base`
+      )
       .settings(
         removeTestSources,
         sharedCantonSettings,
@@ -852,7 +855,7 @@ object BuildCommon {
           scalapb_runtime,
         ),
         Compile / PB.targets := Seq(
-          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
       )
   }

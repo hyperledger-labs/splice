@@ -574,6 +574,7 @@ lazy val `apps-common-frontend-protobuf` = {
     .settings(
       Compile / sourceGenerators += Def.task {
         val log = streams.value.log
+        (`canton-research-services` / Compile / compile).value
         runCommand(Seq(s"${baseDirectory.value}/gen-ledger-api-proto.sh"), log)
         Seq()
       }.taskValue,
