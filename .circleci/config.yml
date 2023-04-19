@@ -1302,10 +1302,14 @@ workflows:
             - deploy_cluster
 
   pulumi:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - run_preview:
+          <<: *main-branch-never
           type: approval
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview devnet
           cluster: devnet
           context:
@@ -1313,6 +1317,7 @@ workflows:
           requires:
             - run_preview
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview scratchnet
           cluster: scratchnet
           context:
@@ -1320,6 +1325,7 @@ workflows:
           requires:
             - run_preview
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview scratchnetb
           cluster: scratchnetb
           context:
@@ -1327,6 +1333,7 @@ workflows:
           requires:
             - run_preview
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview scratchnetc
           cluster: scratchnetc
           context:
@@ -1334,6 +1341,7 @@ workflows:
           requires:
             - run_preview
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview staging
           cluster: staging
           context:
@@ -1341,6 +1349,7 @@ workflows:
           requires:
             - run_preview
       - pulumi_preview:
+          <<: *main-branch-never
           name: preview testnet
           cluster: testnet
           context:
