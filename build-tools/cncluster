@@ -426,12 +426,6 @@ function subcmd_gcloud_logs() {
         shift
     fi
 
-    function maybe_open() {
-      if [ -z "${download_only-}" ] ; then
-        lnav "$1"
-      fi
-    }
-
     if [ -z "${1-}" ]; then
         _error "No namespace specified"
     fi
@@ -453,8 +447,21 @@ function subcmd_gcloud_logs() {
     LOGFILE=$(mktemp "$namespace"-"$app"-XXXX.clog)
     echo "Writing log to $LOGFILE"
 
-    gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter" \
-        | jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload' > "$LOGFILE" & maybe_open "$LOGFILE"
+    function gcloud_read() {
+        gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter"
+    }
+    function jq_parse() {
+        jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload'
+    }
+
+
+    if [ -z "${download_only-}" ]
+    then
+        gcloud_read | jq_parse > "$LOGFILE" &
+        lnav "$LOGFILE"
+    else
+        gcloud_read | jq_parse > "$LOGFILE"
+    fi
 }
 
 ###

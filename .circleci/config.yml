@@ -736,8 +736,9 @@ commands:
             # download various interesting logs since "20 minutes ago"
             duration=1200
             now=$(date -u +%s)
+            now_formatted=$(date -u -d @$now +"%Y-%m-%dT%H:%M:%S")
             before=$(date -u -d @$((now-duration)) +"%Y-%m-%dT%H:%M:%S")
-            query="timestamp>=\"$before\""
+            query="timestamp>=\"$before\" AND timestamp<=\"$now_formatted\""
             apps=(
               "sv-1 sv-app"
               "sv-2 sv-app"
