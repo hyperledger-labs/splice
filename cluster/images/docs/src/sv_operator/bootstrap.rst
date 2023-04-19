@@ -11,6 +11,7 @@ Prerequisites
 The availability of an onboarded and fully operational validator node under your control is a requirement to operating an SV node.
 Make sure you have completed the steps in :ref:`self_hosted_validator`,
 including the steps to setup a Canton participant node.
+However, if you still have the participant and validator running from the previous runbook, please terminate both (by hitting Ctrl+C in both terminals), we will be launching a new participant in this runbook.
 
 SV nodes must be connected to a Canton participant node that is configured to use persistent storage via a PostgreSQL database:
 

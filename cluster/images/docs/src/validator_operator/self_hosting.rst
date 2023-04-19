@@ -198,7 +198,7 @@ Configuring the Splitwell UI
 
 To use splitwell, you first need to connect your participant to the splitwell domain
 and upload the DAR.
-Go to the terminal you started Canton in and run:
+Go to the terminal in which you are running the validator (the one using "validator.conf"), and type:
 
 .. parsed-literal::
 
