@@ -19,7 +19,7 @@ parameters:
     default: "15"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-staging-tokens]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens]
     default: build
 
 notify-fail: &notify-fail
@@ -1166,7 +1166,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet"]
+        enum: ["staging", "devnet", "testnet", "scratchnet", "scratchnetb", "scratchnetc"]
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -1574,12 +1574,30 @@ workflows:
           - docker_images_push
           - deploy_cluster
 
-  refresh_staging_tokens:
+  daily_refresh_tokens:
     when:
-      equal: [ refresh-staging-tokens, << pipeline.parameters.run-job >> ]
+      equal: [ refresh-fixed-tokens, << pipeline.parameters.run-job >> ]
     jobs:
     - refresh_tokens:
         cluster: "staging"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - refresh_tokens:
+        cluster: "scratchnet"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - refresh_tokens:
+        cluster: "scratchnetb"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - refresh_tokens:
+        cluster: "scratchnetc"
         <<: *main-branch-only
         context:
           - artifactory

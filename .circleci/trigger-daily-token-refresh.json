@@ -1,10 +1,10 @@
 {
-    "name" : "Staging token refresh",
-    "description" : "Daily refresh of auth0 client credential tokens on staging",
+    "name" : "Daily fixed-tokens refresh",
+    "description" : "Daily refresh of auth0 client credential tokens",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "refresh-staging-tokens"
+      "run-job": "refresh-fixed-tokens"
     },
     "timetable" : {
       "per-hour" : 1,
