@@ -13,7 +13,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -53,15 +52,15 @@ class AdvanceOpenMiningRoundTrigger(
         rounds.newest.contractId,
         agreedCoinPrice.contractId,
       )
-      tx <- connection.submitCommandsNoDedupTransaction(
+      (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
+        cmd,
         domainId = domainId,
       )
       // make sure the store ingested our update so we don't
       // attempt to advance the same round twice
-      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, tx.getOffset())
+      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offset)
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )
