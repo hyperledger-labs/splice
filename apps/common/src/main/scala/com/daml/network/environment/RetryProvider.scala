@@ -193,11 +193,10 @@ class RetryProvider(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retry(
+    retryForClientCalls(
       operationName,
       task,
       logger,
-      retryForClientCallsConfig,
       RetryProvider.RetryableError(
         _,
         additionalCodes,
@@ -205,6 +204,24 @@ class RetryProvider(
         nonTransientDescription,
         fatalBehavior,
       ),
+    )
+
+  /** A retry intended for client calls, thus timing out relatively quickly. */
+  def retryForClientCalls[T](
+      operationName: String,
+      task: => Future[T],
+      logger: TracedLogger,
+      retryable: String => ExceptionRetryable,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[T] =
+    retry(
+      operationName,
+      task,
+      logger,
+      retryForClientCallsConfig,
+      retryable,
     )
 
   private def retry[T](

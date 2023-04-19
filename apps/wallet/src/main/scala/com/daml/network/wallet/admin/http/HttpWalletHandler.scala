@@ -2,6 +2,8 @@ package com.daml.network.wallet.admin.http
 
 import akka.stream.Materializer
 import cats.implicits.showInterpolator
+import com.daml.error.utils.ErrorDetails
+import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{Template, Unit as DUnit}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
@@ -24,25 +26,40 @@ import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  TracedLogger,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.{Codec, CNNodeUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, Codec, Contract}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.ShowStringSyntax
+import com.digitalasset.canton.util.retry.RetryUtil.{
+  ErrorKind,
+  ExceptionRetryable,
+  FatalErrorKind,
+  NoErrorKind,
+  TransientErrorKind,
+}
 import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
 import com.google.protobuf.Duration
+import io.grpc.protobuf.StatusProto
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
+import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,
@@ -521,16 +538,21 @@ class HttpWalletHandler(
       user: String
   ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-    (for {
-      result <- exerciseWalletCoinAction(
-        new coinoperation.CO_Tap(
-          amount
-        ),
-        user,
-        (outcome: coinoperationoutcome.COO_Tap) =>
-          d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
-      )
-    } yield result)
+    retryProvider.retryForClientCalls(
+      "Tap",
+      for {
+        result <- exerciseWalletCoinAction(
+          new coinoperation.CO_Tap(
+            amount
+          ),
+          user,
+          (outcome: coinoperationoutcome.COO_Tap) =>
+            d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
+        )
+      } yield result,
+      logger,
+      HttpWalletHandler.InactiveContractRetryable(_),
+    )
   }
 
   override def userStatus(respond: r0.UserStatusResponse.type)()(
@@ -726,6 +748,29 @@ class HttpWalletHandler(
 
     } yield {
       getResponse(result)
+    }
+  }
+}
+
+object HttpWalletHandler {
+  case class InactiveContractRetryable(operationName: String) extends ExceptionRetryable {
+    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = outcome match {
+      case Failure(ex: io.grpc.StatusRuntimeException)
+          if ex.getStatus.getCode == Status.Code.NOT_FOUND &&
+            ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+              case ErrorInfoDetail(InactiveContracts.id, _) => true
+              case _ => false
+            } =>
+        logger.info(
+          s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
+        )
+        TransientErrorKind
+      case Failure(ex) =>
+        logThrowable(ex, logger)
+        FatalErrorKind
+      case Success(_) => NoErrorKind
     }
   }
 }

@@ -12,7 +12,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
-import scala.util.Try
 
 class SvcTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
@@ -47,27 +46,15 @@ class SvcTimeBasedIntegrationTest
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       // tapping again..
-      Try(aliceWallet.tap(5)),
-      entries => {
-        forAtLeast(
-          1,
-          entries,
-        )( // .. will initially fail and lead to a cache invalidation..
-          _.message should include regex (
-            s"Invalidating the CoinRules cache"
-          )
-        )
-      },
-    )
-    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      // tapping once more..
       aliceWallet.tap(5),
       entries => {
         forAtLeast(
           1,
           entries,
         )(
-          _.message should include regex ( // will succeed thanks to cache refreshment
+          // will initially fail and lead to a cache invalidation.
+          // then the retry logic in tap will trigger cache refreshment
+          _.message should include regex (
             s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan"
           )
         )
