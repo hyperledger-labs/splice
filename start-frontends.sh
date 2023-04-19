@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-function start_envoy() {
-  cd "${REPO_ROOT}/envoy-proxy-dev"
-  ./start-envoy.sh
-  cd -
-}
-
-function check_envoy_running() {
-  ENVOY_PID=$(cat "${REPO_ROOT}/envoy-proxy-dev/envoy.pid")
-  if [[ -z "$(ps -p "$ENVOY_PID" -o pid=)" ]]; then
-    echo "envoy failed to start" >&2
-    return 1
-  fi
-}
-
 function tmux_cmd() {
   local title=$1
   local wd=$2
@@ -30,6 +16,27 @@ function tmux_cmd() {
   tmux send-keys -t "$t" "cd $wd" C-m
   tmux send-keys -t "$t" "$cmd" C-m
   tmux_window=$((tmux_window+1))
+}
+
+function start_envoy() {
+  jsonnet --tla-str hostname="127.0.0.1" "${REPO_ROOT}/envoy-proxy-dev/envoy.jsonnet" > "${REPO_ROOT}/envoy-proxy-dev/envoy-config.json"
+  if [ -z "$(which envoy)" ]; then
+    echo "envoy executable not found. On MacOS, please install envoy globally using brew" >&2
+    exit 1
+  fi
+  tmux_cmd "envoy" "${REPO_ROOT}/envoy-proxy-dev" "envoy --log-level debug --log-path ${LOG_DIR}/envoy-system.log -c envoy-config.json | tee ${LOG_DIR}/envoy-out.log 2>&1"
+}
+
+function check_envoy_running() {
+  # envoy refuses to come back to the foreground if originally started in the background,
+  # so we can't write out its PID in the same script we start it in
+  ENVOY_PID=$(pgrep envoy)
+  if [[ -z "$ENVOY_PID" ]] || [[ -z "$(ps -p "$ENVOY_PID" -o pid=)" ]]; then
+    echo "envoy is not running"
+    return 1
+  else
+    echo "envoy is running"
+  fi
 }
 
 function start_frontend() {
@@ -125,13 +132,20 @@ tmux_session="cn-frontends"
 tmux_window=0
 
 LOG_DIR="${REPO_ROOT}/log"
-start_envoy
-# envoy kills itself if we spend too much time in `start-envoy.sh`, hence we check this here...
-sleep 0.5s && check_envoy_running
 
 (cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
 
+if check_envoy_running; then
+  echo "envoy is already running, exiting"
+  exit 1
+fi
+
 tmux new-session -d -s "${tmux_session}"
+mkdir -p "${LOG_DIR}"
+
+start_envoy
+# envoy's startup is weird, so we check this here...
+sleep 0.5s && check_envoy_running
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
