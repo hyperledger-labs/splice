@@ -1,18 +1,12 @@
 package com.daml.network.util
 
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.console.{
-  CNRemoteParticipantReference,
-  LocalCNNodeAppReference,
-  ScanAppBackendReference,
-  ValidatorAppBackendReference,
-  WalletAppClientReference,
-}
+import com.daml.network.console.*
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -25,7 +19,6 @@ import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -176,7 +169,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     actAndCheck("advancing time", advanceTime(duration))(
       s"waiting for open and issuing round automation (should create OpenMiningRound ${highestOpen + 1}, should advance IssuingMiningRounds $previousIssuingRounds",
       _ =>
-        eventually(5.seconds) {
+        eventually() {
 
           val (newOpenRounds, newIssuingRounds) =
             scan.getOpenAndIssuingMiningRounds()
