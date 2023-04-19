@@ -145,7 +145,7 @@ mkdir -p "${LOG_DIR}"
 
 start_envoy
 # envoy's startup is weird, so we check this here...
-sleep 0.5s && check_envoy_running
+sleep 2s && check_envoy_running
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
