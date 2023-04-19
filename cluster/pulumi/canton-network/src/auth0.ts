@@ -2,7 +2,7 @@ import * as k8s from "@pulumi/kubernetes";
 
 import fetch from "node-fetch";
 
-import { ExactNamespace } from "./utils";
+import { ExactNamespace, fixedTokens } from "./utils";
 
 const appToClientId = {
   validator: "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
@@ -67,18 +67,56 @@ function getAuth0(): Promise<Auth0SecretMap> {
 
 const auth0Secrets = getAuth0();
 
-function auth0Secret(allSecrets: Auth0SecretMap, clientName: string) {
+function getClientToken(
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  return fetch("https://canton-network-dev.us.auth0.com/oauth/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      audience: "https://canton.network.global",
+      grant_type: "client_credentials",
+    }),
+  })
+    .then((response) => {
+      if (response.ok) {
+        return response.json();
+      }
+      console.error("Error fetching clientToken: " + response.statusText);
+      process.exit(1);
+    })
+    .then((data: any) => data.access_token);
+}
+
+function auth0Secret(
+  allSecrets: Auth0SecretMap,
+  clientName: string
+): Promise<{ [key: string]: string }> {
   const clientSecrets = allSecrets.get(appToClientId[clientName]) || {};
 
   const clientId = clientSecrets["client_id"] || "";
   const clientSecret = clientSecrets["client_secret"] || "";
 
-  return {
-    url: "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration",
-    "client-id": clientId,
-    "client-secret": clientSecret,
-    "ledger-api-user": clientId + "@clients",
-  };
+  if (fixedTokens()) {
+    return getClientToken(clientId, clientSecret).then((accessToken) => {
+      return {
+        token: accessToken,
+        "ledger-api-user": clientId + "@clients",
+      };
+    });
+  } else {
+    return Promise.resolve({
+      url: "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration",
+      "client-id": clientId,
+      "client-secret": clientSecret,
+      "ledger-api-user": clientId + "@clients",
+    });
+  }
 }
 
 export function installAuth0Secret(

@@ -8,7 +8,7 @@ import {
   installAuth0UISecret,
 } from "./auth0";
 
-import { exactNamespace, installCNHelmChart } from "./utils";
+import { exactNamespace, fixedTokens, installCNHelmChart } from "./utils";
 import { installDomain, installParticipant } from "./ledger";
 
 export function installSplitwell(
@@ -59,6 +59,16 @@ export function installSplitwell(
     installAuth0UISecret(xns, "wallet", "splitwell"),
   ];
 
+  var fixedTokenConfig = fixedTokens()
+    ? [
+        "_client_credentials_auth_config = null",
+        "_client_credentials_auth_config = {",
+        '  type = "static"',
+        "  token = ${CN_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
+        "}",
+      ]
+    : [];
+
   return installCNHelmChart(
     xns,
     "splitwell",
@@ -67,10 +77,11 @@ export function installSplitwell(
       postgres: postgresDb,
       additionalUsers: [auth0UserNameEnvVar("splitwell")],
       additionalConfig: [
-        "  canton.validator-apps.validator_backend.app-instances.splitwise = {",
-        "    service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}",
-        "    wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}",
-        '    dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
+        ...fixedTokenConfig,
+        "canton.validator-apps.validator_backend.app-instances.splitwise = {",
+        "  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}",
+        "  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}",
+        '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
         "}",
       ].join("\n"),
     },

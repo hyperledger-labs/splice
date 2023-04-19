@@ -93,28 +93,33 @@ local deployments(config) = [
     ] },
   ]),
 
-  c.deployment(config + validatorConfigOverrides, "validator-app", [
-    {
-      name: "sw-val",
-      port: 5003,
-      internalOnly: true,
-    },
-  ], image="validator-app", namespace="splitwell", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "validator", "validator") +
-                                                             c.appUserNameEnvBinding("splitwell") +
-                                                             [
-                                                               {
-                                                                 name: "ADDITIONAL_CONFIG",
-                                                                 value: |||
-                                                                   canton.validator-apps.validator_backend.app-instances.splitwise = {
-                                                                     service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}
-                                                                     wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}
-                                                                     dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
-                                                                   }
-                                                                 |||,
-                                                               },
-                                                               { name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }
-                                                               { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
-                                                             ]),
+  c.deployment(config + validatorConfigOverrides,
+               "validator-app",
+               [
+                 {
+                   name: "sw-val",
+                   port: 5003,
+                   internalOnly: true,
+                 },
+               ],
+               image="validator-app",
+               namespace="splitwell",
+               extraEnvVars=c.appAuthEnvBinding(config, "validator", "validator") +
+                            c.appUserNameEnvBinding("splitwell") +
+                            [
+                              {
+                                name: "ADDITIONAL_CONFIG",
+                                value: |||
+                                  canton.validator-apps.validator_backend.app-instances.splitwise = {
+                                    service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}
+                                    wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}
+                                    dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]
+                                  }
+                                |||,
+                              },
+                              { name: "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME", value: "auth0|63e12e0415ad881ffe914e61" }
+                              { name: "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS", value: "participant" },
+                            ]),
 
   c.deployment(config, "wallet-web-ui", [
     {
@@ -137,7 +142,7 @@ local deployments(config) = [
       name: "sw-api",
       port: 5213,
     },
-  ], namespace="splitwell", proxyToGrpcWeb=["sw-api"], extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "splitwell")),
+  ], namespace="splitwell", proxyToGrpcWeb=["sw-api"], extraEnvVars=c.appAuthEnvBinding(config, "splitwell")),
 ];
 
 

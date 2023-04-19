@@ -20,7 +20,7 @@ local deployments(num, config) =
         },
       ],
       image="sv-app",
-      extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "sv") + [
+      extraEnvVars=c.appAuthEnvBinding(config, "sv") + [
         { name: "CN_APP_SV_ADMIN_API_PORT", value: std.toString(port) },
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
         {

@@ -1118,10 +1118,17 @@ function subcmd_papply() {
     dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
                      | jq -r '.data["key.json"]')
 
-    subcmd_pulumi up --yes --show-sames \
-                  -c "IMAGE_TAG=${IMAGE_TAG}" \
-                  -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
-                  -c "DNS_SA_KEY=${dns_sa_key}"
+    args=(-c "IMAGE_TAG=${IMAGE_TAG}"
+          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
+          -c "DNS_SA_KEY=${dns_sa_key}")
+
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
+    else
+        args+=(-c "FIXED_TOKENS=0")
+    fi
+
+    subcmd_pulumi up --yes --show-sames "${args[@]}"
 }
 ###
 

@@ -131,14 +131,14 @@ local deployments(config) = [
       name: "dir-api",
       port: 5010,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "directory")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "directory")),
 
   c.deployment(config, "svc-app", [
     {
       name: "svc-app-adm-api",
       port: 5005,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "svc")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "svc")),
 
   [svnode.deployments(num, config) for num in std.range(1, config.numberOfSvNodes)],
 
@@ -147,7 +147,7 @@ local deployments(config) = [
       name: "scan-api",
       port: 5012,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config.fixedTokens, "scan")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "scan")),
 
   c.deployment(config, "scan-web-ui", [
     {

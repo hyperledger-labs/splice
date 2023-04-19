@@ -23,7 +23,7 @@ spec:
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" "scan" | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
         imagePullPolicy: Always
         ports:
         - containerPort: 5012

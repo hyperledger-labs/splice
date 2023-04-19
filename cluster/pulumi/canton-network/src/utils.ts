@@ -77,6 +77,10 @@ function loadJsonFromFile(path: PathLike): any {
   }
 }
 
+export function fixedTokens() {
+  return config.require("FIXED_TOKENS") !== "0";
+}
+
 export function cnChartValues(
   chartPath: string,
   overrideValues: any = {}
@@ -95,6 +99,7 @@ export function cnChartValues(
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
+        fixedTokens: fixedTokens(),
         imageTag: config.require("IMAGE_TAG"),
         ipAddress: infraStack.getOutput("clusterIp"),
         dnsName: CLUSTER_DNS_NAME,
