@@ -14,4 +14,5 @@ const reader = new ConfigReader(
     }),
   })
 );
+
 export const config = reader.loadConfig();

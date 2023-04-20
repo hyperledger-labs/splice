@@ -26,8 +26,6 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
 
   "A wallet transaction history UI" should {
 
-    val aliceWalletNewPort = 3007
-
     "show all subscription payments" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
@@ -40,7 +38,7 @@ class WalletNewTransactionHistoryTimeBasedIntegrationTest
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {
             // alice's directory - also taps 5 CC
-            browseToWallet(aliceWalletNewPort, aliceDamlUser)
+            browseToAliceWallet(aliceDamlUser)
           },
         )(
           "Alice sees the transactions",

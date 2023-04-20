@@ -6,12 +6,13 @@ window.canton_network_config = {
     token_audience: 'https://canton.network.global',
   },
   // OIDC client configuration, see https://authts.github.io/oidc-client-ts/interfaces/UserManagerSettings.html
-  // auth: {
-  //   algorithm: 'rs-256',
-  //   authority: "",
-  //   client_id: "",
-  //   token_audience: "https://cn_api.example.com",
-  // },
+  //   auth: {
+  //     algorithm: 'rs-256',
+  //     authority: "",
+  //     client_id: "",
+  //     token_audience: "https://canton.network.global",
+  //     token_scope: "daml_ledger_api",
+  //   },
   services: {
     wallet: {
       // URL of the wallet app HTTP API

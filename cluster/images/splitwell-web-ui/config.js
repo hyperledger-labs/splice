@@ -16,7 +16,7 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: window.location.origin.replace("splitwell", "wallet-new"),
+      uiUrl: window.location.origin.replace("splitwell", "wallet"),
     },
     splitwell: {
       // URL of the gRPC-Web envoy proxy, proxying the splitwell gRPC API

@@ -28,8 +28,6 @@ class WalletNewPaymentFrontendIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
 
-  val aliceWalletNewPort = 3007
-
   "A wallet payments UI" should {
 
     "for single receiver" should {
@@ -59,8 +57,8 @@ class WalletNewPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice goes to the page to confirm the payment", {
-              go to s"http://localhost:$aliceWalletNewPort/confirm-payment/${paymentRequestContractId.contractId}"
-              loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+              go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
+              loginOnCurrentPage(3000, aliceDamlUser)
             },
           )(
             "Alice sees the payment information",
@@ -88,7 +86,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
               )
-              go to s"http://localhost:$aliceWalletNewPort"
+              go to s"http://localhost:3000"
             },
           )(
             "The payment is shown on Alice's transactions",
@@ -131,8 +129,8 @@ class WalletNewPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice goes to the page to confirm the payment", {
-              go to s"http://localhost:$aliceWalletNewPort/confirm-payment/${paymentRequestContractId.contractId}"
-              loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+              go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
+              loginOnCurrentPage(3000, aliceDamlUser)
             },
           )(
             "Alice sees the payment information",
@@ -160,7 +158,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
               )
-              go to s"http://localhost:$aliceWalletNewPort"
+              go to s"http://localhost:3000"
             },
           )(
             "The payment is shown on Alice's transactions",
@@ -208,8 +206,8 @@ class WalletNewPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice goes to the page to confirm the payment", {
-              go to s"http://localhost:$aliceWalletNewPort/confirm-payment/${paymentRequestContractId.contractId}"
-              loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+              go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
+              loginOnCurrentPage(3000, aliceDamlUser)
             },
           )(
             "Alice sees the payment information",
@@ -239,7 +237,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
               )
-              go to s"http://localhost:$aliceWalletNewPort"
+              go to s"http://localhost:3000"
             },
           )(
             "The payment is shown on Alice's transactions",
@@ -283,8 +281,8 @@ class WalletNewPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice goes to the page to confirm the payment", {
-              go to s"http://localhost:$aliceWalletNewPort/confirm-payment/${paymentRequestContractId.contractId}"
-              loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+              go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
+              loginOnCurrentPage(3000, aliceDamlUser)
             },
           )(
             "Alice sees the payment information",
@@ -314,7 +312,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
               )
-              go to s"http://localhost:$aliceWalletNewPort"
+              go to s"http://localhost:3000"
             },
           )(
             "The payment is shown on Alice's transactions",
@@ -358,8 +356,8 @@ class WalletNewPaymentFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice goes to the page to confirm the payment", {
-              go to s"http://localhost:$aliceWalletNewPort/confirm-payment/${paymentRequestContractId.contractId}"
-              loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+              go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
+              loginOnCurrentPage(3000, aliceDamlUser)
             },
           )(
             "Alice sees the payment information",
@@ -389,7 +387,7 @@ class WalletNewPaymentFrontendIntegrationTest
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
               )
-              go to s"http://localhost:$aliceWalletNewPort"
+              go to s"http://localhost:3000"
             },
           )(
             "The payment is shown on Alice's transactions",
@@ -418,7 +416,7 @@ class WalletNewPaymentFrontendIntegrationTest
     actAndCheck(
       "Alice clicks on the button to confirm the payment", {
         click on className("payment-accept")
-        go to s"http://localhost:$aliceWalletNewPort"
+        go to s"http://localhost:3000"
       },
     )(
       "The payment is processed",

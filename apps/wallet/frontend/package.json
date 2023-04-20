@@ -1,30 +1,7 @@
 {
   "name": "wallet-frontend",
-  "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@daml.js/canton-coin": "file:../../common/frontend/daml.js/canton-coin-0.1.0",
-    "@daml.js/wallet": "file:../../common/frontend/daml.js/wallet-0.1.0",
-    "@daml.js/wallet-payments": "file:../../common/frontend/daml.js/wallet-payments-0.1.0",
-    "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
-    "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
-    "@emotion/react": "^11.10.0",
-    "@emotion/styled": "^11.10.0",
-    "@mui/icons-material": "^5.10.16",
-    "@mui/lab": "^5.0.0-alpha.93",
-    "@mui/material": "^5.9.3",
-    "bignumber.js": "^9.1.1",
-    "common-frontend": "^0.1.0",
-    "common-protobuf": "^0.1.0",
-    "grpc-web": "^1.4.1",
-    "oidc-client-ts": "^2.2.1",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "react-oidc-context": "^2.2.0",
-    "react-router-dom": "^6.4.2",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
-  },
+  "version": "0.1.0",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -38,6 +15,32 @@
     "lint:fix": "eslint src --fix",
     "lint:check": "eslint src --max-warnings=0"
   },
+  "dependencies": {
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "@mui/icons-material": "latest",
+    "@mui/material": "latest",
+    "bignumber.js": "^9.1.1",
+    "common-frontend": "^0.1.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "^6.8.1",
+    "react-scripts": "^5.0.1"
+  },
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^4.0.0",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "eslint": "^8.34.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "prettier": "^2.8.4",
+    "typescript": "^4.9.5"
+  },
   "browserslist": {
     "production": [
       ">0.2%",
@@ -49,18 +52,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^5.16.5",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^14.4.3",
-    "@trivago/prettier-plugin-sort-imports": "^3.3.0",
-    "@types/google-protobuf": "^3.15.6",
-    "@types/jest": "^29.2.0",
-    "@types/node": "^18.11.0",
-    "@types/react": "^18.0.21",
-    "@types/react-dom": "^18.0.6",
-    "prettier": "^2.7.1",
-    "typescript": "^4.8.4"
   }
 }

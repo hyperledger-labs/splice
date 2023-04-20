@@ -25,8 +25,6 @@ class WalletNewTransactionHistoryIntegrationTest
 
   "A wallet transaction history UI" should {
 
-    val aliceWalletNewPort = 3007
-
     "show all types of transactions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
@@ -43,7 +41,7 @@ class WalletNewTransactionHistoryIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
           "Alice goes to her wallet", {
-            browseToWallet(aliceWalletNewPort, aliceDamlUser)
+            browseToAliceWallet(aliceDamlUser)
           },
         )(
           "Alice sees no transactions",

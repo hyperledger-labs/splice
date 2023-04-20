@@ -91,7 +91,7 @@ class Validator1PreflightIntegrationTest
   // differs from the latest one on your branch
 
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
     val aliceUser = auth0Users.get("alice-validator1").value
 
@@ -169,7 +169,7 @@ class Validator1PreflightIntegrationTest
 
     val groupName = "troika"
 
-    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val splitwellUiUrl = s"https://splitwell.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val aliceUser = auth0Users.get("alice-validator1").value
     val bobUser = auth0Users.get("bob-validator1").value
@@ -243,7 +243,7 @@ class Validator1PreflightIntegrationTest
   }
 
   "test a directory entry allocation against validator1" taggedAs LiveDevNetTest in { _ =>
-    val walletUiUrl = s"https://wallet-new.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 

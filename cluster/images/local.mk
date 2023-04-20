@@ -9,7 +9,6 @@ images := \
 	scan-app \
 	scan-web-ui \
 	directory-app \
-	wallet-new-web-ui \
 	wallet-web-ui \
 	validator-app \
 	splitwell-app \

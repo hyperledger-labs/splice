@@ -29,8 +29,6 @@ class WalletNewFrontendTimeBasedIntegrationTest
 
   "A wallet UI" should {
 
-    val aliceWalletNewPort = 3007
-
     "onboard a new user" in { implicit env =>
       // Note: the test generates a unique user for each test
       val newRandomUser = aliceWallet.config.ledgerApiUser
@@ -55,7 +53,7 @@ class WalletNewFrontendTimeBasedIntegrationTest
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       onboardWalletUser(aliceWallet, aliceValidator)
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         actAndCheck(
           "Alice logs out", {
             click on "logout-button"
@@ -81,7 +79,7 @@ class WalletNewFrontendTimeBasedIntegrationTest
       }
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         eventually() {
           val loggedInUser = find(id("logged-in-user")).value.text.trim
           loggedInUser shouldBe entryName
@@ -95,7 +93,7 @@ class WalletNewFrontendTimeBasedIntegrationTest
       val alicePartyId = onboardWalletUser(aliceWallet, aliceValidator)
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         eventually() {
           val loggedInUser = find(id("logged-in-user")).value.text.trim
           loggedInUser shouldBe alicePartyId.toProtoPrimitive
@@ -121,7 +119,7 @@ class WalletNewFrontendTimeBasedIntegrationTest
       )
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
 
         eventually() {
           val ccText = find(id("wallet-balance-cc")).value.text.trim

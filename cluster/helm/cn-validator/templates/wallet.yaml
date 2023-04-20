@@ -2,68 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: wallet-new-web-ui
-  name: wallet-new-web-ui
-  namespace: {{ .Release.Namespace }}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: wallet-new-web-ui
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: wallet-new-web-ui
-    spec:
-      containers:
-      - env:
-        - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
-        - name: CN_APP_WALLET_UI_AUTH_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              key: client-id
-              name: cn-app-wallet-ui-auth
-              optional: false
-        - name: CN_APP_WALLET_UI_AUTH_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: cn-app-wallet-ui-auth
-              optional: false
-        image: "{{ .Values.imageRepo }}/wallet-new-web-ui:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        name: wallet-new-web-ui
-        ports:
-        - containerPort: 80
-          name: http
-          protocol: TCP
-        resources:
-          limits:
-            memory: 1536Mi
-          requests:
-            cpu: 500m
-            memory: 1536Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: wallet-new-web-ui
-  namespace: {{ .Release.Namespace }}
-spec:
-  selector:
-    app: wallet-new-web-ui
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
     app: wallet-web-ui
   name: wallet-web-ui
   namespace: {{ .Release.Namespace }}

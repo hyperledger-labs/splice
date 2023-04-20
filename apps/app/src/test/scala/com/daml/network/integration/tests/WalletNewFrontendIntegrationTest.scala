@@ -23,8 +23,6 @@ class WalletNewFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    val aliceWalletNewPort = 3007
-
     "tap" should {
 
       def onboardAndTapTest(damlUser: String) = {
@@ -32,7 +30,7 @@ class WalletNewFrontendIntegrationTest
           actAndCheck(
             "User logs in", {
               // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
-              login(aliceWalletNewPort, damlUser)
+              login(3000, damlUser)
             },
           )(
             "User sees the onboarding page",
@@ -100,7 +98,7 @@ class WalletNewFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice taps balance with more than 10 decimal places in the wallet", {
-              browseToWallet(aliceWalletNewPort, aliceDamlUser)
+              browseToAliceWallet(aliceDamlUser)
               loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(WARN))(
                 {
                   // Using tapCoins will fail the assertion within
@@ -144,7 +142,7 @@ class WalletNewFrontendIntegrationTest
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice logs in", {
-              browseToWallet(aliceWalletNewPort, aliceWallet.config.ledgerApiUser)
+              browseToAliceWallet(aliceWallet.config.ledgerApiUser)
             },
           )(
             "Alice is initially NOT featured",
@@ -201,7 +199,7 @@ class WalletNewFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
           "Alice browses to the wallet", {
-            browseToWallet(aliceWalletNewPort, aliceDamlUser)
+            browseToAliceWallet(aliceDamlUser)
           },
         )(
           "Alice sees her directory entry name",

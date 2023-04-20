@@ -83,14 +83,6 @@ local deployments(config) = [
     },
   ], image="wallet-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
 
-  c.deployment(config, "wallet-new-web-ui", [
-    {
-      name: "val1-wal-new-ui",
-      port: 80,
-      internalOnly: true,
-    },
-  ], image="wallet-new-web-ui", namespace="validator1", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
-
   c.deployment(config, "directory-web-ui", [
     {
       name: "val1-dir-ui",

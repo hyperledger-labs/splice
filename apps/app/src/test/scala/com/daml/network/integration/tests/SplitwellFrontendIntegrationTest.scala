@@ -123,7 +123,7 @@ class SplitwellFrontendIntegrationTest
         // Bob is redirected to wallet ..
         loginOnCurrentPage(3001, bobDamlUser)
 
-        click on className("accept-button")
+        click on className("payment-accept")
 
         // And then back to splitwell, where he is already logged in
         eventually() {
@@ -199,7 +199,7 @@ class SplitwellFrontendIntegrationTest
         // Bob is redirected to wallet ..
         loginOnCurrentPage(3001, bobDamlUser)
 
-        click on className("accept-button")
+        click on className("payment-accept")
 
         // And then back to splitwell, where he is already logged in
         eventually(scaled(5 seconds)) {

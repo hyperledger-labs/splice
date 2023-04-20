@@ -1,25 +1,46 @@
-import { Contract, OpenAPILoggingMiddleware, UserStatusResponse } from 'common-frontend';
-import { useUserState } from 'common-frontend';
-import { Decimal } from 'decimal.js';
+import BigNumber from 'bignumber.js';
+import {
+  Contract,
+  OpenAPILoggingMiddleware,
+  UserStatusResponse,
+  useUserState,
+} from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
-  Middleware,
   createConfiguration,
-  WalletApi,
-  ServerConfiguration,
+  ListTransactionsRequest,
+  Middleware,
   RequestContext,
   ResponseContext,
-  CoinPosition,
+  ServerConfiguration,
+  WalletApi,
 } from 'wallet-openapi';
 
-import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
-  SubscriptionRequest,
   Subscription,
+  SubscriptionContext,
   SubscriptionIdleState,
   SubscriptionPayment,
+  SubscriptionRequest,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
+
+import {
+  Automation,
+  BalanceChange,
+  ListAcceptedTransferOffersResponse,
+  ListResponse,
+  ListSubscriptionRequestsResponse,
+  ListSubscriptionsResponse,
+  ListTransferOffersResponse,
+  Transaction,
+  Transfer,
+  WalletBalance,
+  SubscriptionRequestWithContext,
+  AppPaymentRequest,
+} from '../models/models';
+import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
@@ -27,52 +48,15 @@ export interface WalletProps {
   url: string;
 }
 
-export interface GetBalanceResponse {
-  round: number;
-  effectiveUnlockedQty: string;
-  effectiveLockedQty: string;
-  totalHoldingFees: string;
-}
-
-export interface ListResponse {
-  lockedCoins: CoinPosition[];
-  coins: CoinPosition[];
-}
-
-export interface ListTransferOffersResponse {
-  offersList: Contract<TransferOffer>[];
-}
-
-export interface ListAcceptedTransferOffersResponse {
-  acceptedOffersList: Contract<AcceptedTransferOffer>[];
-}
-
-export interface ListAppPaymentRequestsResponse {
-  paymentRequestsList: Contract<AppPaymentRequest>[];
-}
-
-export interface ListSubscriptionRequestsResponse {
-  subscriptionRequestsList: Contract<SubscriptionRequest>[];
-}
-
-export type SubscriptionTuple = [Contract<Subscription>, SubscriptionState];
-
-export type SubscriptionState =
-  | { type: 'idle'; value: Contract<SubscriptionIdleState> }
-  | { type: 'payment'; value: Contract<SubscriptionPayment> };
-
-export interface ListSubscriptionsResponse {
-  subscriptionsList: SubscriptionTuple[];
-}
-
 export interface WalletClient {
   tap: (amount: string) => Promise<void>;
   list: () => Promise<ListResponse>;
-  getBalance: () => Promise<GetBalanceResponse>;
+  getBalance: () => Promise<WalletBalance>;
+  listTransactions: (beginAfterId?: string) => Promise<Transaction[]>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
-    amount: Decimal,
+    amount: BigNumber,
     description: string,
     expiresAt: Date,
     idempotencyKey: string
@@ -82,10 +66,11 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
-  listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
+  getAppPaymentRequest: (contractId: string) => Promise<AppPaymentRequest>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
+  getSubscriptionRequest: (contractId: string) => Promise<SubscriptionRequestWithContext>;
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
   listSubscriptions: () => Promise<ListSubscriptionsResponse>;
@@ -95,23 +80,9 @@ export interface WalletClient {
   selfGrantFeaturedAppRights: () => Promise<void>;
 }
 
-class ApiMiddleware implements Middleware {
-  private token: string | undefined;
-
-  async pre(context: RequestContext): Promise<RequestContext> {
-    if (!this.token) {
-      throw new Error('Request issued before access token was set');
-    }
-    context.setHeaderParam('Authorization', `Bearer ${this.token}`);
-    return context;
-  }
-  post(context: ResponseContext): Promise<ResponseContext> {
-    return Promise.resolve(context);
-  }
-  constructor(accessToken: string | undefined) {
-    this.token = accessToken;
-  }
-}
+class ApiMiddleware
+  extends BaseApiMiddleware<RequestContext, ResponseContext>
+  implements Middleware {}
 
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
   url,
@@ -141,14 +112,60 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const request = { amount: amount };
         await walletClient.tap(request);
       },
-      getBalance: async (): Promise<GetBalanceResponse> => {
+      getBalance: async (): Promise<WalletBalance> => {
         const balance = await walletClient.getBalance();
         return {
-          round: balance.round,
-          effectiveUnlockedQty: balance.effectiveUnlockedQty,
-          effectiveLockedQty: balance.effectiveLockedQty,
-          totalHoldingFees: balance.totalHoldingFees,
+          availableCC: new BigNumber(balance.effectiveUnlockedQty),
         };
+      },
+      listTransactions: async (beginAfterId?: string): Promise<Transaction[]> => {
+        const request: ListTransactionsRequest = { pageSize: 10, beginAfterId };
+        const response = await walletClient.listTransactions(request);
+        return response.items.flatMap<Transaction>(item => {
+          const id = item.eventId;
+          const receivers = (item.receivers || []).map(r => ({
+            amount: new BigNumber(r.amount),
+            party: r.party,
+          }));
+          const date = item.date;
+
+          if (item.transactionType === 'balance_change') {
+            const balanceChange: BalanceChange = {
+              transactionType: 'balance_change',
+              id,
+              date,
+              receivers,
+            };
+            return [balanceChange];
+          } else if (item.transactionType === 'transfer') {
+            const isAutomation = item.transactionSubtype === 'wallet_automation';
+            if (isAutomation) {
+              const automation: Automation = {
+                transactionType: 'automation',
+                id,
+                date,
+                providerId: item.provider!,
+                senderAmountCC: new BigNumber(item.sender!.amount),
+              };
+              return [automation];
+            } else {
+              const transfer: Transfer = {
+                transactionType: 'transfer',
+                id,
+                date,
+                receivers,
+                // sender and provider MUST be available for transfer
+                providerId: item.provider!,
+                senderId: item.sender!.party,
+                senderAmountCC: new BigNumber(item.sender!.amount),
+              };
+              return [transfer];
+            }
+          } else {
+            console.error('Unsupported transaction type.', item);
+            return [];
+          }
+        });
       },
       createTransferOffer: async (
         receiverPartyId,
@@ -159,7 +176,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       ) => {
         const request = {
           receiverPartyId: receiverPartyId,
-          amount: amount.isInt() ? amount.toFixed(1) : amount.toString(),
+          amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
           description: description,
           expiresAt: expiresAt.getTime() * 1000,
           idempotencyKey: idempotencyKey,
@@ -189,14 +206,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           ),
         };
       },
-
-      listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
-        const res = await walletClient.listAppPaymentRequests();
-        return {
-          paymentRequestsList: res.paymentRequests.map(c =>
-            Contract.decodeOpenAPI(c.appPaymentRequest, AppPaymentRequest)
-          ),
-        };
+      getAppPaymentRequest: async contractId => {
+        const response = await walletClient.getAppPaymentRequest(contractId);
+        const appPaymentRequest = Contract.decodeOpenAPI(
+          response.appPaymentRequest,
+          payment.AppPaymentRequest
+        );
+        const deliveryOffer = Contract.decodeOpenAPI(response.deliveryOffer, payment.DeliveryOffer);
+        return { appPaymentRequest, deliveryOffer };
       },
       acceptAppPaymentRequest: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(requestContractId);
@@ -204,13 +221,26 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       rejectAppPaymentRequest: async requestContractId => {
         await walletClient.rejectAppPaymentRequest(requestContractId);
       },
-
+      getSubscriptionRequest: async contractId => {
+        const response = await walletClient.getSubscriptionRequest(contractId);
+        const subscriptionRequest = Contract.decodeOpenAPI(
+          response.subscriptionRequest,
+          SubscriptionRequest
+        );
+        const context = Contract.decodeOpenAPI(response.context, SubscriptionContext);
+        return { subscriptionRequest, context };
+      },
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
         const res = await walletClient.listSubscriptionRequests();
         return {
-          subscriptionRequestsList: res.subscriptionRequests.map(c =>
-            Contract.decodeOpenAPI(c.subscriptionRequest, SubscriptionRequest)
-          ),
+          subscriptionRequestsList: res.subscriptionRequests.map(sr => {
+            const subscription = Contract.decodeOpenAPI(
+              sr.subscriptionRequest,
+              SubscriptionRequest
+            );
+            const context = Contract.decodeOpenAPI(sr.context, SubscriptionContext);
+            return { subscriptionRequest: subscription, context };
+          }),
         };
       },
       acceptSubscriptionRequest: async requestContractId => {
@@ -220,7 +250,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.listSubscriptions();
         return {
           subscriptionsList: res.subscriptions.map(sub => {
-            const main = Contract.decodeOpenAPI(sub.subscription, Subscription);
+            const subscription = Contract.decodeOpenAPI(sub.subscription, Subscription);
             const state = sub.state.payment
               ? {
                   type: 'payment' as 'payment',
@@ -230,7 +260,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
                   type: 'idle' as 'idle',
                   value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
                 };
-            return [main, state];
+            const context = Contract.decodeOpenAPI(sub.context, SubscriptionContext);
+            return { subscription, state, context };
           }),
         };
       },

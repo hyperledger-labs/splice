@@ -29,8 +29,6 @@ class WalletNewSubscriptionsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    val aliceWalletNewPort = 3007
-
     "show and cancel subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidator)
@@ -60,7 +58,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       )
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         val (_, subscriptionRows) = actAndCheck(
           "Alice goes to the subscriptions page", {
             click on "navlink-subscriptions"
@@ -113,7 +111,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       }
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         actAndCheck(
           "Alice goes to the subscriptions page", {
             click on "navlink-subscriptions"
@@ -143,8 +141,8 @@ class WalletNewSubscriptionsFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
           "Alice goes to the confirm-subscription page", {
-            go to s"http://localhost:$aliceWalletNewPort/confirm-subscription/${subCid.contractId}"
-            loginOnCurrentPage(aliceWalletNewPort, aliceDamlUser)
+            go to s"http://localhost:3000/confirm-subscription/${subCid.contractId}"
+            loginOnCurrentPage(3000, aliceDamlUser)
           },
         )(
           "She sees the data of the subscription request",
@@ -178,7 +176,7 @@ class WalletNewSubscriptionsFrontendIntegrationTest
 
         actAndCheck(
           "Alice sees the subscription in the list", {
-            go to s"http://localhost:$aliceWalletNewPort" // already logged in
+            go to s"http://localhost:3000" // already logged in
             click on "navlink-subscriptions"
           },
         )(

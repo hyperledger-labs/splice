@@ -9,33 +9,20 @@ import {
   ResponseContext,
 } from 'validator-openapi';
 
+import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
+
 const ValidatorContext = React.createContext<ValidatorClient | undefined>(undefined);
 
 export interface ValidatorProps {
   url: string;
 }
-
 export interface ValidatorClient {
   registerUser: () => Promise<void>;
 }
 
-class ApiMiddleware implements Middleware {
-  private token: string | undefined;
-
-  async pre(context: RequestContext): Promise<RequestContext> {
-    if (!this.token) {
-      throw new Error('Request issued before access token was set');
-    }
-    context.setHeaderParam('Authorization', `Bearer ${this.token}`);
-    return context;
-  }
-  post(context: ResponseContext): Promise<ResponseContext> {
-    return Promise.resolve(context);
-  }
-  constructor(accessToken: string | undefined) {
-    this.token = accessToken;
-  }
-}
+class ApiMiddleware
+  extends BaseApiMiddleware<RequestContext, ResponseContext>
+  implements Middleware {}
 
 export const ValidatorClientProvider: React.FC<React.PropsWithChildren<ValidatorProps>> = ({
   url,
@@ -56,7 +43,7 @@ export const ValidatorClientProvider: React.FC<React.PropsWithChildren<Validator
 
     return {
       registerUser: async (): Promise<void> => {
-        validatorClient.register();
+        await validatorClient.register();
       },
     };
   }, [url, userAccessToken]);

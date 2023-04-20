@@ -26,8 +26,6 @@ class WalletNewTransfersFrontendIntegrationTest
       .withCoinPrice(coinPrice)
 
   "A wallet UI" should {
-    val aliceWalletNewPort = 3007
-    val bobWalletNewPort = 3008
 
     "create a p2p transfer" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
@@ -50,7 +48,7 @@ class WalletNewTransfersFrontendIntegrationTest
       bobWallet.listTransferOffers() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
 
         actAndCheck(
           "alice creates transfer offer", {
@@ -78,7 +76,7 @@ class WalletNewTransfersFrontendIntegrationTest
       withFrontEnd("bob") { implicit webDriver =>
         actAndCheck(
           "Bob goes to his wallet", {
-            browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+            browseToBobWallet(bobWallet.config.ledgerApiUser)
           },
         )(
           "He sees the transfer offer",
@@ -140,7 +138,7 @@ class WalletNewTransfersFrontendIntegrationTest
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         eventually() {
           val offerCards = findAll(className("transfer-offer")).toList
 
@@ -199,7 +197,7 @@ class WalletNewTransfersFrontendIntegrationTest
       )
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
         clue("Alice can't see transfer offers she created") {
           eventually() {
             findAll(className("transfer-offer")).toList should have size 0
@@ -229,13 +227,13 @@ class WalletNewTransfersFrontendIntegrationTest
       actAndCheck(
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
-          browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+          browseToBobWallet(bobWallet.config.ledgerApiUser)
           createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
 
         eventually() {
           findAll(className("transfer-offer")).toList.size shouldBe 1
@@ -277,13 +275,13 @@ class WalletNewTransfersFrontendIntegrationTest
       actAndCheck(
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
-          browseToWallet(bobWalletNewPort, bobWallet.config.ledgerApiUser)
+          browseToBobWallet(bobWallet.config.ledgerApiUser)
           createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
 
       withFrontEnd("alice") { implicit webDriver =>
-        browseToWallet(aliceWalletNewPort, aliceDamlUser)
+        browseToAliceWallet(aliceDamlUser)
 
         eventually() {
           findAll(className("transfer-offer")) should have size 1

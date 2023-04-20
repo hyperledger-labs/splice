@@ -33,11 +33,11 @@ class WalletNewAuth0FrontendIntegrationTest
   "A wallet UI with a backend configured to accept auth0 tokens" should {
     "allow login via auth0 and persist user name on refresh" taggedAs LocalAuth0Test in {
       implicit env =>
-        withAuth0LoginCheck("randomUser", 3007) { (userPartyId, wd) =>
+        withAuth0LoginCheck("randomUser", 3000) { (userPartyId, wd) =>
           implicit val webDriver: WebDriverType = wd
           actAndCheck(
             "The user reloads the page", {
-              go to s"http://localhost:3007"
+              go to s"http://localhost:3000"
             },
           )(
             "The user is automatically logged in",
