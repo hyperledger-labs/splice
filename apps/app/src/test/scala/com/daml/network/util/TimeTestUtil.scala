@@ -14,7 +14,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.Assertion
 
 import java.time.Duration
@@ -90,6 +90,42 @@ trait TimeTestUtil extends CNNodeTestCommon {
     }
   }
 
+  def transferOutputCoin(
+      receiver: PartyId,
+      receiverFeeRatio: BigDecimal,
+      amount: BigDecimal,
+  ): v1.coin.TransferOutput = {
+    new TransferOutput(
+      receiver.toProtoPrimitive,
+      receiverFeeRatio.bigDecimal,
+      amount.bigDecimal,
+      None.toJava,
+    )
+  }
+
+  def transferOutputLockedCoin(
+      receiver: PartyId,
+      lockHolders: Seq[PartyId],
+      receiverFeeRatio: BigDecimal,
+      amount: BigDecimal,
+      expiredDuration: Duration,
+  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): v1.coin.TransferOutput = {
+    val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
+    val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
+
+    new TransferOutput(
+      receiver.toProtoPrimitive,
+      receiverFeeRatio.bigDecimal,
+      amount.bigDecimal,
+      Some(
+        new TimeLock(
+          lockHolders.map(_.toProtoPrimitive).asJava,
+          expiration.toInstant,
+        )
+      ).toJava,
+    )
+  }
+
   def lockCoins(
       userValidator: ValidatorAppBackendReference,
       userParty: PartyId,
@@ -105,9 +141,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
       val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
 
-      val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
-      val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
-
       userValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         optTimeout = None,
@@ -122,16 +155,12 @@ trait TimeTestUtil extends CNNodeTestCommon {
                 )
               ).asJava,
               Seq[v1.coin.TransferOutput](
-                new TransferOutput(
-                  userParty.toProtoPrimitive,
-                  BigDecimal(0.0).bigDecimal,
-                  amount.bigDecimal,
-                  Some(
-                    new TimeLock(
-                      Seq(userParty.toProtoPrimitive).asJava,
-                      expiration.toInstant,
-                    )
-                  ).toJava,
+                transferOutputLockedCoin(
+                  userParty,
+                  Seq(userParty),
+                  BigDecimal(0.0),
+                  amount,
+                  expiredDuration,
                 )
               ).asJava,
             ),
@@ -149,6 +178,54 @@ trait TimeTestUtil extends CNNodeTestCommon {
         disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
       )
     }
+
+  /** Directly exercises the CoinRules_Transfer choice.
+    * Note that all parties participating in the transfer need to be hosted on the same participant
+    */
+  def rawTransfer(
+      userValidator: ValidatorAppBackendReference,
+      userId: String,
+      userParty: PartyId,
+      validatorParty: PartyId,
+      coin: HttpWalletAppClient.CoinPosition,
+      outputs: Seq[v1.coin.TransferOutput],
+      domainId: Option[DomainId] = None,
+  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
+    val coinRules = scan.getCoinRules()
+    val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
+    val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
+
+    val authorizers =
+      Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
+
+    userValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = authorizers.distinct,
+      readAs = Seq.empty,
+      update = transferContext.coinRules
+        .exerciseCoinRules_Transfer(
+          new v1.coin.Transfer(
+            userParty.toProtoPrimitive,
+            userParty.toProtoPrimitive,
+            Seq[v1.coin.TransferInput](
+              new v1.coin.transferinput.InputCoin(
+                coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+              )
+            ).asJava,
+            outputs.asJava,
+          ),
+          new v1.coin.TransferContext(
+            transferContext.openMiningRound,
+            Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
+            Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+            // note: we don't provide a featured app right as sender == provider
+            None.toJava,
+          ),
+        ),
+      domainId = domainId,
+      disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+    )
+  }
 
   /** This function advances time by ~one tick and waits for the SVC round management automation for open, summarizing
     * and issuing rounds to finish processing the events generated by the new time.

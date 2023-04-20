@@ -27,8 +27,10 @@ import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
-import org.scalatest.matchers.Matcher
+import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.AppendedClues
+
+import scala.math.BigDecimal.RoundingMode
 
 /** Analogue to Canton's CommunityTests */
 object CNNodeTests {
@@ -194,6 +196,16 @@ object CNNodeTests {
     val smallAmount: BigDecimal = BigDecimal(1.0)
     def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
       be >= lower and be <= upper
+
+    /** Asserts two BigDecimals are equal up to `n` decimal digits. */
+    def beEqualUpTo(right: BigDecimal, n: Int): Matcher[BigDecimal] =
+      Matcher { (left: BigDecimal) =>
+        MatchResult(
+          left.setScale(n, RoundingMode.HALF_EVEN) == right.setScale(n, RoundingMode.HALF_EVEN),
+          s"$left was not equal to $right up to $n digits",
+          s"$left was equal to $right up to $n digits",
+        )
+      }
 
     /** A function abstracting the common pattern of acting and then waiting for the action to
       * eventually have its expected results.

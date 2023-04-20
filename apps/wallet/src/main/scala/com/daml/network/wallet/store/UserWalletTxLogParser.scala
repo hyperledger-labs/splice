@@ -34,7 +34,7 @@ import java.time.{Instant, ZoneOffset}
 import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
@@ -710,11 +710,9 @@ object UserWalletTxLogParser {
       + res.summary.inputCoinAmount - res.summary.holdingFees
 
     // Output coins going back to the sender, after deducting transfer fees
-    // TODO(#2843) Add detailed tests for the correctness of these fee computations.
-    // In particular, the subtraction of the sender fee does not seem to be right.
     val netOutput = parseOutputAmounts(arg, res)
       .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
-      .map(o => o.output.amount - o.receiverFee - o.senderFee)
+      .map(o => o.output.amount - o.senderFee)
       .sum
 
     // Leftover change
@@ -724,14 +722,28 @@ object UserWalletTxLogParser {
     sender -> (netOutput + netChange - netInput)
   }
 
-  /** Returns a list of receivers */
+  /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
       arg: v1.coin.CoinRules_Transfer,
       res: v1.coin.TransferResult,
   ): Seq[(String, BigDecimal)] = {
+    def netBalanceChange(o: OutputWithFees) =
+      if (o.output.lock.isEmpty) {
+        o.output.amount - o.receiverFee
+      } else {
+        -o.receiverFee
+      }
+
+    // Note: the same receiver party can appear multiple times in the transfer result
+    // The code below merges balance changes for the same receiver, while preserving
+    // the order of receivers.
     parseOutputAmounts(arg, res)
       .filter(_.output.receiver != arg.transfer.sender)
-      .map(o => o.output.receiver -> (o.output.amount - o.receiverFee))
+      .map(o => o.output.receiver -> netBalanceChange(o))
+      .foldLeft(immutable.ListMap.empty[String, BigDecimal])((acc, receiver) =>
+        acc.updatedWith(receiver._1)(prev => Some(prev.fold(receiver._2)(_ + receiver._2)))
+      )
+      .toList
   }
 
   /** A requested output of a transfer, together with the actual fees paid for the transfer.
@@ -760,12 +772,14 @@ object UserWalletTxLogParser {
       .map { case (out, fee) =>
         OutputWithFees(
           output = out,
-          // TODO(#2843) Add detailed tests for the correctness of these fee computations, in particular, that we don't
-          // need to force a scale here.
-          senderFee = BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio),
-          receiverFee = BigDecimal(fee) * out.receiverFeeRatio,
+          senderFee = setDamlDecimalScale(BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio)),
+          receiverFee = setDamlDecimalScale(BigDecimal(fee) * out.receiverFeeRatio),
         )
       }
   }
+
+  /** Returns the input number modified such that it has the same number of decimal places as a daml decimal */
+  private def setDamlDecimalScale(x: BigDecimal): BigDecimal =
+    x.setScale(10, RoundingMode.HALF_EVEN)
 
 }

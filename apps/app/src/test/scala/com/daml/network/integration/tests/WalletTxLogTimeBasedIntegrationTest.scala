@@ -7,6 +7,8 @@ import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 
+import java.time.Duration
+
 class WalletTxLogTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
@@ -127,6 +129,110 @@ class WalletTxLogTimeBasedIntegrationTest
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },
+        ),
+      )
+    }
+
+    "include correct fees" in { implicit env =>
+      // Note: all of the parties in this test must be hosted on the same participant
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      waitForWalletUser(aliceValidatorWallet)
+      val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
+
+      val coinConfig = clue("Get coin config") {
+        scan.getCoinConfigForRound(0)
+      }
+
+      val transferAmount = BigDecimal("32.1234567891").setScale(10)
+      val transferFee =
+        coinConfig.transferFee.steps
+          .findLast(_.amount <= transferAmount)
+          .fold(coinConfig.transferFee.initial)(_.rate) * transferAmount
+      val receiverFeeRatio = BigDecimal("0.1234567891").setScale(10)
+      val senderFeeRatio = (BigDecimal(1.0) - receiverFeeRatio).setScale(10)
+
+      clue("Tap to get some coins") {
+        aliceWallet.tap(10000)
+      }
+
+      clue("Advance rounds to accumulate holding fees") {
+        advanceRoundsByOneTick
+        advanceRoundsByOneTick
+      }
+
+      val balance0 = charlieWallet.balance().unlockedQty
+      actAndCheck(
+        "Alice makes a complex transfer",
+        rawTransfer(
+          aliceValidator,
+          aliceWallet.config.ledgerApiUser,
+          aliceUserParty,
+          aliceValidator.getValidatorPartyId(),
+          aliceWallet.list().coins.head,
+          Seq(
+            transferOutputCoin(
+              charlieUserParty,
+              receiverFeeRatio,
+              transferAmount,
+            ),
+            transferOutputCoin(
+              charlieUserParty,
+              receiverFeeRatio,
+              transferAmount,
+            ),
+            transferOutputLockedCoin(
+              charlieUserParty,
+              Seq(charlieUserParty, aliceValidatorUserParty),
+              receiverFeeRatio,
+              transferAmount,
+              Duration.ofMinutes(5),
+            ),
+          ),
+        ),
+      )(
+        "Charlie has received the CC",
+        _ => charlieWallet.balance().unlockedQty should be > balance0,
+      )
+
+      val expectedAliceBalanceChange = BigDecimal(0)
+        - 3 * transferAmount // each output is worth `transferAmount`
+        - 3 * transferFee * senderFeeRatio // one transferFee for each output
+        - 3 * coinConfig.coinCreateFee * senderFeeRatio // one coinCreateFee for each output
+        - coinConfig.lockHolderFee * senderFeeRatio // one lockHolderFee for each lock holder that is not the receiver
+        - coinConfig.coinCreateFee // one coinCreateFee for the sender change coin
+
+      val expectedCharlieBalanceChange = BigDecimal(0)
+        + 2 * transferAmount // 2 coins created for Charlie (the locked coin does not change his balance)
+        - 3 * transferFee * receiverFeeRatio // one transferFee for each output
+        - 3 * coinConfig.coinCreateFee * receiverFeeRatio // one coinCreateFee for each output
+        - coinConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
+
+      // This test advances 2 rounds between the tap and the transfer
+      val expectedHoldingFees = 2 * coinConfig.holdingFee
+
+      // Note: there are 3 places where we multiply fixed digit numbers:
+      // - In our daml code, computing actual balance changes
+      // - In the tx log parser, computing reported balance changes
+      // - Here in the test, computing expected balance changes
+      // Due to rounding, these numbers may all be different. We therefore only compare numbers up to 9 digits here.
+      checkTxHistory(
+        charlieWallet,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: walletLogEntry.Transfer =>
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beEqualUpTo(expectedAliceBalanceChange, 9)
+              amount.scale shouldBe scale
+            }
+            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+              receiver shouldBe charlieUserParty.toProtoPrimitive
+              amount should beEqualUpTo(expectedCharlieBalanceChange, 9)
+              amount.scale shouldBe scale
+            }
+            logEntry.senderHoldingFees shouldBe expectedHoldingFees
+            logEntry.senderHoldingFees.scale shouldBe scale
+          }
         ),
       )
     }
