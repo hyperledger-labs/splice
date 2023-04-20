@@ -1,14 +1,12 @@
 import * as React from 'react';
-import { useUserState } from 'common-frontend';
 import { NavLink } from 'react-router-dom';
 
-import { Logout } from '@mui/icons-material';
-import { Button, Divider, Stack, Toolbar } from '@mui/material';
-import Link from '@mui/material/Link';
+import { Divider, Stack, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import CurrentUser from './CurrentUser';
 import FeaturedAppRight from './FeaturedAppRight';
+import { LogoutButton } from './LogoutButton';
 
 const Header: React.FC = () => {
   const navLinks = [
@@ -26,8 +24,6 @@ const Header: React.FC = () => {
 
     return isActive ? { ...style, textDecoration: 'underline' } : style;
   };
-
-  const { logout } = useUserState();
 
   return (
     <Toolbar
@@ -63,14 +59,7 @@ const Header: React.FC = () => {
         <CurrentUser />
         <FeaturedAppRight />
         <Divider orientation="vertical" variant="middle" flexItem />
-        <Button id="logout-button" onClick={logout} color="inherit">
-          <Stack direction="row" alignItems="center">
-            <Logout />
-            <Link color="inherit" textTransform="none">
-              Logout
-            </Link>
-          </Stack>
-        </Button>
+        <LogoutButton />
       </Stack>
     </Toolbar>
   );

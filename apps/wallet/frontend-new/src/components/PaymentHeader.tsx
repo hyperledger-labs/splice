@@ -3,13 +3,14 @@ import BigNumber from 'bignumber.js';
 import { AmountDisplay, useInterval } from 'common-frontend';
 import { useCallback, useState } from 'react';
 
-import { Box, Stack, Toolbar, Typography } from '@mui/material';
+import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletBalance } from '../models/models';
 import CurrentUser from './CurrentUser';
 import Loading from './Loading';
+import { LogoutButton } from './LogoutButton';
 
 const PaymentHeader: React.FC = () => {
   const walletClient = useWalletClient();
@@ -38,9 +39,13 @@ const PaymentHeader: React.FC = () => {
           Canton Coin Wallet
         </Typography>
         <Stack spacing={2} alignItems="center">
-          <span className="payment-current-user">
-            <CurrentUser />
-          </span>
+          <Stack spacing={2} direction="row">
+            <span className="payment-current-user">
+              <CurrentUser />
+            </span>
+            <Divider flexItem orientation="vertical" />
+            <LogoutButton />
+          </Stack>
           <Typography className="available-balance">
             Total Available Balance:{' '}
             <AmountDisplay amount={walletBalance.availableCC} currency="CC" /> /{' '}

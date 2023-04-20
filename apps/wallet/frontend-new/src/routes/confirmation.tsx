@@ -1,0 +1,19 @@
+import React from 'react';
+import { Outlet } from 'react-router-dom';
+
+import { Box } from '@mui/material';
+
+import PaymentHeader from '../components/PaymentHeader';
+
+export const Confirmation: React.FC = () => {
+  return (
+    <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
+      <PaymentHeader />
+      <Box bgcolor="colors.neutral.25" flex={1}>
+        <Outlet />
+      </Box>
+    </Box>
+  );
+};
+
+export default Confirmation;

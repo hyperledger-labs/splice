@@ -9,7 +9,6 @@ import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-
 import { ContractId } from '@daml/types';
 
 import Loading from '../components/Loading';
-import PaymentHeader from '../components/PaymentHeader';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { SubscriptionRequestWithContext } from '../models/models';
@@ -33,36 +32,27 @@ export const ConfirmSubscription: React.FC = () => {
   }
 
   return (
-    <Stack minHeight="100vh">
-      <PaymentHeader />
-      <Box bgcolor="colors.neutral.25" flex={1}>
-        <Container maxWidth="md">
-          <Stack alignItems="center" paddingTop={4} spacing={4}>
-            <Stack alignItems="center" spacing={1}>
-              <Stack alignItems="center" direction="row" spacing={1}>
-                <Typography variant="h5">Confirm Subscription to </Typography>
-                <DirectoryEntry
-                  partyId={
-                    subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver
-                  }
-                  variant="h5"
-                />
-              </Stack>
-              <Stack alignItems="center" direction="row" spacing={1}>
-                <Typography variant="body2">via </Typography>
-                <DirectoryEntry
-                  partyId={
-                    subscriptionRequest.subscriptionRequest.payload.subscriptionData.provider
-                  }
-                  variant="body2"
-                />
-              </Stack>
-            </Stack>
-            <SubscriptionContainer subscription={subscriptionRequest} />
+    <Container maxWidth="md">
+      <Stack alignItems="center" paddingTop={4} spacing={4}>
+        <Stack alignItems="center" spacing={1}>
+          <Stack alignItems="center" direction="row" spacing={1}>
+            <Typography variant="h5">Confirm Subscription to </Typography>
+            <DirectoryEntry
+              partyId={subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver}
+              variant="h5"
+            />
           </Stack>
-        </Container>
-      </Box>
-    </Stack>
+          <Stack alignItems="center" direction="row" spacing={1}>
+            <Typography variant="body2">via </Typography>
+            <DirectoryEntry
+              partyId={subscriptionRequest.subscriptionRequest.payload.subscriptionData.provider}
+              variant="body2"
+            />
+          </Stack>
+        </Stack>
+        <SubscriptionContainer subscription={subscriptionRequest} />
+      </Stack>
+    </Container>
   );
 };
 

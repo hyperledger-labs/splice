@@ -22,7 +22,6 @@ import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/
 import { ContractId } from '@daml/types';
 
 import Loading from '../components/Loading';
-import PaymentHeader from '../components/PaymentHeader';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { AppPaymentRequest } from '../models/models';
@@ -89,23 +88,18 @@ export const ConfirmPayment: React.FC = () => {
   );
 
   return (
-    <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
-      <PaymentHeader />
-      <Box bgcolor="colors.neutral.25" flex={1}>
-        <Container maxWidth="sm">
-          <Stack alignItems="center" paddingTop={4} spacing={4}>
-            {recipientInfo}
-            <PaymentDescription description={deliveryOffer.payload.description} />
-            <TotalPaymentContainer
-              contractId={appPaymentRequest.contractId}
-              total={total}
-              fee={fee}
-              coinPrice={coinPrice}
-            />
-          </Stack>
-        </Container>
-      </Box>
-    </Box>
+    <Container maxWidth="sm">
+      <Stack alignItems="center" paddingTop={4} spacing={4}>
+        {recipientInfo}
+        <PaymentDescription description={deliveryOffer.payload.description} />
+        <TotalPaymentContainer
+          contractId={appPaymentRequest.contractId}
+          total={total}
+          fee={fee}
+          coinPrice={coinPrice}
+        />
+      </Stack>
+    </Container>
   );
 };
 
