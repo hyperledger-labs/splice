@@ -79,10 +79,14 @@ class TopupValidatorTrafficBalanceTrigger(
       .enqueueCoinOperation(coBuyExtraTraffic)
       .flatMap {
         case outcome: COO_BuyExtraTraffic =>
-          logger.info(s"xxx - successfully bought extra traffic: $outcome")
+          logger.info(
+            s"topUpValidatorTraffic outcome - successfully bought extra traffic: $outcome"
+          )
           Future.successful(true)
         case error: COO_Error =>
-          logger.info(s"xxx - received an unexpected COOError: $error - ignoring for now")
+          logger.info(
+            s"topUpValidatorTraffic outcome - received an unexpected COOError: $error - ignoring for now"
+          )
           // given the error, don't retry immediately
           Future.successful(false)
         case otherwise => sys.error(s"unexpected COO return type: $otherwise")

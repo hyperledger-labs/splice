@@ -404,10 +404,11 @@ class HttpScanHandler(
           val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
           val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
           logger.debug(
-            s"Default traffic balance remaining: ${validatorTrafficRateLimiter.getDefaultTrafficBalance()}"
+            s"Default traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter.getDefaultTrafficBalance()}"
           )
           logger.debug(
-            s"Extra traffic balance remaining: ${validatorTrafficRateLimiter.getExtraTrafficBalance(extraTrafficLimit)}"
+            s"Extra traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter
+                .getExtraTrafficBalance(extraTrafficLimit)}"
           )
           val approved = validatorTrafficRateLimiter.checkAndUpdate(extraTrafficLimit)
           v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
