@@ -28,7 +28,8 @@ import com.daml.network.environment.ledger.api.{
   TransferEvent,
   TreeUpdate,
 }
-import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
+import com.daml.network.store.MultiDomainAcsStore
+import MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
@@ -632,7 +633,7 @@ class CNLedgerConnection(
   def submitTransferAndWaitNoDedup(
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[LedgerOffset] = {
     val commandId = UUID.randomUUID().toString()
     val listenDomain = command match {
       case in: LedgerClient.TransferCommand.In => in.target
@@ -670,8 +671,28 @@ class CNLedgerConnection(
       override def run(): Unit = ks.shutdown()
     })
 
-    completion.map(_ => ())
+    completion.map(_._1._1)
   }
+
+  private[network] final def submitTransferAndAwaitIngestionNoDedup(
+      store: MultiDomainAcsStore,
+      submitter: PartyId,
+      command: LedgerClient.TransferCommand,
+  )(implicit tc: TraceContext): Future[Unit] =
+    submitTransferAndWaitNoDedup(
+      submitter,
+      command,
+    )
+      .flatMap {
+        case loa: LedgerOffset.Absolute =>
+          import LedgerClient.TransferCommand.{In, Out}
+          val awaitDomain = command match {
+            case o: Out => o.source
+            case i: In => i.target
+          }
+          store.signalWhenIngestedOrShutdown(awaitDomain, loa.getOffset)
+        case _ => Future successful (()) // LedgerBegin and LedgerEnd are nonsense, don't await
+      }
 
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
@@ -680,7 +701,9 @@ class CNLedgerConnection(
       commandId: String,
   )(implicit
       traceContext: TraceContext
-  ): Sink[LedgerClient.CompletionStreamResponse, Future[LedgerClient.Completion]] = {
+  ): Sink[LedgerClient.CompletionStreamResponse, Future[
+    (LedgerOffset, LedgerClient.Completion)
+  ]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
     val howLongToWait = timeouts.network.asFiniteApproximation
     Flow[LedgerClient.CompletionStreamResponse]
@@ -692,18 +715,20 @@ class CNLedgerConnection(
           .asRuntimeException()
       }
       .collect(
-        Function unlift { csr =>
+        Function unlift { case LedgerClient.CompletionStreamResponse(laterOffset, completions) =>
           // TODO(tech-debt) don't parse completions that don't match
-          csr.completions find (_.matchesSubmission(applicationId, commandId, commandId))
+          completions
+            .find(_.matchesSubmission(applicationId, commandId, commandId))
+            .map((laterOffset, _))
         }
       )
       .take(1)
       .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
       .toMat(
         Sink
-          .headOption[LedgerClient.Completion]
-          .mapMaterializedValue(_ map (_ map { completion =>
-            if (completion.status.isOk) completion
+          .headOption[(LedgerOffset, LedgerClient.Completion)]
+          .mapMaterializedValue(_ map (_ map { case result @ (_, completion) =>
+            if (completion.status.isOk) result
             else throw completion.status.asRuntimeException()
           } getOrElse {
             throw UNAVAILABLE

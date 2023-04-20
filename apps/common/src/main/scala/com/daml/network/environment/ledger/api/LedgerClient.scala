@@ -572,12 +572,21 @@ object LedgerClient {
     }
   }
 
-  final case class CompletionStreamResponse(completions: Seq[Completion])
+  final case class CompletionStreamResponse(laterOffset: LedgerOffset, completions: Seq[Completion])
 
   object CompletionStreamResponse {
-    def fromProto(spb: multidomain.CompletionStreamResponse): CompletionStreamResponse =
-      // ignoring checkpoint
-      CompletionStreamResponse(spb.completions map Completion.fromProto)
+    def fromProto(spb: multidomain.CompletionStreamResponse): CompletionStreamResponse = {
+      val offset = (for {
+        checkpoint <- spb.checkpoint
+        offset <- checkpoint.offset
+      } yield offset)
+        .getOrElse(throw new IllegalArgumentException("missing offset in CompletionStreamResponse"))
+      // ignoring checkpoint.record_time
+      CompletionStreamResponse(
+        LedgerOffset fromProto scalapbToJava(offset)(_.companion),
+        spb.completions map Completion.fromProto,
+      )
+    }
   }
 
   import com.daml.error.utils.ErrorDetails

@@ -84,10 +84,9 @@ class ExpireRewardCouponsTrigger(
             .flatMap {
               // make sure the store ingested our update so we don't
               // attempt to collect the same coupon twice
-              case (offset, outcome) =>
+              case (offset, _) =>
                 store.multiDomainAcsStore
                   .signalWhenIngestedOrShutdown(domainId, offset)
-                  .map(_ => Some(outcome))
             }
         )
       )
