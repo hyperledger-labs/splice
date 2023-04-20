@@ -665,31 +665,32 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       sv5Participant.ledger_api.acs.of_party(svcParty) shouldBe empty
 
       clue("send mint commands to svc participant while sv5 is starting") {
-        val svcStartF =
+        val sv5StartF =
           Future {
             // SV5 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
             sv5.startSync()
           }(env.executionContext)
 
-        // we should see error logs that svc participant rejects commands while authorization is in progress
+        // we should expect there might be error logs that svc participant rejects commands while authorization is in progress
         // the participant is not crashed by those command
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
           {
             eventually() {
-              noException should be thrownBy {
-                (0 to 30).foreach(_ => svcTap(svcParticipant, 1.0))
-              }
+              noException should be thrownBy svcTap(svcParticipant, 1.0)
+              // keep sending tap commands until sv5StartF is completed
+              sv5StartF.isCompleted shouldBe true
             }
           },
           entries => {
-            forAtLeast(1, entries) { line =>
+            // There shouldn't be any error log other than the `Contract is not locked` one
+            forAll(entries) { line =>
               line.message should include(
                 "The requirement 'Contract is not locked' was not met."
               )
             }
           },
         )
-        svcStartF.futureValue
+        sv5StartF.futureValue
       }
   }
 
