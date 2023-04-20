@@ -11,4 +11,8 @@ fi
 
 set -euo pipefail
 
-echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(version-gen)"
+if [ -z "${PUSH_TO_ARTIFACTORY:-}" ]; then
+    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(version-gen)"
+else
+    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:$(version-gen)"
+fi

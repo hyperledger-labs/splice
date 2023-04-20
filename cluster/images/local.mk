@@ -25,7 +25,6 @@ images := \
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app
 
-
 ifdef CI
     # never use the cache in CI on the master branch
     cache_opt := --no-cache

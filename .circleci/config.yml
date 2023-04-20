@@ -19,7 +19,7 @@ parameters:
     default: "15"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts]
     default: build
 
 notify-fail: &notify-fail
@@ -1135,6 +1135,46 @@ jobs:
          cmd_retry_count: 5
       - cleanup_sbt_test_job
 
+  docker_images_push_artifactory:
+    parameters:
+      url:
+        type: string
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+    steps:
+      - run:
+          name: Login to artifactory
+          command: |
+             if [[ -z "${ARTIFACTORY_USER}" || -z "${ARTIFACTORY_PASSWORD}" ]]; then
+                 echo "artifactory user:key is empty: ${ARTIFACTORY_USER} / pw. maybe add context:artifactory?"
+                 exit 1
+             fi
+             echo "${ARTIFACTORY_PASSWORD}" | docker login << parameters.url >> -u "${ARTIFACTORY_USER}" --password-stdin
+      - checkout
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           make build
+         cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
+      - docker_build
+      - run_bash_command_in_nix:
+         cmd_name: Push Docker images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           export PUSH_TO_ARTIFACTORY=1
+           make docker-push
+         cmd_retry_count: 1
+
   docker_images_build:
     machine:
       image: ubuntu-2004:202010-01
@@ -1196,6 +1236,18 @@ jobs:
 
 workflows:
   version: 2
+
+  publish_public_artifacts:
+    when:
+      equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push_artifactory:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          url: digitalasset-canton-network-docker.jfrog.io
+
   build:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
