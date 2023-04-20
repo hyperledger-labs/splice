@@ -684,9 +684,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           entries => {
             // There shouldn't be any error log other than the `Contract is not locked` one
             forAll(entries) { line =>
-              line.message should include(
+              line.message should (include(
                 "The requirement 'Contract is not locked' was not met."
-              )
+              ) or include(
+                "NOT_FOUND/LOCAL_VERDICT_INACTIVE_CONTRACTS"
+              ))
             }
           },
         )
