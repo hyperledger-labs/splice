@@ -57,6 +57,7 @@ class OffsetStore(override protected val loggerFactory: NamedLoggerFactory)(impl
         offset: LedgerOffset.Absolute
     )(implicit traceContext: TraceContext): Future[Unit] = {
       updateState(_.updateOffset(offset)).map { promiseO =>
+        logger.debug(s"Ingested offset: $offset. offset increased: ${promiseO.isDefined}")
         promiseO.foreach(_.success(offset))
       }
     }
