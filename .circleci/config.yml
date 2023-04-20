@@ -394,6 +394,9 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      no_output_timeout:
+        type: string
+        default: "10m"
       when:
         type: enum
         enum: ["on_success", "always", "on_fail"]
@@ -402,6 +405,7 @@ commands:
       - run:
           name: << parameters.cmd_name >>
           when: << parameters.when >>
+          no_output_timeout: << parameters.no_output_timeout >>
           command: |
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
@@ -732,6 +736,8 @@ commands:
           cmd_name: Download gcloud logs
           cluster: << parameters.cluster >>
           gce_authenticate: true
+          # gcloud log downloads are super slow.
+          no_output_timeout: "30m"
           cmd: |
             # download various interesting logs since "20 minutes ago"
             duration=1200
