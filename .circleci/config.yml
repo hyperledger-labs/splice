@@ -725,7 +725,9 @@ commands:
           path: todo-out/todos
           destination: todos
 
-  download_gcloud_logs:
+  # Actually downloading the logs is too slow so we only print the command and ask people
+  # to run it for the apps they really need.
+  print_gcloud_logs_commands:
     parameters:
       cluster:
         type: enum
@@ -733,11 +735,9 @@ commands:
     steps:
       - run_bash_command_in_nix:
           when: always
-          cmd_name: Download gcloud logs
+          cmd_name: Displaying commands to download gcloud logs
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          # gcloud log downloads are super slow.
-          no_output_timeout: "30m"
           cmd: |
             # download various interesting logs since "20 minutes ago"
             duration=1200
@@ -766,13 +766,9 @@ commands:
             )
             for app in "${apps[@]}"
             do
-              echo "Downloading logs for $app '$query'"
-              cncluster gcloud_logs --download-only $app "$query"
+              echo "Use the following command to download logs for $app '$query':"
+              echo "cncluster gcloud_logs $app \"$query\""
             done
-            mkdir -p $REPO_ROOT/log
-            mv *.clog $REPO_ROOT/log/
-            # never fail so we don't unnecessarily annoy ourselves with CI failures
-            true
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
@@ -1055,7 +1051,7 @@ jobs:
           extra_env_vars: DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "10m"
-      - download_gcloud_logs:
+      - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
       - run_bash_command_in_nix:
