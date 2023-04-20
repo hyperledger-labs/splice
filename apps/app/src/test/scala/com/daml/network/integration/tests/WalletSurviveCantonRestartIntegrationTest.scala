@@ -87,7 +87,8 @@ class WalletSurviveCantonRestartIntegrationTest
       //    treasury service to be blocked waiting for ingestion of the merge. In this case, this tap will just get queued and eventually
       //    time out at the akka-http server.
       // Both failures lead to a CommandFailure exception here.
-      loggerFactory.suppressErrors(
+      // Timeouts log as WARN, so those need to be suppressed too.
+      loggerFactory.suppressWarningsAndErrors(
         an[CommandFailure] should be thrownBy aliceWallet.tap(3)
       )
     }

@@ -110,8 +110,9 @@ final class HttpErrorHandler(
     handleExceptions(handler)
   }
 
-  def timeoutDirective: Directive0 = {
+  def timeoutDirective(implicit traceContext: TraceContext): Directive0 = {
     withRequestTimeoutResponse(request => {
+      logger.warn(s"Request to ${request.uri} resulted in a timeout.")
       val contentType = MediaTypes.`application/json`
       val errorResponse =
         d0.ErrorResponse(
