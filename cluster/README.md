@@ -40,6 +40,10 @@
 1. [Participant User Configuration](#participant-user-configuration)
 1. [Token configuration](#token-configuration)
 1. [Pulumi and Helm](#pulumi-and-helm)
+1. [SV Operations](#sv-operations)
+   1. [Approving new SVs](#approving-new-svs)
+      1. [Approving via SV API](#approving-via-sv-api)
+      1. [Approving via SV config](#approving-via-sv-config)
 1. [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
    1. [Manifests](#manifests)
 
@@ -893,6 +897,66 @@ expected in `external-proxy` for that service to correctly boot.
    once again used to apply only the changes to the cluster.
 1. `cncluster pulumi down` Will remove from the cluster, the portions
    of the configuration managed by Pulumi.
+
+## SV Operations
+
+Supervalidator nodes (SVs) play a central role in the governance and operation of each CN deployment.
+Currently, each of our cluster deployments contains four SV nodes that are under our control (SV1 to SV4).
+This means that we occasionally have to perform operations that SV operators need to perform.
+The SV runbook is currently the main documentation for operating an SV node.
+This section covers aspects not (yet) covered by the SV runbook as well has hints for managing our SV nodes specifically,
+including hints on how to effectively interact with all four of them at the same time.
+
+### Approving new SVs
+
+To enable an external partner to bootstrap an SV node, we need to "approve" its SV identity on our SVs.
+An SV identity consists of a name (string; must match whatever the candidate SV puts in its bootstrap config)
+and a public key (base64 string; must match the public and private key that the candidate SV puts in its bootstrap config).
+External partners need to tell us their name and public key before we can approve them.
+The SV runbook prompts them to do so.
+
+There are two ways of approving a new SV identity.
+It's recommended to complete *both* ways - approval via API for instant approval, and approval via config for persisting the approval across redeploys.
+
+#### Approving via SV API
+
+Approval via the API is instant but not persisted across cluster redeploys (unless we somehow migrate over the state of our SV participants).
+Steps (from a cluster directory):
+
+1. Start the `cn-node` console:
+
+```
+NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global cn-node --config ${REPO_ROOT}/apps/app/src/test/resources/preflight-topology.conf
+```
+
+2. In the console, run (substituting the correct name and public key):
+
+```
+val name = "SV name"
+val publicKey = "SV key"
+remoteSvs.foreach(sv => { println(s"approving ${name} on ${sv.name}"); sv.approveSvIdentity(name, publicKey) })
+```
+
+Note: It will also be possible to approve SV identities via the SV UI.
+However, we might still prefer to do so via the API as it is more convenient than clicking through the UI four times
+(once for each SV).
+
+#### Approving via SV config
+
+Approval via the configs of our SV apps requires a restart of those SVs,
+but the approval is persisted across cluster redeploys.
+To approve a new SV identity on all SVs, it is sufficient to add the new identity to `approved-sv-identities` in `cluster/images/sv-app/app.conf`:
+
+```
+approved-sv-identities = [
+  ...
+  { name = "SV name", public-key = "SV key" },
+  ...
+]
+```
+
+It might be a good idea to deploy your changes to a scratchnet to ensure that you didn't break the config,
+which would prevent our SVs from initializing after the next redeploy.
 
 ## Appendix: Kubernetes Resources
 

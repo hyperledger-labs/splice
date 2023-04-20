@@ -288,12 +288,25 @@ class CNNodeConsoleEnvironment(
         validators.remote,
         Seq("App References"),
       ) :++
-      svs.local.map(v =>
-        TopLevelValue(v.name, helpText("local sv app", v.name), v, Seq("App References"))
+      svs.local.map(sv =>
+        TopLevelValue(sv.name, helpText("local sv app", sv.name), sv, Seq("App References"))
       ) :+ TopLevelValue(
         "svs",
         helpText("All local sv app instances" + genericNodeReferencesDoc, "SVs"),
         svs.local,
+        Seq("App References"),
+      ) :++
+      svs.remote.map(sv =>
+        TopLevelValue(
+          s"${sv.name}Client",
+          helpText("remote sv app", sv.name),
+          sv,
+          Seq("App References"),
+        )
+      ) :+ TopLevelValue(
+        "remoteSvs",
+        helpText("All remote sv app instances" + genericNodeReferencesDoc, "Remote SVs"),
+        svs.remote,
         Seq("App References"),
       ) :++
       wallets.map(w =>
