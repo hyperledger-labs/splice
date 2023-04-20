@@ -324,13 +324,16 @@ function subcmd_push() {
     fi
 
     # Clean and build in parallel
-    make -C "${REPO_ROOT}" "${clean_targets}" -j
-    make -C "${REPO_ROOT}" "${db_targets}" -j
+    # shellcheck disable=SC2086
+    make -C "${REPO_ROOT}" ${clean_targets} -j
+    # shellcheck disable=SC2086
+    make -C "${REPO_ROOT}" ${db_targets} -j
 
     # Run the push serially (since the push is ultimately serialized across
     # the shared upload link anyway, and adding contention won't help speed
     # things up).
-    make -C "${REPO_ROOT}" "${dpf_targets}"
+    # shellcheck disable=SC2086
+    make -C "${REPO_ROOT}" ${dpf_targets}
 
     # Update all the modules in cluster
     for module in "$@"; do
