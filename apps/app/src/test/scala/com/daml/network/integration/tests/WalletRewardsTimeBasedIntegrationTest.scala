@@ -43,7 +43,7 @@ class WalletRewardsTimeBasedIntegrationTest
         aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
       }
 
-      val prevCoins = bobWallet.list().coins
+      val prevBalance = bobValidatorWallet.balance().unlockedQty
 
       // Bob's validator collects rewards
       // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
@@ -53,20 +53,12 @@ class WalletRewardsTimeBasedIntegrationTest
 
       eventually()(bobValidatorWallet.listAppRewardCoupons() should have size 0)
       eventually()(bobValidatorWallet.listValidatorRewardCoupons() should have size 0)
-      // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
-      // for rewards.
-      checkWallet(
-        bob,
-        bobWallet,
-        prevCoins
-          .map(c =>
-            (
-              BigDecimal(c.contract.payload.amount.initialAmount),
-              BigDecimal(c.contract.payload.amount.initialAmount) + 2,
-            )
-          )
-          .sortBy(_._1),
-      )
+
+      val newBalance = bobValidatorWallet.balance().unlockedQty
+
+      // We just check that the balance has increased by roughly the right amount,
+      // rather then repeating the calculation for the reward amount
+      assertInRange(newBalance - prevBalance, (0.1, 0.5))
     }
   }
 }
