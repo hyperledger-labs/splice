@@ -1,5 +1,12 @@
+.. _splitwell-provider:
+
 Deploying Splitwell
 ===================
+
+.. note::
+   This section describes how you can run your own splitwell instance as an appliation provider. If you are only interested in
+   using splitwell, you can connect to the splitwell instance :ref:`operated by DA <splitwell-user>`. To connect to the splitwell instance that you will setup
+   in this section, follow those instructions and use ``http://localhost:5113`` as the URL for the splitwell backend.
 
 This section walks you through the steps required to host a separate
 instance of the Splitwell back end. This can serve as an example

@@ -193,12 +193,22 @@ The Directory UI connects to the validator's participant by using the JSON API s
 
     DAML_SDK_VERSION=\ |daml_sdk_version| daml json-api --config examples/validator/json-api-app.conf
 
+.. _splitwell-user:
+
 Configuring the Splitwell UI
 ----------------------------
 
-To use splitwell, you first need to connect your participant to the splitwell domain
-and upload the DAR.
-Go to the terminal in which you are running the validator (the one using "validator.conf"), and type:
+.. note::
+   This section only describes how to connect as an application user to the splitwell instance run by Digital Asset.
+   If you are interested in hosting your own instance as an application provider, take a
+   look at the :ref:`instructions for deploying splitwell <splitwell-provider>`.
+
+To use splitwell, you first need to connect your participant to the
+splitwell domain and upload the DAR.  Go to the terminal in which you
+are running the validator (the one using "validator.conf"), and type:
+Note, that if you are not connecting to the splitwell instance
+operated by Digital Asset, the Domain URL here will be different. Ask
+the operator for the correct URL.
 
 .. parsed-literal::
 
@@ -219,6 +229,11 @@ As the last step before you can start the frontend, open ``web-uis/splitwell/con
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
     :end-before: END_SPLITWELL_CLUSTER_BACKEND_CONFIG
+
+If you are not connecting to the splitwell instance operated by
+digital asset, also edit the splitwell URL in the ``config.js`` file
+to point at the application backend. If you are unsure about the URL
+ask the application provider.
 
 .. _hosting-the-uis:
 
