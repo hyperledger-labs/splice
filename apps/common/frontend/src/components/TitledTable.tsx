@@ -8,8 +8,8 @@ export const TitledTable: React.FC<PropsWithChildren<{ title: string }>> = ({
   title,
 }) => {
   return (
-    <Stack spacing={2}>
-      <Typography variant="h3" fontWeight="bold">
+    <Stack spacing={2} marginTop={3}>
+      <Typography variant="h4" fontWeight="bold">
         {title}
       </Typography>
       <TableContainer>

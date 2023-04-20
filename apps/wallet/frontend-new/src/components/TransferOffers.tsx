@@ -5,10 +5,10 @@ import {
   Contract,
   DirectoryEntry,
   useInterval,
+  DateDisplay,
   useUserState,
 } from 'common-frontend';
 import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
-import DateDisplay from 'common-frontend/lib/components/DateDisplay';
 import { useCallback, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';

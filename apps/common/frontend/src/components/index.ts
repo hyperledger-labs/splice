@@ -1,5 +1,7 @@
 import AmountDisplay from './AmountDisplay';
 import AuthProvider from './AuthProvider';
+import Copyright from './Copyright';
+import DateDisplay from './DateDisplay';
 import DirectoryEntry from './DirectoryEntry';
 import DirectoryField from './DirectoryField';
 import ErrorBoundary from './ErrorBoundary';
@@ -15,6 +17,8 @@ export {
   DirectoryEntry,
   ErrorBoundary,
   Login,
+  DateDisplay,
+  Copyright,
   PartyId,
   DirectoryField,
   FeaturedAppRight,

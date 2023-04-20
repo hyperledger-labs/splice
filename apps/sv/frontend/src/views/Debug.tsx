@@ -14,7 +14,7 @@ function createRow(key: string, value: string) {
   return { key, value };
 }
 
-const Home: React.FC = () => {
+const DebugView: React.FC = () => {
   const resp = useSvUiState();
   if (resp) {
     const rows = [
@@ -22,7 +22,7 @@ const Home: React.FC = () => {
       createRow('Sv PartyId', resp.svPartyId),
       createRow('Svc PartyId', resp.svcPartyId),
       createRow('Svc Rules ContractId', resp.svcRulesContractId),
-      createRow('Coin Rules ContratId', resp.coinRulesContractId),
+      createRow('Coin Rules ContractId', resp.coinRulesContractId),
     ];
     return (
       <Box>
@@ -47,14 +47,14 @@ const Home: React.FC = () => {
   }
 };
 
-const HomeWithContexts: React.FC = () => {
+const DebugWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
       <SvUiStateProvider>
-        <Home />
+        <DebugView />
       </SvUiStateProvider>
     </SvClientProvider>
   );
 };
 
-export default HomeWithContexts;
+export default DebugWithContexts;

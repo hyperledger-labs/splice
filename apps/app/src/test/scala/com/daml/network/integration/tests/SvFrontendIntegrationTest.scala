@@ -31,7 +31,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "We open SV1's web UI", {
-            go to s"http://localhost:3010"
+            go to s"http://localhost:3010/debug"
           },
         )(
           "We see a table with sv1 as SV Name",

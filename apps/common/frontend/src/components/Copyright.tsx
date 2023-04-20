@@ -4,7 +4,15 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
 const Copyright: React.FC = () => (
-  <Typography variant="body1" color="text.secondary" align="center" margin={2} padding={2}>
+  <Typography
+    variant="body1"
+    color="text.secondary"
+    align="center"
+    position={'fixed'}
+    bottom={0}
+    margin={2}
+    padding={2}
+  >
     {'Copyright © '}
     <Link color="inherit" href="https://digitalasset.com/">
       Digital Asset
