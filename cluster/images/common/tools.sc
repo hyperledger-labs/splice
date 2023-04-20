@@ -33,6 +33,7 @@ def connectGlobalDomain(p: ParticipantReference) {
 }
 
 def ensureParticipantUser(p: ParticipantReference, userName: String, createUser: => User): User = {
+  // TODO(#4176) refactor to avoid logging `NOT_FOUND/USER_NOT_FOUND` error
   val user = Try(p.ledger_api.users.get(userName)).toOption.getOrElse({
     logger.info(s"User missing, creating now: ${userName}")
     createUser

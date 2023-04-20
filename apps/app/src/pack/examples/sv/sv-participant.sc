@@ -1,5 +1,5 @@
 import com.digitalasset.canton.topology.PartyId
-import scala.util.Try
+import scala.annotation.tailrec
 
 val domainUrl = sys.env.get("DOMAIN_URL") match {
   case None =>
@@ -18,8 +18,9 @@ svParticipant.start()
 println(s"Connecting SV participant to the domain $domainUrl")
 svParticipant.domains.connect("global", domainUrl)
 
-if (Try(svParticipant.ledger_api.users.get(svUserName)).isFailure) {
-
+if (userExists(svUserName)) {
+  println(s"Found existing SV user: " + svUserName)
+} else {
   println(s"Creating SV user: " + svUserName)
   val svParty =
     svParticipant.ledger_api.parties.allocate("sv_service_user", "sv_service_user").party
@@ -33,3 +34,20 @@ if (Try(svParticipant.ledger_api.users.get(svUserName)).isFailure) {
   )
 }
 println("SV participant bootstrap finished")
+
+// TODO(#4176) remove in favor of using a dedicated ledger API call
+def userExists(userName: String): Boolean = {
+  // `users.list()` is paginated and we can only `filterUser` there, not search for an exact match
+  @tailrec
+  def loop(userName: String, pageToken: String): Boolean = {
+    val response = svParticipant.ledger_api.users.list(filterUser = userName, pageToken = pageToken)
+    if (response.users.exists(_.id == userName)) {
+      return true
+    } else if (response.nextPageToken.isEmpty) {
+      return false
+    } else {
+      loop(userName, response.nextPageToken)
+    }
+  }
+  loop(userName, "")
+}
