@@ -503,13 +503,14 @@ object DamlPlugin extends AutoPlugin {
         s"Codegen asked to generate code from nonexistent file: $darFile"
       )
 
-    val (url, artifact, packageName, suffix) = language match {
+    val (url, artifact, packageName, suffix, extraArgs) = language match {
       case Codegen.Java =>
         (
-          s"https://repo.maven.apache.org/maven2/com/daml/codegen-java/${damlVersion}/",
-          s"codegen-java-${damlVersion}.jar",
+          s"https://repo.maven.apache.org/maven2/com/daml/codegen-jvm-main/${damlVersion}/",
+          s"codegen-jvm-main-${damlVersion}.jar",
           basePackageName + ".java",
           "java",
+          Seq("java"),
         )
       case Codegen.Scala =>
         (
@@ -517,6 +518,7 @@ object DamlPlugin extends AutoPlugin {
           s"codegen-scala-main-${damlVersion}.jar",
           basePackageName,
           "scala",
+          Seq.empty,
         )
     }
 
@@ -530,8 +532,10 @@ object DamlPlugin extends AutoPlugin {
     log.debug(s"Running $language-codegen for ${darFile} into ${managedSourceDir}")
 
     BuildUtil.runCommand(
-      "java" :: "-jar" :: codegenJarPath :: s"${darFile.getAbsolutePath}=$packageName" ::
-        s"--output-directory=${managedSourceDir.getAbsolutePath}" :: Nil,
+      "java" +: "-jar" +: codegenJarPath +: (extraArgs ++ Seq(
+        s"${darFile.getAbsolutePath}=$packageName",
+        s"--output-directory=${managedSourceDir.getAbsolutePath}",
+      )),
       log,
     )
 
