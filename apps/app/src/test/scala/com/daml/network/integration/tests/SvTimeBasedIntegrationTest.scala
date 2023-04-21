@@ -928,7 +928,7 @@ class SvTimeBasedIntegrationTest
           advanceTime(java.time.Duration.ofSeconds(160))
         },
         entries => {
-          forAtLeast(1, entries) { line =>
+          forExactly(3, entries) { line =>
             line.message should include(
               "Starting check for leader inactivity"
             )
@@ -941,7 +941,7 @@ class SvTimeBasedIntegrationTest
           advanceTime(effectiveTimeout.plus(bufferDuration))
         },
         entries => {
-          forAtLeast(1, entries) { line =>
+          forExactly(3, entries) { line =>
             line.message should include(
               "The leader is inactive"
             )
