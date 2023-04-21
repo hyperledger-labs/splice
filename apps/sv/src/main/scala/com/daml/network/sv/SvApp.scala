@@ -5,18 +5,21 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
+import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
+import com.daml.network.environment.ledger.api.DedupOffset
+import com.daml.network.environment.*
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
+import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.admin.http.HttpSvHandler
+import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
@@ -25,8 +28,8 @@ import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -46,11 +49,8 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
 import scala.jdk.CollectionConverters.*
-import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
-import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
-import com.daml.network.environment.ledger.api.DedupOffset
+import scala.util.{Failure, Success}
 
 class SvApp(
     override val name: InstanceName,
@@ -124,7 +124,7 @@ class SvApp(
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
         logger,
       )
-      // TODO(M3-46) split the SV API into a client API and an admin API with auth
+
       handler = new HttpSvHandler(
         ledgerClient,
         globalDomain,
@@ -139,8 +139,16 @@ class SvApp(
         loggerFactory,
       )
 
+      adminHandler = new HttpSvAdminHandler(
+        ledgerClient,
+        globalDomain,
+        svStore,
+        clock,
+        loggerFactory,
+      )
+
       // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
-      adminHandler = new HttpAdminHandler(
+      commonAdminHandler = new HttpAdminHandler(
         status
           .map(CNNodeStatus.fromNodeStatus)
           .map(NodeStatus.Success(_)),
@@ -156,7 +164,10 @@ class SvApp(
                 SvResource.routes(
                   handler
                 ),
-                CommonAdminResource.routes(adminHandler),
+                SvAdminResource.routes(
+                  adminHandler
+                ),
+                CommonAdminResource.routes(commonAdminHandler),
               )
             }
           }

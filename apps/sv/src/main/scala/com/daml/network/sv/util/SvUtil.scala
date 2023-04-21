@@ -97,4 +97,12 @@ object SvUtil {
     if (svcRules.payload.isDevNet) required min 4
     else required
   }
+
+  def generateRandomOnboardingSecret(): String = {
+    val rng = new SecureRandom();
+    // 256 bits of entropy
+    val bytes = new Array[Byte](32)
+    rng.nextBytes(bytes)
+    Base64.getEncoder().encodeToString(bytes)
+  }
 }

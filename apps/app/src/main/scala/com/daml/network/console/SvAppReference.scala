@@ -3,7 +3,7 @@ package com.daml.network.console
 import akka.util.ByteString
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.CNNodeConsoleEnvironment
-import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
+import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.ClientConfig
@@ -27,7 +27,7 @@ abstract class SvAppReference(
 
   def approveSvIdentity(name: String, key: String): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.ApproveSvIdentity(name, key))
+      httpCommand(HttpSvAdminAppClient.ApproveSvIdentity(name, key))
     }
 
   def onboardSv(token: String): Unit =
@@ -97,7 +97,7 @@ class SvAppBackendReference(
       : Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]] =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAppClient.ListOngoingValidatorOnboardings
+        HttpSvAdminAppClient.ListOngoingValidatorOnboardings
       )
     }
 
@@ -105,7 +105,7 @@ class SvAppBackendReference(
   def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAppClient.PrepareValidatorOnboarding(expiresIn)
+        HttpSvAdminAppClient.PrepareValidatorOnboarding(expiresIn)
       )
     }
 

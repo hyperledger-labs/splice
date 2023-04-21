@@ -4,20 +4,16 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import akka.util.ByteString
 import cats.data.EitherT
-import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvConfirmed, SvOnboarding}
-import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.FiniteDuration
 
 object HttpSvAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -58,53 +54,6 @@ object HttpSvAppClient {
     ) extends SvOnboardingStatus
   }
 
-  case object ListOngoingValidatorOnboardings
-      extends BaseCommand[http.ListOngoingValidatorOnboardingsResponse, Seq[
-        Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]
-      ]] {
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.ListOngoingValidatorOnboardingsResponse] =
-      client.listOngoingValidatorOnboardings(headers = headers)
-
-    override def handleResponse(response: http.ListOngoingValidatorOnboardingsResponse)(implicit
-        decoder: TemplateJsonDecoder
-    ): Either[String, Seq[Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]]] =
-      response match {
-        case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
-          response.ongoingValidatorOnboardings
-            .traverse(req => Contract.fromJson(ValidatorOnboarding.COMPANION)(req))
-            .leftMap(_.toString)
-      }
-  }
-
-  case class PrepareValidatorOnboarding(expiresIn: FiniteDuration)
-      extends BaseCommand[http.PrepareValidatorOnboardingResponse, String] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.PrepareValidatorOnboardingResponse] =
-      client.prepareValidatorOnboarding(
-        body = definitions.PrepareValidatorOnboardingRequest(expiresIn.toSeconds),
-        headers = headers,
-      )
-
-    override def handleResponse(response: http.PrepareValidatorOnboardingResponse)(implicit
-        decoder: TemplateJsonDecoder
-    ): Either[String, String] = response match {
-      case http.PrepareValidatorOnboardingResponse.OK(
-            definitions.PrepareValidatorOnboardingResponse(secret)
-          ) =>
-        Right(secret)
-      case http.PrepareValidatorOnboardingResponse.InternalServerError(e) => Left(e)
-    }
-  }
-
   case class OnboardValidator(candidate: PartyId, secret: String)
       extends BaseCommand[http.OnboardValidatorResponse, Unit] {
 
@@ -123,26 +72,6 @@ object HttpSvAppClient {
       case http.OnboardValidatorResponse.OK => Right(())
       case http.OnboardValidatorResponse.BadRequest(e) => Left(e)
       case http.OnboardValidatorResponse.Unauthorized(e) => Left(e)
-    }
-  }
-
-  case class ApproveSvIdentity(candidateName: String, candidateKey: String)
-      extends BaseCommand[http.ApproveSvIdentityResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ApproveSvIdentityResponse] =
-      client.approveSvIdentity(
-        body = definitions.ApproveSvIdentityRequest(candidateName, candidateKey),
-        headers = headers,
-      )
-
-    override def handleResponse(response: http.ApproveSvIdentityResponse)(implicit
-        decoder: TemplateJsonDecoder
-    ): Either[String, Unit] = response match {
-      case http.ApproveSvIdentityResponse.OK => Right(())
-      case http.ApproveSvIdentityResponse.BadRequest(e) => Left(e)
     }
   }
 

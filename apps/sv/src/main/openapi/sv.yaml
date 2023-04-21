@@ -12,7 +12,7 @@ paths:
   /admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: svAdmin
       operationId: "listOngoingValidatorOnboardings"
       responses:
         "200":
@@ -24,7 +24,7 @@ paths:
   /admin/validator/onboarding/prepare:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: svAdmin
       operationId: "prepareValidatorOnboarding"
       requestBody:
         required: true
@@ -74,7 +74,7 @@ paths:
   /admin/sv/identity/approve:
     post:
       tags: [ sv ]
-      x-jvm-package: sv
+      x-jvm-package: svAdmin
       operationId: "approveSvIdentity"
       requestBody:
         required: true

@@ -14,6 +14,7 @@ import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{SvApp, SvcPartyHosting}
 import com.daml.network.util.{Codec, Contract}
@@ -25,7 +26,6 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
-import java.security.SecureRandom
 import java.util.Base64
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -52,46 +52,6 @@ class HttpSvHandler(
   private val ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
-
-  def listOngoingValidatorOnboardings(
-      respond: v0.SvResource.ListOngoingValidatorOnboardingsResponse.type
-  )(): Future[v0.SvResource.ListOngoingValidatorOnboardingsResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      for {
-        validatorOnboardings <- svStore.listValidatorOnboardings()
-      } yield {
-        definitions.ListOngoingValidatorOnboardingsResponse(
-          validatorOnboardings.map(_.toJson).toVector
-        )
-      }
-    }
-  }
-
-  def prepareValidatorOnboarding(respond: v0.SvResource.PrepareValidatorOnboardingResponse.type)(
-      body: definitions.PrepareValidatorOnboardingRequest
-  ): Future[v0.SvResource.PrepareValidatorOnboardingResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      val secret = generateRandomOnboardingSecret()
-      val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
-      SvApp
-        .prepareValidatorOnboarding(
-          secret,
-          expiresIn,
-          svStore,
-          ledgerConnection,
-          globalDomain,
-          clock,
-          logger,
-        )
-        .map {
-          case Left(reason) =>
-            v0.SvResource.PrepareValidatorOnboardingResponseInternalServerError(
-              s"Could not prepare onboarding: $reason"
-            )
-          case Right(()) => definitions.PrepareValidatorOnboardingResponse(secret)
-        }
-    }
-  }
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -122,28 +82,6 @@ class HttpSvHandler(
         case Left(error) =>
           Future.successful(v0.SvResource.OnboardValidatorResponseBadRequest(error))
       }
-    }
-
-  def approveSvIdentity(
-      respond: v0.SvResource.ApproveSvIdentityResponse.type
-  )(body: definitions.ApproveSvIdentityRequest): Future[v0.SvResource.ApproveSvIdentityResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      SvApp
-        .approveSvIdentity(
-          body.candidateName,
-          body.candidateKey,
-          svStore,
-          ledgerConnection,
-          globalDomain,
-          logger,
-        )
-        .map {
-          case Left(reason) =>
-            v0.SvResource.ApproveSvIdentityResponseBadRequest(
-              s"Bad request: $reason"
-            )
-          case Right(()) => v0.SvResource.ApproveSvIdentityResponseOK
-        }
     }
 
   def onboardSv(
@@ -379,14 +317,6 @@ class HttpSvHandler(
         contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
       )
     )
-  }
-
-  private def generateRandomOnboardingSecret(): String = {
-    val rng = new SecureRandom();
-    // 256 bits of entropy
-    val bytes = new Array[Byte](32)
-    rng.nextBytes(bytes)
-    Base64.getEncoder().encodeToString(bytes)
   }
 
   private def onboardValidator(
