@@ -70,8 +70,8 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Unit] = response match {
       case http.OnboardValidatorResponse.OK => Right(())
-      case http.OnboardValidatorResponse.BadRequest(e) => Left(e)
-      case http.OnboardValidatorResponse.Unauthorized(e) => Left(e)
+      case http.OnboardValidatorResponse.BadRequest(e) => Left(e.error)
+      case http.OnboardValidatorResponse.Unauthorized(e) => Left(e.error)
     }
   }
 
@@ -90,8 +90,8 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Unit] = response match {
       case http.OnboardSvResponse.OK => Right(())
-      case http.OnboardSvResponse.BadRequest(e) => Left(e)
-      case http.OnboardSvResponse.Unauthorized(e) => Left(e)
+      case http.OnboardSvResponse.BadRequest(e) => Left(e.error)
+      case http.OnboardSvResponse.Unauthorized(e) => Left(e.error)
     }
   }
 
@@ -156,8 +156,8 @@ object HttpSvAppClient {
             case Some(status) => Right(status: SvOnboardingStatus)
             case None => Left(s"Could not parse response: $response.")
           }
-        case http.GetSvOnboardingStatusResponse.BadRequest(e) => Left(e)
-        case http.GetSvOnboardingStatusResponse.InternalServerError(e) => Left(e)
+        case http.GetSvOnboardingStatusResponse.BadRequest(e) => Left(e.error)
+        case http.GetSvOnboardingStatusResponse.InternalServerError(e) => Left(e.error)
       }
     }
   }
@@ -178,8 +178,8 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, String] = response match {
       case http.DevNetOnboardValidatorPrepareResponse.OK(secret) => Right(secret)
-      case http.DevNetOnboardValidatorPrepareResponse.InternalServerError(e) => Left(e)
-      case http.DevNetOnboardValidatorPrepareResponse.NotImplemented(e) => Left(e)
+      case http.DevNetOnboardValidatorPrepareResponse.InternalServerError(e) => Left(e.error)
+      case http.DevNetOnboardValidatorPrepareResponse.NotImplemented(e) => Left(e.error)
     }
   }
 
@@ -245,8 +245,8 @@ object HttpSvAppClient {
               definitions.OnboardSvPartyMigrationAuthorizeResponse(encodedAcsSnapshot)
             ) =>
           Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
-        case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(e) => Left(e)
-        case http.OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(e) => Left(e)
+        case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(e) => Left(e.error)
+        case http.OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(e) => Left(e.error)
       }
     }
   }

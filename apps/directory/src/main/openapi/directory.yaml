@@ -51,7 +51,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/LookupEntryByPartyResponse"
         "404":
-          description: not_found
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /entries/by-name/{name}:
     get:
       tags: [directory]
@@ -71,7 +71,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/LookupEntryByNameResponse"
         "404":
-          description: not_found
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /provider-party-id:
     get:
       tags: [directory]

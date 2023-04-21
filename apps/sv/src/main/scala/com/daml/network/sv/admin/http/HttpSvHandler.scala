@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
@@ -61,12 +62,10 @@ class HttpSvHandler(
         case Right(partyId) =>
           svStore.lookupValidatorOnboardingBySecret(body.secret).flatMap {
             case None =>
-              svStore.lookupUsedSecret(body.secret).map {
+              svStore.lookupUsedSecret(body.secret).flatMap {
                 case Some(_) =>
-                  v0.SvResource
-                    .OnboardValidatorResponseUnauthorized(s"Secret has already been used.")
-                case None =>
-                  v0.SvResource.OnboardValidatorResponseUnauthorized("Unknown secret.")
+                  Future.failed(HttpErrorHandler.unauthorized("Secret has already been used."))
+                case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
               }
             case Some(vo) =>
               for {
@@ -80,7 +79,7 @@ class HttpSvHandler(
               } yield v0.SvResource.OnboardValidatorResponseOK
           }
         case Left(error) =>
-          Future.successful(v0.SvResource.OnboardValidatorResponseBadRequest(error))
+          Future.failed(HttpErrorHandler.badRequest(error))
       }
     }
 
@@ -90,35 +89,31 @@ class HttpSvHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
-          Future.successful(
-            v0.SvResource.OnboardSvResponseBadRequest(s"Could not verify and decode token: $error")
+          Future.failed(
+            HttpErrorHandler.badRequest(s"Could not verify and decode token: $error")
           )
         case Right(token) =>
           SvApp
             .isApprovedSvIdentity(token.candidateName, token.candidateParty, body.token, svStore)
             .flatMap {
               case Left(reason) =>
-                Future.successful(
-                  v0.SvResource
-                    .OnboardSvResponseUnauthorized(
-                      s"Could not authorize onboarding request because of reason: $reason"
-                    )
+                Future.failed(
+                  HttpErrorHandler.unauthorized(
+                    s"Could not authorize onboarding request because of reason: $reason"
+                  )
                 )
               case Right(_) =>
                 // We retry here because the SvcRules can change while attempting this.
-                for {
-                  outcome <- retryProvider.retryForClientCalls(
+                retryProvider
+                  .retryForClientCalls(
                     "start SV onboarding via SvcRules",
                     startSvOnboarding(token.candidateName, token.candidateParty, body.token),
                     logger,
                   )
-                } yield outcome match {
-                  case Left(reason) =>
-                    v0.SvResource.OnboardSvResponseBadRequest(
-                      s"Could not start onboarding: $reason"
-                    )
-                  case Right(()) => v0.SvResource.OnboardSvResponseOK
-                }
+                  .flatMap {
+                    case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+                    case Right(()) => Future.successful(v0.SvResource.OnboardSvResponseOK)
+                  }
             }
       }
     }
@@ -143,7 +138,7 @@ class HttpSvHandler(
             if (svPartyOrName.nonEmpty) {
               definitions.GetSvOnboardingStatusResponse(state = "unknown")
             } else {
-              v0.SvResource.GetSvOnboardingStatusResponseBadRequest(
+              throw HttpErrorHandler.badRequest(
                 s"Could not find any party ID or name matching: $svPartyOrName; error: $error"
               )
             }
@@ -186,17 +181,18 @@ class HttpSvHandler(
             clock,
             logger,
           )
-          .map {
+          .flatMap {
             case Left(reason) =>
-              v0.SvResource.DevNetOnboardValidatorPrepareResponseInternalServerError(
-                s"Could not prepare onboarding: $reason"
+              Future.failed(
+                HttpErrorHandler.internalServerError(s"Could not prepare onboarding: $reason")
               )
-            case Right(()) => v0.SvResource.DevNetOnboardValidatorPrepareResponseOK(secret)
+            case Right(()) =>
+              Future.successful(v0.SvResource.DevNetOnboardValidatorPrepareResponseOK(secret))
           }
       } else {
-        Future.successful(
-          v0.SvResource.DevNetOnboardValidatorPrepareResponseNotImplemented(
-            s"Validator onboarding preparation self-service is only available in DevNet."
+        Future.failed(
+          HttpErrorHandler.notImplemented(
+            "Validator onboarding preparation self-service is only available in DevNet."
           )
         )
       }
@@ -414,8 +410,8 @@ class HttpSvHandler(
         .fold(
           err =>
             Future
-              .successful(
-                v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(err.message)
+              .failed(
+                HttpErrorHandler.badRequest(err.message)
               ),
           participantId =>
             for {

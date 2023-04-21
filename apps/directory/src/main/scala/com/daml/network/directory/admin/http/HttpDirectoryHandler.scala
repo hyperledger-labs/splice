@@ -9,6 +9,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.admin.http.HttpErrorHandler
 
 class HttpDirectoryHandler(
     store: DirectoryStore,
@@ -32,30 +33,36 @@ class HttpDirectoryHandler(
       respond: v0.DirectoryResource.LookupEntryByPartyResponse.type
   )(party: String): Future[v0.DirectoryResource.LookupEntryByPartyResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
-      for {
-        entry <- store.lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
-      } yield entry.fold(
-        v0.DirectoryResource.LookupEntryByPartyResponse.NotFound
-      )(e =>
-        v0.DirectoryResource.LookupEntryByPartyResponse.OK(
-          definitions.LookupEntryByPartyResponse(e.toJson)
-        )
-      )
+      store
+        .lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
+        .flatMap {
+          case Some(entry) =>
+            Future.successful(
+              v0.DirectoryResource.LookupEntryByPartyResponse.OK(
+                definitions.LookupEntryByPartyResponse(entry.toJson)
+              )
+            )
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(s"No directory entry found for party: ${party}")
+            )
+        }
     }
 
   override def lookupEntryByName(
       respond: v0.DirectoryResource.LookupEntryByNameResponse.type
   )(name: String): Future[v0.DirectoryResource.LookupEntryByNameResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
-      for {
-        entry <- store.lookupEntryByName(name)
-      } yield entry.fold(
-        v0.DirectoryResource.LookupEntryByNameResponse.NotFound
-      )(e =>
-        v0.DirectoryResource.LookupEntryByNameResponse.OK(
-          definitions.LookupEntryByNameResponse(e.toJson)
-        )
-      )
+      store.lookupEntryByName(name).flatMap {
+        case Some(entry) =>
+          Future.successful(
+            v0.DirectoryResource.LookupEntryByNameResponse.OK(
+              definitions.LookupEntryByNameResponse(entry.toJson)
+            )
+          )
+        case None =>
+          Future.failed(HttpErrorHandler.notFound(s"No directory entry found for name: $name"))
+      }
     }
 
   @nowarn("cat=unused")

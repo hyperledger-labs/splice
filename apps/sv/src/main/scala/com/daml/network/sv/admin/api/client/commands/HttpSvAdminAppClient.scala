@@ -67,7 +67,8 @@ object HttpSvAdminAppClient {
             definitions.PrepareValidatorOnboardingResponse(secret)
           ) =>
         Right(secret)
-      case http.PrepareValidatorOnboardingResponse.InternalServerError(e) => Left(e)
+      case http.PrepareValidatorOnboardingResponse.InternalServerError(e) =>
+        Left(e.error)
     }
   }
 
@@ -87,7 +88,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ): Either[String, Unit] = response match {
       case http.ApproveSvIdentityResponse.OK => Right(())
-      case http.ApproveSvIdentityResponse.BadRequest(e) => Left(e)
+      case http.ApproveSvIdentityResponse.BadRequest(e) => Left(e.error)
     }
   }
 

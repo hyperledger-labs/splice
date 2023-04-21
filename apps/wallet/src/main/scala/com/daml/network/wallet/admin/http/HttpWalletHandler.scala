@@ -60,6 +60,7 @@ import io.grpc.protobuf.StatusProto
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
+import com.daml.network.admin.http.HttpErrorHandler
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,
@@ -528,10 +529,7 @@ class HttpWalletHandler(
             ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
           )
         ),
-      ).recover {
-        case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
-          r0.CreateTransferOfferResponse.Conflict
-      }
+      ).transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
     }
 
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(

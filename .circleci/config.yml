@@ -119,7 +119,8 @@ commands:
           # - branch: to prevent re-usage of classes between branches
           # - dependencies: to prevent re-usage of classes with mismatching libraries (this can lead to subtle errors)
           # - rev: to allow for updating the cache when sources have changed
-          key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} rev:{{ .Revision }}
+          # - common-openapi: guardrail does not track dependencies of imported schemas properly so we disable the cache if the imported schema changes, see #2747
+          key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} common-openapi={{ checksum "apps/common/src/main/openapi/common.yaml" }} rev:{{ .Revision }}
           paths:
             - /tmp/classes
       - store_artifacts:
@@ -143,10 +144,10 @@ commands:
             - *compiled_classes_key
             # Then, try to download the latest class files produced for the same branch.
             # Make sure that library versions still match.
-            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} common-openapi={{ checksum "apps/common/src/main/openapi/common.yaml" }}
             # Then, try to download the latest class files produced for the main branch.
             # Make sure that library versions still match.
-            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} common-openapi={{ checksum "apps/common/src/main/openapi/common.yaml" }}
       - run:
           name: Extracting precompiled classes
           command: |

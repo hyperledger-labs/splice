@@ -21,7 +21,8 @@ import io.circe.Printer
 import com.daml.network.http.v0.definitions as d0
 import scala.util.{Try, Success, Failure}
 
-case class CustomHttpError(code: Status.Code, message: String) extends Exception
+final case class HttpErrorWithGrpcCode(code: Status.Code, message: String) extends Exception
+final case class HttpErrorWithHttpCode(code: StatusCode, message: String) extends Exception
 
 object HttpErrorHandler {
   def apply(loggerFactory: NamedLoggerFactory)(implicit traceContext: TraceContext): Directive0 =
@@ -29,20 +30,48 @@ object HttpErrorHandler {
       loggerFactory
     ).directive
 
-  def onGrpcNotFound[T](message: String): Try[T] => Try[T] =
+  // 400
+  def badRequest(message: String) = HttpErrorWithHttpCode(StatusCodes.BadRequest, message);
+
+  // 401
+  def unauthorized(message: String) = HttpErrorWithHttpCode(StatusCodes.Unauthorized, message);
+
+  // 404
+  def notFound(message: String) = HttpErrorWithHttpCode(StatusCodes.NotFound, message);
+
+  // 409
+  def conflict(message: String) = HttpErrorWithHttpCode(StatusCodes.Conflict, message);
+
+  // 500
+  def internalServerError(message: String) =
+    HttpErrorWithHttpCode(StatusCodes.InternalServerError, message);
+
+  // 501
+  def notImplemented(message: String) =
+    HttpErrorWithHttpCode(StatusCodes.NotImplemented, message);
+
+  private def grpcErrorCatcher[T](
+      grpcCondition: (Status.Code => Boolean),
+      message: String,
+  ): Try[T] => Try[T] =
     (t: Try[T]) => {
       t match {
         case Success(value) => Success(value)
         case Failure(exception) => {
           exception match {
-            case e: StatusRuntimeException
-                if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-              Failure(new CustomHttpError(e.getStatus.getCode, message))
+            case e: StatusRuntimeException if grpcCondition(e.getStatus.getCode) =>
+              Failure(new HttpErrorWithGrpcCode(e.getStatus.getCode, message))
             case x => Failure(x)
           }
         }
       }
     }
+
+  def onGrpcNotFound[T](message: String): Try[T] => Try[T] =
+    grpcErrorCatcher(_ == io.grpc.Status.Code.NOT_FOUND, message)
+
+  def onGrpcAlreadyExists[T](message: String): Try[T] => Try[T] =
+    grpcErrorCatcher(_ == io.grpc.Status.Code.ALREADY_EXISTS, message)
 }
 
 final class HttpErrorHandler(
@@ -52,6 +81,7 @@ final class HttpErrorHandler(
   private def mapToStatusCode(grpcCode: Status.Code): StatusCode = {
     grpcCode match {
       case Status.Code.NOT_FOUND => StatusCodes.NotFound
+      case Status.Code.ALREADY_EXISTS => StatusCodes.Conflict
       case Status.Code.ABORTED => StatusCodes.TooManyRequests
       case Status.Code.UNAVAILABLE => StatusCodes.ServiceUnavailable
       case Status.Code.INTERNAL => StatusCodes.InternalServerError
@@ -82,13 +112,15 @@ final class HttpErrorHandler(
 
   def exceptionsDirective(implicit traceContext: TraceContext) = {
     val handler = ExceptionHandler {
-      case e: CustomHttpError =>
+      case HttpErrorWithGrpcCode(code, message) =>
         extractUri { uri =>
-          logger.info(
-            s"Request to $uri resulted in an HTTP exception: ${e.message}",
-            e,
-          )
-          completeErrorResponse(e.code, e.message)
+          logger.info(s"Request to $uri resulted in an HTTP exception: ${message}")
+          completeErrorResponse(code, message)
+        }
+      case HttpErrorWithHttpCode(code, message) =>
+        extractUri { uri =>
+          logger.info(s"Request to $uri resulted in an HTTP exception: ${message}")
+          completeErrorResponse(code, message)
         }
       case e: StatusRuntimeException =>
         extractUri { uri =>

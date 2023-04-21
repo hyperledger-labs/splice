@@ -263,12 +263,6 @@ object HttpWalletAppClient {
     }
   }
 
-  object Err {
-    object CreateTransferOfferResponse {
-      val Conflict = Left("CreateTransferOffer duplicate command")
-    }
-  }
-
   case object SelfGrantFeaturedAppRight
       extends BaseCommand[
         http.SelfGrantFeatureAppRightResponse,
@@ -750,7 +744,7 @@ object HttpWalletAppClient {
           Codec.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
             response.offerContractId
           )
-        case http.CreateTransferOfferResponse.Conflict => Err.CreateTransferOfferResponse.Conflict
+        case http.CreateTransferOfferResponse.Conflict(ErrorResponse(errorMsg)) => Left(errorMsg)
         case http.CreateTransferOfferResponse.NotFound(ErrorResponse(errorMsg)) => Left(errorMsg)
         case http.CreateTransferOfferResponse.InternalServerError(ErrorResponse(errorMsg)) =>
           Left(errorMsg)

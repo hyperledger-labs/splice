@@ -71,8 +71,8 @@ object HttpDirectoryAppClient {
             entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
           } yield entry
           r.leftMap(_.toString)
-        case http.LookupEntryByPartyResponse.NotFound =>
-          Left(s"No directory entry found for party ${party.toProtoPrimitive}")
+        case http.LookupEntryByPartyResponse.NotFound(r) =>
+          Left(r.error)
       }
     }
   }
@@ -100,8 +100,8 @@ object HttpDirectoryAppClient {
             entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
           } yield entry
           r.leftMap(_.toString)
-        case http.LookupEntryByNameResponse.NotFound =>
-          Left(s"No directory entry found for name $name")
+        case http.LookupEntryByNameResponse.NotFound(r) =>
+          Left(r.error)
       }
   }
 

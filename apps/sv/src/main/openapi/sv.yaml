@@ -40,11 +40,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
-          description: internal server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /onboard/validator:
     post:
       tags: [sv]
@@ -60,20 +56,12 @@ paths:
         "200":
           description: ok
         "400":
-          description: bad request
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "401":
-          description: unauthorized
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
   /admin/sv/identity/approve:
     post:
-      tags: [ sv ]
+      tags: [sv]
       x-jvm-package: svAdmin
       operationId: "approveSvIdentity"
       requestBody:
@@ -86,12 +74,7 @@ paths:
         "200":
           description: ok
         "400":
-          description: bad request
-          content:
-            text/plain:
-              schema:
-                type: string
-
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /onboard/sv:
     post:
       tags: [sv]
@@ -107,17 +90,9 @@ paths:
         "200":
           description: ok
         "400":
-          description: bad request
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "401":
-          description: unauthorized
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
   /onboard/sv/status/{candidate_party_id_or_name}:
     get:
       tags: [sv]
@@ -137,17 +112,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetSvOnboardingStatusResponse"
         "400":
-          description: bad request
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "500":
-          description: internal server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /onboard/sv/party-migration/authorize:
     post:
       tags: [sv]
@@ -167,19 +134,10 @@ paths:
               schema:
                 "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeResponse"
         "400":
-          description: bad request
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         # TODO (#3429) use this
         "401":
-          description: unauthorized
-          content:
-            text/plain:
-              schema:
-                type: string
-
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -194,17 +152,9 @@ paths:
               schema:
                 type: string
         "500":
-          description: internal server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
         "501":
-          description: not implemented
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/501"
   /debug:
     get:
       tags: [sv]
@@ -279,7 +229,7 @@ components:
     GetSvOnboardingStatusResponse:
       type: object
       required:
-      - state
+        - state
       properties:
         # Note: our codegen does not support oneOf; if it did, the state would be an enum with the following values:
         # - 'unknown', with no fields

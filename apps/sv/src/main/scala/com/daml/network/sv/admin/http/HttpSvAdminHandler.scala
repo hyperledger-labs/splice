@@ -1,5 +1,6 @@
 package com.daml.network.sv.admin.http
 
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.sv.SvApp
@@ -61,12 +62,13 @@ class HttpSvAdminHandler(
           clock,
           logger,
         )
-        .map {
+        .flatMap {
           case Left(reason) =>
-            v0.SvAdminResource.PrepareValidatorOnboardingResponseInternalServerError(
-              s"Could not prepare onboarding: $reason"
+            Future.failed(
+              HttpErrorHandler.internalServerError(s"Could not prepare onboarding: $reason")
             )
-          case Right(()) => definitions.PrepareValidatorOnboardingResponse(secret)
+          case Right(()) =>
+            Future.successful(definitions.PrepareValidatorOnboardingResponse(secret))
         }
     }
   }
@@ -86,12 +88,9 @@ class HttpSvAdminHandler(
           globalDomain,
           logger,
         )
-        .map {
-          case Left(reason) =>
-            v0.SvAdminResource.ApproveSvIdentityResponseBadRequest(
-              s"Bad request: $reason"
-            )
-          case Right(()) => v0.SvAdminResource.ApproveSvIdentityResponseOK
+        .flatMap {
+          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+          case Right(()) => Future.successful(v0.SvAdminResource.ApproveSvIdentityResponseOK)
         }
     }
 }
