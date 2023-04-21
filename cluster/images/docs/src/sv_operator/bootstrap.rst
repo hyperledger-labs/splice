@@ -100,8 +100,9 @@ Edit the example ``examples/sv/sv-bootstrap.conf`` to:
 Start the SV app
 ----------------
 
-If your configuration is sound and your SV identity has been approved by a sufficient number of currently active SVs,
-starting the SV node software (the *SV app*) for the first time will automatically bootstrap your SV into a fully operational status.
+If your configuration is sound and your SV identity has been approved by a sufficient number of currently active SVs
+(currently, this can be performed by DA once you generate and provide your identity information as explained above),
+starting the SV app for the first time will automatically bootstrap your SV into a fully operational status.
 To start the SV app, run the following command:
 
 .. parsed-literal::
