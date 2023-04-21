@@ -176,7 +176,7 @@ object BuildCommon {
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-svc/clean; apps-sv/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-api-daml/clean; svc-governance-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwell-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-svc/clean; apps-sv/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-api-daml/clean; svc-governance-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwell-daml/clean; validator-lifecycle-daml/clean; canton-coin-v1test-daml/clean; svc-governance-v1test-daml/clean; wallet-v1test-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(
