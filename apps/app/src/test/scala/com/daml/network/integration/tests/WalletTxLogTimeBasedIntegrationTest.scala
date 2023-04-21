@@ -87,6 +87,11 @@ class WalletTxLogTimeBasedIntegrationTest
         }
       }
 
+      val appRewards = aliceValidatorWallet.listAppRewardCoupons()
+      val validatorRewards = aliceValidatorWallet.listValidatorRewardCoupons()
+      val (appRewardAmount, validatorRewardAmount) =
+        getRewardCouponsValue(appRewards, validatorRewards, false)
+
       actAndCheck(
         "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
         p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0),
@@ -102,16 +107,19 @@ class WalletTxLogTimeBasedIntegrationTest
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.Transfer =>
             // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
-            // TODO(#3525): this transfer should show the rewards used
+            val senderAmount =
+              (BigDecimal(10) - appRewardAmount - validatorRewardAmount) max BigDecimal(0)
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.P2PPaymentCompleted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceValidator.getValidatorPartyId().toProtoPrimitive
-              amount should beWithin(-10 - smallAmount, BigDecimal(-10))
+              amount should beWithin(-senderAmount - smallAmount, -senderAmount)
             }
             inside(logEntry.receivers) { case Seq((receiver, amount)) =>
               receiver shouldBe bobUserParty.toProtoPrimitive
               amount should beWithin(10 - smallAmount, BigDecimal(10))
             }
+            logEntry.appRewardsUsed shouldBe appRewardAmount
+            logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
             logEntry.senderHoldingFees should be > BigDecimal(0)
             logEntry.coinPrice shouldBe coinPrice
           },

@@ -871,6 +871,10 @@ components:
           type: string
         coin_price:
           type: string
+        app_rewards_used:
+          type: string
+        validator_rewards_used:
+          type: string
 
     ListTransactionsResponse:
       type: object

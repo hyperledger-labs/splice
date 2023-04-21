@@ -347,6 +347,8 @@ object UserWalletTxLogParser {
         receivers: Seq[(String, BigDecimal)],
         senderHoldingFees: BigDecimal,
         coinPrice: BigDecimal,
+        appRewardsUsed: BigDecimal,
+        validatorRewardsUsed: BigDecimal,
     ) extends TxLogEntry {
       override def toResonseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
@@ -361,6 +363,8 @@ object UserWalletTxLogParser {
             Some(receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector),
           holdingFees = Some(Codec.encode(senderHoldingFees)),
           coinPrice = Some(Codec.encode(coinPrice)),
+          appRewardsUsed = Some(Codec.encode(appRewardsUsed)),
+          validatorRewardsUsed = Some(Codec.encode(validatorRewardsUsed)),
         )
     }
     object Transfer {
@@ -435,6 +439,10 @@ object UserWalletTxLogParser {
         senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
         coinPriceStr <- item.coinPrice.toRight("Coin price missing")
         coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
+        appRewardsUsedStr <- item.appRewardsUsed.toRight("App rewards missing")
+        appRewardsUsed <- Codec.decode(Codec.BigDecimal)(appRewardsUsedStr)
+        validatorRewardsUsedStr <- item.validatorRewardsUsed.toRight("Validator rewards missing")
+        validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(validatorRewardsUsedStr)
       } yield TxLogEntry.Transfer(
         indexRecord = indexRecord,
         transactionSubtype = item.transactionSubtype,
@@ -444,6 +452,8 @@ object UserWalletTxLogParser {
         receivers = receivers,
         senderHoldingFees = senderHoldingFees,
         coinPrice = coinPrice,
+        appRewardsUsed = appRewardsUsed,
+        validatorRewardsUsed = validatorRewardsUsed,
       )
     }
 
@@ -598,6 +608,8 @@ object UserWalletTxLogParser {
         receivers = parseReceivers(node.argument.value, node.result.value),
         senderHoldingFees = node.result.value.summary.holdingFees,
         coinPrice = node.result.value.summary.coinPrice,
+        appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
+        validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
       )
 
       State(
@@ -703,11 +715,8 @@ object UserWalletTxLogParser {
   ): (String, BigDecimal) = {
     val sender = arg.transfer.sender
 
-    // Input coins and rewards, excluding holding fees
-    val netInput = BigDecimal(res.summary.inputAppRewardAmount) + BigDecimal(
-      res.summary.inputValidatorRewardAmount
-    )
-      + res.summary.inputCoinAmount - res.summary.holdingFees
+    // Input coins, excluding holding fees
+    val netInput = res.summary.inputCoinAmount - res.summary.holdingFees
 
     // Output coins going back to the sender, after deducting transfer fees
     val netOutput = parseOutputAmounts(arg, res)

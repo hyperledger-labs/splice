@@ -34,39 +34,53 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
 
       bobWallet.tap(50)
 
-      // Transfer from Bob to Alice. Bob's validator will receive some rewards
-      p2pTransfer(bobValidator, bobWallet, aliceWallet, alice, 30.0)
+      actAndCheck(
+        "Transfer from Bob to Alice",
+        p2pTransfer(bobValidator, bobWallet, aliceWallet, alice, 30.0),
+      )(
+        "Bob's validator will receive some rewards",
+        _ => {
+          bobValidatorWallet.listAppRewardCoupons() should have size 1
+          bobValidatorWallet.listValidatorRewardCoupons() should have size 1
+        },
+      )
 
-      eventually() {
-        bobValidatorWallet.listAppRewardCoupons() should have size 1
-        bobValidatorWallet.listValidatorRewardCoupons() should have size 1
-      }
+      val appRewards = bobValidatorWallet.listAppRewardCoupons()
+      val validatorRewards = bobValidatorWallet.listValidatorRewardCoupons()
 
-      /*val balanceBefore = */
-      bobValidatorWallet.balance().unlockedQty
+      val balanceBefore = bobValidatorWallet.balance().unlockedQty
+      val (_, balanceAfter) = actAndCheck(
+        "It takes 3 ticks for the IssuingMiningRound 1 to be created and open.", {
+          advanceRoundsByOneTick
+          advanceRoundsByOneTick
+          advanceRoundsByOneTick
+        },
+      )(
+        "Bob's validator collects rewards",
+        _ => {
+          bobValidatorWallet.listAppRewardCoupons() should have size 0
+          bobValidatorWallet.listValidatorRewardCoupons() should have size 0
+          val balanceAfter = bobValidatorWallet.balance().unlockedQty
+          balanceAfter should be > balanceBefore
+          balanceAfter
+        },
+      )
 
-      // Bob's validator collects rewards
-      // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
-
-      eventually()(bobValidatorWallet.listAppRewardCoupons() should have size 0)
-      eventually()(bobValidatorWallet.listValidatorRewardCoupons() should have size 0)
-
-      /*val balanceAfter = */
-      bobValidatorWallet.balance().unlockedQty
+      val (appRewardAmount, validatorRewardAmount) =
+        getRewardCouponsValue(appRewards, validatorRewards, true)
 
       checkTxHistory(
         bobValidatorWallet,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.Transfer =>
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.WalletAutomation
-          // TODO(#4191) this entry should show the net change in the balance, which it currently does not
-          /* inside(logEntry.receivers) { case Seq(receiver, amount) =>
-              receiver shouldBe bobValidator.config.ledgerApiUser
-              amount should be (balanceAfter - balanceBefore)
-            } */
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe bobValidator.getValidatorPartyId().toProtoPrimitive
+              amount should be(balanceAfter - balanceBefore)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.appRewardsUsed shouldBe appRewardAmount
+            logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
           }
         ),
       )

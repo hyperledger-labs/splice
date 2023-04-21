@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.ExercisedEvent
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -778,6 +779,45 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       ),
       domainId = domainId,
     )
+  }
+
+  /** Returns the total value of the given reward coupons at current issuing round */
+  def getRewardCouponsValue(
+      appRewards: Seq[
+        Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
+      ],
+      validatorRewards: Seq[
+        Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+      ],
+      featured: Boolean,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): (BigDecimal, BigDecimal) = {
+    val issuanceConfig = scan
+      .getOpenAndIssuingMiningRounds()
+      ._2
+      .lastOption
+      .getOrElse(throw new RuntimeException("No issuing round found"))
+      .payload
+
+    val issuancePerARC = if (featured) {
+      BigDecimal(issuanceConfig.issuancePerFeaturedAppRewardCoupon)
+    } else {
+      BigDecimal(issuanceConfig.issuancePerUnfeaturedAppRewardCoupon)
+    }
+    val issuancePerVRC = BigDecimal(issuanceConfig.issuancePerValidatorRewardCoupon)
+
+    val appRewardBalance = appRewards
+      .foldLeft(BigDecimal(0))((total, coupon) =>
+        total + BigDecimal(coupon.payload.amount) * issuancePerARC
+      )
+      .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
+    val validatorRewardBalance = validatorRewards
+      .foldLeft(BigDecimal(0))((total, coupon) =>
+        total + BigDecimal(coupon.payload.amount) * issuancePerVRC
+      )
+      .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
+    appRewardBalance -> validatorRewardBalance
   }
 
 }
