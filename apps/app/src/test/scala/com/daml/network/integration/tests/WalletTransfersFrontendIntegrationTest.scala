@@ -55,8 +55,10 @@ class WalletTransfersFrontendIntegrationTest
             createTransferOffer(bobUserParty, transferAmount, expiryDays)
           },
         )(
-          "bob observes transfer offer",
+          "alice is redirected to /transactions & bob observes transfer offer",
           _ => {
+            currentUrl should endWith("/transactions")
+
             bobWallet.listTransferOffers() should have size 1
             val transfer = bobWallet.listTransferOffers().head.payload
             val tenDaysFromNow = Instant.now().plus(expiryDays.toLong, ChronoUnit.DAYS)

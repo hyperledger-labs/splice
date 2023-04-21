@@ -1,7 +1,8 @@
 import BigNumber from 'bignumber.js';
 import { DirectoryField } from 'common-frontend';
 import addHours from 'date-fns/addHours';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -39,11 +40,31 @@ const SendTransfer: React.FC = () => {
     { name: '90 days', value: 90 },
   ];
 
+  const [isSending, setIsSending] = useState<boolean>(false);
+  // Only set idempotencyKey once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
+  // But: if the transfer is accepted by the BE, but the response fails to reach the FE (e.g., timeout),
+  // you need to make sure that if the user clicks "Send" again it will be with the same key to prevent double-sends.
+  const idempotencyKey: string = useMemo(() => uuidv4(), []);
+
+  const navigate = useNavigate();
+
   const handleSendTransfer = async () => {
+    setIsSending(true); // Disable the button to prevent double-clicks
+
     const now = new Date();
     const expires = addHours(now, Number(expDays) * 24);
 
-    await createTransferOffer(receiver, ccAmount, description, expires, uuidv4());
+    await createTransferOffer(receiver, ccAmount, description, expires, idempotencyKey).then(
+      () => navigate('/transactions'),
+      err => {
+        // TODO (#2831): show an error to the user.
+        console.error(
+          `Failed to send transfer to ${receiver} of ${ccAmount} CC with idempotencyKey ${idempotencyKey}`,
+          err
+        );
+        setIsSending(false); // allow the user to try again, with the same idempotencyKey
+      }
+    );
   };
 
   const convertUsd = useCallback(() => {
@@ -142,6 +163,7 @@ const SendTransfer: React.FC = () => {
             fullWidth
             size="large"
             onClick={handleSendTransfer}
+            disabled={isSending}
           >
             Send
           </Button>
