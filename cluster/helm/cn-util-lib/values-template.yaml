@@ -1,0 +1,3 @@
+cluster:
+  imageTag: VERSION_TAG
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"

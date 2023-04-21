@@ -1,8 +1,0 @@
-imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-resources:
-  limits:
-    cpu: "2"
-    memory: 8Gi
-  requests:
-    cpu: "2"
-    memory: 8Gi

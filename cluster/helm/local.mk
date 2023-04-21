@@ -15,8 +15,11 @@ charts := \
 cluster/helm/build: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-build)
 
 .PHONY: cluster/helm/clean
-cluster/helm/clean:
+cluster/helm/clean: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
+
+%/values.yaml: %/values-template.yaml
+	cat $< | version-tag-subst > $@
 
 #########
 # Helm pattern rules
@@ -28,14 +31,14 @@ define DEFINE_PHONY_CHART_RULES =
 prefix := cluster/helm/$(1)
 
 .PHONY: $$(prefix)/helm-build
-$$(prefix)/helm-build: $$(prefix)/Chart.yaml
+$$(prefix)/helm-build: $$(prefix)/values.yaml
 	helm package $$(@D) --dependency-update --destination cluster/helm/target
 
-.PHONY: $$(prefix)/helm-push
-$$(prefix)/helm-push:
-	jfrog rt upload $$(@D)/target/*.tgz artifactory
+.PHONY: $$(prefix)/helm-clean
+$$(prefix)/helm-clean:
+	rm -vf $$(@D)/values.yaml
 
-endef # end DEFINE_PHONY_CHART_RULESp
+endef # end DEFINE_PHONY_CHART_RULES
 
 $(foreach chart,$(charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
 

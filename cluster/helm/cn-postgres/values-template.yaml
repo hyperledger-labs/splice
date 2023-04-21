@@ -1,0 +1,10 @@
+cluster:
+  imageTag: VERSION_TAG
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+resources:
+  limits:
+    cpu: "2"
+    memory: 8Gi
+  requests:
+    cpu: "2"
+    memory: 8Gi

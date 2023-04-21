@@ -96,6 +96,7 @@ export function cnChartValues(
   return _.merge(
     chartDefaultValues,
     {
+      imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images",
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,

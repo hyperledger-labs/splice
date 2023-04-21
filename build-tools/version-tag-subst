@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+VERSION_TAG=$(version-gen)
+
+sed --expression="s/VERSION_TAG/${VERSION_TAG}/g"

@@ -1,4 +1,9 @@
-imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+cluster:
+  imageTag: VERSION_TAG
+
+imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+fixedTokens: false
 
 defaultJvmOptions: -Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4
 resources:
