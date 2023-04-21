@@ -19,7 +19,7 @@ parameters:
     default: "15"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, publish-public-charts]
     default: build
 
 notify-fail: &notify-fail
@@ -1178,7 +1178,36 @@ jobs:
            export PATH=$HOME/.daml/bin:$PATH
            export PUSH_TO_ARTIFACTORY=1
            make docker-push
-         cmd_retry_count: 1
+
+  helm_charts_push_artifactory:
+    parameters:
+      url:
+        type: string
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build Helm charts
+         cmd: make cluster/helm/build
+      - run_bash_command_in_nix:
+         additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+         cmd_name: Push Helm charts
+         cmd: |
+           publish () {
+             source=$1
+             full_path=$2
+             echo "Publishing ${source} to ${full_path}"
+             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+           }
+
+           for chart in cluster/helm/target/*.tgz; do
+              artifactory_url="https://digitalasset.jfrog.io/artifactory"
+              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+           done
 
   docker_images_build:
     machine:
@@ -1252,6 +1281,17 @@ workflows:
             - artifactory
             - slack-context
           url: digitalasset-canton-network-docker.jfrog.io
+
+  publish_public_charts:
+    when:
+      equal: [ publish-public-charts, << pipeline.parameters.run-job >> ]
+    jobs:
+      - helm_charts_push_artifactory:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          url: https://digitalasset.jfrog.io/artifactory/canton-network-helm/
 
   build:
     when:

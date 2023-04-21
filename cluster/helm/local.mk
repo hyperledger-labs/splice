@@ -11,24 +11,31 @@ charts := \
 	cn-svc \
 	cn-validator
 
-helm-build := target/helm.build
-
 .PHONY: cluster/helm/build
-cluster/helm/build: $(foreach chart,$(charts),cluster/helm/$(chart)/$(helm-build))
+cluster/helm/build: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-build)
 
 .PHONY: cluster/helm/clean
-cluster/helm/clean: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-clean)
-	echo clean here
+cluster/helm/clean:
+	rm -rfv cluster/helm/target
 
 #########
 # Helm pattern rules
 #########
 
-%/$(helm-build): %/Chart.yaml
-	cd cluster/helm && helm dependency update $(notdir $(abspath $(@D)/..))
-	mkdir -pv $(@D)
-	touch $@
+# You cannot define implicit phony targets
+# so instead we define the phony targets in here.
+define DEFINE_PHONY_CHART_RULES =
+prefix := cluster/helm/$(1)
 
-.PHONY: %/helm-clean
-%/helm-clean:
-	rm -rfv $(@D)/target $(@D)/charts
+.PHONY: $$(prefix)/helm-build
+$$(prefix)/helm-build: $$(prefix)/Chart.yaml
+	helm package $$(@D) --dependency-update --destination cluster/helm/target
+
+.PHONY: $$(prefix)/helm-push
+$$(prefix)/helm-push:
+	jfrog rt upload $$(@D)/target/*.tgz artifactory
+
+endef # end DEFINE_PHONY_CHART_RULESp
+
+$(foreach chart,$(charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
+
