@@ -223,7 +223,7 @@ final class ScanConnection(
 
   def getValidatorTrafficBalance(
       validatorParty: PartyId
-  )(implicit ec: ExecutionContext): Future[Double] = {
+  )(implicit ec: ExecutionContext): Future[HttpScanAppClient.ValidatorTrafficBalance] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetValidatorTrafficBalance(validatorParty),

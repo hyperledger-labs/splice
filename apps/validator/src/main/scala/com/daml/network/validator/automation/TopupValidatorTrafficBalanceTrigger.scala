@@ -1,14 +1,16 @@
 package com.daml.network.validator.automation
 
+import akka.stream.Materializer
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
+import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyExtraTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_BuyExtraTraffic,
   COO_Error,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, DomainFeesConstants}
+import com.daml.network.util.{CNNodeUtil, Contract, DomainFeesConstants}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
@@ -26,6 +28,7 @@ class TopupValidatorTrafficBalanceTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
+    mat: Materializer,
 ) extends PollingTrigger {
 
   private def getValidatorTraffic
@@ -39,6 +42,15 @@ class TopupValidatorTrafficBalanceTrigger(
         )
       )
     )
+  }
+
+  private def getValidatorWalletBalance()(implicit tc: TraceContext): Future[BigDecimal] = {
+    for {
+      coins <- store.multiDomainAcsStore.listContracts(Coin.COMPANION)
+      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+    } yield coins.view
+      .map(c => BigDecimal(CNNodeUtil.currentAmount(c.contract.payload, currentRound)))
+      .sum
   }
 
   private def getValidatorTreasury: Future[TreasuryService] = {
@@ -100,12 +112,21 @@ class TopupValidatorTrafficBalanceTrigger(
       currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
         store.key.validatorParty
       )
+      validatorWalletBalance <- getValidatorWalletBalance()
       pollingIntervalInSecs = context.config.pollingInterval.duration.toSeconds
       topUpAmount =
         (DomainFeesConstants.targetThroughput.value - DomainFeesConstants.defaultThroughput.value)
           * pollingIntervalInSecs
       result <-
-        if (currentTrafficBalance <= topUpAmount)
+        if (
+          // check that current traffic balance from scan app is not stale
+          currentTrafficBalance.totalPaid >= validatorTrafficContract.payload.amount
+            .doubleValue() &&
+          // check to prevent topup attempt if validator clearly does not have enough coins (1 CC = 1 Traffic Unit)
+          validatorWalletBalance > topUpAmount &&
+          // check if traffic balance has fallen below minimum threshold
+          currentTrafficBalance.remainingBalance <= topUpAmount
+        )
           topUpValidatorTraffic(validatorTreasury, validatorTrafficContract.contractId, topUpAmount)
         else Future.successful(false)
     } yield result

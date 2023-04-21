@@ -79,7 +79,7 @@ trait ScanStore
       )
     )
 
-  def getValidatorExtraTrafficLimit(validatorParty: PartyId)(implicit
+  def getTotalPaidValidatorTraffic(validatorParty: PartyId)(implicit
       tc: TraceContext
   ): Future[BigDecimal]
 }

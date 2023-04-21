@@ -17,7 +17,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
 
-  private val toxiproxy = UseToxiproxy(createLedgerApiProxies = true)
+  private val toxiproxy = UseToxiproxy(createSvLedgerApiProxies = true)
   registerPlugin(toxiproxy)
 
   "sv app should recover and correctly report their activeness status after a disconnect" in {

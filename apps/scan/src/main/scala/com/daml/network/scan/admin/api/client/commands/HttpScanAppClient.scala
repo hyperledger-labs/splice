@@ -460,8 +460,13 @@ object HttpScanAppClient {
     }
   }
 
+  final case class ValidatorTrafficBalance(
+      remainingBalance: Double,
+      totalPaid: Double,
+  )
+
   case class GetValidatorTrafficBalance(validatorParty: PartyId)
-      extends BaseCommand[http.GetValidatorTrafficBalanceResponse, Double] {
+      extends BaseCommand[http.GetValidatorTrafficBalanceResponse, ValidatorTrafficBalance] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
@@ -470,10 +475,10 @@ object HttpScanAppClient {
 
     override def handleResponse(
         response: http.GetValidatorTrafficBalanceResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Double] =
+    )(implicit decoder: TemplateJsonDecoder): Either[String, ValidatorTrafficBalance] =
       response match {
         case http.GetValidatorTrafficBalanceResponse.OK(response) =>
-          Right(response.validatorTrafficBalance)
+          Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPaid))
         case http.GetValidatorTrafficBalanceResponse.NotFound(value) =>
           Left(value.error)
       }

@@ -166,7 +166,9 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary("Get the available traffic balance for a validator")
-  def getValidatorTrafficBalance(validatorParty: PartyId): Double =
+  def getValidatorTrafficBalance(
+      validatorParty: PartyId
+  ): HttpScanAppClient.ValidatorTrafficBalance =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetValidatorTrafficBalance(validatorParty))
     }

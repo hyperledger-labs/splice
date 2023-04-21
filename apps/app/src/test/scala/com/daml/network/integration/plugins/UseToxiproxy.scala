@@ -16,8 +16,9 @@ import scala.collection.mutable.Map
   */
 case class UseToxiproxy(
     // these arguments are just a way to reduce startup time without investing into a proper generalization yet.
-    createLedgerApiProxies: Boolean = false,
+    createSvLedgerApiProxies: Boolean = false,
     createScanAppProxies: Boolean = false,
+    createScanLedgerApiProxy: Boolean = false,
 ) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
     with BaseTest {
 
@@ -67,8 +68,8 @@ case class UseToxiproxy(
       remoteScanApp.focus(_.adminApi.port).replace(listenPort)
     }
 
-    val lapiConf =
-      if (createLedgerApiProxies)
+    val svLedgerApiConf =
+      if (createSvLedgerApiProxies)
         config
           .focus(_.svApps)
           .modify(
@@ -84,7 +85,7 @@ case class UseToxiproxy(
 
     val scanAppConf =
       if (createScanAppProxies)
-        lapiConf
+        svLedgerApiConf
           .focus(_.validatorApps)
           .modify(
             _.toSeq
@@ -95,9 +96,22 @@ case class UseToxiproxy(
               }
               .toMap
           )
-      else lapiConf
+      else svLedgerApiConf
 
-    scanAppConf
+    val scanLedgerApiConf =
+      if (createScanLedgerApiProxy)
+        scanAppConf
+          .focus(_.scanApp)
+          .modify(
+            _.map(c =>
+              c.copy(
+                remoteParticipant = addLedgerApiProxy("scan-app", c.remoteParticipant, 0)
+              )
+            )
+          )
+      else scanAppConf
+
+    scanLedgerApiConf
   }
 
   override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
@@ -127,4 +141,5 @@ case class UseToxiproxy(
 object UseToxiproxy {
   def ledgerApiProxyName(forInstance: String): String = s"$forInstance-ledger-api"
   def scanHttpApiProxyName(forInstance: String): String = s"$forInstance-scan-api"
+  lazy val scanLedgerApiProxyName = "scan-app-ledger-api"
 }

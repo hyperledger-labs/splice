@@ -378,9 +378,12 @@ components:
           format: int64
     GetValidatorTrafficBalanceResponse:
       type: object
-      required: ["validatorTrafficBalance"]
+      required: ["remainingBalance", "totalPaid"]
       properties:
-        validatorTrafficBalance:
+        remainingBalance:
+          type: number
+          format: double
+        totalPaid:
           type: number
           format: double
     CheckAndUpdateValidatorTrafficBalanceResponse:

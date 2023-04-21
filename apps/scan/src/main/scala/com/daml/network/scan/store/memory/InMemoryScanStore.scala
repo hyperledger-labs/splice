@@ -184,7 +184,7 @@ class InMemoryScanStore(
       }),
     )
 
-  override def getValidatorExtraTrafficLimit(
+  override def getTotalPaidValidatorTraffic(
       validatorParty: PartyId
   )(implicit tc: TraceContext): Future[BigDecimal] = {
     lookupValidatorTraffic(validatorParty).map {

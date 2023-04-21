@@ -378,14 +378,15 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
       store
-        .getValidatorExtraTrafficLimit(validatorPartyId)
-        .map(limit => {
-          val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
+        .getTotalPaidValidatorTraffic(validatorPartyId)
+        .map(totalTraffic => {
+          val totalPaidTraffic = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
           val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
           val extraTrafficBalance =
-            validatorTrafficRateLimiter.getExtraTrafficBalance(extraTrafficLimit)
+            validatorTrafficRateLimiter.getExtraTrafficBalance(totalPaidTraffic)
           v0.ScanResource.GetValidatorTrafficBalanceResponse.OK(
-            definitions.GetValidatorTrafficBalanceResponse(extraTrafficBalance)
+            definitions
+              .GetValidatorTrafficBalanceResponse(extraTrafficBalance, totalPaidTraffic.value)
           )
         })
 
@@ -399,18 +400,18 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
       store
-        .getValidatorExtraTrafficLimit(validatorPartyId)
-        .map(limit => {
-          val extraTrafficLimit = NonNegativeNumeric.tryCreate(limit.toDouble)
+        .getTotalPaidValidatorTraffic(validatorPartyId)
+        .map(totalTraffic => {
+          val totalPaidTraffic = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
           val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
           logger.debug(
             s"Default traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter.getDefaultTrafficBalance()}"
           )
           logger.debug(
             s"Extra traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter
-                .getExtraTrafficBalance(extraTrafficLimit)}"
+                .getExtraTrafficBalance(totalPaidTraffic)}"
           )
-          val approved = validatorTrafficRateLimiter.checkAndUpdate(extraTrafficLimit)
+          val approved = validatorTrafficRateLimiter.checkAndUpdate(totalPaidTraffic)
           v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
             definitions.CheckAndUpdateValidatorTrafficBalanceResponse(approved)
           )
