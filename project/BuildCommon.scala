@@ -105,6 +105,7 @@ object BuildCommon {
           val Seq(darFile) = (Compile / damlBuild).value
           Seq(
             (
+              (Compile / baseDirectory).value,
               darFile,
               "com.daml.network.codegen",
             )
@@ -723,6 +724,7 @@ object BuildCommon {
           val Seq(darFile) = (Compile / damlBuild).value
           Seq(
             (
+              (Compile / baseDirectory).value,
               darFile,
               "com.digitalasset.canton.examples",
             )
@@ -819,10 +821,12 @@ object BuildCommon {
         Compile / damlCodeGeneration :=
           Seq(
             (
+              (Compile / baseDirectory).value,
               (Compile / resourceDirectory).value / "dar" / "AdminWorkflows.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
+              (Compile / baseDirectory).value,
               (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.6.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),

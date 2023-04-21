@@ -13,3 +13,7 @@ data-dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
+codegen:
+  java:
+    package-prefix: com.daml.network.codegen.java
+    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
