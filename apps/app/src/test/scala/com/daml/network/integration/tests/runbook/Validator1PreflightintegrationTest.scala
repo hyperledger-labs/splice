@@ -18,7 +18,7 @@ class Validator1PreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator1", "bob-validator1")
     with FrontendLoginUtil
     with DirectoryFrontendTestUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
   private val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]

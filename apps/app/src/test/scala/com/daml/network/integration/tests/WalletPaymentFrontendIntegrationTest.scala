@@ -5,19 +5,14 @@ import com.daml.network.codegen.java.cn.wallet.payment.{AcceptedAppPayment, Curr
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{
-  Contract,
-  FrontendLoginUtil,
-  WalletNewFrontendTestUtil,
-  WalletTestUtil,
-}
+import com.daml.network.util.{Contract, FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
-class WalletNewPaymentFrontendIntegrationTest
+class WalletPaymentFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
   private val coinPrice = 2

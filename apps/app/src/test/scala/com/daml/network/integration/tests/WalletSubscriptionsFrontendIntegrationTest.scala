@@ -4,20 +4,14 @@ import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{
-  FrontendLoginUtil,
-  TimeTestUtil,
-  WalletFrontendTestUtil,
-  WalletTestUtil,
-}
+import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, LocalDate}
 
-class WalletNewSubscriptionsFrontendIntegrationTest
+class WalletSubscriptionsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
-    with WalletFrontendTestUtil
     with FrontendLoginUtil
     with TimeTestUtil {
 

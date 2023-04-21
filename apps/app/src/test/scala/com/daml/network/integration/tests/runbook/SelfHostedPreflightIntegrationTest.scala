@@ -12,7 +12,7 @@ import com.daml.network.util.{
   CantonProcessTestUtil,
   DirectoryFrontendTestUtil,
   FrontendLoginUtil,
-  WalletNewFrontendTestUtil,
+  WalletFrontendTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
@@ -32,7 +32,7 @@ class SelfHostedPreflightIntegrationTest
     with HasConsoleScriptRunner
     with CantonProcessTestUtil
     with FrontendLoginUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with DirectoryFrontendTestUtil {
 
   // We need to delay this until we started the validator. Otherwise we might

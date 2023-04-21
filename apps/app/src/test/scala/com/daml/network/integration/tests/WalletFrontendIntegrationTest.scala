@@ -3,15 +3,15 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletNewFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level.WARN
 
-class WalletNewFrontendIntegrationTest
+class WalletFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
   val coinPrice = 2

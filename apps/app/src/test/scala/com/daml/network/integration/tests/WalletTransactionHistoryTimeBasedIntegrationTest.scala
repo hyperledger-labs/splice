@@ -3,16 +3,16 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletNewFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 
-class WalletNewTransactionHistoryTimeBasedIntegrationTest
+class WalletTransactionHistoryTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
     with WalletTxLogTestUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
   private val coinPrice = 2

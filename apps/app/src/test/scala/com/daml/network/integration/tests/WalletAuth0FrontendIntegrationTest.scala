@@ -9,7 +9,7 @@ import monocle.macros.syntax.lens.*
 
 import java.net.URL
 
-class WalletNewAuth0FrontendIntegrationTest
+class WalletAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("randomUser")
     with FrontendLoginUtil {
 

@@ -6,17 +6,17 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{
   FrontendLoginUtil,
   TimeTestUtil,
-  WalletNewFrontendTestUtil,
+  WalletFrontendTestUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 
-class WalletNewFrontendTimeBasedIntegrationTest
+class WalletFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
-    with WalletNewFrontendTestUtil
+    with WalletFrontendTestUtil
     with FrontendLoginUtil
     with TimeTestUtil {
 
