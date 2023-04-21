@@ -29,6 +29,7 @@ class ApiClientRequestLogger(
 
   private val requestsToIgnore: Set[String] =
     Set(
+      "com.daml.ledger.api.v1.TransactionService/GetLedgerEnd",
       "com.digitalasset.canton.research.participant.multidomain.UpdateService/GetLedgerEnd",
       "com.digitalasset.canton.research.participant.multidomain.StateSnapshotService/GetConnectedDomains",
     )
