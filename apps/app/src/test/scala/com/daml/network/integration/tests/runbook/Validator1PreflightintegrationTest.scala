@@ -255,27 +255,30 @@ class Validator1PreflightIntegrationTest
       tapCoins(100)
 
       allocateDirectoryEntry(
-        () => auth0Login(aliceUser, directoryUiUrl, () => find(id("entry-name-field")).isDefined),
+        () =>
+          auth0Login(
+            aliceUser,
+            directoryUiUrl,
+            () => find(id("entry-name-field")) should not be empty,
+          ),
         "alice.cns",
       )
     }
   }
 
-  private def auth0Login(user: Auth0User, url: String, completedWhen: () => Boolean)(implicit
+  private def auth0Login(
+      user: Auth0User,
+      url: String,
+      assertCompleted: () => org.scalatest.Assertion,
+  )(implicit
       webDriver: WebDriverType
   ) = {
     clue(s"Auth0 user login as: ${user.id} (${user.email})") {
-      go to url
-      eventually() {
-        currentUrl should startWith(url)
-      }
-      // We reuse frontends across tests so we might need to log out first.
-      find(id("logout-button")).foreach(click on _)
-      click on "oidc-login-button"
-      completeAuth0Prompts(
+      completeAuth0LoginWithAuthorization(
+        url,
         user.email,
         user.password,
-        completedWhen,
+        assertCompleted,
       )
     }
   }
@@ -292,7 +295,11 @@ class Validator1PreflightIntegrationTest
       url: String,
   )(implicit webDriver: WebDriverType) = {
     clue(s"Logging in to splitwell UI at: ${url}") {
-      auth0Login(user, url, () => find(id("group-id-field")).isDefined)
+      auth0Login(
+        user,
+        url,
+        () => find(id("group-id-field")) should not be empty,
+      )
       waitForQuery(id("logged-in-user"))
     }
   }
@@ -303,8 +310,11 @@ class Validator1PreflightIntegrationTest
       onboardUserToWallet: Boolean,
   )(implicit webDriver: WebDriverType): String = {
     clue(s"Logging in to wallet UI at: ${url}") {
-      auth0Login(user, url, () => find(id("onboard-button")).isDefined)
-      waitForQuery(id("onboard-button"))
+      auth0Login(
+        user,
+        url,
+        () => find(id("onboard-button")) should not be empty,
+      )
 
       if (onboardUserToWallet)
         click on "onboard-button"

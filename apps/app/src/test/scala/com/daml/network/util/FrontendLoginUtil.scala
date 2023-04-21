@@ -70,19 +70,14 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
       val userPartyId = aliceValidator.onboardUser(user.id)
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
-        actAndCheck(
-          "The user logs in with OAauth2 and completes all Auth0 login prompts", {
-            completeAuth0LoginWithAuthorization(
-              s"http://localhost:$localHostPort",
-              user.email,
-              user.password,
-              userPartyId,
-            )
-          },
-        )(
-          "The user sees his own party ID in the app",
-          _ => find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
-        )
+        clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
+          completeAuth0LoginWithAuthorization(
+            s"http://localhost:$localHostPort",
+            user.email,
+            user.password,
+            () => find(id("logged-in-user")).value.text shouldBe userPartyId.toProtoPrimitive,
+          )
+        }
 
         afterLoginChecks(userPartyId, webDriver)
       }
