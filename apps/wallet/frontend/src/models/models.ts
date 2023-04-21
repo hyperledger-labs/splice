@@ -32,12 +32,14 @@ export interface Transfer {
   providerId: Party;
   senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
   date: Date;
+  coinPrice: BigNumber;
 }
 export interface BalanceChange {
   id: string;
   transactionType: 'balance_change';
   receivers: TransactionReceiver[];
   date: Date;
+  coinPrice: BigNumber;
 }
 export interface Automation {
   // receivers is effectively the current user
@@ -46,6 +48,7 @@ export interface Automation {
   providerId: Party;
   senderAmountCC: BigNumber;
   date: Date;
+  coinPrice: BigNumber;
 }
 
 export interface TransactionReceiver {

@@ -128,6 +128,11 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             party: r.party,
           }));
           const date = item.date;
+          if (!item.coinPrice) {
+            console.error('Transaction does not contain coinPrice.', item);
+            return [];
+          }
+          const coinPrice = new BigNumber(item.coinPrice);
 
           if (item.transactionType === 'balance_change') {
             const balanceChange: BalanceChange = {
@@ -135,6 +140,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               id,
               date,
               receivers,
+              coinPrice,
             };
             return [balanceChange];
           } else if (item.transactionType === 'transfer') {
@@ -146,6 +152,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
                 date,
                 providerId: item.provider!,
                 senderAmountCC: new BigNumber(item.sender!.amount),
+                coinPrice,
               };
               return [automation];
             } else {
@@ -158,6 +165,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
                 providerId: item.provider!,
                 senderId: item.sender!.party,
                 senderAmountCC: new BigNumber(item.sender!.amount),
+                coinPrice,
               };
               return [transfer];
             }

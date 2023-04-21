@@ -74,7 +74,6 @@ const TransactionHistory: React.FC = () => {
                 <TransactionHistoryRow
                   key={'tx-row-' + tx.id}
                   transaction={tx}
-                  coinPrice={coinPrice}
                   primaryPartyId={primaryPartyId}
                 />
               );
@@ -96,13 +95,11 @@ const TransactionHistory: React.FC = () => {
 
 interface TransactionHistoryRowProps {
   transaction: Transaction;
-  coinPrice: BigNumber;
   primaryPartyId: Party;
 }
 
 const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
   transaction,
-  coinPrice,
   primaryPartyId,
 }) => {
   return (
@@ -117,11 +114,7 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
         <SenderReceiverInfo transaction={transaction} />
       </TableCell>
       <TableCell>
-        <TransactionAmount
-          transaction={transaction}
-          coinPrice={coinPrice}
-          primaryPartyId={primaryPartyId}
-        />
+        <TransactionAmount transaction={transaction} primaryPartyId={primaryPartyId} />
       </TableCell>
     </TableRow>
   );
@@ -213,14 +206,9 @@ const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore }) => {
 
 interface TransactionAmountProps {
   transaction: Transaction;
-  coinPrice: BigNumber;
   primaryPartyId: Party;
 }
-const TransactionAmount: React.FC<TransactionAmountProps> = ({
-  transaction,
-  coinPrice,
-  primaryPartyId,
-}) => {
+const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, primaryPartyId }) => {
   let amountCC: BigNumber;
   switch (transaction.transactionType) {
     case 'automation':
@@ -242,9 +230,7 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({
   // If the balance change is negative, the number already contains the minus sign.
   const sign = amountCC.isPositive() ? '+' : '';
 
-  // TODO (#3623): this should be the exchange rate at the time of the transaction,
-  //              but it's not included in the response
-  // const totalUSDAmount = amountCC.times(coinPrice);
+  const coinPriceAtTimeOfTransaction = transaction.coinPrice;
 
   return (
     <Stack direction="column">
@@ -255,11 +241,16 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({
       <Stack direction="row" spacing={0.5}>
         <Typography variant="caption" className="tx-amount-usd">
           {sign}
-          <AmountDisplay amount={amountCC} currency="CC" convert="CCtoUSD" coinPrice={coinPrice} />
+          <AmountDisplay
+            amount={amountCC}
+            currency="CC"
+            convert="CCtoUSD"
+            coinPrice={coinPriceAtTimeOfTransaction}
+          />
         </Typography>
         <Typography variant="caption">@</Typography>
         <Typography variant="caption" className="tx-amount-rate">
-          <RateDisplay base="CC" quote="USD" coinPrice={coinPrice} />
+          <RateDisplay base="CC" quote="USD" coinPrice={coinPriceAtTimeOfTransaction} />
         </Typography>
       </Stack>
     </Stack>
