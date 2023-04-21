@@ -220,14 +220,26 @@ object DamlPlugin extends AutoPlugin {
         val damlc = ensureDamlc(damlVersion, log)
         // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
         val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value, log)
+        val damlDebug = sys.env.get("DAML_DEBUG")
+        val stdoutLogger = new ProcessLogger {
+          // We overwrite this because by default this ends up being an error log
+          // in sbt while damlc really just logs debug information there.
+          override def err(message: => String) = log.out(s"stderr: $message")
+          override def out(message: => String) = log.out(message)
+          override def buffer[T](f: => T) = f
+        }
         damlProjectFiles.get.toList.foreach { projectFile =>
           val projectDirectory = projectFile.toPath.toAbsolutePath.getParent
           val result = Process(
-            command =
-              Seq(damlc.getAbsolutePath, "test", "--project-root", projectDirectory.toString),
+            command = Seq(
+              damlc.getAbsolutePath,
+              "test",
+              "--project-root",
+              projectDirectory.toString,
+            ) ++ Seq("--debug").filter(_ => damlDebug.isDefined),
             cwd = projectDirectory.toFile,
             extraEnv = damlLibsEnv: _*,
-          ) ! log
+          ) ! stdoutLogger
           if (result != 0) {
             throw new MessageOnlyException(s"""
                                               |damlc test failed ${projectDirectory}:

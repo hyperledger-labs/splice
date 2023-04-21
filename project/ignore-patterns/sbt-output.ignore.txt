@@ -71,4 +71,7 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 # Without that we'd have to ignore all errors from specific logs when checking the sbt output.
 \(ignore this line in check-sbt-output\.sh\)$
 
+# daml test output at debug level
+stderr: Finishing shakeRun .*exception: AsyncCancelled
+
 # Make sure to have a trailing newline
