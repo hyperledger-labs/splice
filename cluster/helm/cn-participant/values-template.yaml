@@ -9,3 +9,36 @@ resources:
   requests:
     cpu: "1"
     memory: 32Gi
+
+postgres: postgres.svc.svc.cluster.local
+postgresSchema: svc_participant
+
+
+extraDomains: '[]'
+extraEnvVars:
+- name: CN_APP_SV1_LEDGER_API_AUTH_USER_NAME
+  valueFrom:
+    secretKeyRef:
+      key: ledger-api-user
+      name: cn-app-sv1-ledger-api-auth
+      optional: false
+- name: CN_APP_SVC_LEDGER_API_AUTH_USER_NAME
+  valueFrom:
+    secretKeyRef:
+      key: ledger-api-user
+      name: cn-app-svc-ledger-api-auth
+      optional: false
+- name: CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME
+  valueFrom:
+    secretKeyRef:
+      key: ledger-api-user
+      name: cn-app-scan-ledger-api-auth
+      optional: false
+- name: CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME
+  valueFrom:
+    secretKeyRef:
+      key: ledger-api-user
+      name: cn-app-directory-ledger-api-auth
+      optional: false
+
+participantUsers: '[{"actAs":[{"fromUser":"self"}],"admin":true,"name":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"allocate":"svc_party"},"readAs":[]},{"actAs":[],"admin":false,"name":{"env":"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}},"readAs":[{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}]},{"actAs":[{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}],"admin":true,"name":{"env":"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}},"readAs":[]},{"actAs":[{"fromUser":"self"},{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}],"admin":true,"name":{"env":"CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"allocate":"sv1"},"readAs":[]}]'

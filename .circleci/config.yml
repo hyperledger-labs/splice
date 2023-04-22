@@ -19,7 +19,7 @@ parameters:
     default: "15"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, publish-public-charts]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, publish-public-docker-images, publish-public-charts]
     default: build
 
 notify-fail: &notify-fail
@@ -1277,10 +1277,21 @@ workflows:
       equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
     jobs:
       - docker_images_push_artifactory:
-          <<: *main-branch-never
           context:
             - artifactory
-            - slack-context
+          url: digitalasset-canton-network-docker.jfrog.io
+      - helm_charts_push_artifactory:
+          context:
+            - artifactory
+          url: https://digitalasset.jfrog.io/artifactory/canton-network-helm/
+
+  publish_public_docker_images:
+    when:
+      equal: [ publish-public-docker-images, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push_artifactory:
+          context:
+            - artifactory
           url: digitalasset-canton-network-docker.jfrog.io
 
   publish_public_charts:
@@ -1288,10 +1299,8 @@ workflows:
       equal: [ publish-public-charts, << pipeline.parameters.run-job >> ]
     jobs:
       - helm_charts_push_artifactory:
-          <<: *main-branch-never
           context:
             - artifactory
-            - slack-context
           url: https://digitalasset.jfrog.io/artifactory/canton-network-helm/
 
   build:
