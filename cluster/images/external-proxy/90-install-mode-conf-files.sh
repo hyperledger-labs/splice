@@ -7,5 +7,4 @@ for modename in ${ENABLE_INGRESS_MODES}; do
 
     cp -v /conf-modes/"${modename}"/* /etc/nginx/conf.d/
 done
-
 echo "Done installing ingres modes."
