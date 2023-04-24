@@ -2,11 +2,14 @@ package com.daml.network.sv
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
+import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.codegen.java.{cc, cn}
@@ -125,6 +128,11 @@ class SvApp(
         logger,
       )
 
+      verifier = config.auth match {
+        case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
+        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+      }
+
       handler = new HttpSvHandler(
         ledgerClient,
         globalDomain,
@@ -155,17 +163,28 @@ class SvApp(
         loggerFactory,
       )
 
-      routes = cors() {
+      routes = cors(
+        CorsSettings(ac).withAllowedMethods(
+          List(
+            HttpMethods.DELETE,
+            HttpMethods.GET,
+            HttpMethods.POST,
+            HttpMethods.HEAD,
+            HttpMethods.OPTIONS,
+          )
+        )
+      ) {
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                // TODO(M3-46) add client authentication via `AuthExtractor`
                 SvResource.routes(
-                  handler
+                  handler,
+                  _ => provide(()),
                 ),
                 SvAdminResource.routes(
-                  adminHandler
+                  adminHandler,
+                  AuthExtractor(verifier, loggerFactory, "canton network sv admin realm"),
                 ),
                 CommonAdminResource.routes(commonAdminHandler),
               )

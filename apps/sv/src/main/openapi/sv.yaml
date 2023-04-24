@@ -5,10 +5,6 @@ info:
 tags:
   - name: sv
 paths:
-  /status:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
-  /version:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
   /admin/validator/onboarding/ongoing:
     get:
       tags: [sv]

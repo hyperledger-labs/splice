@@ -28,7 +28,7 @@ import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
@@ -44,9 +44,9 @@ class HttpSvHandler(
     svcPartyHosting: SvcPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContextExecutor,
+    ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.SvHandler
+) extends v0.SvHandler[Unit]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
@@ -56,7 +56,9 @@ class HttpSvHandler(
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
-  )(body: definitions.OnboardValidatorRequest): Future[v0.SvResource.OnboardValidatorResponse] =
+  )(
+      body: definitions.OnboardValidatorRequest
+  )(fake: Unit): Future[v0.SvResource.OnboardValidatorResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       PartyId.fromProtoPrimitive(body.partyId) match {
         case Right(partyId) =>
@@ -85,7 +87,9 @@ class HttpSvHandler(
 
   def startSvOnboarding(
       respond: v0.SvResource.StartSvOnboardingResponse.type
-  )(body: definitions.StartSvOnboardingRequest): Future[v0.SvResource.StartSvOnboardingResponse] =
+  )(
+      body: definitions.StartSvOnboardingRequest
+  )(fake: Unit): Future[v0.SvResource.StartSvOnboardingResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
@@ -120,7 +124,7 @@ class HttpSvHandler(
 
   def getSvOnboardingStatus(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
-  )(svPartyOrName: String): Future[SvResource.GetSvOnboardingStatusResponse] = {
+  )(svPartyOrName: String)(fake: Unit): Future[SvResource.GetSvOnboardingStatusResponse] = {
     PartyId.fromProtoPrimitive(svPartyOrName) match {
       case Left(error) =>
         for {
@@ -166,7 +170,7 @@ class HttpSvHandler(
 
   def devNetOnboardValidatorPrepare(
       respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type
-  )(): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] =
+  )()(fake: Unit): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       if (isDevNet) {
         val secret = generateRandomOnboardingSecret()
@@ -200,7 +204,7 @@ class HttpSvHandler(
 
   def getDebugInfo(
       respond: v0.SvResource.GetDebugInfoResponse.type
-  )(): Future[v0.SvResource.GetDebugInfoResponse] =
+  )()(fake: Unit): Future[v0.SvResource.GetDebugInfoResponse] =
     withNewTrace(workflowId) { _ => _ =>
       for {
         coinRules <- svcStore.getCoinRules()
@@ -212,6 +216,62 @@ class HttpSvHandler(
         coinRulesContractId = coinRules.contractId.toString,
         svcRulesContractId = svcRules.contractId.toString,
       )
+    }
+
+  // TODO(#3429) add a check here to make sure the candidate SV is already confirmed.
+  def onboardSvPartyMigrationAuthorize(
+      respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
+  )(
+      body: definitions.OnboardSvPartyMigrationAuthorizeRequest
+  )(fake: Unit): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      ParticipantId
+        .fromProtoPrimitive(body.participantId, "")
+        .fold(
+          err =>
+            Future
+              .failed(
+                HttpErrorHandler.badRequest(err.message)
+              ),
+          participantId =>
+            for {
+              // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
+              // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
+              _ <- retryProvider.retryForClientCalls(
+                "locking SvcRules and CoinRules contracts",
+                lockSvcRulesAndCoinRules(),
+                logger,
+              )
+              _ = logger.info(
+                s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
+              )
+
+              // this will wait until the PartyToParticipant state change completed
+              authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
+                globalDomain,
+                participantId,
+                RequestSide.From,
+              )
+
+              _ <- retryProvider.retryForClientCalls(
+                "unlocking SvcRules and CoinRules contracts",
+                unlockSvcRulesAndCoinRules(),
+                logger,
+              )
+
+              _ = logger.info(
+                s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
+              )
+
+              acsBytes <- participantAdminConnection.downloadAcsSnapshot(
+                Set(svcParty),
+                filterDomainId = globalDomain.toProtoPrimitive,
+                timestamp = Some(authorizedAt),
+              )
+              // TODO(M3-57) consider if a more space-efficient encoding is necessary
+              encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
+            } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded),
+        )
     }
 
   private def isCompleted(
@@ -396,62 +456,6 @@ class HttpSvHandler(
           }
         }
       } yield outcome
-    }
-
-  // TODO(#3429) add a check here to make sure the candidate SV is already confirmed.
-  override def onboardSvPartyMigrationAuthorize(
-      respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
-  )(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest
-  ): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      ParticipantId
-        .fromProtoPrimitive(body.participantId, "")
-        .fold(
-          err =>
-            Future
-              .failed(
-                HttpErrorHandler.badRequest(err.message)
-              ),
-          participantId =>
-            for {
-              // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
-              // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-              _ <- retryProvider.retryForClientCalls(
-                "locking SvcRules and CoinRules contracts",
-                lockSvcRulesAndCoinRules(),
-                logger,
-              )
-              _ = logger.info(
-                s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
-              )
-
-              // this will wait until the PartyToParticipant state change completed
-              authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-                globalDomain,
-                participantId,
-                RequestSide.From,
-              )
-
-              _ <- retryProvider.retryForClientCalls(
-                "unlocking SvcRules and CoinRules contracts",
-                unlockSvcRulesAndCoinRules(),
-                logger,
-              )
-
-              _ = logger.info(
-                s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
-              )
-
-              acsBytes <- participantAdminConnection.downloadAcsSnapshot(
-                Set(svcParty),
-                filterDomainId = globalDomain.toProtoPrimitive,
-                timestamp = Some(authorizedAt),
-              )
-              // TODO(M3-57) consider if a more space-efficient encoding is necessary
-              encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-            } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded),
-        )
     }
 
   private def lockSvcRulesAndCoinRules() = for {

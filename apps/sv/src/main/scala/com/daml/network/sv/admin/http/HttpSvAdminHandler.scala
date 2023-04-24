@@ -13,7 +13,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 class HttpSvAdminHandler(
     ledgerClient: CNLedgerClient,
@@ -22,9 +22,9 @@ class HttpSvAdminHandler(
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContextExecutor,
+    ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.SvAdminHandler
+) extends v0.SvAdminHandler[String]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
@@ -32,7 +32,7 @@ class HttpSvAdminHandler(
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
-  )(): Future[v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse] = {
+  )()(adminUser: String): Future[v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse] = {
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         validatorOnboardings <- svStore.listValidatorOnboardings()
@@ -48,7 +48,7 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.PrepareValidatorOnboardingResponse.type
   )(
       body: definitions.PrepareValidatorOnboardingRequest
-  ): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
+  )(adminUser: String): Future[v0.SvAdminResource.PrepareValidatorOnboardingResponse] = {
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val secret = generateRandomOnboardingSecret()
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
@@ -77,7 +77,7 @@ class HttpSvAdminHandler(
       respond: v0.SvAdminResource.ApproveSvIdentityResponse.type
   )(
       body: definitions.ApproveSvIdentityRequest
-  ): Future[v0.SvAdminResource.ApproveSvIdentityResponse] =
+  )(adminUser: String): Future[v0.SvAdminResource.ApproveSvIdentityResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       SvApp
         .approveSvIdentity(

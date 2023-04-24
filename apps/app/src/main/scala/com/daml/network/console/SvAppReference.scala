@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.daml.network.auth.AuthUtil
 import akka.util.ByteString
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -84,6 +85,16 @@ class SvAppBackendReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SV"
+
+  override def token: Option[String] = {
+    Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = config.ledgerApiUser,
+        secret = AuthUtil.testSecret,
+      )
+    )
+  }
 
   override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
 

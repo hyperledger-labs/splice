@@ -16,13 +16,10 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import io.circe.generic.auto.*
-import io.circe.parser
 import monocle.macros.syntax.lens.*
 
 import java.net.URI
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-import scala.annotation.nowarn
 import scala.util.Using
 
 /** Preflight test that spins up a new validator following our runbook.
@@ -147,22 +144,14 @@ class SelfHostedPreflightIntegrationTest
 
     val request = HttpRequest
       .newBuilder()
-      .uri(URI.create(s"$url/admin/validator/onboarding/prepare"))
-      .header("content-type", "application/json")
+      .uri(URI.create(s"$url/devnet/onboard/validator/prepare"))
+      .header("content-type", "text/plain")
       .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
       .build();
 
-    case class PrepareValidatorOnboardingResponse(secret: String)
-
     val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-    val body = response.body
 
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
-    val decoded = parser.decode[PrepareValidatorOnboardingResponse](body)
-
-    decoded
-      .getOrElse(fail(s"Expected secret for validator onboarding, but received: ${body}"))
-      .secret
+    response.body
   }
 
   private def checkFrontendsNetworkAppsAddress(networkAppsAddress: String): Unit = {

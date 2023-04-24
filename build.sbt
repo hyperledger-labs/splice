@@ -347,6 +347,7 @@ lazy val `apps-sv` =
     )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors),
+      BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "sv-openapi",
         openApiSpec = "sv.yaml",
@@ -358,6 +359,7 @@ lazy val `apps-sv` =
             new File("apps/sv/src/main/openapi/sv.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
+            customExtraction = true,
           ),
           ScalaClient(
             new File("apps/sv/src/main/openapi/sv.yaml"),

@@ -1,5 +1,6 @@
 package com.daml.network.sv.config
 
+import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
   CNRemoteParticipantConfig,
@@ -63,6 +64,7 @@ case class LocalSvAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
+    auth: AuthConfig,
     remoteParticipant: CNRemoteParticipantConfig,
     // TODO(#3856): consider if we can remove this already
     remoteSvc: SvcAppClientConfig,

@@ -27,4 +27,12 @@ class SvcPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnviron
       }
     )
   }
+
+  "we can use the admin API of all SVs" taggedAs LiveDevNetTest in { implicit env =>
+    env.svs.local.foreach(sv =>
+      clue(s"Checking SV at ${sv.httpClientConfig.url}") {
+        sv.listOngoingValidatorOnboardings()
+      }
+    )
+  }
 }
