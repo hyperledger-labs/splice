@@ -17,9 +17,9 @@ import monocle.macros.syntax.lens.*
 
 import scala.util.Using
 
-/** Preflight test that bootstraps a new SV following our runbook.
+/** Preflight test that onboards a new SV following our runbook.
   */
-class SvBootstrappingPreflightIntegrationTest
+class SvOnboardingPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasConsoleScriptRunner
     with CantonProcessTestUtil {
@@ -39,7 +39,7 @@ class SvBootstrappingPreflightIntegrationTest
       .fromFiles(
         this.getClass.getSimpleName,
         svPath / "sv.conf",
-        svPath / "sv-bootstrap.conf",
+        svPath / "sv-onboarding.conf",
         testResourcesPath / "preflight-topology.conf",
       )
       // clearing default config transforms because they have settings
@@ -50,13 +50,13 @@ class SvBootstrappingPreflightIntegrationTest
       // when the app starts. The apps are started manually in `sv-participant.sc` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
 
-  "run through sv bootstrapping runbook" taggedAs LiveDevNetTest in { implicit env =>
+  "run through sv onboarding runbook" taggedAs LiveDevNetTest in { implicit env =>
     // TODO(M3-53) Consider running this test more than once per deployment once we can offboard SVs
     // and/or remove the SVC party from their participants.
     sv1Client.getSvOnboardingStatus("svTest") match {
       case _: SvOnboardingStatus.Completed =>
         println(
-          "Ignoring SV bootstrapping preflight check as we already ran it once in this cluster."
+          "Ignoring SV onboarding preflight check as we already ran it once in this cluster."
         )
       case _ => {
         // Start Canton as a separate process. We do that here rather than in the env setup

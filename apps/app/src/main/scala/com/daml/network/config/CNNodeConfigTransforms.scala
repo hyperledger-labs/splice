@@ -8,7 +8,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
+import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -212,12 +212,12 @@ object CNNodeConfigTransforms {
     updateAllSvAppConfigs((_, config) => update(config))
 
   def updateAllSvAppFoundCollectiveConfigs_(
-      update: SvBootstrapConfig.FoundCollective => SvBootstrapConfig.FoundCollective
+      update: SvOnboardingConfig.FoundCollective => SvOnboardingConfig.FoundCollective
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs_(c =>
-      c.focus(_.bootstrap)
+      c.focus(_.onboarding)
         .modify(_ match {
-          case found: SvBootstrapConfig.FoundCollective => update(found)
+          case found: SvOnboardingConfig.FoundCollective => update(found)
           case other => other
         })
     )

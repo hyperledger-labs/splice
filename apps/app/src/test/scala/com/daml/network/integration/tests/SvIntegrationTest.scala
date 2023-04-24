@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSv}
+import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.{
   CNRemoteParticipantReference,
@@ -317,13 +317,13 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .primaryParty
       .value
 
-    val (token, svOnboardingCid) =
+    val (token, svOnboardingRequestCid) =
       clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
         eventually()(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty)
+              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
               svOnboarding.data.candidateName shouldBe "sv4"
@@ -346,15 +346,15 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         )
       }
     clue("Attempting to start an onboarding multiple times has no effect") {
-      sv1.onboardSv(token)
+      sv1.startSvOnboarding(token)
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
+        .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
     }
     clue(
       "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
     ) {
       assertThrowsAndLogsCommandFailures(
-        sv3.onboardSv(token),
+        sv3.startSvOnboarding(token),
         _.errorMessage should include("no matching approved SV identity found"),
       )
     }
@@ -368,9 +368,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("SV4's onboarding status is reported correctly.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
-        case status: SvOnboardingStatus.Onboarding => {
+        case status: SvOnboardingStatus.Requested => {
           status.name shouldBe "sv4"
-          status.svOnboardingCid shouldBe svOnboardingCid
+          status.svOnboardingRequestCid shouldBe svOnboardingRequestCid
           status.confirmedBy.sorted shouldBe Vector("sv1")
           status.requiredNumConfirmations shouldBe 2
           sv1.getSvOnboardingStatus("sv4") shouldBe sv1.getSvOnboardingStatus(sv4Party)
@@ -381,7 +381,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) shouldBe empty
+          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
         getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive)
       },
     )
@@ -410,7 +410,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         getSvcRules().data.members should have size 1
       }
       // We are not using sv2.getDebugInfo() to get sv2's party id because we
-      // don't want SV2 to actually start and get bootstrapped for this test
+      // don't want SV2 to actually start and get onboarded for this test
       // and hence the http service is not available.
       val sv2Party = svc.remoteParticipant.ledger_api.users
         .get(sv2.config.ledgerApiUser)
@@ -430,7 +430,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             actAs = Seq(svcParty),
             readAs = Seq(),
             update = getSvcRules().id
-              .exerciseSvcRules_ConfirmSv(
+              .exerciseSvcRules_ConfirmSvOnboarding(
                 sv2Party.toProtoPrimitive,
                 "sv2",
                 "no reason",
@@ -439,11 +439,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           .exerciseResult,
       )(
         "Confirmed SVs get told they are are confirmed",
-        svConfirmedCid =>
+        svOnboardingConfirmedCid =>
           inside(sv1.getSvOnboardingStatus(sv2Party)) {
             case status: SvOnboardingStatus.Confirmed => {
               status.name shouldBe "sv2"
-              status.svConfirmedCid shouldBe svConfirmedCid
+              status.svOnboardingConfirmedCid shouldBe svOnboardingConfirmedCid
               sv1.getSvOnboardingStatus("sv2") shouldBe sv1.getSvOnboardingStatus(sv2Party)
             }
           },
@@ -529,19 +529,19 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         val svcRules = getSvcRules()
         val newMemberName = "svX"
         val newMemberPartyId = allocateRandomSvParty(newMemberName)
-        createSvConfirmedConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
-        createSvConfirmedConfirmation(svcRules, sv2, newMemberPartyId, newMemberName)
-        createSvConfirmedConfirmation(svcRules, sv3, newMemberPartyId, newMemberName)
-        createSvConfirmedConfirmation(svcRules, sv4, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv2, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv3, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv4, newMemberPartyId, newMemberName)
       },
     )(
       "There are 10 SVC members in total but only 4 confirmations are required to confirm a SV",
       _ =>
         inside(
           svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.svonboarding.SvConfirmed.COMPANION)(svcParty)
-        ) { case Seq(svConfirmed) =>
-          svConfirmed.data.svName shouldBe "svX"
+            .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
+        ) { case Seq(svOnboardingConfirmed) =>
+          svOnboardingConfirmed.data.svName shouldBe "svX"
         },
     )
   }
@@ -684,7 +684,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       foundCoinRules.head
     }
 
-  private def createSvConfirmedConfirmation(
+  private def createSvOnboardingConfirmation(
       svcRules: SvcRules.Contract,
       svApp: SvAppBackendReference,
       newMemberParty: PartyId,
@@ -698,8 +698,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       update = svcRules.id.exerciseSvcRules_ConfirmAction(
         svParty.toProtoPrimitive,
         new ARC_SvcRules(
-          new SRARC_ConfirmSv(
-            new SvcRules_ConfirmSv(newMemberParty.toProtoPrimitive, newMemberName, "because")
+          new SRARC_ConfirmSvOnboarding(
+            new SvcRules_ConfirmSvOnboarding(
+              newMemberParty.toProtoPrimitive,
+              newMemberName,
+              "because",
+            )
           )
         ),
       ),

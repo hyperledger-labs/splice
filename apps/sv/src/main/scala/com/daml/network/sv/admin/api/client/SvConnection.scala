@@ -42,13 +42,13 @@ final class SvConnection(
 
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */
-  def onboardSv(token: String)(implicit
+  def startSvOnboarding(token: String)(implicit
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Unit] =
-    runHttpCmd(config.url, HttpSvAppClient.OnboardSv(token))
+    runHttpCmd(config.url, HttpSvAppClient.StartSvOnboarding(token))
 
   /** Ask the sponsoring SV to authorize hosting the SVC party at the candidate participant and to prepare the ACS snapshot.
     */

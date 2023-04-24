@@ -30,8 +30,8 @@ spec:
               value: "5014"
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
-            - name: CN_APP_SV_BOOTSTRAP_TYPE
-              value: {{ .Values.bootstrapType }}
+            - name: CN_APP_SV_ONBOARDING_TYPE
+              value: {{ .Values.onboardingType }}
           ports:
             - name: sv-api
               containerPort: 5014

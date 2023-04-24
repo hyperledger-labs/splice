@@ -52,7 +52,7 @@ data CoinRulesV1Test_ActionRequiringConfirmation
 data SvcRulesV1Test_ActionRequiringConfirmation
   = SRARCV1Test_AddMember SvcRulesV1Test_AddMember
   | SRARCV1Test_RemoveMember SvcRulesV1Test_RemoveMember
-  | SRARCV1Test_ConfirmSv SvcRulesV1Test_ConfirmSv
+  | SRARCV1Test_ConfirmSvOnboarding SvcRulesV1Test_ConfirmSvOnboarding
   deriving (Eq, Show)
 
 
@@ -136,17 +136,17 @@ template SvcRulesV1Test with
     nonconsuming choice SvcRulesV1Test_AddConfirmedMember : ContractId SvcRulesV1Test
       with
         sv : Party
-        svConfirmedCid : ContractId SvConfirmed
+        svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
       controller sv
       do
-        svConfirmed <- fetch svConfirmedCid
-        archive svConfirmedCid
-        require "SVC matches" (svConfirmed.svc == svc)
-        require "SV matches" (svConfirmed.svParty == sv)
+        svOnboardingConfirmed <- fetch svOnboardingConfirmedCid
+        archive svOnboardingConfirmedCid
+        require "SVC matches" (svOnboardingConfirmed.svc == svc)
+        require "SV matches" (svOnboardingConfirmed.svParty == sv)
         exercise self SvcRulesV1Test_AddMember with
           newMemberParty = sv
-          newMemberName = svConfirmed.svName
-          reason = svConfirmed.reason
+          newMemberName = svOnboardingConfirmed.svName
+          reason = svOnboardingConfirmed.reason
 
     -- Leader election
     ------------------
@@ -262,7 +262,7 @@ template SvcRulesV1Test with
     -- SV onboarding
     ----------------
 
-    nonconsuming choice SvcRulesV1Test_StartSvOnboarding : ContractId SvOnboarding
+    nonconsuming choice SvcRulesV1Test_StartSvOnboarding : ContractId SvOnboardingRequest
       with
         candidateName : Text
         candidateParty : Party
@@ -272,17 +272,17 @@ template SvcRulesV1Test with
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         now <- getTime
-        let expiresAt = now `addRelTime` config.svOnboardingTimeout
-        create SvOnboarding with ..
+        let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
+        create SvOnboardingRequest with ..
 
-    nonconsuming choice SvcRulesV1Test_ExpireSvOnboarding : ()
+    nonconsuming choice SvcRulesV1Test_ExpireSvOnboardingRequest : ()
       with
-        cid: ContractId SvOnboarding
+        cid: ContractId SvOnboardingRequest
       controller leader
       do
-        exercise cid SvOnboarding_Expire
+        exercise cid SvOnboardingRequest_Expire
 
-    nonconsuming choice SvcRulesV1Test_ConfirmSv : ContractId SvConfirmed
+    nonconsuming choice SvcRulesV1Test_ConfirmSvOnboarding : ContractId SvOnboardingConfirmed
       with
         newMemberParty : Party
         newMemberName : Text
@@ -292,20 +292,20 @@ template SvcRulesV1Test with
         require "Member party is new" (not $ newMemberParty `Map.member` members)
         require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
         now <- getTime
-        let expiresAt = now `addRelTime` config.svConfirmedTimeout
-        create SvConfirmed with
+        let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
+        create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
           reason
           svc
           expiresAt
 
-    nonconsuming choice SvcRulesV1Test_ExpireSvConfirmed : ()
+    nonconsuming choice SvcRulesV1Test_ExpireSvOnboardingConfirmed : ()
       with
-        cid: ContractId SvConfirmed
+        cid: ContractId SvOnboardingConfirmed
       controller leader
       do
-        exercise cid SvConfirmed_Expire
+        exercise cid SvOnboardingConfirmed_Expire
 
     -- Coin management driven directly by the leader
     --------------------------------------------------
@@ -436,7 +436,7 @@ executeActionRequiringConfirmationV1Test svcRulesCid act = case act of
     case svcAction of
       SRARCV1Test_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARCV1Test_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
-      SRARCV1Test_ConfirmSv choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARCV1Test_ConfirmSvOnboarding choiceArg -> void $ exercise svcRulesCid choiceArg
 
 
 -- Functions implementing instant-runoff voting

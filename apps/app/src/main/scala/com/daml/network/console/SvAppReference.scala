@@ -30,9 +30,9 @@ abstract class SvAppReference(
       httpCommand(HttpSvAdminAppClient.ApproveSvIdentity(name, key))
     }
 
-  def onboardSv(token: String): Unit =
+  def startSvOnboarding(token: String): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.OnboardSv(token))
+      httpCommand(HttpSvAppClient.StartSvOnboarding(token))
     }
 
   def getSvOnboardingStatus(candidate: PartyId): HttpSvAppClient.SvOnboardingStatus =

@@ -7,13 +7,16 @@ import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
-import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, SvcRules_ConfirmSv}
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  SvcRules_ConfirmSvOnboarding,
+}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
@@ -342,60 +345,62 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupSvOnboardingByTokenWithOffset(
+  def lookupSvOnboardingRequestByTokenWithOffset(
       token: String
   ): Future[
-    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+    QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingRequest.COMPANION)(
         _,
         co => co.payload.token == token,
       )
     )
 
-  def lookupSvOnboardingByCandidateParty(
+  def lookupSvOnboardingRequestByCandidateParty(
       candidateParty: PartyId
   ): Future[
-    Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]
-  ] = lookupSvOnboardingByCandidatePartyWithOffset(candidateParty).map(_.value)
+    Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]
+  ] = lookupSvOnboardingRequestByCandidatePartyWithOffset(candidateParty).map(_.value)
 
-  def lookupSvOnboardingByCandidateName(
+  def lookupSvOnboardingRequestByCandidateName(
       candidateName: String
   ): Future[
-    Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]
-  ] = lookupSvOnboardingByCandidateNameWithOffset(candidateName).map(_.value)
+    Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]
+  ] = lookupSvOnboardingRequestByCandidateNameWithOffset(candidateName).map(_.value)
 
-  def listExpiredSvOnboardings: ListExpiredContracts[so.SvOnboarding.ContractId, so.SvOnboarding] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboarding.COMPANION)(
+  def listExpiredSvOnboardingRequests
+      : ListExpiredContracts[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingRequest.COMPANION)(
       _.expiresAt
     )
 
-  def listExpiredSvConfirmed: ListExpiredContracts[so.SvConfirmed.ContractId, so.SvConfirmed] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvConfirmed.COMPANION)(
+  def listExpiredSvOnboardingConfirmed
+      : ListExpiredContracts[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingConfirmed.COMPANION)(
       _.expiresAt
     )
 
-  def lookupSvConfirmedByParty(
+  def lookupSvOnboardingConfirmedByParty(
       svParty: PartyId
   ): Future[
-    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+    Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
-    lookupSvConfirmedByPartyWithOffset(svParty).map(_.value)
+    lookupSvOnboardingConfirmedByPartyWithOffset(svParty).map(_.value)
 
-  def lookupSvConfirmedByName(
+  def lookupSvOnboardingConfirmedByName(
       svName: String
   ): Future[
-    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+    Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
-    lookupSvConfirmedByNameWithOffset(svName).map(_.value)
+    lookupSvOnboardingConfirmedByNameWithOffset(svName).map(_.value)
 
   def listSvOnboardingConfirmations(
-      svOnboarding: Contract[so.SvOnboarding.ContractId, so.SvOnboarding]
+      svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]
   ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
     val expectedAction = new ARC_SvcRules(
-      new SRARC_ConfirmSv(
-        new SvcRules_ConfirmSv(
+      new SRARC_ConfirmSvOnboarding(
+        new SvcRules_ConfirmSvOnboarding(
           svOnboarding.payload.candidateParty,
           svOnboarding.payload.candidateName,
           svOnboarding.payload.token,
@@ -405,15 +410,15 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     listConfirmations(expectedAction)
   }
 
-  def listSvOnboardingsBySvcMembers(
+  def listSvOnboardingRequestsBySvcMembers(
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
-  ): Future[Seq[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]] =
+  ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]] =
     for {
       domain <- defaultAcsDomainIdF
       svOnboardings <- multiDomainAcsStore.listContractsOnDomain(
-        so.SvOnboarding.COMPANION,
+        so.SvOnboardingRequest.COMPANION,
         domain,
-        (co: Contract[so.SvOnboarding.ContractId, so.SvOnboarding]) =>
+        (co: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]) =>
           svcRules.payload.members.asScala
             .get(co.payload.candidateParty)
             .exists(_.name == co.payload.candidateName),
@@ -468,49 +473,49 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.expiresAt
     )
 
-  private def lookupSvOnboardingByCandidatePartyWithOffset(
+  private def lookupSvOnboardingRequestByCandidatePartyWithOffset(
       candidateParty: PartyId
   ): Future[
-    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+    QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingRequest.COMPANION)(
         _,
         co => co.payload.candidateParty == candidateParty.toProtoPrimitive,
       )
     )
 
-  private def lookupSvOnboardingByCandidateNameWithOffset(
+  private def lookupSvOnboardingRequestByCandidateNameWithOffset(
       candidateName: String
   ): Future[
-    QueryResult[Option[Contract[so.SvOnboarding.ContractId, so.SvOnboarding]]]
+    QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboarding.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingRequest.COMPANION)(
         _,
         co => co.payload.candidateName == candidateName,
       )
     )
 
-  private def lookupSvConfirmedByPartyWithOffset(
+  private def lookupSvOnboardingConfirmedByPartyWithOffset(
       svParty: PartyId
   ): Future[
-    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+    QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingConfirmed.COMPANION)(
         _,
         co => co.payload.svParty == svParty.toProtoPrimitive,
       )
     )
 
-  private def lookupSvConfirmedByNameWithOffset(
+  private def lookupSvOnboardingConfirmedByNameWithOffset(
       svName: String
   ): Future[
-    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+    QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingConfirmed.COMPANION)(
         _,
         co => co.payload.svName == svName,
       )
@@ -559,8 +564,8 @@ object SvSvcStore {
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv
         ),
-        mkFilter(so.SvOnboarding.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(so.SvConfirmed.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(so.SvOnboardingRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),

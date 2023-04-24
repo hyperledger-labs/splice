@@ -75,17 +75,17 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
-  /onboard/sv:
+  /onboard/sv/start:
     post:
       tags: [sv]
       x-jvm-package: sv
-      operationId: "onboardSv"
+      operationId: "startSvOnboarding"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/OnboardSvRequest"
+              "$ref": "#/components/schemas/StartSvOnboardingRequest"
       responses:
         "200":
           description: ok
@@ -218,7 +218,7 @@ components:
         candidateKey:
           type: string
 
-    OnboardSvRequest:
+    StartSvOnboardingRequest:
       type: object
       required:
         - token
@@ -233,8 +233,8 @@ components:
       properties:
         # Note: our codegen does not support oneOf; if it did, the state would be an enum with the following values:
         # - 'unknown', with no fields
-        # - 'onboarding', with fields: name, contract_id (of `SvOnboarding`), confirmed_by, required_num_confirmations
-        # - 'confirmed', with fields: name, contract_id (of `SvConfirmed`)
+        # - 'requested', with fields: name, contract_id (of `SvOnboardingRequested`), confirmed_by, required_num_confirmations
+        # - 'confirmed', with fields: name, contract_id (of `SvOnboardingConfirmed`)
         # - 'completed', with fields: name, contract_id (of `SvcRules`)
         # TODO(#2755) Make an issue to refactor this with a proper `oneOf`.
         state:

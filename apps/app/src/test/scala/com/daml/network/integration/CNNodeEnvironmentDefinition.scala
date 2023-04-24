@@ -9,7 +9,7 @@ import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.sv.config.SvBootstrapConfig
+import com.daml.network.sv.config.SvOnboardingConfig
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
@@ -78,8 +78,8 @@ case class CNNodeEnvironmentDefinition(
             .party
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
-            actAs = sv.config.bootstrap match {
-              case _: SvBootstrapConfig.FoundCollective => Set(svParty, svcParty)
+            actAs = sv.config.onboarding match {
+              case _: SvOnboardingConfig.FoundCollective => Set(svParty, svcParty)
               case _ => Set(svParty)
             },
             primaryParty = Some(svParty),

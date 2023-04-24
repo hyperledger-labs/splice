@@ -15,8 +15,8 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
-import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
@@ -139,20 +139,20 @@ class ExecuteConfirmedActionTrigger(
         }
       case arcSvcRules: ARC_SvcRules =>
         arcSvcRules.svcAction match {
-          case confirmSvAction: SRARC_ConfirmSv =>
+          case confirmSvAction: SRARC_ConfirmSvOnboarding =>
             for {
-              isSvConfirmed <- store.multiDomainAcsStore
-                .findContractOnDomainWithOffset(SvConfirmed.COMPANION)(
+              isSvOnboardingConfirmed <- store.multiDomainAcsStore
+                .findContractOnDomainWithOffset(SvOnboardingConfirmed.COMPANION)(
                   confirmation.domain,
-                  (c: Contract[SvConfirmed.ContractId, SvConfirmed]) =>
+                  (c: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]) =>
                     c.payload.svc == store.key.svcParty.toProtoPrimitive &&
-                      c.payload.svParty == confirmSvAction.svcRules_ConfirmSvValue.newMemberParty,
+                      c.payload.svParty == confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty,
                 )
                 .map(_.value.nonEmpty)
               newMemberParty = PartyId.tryFromProtoPrimitive(
-                confirmSvAction.svcRules_ConfirmSvValue.newMemberParty
+                confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
               )
-              newMemberName = confirmSvAction.svcRules_ConfirmSvValue.newMemberName
+              newMemberName = confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberName
               isSvPartOfSvc <- store
                 .getSvcRules()
                 .map(svcRules =>
@@ -160,7 +160,7 @@ class ExecuteConfirmedActionTrigger(
                     !isDevNet(svcRules) && isSvcMemberName(newMemberName, svcRules)
                   )
                 )
-            } yield isSvConfirmed || isSvPartOfSvc
+            } yield isSvOnboardingConfirmed || isSvPartOfSvc
           case action =>
             throw new UnsupportedOperationException(
               show"svc rules $action is not yet supported"

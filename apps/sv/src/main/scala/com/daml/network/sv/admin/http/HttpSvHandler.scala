@@ -3,7 +3,7 @@ package com.daml.network.sv.admin.http
 import cats.data.OptionT
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.{
   CNLedgerClient,
@@ -83,9 +83,9 @@ class HttpSvHandler(
       }
     }
 
-  def onboardSv(
-      respond: v0.SvResource.OnboardSvResponse.type
-  )(body: definitions.OnboardSvRequest): Future[v0.SvResource.OnboardSvResponse] =
+  def startSvOnboarding(
+      respond: v0.SvResource.StartSvOnboardingResponse.type
+  )(body: definitions.StartSvOnboardingRequest): Future[v0.SvResource.StartSvOnboardingResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
@@ -112,7 +112,7 @@ class HttpSvHandler(
                   )
                   .flatMap {
                     case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-                    case Right(()) => Future.successful(v0.SvResource.OnboardSvResponseOK)
+                    case Right(()) => Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
                   }
             }
       }
@@ -130,7 +130,7 @@ class HttpSvHandler(
               isCompleted(svPartyOrName, svcRules)
             )
             .orElse(isConfirmed(svPartyOrName, svcStore))
-            .orElse(isOnboarded(svPartyOrName, svcRules))
+            .orElse(isRequested(svPartyOrName, svcRules))
             .value
         } yield result match {
           case Some(result) => result
@@ -154,7 +154,7 @@ class HttpSvHandler(
               isConfirmed(svPartyId, svcStore)
             )
             .orElse(
-              isOnboarded(svPartyId, svcRules)
+              isRequested(svPartyId, svcRules)
             )
             .value
         } yield result match {
@@ -240,32 +240,32 @@ class HttpSvHandler(
     )
   }
 
-  private def isOnboarded(
+  private def isRequested(
       svParty: PartyId,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
-      svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateParty(svParty))
-      result <- getOnboardedStatus(svOnboarding, svcRules)
+      svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateParty(svParty))
+      result <- getOnboardedStatus(svOnboardingRequest, svcRules)
     } yield result
   }
 
-  private def isOnboarded(
+  private def isRequested(
       svParty: String,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
-      svOnboarding <- OptionT(svcStore.lookupSvOnboardingByCandidateName(svParty))
-      result <- getOnboardedStatus(svOnboarding, svcRules)
+      svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateName(svParty))
+      result <- getOnboardedStatus(svOnboardingRequest, svcRules)
     } yield result
   }
 
   private def getOnboardedStatus(
-      svOnboarding: Contract[SvOnboarding.ContractId, SvOnboarding],
+      svOnboardingRequest: Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   ) = {
     for {
-      confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboarding))
+      confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboardingRequest))
       confirmedBy = confirmations
         .map(c =>
           svcRules.payload.members.asScala.get(c.payload.confirmer) match {
@@ -275,9 +275,9 @@ class HttpSvHandler(
         )
         .toVector
     } yield definitions.GetSvOnboardingStatusResponse(
-      state = "onboarding",
-      name = Some(svOnboarding.payload.candidateName),
-      contractId = Some(Codec.encodeContractId(svOnboarding.contractId)),
+      state = "requested",
+      name = Some(svOnboardingRequest.payload.candidateName),
+      contractId = Some(Codec.encodeContractId(svOnboardingRequest.contractId)),
       confirmedBy = Some(confirmedBy),
       requiredNumConfirmations = Some(SvUtil.requiredNumConfirmations(svcRules)),
     )
@@ -289,12 +289,12 @@ class HttpSvHandler(
   ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
       svcStore
-        .lookupSvConfirmedByParty(svParty)
-    ).map(svConfirmed =>
+        .lookupSvOnboardingConfirmedByParty(svParty)
+    ).map(svOnboardingConfirmed =>
       definitions.GetSvOnboardingStatusResponse(
         state = "confirmed",
-        name = Some(svConfirmed.payload.svName),
-        contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
+        name = Some(svOnboardingConfirmed.payload.svName),
+        contractId = Some(Codec.encodeContractId(svOnboardingConfirmed.contractId)),
       )
     )
   }
@@ -305,12 +305,12 @@ class HttpSvHandler(
   ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
       svcStore
-        .lookupSvConfirmedByName(svName)
-    ).map(svConfirmed =>
+        .lookupSvOnboardingConfirmedByName(svName)
+    ).map(svOnboardingConfirmed =>
       definitions.GetSvOnboardingStatusResponse(
         state = "confirmed",
-        name = Some(svConfirmed.payload.svName),
-        contractId = Some(Codec.encodeContractId(svConfirmed.contractId)),
+        name = Some(svOnboardingConfirmed.payload.svName),
+        contractId = Some(Codec.encodeContractId(svOnboardingConfirmed.contractId)),
       )
     )
   }
@@ -352,7 +352,7 @@ class HttpSvHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         svcRules <- svcStore.getSvcRules()
-        lookup <- svcStore.lookupSvOnboardingByTokenWithOffset(token)
+        lookup <- svcStore.lookupSvOnboardingRequestByTokenWithOffset(token)
         outcome <- lookup match {
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")

@@ -7,7 +7,7 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.codegen.java.cn.svonboarding.{SvConfirmed, SvOnboarding}
+import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -38,15 +38,15 @@ object HttpSvAppClient {
   sealed trait SvOnboardingStatus;
   object SvOnboardingStatus {
     final case class Unknown() extends SvOnboardingStatus
-    final case class Onboarding(
+    final case class Requested(
         name: String,
-        svOnboardingCid: SvOnboarding.ContractId,
+        svOnboardingRequestCid: SvOnboardingRequest.ContractId,
         confirmedBy: Vector[String],
         requiredNumConfirmations: Int,
     ) extends SvOnboardingStatus
     final case class Confirmed(
         name: String,
-        svConfirmedCid: SvConfirmed.ContractId,
+        svOnboardingConfirmedCid: SvOnboardingConfirmed.ContractId,
     ) extends SvOnboardingStatus
     final case class Completed(
         name: String,
@@ -75,23 +75,24 @@ object HttpSvAppClient {
     }
   }
 
-  case class OnboardSv(token: String) extends BaseCommand[http.OnboardSvResponse, Unit] {
+  case class StartSvOnboarding(token: String)
+      extends BaseCommand[http.StartSvOnboardingResponse, Unit] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardSvResponse] =
-      client.onboardSv(
-        body = definitions.OnboardSvRequest(token),
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.StartSvOnboardingResponse] =
+      client.startSvOnboarding(
+        body = definitions.StartSvOnboardingRequest(token),
         headers = headers,
       )
 
-    override def handleResponse(response: http.OnboardSvResponse)(implicit
+    override def handleResponse(response: http.StartSvOnboardingResponse)(implicit
         decoder: TemplateJsonDecoder
     ): Either[String, Unit] = response match {
-      case http.OnboardSvResponse.OK => Right(())
-      case http.OnboardSvResponse.BadRequest(e) => Left(e.error)
-      case http.OnboardSvResponse.Unauthorized(e) => Left(e.error)
+      case http.StartSvOnboardingResponse.OK => Right(())
+      case http.StartSvOnboardingResponse.BadRequest(e) => Left(e.error)
+      case http.StartSvOnboardingResponse.Unauthorized(e) => Left(e.error)
     }
   }
 
@@ -114,18 +115,18 @@ object HttpSvAppClient {
         case http.GetSvOnboardingStatusResponse.OK(response) =>
           (response.state match {
             case "unknown" => Some(SvOnboardingStatus.Unknown())
-            case "onboarding" =>
+            case "requested" =>
               for {
                 name <- response.name
                 cidString <- response.contractId
-                svOnboardingCid <- Codec
-                  .decodeJavaContractId(SvOnboarding.COMPANION)(cidString)
+                svOnboardingRequestCid <- Codec
+                  .decodeJavaContractId(SvOnboardingRequest.COMPANION)(cidString)
                   .toOption
                 confirmedBy <- response.confirmedBy
                 requiredNumConfirmations <- response.requiredNumConfirmations
-              } yield SvOnboardingStatus.Onboarding(
+              } yield SvOnboardingStatus.Requested(
                 name,
-                svOnboardingCid,
+                svOnboardingRequestCid,
                 confirmedBy,
                 requiredNumConfirmations,
               )
@@ -133,12 +134,12 @@ object HttpSvAppClient {
               for {
                 name <- response.name
                 cidString <- response.contractId
-                svConfirmedCid <- Codec
-                  .decodeJavaContractId(SvConfirmed.COMPANION)(cidString)
+                svOnboardingConfirmedCid <- Codec
+                  .decodeJavaContractId(SvOnboardingConfirmed.COMPANION)(cidString)
                   .toOption
               } yield SvOnboardingStatus.Confirmed(
                 name,
-                svConfirmedCid,
+                svOnboardingConfirmedCid,
               )
             case "completed" =>
               for {

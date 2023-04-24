@@ -13,7 +13,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-class ExpiredSvOnboardingTrigger(
+class ExpiredSvOnboardingConfirmedTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     connection: CNLedgerConnection,
@@ -21,32 +21,37 @@ class ExpiredSvOnboardingTrigger(
     override val ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      cn.svonboarding.SvOnboarding.ContractId,
-      cn.svonboarding.SvOnboarding,
+      cn.svonboarding.SvOnboardingConfirmed.ContractId,
+      cn.svonboarding.SvOnboardingConfirmed,
     ](
       store.multiDomainAcsStore,
-      store.listExpiredSvOnboardings,
-      cn.svonboarding.SvOnboarding.COMPANION,
+      store.listExpiredSvOnboardingConfirmed,
+      cn.svonboarding.SvOnboardingConfirmed.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
-      cn.svonboarding.SvOnboarding.ContractId,
-      cn.svonboarding.SvOnboarding,
+      cn.svonboarding.SvOnboardingConfirmed.ContractId,
+      cn.svonboarding.SvOnboardingConfirmed,
     ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
-    ReadyContract[cn.svonboarding.SvOnboarding.ContractId, cn.svonboarding.SvOnboarding]
+    ReadyContract[
+      cn.svonboarding.SvOnboardingConfirmed.ContractId,
+      cn.svonboarding.SvOnboardingConfirmed,
+    ]
   ]
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId.exerciseSvcRules_ExpireSvOnboarding(co.work.contract.contractId)
+      cmd = svcRules.contractId.exerciseSvcRules_ExpireSvOnboardingConfirmed(
+        co.work.contract.contractId
+      )
       _ <- connection.submitCommandsNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         commands = cmd.commands.asScala.toSeq,
         domainId = co.work.domain,
       )
-    } yield TaskSuccess("archived expired SV onboarding contract")
+    } yield TaskSuccess("archived expired SV confirmed contract")
 
   override def completeTaskAsFollower(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     Future.successful(

@@ -35,6 +35,8 @@ Version: |version_literal|
 
    sv_operator/bootstrap.rst
 
+.. TODO(#4246): ^ change to `sv_operator/onboarding.html` and add redirect
+
 .. toctree::
    :maxdepth: 2
    :caption: DevNet Architecture

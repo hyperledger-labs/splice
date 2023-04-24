@@ -13,4 +13,4 @@ resources:
     cpu: 1
     memory: 1536Mi
 
-bootstrapType: join-via-svc-app
+onboardingType: join-via-svc-app

@@ -17,7 +17,7 @@ import com.daml.network.sv.config.{
   ExpectedOnboardingConfig,
   LocalSvAppConfig,
   RemoteSvAppConfig,
-  SvBootstrapConfig,
+  SvOnboardingConfig,
 }
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
@@ -435,15 +435,16 @@ object CNNodeConfig {
     implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
       deriveReader[RemoteSvAppConfig]
 
-    implicit val svBootstrapConfigHint = new FieldCoproductHint[SvBootstrapConfig]("type")
-    implicit val svBootstrapFoundCollectiveReader: ConfigReader[SvBootstrapConfig.FoundCollective] =
-      deriveReader[SvBootstrapConfig.FoundCollective]
-    implicit val svBootstrapJoinViaSvcAppReader: ConfigReader[SvBootstrapConfig.JoinViaSvcApp] =
-      deriveReader[SvBootstrapConfig.JoinViaSvcApp]
-    implicit val svBootstrapJoinWithKeyReader: ConfigReader[SvBootstrapConfig.JoinWithKey] =
-      deriveReader[SvBootstrapConfig.JoinWithKey]
-    implicit val svBootstrapConfigReader: ConfigReader[SvBootstrapConfig] =
-      deriveReader[SvBootstrapConfig]
+    implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
+    implicit val svOnboardingFoundCollectiveReader
+        : ConfigReader[SvOnboardingConfig.FoundCollective] =
+      deriveReader[SvOnboardingConfig.FoundCollective]
+    implicit val svOnboardingJoinViaSvcAppReader: ConfigReader[SvOnboardingConfig.JoinViaSvcApp] =
+      deriveReader[SvOnboardingConfig.JoinViaSvcApp]
+    implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
+      deriveReader[SvOnboardingConfig.JoinWithKey]
+    implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
+      deriveReader[SvOnboardingConfig]
     implicit val expectedOnboardingConfigReader: ConfigReader[ExpectedOnboardingConfig] =
       deriveReader[ExpectedOnboardingConfig]
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
@@ -542,16 +543,17 @@ object CNNodeConfig {
     implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
       deriveWriter[RemoteSvAppConfig]
 
-    implicit val svBootstrapConfigHint: FieldCoproductHint[SvBootstrapConfig] =
-      new FieldCoproductHint[SvBootstrapConfig]("type")
-    implicit val svBootstrapFoundCollectiveWriter: ConfigWriter[SvBootstrapConfig.FoundCollective] =
-      deriveWriter[SvBootstrapConfig.FoundCollective]
-    implicit val svBootstrapJoinViaSvcAppWriter: ConfigWriter[SvBootstrapConfig.JoinViaSvcApp] =
-      deriveWriter[SvBootstrapConfig.JoinViaSvcApp]
-    implicit val svBootstrapJoinWithKeyWriter: ConfigWriter[SvBootstrapConfig.JoinWithKey] =
-      deriveWriter[SvBootstrapConfig.JoinWithKey]
-    implicit val svBootstrapConfigWriter: ConfigWriter[SvBootstrapConfig] =
-      confidentialWriter[SvBootstrapConfig](SvBootstrapConfig.hideConfidential)
+    implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
+      new FieldCoproductHint[SvOnboardingConfig]("type")
+    implicit val svOnboardingFoundCollectiveWriter
+        : ConfigWriter[SvOnboardingConfig.FoundCollective] =
+      deriveWriter[SvOnboardingConfig.FoundCollective]
+    implicit val svOnboardingJoinViaSvcAppWriter: ConfigWriter[SvOnboardingConfig.JoinViaSvcApp] =
+      deriveWriter[SvOnboardingConfig.JoinViaSvcApp]
+    implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
+      deriveWriter[SvOnboardingConfig.JoinWithKey]
+    implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
+      confidentialWriter[SvOnboardingConfig](SvOnboardingConfig.hideConfidential)
 
     implicit val expectedOnboardingConfigWriter: ConfigWriter[ExpectedOnboardingConfig] =
       confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)

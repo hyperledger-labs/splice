@@ -7,14 +7,14 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboarding
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules,
-  SvcRules_ConfirmSv,
+  SvcRules_ConfirmSvOnboarding,
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSv
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -29,7 +29,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class SvOnboardingTrigger(
+class SvOnboardingRequestTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     svStore: SvSvStore,
@@ -39,31 +39,31 @@ class SvOnboardingTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnReadyContractTrigger.Template[
-      SvOnboarding.ContractId,
-      SvOnboarding,
+      SvOnboardingRequest.ContractId,
+      SvOnboardingRequest,
     ](
       svcStore,
-      SvOnboarding.COMPANION,
+      SvOnboardingRequest.COMPANION,
     ) {
 
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
 
-  private def svcRulesConfirmSvAction(
+  private def svcRulesConfirmSvOnboardingAction(
       candidateParty: PartyId,
       candidateName: String,
       reason: String,
   ): ActionRequiringConfirmation = new ARC_SvcRules(
-    new SRARC_ConfirmSv(
-      new SvcRules_ConfirmSv(candidateParty.toProtoPrimitive, candidateName, reason)
+    new SRARC_ConfirmSvOnboarding(
+      new SvcRules_ConfirmSvOnboarding(candidateParty.toProtoPrimitive, candidateName, reason)
     )
   )
 
   private def attemptConfirmation(
       svcRules: Contract[SvcRules.ContractId, SvcRules],
       svOnboarding: ReadyContract[
-        SvOnboarding.ContractId,
-        SvOnboarding,
+        SvOnboardingRequest.ContractId,
+        SvOnboardingRequest,
       ],
   )(): Future[TaskOutcome] = {
     for {
@@ -113,14 +113,14 @@ class SvOnboardingTrigger(
 
   override def completeTask(
       svOnboarding: ReadyContract[
-        SvOnboarding.ContractId,
-        SvOnboarding,
+        SvOnboardingRequest.ContractId,
+        SvOnboardingRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- svcStore.getSvcRules()
       isPartyOnboardingConfirmed <- svcStore
-        .lookupSvConfirmedByParty(
+        .lookupSvOnboardingConfirmedByParty(
           PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)
         )
         .flatMap(optionalConfirmation => Future(optionalConfirmation.isDefined))
@@ -153,7 +153,7 @@ class SvOnboardingTrigger(
       svcRules: Contract[SvcRules.ContractId, SvcRules],
       domainId: DomainId,
   ): Future[TaskOutcome] = {
-    val action = svcRulesConfirmSvAction(party, name, reason)
+    val action = svcRulesConfirmSvOnboardingAction(party, name, reason)
     for {
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
@@ -174,7 +174,7 @@ class SvOnboardingTrigger(
               readAs = Seq(svcParty),
               update = cmd,
               commandId = CNLedgerConnection.CommandId(
-                "com.daml.network.sv.svOnboardingConfirmSvConfirmation",
+                "com.daml.network.sv.svOnboardingConfirmSvOnboardingConfirmation",
                 Seq(svParty, svcParty),
                 party.toProtoPrimitive,
               ),

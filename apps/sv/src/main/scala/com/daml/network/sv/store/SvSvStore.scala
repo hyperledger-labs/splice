@@ -84,20 +84,20 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   ): Future[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]] =
     lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
 
-  def lookupSvConfirmedWithOffset(): Future[
-    QueryResult[Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]]
+  def lookupSvOnboardingConfirmedWithOffset(): Future[
+    QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvConfirmed.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingConfirmed.COMPANION)(
         _,
         co => co.payload.svParty == key.svParty.toProtoPrimitive,
       )
     )
 
-  def lookupSvConfirmed(): Future[
-    Option[Contract[so.SvConfirmed.ContractId, so.SvConfirmed]]
+  def lookupSvOnboardingConfirmed(): Future[
+    Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
-    lookupSvConfirmedWithOffset().map(_.value)
+    lookupSvOnboardingConfirmedWithOffset().map(_.value)
 
   def key: SvStore.Key
 }
@@ -128,7 +128,7 @@ object SvSvStore {
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
         mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
         mkFilter(so.ApprovedSvIdentity.COMPANION)(co => co.payload.approvingSv == sv),
-        mkFilter(so.SvConfirmed.COMPANION)(co => co.payload.svParty == sv),
+        mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svParty == sv),
       ),
     )
   }

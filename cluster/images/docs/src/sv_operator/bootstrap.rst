@@ -1,7 +1,7 @@
-.. _sv_bootstrap:
+.. _sv_onboarding:
 
-Bootstrapping an SV
-===================
+Onboarding a SV
+===============
 
 These pages give a step-by-step guide how to deploy your own supervalidator (SV) node to the Canton network.
 
@@ -83,8 +83,8 @@ Configure your SV node
 ----------------------
 
 An example SV node configuration with defaults that match the Canton participant configuration used above is provided in ``examples/sv/sv.conf``.
-While this configuration is sufficient to operate an already bootstrapped SV node, an additional *bootstrapping* configuration is required for initializing your SV on its first start.
-Edit the example ``examples/sv/sv-bootstrap.conf`` to:
+While this configuration is sufficient to operate an SV node that is already an established member of the SVC, an additional *onboarding* configuration is required for initializing your SV on its first start.
+Edit the example ``examples/sv/sv-onboarding.conf`` to:
 
 - (optional) Chose a different existing SV as an onboarding sponsor (via the ``remote-sv`` key).
   This SV is going to play a key role in orchestrating the initialization of your SV into a fully operational SV.
@@ -95,19 +95,19 @@ Edit the example ``examples/sv/sv-bootstrap.conf`` to:
 
 .. [#] Note that alternative forms of SV authentication and private key storage will be available in the future.
    As a workaround for increasing the security of your SV private key,
-   the SV bootstrapping config can be removed from running nodes once bootstrapping has been completed.
+   the SV onboarding config can be removed from running nodes once onboarding has been completed.
 
 Start the SV app
 ----------------
 
 If your configuration is sound and your SV identity has been approved by a sufficient number of currently active SVs
 (currently, this can be performed by DA once you generate and provide your identity information as explained above),
-starting the SV app for the first time will automatically bootstrap your SV into a fully operational status.
+starting the SV app for the first time will automatically onboard your SV into a fully operational status.
 To start the SV app, run the following command:
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-bootstrap.conf --bootstrap examples/sv/sv.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-onboarding.conf --bootstrap examples/sv/sv.sc
 
 Once the SV app has started and you can access the CN console, you can confirm that your SV node is fully operational by querying its debug endpoint: ::
 
@@ -117,6 +117,6 @@ Troubleshooting
 ---------------
 
 If your SV node is unable to complete its first startup (after waiting for up to 2 minutes), consult the logs recorded to ``log/canton.log`` for hints about potential reasons.
-You can also inspect these logs to confirm that your SV node is actively performing its service to the network, once bootstrapped. [#]_
+You can also inspect these logs to confirm that your SV node is actively performing its service to the network, once onboarded. [#]_
 
 .. [#] More sophisticated means of monitoring SV nodes will be made available soon.

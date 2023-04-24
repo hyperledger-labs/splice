@@ -145,7 +145,7 @@ export function installSvNode(svc: k8s.helm.v3.Release, nodename: string) {
     nodename + "-sv-app",
     "cn-sv-node",
     {
-      bootstrapType:
+      onboardingType:
         nodename === "sv-1" ? "found-collective" : "join-via-svc-app",
     },
     dependsOn

@@ -25,7 +25,7 @@ local deployments(num, config) =
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
         {
           // the first one is the founding SV app
-          name: "CN_APP_SV_BOOTSTRAP_TYPE",
+          name: "CN_APP_SV_ONBOARDING_TYPE",
           value: if num == 1 then "found-collective" else "join-via-svc-app",
         },
       ] + (

@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
+//TODO(#3756) reconsider this trigger
 class CompletedSvOnboardingTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
@@ -47,10 +48,10 @@ class CompletedSvOnboardingTrigger(
       svcRules: SvcRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svOnboardings <- svcStore.listSvOnboardingsBySvcMembers(svcRules.contract)
+      svOnboardings <- svcStore.listSvOnboardingRequestsBySvcMembers(svcRules.contract)
       cmds = svOnboardings.map(co =>
         svcRules.contract.contractId
-          .exerciseSvcRules_ArchiveSvOnboarding(co.contractId)
+          .exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId)
       )
       _ <- Future.sequence(
         cmds.map(cmd =>
@@ -63,7 +64,7 @@ class CompletedSvOnboardingTrigger(
         )
       )
     } yield TaskSuccess(
-      show"Archived ${cmds.size} `SvOnboarding` contract(s) as the SV(s) are added to SVC."
+      show"Archived ${cmds.size} `SvOnboardingRequest` contract(s) as the SV(s) are added to SVC."
     )
   }
 

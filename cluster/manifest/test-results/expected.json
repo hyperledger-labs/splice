@@ -1046,7 +1046,7 @@
                               "value": "true"
                            },
                            {
-                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "found-collective"
                            }
                         ],
@@ -1200,7 +1200,7 @@
                               "value": "true"
                            },
                            {
-                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
                            }
                         ],
@@ -1354,7 +1354,7 @@
                               "value": "true"
                            },
                            {
-                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
                            }
                         ],
@@ -1508,7 +1508,7 @@
                               "value": "true"
                            },
                            {
-                              "name": "CN_APP_SV_BOOTSTRAP_TYPE",
+                              "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
                            }
                         ],

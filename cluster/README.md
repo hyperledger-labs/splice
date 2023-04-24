@@ -909,9 +909,9 @@ including hints on how to effectively interact with all four of them at the same
 
 ### Approving new SVs
 
-To enable an external partner to bootstrap an SV node, we need to "approve" its SV identity on our SVs.
-An SV identity consists of a name (string; must match whatever the candidate SV puts in its bootstrap config)
-and a public key (base64 string; must match the public and private key that the candidate SV puts in its bootstrap config).
+To enable an external partner to onboard an SV node, we need to "approve" its SV identity on our SVs.
+An SV identity consists of a name (string; must match whatever the candidate SV puts in its onboarding config)
+and a public key (base64 string; must match the public and private key that the candidate SV puts in its onboarding config).
 External partners need to tell us their name and public key before we can approve them.
 The SV runbook prompts them to do so.
 

@@ -46,7 +46,7 @@ data CoinRules_ActionRequiringConfirmation
 data SvcRules_ActionRequiringConfirmation
   = SRARC_AddMember SvcRules_AddMember
   | SRARC_RemoveMember SvcRules_RemoveMember
-  | SRARC_ConfirmSv SvcRules_ConfirmSv
+  | SRARC_ConfirmSvOnboarding SvcRules_ConfirmSvOnboarding
   deriving (Eq, Show)
 
 -- | Information about members relevant to collective governance.
@@ -140,9 +140,9 @@ template AgreedCoinPrice
 -- TODO(M3-46): support changing the config
 data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
-    svOnboardingTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
-    svConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
+    svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
+    svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
     cometBftConfigLimits : CometBft.NetworkConfigLimits
     -- ^ Limits to enforce on the members' CometBft.SvNodeConfig's
   deriving (Eq, Show)
@@ -225,18 +225,18 @@ template SvcRules with
     nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
       with
         sv : Party
-        svConfirmedCid : ContractId SvConfirmed
+        svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
       controller sv
       do
         requireUnlocked lock
-        svConfirmed <- fetch svConfirmedCid
-        archive svConfirmedCid
-        require "SVC matches" (svConfirmed.svc == svc)
-        require "SV matches" (svConfirmed.svParty == sv)
+        svOnboardingConfirmed <- fetch svOnboardingConfirmedCid
+        archive svOnboardingConfirmedCid
+        require "SVC matches" (svOnboardingConfirmed.svc == svc)
+        require "SV matches" (svOnboardingConfirmed.svParty == sv)
         exercise self SvcRules_AddMember with
           newMemberParty = sv
-          newMemberName = svConfirmed.svName
-          reason = svConfirmed.reason
+          newMemberName = svOnboardingConfirmed.svName
+          reason = svOnboardingConfirmed.reason
 
     -- CometBFT config management
     -----------------------------
@@ -389,7 +389,7 @@ template SvcRules with
     -- SV onboarding
     ----------------
 
-    nonconsuming choice SvcRules_StartSvOnboarding : ContractId SvOnboarding
+    nonconsuming choice SvcRules_StartSvOnboarding : ContractId SvOnboardingRequest
       with
         candidateName : Text
         candidateParty : Party
@@ -400,32 +400,32 @@ template SvcRules with
         requireUnlocked lock
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         now <- getTime
-        let expiresAt = now `addRelTime` config.svOnboardingTimeout
-        create SvOnboarding with ..
+        let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
+        create SvOnboardingRequest with ..
 
-    nonconsuming choice SvcRules_ExpireSvOnboarding : ()
+    nonconsuming choice SvcRules_ExpireSvOnboardingRequest : ()
       with
-        cid: ContractId SvOnboarding
+        cid: ContractId SvOnboardingRequest
       controller leader
       do
         requireUnlocked lock
-        exercise cid SvOnboarding_Expire
+        exercise cid SvOnboardingRequest_Expire
 
-    nonconsuming choice SvcRules_ArchiveSvOnboarding : ()
+    nonconsuming choice SvcRules_ArchiveSvOnboardingRequest : ()
       with
-        svOnboardingCid: ContractId SvOnboarding
+        svOnboardingRequestCid: ContractId SvOnboardingRequest
       controller leader
       do
         requireUnlocked lock
         -- require that the member is already added to the SVC
-        -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvConfirmed` contract is created.
-        svOnboarding <- fetch svOnboardingCid
-        let maybeMember = Map.lookup svOnboarding.candidateParty members
+        -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvOnboardingConfirmed` contract is created.
+        svOnboardingRequest <- fetch svOnboardingRequestCid
+        let maybeMember = Map.lookup svOnboardingRequest.candidateParty members
         require "member party is already added to the SVC collective" (isSome maybeMember)
-        require "member name matches" ((fromSome maybeMember).name == svOnboarding.candidateName)
-        archive svOnboardingCid
+        require "member name matches" ((fromSome maybeMember).name == svOnboardingRequest.candidateName)
+        archive svOnboardingRequestCid
 
-    nonconsuming choice SvcRules_ConfirmSv : ContractId SvConfirmed
+    nonconsuming choice SvcRules_ConfirmSvOnboarding : ContractId SvOnboardingConfirmed
       with
         newMemberParty : Party
         newMemberName : Text
@@ -439,21 +439,21 @@ template SvcRules with
             require "Member name is expected to be new unless in devnet" (newMemberName `notElem` (map (.name) (Map.values members)))
           else pure ()
         now <- getTime
-        let expiresAt = now `addRelTime` config.svConfirmedTimeout
-        create SvConfirmed with
+        let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
+        create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
           reason
           svc
           expiresAt
 
-    nonconsuming choice SvcRules_ExpireSvConfirmed : ()
+    nonconsuming choice SvcRules_ExpireSvOnboardingConfirmed : ()
       with
-        cid: ContractId SvConfirmed
+        cid: ContractId SvOnboardingConfirmed
       controller leader
       do
         requireUnlocked lock
-        exercise cid SvConfirmed_Expire
+        exercise cid SvOnboardingConfirmed_Expire
 
     -- Coin management driven directly by the leader
     --------------------------------------------------
@@ -640,7 +640,7 @@ executeActionRequiringConfirmation svcRulesCid act = case act of
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
-      SRARC_ConfirmSv choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_ConfirmSvOnboarding choiceArg -> void $ exercise svcRulesCid choiceArg
 
 
 -- Functions implementing instant-runoff voting

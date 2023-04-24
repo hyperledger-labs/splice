@@ -8,7 +8,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cn.svonboarding.SvConfirmed
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -21,7 +21,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
-import com.daml.network.sv.config.{LocalSvAppConfig, SvBootstrapConfig}
+import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
@@ -109,7 +109,7 @@ class SvApp(
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
       ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      (svcStore, svcAutomation) <- ensureBootstrapped(
+      (svcStore, svcAutomation) <- ensureOnboarded(
         svStore,
         ledgerClient,
         ledgerConnection,
@@ -204,7 +204,7 @@ class SvApp(
   // SV app uploads package so no dep.
   override lazy val requiredTemplates = Set.empty
 
-  private def ensureBootstrapped(
+  private def ensureOnboarded(
       svStore: SvSvStore,
       ledgerClient: CNLedgerClient,
       ledgerConnection: CNLedgerConnection,
@@ -231,16 +231,16 @@ class SvApp(
           for {
             domainId <- waitForDomainConnection(svcStore.domains, config.domains.global)
             _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
-            bootstrapped <- isBootstrapped(svcStore)
+            onboarded <- isOnboarded(svcStore)
             _ <-
-              if (bootstrapped) {
+              if (onboarded) {
                 logger.info(
-                  "We can see the SvcRules and are listed as an SVC member => already bootstrapped."
+                  "We can see the SvcRules and are listed as an SVC member => already onboarded."
                 )
                 Future.successful(())
               } else {
-                logger.info("Starting bootstrapping (without SVC party migration).")
-                startBootstrappingWithSvcPartyHosted(
+                logger.info("Starting onboarding (without SVC party migration).")
+                startOnboardingWithSvcPartyHosted(
                   svStore,
                   svcStore,
                   globalDomain,
@@ -251,9 +251,9 @@ class SvApp(
         } else {
           logger.info(
             "The SVC party is not authorized to our participant. " +
-              "Starting bootstrapping with SVC party migration."
+              "Starting onboarding with SVC party migration."
           )
-          startBootstrappingWithSvcPartyMigration(
+          startOnboardingWithSvcPartyMigration(
             svStore,
             participantId,
             globalDomain,
@@ -266,7 +266,7 @@ class SvApp(
     } yield (svcStore, svcAutomation)
   }
 
-  private def startBootstrappingWithSvcPartyMigration(
+  private def startOnboardingWithSvcPartyMigration(
       svStore: SvSvStore,
       participantId: ParticipantId,
       globalDomain: DomainId,
@@ -274,8 +274,8 @@ class SvApp(
       ledgerConnection: CNLedgerConnection,
       svcPartyHosting: SvcPartyHosting,
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
-    config.bootstrap match {
-      case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
+    config.onboarding match {
+      case SvOnboardingConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
@@ -288,7 +288,7 @@ class SvApp(
                 svStore.key.svcParty,
                 privateKey_,
               )
-              svConfirmed <- waitForSvConfirmed(svStore)
+              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStore)
               _ <- startHostingSvcPartyInParticipant(
                 globalDomain,
                 participantId,
@@ -304,7 +304,7 @@ class SvApp(
               _ <- addMemberToSvc(
                 svcStore,
                 globalDomain,
-                svConfirmed,
+                svOnboardingConfirmed,
                 ledgerConnection,
               )
             } yield (svcStore, svcAutomation)
@@ -314,18 +314,18 @@ class SvApp(
     }
   }
 
-  private def startBootstrappingWithSvcPartyHosted(
+  private def startOnboardingWithSvcPartyHosted(
       svStore: SvSvStore,
       svcStore: SvSvcStore,
       globalDomain: DomainId,
       ledgerConnection: CNLedgerConnection,
   ): Future[Unit] = {
-    config.bootstrap match {
-      case foundingConfig: SvBootstrapConfig.FoundCollective =>
+    config.onboarding match {
+      case foundingConfig: SvOnboardingConfig.FoundCollective =>
         foundCollective(foundingConfig, svcStore, ledgerConnection, globalDomain)
-      case _: SvBootstrapConfig.JoinViaSvcApp =>
+      case _: SvOnboardingConfig.JoinViaSvcApp =>
         joinCollective(svcStore.key.svParty)
-      case SvBootstrapConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
+      case SvOnboardingConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
@@ -337,18 +337,18 @@ class SvApp(
                 svcStore.key.svcParty,
                 privateKey_,
               )
-              svConfirmed <- waitForSvConfirmed(svStore)
+              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStore)
               _ <- addMemberToSvc(
                 svcStore,
                 globalDomain,
-                svConfirmed,
+                svOnboardingConfirmed,
                 ledgerConnection,
               )
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
         }
-      // TODO(#2241) throw an error here if bootstrap config is not set (once it becomes optional)
-      // case None => sys.error("Not bootstrapped but no bootstrap config found; exiting.")
+      // TODO(#2241) throw an error here if onboarding config is not set (once it becomes optional)
+      // case None => sys.error("Not onboarded but no onboarding config found; exiting.")
     }
   }
 
@@ -444,7 +444,7 @@ class SvApp(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
   ) = new SvcPartyHosting(
-    config.bootstrap,
+    config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
     coinAppParameters,
@@ -455,7 +455,7 @@ class SvApp(
   private def addMemberToSvc(
       svcStore: SvSvcStore,
       domainId: DomainId,
-      svConfirmed: Contract[SvConfirmed.ContractId, SvConfirmed],
+      svOnboardingConfirmed: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed],
       connection: CNLedgerConnection,
   ): Future[Unit] = {
     retryProvider.retryForAutomation(
@@ -464,7 +464,7 @@ class SvApp(
         svcRules <- svcStore.getSvcRules()
         cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
           svcStore.key.svParty.toProtoPrimitive,
-          svConfirmed.contractId,
+          svOnboardingConfirmed.contractId,
         )
         _ <- connection.submitCommandsNoDedup(
           Seq(svcStore.key.svParty),
@@ -477,30 +477,32 @@ class SvApp(
     )
   }
 
-  private def isBootstrapped(svcStore: SvSvcStore): Future[Boolean] = for {
+  private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
   } yield svcRules.exists(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
 
-  private def waitForSvConfirmed(
+  private def waitForSvOnboardingConfirmed(
       svStore: SvSvStore
-  ): Future[Contract[SvConfirmed.ContractId, SvConfirmed]] = {
-    logger.info(s"Waiting for SvConfirmed contract to be created for ${svStore.key.svParty}")
+  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] = {
+    logger.info(
+      s"Waiting for SvOnboardingConfirmed contract to be created for ${svStore.key.svParty}"
+    )
     retryProvider.retryForAutomation(
-      "Wait for SVC SvConfirmed contract",
+      "Wait for SVC SvOnboardingConfirmed contract",
       for {
-        svConfirmedOpt <- svStore.lookupSvConfirmed()
-        svConfirmed <- svConfirmedOpt match {
+        svOnboardingConfirmedOpt <- svStore.lookupSvOnboardingConfirmed()
+        svOnboardingConfirmed <- svOnboardingConfirmedOpt match {
           case Some(sc) =>
-            logger.info("svConfirmed found, done waiting")
+            logger.info("svOnboardingConfirmed found, done waiting")
             Future.successful(sc)
           case None =>
             throw new StatusRuntimeException(
               Status.NOT_FOUND.withDescription(
-                s"SvConfirmed contract not found yet"
+                s"SvOnboardingConfirmed contract not found yet"
               )
             )
         }
-      } yield svConfirmed,
+      } yield svOnboardingConfirmed,
       logger,
     )
   }
@@ -534,7 +536,7 @@ class SvApp(
   }
 
   private def foundCollective(
-      foundingConfig: SvBootstrapConfig.FoundCollective,
+      foundingConfig: SvOnboardingConfig.FoundCollective,
       svcStore: SvSvcStore,
       ledgerConnection: CNLedgerConnection,
       globalDomain: DomainId,
@@ -585,7 +587,7 @@ class SvApp(
 
   // Create SvcRules and CoinRules and open the first mining round
   private def bootstrapSvc(
-      foundingConfig: SvBootstrapConfig.FoundCollective,
+      foundingConfig: SvOnboardingConfig.FoundCollective,
       store: SvSvcStore,
       ledgerConnection: CNLedgerConnection,
       domainId: DomainId,
@@ -662,7 +664,7 @@ class SvApp(
   private def createUpgradedCoinRulesIfEnabled(
       store: SvSvcStore,
       ledgerConnection: CNLedgerConnection,
-      foundingConfig: SvBootstrapConfig.FoundCollective,
+      foundingConfig: SvOnboardingConfig.FoundCollective,
       domainId: DomainId,
   ): Future[Unit] =
     for {
@@ -677,7 +679,7 @@ class SvApp(
   private def createUpgradedCoinRules(
       store: SvSvcStore,
       connection: CNLedgerConnection,
-      foundingConfig: SvBootstrapConfig.FoundCollective,
+      foundingConfig: SvOnboardingConfig.FoundCollective,
       domainId: DomainId,
   ): Future[Unit] = {
     val svcParty = store.key.svcParty
@@ -739,7 +741,7 @@ class SvApp(
               loggerFactory,
             )
             svConnection
-              .onboardSv(token)
+              .startSvOnboarding(token)
               .andThen(_ => svConnection.close())
           },
           logger,

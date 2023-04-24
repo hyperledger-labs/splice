@@ -3,10 +3,10 @@ daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar 0a4c3b536a78b0780494b70ed6ad02
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 250886ef3183c8a999461d295b39de0363d4250841e3fd484386b6a5f28a6f8f
 daml/directory-service/.daml/dist/directory-service-0.1.0.dar 12621ee9e474d7b0ffb918710d5b6c77b7d9281635da23cc57619718e28074ff
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar 257c698ec48f8f4b42436a91f3ff9cba0ae1fbf4adc2bebc3a234663ec45de1c
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 942944c3d14002563afe5387a05c554017cc3e01b429bb34597c17e46dab5929
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 11e6c5c0764aa73168baafce8183d3a031ae7ca7c8f05fe066f5bfe8d3607fa8
 daml/upgrade-tests/cc-upgrade-test/.daml/dist/canton-coin-0.1.1.dar 8503821306b6b13981547f47fcd7320a49f88cb3684917a5e17043bba8164a63
 daml/upgrade-tests/coin-upgrade-test/.daml/dist/canton-coin-0.1.2.dar 325a3a2be01c98255cd91235c938418818e68a12447f8eb3dbde66b37e88dd1b
-daml/upgrade-tests/svc-governance-upgrade-test/.daml/dist/svc-governance-0.1.1.dar 0429467fe13459e0b670d1aad3b9578179d6eb803b6ffdd2902a96d27994c1e6
+daml/upgrade-tests/svc-governance-upgrade-test/.daml/dist/svc-governance-0.1.1.dar 91c5d1f7a2c060c5333aa5e266e04e1c7297be609190c06b77af42df3f2528fc
 daml/upgrade-tests/wallet-upgrade-test/.daml/dist/wallet-0.1.1.dar 7f4deb5de34cd084d07d3dbd703291f3e6f706b97d2e1c35365cd3a675a90cf1
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 8c2e538e8684630dff9e8d86a7def95298332ac89fd8ba43358f742385edffe4
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 26f5c779f9d8ce9b341ca8d7487b8a820e022807ae3506fcdb549b386fb6a5e5

@@ -715,18 +715,18 @@ class SvTimeBasedIntegrationTest
       eventually()(
         // The onboarding is requested by SV4 during SvApp init.
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) should have length 1
+          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
       )
     }
     actAndCheck("No onboarding happens for a long time", advanceTime(Duration.ofHours(25)))(
       "The `SvOnboarding` contract expires and is archived",
       _ =>
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboarding.COMPANION)(svcParty) shouldBe empty,
+          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty,
     )
   }
 
-  "expire stale `SvConfirmed` contracts" in { implicit env =>
+  "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
       Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
         _.start()
@@ -738,34 +738,36 @@ class SvTimeBasedIntegrationTest
     }
     val svXParty = allocateRandomSvParty("svX")
     actAndCheck(
-      "Create a new `SvConfirmed` Contract with new party \"svX\"",
+      "Create a new `SvOnboardingConfirmed` Contract with new party \"svX\"",
       svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
         commands = getSvcRules().id
-          .exerciseSvcRules_ConfirmSv(
+          .exerciseSvcRules_ConfirmSvOnboarding(
             svXParty.toProtoPrimitive,
             "new random party",
-            "create new `SvConfirmed` contract",
+            "create new `SvOnboardingConfirmed` contract",
           )
           .commands
           .asScala
           .toSeq,
       ),
     )(
-      "SvX's `SvConfirmed` contract is created'",
+      "SvX's `SvOnboardingConfirmed` contract is created'",
       _ =>
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvConfirmed.COMPANION)(svcParty) should have length 1,
+          .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
+            svcParty
+          ) should have length 1,
     )
     actAndCheck(
       "No confirmation happens within 24h",
       advanceTime(Duration.ofHours(25)),
     )(
-      "The `SvConfirmed` contract expires and is archived",
+      "The `SvOnboardingConfirmed` contract expires and is archived",
       _ =>
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvConfirmed.COMPANION)(svcParty) shouldBe empty,
+          .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty) shouldBe empty,
     )
   }
 

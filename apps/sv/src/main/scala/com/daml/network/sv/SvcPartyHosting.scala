@@ -7,7 +7,7 @@ import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.config.{RemoteSvAppConfig, SvBootstrapConfig}
+import com.daml.network.sv.config.{RemoteSvAppConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** Class used to orchester the flow of SVC Party hosting on SV dedicated participant.
   */
 class SvcPartyHosting(
-    bootstrapConfig: SvBootstrapConfig,
+    onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
     svcParty: PartyId,
     coinAppParameters: SharedCNNodeAppParameters,
@@ -55,7 +55,7 @@ class SvcPartyHosting(
   def start(domainId: DomainId, participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): Future[Either[String, Unit]] = {
-    getSponsorSvConfig(bootstrapConfig) match {
+    getSponsorSvConfig(onboardingConfig) match {
       case Some(sponsorSvConfig) =>
         for {
           _ <- participantAdminConnection.reconnectAllDomains()
@@ -76,10 +76,10 @@ class SvcPartyHosting(
   }
 
   private def getSponsorSvConfig(
-      bootstrapConfig: SvBootstrapConfig
+      onboardingConfig: SvOnboardingConfig
   ): Option[RemoteSvAppConfig] =
-    bootstrapConfig match {
-      case SvBootstrapConfig.JoinWithKey(_, sponsorSv, _, _) =>
+    onboardingConfig match {
+      case SvOnboardingConfig.JoinWithKey(_, sponsorSv, _, _) =>
         Some(sponsorSv)
       case _ => None
     }

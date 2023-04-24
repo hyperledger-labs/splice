@@ -162,15 +162,15 @@ testSvOnboarding = do
   svSubmits app sv2 $ \cid -> exerciseCmd cid $
     SvcRules_StartSvOnboarding "svX" svX token sv2
 
-  -- an onboarding contract for svX has been created
-  [(_, svOnboarding)] <- query @SvOnboarding svc
-  svOnboarding === SvOnboarding with
+  -- an onboarding request for svX has been created
+  [(_, svOnboardingRequest)] <- query @SvOnboardingRequest svc
+  svOnboardingRequest === SvOnboardingRequest with
     candidateName = "svX"
     candidateParty = svX
     token
     sponsor = sv2
     svc
-    expiresAt = svOnboarding.expiresAt
+    expiresAt = svOnboardingRequest.expiresAt
 
   -- svX collects three confirmations which is enough to onboard him
   [(svcRulesCid, _)] <- query @SvcRules svc
@@ -178,27 +178,27 @@ testSvOnboarding = do
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
-        svcAction = SRARC_ConfirmSv $ SvcRules_ConfirmSv with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
           newMemberParty = svX
           newMemberName = "svX"
           reason = "because"
   executeAllConfirmedActions app
 
   -- svX is now a confirmed SV
-  [(svConfirmedCid, svConfirmed)] <- query @SvConfirmed svc
-  svConfirmed === SvConfirmed with
+  [(svOnboardingConfirmedCid, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed svc
+  svOnboardingConfirmed === SvOnboardingConfirmed with
     svParty = svX
     svName = "svX"
     reason = "because"
     svc
-    expiresAt = svConfirmed.expiresAt
+    expiresAt = svOnboardingConfirmed.expiresAt
 
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   -- once svX becomes able to read as svc (e.g., after party migration to svX's participant), it completes the onboarding by adding itself to the SvcRules
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
     sv = svX
-    svConfirmedCid
+    svOnboardingConfirmedCid
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   assert (svX `elem` Map.keys svcRules.members)
@@ -231,8 +231,8 @@ testSvOnboarding = do
   pure ()
 
 
-testSvOnboardingExpiry : Script ()
-testSvOnboardingExpiry = do
+testSvOnboardingRequestExpiry : Script ()
+testSvOnboardingRequestExpiry = do
   (app, _, (_, sv2, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
@@ -243,23 +243,23 @@ testSvOnboardingExpiry = do
   let token = "mock-token"
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
-  svOnboardingCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     SvcRules_StartSvOnboarding "svX" svX token sv2
 
   -- leader tries to expire the onboarding, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    SvcRules_ExpireSvOnboarding svOnboardingCid
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
 
   -- wait for the onboarding to expire
   passTime (hours 25)
 
   -- leader expires the onboarding
   leaderSubmits app $ \cid -> exerciseCmd cid $
-    SvcRules_ExpireSvOnboarding svOnboardingCid
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
 
 
-testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember : Script ()
-testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember = do
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   (app, svc, (_, sv2, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
@@ -270,25 +270,25 @@ testSvOnboardingArchiveWhenSvIsAlreadyAddedAsMember = do
   let token = "mock-token"
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
-  svOnboardingCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     SvcRules_StartSvOnboarding "svX" svX token sv2
 
   [(svcRulesCid, _)] <- query @SvcRules svc
 
   -- leader cannot archive the onboarding as svX is not yet added as member
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    SvcRules_ArchiveSvOnboarding svOnboardingCid
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
-  -- create a SvConfirmed contract
+  -- create a SvOnboardingConfirmed contract
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" "because"
 
   -- leader can archive the onboarding as svX is added as member
   leaderSubmits app $ \cid -> exerciseCmd cid $
-    SvcRules_ArchiveSvOnboarding svOnboardingCid
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
 
-testSvConfirmedExpiry : Script ()
-testSvConfirmedExpiry = do
+testSvOnboardingConfirmedExpiry : Script ()
+testSvOnboardingConfirmedExpiry = do
   (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
@@ -301,25 +301,25 @@ testSvConfirmedExpiry = do
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
-        svcAction = SRARC_ConfirmSv $ SvcRules_ConfirmSv with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
           newMemberParty = svX
           newMemberName = "svX"
           reason = "because"
 
   executeAllConfirmedActions app
 
-  [(svConfirmedCid, _)] <- query @SvConfirmed svc
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed svc
 
   -- leader tries to expire the confirmation but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    SvcRules_ExpireSvConfirmed svConfirmedCid
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
 
   -- wait for the confirmation to expire
   passTime (hours 25)
 
   -- leader expires the confirmation
   leaderSubmits app $ \cid -> exerciseCmd cid $
-    SvcRules_ExpireSvConfirmed svConfirmedCid
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
 
 
 testSvNameUniquenessNotInDevNet : Script ()
@@ -385,11 +385,11 @@ testRequiredNumOfConfirmationInDevNet = do
   length confirmations === 4
 
   -- There are 10 SVC members in total but only 4 confirmations are required to confirm a SV in devnet
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_ConfirmSv svX "svX" "because"
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_ConfirmSvOnboarding svX "svX" "because"
 
-  [(_, svConfirmed)] <- query @SvConfirmed svc
-  svConfirmed.svParty === svX
-  svConfirmed.svName === "svX"
+  [(_, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed svc
+  svOnboardingConfirmed.svParty === svX
+  svOnboardingConfirmed.svName === "svX"
 
   pure ()
 
@@ -478,9 +478,9 @@ initCollective isDevNet = do
 
   let config = SvcRulesConfig with
         numUnclaimedRewardsThreshold = 5
-        svOnboardingTimeout = hours 24
         actionConfirmationTimeout = minutes 5
-        svConfirmedTimeout = hours 24
+        svOnboardingRequestTimeout = hours 24
+        svOnboardingConfirmedTimeout = hours 24
         cometBftConfigLimits = CometBft.defaultNetworkConfigLimits
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
 
@@ -497,7 +497,7 @@ initCollective isDevNet = do
           primaryParty = svc
 
   -- add more sv nodes
-  -- TODO(#2241) consider replicating the proper SV bootstrapping flow here
+  -- TODO(#2241) consider replicating the proper SV onboarding flow here
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
