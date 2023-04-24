@@ -3,7 +3,7 @@ package com.daml.network.sv.automation
 import cats.data.OptionT
 import cats.instances.future.*
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -71,35 +71,51 @@ class AdvanceOpenMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     logger.debug(show"Starting check for leader inactivity for ${task.work}")
+    store
+      .getSvcRules()
+      .map(_.payload.leader)
+      .flatMap(monitoredLeader => {
 
-    val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
-      context.clock
-        .scheduleAfter(
-          _ => {
-            isStaleTask(task).foreach { isStale =>
-              if (!isStale) {
-                logger.warn(show"The leader is inactive for ${task.work}")
-              }
-            }
-          },
-          context.config.leaderInactiveTimeout.asJavaApproximation
-            .plus(context.config.pollingInterval.asJavaApproximation),
+        val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
+          context.clock
+            .scheduleAfter(
+              _ => {
+                val isLeaderInactive = for {
+                  currentLeader <- store
+                    .getSvcRules()
+                    .map(_.payload.leader == monitoredLeader)
+                  taskStale <- isStaleTask(task)
+                } yield currentLeader && !taskStale
+
+                isLeaderInactive.foreach(isInactive => {
+                  if (isInactive) {
+                    handleLeaderFailure(
+                      monitoredLeader,
+                      show"The leader is inactive for ${task.work}",
+                    )
+                  }
+                })
+              },
+              context.config.leaderInactiveTimeout.asJavaApproximation
+                .plus(context.config.pollingInterval.asJavaApproximation),
+            )
         )
-    )
-    continueOrShutdownSignal.unwrap.flatMap {
-      case UnlessShutdown.AbortedDueToShutdown =>
-        Future.successful(
-          TaskSuccess(
-            show"Shutting down leader inactivity check for ${task.work}"
-          )
-        )
-      case UnlessShutdown.Outcome(()) =>
-        Future.successful(
-          TaskSuccess(
-            show"Leader inactivity check completed for ${task.work}"
-          )
-        )
-    }
+        continueOrShutdownSignal.unwrap.flatMap {
+          case UnlessShutdown.AbortedDueToShutdown =>
+            Future.successful(
+              TaskSuccess(
+                show"Shutting down leader inactivity check for ${task.work}"
+              )
+            )
+          case UnlessShutdown.Outcome(()) =>
+            Future.successful(
+              TaskSuccess(
+                show"Leader inactivity check completed for ${task.work}"
+              )
+            )
+        }
+
+      })
   }
 
   override protected def isStaleTask(
@@ -122,6 +138,40 @@ class AdvanceOpenMiningRoundTrigger(
         )
       )
     } yield ()).isEmpty
+  }
+
+  def handleLeaderFailure(currentLeader: String, msg: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] = {
+    logger.warn(msg)
+
+    import scala.jdk.CollectionConverters.*
+    import scala.util.Random
+
+    for {
+      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      svcRules <- store.getSvcRules()
+      self = store.key.svParty.toProtoPrimitive
+      otherParties = Set.empty ++ svcRules.payload.members.keySet.asScala - currentLeader - self
+      ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
+      cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
+        self,
+        new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+          com.daml.ledger.javaapi.data.Unit.getInstance()
+        ),
+        ranking.asJava,
+      )
+      (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
+        Seq(store.key.svParty),
+        Seq(store.key.svcParty),
+        cmd,
+        domainId = domainId,
+      )
+    } yield {
+      TaskSuccess(
+        s"Successfully requested an election to replace inactive leader ${currentLeader}"
+      )
+    }
   }
 
   override protected def isLeader(): Future[Boolean] = store.svIsLeader()

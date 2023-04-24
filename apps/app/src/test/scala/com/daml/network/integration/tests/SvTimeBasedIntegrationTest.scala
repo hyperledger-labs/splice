@@ -938,19 +938,34 @@ class SvTimeBasedIntegrationTest
         },
       )
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        {
-          advanceTime(effectiveTimeout.plus(bufferDuration))
-        },
-        entries => {
-          forExactly(3, entries) { line =>
-            line.message should include(
-              "The leader is inactive"
-            )
-          }
+      actAndCheck(
+        "Wait for leader inactivity to be detected",
+        advanceTime(effectiveTimeout.plus(bufferDuration)),
+      )(
+        "The inactivity is detected and logged",
+        _ => {
+          loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+            {},
+            entries => {
+              forExactly(3, entries) { line =>
+                line.message should include(
+                  "The leader is inactive"
+                )
+              }
+            },
+          )
         },
       )
 
+      eventually() {
+        val electionRequests = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
+        electionRequests should have length 3
+        val requestsData = electionRequests.map(req => req.data)
+        requestsData.foreach(data => data.ranking.asScala.head shouldBe data.requester)
+        val currentLeader = getSvcRules().data.leader
+        requestsData.foreach(_.ranking.asScala.last shouldBe currentLeader)
+      }
     }
   }
 
