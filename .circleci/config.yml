@@ -565,7 +565,7 @@ commands:
           extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
           # it is in our best interest for our tests to be faster than this,
           # but failing CI because of slow tests is also not very nice
-          timeout: "15m"
+          timeout: "20m"
 
   setup_vpn:
     steps:
