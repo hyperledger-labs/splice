@@ -22,11 +22,11 @@ export interface WalletBalance {
   availableCC: BigNumber;
 }
 
-// TODO(#3981): Improve the classification of transactions
-export type Transaction = Transfer | BalanceChange | Automation;
+export type Transaction = Transfer | BalanceChange;
 export interface Transfer {
   id: string;
   transactionType: 'transfer';
+  transactionSubtype: string;
   receivers: TransactionReceiver[]; // will be empty for e.g. mergers & self-transfers
   senderId: Party;
   providerId: Party;
@@ -37,16 +37,8 @@ export interface Transfer {
 export interface BalanceChange {
   id: string;
   transactionType: 'balance_change';
+  transactionSubtype: string;
   receivers: TransactionReceiver[];
-  date: Date;
-  coinPrice: BigNumber;
-}
-export interface Automation {
-  // receivers is effectively the current user
-  id: string;
-  transactionType: 'automation';
-  providerId: Party;
-  senderAmountCC: BigNumber;
   date: Date;
   coinPrice: BigNumber;
 }

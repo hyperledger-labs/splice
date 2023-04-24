@@ -4,6 +4,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
@@ -68,7 +69,7 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
           },
         )
 
-        matchLockUnlockDirectoryPayment(txsAfter.take(2), directoryExpectedCns)
+        matchLockUnlockDirectoryPayment(txsAfter.take(2), directoryExpectedCns, isInitial = false)
         matchInitialTransactions(txsAfter.drop(2), directoryExpectedCns)
       }
     }
@@ -77,17 +78,22 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
         env: CNNodeTestConsoleEnvironment
     ) = {
       inside(txs) { case rest :+ balanceChange =>
-        matchLockUnlockDirectoryPayment(rest, directoryExpectedCns)
+        matchLockUnlockDirectoryPayment(rest, directoryExpectedCns, isInitial = true)
         matchTransaction(balanceChange)(
           coinPrice = 2,
           expectedAction = "Balance Change",
+          expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.Tap,
           expectedPartyDescription = None,
           expectedAmountCC = BigDecimal(5),
         )
       }
     }
 
-    def matchLockUnlockDirectoryPayment(txs: Seq[Element], directoryExpectedCns: String)(implicit
+    def matchLockUnlockDirectoryPayment(
+        txs: Seq[Element],
+        directoryExpectedCns: String,
+        isInitial: Boolean,
+    )(implicit
         env: CNNodeTestConsoleEnvironment
     ) = {
       inside(txs) { case directoryCreation +: lockForDirectory +: Nil =>
@@ -96,12 +102,20 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
         matchTransaction(directoryCreation)(
           coinPrice = 2,
           expectedAction = "Sent",
+          expectedSubtype =
+            if (isInitial)
+              UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
+            else UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionPaymentCollected,
           expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForDirectory)(
           coinPrice = 2,
           expectedAction = "Sent",
+          expectedSubtype =
+            if (isInitial)
+              UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted
+            else UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionPaymentAccepted,
           expectedPartyDescription =
             Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD

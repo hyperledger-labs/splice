@@ -6,6 +6,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{Contract, FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
@@ -519,6 +520,7 @@ class WalletPaymentFrontendIntegrationTest
       matchTransaction(lockTx)(
         coinPrice,
         "Sent",
+        UserWalletTxLogParser.TxLogEntry.Transfer.AppPaymentAccepted,
         Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
         expectedLockedAmount,
       )
@@ -526,6 +528,7 @@ class WalletPaymentFrontendIntegrationTest
       matchTransaction(paymentTx)(
         coinPrice,
         "Sent",
+        UserWalletTxLogParser.TxLogEntry.Transfer.AppPaymentCollected,
         Some(s"${expectedCns(receiverPartyId, expectedEntryName)} via $provider"),
         balanceChangeForSender,
       )

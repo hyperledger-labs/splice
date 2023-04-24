@@ -54,6 +54,7 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
 
     FrontendTransaction(
       action = transactionRow.childElement(className("tx-action")).text,
+      subtype = transactionRow.childElement(className("tx-subtype")).text.replaceAll("[()]", ""),
       partyDescription = transactionRow.findChildElement(className("tx-party")).map(_.text),
       ccAmount = parseAmountText(
         transactionRow
@@ -74,6 +75,7 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
   protected def matchTransaction(transactionRow: Element)(
       coinPrice: BigDecimal,
       expectedAction: String,
+      expectedSubtype: String,
       expectedPartyDescription: Option[String],
       expectedAmountCC: BigDecimal,
   ): Assertion = {
@@ -81,6 +83,7 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
     val expectedAmountUSD = expectedAmountCC * coinPrice
 
     transaction.action should matchText(expectedAction)
+    transaction.subtype should matchText(expectedSubtype)
     (transaction.partyDescription, expectedPartyDescription) match {
       case (None, None) => ()
       case (Some(party), Some(ep)) => party should matchText(ep)
@@ -129,6 +132,7 @@ object WalletFrontendTestUtil {
 
   case class FrontendTransaction(
       action: String,
+      subtype: String,
       partyDescription: Option[String],
       ccAmount: BigDecimal,
       usdAmount: BigDecimal,

@@ -27,7 +27,6 @@ import {
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 import {
-  Automation,
   BalanceChange,
   ListAcceptedTransferOffersResponse,
   ListResponse,
@@ -127,7 +126,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             amount: new BigNumber(r.amount),
             party: r.party,
           }));
-          const date = item.date;
+          const { date, transactionSubtype } = item;
+
           if (!item.coinPrice) {
             console.error('Transaction does not contain coinPrice.', item);
             return [];
@@ -137,6 +137,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           if (item.transactionType === 'balance_change') {
             const balanceChange: BalanceChange = {
               transactionType: 'balance_change',
+              transactionSubtype,
               id,
               date,
               receivers,
@@ -144,31 +145,19 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             };
             return [balanceChange];
           } else if (item.transactionType === 'transfer') {
-            const isAutomation = item.transactionSubtype === 'wallet_automation';
-            if (isAutomation) {
-              const automation: Automation = {
-                transactionType: 'automation',
-                id,
-                date,
-                providerId: item.provider!,
-                senderAmountCC: new BigNumber(item.sender!.amount),
-                coinPrice,
-              };
-              return [automation];
-            } else {
-              const transfer: Transfer = {
-                transactionType: 'transfer',
-                id,
-                date,
-                receivers,
-                // sender and provider MUST be available for transfer
-                providerId: item.provider!,
-                senderId: item.sender!.party,
-                senderAmountCC: new BigNumber(item.sender!.amount),
-                coinPrice,
-              };
-              return [transfer];
-            }
+            const transfer: Transfer = {
+              transactionType: 'transfer',
+              transactionSubtype,
+              id,
+              date,
+              receivers,
+              // sender and provider MUST be available for transfer
+              providerId: item.provider!,
+              senderId: item.sender!.party,
+              senderAmountCC: new BigNumber(item.sender!.amount),
+              coinPrice,
+            };
+            return [transfer];
           } else {
             console.error('Unsupported transaction type.', item);
             return [];

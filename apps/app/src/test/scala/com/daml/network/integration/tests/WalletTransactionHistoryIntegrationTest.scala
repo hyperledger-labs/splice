@@ -5,6 +5,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletTransactionHistoryIntegrationTest
@@ -99,12 +100,14 @@ class WalletTransactionHistoryIntegrationTest
             matchTransaction(otp)(
               coinPrice = 2,
               expectedAction = "Sent",
+              expectedSubtype = UserWalletTxLogParser.TxLogEntry.Transfer.AppPaymentAccepted,
               expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
               coinPrice = 2,
               expectedAction = "Sent",
+              expectedSubtype = UserWalletTxLogParser.TxLogEntry.Transfer.P2PPaymentCompleted,
               expectedPartyDescription = Some(
                 s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
               ),
@@ -113,6 +116,7 @@ class WalletTransactionHistoryIntegrationTest
             matchTransaction(received)(
               coinPrice = 2,
               expectedAction = "Received",
+              expectedSubtype = UserWalletTxLogParser.TxLogEntry.Transfer.P2PPaymentCompleted,
               expectedPartyDescription = Some(
                 s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
               ),
@@ -123,18 +127,23 @@ class WalletTransactionHistoryIntegrationTest
             matchTransaction(directoryCreation)(
               coinPrice = 2,
               expectedAction = "Sent",
+              expectedSubtype =
+                UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentCollected,
               expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForDirectory)(
               coinPrice = 2,
               expectedAction = "Sent",
+              expectedSubtype =
+                UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted,
               expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(
               coinPrice = 2,
               expectedAction = "Balance Change",
+              expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.Tap,
               expectedPartyDescription = None,
               expectedAmountCC = BigDecimal(5),
             )

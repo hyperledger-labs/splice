@@ -2,8 +2,8 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  RateDisplay,
   DirectoryEntry,
+  RateDisplay,
   useInterval,
   useUserState,
 } from 'common-frontend';
@@ -14,7 +14,6 @@ import {
   AccountBalanceWallet,
   ArrowCircleLeftOutlined,
   ArrowCircleRightOutlined,
-  PrecisionManufacturing,
 } from '@mui/icons-material';
 import {
   Button,
@@ -135,10 +134,6 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       icon = <AccountBalanceWallet fontSize="small" />;
       text = 'Balance Change';
       break;
-    case 'automation':
-      icon = <PrecisionManufacturing fontSize="small" />;
-      text = 'Automation';
-      break;
     case 'transfer':
       const isUserTheSender = transaction.senderId === primaryPartyId;
       if (isUserTheSender) {
@@ -156,7 +151,12 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       <Icon sx={{ marginRight: '16px' }} fontSize="small">
         {icon}
       </Icon>
-      <Typography className="tx-action">{text}</Typography>
+      <Stack>
+        <Typography className="tx-action">{text}</Typography>
+        <Typography className="tx-subtype" variant="body2">
+          ({transaction.transactionSubtype})
+        </Typography>
+      </Stack>
     </Stack>
   );
 };
@@ -164,10 +164,7 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
 const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
   const { primaryPartyId } = useUserState();
 
-  if (
-    transaction.transactionType === 'balance_change' ||
-    transaction.transactionType === 'automation'
-  ) {
+  if (transaction.transactionType === 'balance_change') {
     return <></>;
   }
 
@@ -211,9 +208,6 @@ interface TransactionAmountProps {
 const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, primaryPartyId }) => {
   let amountCC: BigNumber;
   switch (transaction.transactionType) {
-    case 'automation':
-      amountCC = transaction.senderAmountCC;
-      break;
     case 'transfer':
       if (transaction.senderId === primaryPartyId) {
         amountCC = transaction.senderAmountCC;
