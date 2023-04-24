@@ -16,6 +16,7 @@ import com.daml.network.history.{
   CoinArchive,
   CoinCreate,
   CoinExpire,
+  CoinRules_BuyExtraTraffic,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
   LockedCoinUnlock,
@@ -270,6 +271,13 @@ class UserWalletTxLogParser(
             )
 
           // ------------------------------------------------------------------
+          // Buying extra traffic
+          // ------------------------------------------------------------------
+
+          case CoinRules_BuyExtraTraffic(_) =>
+            State.fromBuyExtraTraffic(tree, exercised)
+
+          // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
 
@@ -377,6 +385,7 @@ object UserWalletTxLogParser {
       val SubscriptionPaymentAccepted = "subscription_payment_accepted"
       val SubscriptionPaymentCollected = "subscription_payment_collected"
       val WalletAutomation = "wallet_automation"
+      val ExtraTrafficPurchase = "extra_traffic_purchase"
       val Transfer = "unknown_transfer"
     }
 
@@ -615,6 +624,60 @@ object UserWalletTxLogParser {
       State(
         entries = immutable.Queue(newEntry)
       )
+    }
+
+    def fromBuyExtraTraffic(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+    )(implicit lc: ErrorLoggingContext): State = {
+      // first child event is the transfer of CC from validator to SVC to buy extra traffic
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(0))
+      // Calculate tx log entries from transfer of CC from validator to SVC
+      val transferNode = (transferEvent match {
+        case e: ExercisedEvent => Transfer.unapply(e)
+        case _ => None
+      }).getOrElse(
+        throw new RuntimeException(s"Unable to parse event ${transferEvent.getEventId} as Transfer")
+      )
+      val stateFromTransfer =
+        State.fromTransfer(tx, transferEvent, transferNode, TxLogEntry.Transfer.Transfer)
+
+      // second child event is burning of transferred coin by SVC
+      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      // Adjust tx log entries for SVC since the coin it receives is immediately burnt
+      val burntCoin = tx.getEventsById.asScala
+        .collectFirst {
+          case (_, c: CreatedEvent) if c.getContractId == coinArchiveEvent.getContractId =>
+            CoinCreate.unapply(c).map(_.payload)
+        }
+        .flatten
+        .getOrElse(
+          throw new RuntimeException(
+            s"The coin contract ${coinArchiveEvent.getContractId} " +
+              s"referenced by the coin archive event ${coinArchiveEvent.getEventId} " +
+              s"was not found in transaction ${tx.getTransactionId}"
+          )
+        )
+      val stateFromBurntCoin = State(entries =
+        immutable.Queue(
+          TxLogEntry.BalanceChange(
+            indexRecord = TxLogIndexRecord(
+              offset = tx.getOffset,
+              eventId = transferEvent.getEventId,
+            ),
+            transactionSubtype = BalanceChange.TransactionType,
+            date = tx.getEffectiveAt,
+            receiver = burntCoin.owner,
+            amount = -burntCoin.amount.initialAmount,
+            coinPrice = transferNode.result.value.summary.coinPrice,
+          )
+        )
+      )
+
+      stateFromTransfer
+        .appended(stateFromBurntCoin)
+        .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.ExtraTrafficPurchase)
+
     }
 
     /** State from a choice that returns a `MintSummary`.

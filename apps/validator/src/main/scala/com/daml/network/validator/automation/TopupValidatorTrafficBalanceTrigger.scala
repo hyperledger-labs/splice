@@ -125,7 +125,7 @@ class TopupValidatorTrafficBalanceTrigger(
           // check to prevent topup attempt if validator clearly does not have enough coins (1 CC = 1 Traffic Unit)
           validatorWalletBalance > topUpAmount &&
           // check if traffic balance has fallen below minimum threshold
-          currentTrafficBalance.remainingBalance <= topUpAmount
+          currentTrafficBalance.remainingBalance < topUpAmount
         )
           topUpValidatorTraffic(validatorTreasury, validatorTrafficContract.contractId, topUpAmount)
         else Future.successful(false)

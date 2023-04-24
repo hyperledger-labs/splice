@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
@@ -18,6 +19,7 @@ import scala.util.control.NonFatal
 class DomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
+    with WalletTxLogTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
@@ -96,6 +98,55 @@ class DomainFeesTimeBasedIntegrationTest
     }
   }
 
+  // TODO(#3816): Move this test to WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest once
+  //  the env config flags have been removed
+  "A validator wallet's tx log" should {
+    "handle domain fees properly" in { implicit env =>
+      clue("Create validator wallet with sufficient balance") {
+        onboardWalletUser(bobWallet, bobValidator)
+        bobValidatorWallet.tap(20)
+      }
+      actAndCheck(
+        "Purchase extra traffic",
+        // Advance time by 1 polling interval to allow the automation
+        // to kick in and purchase extra traffic.
+        advanceTimeByPollingInterval(bobValidator),
+      )(
+        "Verify the transaction history",
+        _ => {
+          // Amount of fees paid equals amount of extra traffic purchased since 1 CC = 1 Traffic Unit
+          val domainFeesPaid = BigDecimal(
+            (DomainFeesConstants.targetThroughput.value - DomainFeesConstants.defaultThroughput.value) *
+              bobValidator.config.automation.pollingInterval.duration.toSeconds
+          )
+          bobValidatorWallet.balance().unlockedQty should be < BigDecimal(20)
+          checkTxHistory(
+            bobValidatorWallet,
+            Seq[CheckTxHistoryFn](
+              { case logEntry: walletLogEntry.Transfer =>
+                // Payment of domain fees by validator to SVC
+                logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.ExtraTrafficPurchase
+                inside(logEntry.sender) { case (sender, amount) =>
+                  sender shouldBe bobValidator.getValidatorPartyId().toProtoPrimitive
+                  amount should beWithin(-domainFeesPaid - smallAmount, -domainFeesPaid)
+                }
+                inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+                  receiver shouldBe svcParty.toProtoPrimitive
+                  // domain fees paid is immediately burnt by SVC
+                  amount shouldBe 0
+                }
+              },
+              { case logEntry: walletLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+              },
+            ),
+          )
+        },
+      )
+    }
+
+  }
+
   private def testCoinTxsAndAssertLogs(
       coinTxsPerSecond: Double
   )(implicit env: CNNodeTestConsoleEnvironment) = {
@@ -113,9 +164,6 @@ class DomainFeesTimeBasedIntegrationTest
         forAll(lines) { line =>
           line.message should (include(
             "Aborted operation - insufficient validator credit to create coins"
-          ) or include(
-            // TODO(#4067): Remove this and properly handle the coin archival in tx log parsers
-            "Unexpected coin archive event"
           ))
         }
       },
