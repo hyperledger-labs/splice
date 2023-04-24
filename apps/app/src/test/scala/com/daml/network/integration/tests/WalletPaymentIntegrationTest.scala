@@ -38,7 +38,7 @@ class WalletPaymentIntegrationTest
             1,
             entries,
           ) { log =>
-            log.message should include("HTTP GET /app-payment-requests/does%20not%20exist")
+            log.message should include("HTTP GET /wallet/app-payment-requests/does%20not%20exist")
             log.message should include("Responding with status code: 404 Not Found")
           }
         },
