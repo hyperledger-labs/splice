@@ -61,7 +61,7 @@ const TransactionHistory: React.FC = () => {
   }
 
   return (
-    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+    <Stack mt={4} spacing={4} direction="column" justifyContent="center" id="tx-history">
       <Typography mt={6} variant="h4">
         Transaction History
       </Typography>

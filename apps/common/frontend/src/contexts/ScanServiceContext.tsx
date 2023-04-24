@@ -5,7 +5,7 @@ import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
 import { Party } from '@daml/types';
 
-import { FeaturedAppRight } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { CoinRules, FeaturedAppRight } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { OpenMiningRound } from '../../daml.js/canton-coin-0.1.0/lib/CC/Round';
 import { Contract, OpenAPILoggingMiddleware } from '../utils';
 
@@ -20,6 +20,7 @@ export interface ScanClient {
    * Expressed as USD/CC
    */
   getCoinPrice: () => Promise<BigNumber>;
+  getCoinRules: () => Promise<Contract<CoinRules>>;
   lookupFeaturedAppRight: (partyId: Party) => Promise<Contract<FeaturedAppRight> | undefined>;
   getSvcPartyId: () => Promise<string>;
 }
@@ -55,6 +56,15 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
         } else {
           return new BigNumber(0);
         }
+      },
+      getCoinRules: async () => {
+        const response = await scanClient.getCoinRules({});
+        if (!response.coinRulesUpdate.contract) {
+          throw new Error(
+            `There was no coin rules contract in response: ${JSON.stringify(response)}`
+          );
+        }
+        return Contract.decodeOpenAPI(response.coinRulesUpdate.contract, CoinRules);
       },
       lookupFeaturedAppRight: async (partyId: Party) => {
         const response = await scanClient.lookupFeaturedAppRight(partyId);

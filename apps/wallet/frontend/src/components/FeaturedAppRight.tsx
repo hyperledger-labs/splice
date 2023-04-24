@@ -1,4 +1,5 @@
 import { useScanClient, useUserState } from 'common-frontend';
+import DevNetOnly from 'common-frontend/lib/components/DevNetOnly';
 import React, { useEffect, useState } from 'react';
 
 import { Star } from '@mui/icons-material';
@@ -45,9 +46,11 @@ const FeaturedAppRight: React.FC = () => {
     );
   } else {
     return (
-      <Button variant="contained" color="info" onClick={selfGrant} id="self-feature">
-        Self-grant featured app rights
-      </Button>
+      <DevNetOnly>
+        <Button variant="contained" color="info" onClick={selfGrant} id="self-feature">
+          Self-grant featured app rights
+        </Button>
+      </DevNetOnly>
     );
   }
 };

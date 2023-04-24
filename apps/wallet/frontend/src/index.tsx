@@ -6,6 +6,7 @@ import {
   theme,
   UserProvider,
 } from 'common-frontend';
+import { IsDevNetProvider } from 'common-frontend/lib/components/DevNetOnly';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -57,7 +58,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
               <ScanClientProvider url={config.services.scan.url}>
                 <CurrentUserProvider>
                   <CoinPriceProvider>
-                    <ThemeProvider theme={theme}>{children}</ThemeProvider>
+                    <IsDevNetProvider>
+                      <ThemeProvider theme={theme}>{children}</ThemeProvider>
+                    </IsDevNetProvider>
                   </CoinPriceProvider>
                 </CurrentUserProvider>
               </ScanClientProvider>
