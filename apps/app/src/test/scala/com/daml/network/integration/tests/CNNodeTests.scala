@@ -14,6 +14,7 @@ import com.daml.network.console.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.sv.config.SvBootstrapConfig.*
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
@@ -175,10 +176,19 @@ object CNNodeTests {
       with LedgerApiExtensions
       with AppendedClues {
 
-    lazy val defaultTickDuration = NonNegativeFiniteDuration.ofSeconds(150)
+    def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds((sv1.config.bootstrap match {
+        case foundCollective: FoundCollective =>
+          foundCollective.initialTickDuration.asJavaApproximation
+        case _ =>
+          fail("Failed to retrieve defaultTickDuration from sv1. sv1 is not part of the SVC.")
+      }).toSeconds)
+
+    def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
+      defaultTickDuration.asJavaApproximation.plus(java.time.Duration.ofSeconds(10))
 
     protected def mkCoinConfig(
-        tickDuration: NonNegativeFiniteDuration = defaultTickDuration,
+        tickDuration: NonNegativeFiniteDuration,
         maxNumInputs: Int = 100,
         holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
     ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =

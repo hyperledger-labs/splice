@@ -39,7 +39,10 @@ class SvcTimeBasedIntegrationTest
     clue("schedule a config change, so the coinrules change, invalidating the cache.") {
       val configSchedule =
         createConfigSchedule(
-          (defaultTickDuration.asJavaApproximation, mkCoinConfig(maxNumInputs = 101))
+          (
+            defaultTickDuration.asJavaApproximation,
+            mkCoinConfig(tickDuration = defaultTickDuration, maxNumInputs = 101),
+          )
         )
       svcClient.setConfigSchedule(configSchedule)
     }

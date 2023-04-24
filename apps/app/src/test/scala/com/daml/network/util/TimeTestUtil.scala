@@ -232,7 +232,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     * This function does not wait for the closed round automation.
     */
   def advanceRoundsByOneTick(implicit env: CNNodeTestConsoleEnvironment) = {
-    advanceTimeAndWaitForRoundAutomation(Duration.ofSeconds(160))
+    advanceTimeAndWaitForRoundAutomation(tickDurationWithBuffer)
   }
 
   @nowarn("msg=match may not be exhaustive")

@@ -81,7 +81,7 @@ class SvTimeBasedIntegrationTest
     val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
     // next tick - issuing round 0 can be closed
     // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
-    advanceTime(java.time.Duration.ofSeconds(160))
+    advanceTime(tickDurationWithBuffer)
     eventually() {
       // Check for closing mining round in transactions instead of acs
       // to guard against automation archiving it concurrently.
@@ -415,11 +415,11 @@ class SvTimeBasedIntegrationTest
           mkCoinConfig(defaultTickDuration),
           List(
             new Tuple2(
-              now.add(Duration.ofSeconds(160)).toInstant,
+              now.add(tickDurationWithBuffer).toInstant,
               config201,
             ),
             new Tuple2(
-              now.add(Duration.ofSeconds(161)).toInstant,
+              now.add(tickDurationWithBuffer.plus(Duration.ofSeconds(1))).toInstant,
               config202,
             ),
           ).asJava,
@@ -838,7 +838,7 @@ class SvTimeBasedIntegrationTest
 
     val confirmationCid = actAndCheck(
       "Wait for one tick",
-      advanceTime(java.time.Duration.ofSeconds(160)),
+      advanceTime(tickDurationWithBuffer),
     )(
       "Find confirmation (for issuing rounds)",
       _ => {
@@ -927,7 +927,7 @@ class SvTimeBasedIntegrationTest
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
-          advanceTime(java.time.Duration.ofSeconds(160))
+          advanceTime(tickDurationWithBuffer)
         },
         entries => {
           forExactly(3, entries) { line =>
