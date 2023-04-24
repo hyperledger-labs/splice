@@ -128,15 +128,19 @@ final class ScanConnection(
             HttpScanAppClient.GetCoinRules(cacheO.map(_.coinRules)),
           )
         } yield {
-
-          coinRulesCache.set(
-            Some(
-              CachedCoinRules(
-                now.add(config.coinRulesCacheTimeToLive.asJavaApproximation),
-                coinRules,
+          // only cache coinRules if it is not locked.
+          // otherwise, an inactive locked coinRules will failed interpretation in the local participant
+          // and the cached coinRules contract will never be invalidated as other participant will not be able to validate if it is inactive.
+          // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
+          if (!coinRules.payload.lock)
+            coinRulesCache.set(
+              Some(
+                CachedCoinRules(
+                  now.add(config.coinRulesCacheTimeToLive.asJavaApproximation),
+                  coinRules,
+                )
               )
             )
-          )
           coinRules
         }
     }

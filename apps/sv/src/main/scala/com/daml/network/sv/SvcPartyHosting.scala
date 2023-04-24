@@ -65,10 +65,16 @@ class SvcPartyHosting(
             RequestSide.To,
           )
           _ <- participantAdminConnection.disconnectFromAllDomains()
+          _ = logger.info("candidate SV participant disconnected from global domain")
           acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId)
           _ <- participantAdminConnection.uploadAcsSnapshot(acsBytes)
+          _ = logger.info(
+            "Imported Acs snapshot from sponsor SV participant to candidate participant"
+          )
           _ <- participantAdminConnection.reconnectAllDomains()
+          _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
+          _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
         } yield Right(())
       case None =>
         Future.successful(Left("unexpected on-boarding config"))
@@ -166,10 +172,15 @@ class SvcPartyHosting(
     "wait for svc party to participant authorization to complete", {
       listActiveSvcPartyMappings(domain, participantId, Some(side)).map {
         case Seq(mapping) =>
+          logger.debug(
+            s"the party to participant authorization $mapping has been observed. done waiting."
+          )
           mapping.context.validFrom
         case Seq() =>
           throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("Authorization is still in progress")
+            Status.NOT_FOUND.withDescription(
+              s"Authorization to $participantId on $side is still in progress"
+            )
           )
         case _ =>
           throw new StatusRuntimeException(

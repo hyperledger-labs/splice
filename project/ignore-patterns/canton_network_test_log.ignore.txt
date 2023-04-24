@@ -40,4 +40,7 @@ ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when
 ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 
+# TODO(#3933) remove once when canton team has completed a proper fix to #3933
+LOCAL_VERDICT_INACTIVE_CONTRACTS.+Rejected transaction is referring to inactive contracts
+
 # Make sure to have a trailing newline

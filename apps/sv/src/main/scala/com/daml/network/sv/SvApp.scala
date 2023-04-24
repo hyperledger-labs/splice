@@ -540,7 +540,7 @@ class SvApp(
             } else {
               throw new StatusRuntimeException(
                 Status.FAILED_PRECONDITION.withDescription(
-                  s"SvcRules found but we are not a member"
+                  s"SvcRules found but ${svcStore.key.svParty} is not a member"
                 )
               )
             }

@@ -26,10 +26,10 @@ println("Connecting splitwell to upgraded domain...")
 splitwellParticipant.domains.connect_local(splitwellUpgrade)
 
 def createUser(
-    participant: ParticipantReference,
-    user: String,
-    additionalActAsParties: Set[PartyId] = Set(),
-    readAsParties: Set[PartyId] = Set(),
+  participant: ParticipantReference,
+  user: String,
+  additionalActAsParties: Set[PartyId] = Set(),
+  readAsParties: Set[PartyId] = Set(),
 ) = {
   val party = participant.ledger_api.parties.allocate(user, user).party
   participant.ledger_api.users.create(
@@ -54,15 +54,12 @@ Seq(
 }
 
 val svcParty = createUser(svcParticipant, "svc_shared_service_user")
-Seq(
-  "sv1",
-  "sv2",
-  "sv3",
-  "sv4",
-).foreach { user =>
-  createUser(svcParticipant, user, additionalActAsParties = Set(svcParty))
-}
+createUser(svcParticipant, "sv1", additionalActAsParties = Set(svcParty))
 
+// These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
+createUser(sv2Participant, "sv2", readAsParties = Set(svcParty))
+createUser(svcParticipant, "sv3", readAsParties = Set(svcParty))
+createUser(svcParticipant, "sv4", readAsParties = Set(svcParty))
 createUser(sv5Participant, "sv5", readAsParties = Set(svcParty))
 
 svcParticipant.ledger_api.users.create(

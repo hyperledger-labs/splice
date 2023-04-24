@@ -755,12 +755,7 @@ object HttpWalletHandler {
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
     ): ErrorKind = outcome match {
-      case Failure(ex: io.grpc.StatusRuntimeException)
-          if ex.getStatus.getCode == Status.Code.NOT_FOUND &&
-            ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-              case ErrorInfoDetail(InactiveContracts.id, _) => true
-              case _ => false
-            } =>
+      case Failure(ex: io.grpc.StatusRuntimeException) if isInactiveContract(ex) =>
         logger.info(
           s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
         )
@@ -769,6 +764,14 @@ object HttpWalletHandler {
         logThrowable(ex, logger)
         FatalErrorKind
       case Success(_) => NoErrorKind
+    }
+  }
+
+  private def isInactiveContract(ex: io.grpc.StatusRuntimeException): Boolean = {
+    ex.getStatus.getCode == Status.Code.NOT_FOUND &&
+    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+      case ErrorInfoDetail(InactiveContracts.id, _) => true
+      case _ => false
     }
   }
 }

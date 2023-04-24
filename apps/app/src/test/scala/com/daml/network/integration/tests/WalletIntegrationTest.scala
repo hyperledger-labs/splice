@@ -303,19 +303,20 @@ class WalletIntegrationTest
         splitwellProviderWallet.cancelFeaturedAppRight()
       )
 
-      actAndCheck(
-        "grant a featured app right to splitwell provider", {
-          svcClient.grantFeaturedAppRight(splitwellProvider)
-        },
-      )(
-        "splitwell provider is featured",
-        { _ =>
+      clue("grant a featured app right to splitwell provider") {
+        eventually() {
+          noException should be thrownBy svcClient.grantFeaturedAppRight(splitwellProvider)
+        }
+      }
+
+      clue("splitwell provider is featured") {
+        eventually() {
           inside(scan.listFeaturedAppRights()) { case Seq(r) =>
             r.payload.provider shouldBe splitwellProvider.toProtoPrimitive
           }
           splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
-        },
-      )
+        }
+      }
 
       actAndCheck(
         "splitwell cancels its own featured app right",
@@ -330,7 +331,9 @@ class WalletIntegrationTest
 
       actAndCheck(
         "Splitwell provider grants itself a featured app right",
-        splitwellProviderWallet.selfGrantFeaturedAppRight(),
+        // We need to retry as the command might failed due to inactive cached CoinRules contract
+        // The failed command submission will triggers a cache invalidation
+        retryCommandSubmission(splitwellProviderWallet.selfGrantFeaturedAppRight()),
       )(
         "splitwell provider is featured",
         { featuredAppRight =>

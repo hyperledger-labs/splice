@@ -5,7 +5,6 @@ import akka.stream.StreamTcpException
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
-import com.daml.network.environment.BaseAppConnection
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
@@ -335,7 +334,14 @@ object RetryProvider {
                 .appendedAll(errorDetails.map(_.toString))
             logger.info(msg.mkString("\n"))
             TransientErrorKind
-          case None if retryableStatusCodes.contains(statusCode) =>
+          case None
+              if retryableStatusCodes.contains(statusCode) ||
+                (
+                  // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+                  statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
+                    "An error occurred. Please contact the operator and inquire about the request"
+                  )
+                ) =>
             val msg = Seq(
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",
               s"statusCode=$statusCode",

@@ -233,7 +233,8 @@ class HttpSvHandler(
               .failed(
                 HttpErrorHandler.badRequest(err.message)
               ),
-          participantId =>
+          participantId => {
+            logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
             for {
               // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
               // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
@@ -252,7 +253,8 @@ class HttpSvHandler(
                 participantId,
                 RequestSide.From,
               )
-
+              _ = logger
+                .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
               _ <- retryProvider.retryForClientCalls(
                 "unlocking SvcRules and CoinRules contracts",
                 unlockSvcRulesAndCoinRules(),
@@ -270,7 +272,8 @@ class HttpSvHandler(
               )
               // TODO(M3-57) consider if a more space-efficient encoding is necessary
               encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-            } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded),
+            } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded)
+          },
         )
     }
 

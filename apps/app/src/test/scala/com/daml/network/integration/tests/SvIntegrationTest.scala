@@ -163,7 +163,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "the candidate's secret is marked as used",
       _ => {
         inside(
-          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          sv.remoteParticipantWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)
         ) {
           case Seq(usedSecret) => {
@@ -207,7 +207,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
         sv1.getDebugInfo().svParty
-      ) should have length 2
+      ) should have length 4
     val svXName = "svX"
     val svXKey =
       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
@@ -217,7 +217,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getDebugInfo().svParty)
     ) {
       case approvedSvIds => {
-        approvedSvIds should have size 3
+        approvedSvIds should have size 5
         val maybeSvXApprovedSvId = approvedSvIds.find(_.data.candidateName == svXName)
         inside(maybeSvXApprovedSvId) { case Some(svXApprovedSvId) =>
           svXApprovedSvId.data.candidateKey shouldBe svXKey
@@ -257,7 +257,15 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         case approvedSvIds => {
           // if this check fails:
           // make sure that the values (especially the key) are in sync with sv1's config file
-          approvedSvIds should have size 2
+          approvedSvIds should have size 4
+          val maybeSv2ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv2")
+          inside(maybeSv2ApprovedSvId) { case Some(sv2ApprovedSvId) =>
+            sv2ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVdt8tLAfv+6H6s6EGpYMbthSdtEbykUO2Fau0k2wipf/6C0A/+xzKtqKJlBkybcBiICG/ZonGkuKgWBAC1jVAg=="
+          }
+          val maybeSv3ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv3")
+          inside(maybeSv3ApprovedSvId) { case Some(sv2ApprovedSvId) =>
+            sv2ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7sHQDYkVisVznuFqvjWWxH3u8S+f07f1HCZ+mx+yj28ysRJjbatPNnsVAbiFDu2XOqyITx+os/Gd39piOfyw2w=="
+          }
           val maybeSv4ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv4")
           inside(maybeSv4ApprovedSvId) { case Some(sv4ApprovedSvId) =>
             sv4ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
@@ -283,7 +291,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        sv3.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
             sv3.getDebugInfo().svParty,
             c => c.data.candidateName == "sv4",
@@ -312,7 +320,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     val sv1Party = sv1.getDebugInfo().svParty
     // We are not using sv4.getDebugInfo() to get sv4's party id
     // because the SvApp is not completely initialized yet and hence the http service is not available.
-    val sv4Party = svc.remoteParticipant.ledger_api.users
+    val sv4Party = sv4.remoteParticipant.ledger_api.users
       .get(sv4.config.ledgerApiUser)
       .primaryParty
       .value
@@ -362,7 +370,15 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       eventually() {
         svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
-          .filter(_.data.action.toValue.getConstructor() == "ARC_SvcRules") should have length 1
+          .filter(_.data.action match {
+            case a: ARC_SvcRules =>
+              a.svcAction match {
+                case confirm: SRARC_ConfirmSvOnboarding =>
+                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == "sv4"
+                case _ => false
+              }
+            case _ => false
+          }) should have length 1
       }
       getSvcRules().data.members.keySet should not contain sv4Party.toProtoPrimitive
     }
@@ -412,7 +428,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       // We are not using sv2.getDebugInfo() to get sv2's party id because we
       // don't want SV2 to actually start and get onboarded for this test
       // and hence the http service is not available.
-      val sv2Party = svc.remoteParticipant.ledger_api.users
+      val sv2Party = sv2.remoteParticipant.ledger_api.users
         .get(sv2.config.ledgerApiUser)
         .primaryParty
         .value
@@ -525,7 +541,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )
 
     actAndCheck(
-      "SV1 to SV4 create confirmation to Confirm SV5", {
+      "SV1 to SV4 create confirmation to Confirm SVX", {
         val svcRules = getSvcRules()
         val newMemberName = "svX"
         val newMemberPartyId = allocateRandomSvParty(newMemberName)

@@ -16,6 +16,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.digitalasset.canton.console.CommandExecutionFailedException
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -743,7 +744,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
       "Self-grant a featured app right",
-      wallet.selfGrantFeaturedAppRight(),
+      // We need to retry as the command might failed due to inactive cached CoinRules contract
+      // The failed command submission will triggers a cache invalidation
+      retryCommandSubmission(wallet.selfGrantFeaturedAppRight()),
     )(
       "Wait for right to be ingested",
       _ => {
@@ -753,7 +756,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         wallet.userStatus().hasFeaturedAppRight shouldBe true
       },
     )
-
   }
 
   /** Directly executes the CoinRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
@@ -818,6 +820,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       )
       .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
     appRewardBalance -> validatorRewardBalance
+  }
+
+  protected def retryCommandSubmission[T](f: => T) = {
+    eventually() {
+      try {
+        f
+      } catch {
+        case ex: CommandExecutionFailedException => {
+          logger.debug(s"command failed, triggering retry...")
+          fail(ex)
+        }
+        case ex: Throwable => throw ex // throw anything else
+      }
+    }
   }
 
 }
