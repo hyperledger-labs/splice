@@ -57,3 +57,4 @@ openapi-ts-client
 /cluster/manifest/test-results/actual.json
 .direnv
 rust_mozprofile*
+openapi-cache-key.txt
