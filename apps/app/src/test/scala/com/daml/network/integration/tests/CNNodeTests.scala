@@ -14,7 +14,7 @@ import com.daml.network.console.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.sv.config.SvBootstrapConfig.*
+import com.daml.network.sv.config.SvOnboardingConfig.FoundCollective
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
@@ -177,7 +177,7 @@ object CNNodeTests {
       with AppendedClues {
 
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds((sv1.config.bootstrap match {
+      NonNegativeFiniteDuration.ofSeconds((sv1.config.onboarding match {
         case foundCollective: FoundCollective =>
           foundCollective.initialTickDuration.asJavaApproximation
         case _ =>
