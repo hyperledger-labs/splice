@@ -41,11 +41,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def key: SvStore.Key
 
-  protected[this] def svStore: SvSvStore
-
-  // TODO(#3936) Remove this workaround once Canton emits domains with observation permissions.
-  override lazy val domains = svStore.domains
-
   protected[this] def appConfig: LocalSvAppConfig
 
   override final def defaultAcsDomain = appConfig.domains.global
@@ -525,7 +520,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 object SvSvcStore {
   def apply(
       key: SvStore.Key,
-      svStore: SvSvStore,
       storage: Storage,
       config: LocalSvAppConfig,
       loggerFactory: NamedLoggerFactory,
@@ -536,7 +530,6 @@ object SvSvcStore {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
           key,
-          svStore,
           config,
           loggerFactory,
           futureSupervisor,

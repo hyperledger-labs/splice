@@ -244,7 +244,7 @@ class SvApp(
       (svcStore, svcAutomation) <-
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
-          val svcStore = newSvcStore(svStore.key, svStore)
+          val svcStore = newSvcStore(svStore.key)
           val svcAutomation =
             newSvSvcAutomationService(svStore, svcStore, ledgerClient)
           for {
@@ -313,7 +313,7 @@ class SvApp(
                 participantId,
                 svcPartyHosting,
               )
-              svcStore = newSvcStore(svStore.key, svStore)
+              svcStore = newSvcStore(svStore.key)
               svcAutomation = newSvSvcAutomationService(
                 svStore,
                 svcStore,
@@ -419,9 +419,8 @@ class SvApp(
     retryProvider,
   )
 
-  private def newSvcStore(key: SvStore.Key, svStore: SvSvStore) = SvSvcStore(
+  private def newSvcStore(key: SvStore.Key) = SvSvcStore(
     key,
-    svStore,
     storage,
     config,
     loggerFactory,
