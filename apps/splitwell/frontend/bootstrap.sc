@@ -83,3 +83,6 @@ Seq(
   splitwell.ledgerApi.ledger_api_extensions.acs
     .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
 }
+
+println("Waiting for SVC initialization...")
+Seq(sv1, sv2, sv3, sv4).foreach(_.waitForInitialization())

@@ -58,8 +58,8 @@ createUser(svcParticipant, "sv1", additionalActAsParties = Set(svcParty))
 
 // These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
 createUser(sv2Participant, "sv2", readAsParties = Set(svcParty))
-createUser(svcParticipant, "sv3", readAsParties = Set(svcParty))
-createUser(svcParticipant, "sv4", readAsParties = Set(svcParty))
+createUser(sv3Participant, "sv3", readAsParties = Set(svcParty))
+createUser(sv4Participant, "sv4", readAsParties = Set(svcParty))
 createUser(sv5Participant, "sv5", readAsParties = Set(svcParty))
 
 svcParticipant.ledger_api.users.create(
