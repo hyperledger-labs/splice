@@ -41,4 +41,7 @@ class OffsetIngestionService(
     } yield false).andThen { r =>
       lastQueryFailed.set(r.failed.toOption)
     }
+
+  // TODO(#4214) remove
+  connection.registerTransferCompletionCallback(ingestionSink.ingestOffset(_)(TraceContext.empty))
 }
