@@ -349,7 +349,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
     .. parsed-literal::
 
-        curl -X POST https://dev.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+        curl -X POST https://|cn_cluster|.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
     b. start Canton Network:
 
