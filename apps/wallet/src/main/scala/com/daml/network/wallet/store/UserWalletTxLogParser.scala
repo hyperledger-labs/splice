@@ -338,7 +338,8 @@ object UserWalletTxLogParser {
   ) extends TxLogStore.IndexRecord
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {
-    def toResonseItem: httpDef.ListTransactionsResponseItem
+    def toResponseItem: httpDef.ListTransactionsResponseItem
+    def setEventId(eventId: String): TxLogEntry
   }
 
   object TxLogEntry {
@@ -358,7 +359,7 @@ object UserWalletTxLogParser {
         appRewardsUsed: BigDecimal,
         validatorRewardsUsed: BigDecimal,
     ) extends TxLogEntry {
-      override def toResonseItem: httpDef.ListTransactionsResponseItem =
+      override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = Transfer.TransactionType,
           transactionSubtype = transactionSubtype,
@@ -374,6 +375,10 @@ object UserWalletTxLogParser {
           appRewardsUsed = Some(Codec.encode(appRewardsUsed)),
           validatorRewardsUsed = Some(Codec.encode(validatorRewardsUsed)),
         )
+
+      override def setEventId(eventId: String): TxLogEntry = {
+        copy(indexRecord = indexRecord.copy(eventId = eventId))
+      }
     }
     object Transfer {
       val TransactionType = "transfer"
@@ -399,7 +404,7 @@ object UserWalletTxLogParser {
         amount: BigDecimal,
         coinPrice: BigDecimal,
     ) extends TxLogEntry {
-      override def toResonseItem: httpDef.ListTransactionsResponseItem =
+      override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = BalanceChange.TransactionType,
           transactionSubtype = transactionSubtype,
@@ -412,7 +417,12 @@ object UserWalletTxLogParser {
           holdingFees = None,
           coinPrice = Some(Codec.encode(coinPrice)),
         )
+
+      override def setEventId(eventId: String): TxLogEntry = {
+        copy(indexRecord = indexRecord.copy(eventId = eventId))
+      }
     }
+
     object BalanceChange {
       val TransactionType = "balance_change"
       val Tap = "tap"
@@ -524,6 +534,18 @@ object UserWalletTxLogParser {
             b.copy(transactionSubtype = transactionSubtype)
           case other => other
         }
+      )
+    }
+
+    /** Sets the index record eventId for all entries to the given eventId.
+      *
+      * This is useful when you want to re-use the parsing logic of existing methods
+      * like State.fromTransfer for some new event but want the index record to reflect
+      * the eventId of the new event.
+      */
+    def setEventId(eventId: String): State = {
+      State(
+        entries = entries.map(_.setEventId(eventId))
       )
     }
 
@@ -677,6 +699,7 @@ object UserWalletTxLogParser {
       stateFromTransfer
         .appended(stateFromBurntCoin)
         .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.ExtraTrafficPurchase)
+        .setEventId(event.getEventId)
 
     }
 
