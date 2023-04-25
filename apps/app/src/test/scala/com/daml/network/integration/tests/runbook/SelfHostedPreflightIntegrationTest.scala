@@ -2,8 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import better.files.*
 import com.daml.network.LiveDevNetTest
-import com.daml.network.config.CNHttpClientConfig.*
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -18,8 +17,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import java.net.URI
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import scala.util.Using
 
 /** Preflight test that spins up a new validator following our runbook.
@@ -30,6 +27,7 @@ class SelfHostedPreflightIntegrationTest
     with CantonProcessTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
+    with PreflightIntegrationTestUtil
     with DirectoryFrontendTestUtil {
 
   // We need to delay this until we started the validator. Otherwise we might
@@ -38,10 +36,6 @@ class SelfHostedPreflightIntegrationTest
 
   private val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   private val validatorPath: File = examplesPath / "validator"
-
-  // We cache this because we only need it for one test case
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  var validatorOnboardingSecret: Option[String] = None
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 6001),
@@ -112,46 +106,6 @@ class SelfHostedPreflightIntegrationTest
       // Stop nodes before Canton is shutdown
       env.coinNodes.local.foreach(_.stop())
     }
-  }
-
-  private def insertValidatorOnboardingSecret(conf: CNNodeConfig): CNNodeConfig = {
-
-    conf.validatorApps.size shouldBe 1
-
-    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
-      val oc = vc.onboarding.value
-
-      // obtain an onboarding secret
-      val secret = validatorOnboardingSecret match {
-        case Some(s) => s
-        case None => {
-          val s = prepareValidatorOnboarding(oc.remoteSv.adminApi.url)
-          validatorOnboardingSecret = Some(s)
-          s
-        }
-      }
-      // insert it
-      vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
-    })(conf)
-  }
-
-  // We invoke the API via a basic HTTP request, just like we expect runbook users to do for now.
-  private def prepareValidatorOnboarding(url: String): String = {
-    val client = HttpClient
-      .newBuilder()
-      .connectTimeout(java.time.Duration.ofSeconds(20))
-      .build()
-
-    val request = HttpRequest
-      .newBuilder()
-      .uri(URI.create(s"$url/devnet/onboard/validator/prepare"))
-      .header("content-type", "text/plain")
-      .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
-      .build();
-
-    val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-
-    response.body
   }
 
   private def checkFrontendsNetworkAppsAddress(networkAppsAddress: String): Unit = {
