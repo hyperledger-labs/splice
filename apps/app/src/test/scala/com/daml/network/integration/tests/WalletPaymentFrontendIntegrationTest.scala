@@ -66,7 +66,7 @@ class WalletPaymentFrontendIntegrationTest
                 expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "1.5",
-                expectedComputeText = "1.5 CC + 0 CC fee / 3 USD",
+                expectedComputeText = "3 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },
@@ -138,7 +138,7 @@ class WalletPaymentFrontendIntegrationTest
                 expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "2.75",
-                expectedComputeText = "2.75 CC + 0 CC fee / 5.5 USD",
+                expectedComputeText = "5.5 USD @ 2 USD/CC",
                 expectedDescription = description,
               )
             },
@@ -217,7 +217,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "4",
-                expectedComputeText = "4 CC + 0 CC fee / 8 USD",
+                expectedComputeText = "8 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },
@@ -292,7 +292,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "2",
-                expectedComputeText = "2 CC + 0 CC fee / 4 USD",
+                expectedComputeText = "4 USD @ 2 USD/CC",
                 expectedDescription = description,
               )
             },
@@ -367,7 +367,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = "2.75",
-                expectedComputeText = "2.75 CC + 0 CC fee / 5.5 USD",
+                expectedComputeText = "5.5 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },

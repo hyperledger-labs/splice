@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, RateDisplay } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -69,8 +69,6 @@ export const ConfirmPayment: React.FC = () => {
     return <>No receivers in app payment.</>;
   }
 
-  const fee = new BigNumber(0); // TODO (#3492): compute actual fee
-
   const isSingleRecipient = appPaymentRequest.payload.receiverAmounts.length === 1;
   const recipientInfo = isSingleRecipient ? (
     <SingleRecipientInfo
@@ -95,7 +93,6 @@ export const ConfirmPayment: React.FC = () => {
         <TotalPaymentContainer
           contractId={appPaymentRequest.contractId}
           total={total}
-          fee={fee}
           coinPrice={coinPrice}
         />
       </Stack>
@@ -256,19 +253,17 @@ const PaymentDescription: React.FC<PaymentDescriptionProps> = ({ description }) 
 interface PaymentContainerProps {
   contractId: ContractId<payment.AppPaymentRequest>;
   total: Total;
-  fee: BigNumber;
   coinPrice: BigNumber;
 }
 const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   contractId,
   total,
-  fee,
   coinPrice,
 }) => {
   const converted = convertCurrency(total.totalAmount, total.totalCurrency, coinPrice);
   const ccAmount = total.totalCurrency === 'CC' ? total.totalAmount : converted.amount;
 
-  const totalCC = ccAmount.plus(fee);
+  const totalCC = ccAmount; // TODO (#3492): compute actual fee
   const totalUSD = totalCC.times(coinPrice);
 
   return (
@@ -281,10 +276,14 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
               <AmountDisplay amount={totalCC} currency={'CC'} />
             </Typography>
             <Typography variant="body2" className="payment-compute">
-              <AmountDisplay amount={ccAmount} currency={'CC'} /> +{' '}
-              <AmountDisplay amount={fee} currency={'CC'} /> fee /{' '}
-              <AmountDisplay amount={totalUSD} currency={'USD'} />
+              <AmountDisplay amount={totalUSD} currency={'USD'} /> @{' '}
+              <RateDisplay
+                base={total.totalCurrency}
+                quote={converted.currency}
+                coinPrice={coinPrice}
+              />
             </Typography>
+            <Typography variant="body2">Fees will be added.</Typography>
           </Stack>
           <ConfirmPaymentButton contractId={contractId} />
         </Stack>

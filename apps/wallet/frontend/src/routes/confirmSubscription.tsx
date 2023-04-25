@@ -92,6 +92,7 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
               <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
               <AmountDisplay amount={coinPrice} currency={currency} />/{converted.currency}
             </Typography>
+            <Typography variant="body2">Fees will be added.</Typography>
           </Stack>
           <Stack alignItems="center">
             <Typography variant="body2">The first payment will be deducted immediately.</Typography>
