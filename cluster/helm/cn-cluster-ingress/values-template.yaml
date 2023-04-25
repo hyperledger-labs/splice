@@ -1,4 +1,4 @@
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 cluster:
-  imageTag: VERSION_TAG
+  imageTag: IMAGE_TAG
 defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4

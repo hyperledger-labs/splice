@@ -1,0 +1,12 @@
+apiVersion: v2
+name: cn-validator
+type: application
+version: VERSION_NUMBER
+appVersion: VERSION_NUMBER
+
+description: Canton Network Validator
+
+dependencies:
+- name: cn-util-lib
+  version: 0.2.0
+  repository: file://../cn-util-lib

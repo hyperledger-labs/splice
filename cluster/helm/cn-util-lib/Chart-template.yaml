@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cn-util-lib
+type: library
+version: 0.2.0
+appVersion: 0.2.0
+
+description: Canton Network Deployment Utilities

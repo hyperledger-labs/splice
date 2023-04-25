@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cn-postgres
+type: application
+version: VERSION_NUMBER
+appVersion: VERSION_NUMBER
+
+description: Canton Network Self-Hosted PGSQL

@@ -22,4 +22,4 @@
 .idea/
 *.tmproj
 .vscode/
-values-template.yaml
+*-template.yaml

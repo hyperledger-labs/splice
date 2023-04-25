@@ -1,7 +1,0 @@
-apiVersion: v2
-name: cn-cluster-ingress
-description: Canton Network Cluster Ingress
-type: application
-
-version: 0.1.0
-appVersion: "1.16.0"
