@@ -59,7 +59,7 @@ export function installSplitwell(
     installAuth0UISecret(xns, "wallet", "splitwell"),
   ];
 
-  var fixedTokenConfig = fixedTokens()
+  const fixedTokenConfig = fixedTokens()
     ? [
         "_client_credentials_auth_config = null",
         "_client_credentials_auth_config = {",

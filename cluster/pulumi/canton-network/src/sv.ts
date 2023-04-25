@@ -5,9 +5,9 @@ import * as postgres from "./postgres";
 import { auth0UserNameEnvVar, installAuth0Secret } from "./auth0";
 
 import { exactNamespace, installCNHelmChart } from "./utils";
-import { installDomain, installParticipant } from "./ledger";
+import { installDomain, installParticipant, ParticipantUser } from "./ledger";
 
-function svNodeParty(name: string): any {
+function svUser(name: string): ParticipantUser {
   return {
     actAs: [
       {
@@ -96,10 +96,10 @@ export function installSVC(): k8s.helm.v3.Release {
         },
         readAs: [],
       },
-      svNodeParty("sv1"),
-      svNodeParty("sv2"),
-      svNodeParty("sv3"),
-      svNodeParty("sv4"),
+      svUser("sv1"),
+      svUser("sv2"),
+      svUser("sv3"),
+      svUser("sv4"),
     ],
     [
       auth0UserNameEnvVar("sv1"),

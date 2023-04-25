@@ -17,10 +17,10 @@ export function installParticipant(
   xns: ExactNamespace,
   name: string,
   postgresDb: pulumi.Output<string>,
-  extraDomains: any,
-  participantUsers: any,
-  extraEnvVars: any,
-  dependsOn: any = []
+  extraDomains: Domain[],
+  participantUsers: ParticipantUser[],
+  extraEnvVars: k8s.types.input.core.v1.EnvVar[],
+  dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
   return installCNHelmChart(
     xns,
@@ -36,3 +36,17 @@ export function installParticipant(
     dependsOn
   );
 }
+
+export type ParticipantUser = {
+  name: StringOrEnv;
+  actAs: Party[];
+  primaryParty: Party;
+  readAs: Party[];
+  admin: boolean;
+};
+
+type Party = { fromUser: StringOrEnv } | { allocate: StringOrEnv };
+
+type Domain = { alias: StringOrEnv; url: StringOrEnv };
+
+type StringOrEnv = string | { env: string };

@@ -54,8 +54,8 @@ export function exactNamespace(name: string): ExactNamespace {
 // world. To avoid fully declaring these external data types, these are
 // modeled as 'any', with the any warning disabled.
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadYamlFromFile(path: PathLike): any {
-  // eslint-disable-line @typescript-eslint/no-explicit-any
   return load(fs.readFileSync(path, "utf-8"));
 }
 
@@ -66,6 +66,7 @@ function stripJsonComments(rawText: string): string {
   return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? "" : m));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadJsonFromFile(path: PathLike): any {
   try {
     const content = stripJsonComments(fs.readFileSync(path, "utf8"));
@@ -83,8 +84,8 @@ export function fixedTokens() {
 
 export function cnChartValues(
   chartPath: string,
-  overrideValues: any = {}
-): any {
+  overrideValues: ChartValues = {}
+): ChartValues {
   const networkSettings = loadJsonFromFile(
     process.env.REPO_ROOT + "/cluster/network-settings.json"
   );
@@ -116,8 +117,8 @@ export function installCNHelmChartByNamespaceName(
   nsName: pulumi.Output<string>,
   name: string,
   chartName: string,
-  values: { [key: string]: any } = {},
-  dependsOn: any = []
+  values: ChartValues = {},
+  dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
@@ -138,8 +139,8 @@ export function installCNHelmChart(
   xns: ExactNamespace,
   name: string,
   chartName: string,
-  values: { [key: string]: any } = {},
-  dependsOn: any = []
+  values: ChartValues = {},
+  dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
     `helm-${xns.logicalName}-${name}`,
@@ -155,3 +156,8 @@ export function installCNHelmChart(
     }
   );
 }
+
+// Typically used for overriding chart values.
+// The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartValues = { [key: string]: any };

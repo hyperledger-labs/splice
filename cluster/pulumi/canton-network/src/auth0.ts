@@ -53,11 +53,10 @@ function getAuth0(): Promise<Auth0SecretMap> {
       );
       process.exit(1);
     })
-    .then((data: any) => {
+    .then((data: [{ client_id: string }]) => {
       const secrets = new Map() as Auth0SecretMap;
 
-      data.forEach((app: any) => {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
+      data.forEach((app: { client_id: string }) => {
         secrets.set(app["client_id"], app);
       });
 
@@ -90,7 +89,7 @@ function getClientToken(
       console.error("Error fetching clientToken: " + response.statusText);
       process.exit(1);
     })
-    .then((data: any) => data.access_token);
+    .then((data: { access_token: string }) => data.access_token);
 }
 
 function auth0Secret(
@@ -179,7 +178,10 @@ export function installAuth0UISecret(
   );
 }
 
-export function auth0UserNameEnvVar(name: string, secretName: any = null): any {
+export function auth0UserNameEnvVar(
+  name: string,
+  secretName: string | null = null
+): k8s.types.input.core.v1.EnvVar {
   if (!secretName) {
     secretName = name;
   }
