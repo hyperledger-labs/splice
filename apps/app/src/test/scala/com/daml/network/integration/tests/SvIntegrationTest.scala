@@ -228,22 +228,22 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
-    clue("SV2 has created as many ValidatorOnboarding contracts as it's configured to.") {
-      sv2.listOngoingValidatorOnboardings() should have length 3
+    clue("SV1 has created as many ValidatorOnboarding contracts as it's configured to.") {
+      sv1.listOngoingValidatorOnboardings() should have length 5
     }
-    clue("SV2 doesn't recreate ValidatorOnboarding contracts on restart...") {
-      sv2.stop()
-      sv2.startSync()
-      sv2.listOngoingValidatorOnboardings() should have length 3
+    clue("SV1 doesn't recreate ValidatorOnboarding contracts on restart...") {
+      sv1.stop()
+      sv1.startSync()
+      sv1.listOngoingValidatorOnboardings() should have length 5
     }
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
       eventually() {
-        sv2.listOngoingValidatorOnboardings() should have length 2
+        sv1.listOngoingValidatorOnboardings() should have length 4
       }
-      sv2.stop()
-      sv2.startSync()
-      sv2.listOngoingValidatorOnboardings() should have length 2
+      sv1.stop()
+      sv1.startSync()
+      sv1.listOngoingValidatorOnboardings() should have length 4
     }
   }
 

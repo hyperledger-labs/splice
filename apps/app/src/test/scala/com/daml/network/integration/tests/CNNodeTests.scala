@@ -61,6 +61,10 @@ object CNNodeTests {
       env.appsHostedBySvc.local.foreach(_.waitForInitialization())
     }
 
+    protected def initSvcWithSingleSv()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.appsHostedBySvcWithSingleSv.local.foreach(_.start())
+      env.appsHostedBySvcWithSingleSv.local.foreach(_.waitForInitialization())
+    }
   }
 
   trait CNNodeIntegrationTestWithSharedEnvironment

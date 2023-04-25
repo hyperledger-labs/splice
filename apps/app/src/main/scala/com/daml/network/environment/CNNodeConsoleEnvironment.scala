@@ -119,18 +119,57 @@ class CNNodeConsoleEnvironment(
     )
   }
 
+  lazy val svApps = NodeReferences(
+    mergeLocalCNNodeInstances(
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      svcOpt.toList,
+      // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
+      svs.local.filter(sv => sv.name != "sv5"),
+    ),
+    mergeRemoteCNNodeInstances(
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      remoteSvcOpt.toList,
+      // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
+      svs.remote.filter(sv => sv.name != "sv5"),
+    ),
+  )
+
+  lazy val svAppsWithSingleSv = NodeReferences(
+    mergeLocalCNNodeInstances(
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      svcOpt.toList,
+      svs.local.filter(sv => sv.name == "sv1"),
+    ),
+    mergeRemoteCNNodeInstances(
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      remoteSvcOpt.toList,
+      svs.remote.filter(sv => sv.name == "sv1"),
+    ),
+  )
+
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
     mergeLocalCNNodeInstances(
-      svcOpt.toList,
-      // SV5 is not hosted by the SVC
-      svs.local.filter(sv => sv.name != "sv5"),
+      svApps.local,
       scans.local,
       directories.local,
     ),
     mergeRemoteCNNodeInstances(
-      remoteSvcOpt.toList,
-      svs.remote.filter(sv => sv.name != "sv5"),
+      svApps.remote,
+      scans.remote,
+      directories.remote,
+    ),
+  )
+
+  /* Local apps that are (in the target deployment) operated by the SVC with only Sv1 */
+  lazy val appsHostedBySvcWithSingleSv = NodeReferences(
+    mergeLocalCNNodeInstances(
+      svAppsWithSingleSv.local,
+      scans.local,
+      directories.local,
+    ),
+    mergeRemoteCNNodeInstances(
+      svAppsWithSingleSv.remote,
       scans.remote,
       directories.remote,
     ),
