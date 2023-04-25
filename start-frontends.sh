@@ -36,6 +36,14 @@ function check_envoy_running() {
   fi
 }
 
+function check_envoy_working() {
+  # Call the admin API of envoy to check whether envoy is ready.
+  # This port used by envoy is defined in `envoy-proxy-dev/envoy.jsonnet`.
+  if [[ "$(curl -s localhost:9901/ready)" != "LIVE" ]]; then
+    return 1
+  fi
+}
+
 function start_frontend() {
   local app=$1
   local port=$2
@@ -129,23 +137,22 @@ tmux_window=0
 
 LOG_DIR="${REPO_ROOT}/log"
 
-(cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
-
 if check_envoy_running; then
   echo "envoy is already running, exiting"
   exit 1
 fi
+
+(cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 mkdir -p "${LOG_DIR}"
 
 start_envoy
 # envoy's startup is weird, so we check this here...
-sleep 2s
-if ! check_envoy_running; then
-  echo "envoy failed to start, exiting"
-  exit 1
-fi
+while ! check_envoy_working; do
+    echo "Waiting for envoy to start..."
+    sleep 1s;
+done
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
