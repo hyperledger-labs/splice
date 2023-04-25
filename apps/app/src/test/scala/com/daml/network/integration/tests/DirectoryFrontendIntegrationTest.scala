@@ -57,7 +57,7 @@ class DirectoryFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("alice", 3004)((_, _) => ())
+      withAuth0LoginCheck("alice", 3004)((_, _, _) => ())
     }
   }
 }

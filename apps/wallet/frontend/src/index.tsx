@@ -13,6 +13,7 @@ import {
   createRoutesFromElements,
   Route,
   RouterProvider,
+  useNavigate,
 } from 'react-router-dom';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
@@ -31,9 +32,38 @@ import Transactions from './routes/transactions';
 import Transfer from './routes/transfer';
 import { config } from './utils/config';
 
+const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const navigate = useNavigate();
+  return (
+    <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+      <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+        <ValidatorClientProvider url={config.services.validator.url}>
+          <WalletClientProvider url={config.services.wallet.url}>
+            <DirectoryClientProvider url={config.services.directory.url}>
+              <ScanClientProvider url={config.services.scan.url}>
+                <CurrentUserProvider>
+                  <CoinPriceProvider>
+                    <IsDevNetProvider>{children}</IsDevNetProvider>
+                  </CoinPriceProvider>
+                </CurrentUserProvider>
+              </ScanClientProvider>
+            </DirectoryClientProvider>
+          </WalletClientProvider>
+        </ValidatorClientProvider>
+      </UserProvider>
+    </AuthProvider>
+  );
+};
+
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route element={<AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />}>
+    <Route
+      element={
+        <Providers>
+          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+        </Providers>
+      }
+    >
       <Route path="/" element={<Root />}>
         <Route index element={<Transactions />} />
         <Route path="transactions" element={<Transactions />} />
@@ -48,35 +78,11 @@ const router = createBrowserRouter(
   )
 );
 
-const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
-  return (
-    <AuthProvider authConf={config.auth}>
-      <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        <ValidatorClientProvider url={config.services.validator.url}>
-          <WalletClientProvider url={config.services.wallet.url}>
-            <DirectoryClientProvider url={config.services.directory.url}>
-              <ScanClientProvider url={config.services.scan.url}>
-                <CurrentUserProvider>
-                  <CoinPriceProvider>
-                    <IsDevNetProvider>
-                      <ThemeProvider theme={theme}>{children}</ThemeProvider>
-                    </IsDevNetProvider>
-                  </CoinPriceProvider>
-                </CurrentUserProvider>
-              </ScanClientProvider>
-            </DirectoryClientProvider>
-          </WalletClientProvider>
-        </ValidatorClientProvider>
-      </UserProvider>
-    </AuthProvider>
-  );
-};
-
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <Providers>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <RouterProvider router={router} />
-    </Providers>
+    </ThemeProvider>
   </React.StrictMode>
 );

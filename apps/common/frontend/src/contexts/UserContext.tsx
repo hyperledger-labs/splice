@@ -103,9 +103,11 @@ export const UserProvider: React.FC<{
 
   const loginWithOidc = () => {
     if (auth) {
+      // see AuthProvider.tsx's extractTargetFromUser
+      const state = { redirectTo: window.location.href.replace(window.location.origin, '') };
       // We store the user id in localStorage. If it really was cleared
       // users should get a chance to login as a different user.
-      auth.signinRedirect({ prompt: 'login' });
+      auth.signinRedirect({ prompt: 'login', state });
     }
   };
 

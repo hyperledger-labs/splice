@@ -319,7 +319,7 @@ class SplitwellFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("aliceSplitwell", 3005)((_, _) => ())
+      withAuth0LoginCheck("aliceSplitwell", 3005)((_, _, _) => ())
     }
   }
 }

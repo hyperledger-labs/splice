@@ -397,40 +397,50 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           )
         }
 
-        actAndCheck(
-          "Auth0 login: Click the login button",
-          click on "oidc-login-button",
-        )(
-          "Auth0 login: Login form is visible",
-          _ => assertAuth0LoginFormVisible(),
-        )
-
-        val (_, needsAuthorization) = actAndCheck(
-          "Auth0 login: Fill out and submit login form", {
-            textField(id("username")).value = username
-            find(id("password")).foreach(_.underlying.sendKeys(password))
-            click on name("action")
-          },
-        )(
-          "Auth0 login: Target page or authorization form is visible",
-          _ => {
-            Try(false -> assertCompleted())
-              .recoverWith(_ => Try(true -> assertAuth0AuthorizationFormVisible()))
-              .get
-              ._1
-          },
-        )
-
-        if (needsAuthorization) {
-          actAndCheck(
-            "Auth0 login: Give consent",
-            click on xpath("//button[@value='accept']"),
-          )(
-            "Auth0 login: Target page is visible",
-            _ => assertCompleted(),
-          )
-        }
+        loginViaAuth0InCurrentPage(username, password, assertCompleted)
       }
+    }
+  }
+
+  protected def loginViaAuth0InCurrentPage(
+      username: String,
+      password: String,
+      assertCompleted: () => org.scalatest.Assertion,
+  )(implicit
+      webDriver: WebDriverType
+  ) = {
+    actAndCheck(
+      "Auth0 login: Click the login button",
+      click on "oidc-login-button",
+    )(
+      "Auth0 login: Login form is visible",
+      _ => assertAuth0LoginFormVisible(),
+    )
+
+    val (_, needsAuthorization) = actAndCheck(
+      "Auth0 login: Fill out and submit login form", {
+        textField(id("username")).value = username
+        find(id("password")).foreach(_.underlying.sendKeys(password))
+        click on name("action")
+      },
+    )(
+      "Auth0 login: Target page or authorization form is visible",
+      _ => {
+        Try(false -> assertCompleted())
+          .recoverWith(_ => Try(true -> assertAuth0AuthorizationFormVisible()))
+          .get
+          ._1
+      },
+    )
+
+    if (needsAuthorization) {
+      actAndCheck(
+        "Auth0 login: Give consent",
+        click on xpath("//button[@value='accept']"),
+      )(
+        "Auth0 login: Target page is visible",
+        _ => assertCompleted(),
+      )
     }
   }
 

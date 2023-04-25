@@ -62,7 +62,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
   }
 
   protected def withAuth0LoginCheck[A](frontendDriverName: String, localHostPort: Int)(
-      afterLoginChecks: (PartyId, WebDriverType) => A
+      afterLoginChecks: (Auth0User, PartyId, WebDriverType) => A
   )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment): A = {
     val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
     Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
@@ -79,7 +79,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
           )
         }
 
-        afterLoginChecks(userPartyId, webDriver)
+        afterLoginChecks(user, userPartyId, webDriver)
       }
     }
   }
