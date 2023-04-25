@@ -1,6 +1,7 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, useInterval } from 'common-frontend';
+import Loading from 'common-frontend/lib/components/Loading';
 import { useCallback, useState } from 'react';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
@@ -9,7 +10,6 @@ import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletBalance } from '../models/models';
 import CurrentUser from './CurrentUser';
-import Loading from './Loading';
 import { LogoutButton } from './LogoutButton';
 
 const PaymentHeader: React.FC = () => {

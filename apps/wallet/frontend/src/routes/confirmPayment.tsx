@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, RateDisplay } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, RateDisplay, Loading } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -21,7 +21,6 @@ import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
-import Loading from '../components/Loading';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { AppPaymentRequest } from '../models/models';

@@ -1,10 +1,10 @@
 import * as React from 'react';
+import { useUserState } from 'common-frontend';
 import { NavLink } from 'react-router-dom';
 
 import { Logout } from '@mui/icons-material';
-import { Button, Divider, Stack, Toolbar } from '@mui/material';
+import { Button, Divider, Stack, Toolbar, Typography } from '@mui/material';
 import Link from '@mui/material/Link';
-import Typography from '@mui/material/Typography';
 
 const Header: React.FC = () => {
   const navLinks = [
@@ -20,7 +20,7 @@ const Header: React.FC = () => {
 
     return isActive ? { ...style, textDecoration: 'underline' } : style;
   };
-
+  const { logout } = useUserState();
   return (
     <Toolbar
       sx={{
@@ -54,7 +54,7 @@ const Header: React.FC = () => {
       </Stack>
       <Stack direction="row" alignItems="center" spacing={1}>
         <Divider orientation="vertical" variant="middle" flexItem />
-        <Button id="logout-button" onClick={event => {}} color="inherit">
+        <Button id="logout-button" onClick={logout} color="inherit">
           <Stack direction="row" alignItems="center">
             <Logout />
             <Link color="inherit" textTransform="none">

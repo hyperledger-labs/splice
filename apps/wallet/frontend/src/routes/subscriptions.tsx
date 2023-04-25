@@ -8,6 +8,7 @@ import {
   sameContracts,
   useInterval,
 } from 'common-frontend';
+import Loading from 'common-frontend/lib/components/Loading';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';
@@ -29,7 +30,6 @@ import {
 import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
-import Loading from '../components/Loading';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { SubscriptionState, WalletSubscription } from '../models/models';

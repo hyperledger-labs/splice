@@ -171,8 +171,8 @@ function start_local_frontends() {
   start_frontend   splitwell 3003 bob     "bob"   $enable_test_auth
   start_frontend   directory 3004 alice   "alice" $enable_test_auth
   start_frontend   splitwell 3005 charlie "alice" $enable_test_auth
+  start_frontend   sv        3010 sv1     "sv1"   $enable_test_auth
   start_frontend   scan      3006 scan    "scan"  "false"           "none"
-  start_frontend   sv        3010 sv1     "sv1"   "false"           "none"
   start_json_api 5201 "--allow-insecure-tokens"
 }
 

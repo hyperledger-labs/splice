@@ -7,6 +7,7 @@ import {
   useInterval,
   useUserState,
 } from 'common-frontend';
+import Loading from 'common-frontend/lib/components/Loading';
 import formatISO from 'date-fns/formatISO';
 import { useCallback, useState } from 'react';
 
@@ -32,7 +33,6 @@ import { Party } from '@daml/types';
 import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { Transaction } from '../models/models';
-import Loading from './Loading';
 
 const TransactionHistory: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
+import Loading from 'common-frontend/lib/components/Loading';
 import { useInterval } from 'common-frontend/lib/utils/hooks';
 import { useCallback, useState } from 'react';
 
@@ -11,7 +12,6 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletBalance } from '../models/models';
 import Header from './Header';
 import Hero from './Hero';
-import Loading from './Loading';
 
 interface LayoutProps {
   children: React.ReactNode;

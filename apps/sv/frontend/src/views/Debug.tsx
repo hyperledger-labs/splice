@@ -1,4 +1,4 @@
-import { SvClientProvider } from 'common-frontend';
+import { Loading, SvClientProvider } from 'common-frontend';
 import TitledTable from 'common-frontend/lib/components/TitledTable';
 import React from 'react';
 
@@ -43,7 +43,11 @@ const DebugView: React.FC = () => {
       </Box>
     );
   } else {
-    return <Box>Loading...</Box>;
+    return (
+      <Box>
+        <Loading />
+      </Box>
+    );
   }
 };
 

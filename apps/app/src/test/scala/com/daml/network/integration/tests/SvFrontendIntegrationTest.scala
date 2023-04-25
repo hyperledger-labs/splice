@@ -18,19 +18,19 @@ class SvFrontendIntegrationTest
 
   "A SV UI" should {
 
-    "exist" in { _ =>
+    "have basic functionalities" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck("We open SV1's web UI", { go to s"http://localhost:3010" })(
+        actAndCheck(
+          "sv1 can login", {
+            login(3010, "sv1")
+          },
+        )(
           "We see a UI with an expected title",
           _ => find(id("app-title")).value.text should matchText("SV OPERATIONS"),
         )
-      }
-    }
 
-    "display sv debug infos" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "We open SV1's web UI", {
+          "debug infos are displayed", {
             go to s"http://localhost:3010/debug"
           },
         )(
@@ -46,8 +46,9 @@ class SvFrontendIntegrationTest
             )
           },
         )
+
       }
     }
-
   }
+
 }

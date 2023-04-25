@@ -9,6 +9,7 @@ import {
   useUserState,
 } from 'common-frontend';
 import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
+import Loading from 'common-frontend/lib/components/Loading';
 import { useCallback, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
@@ -21,7 +22,6 @@ import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
-import Loading from './Loading';
 
 export const TransferOffers: React.FC = () => {
   const { listTransferOffers } = useWalletClient();

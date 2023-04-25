@@ -7,6 +7,7 @@ import DirectoryField from './DirectoryField';
 import ErrorBoundary from './ErrorBoundary';
 import FeaturedAppRight from './FeaturedAppRight';
 import IntervalDisplay from './IntervalDisplay';
+import Loading from './Loading';
 import Login from './Login';
 import PartyId from './PartyId';
 import RateDisplay from './RateDisplay';
@@ -26,4 +27,5 @@ export {
   RateDisplay,
   TitledTable,
   IntervalDisplay,
+  Loading,
 };

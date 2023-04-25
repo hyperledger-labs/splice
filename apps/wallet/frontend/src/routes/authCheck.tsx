@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Login, useUserState, useInterval } from 'common-frontend';
+import Loading from 'common-frontend/lib/components/Loading';
 import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
 import { OnboardedStatus } from 'common-frontend/lib/contexts/UserContext';
 import { useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 
-import Loading from '../components/Loading';
 import Onboarding from '../components/Onboarding';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
