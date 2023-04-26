@@ -14,10 +14,6 @@ window.canton_network_config = {
   //     token_scope: "daml_ledger_api",
   //   },
   services: {
-    wallet: {
-      // URL of the wallet app HTTP API
-      url: 'http://localhost:5003',
-    },
     validator: {
       // URL of the validator app HTTP API
       url: 'http://localhost:5003',

@@ -13,9 +13,6 @@ window.canton_network_config = {
     token_audience: "https://canton.network.global",
   },
   services: {
-    wallet: {
-      url: "https://" + window.location.hostname + "/api/v0/validator",
-    },
     validator: {
       url: "https://" + window.location.hostname + "/api/v0/validator",
     },

@@ -38,7 +38,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
         <ValidatorClientProvider url={config.services.validator.url}>
-          <WalletClientProvider url={config.services.wallet.url}>
+          <WalletClientProvider url={config.services.validator.url}>
             <DirectoryClientProvider url={config.services.directory.url}>
               <ScanClientProvider url={config.services.scan.url}>
                 <CurrentUserProvider>
