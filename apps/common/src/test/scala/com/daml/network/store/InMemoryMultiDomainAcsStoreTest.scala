@@ -105,8 +105,8 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         domain,
         acs.map(toCreatedEvent(_)),
         transferOuts.map { case ((c, targetDomain), tfid) =>
-          toTransferOutEvent(
-            c.contractId,
+          toInFlightTransferOutEvent(
+            c,
             tfid,
             domain,
             targetDomain,
@@ -509,7 +509,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
           )
         )
         _ <- d1.switchToUpdates()
-        _ <- assertList()
+        _ <- assertList(c(1) -> None)
         _ <- d2.switchToUpdates()
         _ <- d2.transferIn(c(1) -> d1, tf0)
         _ <- assertList(c(1) -> Some(d2))
@@ -617,9 +617,6 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         )
         _ <- d1.switchToUpdates()
         _ <- assertTestState(
-          // Currently no filtering of in-flight transfer outs
-          pendingTransfersById = Map(cFeatured(1).contractId -> NonEmpty(Set, TransferId(d1, tf0))),
-          bootstrapTransferOutIds = Set(TransferId(d1, tf0)),
         )
       } yield succeed
     }

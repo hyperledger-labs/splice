@@ -12,8 +12,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
-import com.daml.network.environment.ledger.api.Transfer
-import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, Transfer, TransferEvent}
 import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
@@ -155,6 +154,21 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected val dummy2Domain = DomainId.tryFromString("dummy2::domain")
 
   protected val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
+
+  protected def toInFlightTransferOutEvent[TCid <: ContractId[T], T](
+      contract: Contract[TCid, T],
+      transferOutId: String,
+      source: DomainId = dummyDomain,
+      target: DomainId = dummyDomain,
+  ): InFlightTransferOutEvent = InFlightTransferOutEvent(
+    toTransferOutEvent(
+      contract.contractId,
+      transferOutId,
+      source,
+      target,
+    ),
+    toCreatedEvent(contract),
+  )
 
   protected def toTransferOutEvent(
       contractId: ContractId[_],

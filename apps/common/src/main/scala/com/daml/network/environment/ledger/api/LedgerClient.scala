@@ -462,7 +462,7 @@ object LedgerClient {
 
   final case class GetInFlightTransfersResponse(
       offset: LedgerOffset.Absolute,
-      transferOuts: Seq[TransferEvent.Out],
+      transferOuts: Seq[InFlightTransferOutEvent],
   )
 
   object GetInFlightTransfersResponse {
@@ -471,7 +471,7 @@ object LedgerClient {
     ): GetInFlightTransfersResponse =
       GetInFlightTransfersResponse(
         new LedgerOffset.Absolute(proto.offset),
-        proto.transferOuts.map(TransferEvent.Out.fromProto(_)),
+        proto.transferOuts.map(InFlightTransferOutEvent.fromProto(_)),
       )
   }
 

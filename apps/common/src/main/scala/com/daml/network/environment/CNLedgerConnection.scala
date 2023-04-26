@@ -23,9 +23,9 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.environment.ledger.api.{
   DedupConfig,
   DedupOffset,
+  InFlightTransferOutEvent,
   LedgerClient,
   NoDedup,
-  TransferEvent,
   TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore
@@ -381,7 +381,7 @@ class CNLedgerConnection(
       source: DomainId,
       party: PartyId,
       offset: Option[LedgerOffset.Absolute],
-  ): Future[Seq[TransferEvent.Out]] =
+  ): Future[Seq[InFlightTransferOutEvent]] =
     client
       .getInFlightTransfers(
         Seq(party),

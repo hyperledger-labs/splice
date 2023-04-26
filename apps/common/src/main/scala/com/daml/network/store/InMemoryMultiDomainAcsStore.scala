@@ -3,12 +3,13 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.environment.ledger.api.{
+  InFlightTransferOutEvent,
   TransactionTreeUpdate,
   Transfer,
+  TransferEvent,
   TransferUpdate,
   TreeUpdate,
 }
-import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
 import com.daml.network.environment.RetryProvider
@@ -89,7 +90,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     override def ingestAcsAndTransferOuts(
         domain: DomainId,
         acs: Seq[CreatedEvent],
-        transferOuts: Seq[TransferEvent.Out],
+        transferOuts: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestAcsAndTransferOuts(domain, acs, transferOuts, contractFilter.contains)
@@ -649,12 +650,12 @@ object InMemoryMultiDomainAcsStore {
     def ingestAcsAndTransferOuts(
         domain: DomainId,
         evs: Seq[CreatedEvent],
-        transferOuts: Seq[TransferEvent.Out],
+        transferOuts: Seq[InFlightTransferOutEvent],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestCreatedEvents(domain, evs, p)
-      val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs)
+      val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs, p)
       (
         stInFlight,
         summaryTransferOut.copy(
@@ -911,8 +912,9 @@ object InMemoryMultiDomainAcsStore {
 
     // Used during bootstrapping to ingest in-flight transfer outs
     private def ingestTransferOuts(
-        evs: Seq[TransferEvent.Out],
+        evs: Seq[InFlightTransferOutEvent],
         summary: IngestionSummary[TXE],
+        p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       val addedTransferOuts = Seq.newBuilder[(ContractId[_], TransferId)]
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -921,20 +923,29 @@ object InMemoryMultiDomainAcsStore {
       val removedArchivedTombstones = Seq.newBuilder[ContractId[_]]
       val stNew: State[TXI, TXE] = evs
         .foldLeft(this)((st, ev) => {
-          val id = TransferId.fromTransferOut(ev)
-          val (newSt, summary) = st.ingestTransferOutEvent(ev, bootstrap = true)
-          summary match {
-            case TransferOutEventSummary.Filtered =>
-              numFilteredTransferOuts += 1
-            case TransferOutEventSummary.AddedTransferOut =>
-              addedTransferOuts += ((ev.contractId, id))
-            case TransferOutEventSummary.RemovedTransferIn(removedTombstone) =>
-              removedTransferIns += ((ev.contractId, id))
-              if (removedTombstone) {
-                removedArchivedTombstones += ev.contractId
-              }
+          if (p(ev.createdEvent)) {
+            val (newStCreate, _) = ingestCreatedEvent(
+              ev.createdEvent,
+              ContractLocation(ev.transferEvent.contractId, ev.transferEvent.source),
+            )
+            val id = TransferId.fromTransferOut(ev.transferEvent)
+            val (newSt, summary) = newStCreate.ingestTransferOutEvent(ev.transferEvent)
+            summary match {
+              case TransferOutEventSummary.Filtered =>
+                numFilteredTransferOuts += 1
+              case TransferOutEventSummary.AddedTransferOut =>
+                addedTransferOuts += ((ev.transferEvent.contractId, id))
+              case TransferOutEventSummary.RemovedTransferIn(removedTombstone) =>
+                removedTransferIns += ((ev.transferEvent.contractId, id))
+                if (removedTombstone) {
+                  removedArchivedTombstones += ev.transferEvent.contractId
+                }
+            }
+            newSt
+          } else {
+            numFilteredTransferOuts += 1
+            st
           }
-          newSt
         })
         .copy(
           bootstrapTransferOutIds = bootstrapTransferOutIds ++ addedTransferOuts.result().map(_._2)
@@ -1144,8 +1155,7 @@ object InMemoryMultiDomainAcsStore {
     }
 
     private def ingestTransferOutEvent(
-        out: TransferEvent.Out,
-        bootstrap: Boolean = false,
+        out: TransferEvent.Out
     ): (State[TXI, TXE], TransferOutEventSummary) = {
       val transferId = TransferId.fromTransferOut(out)
       val cid = out.contractId
@@ -1194,18 +1204,11 @@ object InMemoryMultiDomainAcsStore {
             ev.domains.contains(out.source)
           }
         if (!sawMoveIn) {
-          if (bootstrap) {
-            // If we hit this during bootstrapping, we need to store the contract
-            // to guarantee we will submit the transfer in. We accept
-            // potentially leaking the in-flight contract for now.
-            (newSt, summary)
-          } else {
-            // If the transfer is not from bootstrapping, then we can only hit this
-            // because we filtered out the create/transfer in.
-            // We deliberately use `this` instead of `newSt` here. We don't want to update
-            // pending transfers for ignored contracts.
-            (this, TransferOutEventSummary.Filtered)
-          }
+          // We did not see a transfer in or create. That means
+          // we filtered it so we can just ignore it.
+          // We deliberately use `this` instead of `newSt` here. We don't want to update
+          // pending transfers for ignored contracts.
+          (this, TransferOutEventSummary.Filtered)
         } else {
           (
             newSt.updateContractStateEvent(out.contractId, _.excl(out.source)),

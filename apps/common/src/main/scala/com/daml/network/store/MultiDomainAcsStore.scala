@@ -2,8 +2,7 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.ledger.api.TreeUpdate
-import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, TransferEvent, TreeUpdate}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion as JavaContractCompanion,
   ContractId,
@@ -529,7 +528,7 @@ object MultiDomainAcsStore {
     def ingestAcsAndTransferOuts(
         domain: DomainId,
         acs: Seq[CreatedEvent],
-        inFlight: Seq[TransferEvent.Out],
+        inFlight: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit]
 
     def ingestOffset(domain: DomainId, offset: String)(implicit

@@ -1,11 +1,34 @@
 package com.daml.network.environment.ledger.api
 
+import com.daml.ledger.api.v1.event as scalaEvent
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.research.participant.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+
+case class InFlightTransferOutEvent(
+    transferEvent: TransferEvent.Out,
+    createdEvent: CreatedEvent,
+)
+
+object InFlightTransferOutEvent {
+  private[api] def fromProto(
+      proto: multidomain.GetInFlightTransfersResponse.TransferredOutEvent
+  ): InFlightTransferOutEvent =
+    InFlightTransferOutEvent(
+      transferEvent = TransferEvent.Out(
+        submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
+        source = DomainId.tryFromString(proto.source),
+        target = DomainId.tryFromString(proto.target),
+        transferOutId = proto.transferOutId,
+        contractId = new ContractId(proto.contractId),
+      ),
+      createdEvent =
+        CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+    )
+}
 
 sealed trait TransferEvent extends Product with Serializable with PrettyPrinting {
   def submitter: PartyId
