@@ -5,6 +5,12 @@ Onboarding a SV
 
 These pages give a step-by-step guide how to deploy your own supervalidator (SV) node to the Canton network.
 
+.. note::
+  This section describes a local deployment where the relevant processes are launched locally on your machine.
+  While that is useful for learning about the relevant pieces, and for testing, for actual operations of a node
+  using Helm charts, please see :ref:`the instructions for spinning up an SV node in k8s <sv-helm>`
+
+
 Prerequisites
 -------------
 
