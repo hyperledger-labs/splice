@@ -787,14 +787,24 @@ function subcmd_preflight() {
 
     if [ $tmux_session_check -eq 0 ]; then
         _error "CN Frontends are already running. Please run \`stop-frontends.sh\` from the root and try again."
-    else
-        subcmd_start_frontends
     fi;
+
+    postgres=$(docker ps -q -f name=postgres-for-canton-coin)
+
+    if [ -n "$postgres" ]; then
+        _error "postgres container is already running. Please run \`stop-canton.sh\` from the root and try again."
+    fi;
+
+    subcmd_start_frontends
+    cd "${REPO_ROOT}" && scripts/start-postgres-for-preflight.sh
 
     set +e
     subcmd_sbt_for_preflight "apps-app/testOnly *PreflightIntegrationTest"
     local test_result=$?
     set -e
+
+    _log "Stopping postgres..."
+    cd "${REPO_ROOT}" && scripts/postgres.sh stop
 
     _log "Stopping frontends..."
     cd "${REPO_ROOT}" && ./stop-frontends.sh
