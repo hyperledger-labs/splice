@@ -27,12 +27,7 @@ class OffsetIngestionService(
       // TODO(#4024) Switch to participant ledger end once it advances on transfers
       domains <- domainStore.listConnectedDomains()
       offsets <- domains.values.toList.traverse(domainId => connection.ledgerEnd(domainId))
-      // TODO(#4214) The multi-domain ledger end has buggy cache invalidation in some cases so we
-      // also query the participant ledger end. This will advance (although slower) for transactions
-      // but not for transfers so technically there is still a race but it makes it sufficiently unlikely that
-      // I don't expect we hit it in practice.
-      participantLedgerEnd <- connection.participantLedgerEnd()
-      max = (participantLedgerEnd +: offsets)
+      max = offsets
         .collect { case abs: LedgerOffset.Absolute =>
           abs
         }
@@ -41,7 +36,4 @@ class OffsetIngestionService(
     } yield false).andThen { r =>
       lastQueryFailed.set(r.failed.toOption)
     }
-
-  // TODO(#4214) remove
-  connection.registerTransferCompletionCallback(ingestionSink.ingestOffset(_)(TraceContext.empty))
 }

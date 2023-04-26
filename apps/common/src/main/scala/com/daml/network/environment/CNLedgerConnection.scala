@@ -77,11 +77,6 @@ class CNLedgerConnection(
     TraceContext.empty
   )
 
-  // TODO(#4214) remove
-  private[this] val transferCompletionCallbacks
-      : AtomicReference[Seq[LedgerOffset.Absolute => Future[Unit]]] =
-    new AtomicReference(Seq.empty)
-
   override def onClosed(): Unit = {}
 
   import CNLedgerConnection.*
@@ -676,24 +671,7 @@ class CNLedgerConnection(
       override def run(): Unit = ks.shutdown()
     })
 
-    for {
-      completed <- completion
-      ((offset, _), _) = completed
-      // TODO(#4214) remove all calling back
-      _ <- offset match {
-        case loa: LedgerOffset.Absolute =>
-          Future.traverse(transferCompletionCallbacks.get())(f => f(loa))
-        case _ => Future successful (()) // LedgerBegin and LedgerEnd are nonsense, don't await
-      }
-    } yield offset
-  }
-
-  // TODO(#4214) remove
-  private[network] final def registerTransferCompletionCallback(
-      f: LedgerOffset.Absolute => Future[Unit]
-  ): Unit = {
-    val _ = transferCompletionCallbacks.accumulateAndGet(Seq(f), _ ++ _)
-    ()
+    completion.map(_._1._1)
   }
 
   private[network] final def submitTransferAndAwaitIngestionNoDedup(
