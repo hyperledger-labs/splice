@@ -119,14 +119,20 @@ export function installCNHelmChartByNamespaceName(
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  const versionNumber  = config.require("VERSION_NUMBER");
+  const versionNumber = config.require("VERSION_NUMBER");
 
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
       name,
       namespace: nsName,
-      chart: process.env.REPO_ROOT + "/cluster/helm/target/" + chartName + "-" + versionNumber + ".tgz",
+      chart:
+        process.env.REPO_ROOT +
+        "/cluster/helm/target/" +
+        chartName +
+        "-" +
+        versionNumber +
+        ".tgz",
       values: cnChartValues(chartName, values),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
