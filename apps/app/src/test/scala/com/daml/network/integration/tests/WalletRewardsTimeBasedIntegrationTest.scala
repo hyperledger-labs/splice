@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -18,6 +19,10 @@ class WalletRewardsTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
 
   "A wallet" should {
 

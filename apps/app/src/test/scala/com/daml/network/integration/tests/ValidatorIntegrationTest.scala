@@ -35,14 +35,14 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     splitwellValidator.startSync()
     splitwellValidator.stop()
     splitwellValidator.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
@@ -66,7 +66,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
   // TODO(M3-46) clean up once every validator uses this onboarding flow
   "onboard validator via onboarding config" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
 
     clue("Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`") {
       bobValidator.startSync()
@@ -92,7 +92,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
@@ -110,7 +110,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "register user" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     val partyIdFromTokenUser = aliceValidator.register()
@@ -121,7 +121,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     implicit val sys = env.actorSystem
@@ -163,7 +163,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard user multiple times" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
@@ -172,7 +172,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "register user multiple times" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     val party1 = aliceValidator.register()
@@ -181,7 +181,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard, list and offboard users" in { implicit env =>
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
     aliceValidator.startSync()
 
     actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidator))(
@@ -270,6 +270,6 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidator.start()
     aliceValidator.stop()
     // If the validator's shutdown left a dirty state this will throw an ERROR.
-    initSvcWithSingleSv()
+    initSvcWithSv1Only()
   }
 }

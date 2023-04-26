@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.setPollingInterval
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
@@ -20,6 +21,10 @@ class TimeBasedTreasuryIntegrationTest
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .addConfigTransform((_, config) =>
         // for testing non-automation-based coin merging.
         setPollingInterval(NonNegativeFiniteDuration.ofSeconds(30))(config)

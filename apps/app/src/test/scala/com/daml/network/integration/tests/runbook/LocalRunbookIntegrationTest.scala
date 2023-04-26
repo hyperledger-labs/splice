@@ -144,8 +144,8 @@ class LocalRunbookIntegrationTest
       .addConfigTransforms((_, conf) => expectValidatorOnboarding(conf, "validatorsecret"))
       .withThisSetup(env => {
         setupAndStartCanton()
-        env.appsHostedBySvc.local.foreach(_.start())
-        env.appsHostedBySvc.local.foreach(_.waitForInitialization())
+        env.fullSvcApps.local.foreach(_.start())
+        env.fullSvcApps.local.foreach(_.waitForInitialization())
       })
 
   // TODO(#1983)

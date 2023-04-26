@@ -22,6 +22,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
 import com.daml.network.validator.config.ValidatorAppClientConfig
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
 object CNNodeConfigTransforms {
 
@@ -124,6 +125,13 @@ object CNNodeConfigTransforms {
     val id = (new scala.util.Random).nextInt().toHexString
     addConfigName(id)(addDamlNameSuffix(id)(config))
   }
+
+  def onlySv1: (String, CNNodeConfig) => CNNodeConfig =
+    (_, c) =>
+      c.copy(
+        svApps = c.svApps.filter(_._1 == InstanceName.tryCreate("sv1")),
+        svAppClients = c.svAppClients.filter(_._1 == InstanceName.tryCreate("sv1")),
+      )
 
   /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally

@@ -2,13 +2,14 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil, SplitwellTestUtil}
+import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class SplitwellTimeBasedIntegrationTest
@@ -23,6 +24,10 @@ class SplitwellTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(darPath)
         bobValidator.remoteParticipant.dars.upload(darPath)

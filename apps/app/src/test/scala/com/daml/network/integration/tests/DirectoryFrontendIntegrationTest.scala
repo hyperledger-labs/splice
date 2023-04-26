@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
@@ -17,6 +18,10 @@ class DirectoryFrontendIntegrationTest
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
       })

@@ -47,6 +47,10 @@ class WalletSurviveCantonRestartIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )

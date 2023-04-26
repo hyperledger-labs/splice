@@ -1,13 +1,29 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.integration.tests.CNNodeTests.{CNNodeIntegrationTest, CNNodeTestCommon}
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestCommon,
+  CNNodeTestConsoleEnvironment,
+}
 import com.daml.network.util.WalletTestUtil
-import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.jdk.CollectionConverters.*
 
 // TODO(tech-debt): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with CNNodeTestCommon {
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
 
   "restart cleanly" in { implicit env =>
     scan.stop()

@@ -107,69 +107,51 @@ class CNNodeConsoleEnvironment(
   ] = {
     NodeReferences(
       mergeLocalCNNodeInstances(
-        appsHostedBySvc.local,
+        fullSvcApps.local,
         appsHostedByValidator.local,
         appsHostedByThirdParty.local,
       ),
       mergeRemoteCNNodeInstances(
-        appsHostedBySvc.remote,
+        fullSvcApps.remote,
         appsHostedByValidator.remote,
         appsHostedByThirdParty.remote,
       ),
     )
   }
 
-  lazy val svApps = NodeReferences(
+  /* Local apps that are (in the target deployment) operated by the SVC */
+  lazy val fullSvcApps = NodeReferences(
     mergeLocalCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       svcOpt.toList,
       // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
       svs.local.filter(sv => sv.name != "sv5"),
+      scans.local,
+      directories.local,
     ),
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       remoteSvcOpt.toList,
       // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
       svs.remote.filter(sv => sv.name != "sv5"),
-    ),
-  )
-
-  lazy val svAppsWithSingleSv = NodeReferences(
-    mergeLocalCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      svcOpt.toList,
-      svs.local.filter(sv => sv.name == "sv1"),
-    ),
-    mergeRemoteCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      remoteSvcOpt.toList,
-      svs.remote.filter(sv => sv.name == "sv1"),
-    ),
-  )
-
-  /* Local apps that are (in the target deployment) operated by the SVC */
-  lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalCNNodeInstances(
-      svApps.local,
-      scans.local,
-      directories.local,
-    ),
-    mergeRemoteCNNodeInstances(
-      svApps.remote,
       scans.remote,
       directories.remote,
     ),
   )
 
   /* Local apps that are (in the target deployment) operated by the SVC with only Sv1 */
-  lazy val appsHostedBySvcWithSingleSv = NodeReferences(
+  lazy val minimalSvcApps = NodeReferences(
     mergeLocalCNNodeInstances(
-      svAppsWithSingleSv.local,
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      svcOpt.toList,
+      svs.local.filter(sv => sv.name == "sv1"),
       scans.local,
       directories.local,
     ),
     mergeRemoteCNNodeInstances(
-      svAppsWithSingleSv.remote,
+      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
+      remoteSvcOpt.toList,
+      svs.remote.filter(sv => sv.name == "sv1"),
       scans.remote,
       directories.remote,
     ),
@@ -418,9 +400,9 @@ class CNNodeConsoleEnvironment(
           TopLevelValue(scan.name, helpText("Remote scan app", scan.name), scan, Seq("Scan"))
         )
         .toList :+ TopLevelValue(
-        "appsHostedBySvc",
-        helpText("All local apps hosted by the SVC" + genericNodeReferencesDoc, "appsHostedBySvc"),
-        appsHostedBySvc,
+        "fullSvcApps",
+        helpText("All local apps hosted by the SVC" + genericNodeReferencesDoc, "fullSvcApps"),
+        fullSvcApps,
         Seq("App References"),
       ) :+ TopLevelValue(
         "appsHostedByValidator",

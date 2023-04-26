@@ -57,13 +57,13 @@ object CNNodeTests {
         .simpleTopology(this.getClass.getSimpleName)
 
     protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.appsHostedBySvc.local.foreach(_.start())
-      env.appsHostedBySvc.local.foreach(_.waitForInitialization())
+      env.fullSvcApps.local.foreach(_.start())
+      env.fullSvcApps.local.foreach(_.waitForInitialization())
     }
 
-    protected def initSvcWithSingleSv()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.appsHostedBySvcWithSingleSv.local.foreach(_.start())
-      env.appsHostedBySvcWithSingleSv.local.foreach(_.waitForInitialization())
+    protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.minimalSvcApps.local.foreach(_.start())
+      env.minimalSvcApps.local.foreach(_.waitForInitialization())
     }
   }
 

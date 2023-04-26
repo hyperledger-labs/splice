@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -19,6 +20,10 @@ class WalletAuth0FrontendIntegrationTest
   override def environmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllValidatorConfigs_(conf =>
           conf

@@ -22,6 +22,10 @@ class SvcTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .addConfigTransforms((_, config) => {

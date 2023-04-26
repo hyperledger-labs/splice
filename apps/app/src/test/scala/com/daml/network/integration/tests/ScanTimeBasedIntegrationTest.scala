@@ -1,15 +1,17 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil, CNNodeUtil}
+import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.console.WalletAppClientReference
+
 import scala.jdk.CollectionConverters.*
 import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
@@ -23,6 +25,10 @@ class ScanTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // start only sv1 but not sv2-4
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
