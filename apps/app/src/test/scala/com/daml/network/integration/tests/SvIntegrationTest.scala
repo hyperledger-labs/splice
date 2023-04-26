@@ -570,8 +570,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       val svcPartyStr: String = svcParty.toProtoPrimitive
       val svcParticipant = svc.remoteParticipant
       val sv5Participant = sv5.remoteParticipant
-      svcParticipant.ledger_api.acs.of_party(svcParty) should not be empty
-      sv5Participant.ledger_api.acs.of_party(svcParty) shouldBe empty
 
       createCoinOwnBySvc(svcParticipant, 1.0)
 
@@ -611,6 +609,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
         coinFromSv5Participant should have size 2
         coinFromSv5Participant shouldBe coinFromSvcParticipant
+
+        sv5Participant.ledger_api.acs.of_party(svcParty) should not be empty
       }
 
       clue("sv5 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {

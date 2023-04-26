@@ -57,10 +57,10 @@ val svcParty = createUser(svcParticipant, "svc_shared_service_user")
 createUser(svcParticipant, "sv1", additionalActAsParties = Set(svcParty))
 
 // These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
-createUser(sv2Participant, "sv2", readAsParties = Set(svcParty))
-createUser(sv3Participant, "sv3", readAsParties = Set(svcParty))
-createUser(sv4Participant, "sv4", readAsParties = Set(svcParty))
-createUser(sv5Participant, "sv5", readAsParties = Set(svcParty))
+createUser(sv2Participant, "sv2")
+createUser(sv3Participant, "sv3")
+createUser(sv4Participant, "sv4")
+createUser(sv5Participant, "sv5")
 
 svcParticipant.ledger_api.users.create(
   id = "directory_provider",

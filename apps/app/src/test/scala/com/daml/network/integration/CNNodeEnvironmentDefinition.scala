@@ -83,7 +83,7 @@ case class CNNodeEnvironmentDefinition(
               case _ => Set(svParty)
             },
             primaryParty = Some(svParty),
-            readAs = Set(svcParty),
+            readAs = Set.empty,
             participantAdmin = true,
           )
         })

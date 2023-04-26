@@ -101,7 +101,7 @@ class SvApp(
     for {
       // TODO(#3856): find a better way to get the SVC party ID
       svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
-
+      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -111,7 +111,6 @@ class SvApp(
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global)
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
-      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       (svcStore, svcAutomation) <- ensureOnboarded(
         svStore,
         ledgerClient,
@@ -244,10 +243,15 @@ class SvApp(
       (svcStore, svcAutomation) <-
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
-          val svcStore = newSvcStore(svStore.key)
-          val svcAutomation =
-            newSvSvcAutomationService(svStore, svcStore, ledgerClient)
           for {
+            _ <- ledgerConnection.grantUserRights(
+              config.ledgerApiUser,
+              Seq.empty,
+              Seq(svStore.key.svcParty),
+            )
+            svcStore = newSvcStore(svStore.key)
+            svcAutomation =
+              newSvSvcAutomationService(svStore, svcStore, ledgerClient)
             domainId <- waitForDomainConnection(svcStore.domains, config.domains.global)
             _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
             onboarded <- isOnboarded(svcStore)
@@ -312,6 +316,11 @@ class SvApp(
                 globalDomain,
                 participantId,
                 svcPartyHosting,
+              )
+              _ <- ledgerConnection.grantUserRights(
+                config.ledgerApiUser,
+                Seq.empty,
+                Seq(svStore.key.svcParty),
               )
               svcStore = newSvcStore(svStore.key)
               svcAutomation = newSvSvcAutomationService(
