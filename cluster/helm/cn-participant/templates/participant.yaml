@@ -31,6 +31,16 @@ spec:
         - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
           value: {{ .Values.extraDomains | toJson }}
         {{ .Values.extraEnvVars | toYaml | nindent 8 }}
+        {{- with .Values.globalDomain }}
+        {{- if .alias }}
+        - name: GLOBAL_DOMAIN_ALIAS
+          value: "{{ .alias }}"
+        {{- end }}
+        {{- if .url }}
+        - name: GLOBAL_DOMAIN_URL
+          value: "{{ .url }}"
+        {{- end }}
+        {{- end }}
         ports:
         - containerPort: 5002
           name: lg-adm-api

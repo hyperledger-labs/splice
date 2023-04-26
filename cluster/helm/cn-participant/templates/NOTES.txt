@@ -1,1 +1,1 @@
-Canton Network Participant
+Canton Network Ledger Participant

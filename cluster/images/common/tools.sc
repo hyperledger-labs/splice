@@ -20,7 +20,7 @@ case class DomainDef(
 )
 
 def connectDomain(p: ParticipantReference, domain: DomainDef) {
-  logger.info(s"Ensuring connection to ${domain.alias} domain.")
+  logger.info(s"Ensuring connection to ${domain.alias} domain. (url: ${domain.url})")
   p.domains.connect(domain.alias, domain.url)
   utils.retry_until_true(p.domains.active(domain.alias))
 
@@ -29,7 +29,10 @@ def connectDomain(p: ParticipantReference, domain: DomainDef) {
 }
 
 def connectGlobalDomain(p: ParticipantReference) {
-  connectDomain(p, DomainDef("global", "http://global-domain.svc:5008"))
+  val domainAlias = sys.env.get("GLOBAL_DOMAIN_ALIAS").getOrElse("global")
+  val domainUrl = sys.env.get("GLOBAL_DOMAIN_URL").getOrElse("http://global-domain.svc:5008")
+
+  connectDomain(p, DomainDef(domainAlias, domainUrl))
 }
 
 def ensureParticipantUser(p: ParticipantReference, userName: String, createUser: => User): User = {

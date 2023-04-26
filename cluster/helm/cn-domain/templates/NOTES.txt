@@ -1,1 +1,1 @@
-Canton Network Domain
+Canton Network Ledger Domain
