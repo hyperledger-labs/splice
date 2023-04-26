@@ -336,9 +336,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       value
     } catch {
       case NonFatal(e) =>
-        // TODO(#3245): Log at WARN level to notify us whenever something went wrong.
-        // Once we understand the root cause or are happy with just blindly retrying, demote this to DEBUG.
-        logger.warn(
+        logger.debug(
           s"Caught error $e, dumping all frontend debug info before retrying or failing"
         )
         clue("Dumping frontend debug info") {
@@ -371,7 +369,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   )(implicit
       webDriver: WebDriverType
   ) = {
-    // TODO(#3245): Sometimes the whole auth0 login workflow gets stuck for unknown reasons.
+    // Sometimes the whole auth0 login workflow gets stuck for unknown reasons.
     // Therefore we retry the whole workflow and take screenshots on each failed attempt.
     eventually(timeUntilSuccess = 1.minutes) {
       dumpDebugInfoOnFailure {
