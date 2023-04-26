@@ -45,6 +45,12 @@ Version: |version_literal|
 
    devnet/index.rst
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Release Notes
+
+   release_notes.rst
+
 
 .. TODO(M3-17): add back indices and search functionality if required
 
