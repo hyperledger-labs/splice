@@ -153,56 +153,6 @@ function clusterCertificate(
   );
 }
 
-const project = gcp.organizations.getProjectOutput({});
-
-function natGateway(
-  clusterName: string,
-  clusterIp: gcp.compute.Address,
-  options = {}
-): gcp.compute.RouterNat {
-  const privateNetwork = gcp.compute.Network.get(
-    "default",
-    pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
-  );
-
-  const subnet = gcp.compute.getSubnetworkOutput({
-    name: `cn-${clusterName}net-subnet`,
-  });
-
-  const router = new gcp.compute.Router(
-    `router-${clusterName}`,
-    {
-      network: privateNetwork.id,
-    },
-    options
-  );
-
-  // Create a Cloud NAT gateway to configure the outbound IP address
-  const natGateway = new gcp.compute.RouterNat(
-    `nat-${clusterName}-gw`,
-    {
-      router: router.name,
-      region: router.region,
-      natIpAllocateOption: "MANUAL_ONLY",
-      natIps: [clusterIp.selfLink],
-      sourceSubnetworkIpRangesToNat: "LIST_OF_SUBNETWORKS",
-      subnetworks: [
-        {
-          name: subnet.id,
-          sourceIpRangesToNats: ["ALL_IP_RANGES"],
-        },
-      ],
-      logConfig: {
-        enable: true,
-        filter: "ERRORS_ONLY",
-      },
-    },
-    options
-  );
-
-  return natGateway;
-}
-
 class CantonNetwork extends pulumi.ComponentResource {
   clusterIp: gcp.compute.Address;
   ingressNs: k8s.core.v1.Namespace;
@@ -226,8 +176,6 @@ class CantonNetwork extends pulumi.ComponentResource {
         name: "cluster-ingress",
       },
     });
-
-    natGateway(clusterName, clusterIp, { parent: this });
 
     clusterCertificate(
       clusterName,
