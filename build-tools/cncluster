@@ -667,17 +667,6 @@ function subcmd_reset() {
 
 subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
 
-function _delete_cert_manager_objects() {
-    local -a objects
-    readarray -t objects < <( kubectl get "$2" -n "$1"| grep cert-manager | gawk '{ print $1 }' )
-
-    if [[ ${#objects[@]} -gt 0 ]]; then
-        kubectl delete "$2" -n "$1" "${objects[@]}"
-    else
-        _info "No cert-manager objects of type $2 found in namespace $1."
-    fi
-}
-
 function subcmd_obliterate_state() {
     _production_gate
     _prompt_to_confirm
@@ -695,22 +684,6 @@ function subcmd_obliterate_state() {
     # Delete the external service manually, since it does not have
     # the CNJ prefix cluster name label.
     kubectl delete Service external --ignore-not-found=true
-
-    _info "Full delete.... deleting cert-manager..."
-    kubectl delete Namespace cert-manager --ignore-not-found=true
-
-    _info "Deleting cert-manager toplevel objects..."
-    # These are not in the cert-manager namespace and are therefore
-    # not deleted by the namespace delete.
-    _delete_cert_manager_objects kube-system Role
-    _delete_cert_manager_objects kube-system RoleBinding
-    _delete_cert_manager_objects default ClusterRole
-    _delete_cert_manager_objects default ClusterRoleBinding
-    _delete_cert_manager_objects default MutatingWebhookConfiguration
-    _delete_cert_manager_objects default ValidatingWebhookConfiguration
-
-    kubectl delete Issuer letsencrypt-production --ignore-not-found=true
-    kubectl delete Certificate "cn-${GCP_CLUSTER_BASENAME}net-certificate" --ignore-not-found=true
 
     _info "Cluster state obliterated"
 }
@@ -1096,24 +1069,9 @@ function subcmd_papply() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    IMAGE_TAG=${SOURCE_IMAGE_TAG}
+    VERSION_NUMBER=$(get-snapshot-version)
 
-    if [ -z "${1-}" ]; then
-       if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-          _docker_must_be_running
-          if ! make -C "${REPO_ROOT}" docker-check -j; then
-             _error "Images missing from artifact registry, cannot apply."
-             exit 1
-         fi
-       else
-           _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
-       fi
-    else
-        IMAGE_TAG=$1
-       _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
-    fi
-
-    make -C "${REPO_ROOT}" cluster/helm/build
+    make -C "${REPO_ROOT}" cluster/build
 
     # Use the existing secret to populate the secret needed in the
     # ingress namespace. Eventually, the secret management will be
@@ -1121,7 +1079,7 @@ function subcmd_papply() {
     dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
                      | jq -r '.data["key.json"]')
 
-    args=(-c "IMAGE_TAG=${IMAGE_TAG}"
+    args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
           -c "DNS_SA_KEY=${dns_sa_key}")
 

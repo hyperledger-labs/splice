@@ -861,37 +861,25 @@ chart based deployment strategy that's managed using Pulumi
 scripts. While this work is not complete, the beginnings of it are
 already committed and are available as a prototype for testing.
 
-As of the time of this writing, there are two separate Pulumi projects:
-
-1. [`infrastructure`](pulumi/infrastructure)
-2. [`canton-network`](pulumi/canton-network)
-
-The former can be useful to manage the underlying infrastructure used by
-the applications deployed to the kubernetes cluster (e.g. to set up DNS entries
-and configure IP addresses).
-
-There is a `cncluster` sub command called `infra_pulumi` which can be run from
-inside a deployment directory in order to call arbitrary Pulumi commands:
-
-```console
-$ cd cluster/deployment/scratchnet
-$ cncluster infra_pulumi preview
-...
-$ cncluster infra_pulumi up
-```
-
-The "canton-network" Pulumi project is used in order to deploy the canton-network
-applications to the cloud.
+As of the time of this writing, there are two separate Pulumi
+projects. The lower level of the two is an
+[infrastructure project](#cluster-infrastructure-setup) that's
+already in use to manage our cluster's IP addresses, DNS entries,
+and TLS certificates, and other of the more static aspects of our
+cluster configuration. The higher level of the two is the
+[`canton-network`](pulumi/canton-network) script. This script
+uses our redistributable Helm charts to install a Canton Network
+test environment inside a cluster already configured with the
+infrastructure script.
 
 The current Pulumi deployment is in an interim state, and can manage
-the cluster ingress and documentation server. Note that in the
-short-run, you'll need to manually reduce the number of endpoints
-expected in `external-proxy` for that service to correctly boot.
+the cluster ingress and documentation server.
 
+1. Change to the repository root and ensure docker images are built
+   and pushed to the Docker repository. (`make docker-push`)
 1. Start with a working cluster and change to its deployment directory.
 1. Delete the existing cluster resources: `cncluster obliterate_state`.
-1. Apply the Pulumi cluster (you will need to enter a passkey, even
-   though it is currently not used): `cncluster papply`.
+1. Apply the Pulumi cluster configuration: `cncluster papply`.
 1. Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
 1. The Pulumi and Helm charts may now be edited and `cncluster papply`
    once again used to apply only the changes to the cluster.

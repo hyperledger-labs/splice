@@ -56,6 +56,9 @@ export function installSplitwell(
     svc,
     installAuth0Secret(xns, "splitwell", "splitwell"),
     installAuth0Secret(xns, "validator", "splitwell_validator"),
+    installAuth0Secret(xns, "svc", "svc"),
+    installAuth0Secret(xns, "scan", "scan"),
+    installAuth0Secret(xns, "directory", "directory"),
     installAuth0UISecret(xns, "wallet", "splitwell"),
   ];
 

@@ -52,6 +52,9 @@ export function installValidator(
     xns.ns,
     participant,
     installAuth0Secret(xns, "validator", "validator"),
+    installAuth0Secret(xns, "svc", "svc"),
+    installAuth0Secret(xns, "scan", "scan"),
+    installAuth0Secret(xns, "directory", "directory"),
     installAuth0UISecret(xns, "wallet", "wallet"),
   ];
 

@@ -2,20 +2,7 @@
 
 IMAGE_TAG=$(version-gen)
 
-get_snapshot_version() {
-    local sha prefix commit_date number_of_commits commit_sha_8
-
-    prefix=$(<"${REPO_ROOT}"/HELM_CHART_VERSION)
-
-    sha=$(git rev-parse HEAD)
-    commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
-    number_of_commits=$(git rev-list --count "$sha")
-    commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
-
-    echo "$prefix-snapshot.$commit_date.$number_of_commits.0.$commit_sha_8"
-}
-
-VERSION_NUMBER=$(get_snapshot_version)
+VERSION_NUMBER=$(get-snapshot-version)
 
 sed --expression="s/IMAGE_TAG/${IMAGE_TAG}/g" | \
     sed --expression="s/VERSION_NUMBER/${VERSION_NUMBER}/g"

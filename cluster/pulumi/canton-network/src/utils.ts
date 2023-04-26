@@ -102,7 +102,6 @@ export function cnChartValues(
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        imageTag: config.require("IMAGE_TAG"),
         ipAddress: infraStack.getOutput("clusterIp"),
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
@@ -120,12 +119,14 @@ export function installCNHelmChartByNamespaceName(
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
+  const versionNumber  = config.require("VERSION_NUMBER");
+
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
       name,
       namespace: nsName,
-      chart: process.env.REPO_ROOT + "/cluster/helm/" + chartName + "/",
+      chart: process.env.REPO_ROOT + "/cluster/helm/target/" + chartName + "-" + versionNumber + ".tgz",
       values: cnChartValues(chartName, values),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
