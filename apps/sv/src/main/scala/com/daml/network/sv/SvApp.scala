@@ -751,13 +751,13 @@ class SvApp(
       case Right(token) => {
         logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
         retryProvider.retryForAutomation(
-          "request onboarding", {
-            val svConnection = new SvConnection(
-              sponsorConfig,
-              retryProvider,
-              coinAppParameters.processingTimeouts,
-              loggerFactory,
-            )
+          "request onboarding",
+          SvConnection(
+            sponsorConfig,
+            retryProvider,
+            coinAppParameters.processingTimeouts,
+            loggerFactory,
+          ).flatMap { svConnection =>
             svConnection
               .startSvOnboarding(token)
               .andThen(_ => svConnection.close())

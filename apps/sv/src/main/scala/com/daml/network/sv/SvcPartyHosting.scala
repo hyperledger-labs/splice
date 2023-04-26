@@ -98,13 +98,13 @@ class SvcPartyHosting(
       s"Requesting to authorize SVC party hosting via SV at: ${sponsorSvConfig.adminApi.url}"
     )
     retryProvider.retryForAutomation(
-      "authorize SVC party hosting", {
-        val svConnection = new SvConnection(
-          sponsorSvConfig.adminApi,
-          retryProvider,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
+      "authorize SVC party hosting",
+      SvConnection(
+        sponsorSvConfig.adminApi,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      ).flatMap { svConnection =>
         svConnection
           .authorizeSvcPartyHosting(candidateParticipantId)
           .map(bs => ByteString.copyFrom(bs.asByteBuffer))

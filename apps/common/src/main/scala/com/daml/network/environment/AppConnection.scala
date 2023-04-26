@@ -19,6 +19,7 @@ import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Success, Failure}
 
 abstract class BaseAppConnection(
     override val timeouts: ProcessingTimeout,
@@ -190,4 +191,18 @@ abstract class HttpAppConnection(
       }
     }
   }
+}
+
+object HttpAppConnection {
+  private[network] def checkVersionOrClose(
+      conn: HttpAppConnection
+  )(implicit ec: ExecutionContext): Future[conn.type] =
+    conn
+      .checkVersionCompatibility()
+      .transform {
+        case Success(_) => Success(conn)
+        case Failure(e) =>
+          conn.close()
+          Failure(e)
+      }
 }

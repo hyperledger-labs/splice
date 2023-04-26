@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
-final class SvConnection(
+final class SvConnection private (
     config: ClientConfig,
     retryProvider: RetryProvider,
     timeouts: ProcessingTimeout,
@@ -59,4 +59,22 @@ final class SvConnection(
       mat: Materializer,
   ): Future[ByteString] =
     runHttpCmd(config.url, HttpSvAppClient.OnboardSvPartyMigrationAuthorize(candidateParticipantId))
+}
+
+object SvConnection {
+  def apply(
+      config: ClientConfig,
+      retryProvider: RetryProvider,
+      timeouts: ProcessingTimeout,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+  ): Future[SvConnection] =
+    HttpAppConnection.checkVersionOrClose(
+      new SvConnection(config, retryProvider, timeouts, loggerFactory)
+    )
 }

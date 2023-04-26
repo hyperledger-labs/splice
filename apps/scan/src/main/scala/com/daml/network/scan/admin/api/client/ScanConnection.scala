@@ -31,7 +31,7 @@ import scala.jdk.OptionConverters.*
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
   */
-final class ScanConnection(
+final class ScanConnection private (
     coinLedgerClient: CNLedgerClient,
     config: ScanAppClientConfig,
     clock: Clock,
@@ -310,14 +310,10 @@ object ScanConnection {
       mat: Materializer,
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
-  ): Future[ScanConnection] = {
-    val sc =
+  ): Future[ScanConnection] =
+    HttpAppConnection.checkVersionOrClose(
       new ScanConnection(coinLedgerClient, config, clock, retryProvider, timeouts, loggerFactory)
-
-    for {
-      _ <- sc.checkVersionCompatibility()
-    } yield sc
-  }
+    )
 
   private case class CachedCoinRules(
       cacheValidUntil: CantonTimestamp,

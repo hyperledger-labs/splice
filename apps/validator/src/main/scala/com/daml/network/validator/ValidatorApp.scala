@@ -199,13 +199,13 @@ class ValidatorApp(
   ): Future[Unit] = {
     logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
     retryProvider.retryForAutomation(
-      "request onboarding", {
-        val svConnection = new SvConnection(
-          svConfig,
-          retryProvider,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
+      "request onboarding",
+      SvConnection(
+        svConfig,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      ).flatMap { svConnection =>
         svConnection
           .onboardValidator(validatorParty, secret)
           .andThen(_ => svConnection.close())
