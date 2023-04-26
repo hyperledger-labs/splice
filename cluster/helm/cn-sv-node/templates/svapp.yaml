@@ -30,8 +30,26 @@ spec:
               value: "5014"
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
+            {{- if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}
+            {{- end }}
+            {{- with .Values.joinWithKeyOnboarding }}
+            - name: ADDITIONAL_CONFIG
+              value: |
+                _svc_remote {
+                  admin-api.port = 5005
+                  admin-api.address = "{{ .svcApiAddress }}"
+                }
+                _onboarding {
+                  type = "join-with-key"
+                  remote-sv.admin-api.port = {{ .sponsorApiPort }}
+                  remote-sv.admin-api.address = "{{ .sponsorApiUrl }}"
+                  name = "{{ .keyName }}"
+                  public-key = "{{ .publicKey }}"
+                  private-key = "{{ .privateKey }}"
+                }
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014
