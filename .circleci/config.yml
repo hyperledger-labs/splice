@@ -814,9 +814,7 @@ commands:
                               --keep NO_PROXY"
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
-         cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           make docker-build -j
+         cmd: make docker-build -j
 
 jobs:
 
@@ -1106,7 +1104,6 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build docs
          cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
            make cluster/images/docs/html
            tar -zcf cluster/images/docs/docs.tar.gz --exclude-vcs  cluster/images/docs/target
       - store_artifacts:
@@ -1124,9 +1121,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           make build
+         cmd: make build
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
       - run_bash_command_in_nix:
@@ -1140,7 +1135,6 @@ jobs:
          cmd: |
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-           export PATH=$HOME/.daml/bin:$PATH
            make docker-push -j
          cmd_retry_count: 5
       - cleanup_sbt_test_job
@@ -1166,9 +1160,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           make build
+         cmd: make build
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
       - run_bash_command_in_nix:
@@ -1180,7 +1172,6 @@ jobs:
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
          cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
            export PUSH_TO_ARTIFACTORY=1
            make docker-push
 
@@ -1224,9 +1215,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           make build
+         cmd: make build
       - docker_build
       - cleanup_sbt_test_job
 
