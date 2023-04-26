@@ -61,20 +61,6 @@ function _cluster_ip() {
            --format 'value(address)'
 }
 
-function _nat_router() {
-    # Check to see if the NAT router exists
-    gcloud compute routers list \
-            --filter "name:${GCP_NAT_ROUTER_NAME}" \
-            --format 'value(name)'
-}
-
-function _nat_config() {
-    # Check to see if the NAT is configured
-    gcloud compute routers nats list \
-            --router="${GCP_NAT_ROUTER_NAME}" \
-            --format 'value(name)'
-}
-
 function _needs_auth0_management_api_creds() {
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
         _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
@@ -600,27 +586,6 @@ function subcmd_create() {
     fi
 
     echo "Cluster at IP ${IPADDR}, applying configuration."
-
-    #### Check for Cloud NAT rules
-    if [ -z "$(_nat_router)" ]; then
-        _log "NAT router ${GCP_NAT_ROUTER_NAME} not found, creating..."
-        gcloud compute routers create "${GCP_NAT_ROUTER_NAME}" \
-            --network default \
-            --region "${CLOUDSDK_COMPUTE_REGION}"
-    else
-        _log "NAT router ${GCP_NAT_ROUTER_NAME} exists, skipping..."
-    fi
-
-    if [ -z "$(_nat_config)" ]; then
-        _log "NAT config ${GCP_NAT_CONFIG_NAME} not found, creating..."
-        gcloud compute routers nats create "${GCP_NAT_CONFIG_NAME}" \
-                --router-region "${CLOUDSDK_COMPUTE_REGION}" \
-                --router "${GCP_NAT_ROUTER_NAME}" \
-                --nat-all-subnet-ip-ranges \
-                --auto-allocate-nat-external-ips
-    else
-        _log "NAT config ${GCP_NAT_CONFIG_NAME} exists, skipping..."
-    fi
 
     _log "Authenticating to newly created cluster."
     subcmd_activate
