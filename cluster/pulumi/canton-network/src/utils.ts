@@ -94,6 +94,8 @@ export function cnChartValues(
     process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
   );
 
+  const imageTagOverride = config.require("IMAGE_TAG");
+
   return _.merge(
     chartDefaultValues,
     {
@@ -107,7 +109,14 @@ export function cnChartValues(
         networkSettings,
       },
     },
-    overrideValues
+    overrideValues,
+    imageTagOverride
+      ? {
+          cluster: {
+            imageTag: imageTagOverride,
+          },
+        }
+      : {}
   );
 }
 
