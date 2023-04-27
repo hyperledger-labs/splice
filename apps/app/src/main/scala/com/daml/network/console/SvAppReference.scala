@@ -52,9 +52,9 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.DevNetOnboardValidatorPrepare())
     }
 
-  def getDebugInfo(): HttpSvAppClient.DebugInfo =
+  def getSvcInfo(): HttpSvAppClient.SvcInfo =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.GetDebugInfo)
+      httpCommand(HttpSvAppClient.GetSvcInfo)
     }
 
   def onboardSvPartyMigrationAuthorize(participantId: ParticipantId): ByteString =

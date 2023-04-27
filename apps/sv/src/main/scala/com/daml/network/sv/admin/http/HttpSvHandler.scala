@@ -202,19 +202,19 @@ class HttpSvHandler(
       }
     }
 
-  def getDebugInfo(
-      respond: v0.SvResource.GetDebugInfoResponse.type
-  )()(fake: Unit): Future[v0.SvResource.GetDebugInfoResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+  def getSvcInfo(
+      respond: v0.SvResource.GetSvcInfoResponse.type
+  )()(fake: Unit): Future[v0.SvResource.GetSvcInfoResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         coinRules <- svcStore.getCoinRules()
         svcRules <- svcStore.getSvcRules()
-      } yield definitions.GetDebugInfoResponse(
+      } yield definitions.GetSvcInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
         coinRulesContractId = coinRules.contractId.toString,
-        svcRulesContractId = svcRules.contractId.toString,
+        svcRules = svcRules.toJson,
       )
     }
 

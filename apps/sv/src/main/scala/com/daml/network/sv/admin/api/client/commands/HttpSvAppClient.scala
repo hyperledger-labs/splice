@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.{Codec, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import java.util.Base64
@@ -27,12 +27,12 @@ object HttpSvAppClient {
       http.SvClient(host)
   }
 
-  final case class DebugInfo(
+  final case class SvcInfo(
       svUser: String,
       svParty: PartyId,
       svcParty: PartyId,
       coinRules: CoinRules.ContractId,
-      svcRules: SvcRules.ContractId,
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
   )
 
   sealed trait SvOnboardingStatus;
@@ -184,38 +184,39 @@ object HttpSvAppClient {
     }
   }
 
-  case object GetDebugInfo extends BaseCommand[http.GetDebugInfoResponse, DebugInfo] {
+  case object GetSvcInfo extends BaseCommand[http.GetSvcInfoResponse, SvcInfo] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDebugInfoResponse] =
-      client.getDebugInfo(headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcInfoResponse] =
+      client.getSvcInfo(headers = headers)
 
     override def handleResponse(
-        response: http.GetDebugInfoResponse
+        response: http.GetSvcInfoResponse
     )(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, DebugInfo] = {
+    ): Either[String, SvcInfo] = {
       response match {
-        case http.GetDebugInfoResponse.OK(
-              definitions.GetDebugInfoResponse(
+        case http.GetSvcInfoResponse.OK(
+              definitions.GetSvcInfoResponse(
                 svUser,
                 svPartyId,
                 svcPartyId,
                 coinRulesContractId,
-                svcRulesContractId,
+                svcRules,
               )
             ) =>
           for {
             svPartyId <- PartyId.fromProtoPrimitive(svPartyId)
             svcPartyId <- PartyId.fromProtoPrimitive(svcPartyId)
-          } yield DebugInfo(
+            svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
+          } yield SvcInfo(
             svUser,
             svPartyId,
             svcPartyId,
             new CoinRules.ContractId(coinRulesContractId),
-            new SvcRules.ContractId(svcRulesContractId),
+            svcRules,
           )
       }
     }

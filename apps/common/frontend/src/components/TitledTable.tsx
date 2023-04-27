@@ -3,17 +3,16 @@ import { PropsWithChildren } from 'react';
 
 import { Stack, Table, TableContainer, Typography } from '@mui/material';
 
-export const TitledTable: React.FC<PropsWithChildren<{ title: string }>> = ({
-  children,
-  title,
-}) => {
+export const TitledTable: React.FC<
+  PropsWithChildren<{ title: string; style?: React.CSSProperties }>
+> = ({ children, title, style }) => {
   return (
     <Stack spacing={2} marginTop={3}>
       <Typography variant="h4" fontWeight="bold">
         {title}
       </Typography>
       <TableContainer>
-        <Table>{children}</Table>
+        <Table style={style}>{children}</Table>
       </TableContainer>
     </Stack>
   );

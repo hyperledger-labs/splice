@@ -1,4 +1,5 @@
 import { useSvClient } from 'common-frontend';
+import { Contract } from 'common-frontend/lib/utils/interfaces';
 import React, { useContext, useEffect, useState } from 'react';
 
 import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
@@ -11,7 +12,7 @@ type SvUiState =
       svPartyId: string;
       svcPartyId: string;
       coinRulesContractId: ContractId<CoinRules>;
-      svcRulesContractId: ContractId<SvcRules>;
+      svcRules: Contract<SvcRules>;
     }
   | undefined;
 
@@ -19,19 +20,19 @@ const SvUiContext = React.createContext<SvUiState | undefined>(undefined);
 
 export const SvUiStateProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const svClient = useSvClient();
-  const [debugInfo, setDebugInfo] = useState<SvUiState>();
+  const [SvcInfo, setSvcInfo] = useState<SvUiState>();
   useEffect(() => {
-    svClient.getDebugInfo().then(resp =>
-      setDebugInfo({
+    svClient.getSvcInfo().then(resp =>
+      setSvcInfo({
         svUser: resp.svUser,
         svPartyId: resp.svPartyId,
         svcPartyId: resp.svcPartyId,
         coinRulesContractId: resp.coinRulesContractId as ContractId<CoinRules>,
-        svcRulesContractId: resp.svcRulesContractId as ContractId<SvcRules>,
+        svcRules: Contract.decodeOpenAPI(resp.svcRules, SvcRules),
       })
     );
   }, [svClient]);
-  return <SvUiContext.Provider value={debugInfo}>{children}</SvUiContext.Provider>;
+  return <SvUiContext.Provider value={SvcInfo}>{children}</SvUiContext.Provider>;
 };
 
 export const useSvUiState: () => SvUiState | undefined = () => {

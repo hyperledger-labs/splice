@@ -455,7 +455,7 @@ class SvTimeBasedIntegrationTest
       rounds should have size 3
       svs.map { sv =>
         val coins = sv.remoteParticipant.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv.getDebugInfo().svParty)
+          .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         coins shouldBe empty
       }
     }
@@ -478,17 +478,17 @@ class SvTimeBasedIntegrationTest
       // Only Sv1 get svc reward from round 0 as Sv2, Sv3 and Sv4 only joined in round 1
       inside(
         svs.head.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getDebugInfo().svParty)
+          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
       ) { case Seq(newCoin) =>
         newCoin.data.svc shouldBe svcParty.toProtoPrimitive
-        newCoin.data.owner shouldBe svs.head.getDebugInfo().svParty.toProtoPrimitive
+        newCoin.data.owner shouldBe svs.head.getSvcInfo().svParty.toProtoPrimitive
         newCoin.data.amount.initialAmount shouldBe coinsToIssueToSvc
           .setScale(10, RoundingMode.HALF_UP)
       }
 
       svs.tail.map { sv =>
         val coins = sv.remoteParticipant.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv.getDebugInfo().svParty)
+          .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         coins shouldBe empty
       }
     }
@@ -506,20 +506,20 @@ class SvTimeBasedIntegrationTest
       // All Svs get reward from round 1
       inside(
         svs.head.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getDebugInfo().svParty)
+          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
       ) { case Seq(_, newCoin) =>
         newCoin.data.svc shouldBe svcParty.toProtoPrimitive
-        newCoin.data.owner shouldBe svs.head.getDebugInfo().svParty.toProtoPrimitive
+        newCoin.data.owner shouldBe svs.head.getSvcInfo().svParty.toProtoPrimitive
         newCoin.data.amount.initialAmount shouldBe eachSvGetInRound1
       }
 
       svs.tail.map { sv =>
         inside(
           sv.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cc.coin.Coin.COMPANION)(sv.getDebugInfo().svParty)
+            .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         ) { case Seq(newCoin) =>
           newCoin.data.svc shouldBe svcParty.toProtoPrimitive
-          newCoin.data.owner shouldBe sv.getDebugInfo().svParty.toProtoPrimitive
+          newCoin.data.owner shouldBe sv.getSvcInfo().svParty.toProtoPrimitive
           newCoin.data.amount.initialAmount shouldBe eachSvGetInRound1
         }
       }

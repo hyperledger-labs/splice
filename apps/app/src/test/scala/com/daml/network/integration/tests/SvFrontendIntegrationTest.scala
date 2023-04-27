@@ -30,19 +30,20 @@ class SvFrontendIntegrationTest
         )
 
         actAndCheck(
-          "debug infos are displayed", {
-            go to s"http://localhost:3010/debug"
+          "svc infos are displayed", {
+            go to s"http://localhost:3010/svc"
           },
         )(
           "We see a table with sv1 as SV Name",
           _ => {
             val rows = findAll(className("value-name")).toSeq
-            rows should have length 5
+            println(rows)
+            rows should have length 15
             forExactly(1, rows)(
-              _.text should matchText(sv1.getDebugInfo().svUser)
+              _.text should matchText(sv1.getSvcInfo().svUser)
             )
-            forExactly(1, rows)(
-              _.text should matchText(sv1.getDebugInfo().svParty.toProtoPrimitive)
+            forExactly(3, rows)(
+              _.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
             )
           },
         )

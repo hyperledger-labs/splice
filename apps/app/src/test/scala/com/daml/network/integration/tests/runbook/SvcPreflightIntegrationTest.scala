@@ -23,7 +23,7 @@ class SvcPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnviron
   "all SVs are online and reachable via HTTP" taggedAs LiveDevNetTest in { implicit env =>
     env.svs.remote.foreach(sv =>
       clue(s"Checking SV at ${sv.httpClientConfig.url}") {
-        sv.getDebugInfo()
+        sv.getSvcInfo()
       }
     )
   }

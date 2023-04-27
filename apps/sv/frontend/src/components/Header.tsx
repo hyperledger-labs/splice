@@ -8,8 +8,8 @@ import Link from '@mui/material/Link';
 
 const Header: React.FC = () => {
   const navLinks = [
-    { name: 'Debug', path: 'debug' },
-    { name: 'FAQs', path: 'faqs' },
+    { name: 'Infos', path: 'svc' },
+    { name: 'Validator Onboarding', path: 'onboarding' },
   ];
 
   const applyNavStyle = (isActive: boolean) => {

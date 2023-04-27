@@ -151,18 +151,19 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/501"
-  /debug:
+  #TODO(#4354): Part of potential fixes: consider splitting this endpoint (previously named debug) in two (e.g. svc and sv)
+  /svc:
     get:
       tags: [sv]
       x-jvm-package: sv
-      operationId: "getDebugInfo"
+      operationId: "getSvcInfo"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetDebugInfoResponse"
+                "$ref": "#/components/schemas/GetSvcInfoResponse"
 components:
   schemas:
     ListOngoingValidatorOnboardingsResponse:
@@ -264,14 +265,14 @@ components:
         acs_snapshot:
           type: string
 
-    GetDebugInfoResponse:
+    GetSvcInfoResponse:
       type: object
       required:
         - sv_user
         - sv_party_id
         - svc_party_id
         - coin_rules_contract_id
-        - svc_rules_contract_id
+        - svc_rules
       properties:
         # User representing the SV
         sv_user:
@@ -286,5 +287,6 @@ components:
         coin_rules_contract_id:
           type: string
         # Contract IDs of the SvcRules contract associated with the SVC
-        svc_rules_contract_id:
-          type: string
+        svc_rules:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+

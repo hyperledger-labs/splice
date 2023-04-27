@@ -12,8 +12,8 @@ import {
 import { ThemeProvider, CssBaseline } from '@mui/material';
 
 import AuthCheck from './routes/authCheck';
-import Debug from './routes/debug';
 import Root from './routes/root';
+import Svc from './routes/svc';
 import { config } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
@@ -37,8 +37,8 @@ const router = createBrowserRouter(
       }
     >
       <Route path="/" element={<Root />}>
-        <Route index element={<Debug />} />
-        <Route path="debug" element={<Debug />} />
+        <Route index element={<Svc />} />
+        <Route path="svc" element={<Svc />} />
       </Route>
     </Route>
   )

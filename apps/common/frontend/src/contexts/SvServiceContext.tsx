@@ -1,6 +1,6 @@
 import * as openapi from 'sv-openapi';
 import React, { useContext, useMemo } from 'react';
-import { GetDebugInfoResponse, ServerConfiguration } from 'sv-openapi';
+import { GetSvcInfoResponse, ServerConfiguration } from 'sv-openapi';
 
 const SvContext = React.createContext<SvClient | undefined>(undefined);
 
@@ -9,7 +9,7 @@ export interface SVProps {
 }
 
 export interface SvClient {
-  getDebugInfo: () => Promise<GetDebugInfoResponse>;
+  getSvcInfo: () => Promise<GetSvcInfoResponse>;
 }
 
 export const SvClientProvider: React.FC<React.PropsWithChildren<SVProps>> = ({ url, children }) => {
@@ -20,8 +20,8 @@ export const SvClientProvider: React.FC<React.PropsWithChildren<SVProps>> = ({ u
     const svClient = new openapi.SvApi(configuration);
 
     return {
-      getDebugInfo: async (): Promise<GetDebugInfoResponse> => {
-        return await svClient.getDebugInfo();
+      getSvcInfo: async (): Promise<GetSvcInfoResponse> => {
+        return await svClient.getSvcInfo();
       },
     };
   }, [url]);

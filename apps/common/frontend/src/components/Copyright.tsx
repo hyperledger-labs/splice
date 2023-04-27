@@ -8,7 +8,7 @@ const Copyright: React.FC = () => (
     variant="body1"
     color="text.secondary"
     align="center"
-    position={'fixed'}
+    position={'relative'}
     bottom={0}
     margin={2}
     padding={2}
