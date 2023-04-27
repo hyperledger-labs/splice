@@ -9,9 +9,10 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitial
 import com.daml.network.codegen.java.cn.wallet.{
   payment as paymentCodegen,
   subscriptions as subsCodegen,
+  install as walletInstallCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.*
+import com.daml.network.console.{ValidatorAppBackendReference, *}
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -86,18 +87,70 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     }
   }
 
-  def userIsFullyOnboarded(
-      walletAppClient: WalletAppClientReference
-  ): Boolean = {
+  def assertUserFullyOnboarded(
+      walletAppClient: WalletAppClientReference,
+      validatorAppBackend: ValidatorAppBackendReference,
+  ): org.scalatest.Assertion = {
     val status = walletAppClient.userStatus()
-    status.userOnboarded && status.userWalletInstalled
+    status.userOnboarded shouldBe true
+    status.userWalletInstalled shouldBe true
+
+    val endUserParty = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users
+      .get(walletAppClient.config.ledgerApiUser)
+      .primaryParty
+      .value
+
+    status.party shouldBe endUserParty.toProtoPrimitive
+
+    // Validator user must have rights for the end user party
+    val validatorRights =
+      validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users.rights
+        .list(validatorAppBackend.config.ledgerApiUser)
+    validatorRights.actAs should contain(endUserParty)
+
+    // There should be ValidatorRight and WalletInstall contracts
+    val ledgerApiEx = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api_extensions
+    ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
+      endUserParty,
+      c => c.data.user == endUserParty.toProtoPrimitive,
+    ) should have size 1
+    ledgerApiEx.acs.filterJava(walletInstallCodegen.WalletAppInstall.COMPANION)(
+      endUserParty,
+      c => c.data.endUserParty == endUserParty.toProtoPrimitive,
+    ) should have size 1
   }
 
-  def userIsFullyOffboarded(
-      walletAppClient: WalletAppClientReference
-  ): Boolean = {
+  def assertUserFullyOffboarded(
+      walletAppClient: WalletAppClientReference,
+      validatorAppBackend: ValidatorAppBackendReference,
+  ): org.scalatest.Assertion = {
+    // Wallet must report that user is not onboarded
     val status = walletAppClient.userStatus()
-    !status.userOnboarded && !status.userWalletInstalled
+    status.userOnboarded shouldBe false
+    status.userWalletInstalled shouldBe false
+
+    val endUserParty = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users
+      .get(walletAppClient.config.ledgerApiUser)
+      .primaryParty
+      .value
+
+    // Validator user must not have any rights for the end user party
+    val ledgerApi = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api
+    val validatorRights = ledgerApi.users.rights
+      .list(validatorAppBackend.config.ledgerApiUser)
+    validatorRights.readAs should not contain endUserParty
+    validatorRights.actAs should not contain endUserParty
+
+    // All validator right and wallet install contracts must be gone
+    val ledgerApiEx = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api_extensions
+    ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
+      endUserParty,
+      c => c.data.user == endUserParty.toProtoPrimitive,
+    ) shouldBe empty
+    ledgerApiEx.acs.filterJava(walletInstallCodegen.WalletAppInstall.COMPANION)(
+      endUserParty,
+      c => c.data.endUserParty == endUserParty.toProtoPrimitive,
+    ) shouldBe empty
   }
 
   /** The wallet is not immediately usable by an onboarded user, specifically, the wallet
@@ -109,7 +162,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       walletAppClient: WalletAppClientReference
   ) = {
     eventually() {
-      userIsFullyOnboarded(walletAppClient) shouldBe true
+      val status = walletAppClient.userStatus()
+      status.userOnboarded shouldBe true
+      status.userWalletInstalled shouldBe true
     }
   }
 

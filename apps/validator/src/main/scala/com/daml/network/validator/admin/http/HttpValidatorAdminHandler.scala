@@ -1,19 +1,16 @@
 package com.daml.network.validator.admin.http
 
-import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.http.v0.{definitions, validatorAdmin as v0}
-import com.daml.network.util.Contract
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import io.grpc.{Status, StatusRuntimeException}
-import scala.jdk.CollectionConverters.*
+import io.grpc.StatusRuntimeException
 
 class HttpValidatorAdminHandler(
     ledgerClient: CNLedgerClient,
@@ -83,39 +80,14 @@ class HttpValidatorAdminHandler(
   private def offboardUser(
       user: String
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    logger.debug(s"Offboarding user: ${user}")
-    for {
-      install <- store.multiDomainAcsStore.findContractOnDomain(
-        walletCodegen.WalletAppInstall.COMPANION
-      )(
-        domainId,
-        (co: Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]) =>
-          co.payload.endUserName == user,
-      )
-      res <- install match {
-        case None =>
-          Future.failed(
-            Status.NOT_FOUND
-              .withDescription(s"No install contract found for user ${user}")
-              .asRuntimeException()
-          )
-        case Some(c) =>
-          connection.submitCommandsNoDedup(
-            actAs = Seq(
-              store.key.validatorParty,
-              PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
-            ),
-            readAs = Seq.empty,
-            commands = c.contractId
-              .exerciseArchive(
-                new com.daml.network.codegen.java.da.internal.template.Archive()
-              )
-              .commands
-              .asScala
-              .toSeq,
-            domainId = domainId,
-          )
-      }
-    } yield res
+    ValidatorUtil.offboard(
+      user,
+      connection,
+      store,
+      validatorUserName,
+      domainId,
+      retryProvider,
+      logger,
+    )
   }
 }

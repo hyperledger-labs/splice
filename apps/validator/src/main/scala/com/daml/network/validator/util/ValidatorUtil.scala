@@ -32,7 +32,7 @@ private[validator] object ValidatorUtil {
       s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retryForClientCalls(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case result @ QueryResult(_, None) =>
@@ -112,5 +112,79 @@ private[validator] object ValidatorUtil {
         logger = logger,
       )
     } yield userPartyId
+  }
+
+  def offboard(
+      endUserName: String,
+      connection: CNLedgerConnection,
+      store: ValidatorStore,
+      validatorUserName: String,
+      domainId: DomainId,
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    for {
+      endUserParty <- connection.getPrimaryParty(endUserName)
+      _ <- retryProvider.retryForClientCalls(
+        "Remove install contract",
+        store
+          .lookupWalletInstallByNameWithOffset(endUserName)
+          .map(_.value)
+          .flatMap {
+            case None =>
+              logger.debug(s"No install contract found for user $endUserName, skipping")
+              Future.unit
+            case Some(c) =>
+              connection.submitCommandsNoDedup(
+                actAs = Seq(
+                  store.key.validatorParty,
+                  PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
+                ),
+                readAs = Seq.empty,
+                commands = c.contractId
+                  .exerciseArchive(
+                    new com.daml.network.codegen.java.da.internal.template.Archive()
+                  )
+                  .commands
+                  .asScala
+                  .toSeq,
+                domainId = domainId,
+              )
+          },
+        logger,
+      )
+      _ <- retryProvider.retryForClientCalls(
+        "Remove validator right",
+        store
+          .lookupValidatorRightByPartyWithOffset(endUserParty)
+          .map(_.value)
+          .flatMap {
+            case None =>
+              logger.debug(s"No validator right found for user $endUserName, skipping")
+              Future.unit
+            case Some(c) =>
+              connection.submitCommandsNoDedup(
+                actAs = Seq(
+                  store.key.validatorParty,
+                  endUserParty,
+                ),
+                readAs = Seq.empty,
+                commands = c.contractId
+                  .exerciseArchive(
+                    new com.daml.network.codegen.java.da.internal.template.Archive()
+                  )
+                  .commands
+                  .asScala
+                  .toSeq,
+                domainId = domainId,
+              )
+          },
+        logger,
+      )
+      _ <- connection.revokeUserRights(validatorUserName, Seq(endUserParty), Seq(endUserParty))
+    } yield {
+      logger.debug(s"User $endUserParty offboarded")
+      ()
+    }
   }
 }

@@ -70,7 +70,7 @@ object CNNodeUtil {
         QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
       ],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    retryProvider.retryForAutomation(
+    retryProvider.retryForClientCalls(
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
         case result @ QueryResult(_, None) =>

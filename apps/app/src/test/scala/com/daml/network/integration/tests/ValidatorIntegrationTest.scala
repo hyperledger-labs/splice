@@ -211,7 +211,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     )
 
     aliceWallet.tap(100.0)
-    userIsFullyOnboarded(aliceWallet) shouldBe true
+    assertUserFullyOnboarded(aliceWallet, aliceValidator)
 
     actAndCheck(
       "Offboard a user",
@@ -222,15 +222,13 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
         val usernames = aliceValidatorClient.listUsers()
         usernames should contain theSameElementsAs (testUsers ++
           Seq(aliceValidator.config.validatorWalletUser.value))
-        userIsFullyOffboarded(aliceWallet) shouldBe true
+        assertUserFullyOffboarded(aliceWallet, aliceValidator)
       },
     )
 
-    clue("Offboarding alice again - should fail") {
-      assertThrowsAndLogsCommandFailures(
-        aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
-        _.errorMessage should include("No install contract found for user"),
-      )
+    clue("Offboarding alice again - offboarding should be idempotent") {
+      aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser)
+      assertUserFullyOffboarded(aliceWallet, aliceValidator)
     }
 
     actAndCheck(

@@ -44,21 +44,6 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupWalletInstallByName(
-      endUserName: String
-  ): Future[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
-  ] =
-    lookupWalletInstallByNameWithOffset(endUserName).map(_.value)
-
-  def lookupCoinRulesWithOffset(): Future[
-    QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomainWithOffset(coinCodegen.CoinRules.COMPANION)(_, _ => true)
-    )
-
   def lookupValidatorLicenseWithOffset(): Future[
     QueryResult[Option[Contract[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
