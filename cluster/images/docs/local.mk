@@ -11,4 +11,4 @@ $(dir)/html: $(html)
 docs-dir := $(dir)
 $(html): $(shell find $(docs-dir)/src -type f) $(canton-coin-dar) $(wallet-payments-dar) $(directory-service-dar)
 	SKIP_DAML_BUILD=1 $(docs-dir)/gen-daml-docs.sh
-	VERSION=$(shell version-gen) sphinx-build -M html $(docs-dir)/src $(docs-dir)/target -D version=$(shell version-gen) -W
+	VERSION=$(shell version-gen) CHART_VERSION=$(shell get-snapshot-version) sphinx-build -M html $(docs-dir)/src $(docs-dir)/target -D version=$(shell version-gen) -W

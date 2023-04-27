@@ -103,9 +103,13 @@ rst_prolog = """
 .. |cn_cluster| replace:: :raw-html:`<span class="cn-cluster">unknown_cluster</span>`
 
 .. |version_literal| replace:: ``{version}``
+.. |chart_version_literal| replace:: ``{chart_version}``
 .. |canton_version| replace:: {canton_research_version}
 .. |daml_sdk_version| replace:: {daml_sdk_version}
 
+.. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
+
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_cn-node-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
+
 .. |canton_research_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-{canton_research_version}.tar.gz">Download Canton research</a>`
-""".format(version = os.getenv("VERSION"), canton_research_version = canton_research_version, daml_sdk_version=daml_sdk_version)
+""".format(version = os.getenv("VERSION"), chart_version = os.getenv("CHART_VERSION"), canton_research_version = canton_research_version, daml_sdk_version=daml_sdk_version)
