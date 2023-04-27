@@ -32,7 +32,9 @@ Ensure that your local helm installation has access to the Digital Asset Helm ch
         --username ${ARTIFACTORY_USER} \
         --password ${ARTIFACTORY_PASSWORD}
 
-Create the three application namespaces within Kubernetes and ensure they have image pull credentials for fetching images from the Digital Asset Docker image repository: ::
+Create the three application namespaces within Kubernetes and ensure they have image pull credentials for fetching images from the Digital Asset Docker image repository:
+
+.. code-block:: bash
 
     for ns_name in docs svc sv-1; do
         kubectl create ns ${ns_name}
@@ -72,7 +74,9 @@ cert-manager must be available in the cluster (See `cert-manager documentation <
 Installation Instructions:
 --------------------------
 
-Create a cluster-ingress namespace with image pull permissions from the Artifactory docker repository: ::
+Create a cluster-ingress namespace with image pull permissions from the Artifactory docker repository:
+
+.. code-block:: bash
 
     kubectl create ns cluster-ingress
 
@@ -88,7 +92,9 @@ Create a cluster-ingress namespace with image pull permissions from the Artifact
 
 
 Ensure that there is a cert-manager certificate available in a secret named cn-net-tls.
-An example of a suitable certificate definition: ::
+An example of a suitable certificate definition:
+
+.. code-block:: yaml
 
     apiVersion: cert-manager.io/v1
     kind: Certificate
@@ -123,5 +129,3 @@ Where ingress-values.yaml has the following contents. (externalIPRanges can be e
                 - "35.198.147.95/32"
                 - "35.189.40.124/32"
                 - "34.132.91.75/32"
-
-

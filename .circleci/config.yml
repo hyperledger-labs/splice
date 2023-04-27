@@ -1104,6 +1104,7 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build docs
          cmd: |
+           set -eou pipefail
            make cluster/images/docs/html
            tar -zcf cluster/images/docs/docs.tar.gz --exclude-vcs  cluster/images/docs/target
       - store_artifacts:
