@@ -107,6 +107,7 @@ class LocalRunbookIntegrationTest
         "--bootstrap",
         bootstrapFile.toString,
       ),
+      "local-runbook",
       ("DOMAIN_URL", "http://localhost:9008"),
     )
     cantonProcess = Some(process)

@@ -75,7 +75,7 @@ class SvOnboardingPreflightIntegrationTest
           "--bootstrap",
           (svPath / "sv-participant.sc").toString,
         )
-        Using.resource(startCanton(cantonArgs)) { _ =>
+        Using.resource(startCanton(cantonArgs, "self-hosted-sv")) { _ =>
           runScript(svPath / "sv.sc")(env.environment)
 
           // Stop nodes before Canton is shutdown

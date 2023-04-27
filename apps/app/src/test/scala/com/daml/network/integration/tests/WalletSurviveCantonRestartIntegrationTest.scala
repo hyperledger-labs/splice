@@ -64,7 +64,7 @@ class WalletSurviveCantonRestartIntegrationTest
       initSvc()
       aliceValidator.start()
 
-      Using.resource(startCanton(cantonArgs)) { _ =>
+      Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-1")) { _ =>
         eventuallySucceeds(timeUntilSuccess = 40.seconds) {
           aliceValidator.remoteParticipant.domains
             .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
@@ -77,7 +77,7 @@ class WalletSurviveCantonRestartIntegrationTest
         aliceWallet.list()
       }
 
-      Using.resource(startCanton(cantonArgs)) { _ =>
+      Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-2")) { _ =>
         eventuallySucceeds() {
           aliceWallet.tap(2)
         }

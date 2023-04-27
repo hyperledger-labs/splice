@@ -112,7 +112,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       bootstrapFile.toString,
     )
 
-    Using.resource(startCanton(cantonArgs)) { _ =>
+    Using.resource(startCanton(cantonArgs, "self-hosted-splitwell")) { _ =>
       runScript(validatorPath / "validator.sc")(env.environment)
 
       v("validatorApp").remoteParticipant.dars

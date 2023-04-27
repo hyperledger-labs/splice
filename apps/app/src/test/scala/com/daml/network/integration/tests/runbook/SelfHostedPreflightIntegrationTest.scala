@@ -76,7 +76,7 @@ class SelfHostedPreflightIntegrationTest
     checkFrontendsJsonLedgerApiPort("6001")
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 
-    Using.resource(startCanton(cantonArgs)) { _ =>
+    Using.resource(startCanton(cantonArgs, "self-hosted-validator")) { _ =>
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 

@@ -25,7 +25,7 @@ object CantonProcessTestUtil {
 trait CantonProcessTestUtil {
   import CantonProcessTestUtil.CantonProcess
 
-  private val defaultArgs =
+  private def defaultArgs(logSuffix: String) =
     Seq(
       "canton",
       "daemon",
@@ -35,11 +35,12 @@ trait CantonProcessTestUtil {
       "--log-encoder",
       "json",
       "--log-file-name",
-      "log/canton-standalone.clog",
+      s"log/canton-standalone-$logSuffix.clog",
     )
 
   protected def startCanton(
       args: Seq[String],
+      logSuffix: String,
       extraEnv: (String, String)*
   ): CantonProcess = {
     // We use the Java process management APIs here since they
@@ -49,7 +50,7 @@ trait CantonProcessTestUtil {
     // See https://github.com/scala/scala/blob/1efd473aae819c8ddd2dc0656a4259c89bf03312/src/library/scala/sys/process/BasicIO.scala#LL246C39-L246C52
     // for the code in the scala stdlib that does the copying.
     val builder = new ProcessBuilder(
-      (defaultArgs ++ args): _*
+      (defaultArgs(logSuffix) ++ args): _*
     )
     // Clear classpath to avoid issues with multiple logging libs being picked up.
     builder
