@@ -4,4 +4,4 @@ type: application
 description: Canton Network Documentation Server
 
 version: VERSION_NUMBER
-appVersion: VERSION_NUMBER
+appVersion: IMAGE_TAG

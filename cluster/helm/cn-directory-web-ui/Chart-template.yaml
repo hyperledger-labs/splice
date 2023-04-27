@@ -2,7 +2,7 @@ apiVersion: v2
 name: cn-directory-web-ui
 type: application
 version: VERSION_NUMBER
-appVersion: VERSION_NUMBER
+appVersion: IMAGE_TAG
 
 description: Canton Network Directory UI
 dependencies:
