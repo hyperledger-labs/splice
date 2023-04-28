@@ -11,7 +11,7 @@ LOGFILE_BEFORE="$2"
 LOGFILE_AFTER="$3"
 
 # We're using this rather specific pattern to avoid skipping over logs.
-SHUTDOWN_MESSAGE_PATTERN="INFO.*CantonResearchApp.* - Shutting down\.\.\."
+SHUTDOWN_MESSAGE_PATTERN='"message":"Shutting down\.\.\.","logger_name":"c.d.canton.CantonResearchApp$"'
 
 # Succeed if logfile does not exist
 if [[ ! -f "$LOGFILE" ]]
