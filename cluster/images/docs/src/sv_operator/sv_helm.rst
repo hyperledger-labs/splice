@@ -61,8 +61,8 @@ Create the three application namespaces within Kubernetes and ensure they have i
 Installing the Software
 -------------------------
 
-Install the Helm charts needed to start a standalone Canton Network
-cluster. To make these commands work, you will need to meet a few
+Install the Helm charts needed to start an SV node connected to the cluster.
+To make these commands work, you will need to meet a few
 preconditions. The first is that there needs to be an environment
 variable defined to refer to the version of the Helm charts necessary
 to connect to this environment:
@@ -70,7 +70,9 @@ to connect to this environment:
 |chart_version_set|
 
 There should also be a file, ``remote-domain.yaml``, that refers to
-the domain in the cluster to which you are connecting. 
+the domain in the cluster to which you are connecting. As in other sections
+of this runbook, please replace ``TARGET_CLUSTER`` with ``dev`` or ``test``
+per the cluster to which you are connecting.
 
 .. code-block:: yaml
 
@@ -79,7 +81,9 @@ the domain in the cluster to which you are connecting.
       url: http://TARGET_CLUSTER.network.canton.global:5008
 
 The authentication credentials should be defined in a file named
-``cn-join-with-key.yaml``
+``cn-join-with-key.yaml``. If you haven't done so yet, please first follow the instructions in
+the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register a name and keypair for your SV.
+
 
 .. code-block:: yaml
 
@@ -104,12 +108,13 @@ reaches a stable state prior to moving on to the next step.
     helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f remote-domain.yaml
     helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f cn-join-with-key.yaml
 
+Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
 namespaces. A typical query might look as follows:
 
 .. code-block:: bash
 
-    $ kubectl get pods --all-namespaces |grep -v kube-system 
+    $ kubectl get pods --all-namespaces |grep -v kube-system
     NAMESPACE     NAME                                                         READY   STATUS    RESTARTS      AGE
     docs          docs-86647d56dd-97d64                                        1/1     Running   0             34m
     docs          gcs-proxy-86bf867fdc-c2tcm                                   1/1     Running   0             34m
