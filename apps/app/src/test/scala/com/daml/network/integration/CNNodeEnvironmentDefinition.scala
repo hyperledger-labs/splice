@@ -22,6 +22,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
+import org.scalatest.{Inspectors, OptionValues}
 import org.scalatest.matchers.should.Matchers
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.SuppressingLogger
@@ -43,8 +44,10 @@ case class CNNodeEnvironmentDefinition(
       teardown,
       configTransformsWithContext(context),
     )
+    with Inspectors
     with Matchers
-    with NamedLogging {
+    with NamedLogging
+    with OptionValues {
   override def loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   override val configTransforms = configTransformsWithContext(context)
 
@@ -72,10 +75,18 @@ case class CNNodeEnvironmentDefinition(
           readAs = Set.empty,
           participantAdmin = true,
         )
+        val svUserRegex = raw"sv(\d+)-(.*)".r
         svs.local.foreach(sv => {
-          val svParty = sv.remoteParticipantWithAdminToken.ledger_api.parties
-            .allocate(sv.config.ledgerApiUser, sv.config.ledgerApiUser)
-            .party
+          // We want to use the same party for the validator service party and the SV party. This is test only code
+          // so we just find the matching validator user by relying on a specific naming format.
+          val (svNumber, suffix) = sv.config.ledgerApiUser match {
+            case svUserRegex(number, suffix) => (number, suffix)
+            case user => fail(s"SV user name did not match expected format: $user")
+          }
+          val validatorUserName = s"sv${svNumber}_validator_user-$suffix"
+          val user = sv.remoteParticipantWithAdminToken.ledger_api.users
+            .get(validatorUserName)
+          val svParty = user.primaryParty.value
           sv.remoteParticipantWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs = sv.config.onboarding match {
@@ -201,8 +212,8 @@ case class CNNodeEnvironmentDefinition(
 object CNNodeEnvironmentDefinition {
   def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
-      .withAllocatedSvcAndSvUsers()
       .withAllocatedValidatorUsers()
+      .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
 
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =

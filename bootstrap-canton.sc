@@ -26,10 +26,10 @@ println("Connecting splitwell to upgraded domain...")
 splitwellParticipant.domains.connect_local(splitwellUpgrade)
 
 def createUser(
-  participant: ParticipantReference,
-  user: String,
-  additionalActAsParties: Set[PartyId] = Set(),
-  readAsParties: Set[PartyId] = Set(),
+    participant: ParticipantReference,
+    user: String,
+    additionalActAsParties: Set[PartyId] = Set(),
+    readAsParties: Set[PartyId] = Set(),
 ) = {
   val party = participant.ledger_api.parties.allocate(user, user).party
   participant.ledger_api.users.create(
@@ -48,19 +48,38 @@ Seq(
   (bobParticipant, "bob_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
   (splitwellParticipant, "splitwell_provider"),
-  (svcParticipant, "sv1_validator_user"),
 ).foreach { case (participant, user) =>
   createUser(participant, user)
 }
 
 val svcParty = createUser(svcParticipant, "svc_shared_service_user")
-createUser(svcParticipant, "sv1", additionalActAsParties = Set(svcParty))
 
 // These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
-createUser(sv2Participant, "sv2")
-createUser(sv3Participant, "sv3")
-createUser(sv4Participant, "sv4")
-createUser(sv5Participant, "sv5")
+
+val sv1Party = createUser(svcParticipant, "sv1_validator_user")
+svcParticipant.ledger_api.users.create(
+  id = "sv1",
+  primaryParty = Some(sv1Party),
+  actAs = Set(sv1Party, svcParty),
+  readAs = Set.empty,
+  participantAdmin = true,
+)
+
+Seq(
+  ("sv2", sv2Participant),
+  ("sv3", sv3Participant),
+  ("sv4", sv4Participant),
+  ("sv5", sv5Participant),
+).foreach { case (sv, participant) =>
+  val svParty = createUser(participant, s"${sv}_validator_user")
+  participant.ledger_api.users.create(
+    id = sv,
+    actAs = Set(svParty),
+    primaryParty = Some(svParty),
+    readAs = Set(),
+    participantAdmin = true,
+  )
+}
 
 svcParticipant.ledger_api.users.create(
   id = "directory_provider",

@@ -31,9 +31,6 @@ class WalletTxLogTimeBasedIntegrationTest
   "A wallet" should {
 
     "handle sv rewards" in { implicit env =>
-      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
-      logger.info(s"SV1 wallet uses party $sv1UserParty")
-
       actAndCheck(
         "Advance round",
         advanceRoundsByOneTick,

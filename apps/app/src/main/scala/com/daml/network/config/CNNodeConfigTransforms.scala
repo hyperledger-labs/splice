@@ -131,6 +131,9 @@ object CNNodeConfigTransforms {
       c.copy(
         svApps = c.svApps.filter(_._1 == InstanceName.tryCreate("sv1")),
         svAppClients = c.svAppClients.filter(_._1 == InstanceName.tryCreate("sv1")),
+        validatorApps = c.validatorApps.filter { case (name, _) =>
+          !name.toProtoPrimitive.startsWith("sv") || name == InstanceName.tryCreate("sv1Validator")
+        },
       )
 
   /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
@@ -331,9 +334,11 @@ object CNNodeConfigTransforms {
 
   def bumpSelfHostedParticipantPortsBy(bump: Int): CNNodeConfigTransform = {
     val transforms = Seq(
-      updateAllValidatorConfigs_(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-      )
+      updateAllValidatorConfigs { case (name, config) =>
+        if (name.startsWith("sv")) config
+        else
+          config.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      }
     )
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
   }

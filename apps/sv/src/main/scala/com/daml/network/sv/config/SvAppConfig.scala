@@ -76,6 +76,8 @@ case class LocalSvAppConfig(
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
     enableCoinRulesUpgrade: Boolean = false,
+    // TODO(#4319) Remove this once we no longer deploy SV apps without validators.
+    enableValidatorDependency: Boolean = false,
 ) extends LocalCNNodeConfig {
   override val nodeTypeName: String = "SV"
 

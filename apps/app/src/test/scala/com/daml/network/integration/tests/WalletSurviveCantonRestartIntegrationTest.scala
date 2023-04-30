@@ -54,7 +54,9 @@ class WalletSurviveCantonRestartIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
-      .withPreSetup(_ => ())
+      .withPreSetup(implicit env =>
+        CNNodeEnvironmentDefinition.withAllocatedValidator(sv1Validator)
+      )
       .withAllocatedSvcAndSvUsers()
       .withManualStart
   }

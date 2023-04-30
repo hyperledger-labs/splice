@@ -303,6 +303,10 @@ class SvApp(
           case Right(privateKey_) =>
             for {
               _ <- uploadDars(ledgerConnection)
+              _ <-
+                if (config.enableValidatorDependency) {
+                  waitForValidatorLicense(svStore)
+                } else Future.unit
               _ <- requestOnboarding(
                 remoteSv.adminApi,
                 name,
@@ -507,6 +511,20 @@ class SvApp(
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
   } yield svcRules.exists(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
+
+  private def waitForValidatorLicense(svStore: SvSvStore): Future[
+    Contract[cc.validatorlicense.ValidatorLicense.ContractId, cc.validatorlicense.ValidatorLicense]
+  ] = {
+    logger.info(s"Waiting for ValidatorLicense contract to be created for ${svStore.key.svParty}")
+    // If the validator license contract gets created after we disconnected from the domain, Canton blows up during the SVC party migration
+    // because the contract gets added both via the party migration and through the regular event stream for the SV party which is an observer.
+    // Therefore, we let the validator app do its thing first.
+    retryProvider.retryForAutomation(
+      "Wait for ValidatorLicense contract",
+      svStore.getValidatorLicense(),
+      logger,
+    )
+  }
 
   private def waitForSvOnboardingConfirmed(
       svStore: SvSvStore

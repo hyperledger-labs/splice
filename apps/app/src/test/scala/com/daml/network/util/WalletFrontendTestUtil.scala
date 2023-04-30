@@ -79,8 +79,26 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
       expectedPartyDescription: Option[String],
       expectedAmountCC: BigDecimal,
   ): Assertion = {
+    val expectedUSD = expectedAmountCC * coinPrice
+    matchTransactionAmountRange(transactionRow)(
+      coinPrice,
+      expectedAction,
+      expectedSubtype,
+      expectedPartyDescription,
+      (expectedAmountCC - smallAmount, expectedAmountCC),
+      (expectedUSD - smallAmount * coinPrice, expectedUSD),
+    )
+  }
+
+  protected def matchTransactionAmountRange(transactionRow: Element)(
+      coinPrice: BigDecimal,
+      expectedAction: String,
+      expectedSubtype: String,
+      expectedPartyDescription: Option[String],
+      expectedAmountCC: (BigDecimal, BigDecimal),
+      expectedAmountUSD: (BigDecimal, BigDecimal),
+  ): Assertion = {
     val transaction = readTransactionFromRow(transactionRow)
-    val expectedAmountUSD = expectedAmountCC * coinPrice
 
     transaction.action should matchText(expectedAction)
     transaction.subtype should matchText(expectedSubtype)
@@ -89,10 +107,10 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
       case (Some(party), Some(ep)) => party should matchText(ep)
       case _ => fail(s"Unexpected party in transaction: $transaction")
     }
-    transaction.ccAmount should beWithin(expectedAmountCC - smallAmount, expectedAmountCC)
+    transaction.ccAmount should beWithin(expectedAmountCC._1, expectedAmountCC._2)
     transaction.usdAmount should beWithin(
-      expectedAmountUSD - smallAmount * coinPrice,
-      expectedAmountUSD,
+      expectedAmountUSD._1,
+      expectedAmountUSD._2,
     )
     transaction.rate should matchText(s"${BigDecimal(1) / coinPrice} CC/USD")
   }

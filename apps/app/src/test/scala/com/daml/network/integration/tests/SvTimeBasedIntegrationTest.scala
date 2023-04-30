@@ -692,10 +692,28 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.start()
       )
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 3
@@ -709,6 +727,7 @@ class SvTimeBasedIntegrationTest
       // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
     }
     clue("SV4 starts") {
+      sv4Validator.start()
       sv4.start()
     }
     clue("An `SvOnboarding` contract is created") {
@@ -728,10 +747,28 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.start()
       )
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 3
@@ -809,10 +846,32 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv4,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+        sv4Validator,
+      ).foreach(
         _.start()
       )
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv4,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+        sv4Validator,
+      ).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 4
@@ -890,10 +949,32 @@ class SvTimeBasedIntegrationTest
 
   "detect an inactive leader" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv4,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+        sv4Validator,
+      ).foreach(
         _.start()
       )
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3, sv4).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv4,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+        sv4Validator,
+      ).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 4

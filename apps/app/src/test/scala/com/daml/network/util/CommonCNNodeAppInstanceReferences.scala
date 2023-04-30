@@ -105,6 +105,22 @@ trait CommonCNNodeAppInstanceReferences {
     "sv1Validator"
   )
 
+  def sv2Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+    "sv2Validator"
+  )
+
+  def sv3Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+    "sv3Validator"
+  )
+
+  def sv4Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+    "sv4Validator"
+  )
+
+  def sv5Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+    "sv5Validator"
+  )
+
   def splitwellValidator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference =
     v(
       "splitwellValidator"

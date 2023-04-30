@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests.connectivity
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -15,34 +16,33 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withManualStart
 
   private val toxiproxy = UseToxiproxy(createSvLedgerApiProxies = true)
   registerPlugin(toxiproxy)
 
-  "sv app should recover and correctly report their activeness status after a disconnect" in {
+  "sv1 app should recover and correctly report their activeness status after a disconnect" in {
     implicit env =>
       svc.startSync()
-      svs.foreach(_.startSync())
+      sv1.startSync()
       scan.startSync()
 
       clue("svc app should report as active")(svc.health.active shouldBe true)
 
-      clue("sv apps should report as active")(eventually() {
-        svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true)
+      clue("sv1 app should report as active")(eventually() {
+        sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
       })
 
       clue("alice's validator starts successfully")(aliceValidator.startSync())
 
       clue("disable all SV connections to the ledger API server") {
-        svs.foreach(sv =>
-          toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv.name))
-        )
+        toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name))
       }
 
-      clue("sv apps should report as inactive") {
+      clue("sv1 app should report as inactive") {
         eventually() {
-          svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false)
+          sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
         }
       }
 
@@ -57,12 +57,10 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
         }
       }
 
-      clue("re-enable the connection and wait for sv apps to report healthy again") {
-        svs.foreach(sv =>
-          toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv.name))
-        )
+      clue("re-enable the connection and wait for sv1 app to report healthy again") {
+        toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name))
         eventually() {
-          svs.foreach(_.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true)
+          sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
         }
       }
 

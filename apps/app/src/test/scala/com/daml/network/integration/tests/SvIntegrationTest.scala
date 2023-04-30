@@ -8,6 +8,7 @@ import com.daml.network.console.{
   CNRemoteParticipantReference,
   LocalCNNodeAppReference,
   SvAppBackendReference,
+  ValidatorAppBackendReference,
 }
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -53,21 +54,25 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Starting SVC app and SV1 app") {
       // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
       svc.start()
-      sv1.startSync()
+      scan.start()
+      sv1Validator.start()
+      sv1.start()
+      sv1Validator.waitForInitialization()
+      sv1.waitForInitialization()
       svc.waitForInitialization()
+      scan.waitForInitialization()
     }
-    clue("Starting SV2 app") {
-      sv2.startSync()
-    }
-    clue("Starting SV3 app") {
-      sv3.startSync()
-    }
-    clue("Starting SV4 app") {
-      sv4.startSync()
-    }
-    clue("Starting SV5 app") {
-      sv5.startSync()
-    }
+    def startSv(number: Int, sv: SvAppBackendReference, validator: ValidatorAppBackendReference) =
+      clue(s"Starting SV$number app") {
+        validator.start()
+        sv.start()
+        validator.waitForInitialization()
+        sv.waitForInitialization()
+      }
+    startSv(2, sv2, sv2Validator)
+    startSv(3, sv3, sv3Validator)
+    startSv(4, sv4, sv4Validator)
+    startSv(5, sv5, sv5Validator)
   }
 
   "The SVC is bootstrapped correctly" in { implicit env =>
@@ -229,21 +234,21 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV1 has created as many ValidatorOnboarding contracts as it's configured to.") {
-      sv1.listOngoingValidatorOnboardings() should have length 5
+      sv1.listOngoingValidatorOnboardings() should have length 4
     }
     clue("SV1 doesn't recreate ValidatorOnboarding contracts on restart...") {
       sv1.stop()
       sv1.startSync()
-      sv1.listOngoingValidatorOnboardings() should have length 5
+      sv1.listOngoingValidatorOnboardings() should have length 4
     }
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidator.startSync()
       eventually() {
-        sv1.listOngoingValidatorOnboardings() should have length 4
+        sv1.listOngoingValidatorOnboardings() should have length 3
       }
       sv1.stop()
       sv1.startSync()
-      sv1.listOngoingValidatorOnboardings() should have length 4
+      sv1.listOngoingValidatorOnboardings() should have length 3
     }
   }
 
@@ -281,10 +286,28 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.start()
       )
-      Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+      Seq(
+        svc: LocalCNNodeAppReference,
+        scan: LocalCNNodeAppReference,
+        sv1,
+        sv2,
+        sv3,
+        sv1Validator,
+        sv2Validator,
+        sv3Validator,
+      ).foreach(
         _.waitForInitialization()
       )
       getSvcRules().data.members should have size 3
@@ -315,6 +338,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       // active and sv3 hasn't approved sv4.
     }
     clue("SV4 starts") {
+      sv4Validator.start()
       sv4.start()
     }
     val sv1Party = sv1.getSvcInfo().svParty
@@ -469,10 +493,28 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+        Seq(
+          svc: LocalCNNodeAppReference,
+          scan: LocalCNNodeAppReference,
+          sv1,
+          sv2,
+          sv3,
+          sv1Validator,
+          sv2Validator,
+          sv3Validator,
+        ).foreach(
           _.start()
         )
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1, sv2, sv3).foreach(
+        Seq(
+          svc: LocalCNNodeAppReference,
+          scan: LocalCNNodeAppReference,
+          sv1,
+          sv2,
+          sv3,
+          sv1Validator,
+          sv2Validator,
+          sv3Validator,
+        ).foreach(
           _.waitForInitialization()
         )
         getSvcRules().data.members should have size 3
@@ -503,6 +545,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
       actAndCheck(
         "start sv4 with a party id different from existing sv4 in SVC", {
+          sv4Validator.startSync()
           sv4.startSync()
         },
       )(

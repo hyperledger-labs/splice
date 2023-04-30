@@ -129,6 +129,7 @@ class CNNodeConsoleEnvironment(
       svs.local.filter(sv => sv.name != "sv5"),
       scans.local,
       directories.local,
+      validators.local.filter(v => v.name.startsWith("sv")),
     ),
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
@@ -137,6 +138,7 @@ class CNNodeConsoleEnvironment(
       svs.remote.filter(sv => sv.name != "sv5"),
       scans.remote,
       directories.remote,
+      validators.remote.filter(v => v.name.startsWith("sv")),
     ),
   )
 

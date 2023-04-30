@@ -1,20 +1,23 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.scalatest.OptionValues
 
 import java.time.Duration
 
 class WalletTransactionHistoryTimeBasedIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob", "sv1")
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil
-    with FrontendLoginUtil {
+    with FrontendLoginUtil
+    with OptionValues {
 
   private val coinPrice = 2
 
@@ -24,6 +27,7 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
 
   "A wallet transaction history UI" should {
 
@@ -71,6 +75,35 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
 
         matchLockUnlockDirectoryPayment(txsAfter.take(2), directoryExpectedCns, isInitial = false)
         matchInitialTransactions(txsAfter.drop(2), directoryExpectedCns)
+      }
+    }
+
+    "show sv rewards collection in tx history" in { implicit env =>
+      val (_, txs) = withFrontEnd("sv1") { implicit webDriver =>
+        val sv1WalletUser = sv1Validator.config.validatorWalletUser.value
+        browseToSv1Wallet(sv1WalletUser)
+        actAndCheck(
+          "Advance round",
+          advanceRoundsByOneTick,
+        )(
+          "Wait for SV rewards to be collected and show up in the tx history",
+          _ => {
+            val txs = findAll(className("tx-row")).toSeq
+            txs should have size 1
+            txs
+          },
+        )
+      }
+      inside(txs) { case Seq(svRewardCollection) =>
+        matchTransactionAmountRange(svRewardCollection)(
+          coinPrice = 2,
+          expectedAction = "Balance Change",
+          expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.SvRewardCollected,
+          expectedPartyDescription = None,
+          // Rewards depend on round activity which can fluctuate a bit due to automation so we accept a wide range.
+          expectedAmountCC = (BigDecimal(66500), BigDecimal(66600)),
+          expectedAmountUSD = (BigDecimal(133000), BigDecimal(133200)),
+        )
       }
     }
 

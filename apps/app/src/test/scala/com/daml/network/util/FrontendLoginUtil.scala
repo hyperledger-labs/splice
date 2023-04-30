@@ -49,6 +49,10 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
     browseToWallet(3001, ledgerApiUser)
   }
 
+  protected def browseToSv1Wallet(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3011, ledgerApiUser)
+  }
+
   protected def browseToPaymentRequests(ledgerApiUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
     browseToAliceWallet(ledgerApiUser)
