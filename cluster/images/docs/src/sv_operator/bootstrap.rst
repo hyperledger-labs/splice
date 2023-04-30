@@ -48,6 +48,18 @@ Assuming that you have extended the ``examples/sv/sv-participant.conf`` to match
 Like for hosting a validator, you also need to enable the GCP DA Canton DevNet VPN.
 If you can view this documentation, you already enabled the VPN successfully.
 
+.. _validator-secret:
+
+Validator Onboarding
+--------------------
+
+An SV node includes a validator node, so just like when
+:ref:`deploying a validator node <self_hosted_validator>`, you need to obtain a secret from your sponsoring SV:
+
+.. parsed-literal::
+
+   curl -X POST https://|cn_cluster|.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/sv/validator-onboarding-nosecret.conf > validator-onboarding.conf
+
 .. _sv-identity:
 
 Generating an SV identity
@@ -115,11 +127,34 @@ To start the SV app, run the following command:
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-onboarding.conf --bootstrap examples/sv/sv.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-onboarding.conf --config validator-onboarding.conf --bootstrap examples/sv/sv.sc
 
 Once the SV app has started and you can access the CN console, you can confirm that your SV node is fully operational by querying its debug endpoint: ::
 
-  @ sv.getDebugInfo
+  @ sv.getSvcInfo
+
+Hosting the SV Wallet UI
+------------------------
+
+To view the coin balance of your SV, you can host the wallet UI and
+then login as ``sv_wallet_user``.  To do so, first edit the wallet UI
+config file ``web-uis/wallet/config.js`` and replace
+``TARGET_CLUSTER`` with |cn_cluster| as described in the :ref:`runbook
+for self-hosted validators <configuring-wallet-ui>`.
+
+Next run the following command: ::
+
+  docker run -d --name nginx_cn_frontends --add-host=host.docker.internal:host-gateway -p 3000:3000 -v $(pwd)/examples/nginx/conf:/etc/nginx/conf.d -v $(pwd)/web-uis:/usr/share/nginx/html nginx
+
+
+For more detailed instructions or in case of issues, refer to the docs for :ref:`hosting the wallet UI for a self-hosted validator<hosting-the-uis>`. The steps are identical for the SV wallet.
+
+After you hosted it, open http://wallet.localhost:3000 in your browser
+and login as ``sv_wallet_user``.
+
+You will see your balance increase as mining rounds advance every 2.5
+minutes and the transaction history will display
+``sv_reward_collected`` entries.
 
 Troubleshooting
 ---------------

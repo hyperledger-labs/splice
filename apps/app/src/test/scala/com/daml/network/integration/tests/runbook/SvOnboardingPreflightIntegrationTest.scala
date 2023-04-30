@@ -22,7 +22,8 @@ import scala.util.Using
 class SvOnboardingPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil {
+    with CantonProcessTestUtil
+    with PreflightIntegrationTestUtil {
 
   private val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
   private val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
@@ -40,6 +41,7 @@ class SvOnboardingPreflightIntegrationTest
         this.getClass.getSimpleName,
         svPath / "sv.conf",
         svPath / "sv-onboarding.conf",
+        svPath / "validator-onboarding-nosecret.conf",
         testResourcesPath / "preflight-topology.conf",
       )
       // clearing default config transforms because they have settings
@@ -49,6 +51,8 @@ class SvOnboardingPreflightIntegrationTest
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `sv-participant.sc` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
+      .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
   "run through sv onboarding runbook" taggedAs LiveDevNetTest in { implicit env =>
     // TODO(M3-53) Consider running this test more than once per deployment once we can offboard SVs
