@@ -102,7 +102,7 @@ reaches a stable state prior to moving on to the next step.
 
 .. code-block:: bash
 
-    help repo update
+    helm repo update
     helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
     helm install postgres canton-network-helm/cn-postgres -n svc --version ${CHART_VERSION}
     helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f remote-domain.yaml
