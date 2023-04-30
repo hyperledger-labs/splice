@@ -30,6 +30,10 @@ spec:
           value: {{ .Values.participantUsers | toJson }}
         - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
           value: {{ .Values.extraDomains | toJson }}
+        - name: AUTH_JWKS_ENDPOINT
+          value: {{ .Values.auth.jwksEndpoint }}
+        - name: AUTH_TARGET_AUDIENCE
+          value: {{ .Values.auth.targetAudience }}
         {{ .Values.extraEnvVars | toYaml | nindent 8 }}
         {{- with .Values.globalDomain }}
         {{- if .alias }}

@@ -70,15 +70,21 @@ to connect to this environment:
 |chart_version_set|
 
 There should also be a file, ``remote-domain.yaml``, that refers to
-the domain in the cluster to which you are connecting. As in other sections
-of this runbook, please replace ``TARGET_CLUSTER`` with ``dev`` or ``test``
-per the cluster to which you are connecting.
+the domain in the cluster to which you are connecting. As in other
+sections of this runbook, please replace ``TARGET_CLUSTER`` with
+``dev`` or ``test`` per the cluster to which you are connecting. The
+``remote-domain.yaml`` file also contains an additional configuration
+block for specifying the Auth0 instance. This will need to be updated
+to match your configuration.
 
 .. code-block:: yaml
 
     globalDomain:
       alias: global
       url: http://TARGET_CLUSTER.network.canton.global:5008
+    auth:
+      jwksEndpoint: "https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json"
+      targetAudience: "https://canton.network.global"
 
 The authentication credentials should be defined in a file named
 ``cn-join-with-key.yaml``. If you haven't done so yet, please first follow the instructions in
