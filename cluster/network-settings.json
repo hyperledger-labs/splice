@@ -35,7 +35,9 @@
     "18.210.210.130/32",
 
     // DA Clusters
-    "34.171.232.181/32",
+    // da-cn-scratchnet gcp project: sratchnet + staging
+    "34.70.206.199/32",
+    // da-cn-devnet gcp project: devnet + testnet
     "34.121.47.27/32",
 
     // Daml Finance CN Test App
