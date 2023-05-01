@@ -62,7 +62,7 @@ final class DomainOrchestrator private (
       f: Map[DomainId, (TriggerContext, Svc)] => (Map[DomainId, (TriggerContext, Svc)], T)
   ): FutureUnlessShutdown[T] =
     FutureUnlessShutdown(Future {
-      if (triggerContext.retryProvider.isShuttingDown) {
+      if (triggerContext.retryProvider.isClosing) {
         // Avoid allocating new services when we are shutting down.
         UnlessShutdown.AbortedDueToShutdown
       } else
@@ -71,7 +71,7 @@ final class DomainOrchestrator private (
             val (servicesNew, result) = f(servicesVar)
             servicesVar = servicesNew
             // Shutdown might have been initiated concurrently with our change to the service map
-            if (triggerContext.retryProvider.isShuttingDown) {
+            if (triggerContext.retryProvider.isClosing) {
               val msg =
                 "Detected race between update of services and shutdown: closing all services again to be on the safe side."
               logger.debug(msg)(TraceContext.empty)

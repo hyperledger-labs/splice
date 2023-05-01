@@ -771,7 +771,7 @@ class CNLedgerSubscription[S](
 
   private val (killSwitch, completed_) = AkkaUtil.runSupervised(
     ex =>
-      if (retryProvider.isShuttingDown) {
+      if (retryProvider.isClosing) {
         logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)
       } else {
         logger.error("Fatally failed to handle transaction", ex)

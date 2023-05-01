@@ -49,7 +49,8 @@ class RetryProvider(
   private val nonTransientDescription = "non-retryable"
   private val fatalBehavior = "not retrying"
 
-  // shutdown signal together with the registry of the callback setting it
+  // shutdown signal as a promise so we can wait on it more easily than polling isClosing.
+  // TODO(#4405) Derive from FlagCloseable isClosing state.
   private val shutdownSignal = Promise[UnlessShutdown[Nothing]]()
 
   runOnShutdown(new RunOnShutdown {
@@ -62,13 +63,6 @@ class RetryProvider(
       val _ = shutdownSignal.trySuccess(UnlessShutdown.AbortedDueToShutdown)
     }
   })(TraceContext.empty)
-
-  /** True if node-level shutdown was initiated.
-    *
-    * This method relies on the guarantee that a `CNNode` will close its retry provider
-    * before closing its other services.
-    */
-  def isShuttingDown: Boolean = shutdownSignal.isCompleted
 
   /** Completes when node-level shutdown was initiated. */
   def shutdownInitiated: Future[UnlessShutdown[Nothing]] = shutdownSignal.future
@@ -84,7 +78,7 @@ class RetryProvider(
       tc: TraceContext
   ): Try[Done] =
     terminationResult match {
-      case scala.util.Success(_) if isShuttingDown =>
+      case scala.util.Success(_) if isClosing =>
         logger.debug(
           s"Observed successful termination of $name during shutdown"
         )
@@ -95,7 +89,7 @@ class RetryProvider(
         logger.error(msg)
         Failure(new RuntimeException(msg))
 
-      case Failure(ex) if isShuttingDown =>
+      case Failure(ex) if isClosing =>
         logger.debug(s"Ignoring termination of $name with exception, as we are shutting down", ex)
         scala.util.Success(Done)
 

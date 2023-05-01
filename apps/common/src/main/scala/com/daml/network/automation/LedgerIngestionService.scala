@@ -60,7 +60,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                 // The creation of the new subscription races with the call to close the content of `currentSubscription`, which is issued
                 // at most once from outside and might end up closing the previous subscription set in a retry loop.
                 // We resolve that race by checking here whether we are closing, and issuing the call ourselves.
-                if (retryProvider.isShuttingDown) {
+                if (retryProvider.isClosing) {
                   logger.debug("detected shutdown, closing subscription")
                   subscription.initiateShutdown()
                 }
@@ -68,7 +68,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
                 // which signals when the subscription terminated.
                 subscription.completed.map(_ => {
                   // Defensive programming: resubscribe if the subscription terminates normally, outside of closing
-                  if (!retryProvider.isShuttingDown) {
+                  if (!retryProvider.isClosing) {
                     val msg = "subscription terminated unexpectedly"
                     logger.error(msg)
                     throw Status.INTERNAL.withDescription(msg).asRuntimeException

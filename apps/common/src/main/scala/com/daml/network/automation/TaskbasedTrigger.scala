@@ -86,7 +86,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
             }
 
           case Failure(ex) =>
-            if (context.retryProvider.isShuttingDown) {
+            if (context.retryProvider.isClosing) {
               logger.info(
                 "Ignoring processing failure, as we are shutting down",
                 ex,

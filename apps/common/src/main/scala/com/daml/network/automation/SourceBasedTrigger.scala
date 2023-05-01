@@ -73,7 +73,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
           )
           executionHandleRef.set(Some(ExecutionHandle(killSwitch, completed)))
           // Beware: the termination signal might have arrived before setting the reference above
-          if (context.retryProvider.isShuttingDown) {
+          if (context.retryProvider.isClosing) {
             logger.debug(
               "Detected race of shutdown signal with setup of source processing loop: triggering termination now."
             )

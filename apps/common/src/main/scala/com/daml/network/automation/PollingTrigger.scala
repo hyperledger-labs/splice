@@ -90,7 +90,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
               loopWithDelay()
 
             case Success(workDone) =>
-              if (context.retryProvider.isShuttingDown) {
+              if (context.retryProvider.isClosing) {
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.

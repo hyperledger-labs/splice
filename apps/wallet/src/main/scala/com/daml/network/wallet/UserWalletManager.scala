@@ -81,7 +81,7 @@ class UserWalletManager(
   final def getOrCreateUserWallet(
       install: Contract[WalletAppInstall.ContractId, WalletAppInstall]
   ): UnlessShutdown[Boolean] = {
-    if (retryProvider.isShuttingDown) {
+    if (retryProvider.isClosing) {
       UnlessShutdown.AbortedDueToShutdown
     } else {
       val endUserName = install.payload.endUserName
@@ -121,7 +121,7 @@ class UserWalletManager(
           false
         })
       // There might have been a concurrent call to .close() that missed the above addition of this user
-      if (retryProvider.isShuttingDown) {
+      if (retryProvider.isClosing) {
         logger.debug(
           show"Detected race between adding wallet for user ${endUserName.singleQuoted} and shutdown: closing wallet."
         )(TraceContext.empty)
