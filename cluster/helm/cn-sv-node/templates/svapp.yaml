@@ -41,6 +41,13 @@ spec:
               value: {{ .Values.onboardingType }}
             {{- end }}
             {{- with .Values.joinWithKeyOnboarding }}
+            - name: CN_APP_SV_AUTH_AUDIENCE
+              value: {{ .Values.auth.audience | quote }}
+            {{ end }}
+            {{ if .Values.auth.jwksUrl }}
+            - name: CN_APP_SV_AUTH_JWKS_URL
+              value: {{ .Values.auth.jwksUrl | quote }}
+            {{ end }}
             - name: ADDITIONAL_CONFIG
               value: |
                 _svc_remote {
