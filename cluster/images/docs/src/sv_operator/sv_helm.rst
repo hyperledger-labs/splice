@@ -131,7 +131,7 @@ reaches a stable state prior to moving on to the next step.
     helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
     helm install postgres canton-network-helm/cn-postgres -n svc --version ${CHART_VERSION}
     helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml
-    helm install sv-1 canton-network-helm/cn-validator-node -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
+    helm install validator canton-network-helm/cn-validator-node -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
     helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f sv-values.yaml
 
 Once this is running, you should be able to inspect the state of the

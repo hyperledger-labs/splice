@@ -50,7 +50,7 @@
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
 you will be asked to authenticate when you change into this directory
-for the first ##qtime.
+for the first time.
 
 ## Available Clusters
 
