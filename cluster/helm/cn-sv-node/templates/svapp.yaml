@@ -30,6 +30,12 @@ spec:
               value: "5014"
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
+            - name: CN_APP_SV_ENABLE_VALIDATOR_DEPENDENCY
+              {{ if .Values.svEnableValidatorDependency }}
+              value: {{ .Values.svEnableValidatorDependency | quote }}
+              {{ else }}
+              value: "true"
+              {{ end }}
             {{- if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}

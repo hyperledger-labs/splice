@@ -85,6 +85,10 @@ local appUiAuthEnvBinding(appName, varBaseName=appName) =
         },
       },
     },
+    {
+      name: name + "_AUDIENCE",
+      value: "https://canton.network.global",
+    },
   ];
 
 local appAuthEnvBinding(config, appName, varBaseName=appName) =

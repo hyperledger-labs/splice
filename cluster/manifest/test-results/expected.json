@@ -2345,6 +2345,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
@@ -2456,6 +2460,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/directory-web-ui:tag",
@@ -2567,6 +2575,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWELL_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwell-web-ui:tag",
@@ -3328,6 +3340,10 @@
                                     "optional": false
                                  }
                               }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",

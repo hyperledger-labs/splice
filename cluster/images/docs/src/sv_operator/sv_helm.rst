@@ -73,7 +73,7 @@ There should also be a file, ``remote-domain.yaml``, that refers to
 the domain in the cluster to which you are connecting. As in other
 sections of this runbook, please replace ``TARGET_CLUSTER`` with
 ``dev`` or ``test`` per the cluster to which you are connecting. The
-``remote-domain.yaml`` file also contains an additional configuration
+``participant-values.yaml`` file also contains an additional configuration
 block for specifying the Auth0 instance. This will need to be updated
 to match your configuration.
 
@@ -86,8 +86,26 @@ to match your configuration.
       jwksEndpoint: "https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json"
       targetAudience: "https://canton.network.global"
 
+An SV node includes a validator app so you also need to configure
+that. Create a file called ``validator-values.yaml`` with the
+following content.
+
+.. code-block:: yaml
+
+    participant_address: "participant.svc"
+    svSponsorPort: "5014"
+    svSponsorAddress: "https://TARGET_CLUSTER.network.canton.global"
+    scanPort: "5012"
+    scanAddress: "https://TARGET_CLUSTER.network.canton.global"
+    # Replace with the user id in your IAM that you want to use to log into
+    # the wallet as the SV party.
+    validatorWalletUser: "SV_WALLET_USER_ID"
+    auth:
+      audience: https://canton.network.global
+      jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
+
 The authentication credentials should be defined in a file named
-``cn-join-with-key.yaml``. If you haven't done so yet, please first follow the instructions in
+``sv-values.yaml``. If you haven't done so yet, please first follow the instructions in
 the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register a name and keypair for your SV.
 
 
@@ -111,8 +129,9 @@ reaches a stable state prior to moving on to the next step.
     helm repo update
     helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
     helm install postgres canton-network-helm/cn-postgres -n svc --version ${CHART_VERSION}
-    helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f remote-domain.yaml
-    helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f cn-join-with-key.yaml
+    helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml
+    helm install sv-1 canton-network-helm/cn-validator-node -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
+    helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f sv-values.yaml
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
@@ -121,12 +140,14 @@ namespaces. A typical query might look as follows:
 .. code-block:: bash
 
     $ kubectl get pods --all-namespaces |grep -v kube-system
-    NAMESPACE     NAME                                                         READY   STATUS    RESTARTS      AGE
-    docs          docs-86647d56dd-97d64                                        1/1     Running   0             34m
-    docs          gcs-proxy-86bf867fdc-c2tcm                                   1/1     Running   0             34m
-    sv-1          sv-app-c9c6ddf65-h5n55                                       1/1     Running   0             13m
-    svc           participant-5f57f8f58f-mwh8n                                 3/3     Running   1 (29m ago)   31m
-    svc           postgres-0                                                   1/1     Running   0             34m
+    NAMESPACE      NAME                                                       READY   STATUS    RESTARTS   AGE
+    docs           docs-86647d56dd-97d64                                      1/1     Running   0          34m
+    docs           gcs-proxy-86bf867fdc-c2tcm                                 1/1     Running   0          34m
+    sv-1           sv-app-59d4d499dd-nf4mj                                    1/1     Running   0          57m
+    sv-1           validator-app-68fc94d87f-fjz4z                             1/1     Running   0          17m
+    sv-1           wallet-web-ui-7c94df497f-c2pb4                             1/1     Running   0          17m
+    svc            participant-576cc9bc74-22wzx                               3/3     Running   0          151m
+    svc            postgres-0                                                 1/1     Running   0          151m
 
 Note also that ``Pod`` restarts may happen during bringup,
 particualrly if all helm charts are deployed at the same time. The

@@ -25,7 +25,11 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
+        {{ if .Values.participantAddress }}
+          value: {{ .Values.participantAddress | quote }}
+        {{ else }}
           value: participant
+        {{ end }}
         {{ if .Values.appDars -}}
         - name: CN_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
@@ -43,6 +47,34 @@ spec:
         {{ if .Values.additionalConfig -}}
         - name: ADDITIONAL_CONFIG
           value: {{- .Values.additionalConfig | toYaml | indent 12 }}
+        {{ end }}
+        {{ if .Values.svSponsorPort -}}
+        - name: CN_APP_VALIDATOR_SV_SPONSOR_PORT
+          value: {{ .Values.svSponsorPort | quote }}
+        {{ end }}
+        {{ if .Values.svSponsorAddress -}}
+        - name: CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS
+          value: {{ .Values.svSponsorAddress | quote }}
+        {{ end }}
+        {{ if .Values.scanPort -}}
+        - name: CN_APP_VALIDATOR_SCAN_PORT
+          value: {{ .Values.scanPort | quote }}
+        {{ end }}
+        {{ if .Values.scanAddress -}}
+        - name: CN_APP_VALIDATOR_SCAN_ADDRESS
+          value: {{ .Values.scanAddress | quote }}
+        {{ end }}
+        {{ if .Values.validatorWalletUser }}
+        - name: CN_APP_VALIDATOR_WALLET_USER_NAME
+          value: {{ .Values.validatorWalletUser }}
+        {{ end }}
+        {{ if .Values.auth.audience }}
+        - name: CN_APP_VALIDATOR_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        {{ end }}
+        {{ if .Values.auth.jwksUrl }}
+        - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl | quote }}
         {{ end }}
         ports:
         - containerPort: 5003

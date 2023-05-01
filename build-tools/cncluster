@@ -1013,11 +1013,13 @@ function subcmd_update_secrets() {
       [sv2]='rv4bllgKWAiW9tBtdvURMdHW42MAXghz'
       [sv3]='SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk'
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
+      [sv1_validator]='7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov'
   )
 
   local -Ar namespaceToUiClientId=(
     [validator1]='5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK'
     [splitwell]='eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL'
+    [sv-1]='Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J'
   )
 
   for i in \
@@ -1025,6 +1027,7 @@ function subcmd_update_secrets() {
     "cn-app-validator-ledger-api-auth validator validator1" \
     "cn-app-svc-ledger-api-auth svc svc" \
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
+    "cn-app-validator-ledger-api-auth sv1_validator sv-1" \
     "cn-app-sv-ledger-api-auth sv2 sv-2" \
     "cn-app-sv-ledger-api-auth sv3 sv-3" \
     "cn-app-sv-ledger-api-auth sv4 sv-4" \
@@ -1045,7 +1048,7 @@ function subcmd_update_secrets() {
     _set_auth0_secret "$1" "$client_id" "$secret" "$3"
   done
 
-  for i in sv1 sv2 sv3 sv4
+  for i in sv1 sv2 sv3 sv4 sv1_validator
   do
       client_id="${appToClientId[$i]}"
       _set_auth0_api_user "$i" svc "$client_id"
@@ -1055,7 +1058,8 @@ function subcmd_update_secrets() {
     "cn-app-wallet-ui-auth validator1" \
     "cn-app-directory-ui-auth validator1" \
     "cn-app-splitwell-ui-auth validator1" \
-    "cn-app-wallet-ui-auth splitwell"
+    "cn-app-wallet-ui-auth splitwell" \
+    "cn-app-wallet-ui-auth sv-1"
   do
     # shellcheck disable=SC2086
     set -- $i

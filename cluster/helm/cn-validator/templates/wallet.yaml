@@ -33,6 +33,12 @@ spec:
               key: url
               name: cn-app-wallet-ui-auth
               optional: false
+        - name: CN_APP_WALLET_UI_AUTH_AUDIENCE
+          {{ if .Values.auth.audience }}
+          value: {{ .Values.auth.audience | quote }}
+          {{ else }}
+          value: "https://canton.network.global"
+          {{ end }}
         image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: wallet-web-ui
