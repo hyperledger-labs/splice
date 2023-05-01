@@ -100,6 +100,7 @@ following content.
     # Replace with the user id in your IAM that you want to use to log into
     # the wallet as the SV party.
     validatorWalletUser: "SV_WALLET_USER_ID"
+    clusterUrl: "TARGET_CLUSTER.network.canton.global"
     auth:
       audience: https://canton.network.global
       jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
@@ -216,7 +217,7 @@ instructions below expect this file to be named ``ingress-values.yaml``
 
 .. code-block:: yaml
 
-    enableIngressModes: sv
+    enableIngressModes: sv sv-external
     cluster:
         networkSettings:
             externalIPRanges:
@@ -224,6 +225,9 @@ instructions below expect this file to be named ``ingress-values.yaml``
                 - "35.198.147.95/32"
                 - "35.189.40.124/32"
                 - "34.132.91.75/32"
+        ipAddress: "YOUR_CLUSTER_IP"
+
+On GCP you can get the cluster IP from ``gcloud compute addresses list``.
 
 Install the Ingress Helm Chart:
 
@@ -232,3 +236,15 @@ Install the Ingress Helm Chart:
     helm install cluster-ingress canton-network-helm/cn-cluster-ingress \
         -n cluster-ingress \
         -f ingress-values.yaml
+
+.. _helm-sv-wallet-ui:
+
+Logging into the wallet UI
+--------------------------
+
+After you deploy your ingress, open your browser at
+https://wallet.sv-1.svc.cn-cluster.YOUR_DOMAIN.com and login using the
+credentials for the user that you configured as
+``validatorWalletUser`` earlier. You will be able to see your balance
+increase as mining rounds advance every 2.5 minutes and you will see
+``sv_reward_collected`` entries in your transaction history.

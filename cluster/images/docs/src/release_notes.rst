@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-05-07
+----------
+
+* Add wallet UI for SV user to SV runbook. Instructions exist for
+  :ref:`deployment using Helm <helm-sv-wallet-ui>` and :ref:`local
+  deployment <local-sv-wallet-ui>`.
+
 2023-04-30
 ----------
 

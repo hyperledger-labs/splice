@@ -2327,6 +2327,10 @@
                               "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -3320,6 +3324,10 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
                            },
                            {
                               "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",

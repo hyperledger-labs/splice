@@ -133,6 +133,8 @@ Once the SV app has started and you can access the CN console, you can confirm t
 
   @ sv.getSvcInfo
 
+.. _local-sv-wallet-ui:
+
 Hosting the SV Wallet UI
 ------------------------
 

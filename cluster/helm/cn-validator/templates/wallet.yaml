@@ -39,6 +39,8 @@ spec:
           {{ else }}
           value: "https://canton.network.global"
           {{ end }}
+        - name: CN_APP_WALLET_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
         image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         name: wallet-web-ui

@@ -127,7 +127,7 @@ local deployments(config) = [
       port: 80,
       internalOnly: true,
     },
-  ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=c.appUiAuthEnvBinding("wallet")),
+  ], image="wallet-web-ui", namespace="splitwell", cpuRequest=0.5, extraEnvVars=[{ name: "CN_APP_WALLET_UI_CLUSTER", value: config.clusterDnsName }] + c.appUiAuthEnvBinding("wallet")),
 
   c.deployment(config, "splitwell-app", [
     {
