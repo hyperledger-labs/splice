@@ -2,7 +2,16 @@ import { callWithLogging, Contract } from 'common-frontend';
 import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
 
-import { DirectoryEntry, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
+import {
+  DirectoryEntry,
+  DirectoryEntryContext,
+  DirectoryInstall,
+} from '@daml.js/directory/lib/CN/Directory';
+import {
+  Subscription,
+  SubscriptionIdleState,
+  SubscriptionPayment,
+} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import Ledger, { CreateEvent, LedgerOptions } from '@daml/ledger';
 import { Choice, ContractId, Template } from '@daml/types';
 
@@ -125,6 +134,71 @@ export class LedgerApiClient {
     return response
       .filter(c => c.payload.user === user && c.payload.provider === provider)
       .map(ev => this.toContract(ev));
+  }
+
+  async querySubscriptions(user: string, provider: string): Promise<Contract<Subscription>[]> {
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'querySubscriptions',
+      subscription => this.ledger.query(subscription),
+      Subscription
+    );
+    return response
+      .filter(c => c.payload.sender === user && c.payload.provider === provider)
+      .map(ev => this.toContract(ev));
+  }
+
+  async querySubscriptionIdleState(
+    user: string,
+    provider: string
+  ): Promise<Contract<SubscriptionIdleState>[]> {
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'querySubscriptionIdleState',
+      subIdleState => this.ledger.query(subIdleState),
+      SubscriptionIdleState
+    );
+    return response
+      .filter(
+        s =>
+          s.payload.subscriptionData.sender === user &&
+          s.payload.subscriptionData.provider === provider
+      )
+      .map(this.toContract);
+  }
+
+  async querySubscriptionPayment(
+    user: string,
+    provider: string
+  ): Promise<Contract<SubscriptionPayment>[]> {
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'querySubscriptionPayment',
+      subPayment => this.ledger.query(subPayment),
+      SubscriptionPayment
+    );
+    return response
+      .filter(
+        s =>
+          s.payload.subscriptionData.sender === user &&
+          s.payload.subscriptionData.provider === provider
+      )
+      .map(this.toContract);
+  }
+
+  async queryEntryContexts(
+    user: string,
+    provider: string
+  ): Promise<Contract<DirectoryEntryContext>[]> {
+    const response = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'queryEntryContexts',
+      entryContext => this.ledger.query(entryContext),
+      DirectoryEntryContext
+    );
+    return response
+      .filter(c => c.payload.user === user && c.payload.provider === provider)
+      .map(this.toContract);
   }
 
   toContract<T extends object, K, I extends string = string>(

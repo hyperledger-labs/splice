@@ -5,6 +5,8 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
 
+import java.time.format.DateTimeFormatter
+import java.time.{Duration, LocalDateTime}
 import scala.concurrent.duration.DurationInt
 
 class DirectoryFrontendIntegrationTest
@@ -34,6 +36,11 @@ class DirectoryFrontendIntegrationTest
       aliceWallet.tap(100.0)
 
       val entryName = "mycoolentry"
+      val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
+      val expectedExpiry =
+        DateTimeFormatter
+          .ofPattern("MM/dd/yyyy HH:mm")
+          .format(expiry)
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
@@ -51,13 +58,25 @@ class DirectoryFrontendIntegrationTest
 
         // And then back to directory, where she is already logged in
         eventually(scaled(10 seconds)) {
-          findAll(className("entries-table-row")) should have size 1
+          val row: Element = inside(findAll(className("entries-table-row")).toList) {
+            case Seq(row) =>
+              row
+          }
+          val name = row.childElement(className("entries-table-name")).text
+          val amount = row.childElement(className("entries-table-amount")).text
+          val currency = row.childElement(className("entries-table-currency")).text
+          val interval = row.childElement(className("entries-table-payment-interval")).text
+          val expiresAt = row.childElement(className("entries-table-expires-at")).text
+
+          name should be(entryName)
+          amount should be("1.0")
+          currency should be("USD")
+          interval should be("90 days")
+
+          // allowing for some variance on seconds to avoid a flaky test
+          val expiryWithSecsOffset = expectedExpiry.substring(0, expectedExpiry.length - 1)
+          expiresAt should startWith(expiryWithSecsOffset)
         }
-        val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
-          row
-        }
-        val name = row.childElement(className("entries-table-name"))
-        name.text should be(entryName)
       }
     }
 

@@ -3,14 +3,22 @@ import {
   DirectoryClient,
   useDirectoryClient,
 } from 'common-frontend/lib/contexts/DirectoryServiceContext';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
   DirectoryInstall,
   DirectoryEntry,
   DirectoryInstallRequest,
+  DirectoryEntryContext,
 } from '@daml.js/directory/lib/CN/Directory';
-import { SubscriptionRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import {
+  Subscription,
+  SubscriptionContext,
+  SubscriptionIdleState,
+  SubscriptionPayData,
+  SubscriptionPayment,
+  SubscriptionRequest,
+} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
 import { LedgerApiClient, useLedgerApiClient } from './LedgerApiContext';
@@ -21,7 +29,36 @@ type DirectoryUiState = {
   directoryInstallContract?: Contract<DirectoryInstall>;
   directoryEntries: Contract<DirectoryEntry>[];
   requestEntry: (entryName: string) => Promise<ContractId<SubscriptionRequest>>;
+  directoryEntriesContexts: Contract<DirectoryEntryContext>[];
+  subscriptionPayData: SubPayData[];
+  subscriptionWithEntryContextCid: SubscriptionWithEntryContextCid[];
+  entryWithContextCid: EntryWithContextContractId[];
 };
+
+export interface SubPayData {
+  payData: SubscriptionPayData;
+  contractId: ContractId<Subscription>;
+}
+
+export interface EntryWithPayData {
+  contractId: string;
+  expiresAt: string;
+  entryName: string;
+  amount: string;
+  currency: string;
+  paymentInterval: string;
+  paymentDuration: string;
+}
+
+interface EntryWithContextContractId {
+  entry: Contract<DirectoryEntry>;
+  contextContractId: ContractId<DirectoryEntryContext> | undefined;
+}
+
+interface SubscriptionWithEntryContextCid {
+  subContractId: ContractId<Subscription>;
+  entryContextContractId: ContractId<SubscriptionContext>;
+}
 
 const DirectoryUiContext = React.createContext<DirectoryUiState | undefined>(undefined);
 
@@ -79,6 +116,20 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
 
   // Fetch user's directory entries
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
+  const [subscriptionContracts, setSubscriptionContracts] = useState<Contract<Subscription>[]>([]);
+  const [directoryEntriesContexts, setDirectoryEntriesContexts] = useState<
+    Contract<DirectoryEntryContext>[]
+  >([]);
+  const [subWithEntryContextCid, setSubWithEntryContextCid] = useState<
+    SubscriptionWithEntryContextCid[]
+  >([]);
+  const [subscriptionIdleStates, setSubscriptionIdleStates] = useState<
+    Contract<SubscriptionIdleState>[]
+  >([]);
+  const [subscriptionPaymentResults, setSubscriptionPaymentResults] = useState<
+    Contract<SubscriptionPayment>[]
+  >([]);
+  const [subPayData, setSubPayData] = useState<SubPayData[]>([]);
 
   const fetchDirectoryEntries = useCallback(async () => {
     if (primaryPartyId && providerPartyId) {
@@ -90,6 +141,91 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
     }
   }, [ledgerApiClient, primaryPartyId, providerPartyId]);
   useInterval(fetchDirectoryEntries);
+
+  const entriesWithContextCid = useMemo<EntryWithContextContractId[]>(() => {
+    return directoryEntries.map(entry => {
+      const context = directoryEntriesContexts.find(ec => ec.payload.name === entry.payload.name);
+      return {
+        entry,
+        contextContractId: context ? context.contractId : undefined,
+      };
+    });
+  }, [directoryEntries, directoryEntriesContexts]);
+
+  const fetchDirectoryEntriesContexts = useCallback(async () => {
+    if (primaryPartyId && providerPartyId) {
+      const current = await ledgerApiClient.queryEntryContexts(primaryPartyId, providerPartyId);
+      setDirectoryEntriesContexts(prev => (sameContracts(prev, current) ? prev : current));
+    }
+  }, [ledgerApiClient, primaryPartyId, providerPartyId]);
+  useInterval(fetchDirectoryEntriesContexts);
+
+  const fetchSubscriptions = useCallback(async () => {
+    if (primaryPartyId && providerPartyId) {
+      const current = await ledgerApiClient.querySubscriptions(primaryPartyId, providerPartyId);
+      setSubscriptionContracts(prev => (sameContracts(prev, current) ? prev : current));
+    }
+  }, [ledgerApiClient, primaryPartyId, providerPartyId]);
+  useInterval(fetchSubscriptions);
+
+  useMemo(() => {
+    const cids = subscriptionContracts
+      .filter(sub => {
+        return entriesWithContextCid.some(
+          r =>
+            r.contextContractId !== undefined &&
+            DirectoryEntryContext.toInterface(SubscriptionContext, r.contextContractId) ===
+              sub.payload.context
+        );
+      })
+      .map(s => {
+        return {
+          subContractId: s.contractId,
+          entryContextContractId: s.payload.context,
+        };
+      });
+    setSubWithEntryContextCid(cids);
+  }, [entriesWithContextCid, subscriptionContracts]);
+
+  const fetchSubscriptionIdleState = useCallback(async () => {
+    if (primaryPartyId && providerPartyId) {
+      const current = await ledgerApiClient.querySubscriptionIdleState(
+        primaryPartyId,
+        providerPartyId
+      );
+      setSubscriptionIdleStates(prev => (sameContracts(prev, current) ? prev : current));
+    }
+  }, [ledgerApiClient, primaryPartyId, providerPartyId]);
+  useInterval(fetchSubscriptionIdleState);
+
+  const fetchSubscriptionPaymentResults = useCallback(async () => {
+    if (primaryPartyId && providerPartyId) {
+      const current = await ledgerApiClient.querySubscriptionPayment(
+        primaryPartyId,
+        providerPartyId
+      );
+      setSubscriptionPaymentResults(prev => (sameContracts(prev, current) ? prev : current));
+    }
+  }, [ledgerApiClient, primaryPartyId, providerPartyId]);
+  useInterval(fetchSubscriptionPaymentResults);
+
+  useMemo(() => {
+    const idlePayData = subscriptionIdleStates.map(idle => {
+      return {
+        payData: idle.payload.payData,
+        contractId: idle.payload.subscription,
+      };
+    });
+
+    const payResultsData = subscriptionPaymentResults.map(payment => {
+      return {
+        payData: payment.payload.payData,
+        contractId: payment.payload.subscription,
+      };
+    });
+    const merged: SubPayData[] = idlePayData.concat(payResultsData);
+    setSubPayData(merged);
+  }, [subscriptionIdleStates, subscriptionPaymentResults]);
 
   const requestEntry = async (entryName: string) => {
     if (!primaryPartyId) {
@@ -126,6 +262,10 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
         directoryInstallContract,
         directoryEntries,
         requestEntry,
+        directoryEntriesContexts,
+        subscriptionPayData: subPayData,
+        subscriptionWithEntryContextCid: subWithEntryContextCid,
+        entryWithContextCid: entriesWithContextCid,
       }}
     >
       {children}
