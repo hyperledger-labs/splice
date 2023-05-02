@@ -1,6 +1,4 @@
-charts := \
-	cn-util-lib \
-	\
+app_charts := \
 	cn-cluster-ingress \
 	cn-directory-web-ui \
 	cn-docs \
@@ -13,11 +11,13 @@ charts := \
 	cn-svc \
 	cn-validator
 
+all_charts := $(app_charts) cn-util-lib
+
 .PHONY: cluster/helm/build
-cluster/helm/build: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-build)
+cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-build)
 
 .PHONY: cluster/helm/clean
-cluster/helm/clean: $(foreach chart,$(charts),cluster/helm/$(chart)/helm-clean)
+cluster/helm/clean: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
 
 %/values.yaml: %/values-template.yaml HELM_CHART_VERSION
@@ -45,5 +45,11 @@ $$(prefix)/helm-clean:
 
 endef # end DEFINE_PHONY_CHART_RULES
 
-$(foreach chart,$(charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
+define ADD_UTIL_DEP =
+prefix := cluster/helm/$(1)
+$$(prefix)/helm-build: cluster/helm/cn-util-lib/Chart.yaml
+endef
 
+$(foreach chart,$(all_charts),$(eval $(call DEFINE_PHONY_CHART_RULES,$(chart))))
+
+$(foreach chart,$(app_charts),$(eval $(call ADD_UTIL_DEP,$(chart))))

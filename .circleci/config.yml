@@ -1122,7 +1122,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: make build
+         cmd: make build -j
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
       - run_bash_command_in_nix:
@@ -1158,7 +1158,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: make build
+         cmd: make build -j
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
       - run_bash_command_in_nix:
@@ -1171,7 +1171,7 @@ jobs:
            --keep NO_PROXY"
          cmd: |
            export PUSH_TO_ARTIFACTORY=1
-           make docker-push
+           make docker-push -j
       - run_bash_command_in_nix:
          additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
          cmd_name: Push Helm charts
@@ -1198,7 +1198,7 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
-         cmd: make build
+         cmd: make build -j
       - docker_build
       - cleanup_sbt_test_job
 
