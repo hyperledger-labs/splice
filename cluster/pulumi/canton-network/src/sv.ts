@@ -1,21 +1,19 @@
-import * as k8s from "@pulumi/kubernetes";
+import * as k8s from '@pulumi/kubernetes';
 
-import * as postgres from "./postgres";
-
-import { auth0UserNameEnvVar, installAuth0Secret } from "./auth0";
-
-import { exactNamespace, installCNHelmChart } from "./utils";
-import { installDomain, installParticipant, ParticipantUser } from "./ledger";
+import * as postgres from './postgres';
+import { auth0UserNameEnvVar, installAuth0Secret } from './auth0';
+import { installDomain, installParticipant, ParticipantUser } from './ledger';
+import { exactNamespace, installCNHelmChart } from './utils';
 
 function svUser(name: string): ParticipantUser {
   return {
     actAs: [
       {
-        fromUser: "self",
+        fromUser: 'self',
       },
       {
         fromUser: {
-          env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+          env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
         },
       },
     ],
@@ -31,30 +29,30 @@ function svUser(name: string): ParticipantUser {
 }
 
 export function installSVC(): k8s.helm.v3.Release {
-  const xns = exactNamespace("svc");
+  const xns = exactNamespace('svc');
 
-  const postgresDb = postgres.installPostgres(xns, "postgres");
+  const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installDomain(xns, "global-domain", postgresDb);
+  const domain = installDomain(xns, 'global-domain', postgresDb);
 
   const participant = installParticipant(
     xns,
-    "participant",
+    'participant',
     postgresDb,
     [],
     [
       {
         actAs: [
           {
-            fromUser: "self",
+            fromUser: 'self',
           },
         ],
         admin: true,
         name: {
-          env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+          env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
         },
         primaryParty: {
-          allocate: "svc_party",
+          allocate: 'svc_party',
         },
         readAs: [],
       },
@@ -62,17 +60,17 @@ export function installSVC(): k8s.helm.v3.Release {
         actAs: [],
         admin: false,
         name: {
-          env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+          env: 'CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME',
         },
         primaryParty: {
           fromUser: {
-            env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+            env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
           },
         },
         readAs: [
           {
             fromUser: {
-              env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+              env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
             },
           },
         ],
@@ -81,53 +79,53 @@ export function installSVC(): k8s.helm.v3.Release {
         actAs: [
           {
             fromUser: {
-              env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+              env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
             },
           },
         ],
         admin: true,
         name: {
-          env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+          env: 'CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME',
         },
         primaryParty: {
           fromUser: {
-            env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+            env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME',
           },
         },
         readAs: [],
       },
-      svUser("sv1"),
-      svUser("sv2"),
-      svUser("sv3"),
-      svUser("sv4"),
+      svUser('sv1'),
+      svUser('sv2'),
+      svUser('sv3'),
+      svUser('sv4'),
     ],
     [
-      auth0UserNameEnvVar("sv1"),
-      auth0UserNameEnvVar("sv2"),
-      auth0UserNameEnvVar("sv3"),
-      auth0UserNameEnvVar("sv4"),
-      auth0UserNameEnvVar("svc"),
-      auth0UserNameEnvVar("scan"),
-      auth0UserNameEnvVar("directory"),
+      auth0UserNameEnvVar('sv1'),
+      auth0UserNameEnvVar('sv2'),
+      auth0UserNameEnvVar('sv3'),
+      auth0UserNameEnvVar('sv4'),
+      auth0UserNameEnvVar('svc'),
+      auth0UserNameEnvVar('scan'),
+      auth0UserNameEnvVar('directory'),
     ],
     [domain]
   );
 
   const dependsOn = [
     participant,
-    installAuth0Secret(xns, "sv1", "sv-1"),
-    installAuth0Secret(xns, "sv2", "sv-2"),
-    installAuth0Secret(xns, "sv3", "sv-3"),
-    installAuth0Secret(xns, "sv4", "sv-4"),
-    installAuth0Secret(xns, "scan", "scan"),
-    installAuth0Secret(xns, "directory", "directory"),
-    installAuth0Secret(xns, "svc", "svc"),
+    installAuth0Secret(xns, 'sv1', 'sv-1'),
+    installAuth0Secret(xns, 'sv2', 'sv-2'),
+    installAuth0Secret(xns, 'sv3', 'sv-3'),
+    installAuth0Secret(xns, 'sv4', 'sv-4'),
+    installAuth0Secret(xns, 'scan', 'scan'),
+    installAuth0Secret(xns, 'directory', 'directory'),
+    installAuth0Secret(xns, 'svc', 'svc'),
   ];
 
   return installCNHelmChart(
     xns,
-    "svc",
-    "cn-svc",
+    'svc',
+    'cn-svc',
     {
       postgres: postgresDb,
     },
@@ -135,19 +133,18 @@ export function installSVC(): k8s.helm.v3.Release {
   );
 }
 
-export function installSvNode(svc: k8s.helm.v3.Release, nodename: string) {
+export function installSvNode(svc: k8s.helm.v3.Release, nodename: string): void {
   const xns = exactNamespace(nodename);
 
-  const dependsOn = [svc, installAuth0Secret(xns, "sv", nodename)];
+  const dependsOn = [svc, installAuth0Secret(xns, 'sv', nodename)];
 
   installCNHelmChart(
     xns,
-    nodename + "-sv-app",
-    "cn-sv-node",
+    nodename + '-sv-app',
+    'cn-sv-node',
     {
-      onboardingType:
-        nodename === "sv-1" ? "found-collective" : "join-via-svc-app",
-      svEnableValidatorDependency: false
+      onboardingType: nodename === 'sv-1' ? 'found-collective' : 'join-via-svc-app',
+      svEnableValidatorDependency: false,
     },
     dependsOn
   );

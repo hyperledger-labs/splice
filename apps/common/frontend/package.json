@@ -27,10 +27,10 @@
     "start": "tsc --watch",
     "fix": "npm run format:fix && npm run lint:fix",
     "check": "npm run format:check && npm run lint:check",
-    "format:fix": "prettier --write src",
-    "format:check": "prettier --check src",
-    "lint:fix": "eslint src --ignore-pattern src/com/* --fix",
-    "lint:check": "eslint src --ignore-pattern src/com/* --max-warnings=0"
+    "format:fix": "prettier --write -- src",
+    "format:check": "prettier --check -- src",
+    "lint:fix": "eslint --ignore-pattern src/com/* --fix -- src",
+    "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src"
   },
   "browserslist": {
     "production": [

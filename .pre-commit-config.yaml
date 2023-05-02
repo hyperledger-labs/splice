@@ -26,6 +26,6 @@ repos:
       - id: typescriptfmt
         name: typescriptfmt
         language: system
-        entry: "bash -c 'cd apps; npm run fix --workspaces --if-present'"
-        files: '^apps/'
+        entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
+        exclude: "/[.]prettierrc[.]cjs$"

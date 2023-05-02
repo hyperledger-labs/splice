@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "main": "src/index.ts",
     "devDependencies": {
+        "@trivago/prettier-plugin-sort-imports": "^3.3.0",
         "@types/js-yaml": "^4.0.5",
         "@types/lodash": "^4.14.189",
         "@types/node": "^14",

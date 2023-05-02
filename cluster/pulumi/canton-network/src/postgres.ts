@@ -1,26 +1,23 @@
-import * as pulumi from "@pulumi/pulumi";
-import * as k8s from "@pulumi/kubernetes";
-import * as gcp from "@pulumi/gcp";
+import * as gcp from '@pulumi/gcp';
+import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 
-import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from "./utils";
+import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from './utils';
 
 const project = gcp.organizations.getProjectOutput({});
 
 // use existing default network (needs to have a private vpc connection)
 const privateNetwork = gcp.compute.Network.get(
-  "default",
+  'default',
   pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
 );
 
-function installCloudPostgres(
-  xns: ExactNamespace,
-  name: string
-): pulumi.Output<string> {
-  const logicalName = xns.logicalName + "-" + name;
+function installCloudPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
+  const logicalName = xns.logicalName + '-' + name;
   const pgSvc = new gcp.sql.DatabaseInstance(logicalName, {
-    databaseVersion: "POSTGRES_14",
+    databaseVersion: 'POSTGRES_14',
     deletionProtection: false,
-    region: "us-central1",
+    region: 'us-central1',
     settings: {
       backupConfiguration: {
         enabled: true,
@@ -30,7 +27,7 @@ function installCloudPostgres(
         queryInsightsEnabled: true,
       },
       // tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
-      tier: "db-custom-2-7680",
+      tier: 'db-custom-2-7680',
       ipConfiguration: {
         ipv4Enabled: false,
         privateNetwork: privateNetwork.id,
@@ -43,7 +40,7 @@ function installCloudPostgres(
     `db-${logicalName}`,
     {
       instance: pgSvc.name,
-      name: "cantonnet",
+      name: 'cantonnet',
     },
     {
       dependsOn: pgSvc,
@@ -54,8 +51,8 @@ function installCloudPostgres(
     `user-${logicalName}`,
     {
       instance: pgSvc.name,
-      name: "cnadmin",
-      password: "cnadmin",
+      name: 'cnadmin',
+      password: 'cnadmin',
     },
     {
       dependsOn: pgSvc,
@@ -67,17 +64,14 @@ function installCloudPostgres(
 
 /// Database
 
-function installCNPostgres(
-  xns: ExactNamespace,
-  name: string
-): pulumi.Output<string> {
+function installCNPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
   const pg = new k8s.helm.v3.Release(
-    xns.logicalName + "-" + name,
+    xns.logicalName + '-' + name,
     {
       name: name,
       namespace: xns.ns.metadata.name,
-      chart: process.env.REPO_ROOT + "/cluster/helm/cn-postgres/",
-      values: cnChartValues("cn-postgres"),
+      chart: process.env.REPO_ROOT + '/cluster/helm/cn-postgres/',
+      values: cnChartValues('cn-postgres'),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
     {
@@ -90,12 +84,9 @@ function installCNPostgres(
 
 // toplevel
 
-const ENABLE_CLOUD_SQL = "true" === (process.env.ENABLE_CLOUD_SQL ?? "false");
+const ENABLE_CLOUD_SQL = 'true' === (process.env.ENABLE_CLOUD_SQL ?? 'false');
 
-export function installPostgres(
-  xns: ExactNamespace,
-  name: string
-): pulumi.Output<string> {
+export function installPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
   if (ENABLE_CLOUD_SQL) {
     return installCloudPostgres(xns, name);
   } else {

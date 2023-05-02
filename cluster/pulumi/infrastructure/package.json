@@ -4,9 +4,9 @@
     "scripts": {
         "fix": "npm run format:fix && npm run lint:fix",
         "check": "npm run format:check && npm run lint:check",
-        "format:fix": "prettier --write src",
-        "format:check": "prettier --check src",
-        "lint:fix": "eslint src --fix",
-        "lint:check": "eslint src --max-warnings=0"
+        "format:fix": "prettier --write -- src",
+        "format:check": "prettier --check -- src",
+        "lint:fix": "eslint --fix -- src",
+        "lint:check": "eslint --max-warnings=0 -- src"
     }
 }

@@ -1,26 +1,20 @@
-import * as pulumi from "@pulumi/pulumi";
-import * as k8s from "@pulumi/kubernetes";
-import * as gcp from "@pulumi/gcp";
-
-import { load } from "js-yaml";
-
-import * as fs from "fs";
-import { PathLike } from "fs";
-
-import * as _ from "lodash";
+import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
+import * as fs from 'fs';
+import * as _ from 'lodash';
+import { PathLike } from 'fs';
+import { load } from 'js-yaml';
 
 export const config = new pulumi.Config();
 
 export const GLOBAL_TIMEOUT_SEC = 300;
 
-export const CLUSTER_BASENAME = config.require("CLUSTER_BASENAME");
+export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
 // Refrence to upstream infrastructure stack.
-export const infraStack = new pulumi.StackReference(
-  `infra.${CLUSTER_BASENAME}`
-);
+export const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
 
 /// Kubernetes Namespace
 
@@ -56,20 +50,19 @@ export function exactNamespace(name: string): ExactNamespace {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadYamlFromFile(path: PathLike): any {
-  return load(fs.readFileSync(path, "utf-8"));
+  return load(fs.readFileSync(path, 'utf-8'));
 }
 
 function stripJsonComments(rawText: string): string {
-  const JSON_COMMENT_REGEX =
-    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
+  const JSON_COMMENT_REGEX = /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
 
-  return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? "" : m));
+  return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? '' : m));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadJsonFromFile(path: PathLike): any {
   try {
-    const content = stripJsonComments(fs.readFileSync(path, "utf8"));
+    const content = stripJsonComments(fs.readFileSync(path, 'utf8'));
 
     return JSON.parse(content);
   } catch (e) {
@@ -78,33 +71,30 @@ function loadJsonFromFile(path: PathLike): any {
   }
 }
 
-export function fixedTokens() {
-  return config.require("FIXED_TOKENS") !== "0";
+export function fixedTokens(): boolean {
+  return config.require('FIXED_TOKENS') !== '0';
 }
 
-export function cnChartValues(
-  chartPath: string,
-  overrideValues: ChartValues = {}
-): ChartValues {
+export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
   const networkSettings = loadJsonFromFile(
-    process.env.REPO_ROOT + "/cluster/network-settings.json"
+    process.env.REPO_ROOT + '/cluster/network-settings.json'
   );
 
   const chartDefaultValues = loadYamlFromFile(
-    process.env.REPO_ROOT + "/cluster/helm/" + chartPath + "/values.yaml"
+    process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'
   );
 
-  const imageTagOverride = config.optional("IMAGE_TAG");
+  const imageTagOverride = config.optional('IMAGE_TAG');
 
   return _.merge(
     chartDefaultValues,
     {
-      imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+      imageRepo: 'us-central1-docker.pkg.dev/da-cn-images/cn-images',
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        ipAddress: infraStack.getOutput("clusterIp"),
+        ipAddress: infraStack.getOutput('clusterIp'),
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
       },
@@ -128,7 +118,7 @@ export function installCNHelmChartByNamespaceName(
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  const versionNumber = config.require("VERSION_NUMBER");
+  const versionNumber = config.require('VERSION_NUMBER');
 
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
@@ -136,12 +126,7 @@ export function installCNHelmChartByNamespaceName(
       name,
       namespace: nsName,
       chart:
-        process.env.REPO_ROOT +
-        "/cluster/helm/target/" +
-        chartName +
-        "-" +
-        versionNumber +
-        ".tgz",
+        process.env.REPO_ROOT + '/cluster/helm/target/' + chartName + '-' + versionNumber + '.tgz',
       values: cnChartValues(chartName, values),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
@@ -163,7 +148,7 @@ export function installCNHelmChart(
     {
       name,
       namespace: xns.ns.metadata.name,
-      chart: process.env.REPO_ROOT + "/cluster/helm/" + chartName + "/",
+      chart: process.env.REPO_ROOT + '/cluster/helm/' + chartName + '/',
       values: cnChartValues(chartName, values),
       timeout: GLOBAL_TIMEOUT_SEC,
     },

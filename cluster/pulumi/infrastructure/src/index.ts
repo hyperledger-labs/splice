@@ -1,6 +1,5 @@
-import * as pulumi from "@pulumi/pulumi";
-
 import { configureNetwork } from "./network";
+import * as pulumi from "@pulumi/pulumi";
 
 const clusterBasename = pulumi.getStack().replace(/.*[.]/, "");
 

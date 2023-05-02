@@ -81,6 +81,7 @@ lazy val root = (project in file("."))
     `canton-community-participant`,
     `canton-ledger-common`,
     `canton-ledger-api-core`,
+    pulumi,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -690,6 +691,46 @@ lazy val `apps-splitwell` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+    )
+
+lazy val pulumi =
+  project
+    .in(file("cluster/pulumi"))
+    .disablePlugins(sbt.plugins.JvmPlugin, sbt.plugins.IvyPlugin)
+    .settings(
+      npmRootDir := baseDirectory.value,
+      npmFix := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmLint := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmInstall := {
+        val s = streams.value
+        val log = s.log
+        val cacheDir = s.cacheDirectory
+        val buildDir = (ThisBuild / baseDirectory).value
+        val npmInstall = buildDir / "build-tools" / "npm-install.sh"
+        val cache = FileFunction.cached(cacheDir / "npmInstall", FileInfo.hash) { _ =>
+          runCommand(Seq(npmInstall.absolutePath), log, None, Some(npmRootDir.value))
+          Set(npmRootDir.value / "node_modules")
+        }
+        cache(Set(npmRootDir.value / "package.json")).toSeq
+      },
     )
 
 // Copied from Canton. Can probably be removed once we use Canton as a library.

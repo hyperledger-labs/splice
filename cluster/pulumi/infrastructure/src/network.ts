@@ -1,8 +1,7 @@
-import * as pulumi from "@pulumi/pulumi";
 import * as gcp from "@pulumi/gcp";
 import * as k8s from "@pulumi/kubernetes";
-
 import * as certmanager from "@pulumi/kubernetes-cert-manager";
+import * as pulumi from "@pulumi/pulumi";
 
 function clusterIpAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -103,7 +102,7 @@ function clusterCertificate(
 
   const config = new pulumi.Config();
 
-  const dnsSaKey = new k8s.core.v1.Secret(
+  new k8s.core.v1.Secret(
     "clouddns-dns01-solver-svc-acct",
     {
       metadata: {
