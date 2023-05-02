@@ -115,7 +115,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         Source
           .single(request)
           .via(connectionFlow)
-          .completionTimeout(timeouts.default.asFiniteApproximation)
+          .completionTimeout(parameters.requestTimeout.asFiniteApproximation)
           .runWith(Sink.head)
           .recoverWith { case NonFatal(e) =>
             logger.debug(msg("HTTP request failed"), e)(traceContext)

@@ -371,6 +371,11 @@ object RetryProvider {
           s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
+      case Failure(ex: java.util.concurrent.TimeoutException) =>
+        val msg =
+          s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+        logger.info(msg)
+        TransientErrorKind
       case Failure(ex) =>
         logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
         FatalErrorKind

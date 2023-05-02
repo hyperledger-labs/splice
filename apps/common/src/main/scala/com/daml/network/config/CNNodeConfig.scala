@@ -9,6 +9,7 @@ import com.digitalasset.canton.config.{
   LoggingConfig,
   NodeConfig,
   NodeMonitoringConfig,
+  NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
@@ -52,10 +53,11 @@ abstract class RemoteCNNodeConfig extends NodeConfig {}
   */
 case class SharedCNNodeAppParameters(
     override val tracing: TracingConfig,
-    val delayLoggingThreshold_ : NonNegativeFiniteDuration,
+    delayLoggingThreshold_ : NonNegativeFiniteDuration,
     override val loggingConfig: LoggingConfig,
     override val logQueryCost: Option[QueryCostMonitoringConfig],
     override val processingTimeouts: ProcessingTimeout,
+    requestTimeout: NonNegativeDuration,
     // TODO(#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
