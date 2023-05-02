@@ -1608,6 +1608,11 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+    - push_artifactory_release:
+        requires:
+          - preflight_check
+        context:
+          - artifactory
 
   deploy_testnet:
     when:
@@ -1653,6 +1658,11 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+    - push_artifactory_release:
+        requires:
+          - preflight_check
+        context:
+          - artifactory
 
   daily_refresh_tokens:
     when:
