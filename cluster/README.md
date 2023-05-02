@@ -937,7 +937,9 @@ gcloud and local helm charts.
    So `helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml`
    becomes `helm install participant $REPO_ROOT/cluster/helm/target/cn-participant-*.tgz -n svc -f participant-values.yaml -f scratch.yaml`.
 7. If you made a change, uninstall the chart first, e.g., `helm
-   uninstall participant -n svc`. Note that uninstall postgres does
+   uninstall participant -n svc --wait`.
+   * Note the `--wait` which is useful if you intend to reinstall the chart, to make sure things are cleaned up before recreated. This is especially important for the ingress chart.
+   * Note that uninstall postgres does
    not delete the persistent volume so in that case run `kubectl
    delete pvc -A --all`.
 8. For the ingress, create `ingress-values.yaml` with the content from the runbook and then extend it with
