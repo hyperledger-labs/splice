@@ -43,7 +43,7 @@ Create the three application namespaces within Kubernetes and ensure they have i
 
 .. code-block:: bash
 
-    for ns_name in docs svc sv-1; do
+    for ns_name in docs sv-1; do
         kubectl create ns ${ns_name}
 
         kubectl create secret docker-registry docker-reg-cred \
@@ -56,6 +56,60 @@ Create the three application namespaces within Kubernetes and ensure they have i
         kubectl patch serviceaccount default -n ${ns_name} \
             -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
     done
+
+
+Configuring an Auth0 Tenant
+---------------------------
+
+An SV node currently requires the following to exist in your Auth0 tenant:
+
+- An API with audience `https://canton.network.global`  (this is currently the only audience supported. In the future, this will be made customizable.)
+- Two machine-to-machine applications, for the validator and for the sv-app. Both should be authorized for the API defined above.
+- One single-page-application for the wallet web UI, with allowed callback, logout URLs, web origins, and CORS origins configured to the wallet UI URL for your SV's validator. If you're using the ingress configuration of this runbook, that would be `https://wallet.sv-1.svc.YOUR_CLUSTER_URL`.
+
+The following two secrets will instruct the participant to create service users for your validator and sv apps:
+
+.. code-block:: bash
+
+    kubectl create --namespace sv-1 secret generic cn-app-sv1-validator-ledger-api-auth \
+        "--from-literal=ledger-api-user=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}@clients"
+
+    kubectl create --namespace sv-1 secret generic cn-app-sv1-ledger-api-auth \
+        "--from-literal=ledger-api-user=${CLIENT_ID_OF_SV_AUTH0_APP}@clients"
+
+For technical reasons, please also create the following dummy secrets (a requirement that will be removed in the near future):
+
+.. code-block:: bash
+
+    kubectl create --namespace sv-1 secret generic cn-app-scan-ledger-api-auth "--from-literal=ledger-api-user=dummy"
+    kubectl create --namespace sv-1 secret generic cn-app-directory-ledger-api-auth "--from-literal=ledger-api-user=dummy"
+    kubectl create --namespace sv-1 secret generic cn-app-svc-ledger-api-auth "--from-literal=ledger-api-user=dummy"
+
+
+The SV app is configured with a secret as follows:
+
+.. code-block:: bash
+
+    kubectl create --namespace sv-1 secret generic cn-app-sv-ledger-api-auth \
+        "--from-literal=ledger-api-user=${CLIENT_ID_OF_SV_AUTH0_APP}@clients" \
+        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=client-id=${CLIENT_ID_OF_SV_AUTH0_APP}" \
+        "--from-literal=client-secret=${SECRET_OF_SV_AUTH0_APP}"
+
+
+The validator requires the following two secrets, one for the backend, the other for the web UI:
+
+.. code-block:: bash
+
+    kubectl create --namespace sv-1 secret generic cn-app-validator-ledger-api-auth \
+        "--from-literal=ledger-api-user=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}@clients" \
+        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=client-id=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}" \
+        "--from-literal=client-secret=${SECRET_OF_VALIDATOR_AUTH0_APP}"
+
+    kubectl create --namespace sv-1 secret generic cn-app-wallet-ui-auth \
+        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=client-id=${CLIENT_ID_OF_WALLET_WEB_UI_APP}"
 
 
 Installing the Software
@@ -79,11 +133,12 @@ to match your configuration.
 
 .. code-block:: yaml
 
+    postgres: postgres
     globalDomain:
       alias: global
       url: http://TARGET_CLUSTER.network.canton.global:5008
     auth:
-      jwksEndpoint: "https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json"
+      jwksEndpoint: "https://YOUR_AUTH0_TENANT.us.auth0.com/.well-known/jwks.json"
       targetAudience: "https://canton.network.global"
 
 An SV node includes a validator app so you also need to configure
@@ -92,13 +147,13 @@ following content.
 
 .. code-block:: yaml
 
-    participant_address: "participant.svc"
+    participant_address: "participant"
     svSponsorPort: "5014"
     svSponsorAddress: "https://TARGET_CLUSTER.network.canton.global"
     scanPort: "5012"
     scanAddress: "https://TARGET_CLUSTER.network.canton.global"
-    # Replace with the user id in your IAM that you want to use to log into
-    # the wallet as the SV party.
+    # Replace SV_WALLET_USER_ID with the user id in your IAM that you want to use to log into
+    # the wallet as the SV party:
     validatorWalletUser: "SV_WALLET_USER_ID"
     clusterUrl: "TARGET_CLUSTER.network.canton.global"
     auth:
@@ -112,7 +167,6 @@ the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register
 
 .. code-block:: yaml
 
-    participant_address: "participant.svc"
     joinWithKeyOnboarding:
       sponsorApiPort: 5014
       sponsorApiUrl: "https://TARGET_CLUSTER.network.canton.global"
@@ -120,6 +174,9 @@ the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register
       keyName: ... key name goes here ...
       publicKey: ... public key goes here ...
       privateKey: ... private key goes here ...
+    auth:
+      audience: https://canton.network.global
+      jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
 
 
 With this file in place, you can execute the following helm commands
@@ -130,8 +187,8 @@ reaches a stable state prior to moving on to the next step.
 
     helm repo update
     helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
-    helm install postgres canton-network-helm/cn-postgres -n svc --version ${CHART_VERSION}
-    helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml
+    helm install postgres canton-network-helm/cn-postgres -n sv-1 --version ${CHART_VERSION}
+    helm install participant canton-network-helm/cn-participant -n sv-1 --version ${CHART_VERSION} -f participant-values.yaml
     helm install validator canton-network-helm/cn-validator-node -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
     helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f sv-values.yaml
 
@@ -148,8 +205,8 @@ namespaces. A typical query might look as follows:
     sv-1           sv-app-59d4d499dd-nf4mj                                    1/1     Running   0          57m
     sv-1           validator-app-68fc94d87f-fjz4z                             1/1     Running   0          17m
     sv-1           wallet-web-ui-7c94df497f-c2pb4                             1/1     Running   0          17m
-    svc            participant-576cc9bc74-22wzx                               3/3     Running   0          151m
-    svc            postgres-0                                                 1/1     Running   0          151m
+    sv-1           participant-576cc9bc74-22wzx                               3/3     Running   0          151m
+    sv-1           postgres-0                                                 1/1     Running   0          151m
 
 Note also that ``Pod`` restarts may happen during bringup,
 particualrly if all helm charts are deployed at the same time. The
@@ -218,7 +275,7 @@ instructions below expect this file to be named ``ingress-values.yaml``
 
 .. code-block:: yaml
 
-    enableIngressModes: sv sv-external
+    enableIngressModes: sv-external
     cluster:
         networkSettings:
             externalIPRanges:
@@ -244,7 +301,7 @@ Logging into the wallet UI
 --------------------------
 
 After you deploy your ingress, open your browser at
-https://wallet.sv-1.svc.cn-cluster.YOUR_DOMAIN.com and login using the
+https://wallet.sv-1.svc.YOUR_DOMAIN.com and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to see your balance
 increase as mining rounds advance every 2.5 minutes and you will see
