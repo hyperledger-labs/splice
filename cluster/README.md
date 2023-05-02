@@ -886,6 +886,70 @@ the cluster ingress and documentation server.
 1. `cncluster pulumi down` Will remove from the cluster, the portions
    of the configuration managed by Pulumi.
 
+
+## Testing the SV Helm Runbook against a local build
+
+The [SV runbook for a Helm
+deployment](./cluster/images/docs/src/src/sv_operator/sv_helm.rst) is
+written under the assumption that we've fully released a build of the
+software, including public Docker images and Helm charts in Artifactory.
+During development, while you're iterating on changes,
+you can also test against a local build. This is both faster and it avoids
+exposing those intermediate development states to customers. (We
+should not publicly publish any artifacts that have not been fully tested.)
+
+When working against a local cluster, you can skip all the artifactory
+setup in the runbook. We will instead be using docker images from
+gcloud and local helm charts.
+
+1. Lock the scratchnet cluster you want to use for testing using `cncluster lock`. Reset it if it's not empty already.
+2. Create a file called `scratch.yaml` with the following content:
+
+```
+imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+cluster:
+  # TODO(#4389) Fixed token mode currently does not work by default, take a look at the issue for workarounds.
+  fixedTokens: true
+```
+
+This will configure Helm to fetch docker images from GCP and enable
+the fixed token mode which is used for all scratchnet clusters.
+3. Run `make docker-push-force -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
+4. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
+5. Following the runbook, create `participant-values.yaml`,
+   `validator-values.yaml` and `sv-values.yaml`. Replace
+   `TARGET_CLUSTER` with the cluster you are testing against. Note
+   that this is not the cluster you locked before, that will only
+   contain your own SV node. You need a cluster that contains
+   everything else. This cluster needs to run a compatible
+   version. Often you can use staging or devnet for this. If that does
+   not work, you may need to lock another scratchnet and go through
+   the usual `cncluster apply` flow.  Use the SV name, private and
+   public key from `apps/src/pack/eamples/sv/sv-onboarding.conf` in
+   `sv-values.yaml`.  Use either of the user ids from
+   [our list of passwords](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true)
+   as the `validator_wallet_user` in `validator-values.yaml` Use
+   `https://canton.network.global` as the audience and
+   `https://canton-network-dev.us.auth0.com/.well-known/jwks.json` as
+   the JWKS url in `validator-values.yaml`.
+6. Once you created the config files, you can run the `helm install` commands. Instead of specifying the artifactory repo, specify the path
+   to the local tarball created by `make cluster/helm/build`, add `-f scratch.yaml` to overwrite the docker image repo and omit `--version`.
+   So `helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml`
+   becomes `helm install participant $REPO_ROOT/cluster/helm/target/cn-participant-*.tgz -n svc -f participant-values.yaml -f scratch.yaml`.
+7. If you made a change, uninstall the chart first, e.g., `helm
+   uninstall participant -n svc`. Note that uninstall postgres does
+   not delete the persistent volume so in that case run `kubectl
+   delete pvc -A --all`.
+8. For the ingress, create `ingress-values.yaml` with the content from the runbook and then extend it with
+   ```
+   cluster:
+    # existing cluster section stays here
+    basename: YOUR_SCRATCHNET # e.g.. scratchb
+    ipAddress: "34.171.136.234" # ip address of the cluster as output by `cncluster ipaddr`
+   ```
+   cert-manager will already be setup so no need to do anything about that.
+9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global`.
+
 ## SV Operations
 
 Supervalidator nodes (SVs) play a central role in the governance and operation of each CN deployment.

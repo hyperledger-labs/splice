@@ -69,7 +69,7 @@ to connect to this environment:
 
 |chart_version_set|
 
-There should also be a file, ``remote-domain.yaml``, that refers to
+There should also be a file, ``participant-values.yaml``, that refers to
 the domain in the cluster to which you are connecting. As in other
 sections of this runbook, please replace ``TARGET_CLUSTER`` with
 ``dev`` or ``test`` per the cluster to which you are connecting. The
