@@ -6,6 +6,10 @@ import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
+println("Waiting for SVC initialization...")
+// We need to do this at the beginning, otherwise later commands can fail because CoinRules is locked.n
+Seq(sv1, sv2, sv3, sv4).foreach(_.waitForInitialization())
+
 println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
 bobValidator.waitForInitialization()
@@ -83,6 +87,3 @@ Seq(
   splitwell.ledgerApi.ledger_api_extensions.acs
     .awaitJava(splitwellCodegen.SplitwellInstall.COMPANION)(party)
 }
-
-println("Waiting for SVC initialization...")
-Seq(sv1, sv2, sv3, sv4).foreach(_.waitForInitialization())
