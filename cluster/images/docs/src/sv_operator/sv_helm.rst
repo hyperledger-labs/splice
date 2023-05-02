@@ -112,6 +112,7 @@ the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register
 
 .. code-block:: yaml
 
+    participant_address: "participant.svc"
     joinWithKeyOnboarding:
       sponsorApiPort: 5014
       sponsorApiUrl: "https://TARGET_CLUSTER.network.canton.global"

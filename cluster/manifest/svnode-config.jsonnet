@@ -28,6 +28,7 @@ local deployments(num, config) =
           name: "CN_APP_SV_ONBOARDING_TYPE",
           value: if num == 1 then "found-collective" else "join-via-svc-app",
         },
+        { name: "CN_APP_SV_PARTICIPANT_ADDRESS", value: "participant.svc" },
       ] + (
         if (config.tickDuration != null && num == 1) then [{ name: "CN_APP_SV_INITIAL_TICK_DURATION", value: config.tickDuration }] else []
       ),

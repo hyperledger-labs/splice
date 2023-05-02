@@ -54,6 +54,7 @@ export function installValidator(svc: k8s.helm.v3.Release, name: string): k8s.he
     'validator-' + xns.logicalName,
     'cn-validator',
     {
+      participantAddress: 'participant.svc',
       postgres: postgresDb,
       additionalUsers: [],
       appDars: [

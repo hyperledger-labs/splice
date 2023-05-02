@@ -1048,6 +1048,10 @@
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "found-collective"
+                           },
+                           {
+                              "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1202,6 +1206,10 @@
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
+                           },
+                           {
+                              "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1356,6 +1364,10 @@
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
+                           },
+                           {
+                              "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1510,6 +1522,10 @@
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "join-via-svc-app"
+                           },
+                           {
+                              "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

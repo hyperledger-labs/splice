@@ -36,6 +36,12 @@ spec:
               {{ else }}
               value: "true"
               {{ end }}
+            - name: CN_APP_SV_PARTICIPANT_ADDRESS
+              {{ if .Values.participantAddress }}
+              value: {{ .Values.participantAddress | quote }}
+              {{ else }}
+              value: participant
+              {{ end }}
             {{- if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}
