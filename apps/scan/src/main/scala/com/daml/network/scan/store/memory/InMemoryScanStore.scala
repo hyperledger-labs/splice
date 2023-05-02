@@ -19,6 +19,8 @@ import cats.implicits.*
 import cats.kernel.Monoid
 import com.daml.network.store.TxLogStore
 
+import java.time.Instant
+
 class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected[this] val scanConfig: ScanAppBackendConfig,
@@ -76,7 +78,7 @@ class InMemoryScanStore(
     }
   }
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[Long] = {
+  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] = {
     // TODO(#2930): For now, this is simply the latest closed mining round, since we are computing everything on-demand
     // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
     // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
@@ -88,7 +90,12 @@ class InMemoryScanStore(
         }
       )
     } yield {
-      round.round
+      round match {
+        case r: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord =>
+          (r.round, r.effectiveAt)
+        case _ =>
+          throw Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
+      }
     }
   }
 
@@ -102,8 +109,8 @@ class InMemoryScanStore(
     }
     // TODO(#2930): For now, we support querying data for any round up to the latest closed one. This should
     // be revisited once we add some backfilling (historical or ACS-based) in the scan bootstrap.
-    getRoundOfLatestData().flatMap(latestRound =>
-      if (asOfEndOfRound > latestRound) {
+    getRoundOfLatestData().flatMap { case (round, _) =>
+      if (asOfEndOfRound > round) {
         Future.failed(
           Status.NOT_FOUND
             .withDescription(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -112,7 +119,7 @@ class InMemoryScanStore(
       } else {
         Future.successful(())
       }
-    )
+    }
   }
 
   private def sumRewardsCollectedInRound(

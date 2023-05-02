@@ -6,9 +6,9 @@ import com.daml.network.history.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.util.CNNodeUtil.dollarsToCC
-
 import cats.Monoid
 import cats.syntax.foldable.*
+
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.TreeEvent
@@ -16,6 +16,8 @@ import com.daml.network.util.ExerciseNode
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.util.Codec
 import io.grpc.Status
+
+import java.time.Instant
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -86,6 +88,7 @@ object ScanTxLogParser {
         offset: String,
         eventId: String,
         round: Long,
+        effectiveAt: Instant,
     ) extends TxLogIndexRecord
 
     trait RewardIndexRecord extends TxLogIndexRecord {
@@ -239,6 +242,7 @@ object ScanTxLogParser {
           offset = tx.getOffset,
           eventId = event.getEventId(),
           round = round.payload.round.number,
+          effectiveAt = tx.getEffectiveAt,
         )
       )
 

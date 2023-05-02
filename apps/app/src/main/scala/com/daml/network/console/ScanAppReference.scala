@@ -18,6 +18,8 @@ import com.digitalasset.canton.topology.PartyId
 import scala.jdk.CollectionConverters.*
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
+import java.time.Instant
+
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
   */
@@ -143,8 +145,10 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetCoinConfigForRound(round))
     }
 
-  @Help.Summary("Get the latest round number for which aggregated data is available")
-  def getRoundOfLatestData(): Long =
+  @Help.Summary(
+    "Get the latest round number for which aggregated data is available and the ledger effective time at which the round was closed"
+  )
+  def getRoundOfLatestData(): (Long, Instant) =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetRoundOfLatestData())
     }

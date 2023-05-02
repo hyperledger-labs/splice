@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.http.v0.{definitions, scan as http}
-import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
@@ -389,7 +389,8 @@ object HttpScanAppClient {
       }
   }
 
-  case class GetRoundOfLatestData() extends BaseCommand[http.GetRoundOfLatestDataResponse, Long] {
+  case class GetRoundOfLatestData()
+      extends BaseCommand[http.GetRoundOfLatestDataResponse, (Long, Instant)] {
 
     override def submitRequest(
         client: http.ScanClient,
@@ -399,10 +400,10 @@ object HttpScanAppClient {
 
     override def handleResponse(
         response: http.GetRoundOfLatestDataResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Long] =
+    )(implicit decoder: TemplateJsonDecoder): Either[String, (Long, Instant)] =
       response match {
         case http.GetRoundOfLatestDataResponse.OK(response) =>
-          Right(response.round)
+          Right((response.round, response.effectiveAt.toInstant))
         case http.GetRoundOfLatestDataResponse.NotFound(value) =>
           Left(value.error)
       }

@@ -18,6 +18,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Instant
+
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
     extends CNNodeAppStoreWithHistory[
@@ -55,7 +57,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]
 
-  def getRoundOfLatestData()(implicit tc: TraceContext): Future[Long]
+  def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)]
 
   def verifyDataExistsForEndOfRound(
       asOfEndOfRound: Long

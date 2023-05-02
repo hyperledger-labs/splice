@@ -16,6 +16,8 @@ import scala.jdk.CollectionConverters.*
 import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
+import java.time.Duration
+
 class ScanTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
@@ -137,11 +139,15 @@ class ScanTimeBasedIntegrationTest
     })
     actAndCheck("Advance one more tick for round 0 to close", advanceRoundsByOneTick)(
       "Latest round with data should be updated",
-      _ =>
+      _ => {
+        val ledgerTime = getLedgerTime.toInstant
+        advanceTime(Duration.ofMillis(1))
         eventuallySucceeds() {
-          val round = scan.getRoundOfLatestData()
-          round should be(0)
-        },
+          scan.getRoundOfLatestData() should be(
+            (0, ledgerTime)
+          )
+        }
+      },
     )
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
       p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
@@ -173,8 +179,12 @@ class ScanTimeBasedIntegrationTest
     )(
       "Test leaderboards for ends of rounds 4&5",
       _ => {
+        val ledgerTime = getLedgerTime.toInstant
+        advanceTime(Duration.ofMillis(1))
         eventually() {
-          scan.getRoundOfLatestData() should be(5)
+          scan.getRoundOfLatestData() should be(
+            (5, ledgerTime)
+          )
         }
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other

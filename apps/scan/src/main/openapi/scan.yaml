@@ -371,11 +371,14 @@ components:
           type: string
     GetRoundOfLatestDataResponse:
       type: object
-      required: ["round"]
+      required: ["round", "effectiveAt"]
       properties:
         round:
           type: integer
           format: int64
+        effectiveAt:
+          type: string
+          format: date-time
     GetValidatorTrafficBalanceResponse:
       type: object
       required: ["remainingBalance", "totalPaid"]

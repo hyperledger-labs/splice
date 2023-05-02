@@ -35,6 +35,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.StatusRuntimeException
 
+import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
 
 class HttpScanHandler(
@@ -303,11 +304,12 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       store
         .getRoundOfLatestData()
-        .map(round =>
+        .map { case (round, effectiveAt) =>
           v0.ScanResource.GetRoundOfLatestDataResponse.OK(
-            definitions.GetRoundOfLatestDataResponse(round)
+            definitions
+              .GetRoundOfLatestDataResponse(round, effectiveAt.atOffset(ZoneOffset.UTC))
           )
-        )
+        }
         .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))
     }
 
