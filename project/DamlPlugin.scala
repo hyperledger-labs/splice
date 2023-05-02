@@ -80,7 +80,7 @@ object DamlPlugin extends AutoPlugin {
       damlEnableJavaCodegen := true,
       damlGenerateCode := {
         // for the time being we assume if we're using code generation then the DARs must first be built
-        damlBuild.value
+        val dars = damlBuild.value
 
         val settings = damlCodeGeneration.value
         val scalaOutputDirectory = damlScalaCodegenOutput.value
@@ -110,7 +110,7 @@ object DamlPlugin extends AutoPlugin {
               }
           }.toSet
         }
-        cache(settings.map(_._1).toSet).toSeq
+        cache((settings.map(_._1) ++ dars).toSet).toSeq
       },
       damlBuild := {
         val dependencies = damlDependencies.value
@@ -533,6 +533,23 @@ object DamlPlugin extends AutoPlugin {
 
     language match {
       case Codegen.Java =>
+        val damlYaml = readDamlYaml(projectDir / "daml.yaml")
+        // We don't have a JSON library easily accessible in SBT code so we opt for the rather hacky option here to drill down fields.
+        val codegenDir = Try(
+          damlYaml
+            .get("codegen")
+            .asInstanceOf[JMap[String, Object]]
+            .get("java")
+            .asInstanceOf[JMap[String, Object]]
+            .get("output-directory")
+            .asInstanceOf[String]
+        ) match {
+          case Success(dir) => dir
+          case Failure(e) =>
+            log.error(s"Failed to parse codegen config in daml.yaml file: $damlYaml")
+            throw e
+        }
+        IO.delete(projectDir / codegenDir)
         BuildUtil.runCommand(
           Seq("java", "-jar", codegenJarPath, "java"),
           log,
