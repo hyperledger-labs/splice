@@ -963,12 +963,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             set -eou pipefail
-
-            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/the-real-canton-coin.git
-
             cncluster activate
             cncluster ci_apply
-          cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
@@ -1177,8 +1173,10 @@ jobs:
            export PUSH_TO_ARTIFACTORY=1
            make docker-push -j
       - run_bash_command_in_nix:
-         additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
-         cmd_name: Push Helm charts
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD \
+           --keep GITHUB_TOKEN"
+         cmd_name: Push Helm charts and tag git accordingly
          cmd: |
            publish () {
              source=$1
@@ -1191,6 +1189,11 @@ jobs:
               artifactory_url="https://digitalasset.jfrog.io/artifactory"
               publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
+
+           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/the-real-canton-coin.git
+           RELEASE_TAG=$(get-snapshot-version)
+           hub tag "${RELEASE_TAG}"
+           hub push origin "${RELEASE_TAG}"
 
   docker_images_build:
     machine:

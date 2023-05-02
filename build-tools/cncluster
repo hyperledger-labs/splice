@@ -710,18 +710,6 @@ function subcmd_ci_apply() {
 
     _cluster_reset
     _cluster_apply "${SOURCE_IMAGE_TAG}"
-
-    if [ -n "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
-        RELEASE_TAG="${GCP_CLUSTER_BASENAME}-$(date "+%y%m%d-%H%M")"
-
-        if [ -n "${GCP_SKIP_RELEASE_TAG-}" ] ; then
-            _info "Skipping release tag: ${RELEASE_TAG}"
-        else
-            _info "Tagging release: ${RELEASE_TAG}"
-            hub tag "${RELEASE_TAG}"
-            hub push origin "${RELEASE_TAG}"
-        fi
-    fi
 }
 
 ###
