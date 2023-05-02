@@ -905,15 +905,15 @@ gcloud and local helm charts.
 1. Lock the scratchnet cluster you want to use for testing using `cncluster lock`. Reset it if it's not empty already.
 2. Create a file called `scratch.yaml` with the following content:
 
-```
-imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-cluster:
-  # TODO(#4389) Fixed token mode currently does not work by default, take a look at the issue for workarounds.
-  fixedTokens: true
-```
+   ```
+   imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+   cluster:
+     # TODO(#4389) Fixed token mode currently does not work by default, take a look at the issue for workarounds.
+     fixedTokens: true
+   ```
 
-This will configure Helm to fetch docker images from GCP and enable
-the fixed token mode which is used for all scratchnet clusters.
+   This will configure Helm to fetch docker images from GCP and enable
+   the fixed token mode which is used for all scratchnet clusters.
 3. Run `make docker-push-force -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
 4. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
 5. Following the runbook, create `participant-values.yaml`,
