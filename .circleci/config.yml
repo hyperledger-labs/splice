@@ -959,9 +959,13 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep GITHUB_TOKEN"
           gce_authenticate: true
           cmd: |
             set -eou pipefail
+
+            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/the-real-canton-coin.git
+
             cncluster activate
             cncluster ci_apply
           cmd_retry_count: 5
