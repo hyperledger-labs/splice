@@ -7,6 +7,7 @@ import com.daml.network.store.CNNodeAppStoreWithoutHistory
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import cats.syntax.traverseFilter.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,11 +22,12 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   def walletKey: WalletStore.Key
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   def lookupInstallByParty(
       endUserParty: PartyId
-  ): Future[Option[
+  )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
     domainId <- defaultAcsDomainIdF
@@ -38,7 +40,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupInstallByName(
       endUserName: String
-  ): Future[Option[
+  )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
     domainId <- defaultAcsDomainIdF
@@ -49,8 +51,9 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
     )
   } yield install
 
-  def lookupValidatorFeaturedAppRight()
-      : Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] =
+  def lookupValidatorFeaturedAppRight()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(
         _,
@@ -62,7 +65,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   def listUsersWithArchivedWalletInstalls(
       usernames: Seq[String],
       limit: Integer,
-  ): Future[Seq[String]] = {
+  )(implicit tc: TraceContext): Future[Seq[String]] = {
     usernames.toList
       .filterA(lookupInstallByName(_).map(!_.isDefined))
       .map(_.take(limit))

@@ -12,6 +12,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,11 +24,12 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = domainConfig.global
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -39,14 +41,14 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupValidatorOnboardingBySecret(
       secret: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]
   ] =
     lookupValidatorOnboardingBySecretWithOffset(secret).map(_.value)
 
   def lookupUsedSecretWithOffset(
       secret: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -58,20 +60,21 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupUsedSecret(
       secret: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[vo.UsedSecret.ContractId, vo.UsedSecret]]
   ] =
     lookupUsedSecretWithOffset(secret).map(_.value)
 
-  def listValidatorOnboardings()
-      : Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
+  def listValidatorOnboardings()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
     )
 
   def lookupApprovedSvIdentityByNameWithOffset(
       name: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -83,10 +86,12 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupApprovedSvIdentityByName(
       name: String
+  )(implicit
+      tc: TraceContext
   ): Future[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]] =
     lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
 
-  def lookupSvOnboardingConfirmedWithOffset(): Future[
+  def lookupSvOnboardingConfirmedWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -96,18 +101,21 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupSvOnboardingConfirmed(): Future[
+  def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
     lookupSvOnboardingConfirmedWithOffset().map(_.value)
 
-  def lookupValidatorLicense()
-      : Future[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
+  def lookupValidatorLicense()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(vl.ValidatorLicense.COMPANION)(_, (_: Any) => true)
     )
 
-  def getValidatorLicense(): Future[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]] =
+  def getValidatorLicense()(implicit
+      tc: TraceContext
+  ): Future[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]] =
     lookupValidatorLicense().map(
       _.getOrElse(
         throw new StatusRuntimeException(

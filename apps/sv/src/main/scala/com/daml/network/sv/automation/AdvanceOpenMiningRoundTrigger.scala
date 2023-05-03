@@ -174,7 +174,7 @@ class AdvanceOpenMiningRoundTrigger(
     }
   }
 
-  override protected def isLeader(): Future[Boolean] = store.svIsLeader()
+  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }
 
 object AdvanceOpenMiningRoundTrigger {

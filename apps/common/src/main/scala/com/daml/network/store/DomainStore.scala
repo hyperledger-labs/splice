@@ -13,7 +13,7 @@ abstract class DomainStore extends AutoCloseable {
   def listConnectedDomains(): Future[Map[DomainAlias, DomainId]]
   def getDomainId(alias: DomainAlias): Future[DomainId]
 
-  def signalWhenConnected(alias: DomainAlias): Future[DomainId]
+  def signalWhenConnected(alias: DomainAlias)(implicit tc: TraceContext): Future[DomainId]
 
   /** Stream all domain connection events, starts with
     * DomainAdded for all current domains and then sends updates.

@@ -44,7 +44,7 @@ class HttpValidatorAdminHandler(
   )()(fake: Unit): Future[
     v0.ValidatorAdminResource.ListUsersResponse
   ] =
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
     }
 

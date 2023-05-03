@@ -2,7 +2,9 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -13,8 +15,13 @@ import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
-class InMemoryDomainStore(party: PartyId, override protected val loggerFactory: NamedLoggerFactory)(
-    implicit ec: ExecutionContext
+class InMemoryDomainStore(
+    party: PartyId,
+    override protected val loggerFactory: NamedLoggerFactory,
+    futureSupervisor: FutureSupervisor,
+    retryProvider: RetryProvider,
+)(implicit
+    ec: ExecutionContext
 ) extends DomainStore
     with NamedLogging {
   @volatile
@@ -40,13 +47,25 @@ class InMemoryDomainStore(party: PartyId, override protected val loggerFactory: 
         )
       )(Future.successful(_))
 
-  override def signalWhenConnected(alias: DomainAlias): Future[DomainId] =
+  override def signalWhenConnected(
+      alias: DomainAlias
+  )(implicit tc: TraceContext): Future[DomainId] =
     updateState[Future[DomainId]](state =>
       state.connectedDomains.get(alias) match {
         case Some(domainId) => (state, Future.successful(domainId))
         case None =>
           val (newState, promise) = state.addAliasToSignal(alias)
-          (newState, promise.future)
+          val name = show"signalWhenConnectedOrShutdown($alias)"
+          val connectedOrShutdown = retryProvider
+            .waitUnlessShutdown(promise.future)
+            .onShutdown {
+              logger.debug(s"Aborted $name, as we are shutting down")
+              throw Status.UNAVAILABLE
+                .withDescription(show"Aborting $name because we're shutting down")
+                .asRuntimeException()
+            }
+          val supervisedFuture = futureSupervisor.supervised(name)(connectedOrShutdown)
+          (newState, supervisedFuture)
       }
     ).flatten
 

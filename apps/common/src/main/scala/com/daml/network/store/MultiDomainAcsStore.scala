@@ -191,11 +191,12 @@ trait MultiDomainAcsStore extends AutoCloseable {
       expiresAt: T => java.time.Instant
   )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
     (now, limit) =>
-      listReadyContracts(
-        companion = companion,
-        filter = co => now.toInstant isAfter expiresAt(co.payload),
-        limit = Some(limit.toLong),
-      )
+      _ =>
+        listReadyContracts(
+          companion = companion,
+          filter = co => now.toInstant isAfter expiresAt(co.payload),
+          limit = Some(limit.toLong),
+        )
 
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple

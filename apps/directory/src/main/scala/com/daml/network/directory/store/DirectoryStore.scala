@@ -14,6 +14,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,7 +28,8 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   import MultiDomainAcsStore.QueryResult
 
-  private[directory] def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private[directory] def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
@@ -44,7 +46,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(
       user: PartyId
-  ): Future[QueryResult[Option[
+  )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
   ]]] =
     defaultAcsDomainIdF.flatMap(
@@ -58,7 +60,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   /** Lookup a directory entry by name. */
   def lookupEntryByNameWithOffset(
       name: String
-  ): Future[QueryResult[
+  )(implicit tc: TraceContext): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
     defaultAcsDomainIdF.flatMap(
@@ -68,7 +70,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupEntryByName(name: String): Future[
+  def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
     lookupEntryByNameWithOffset(name).map(_.value)
@@ -78,7 +80,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     */
   def lookupEntryByParty(
       partyId: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -91,7 +93,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   /** List all directory entries that are active as of a specific revision, up to a certain number. */
   // TODO(#300): allow submitting the page token to receive the next page
   // TODO(#300): at the moment, trimming the list to the right size is performed here, that should be moved to the acsStore
-  def listEntries(namePrefix: String, pageSize: Int): Future[
+  def listEntries(namePrefix: String, pageSize: Int)(implicit tc: TraceContext): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ] =
     for {
@@ -119,7 +121,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
       limit: Int,
-  ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
+  )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     for {
       domainId <- defaultAcsDomainIdF
       dueSubscriptions <- multiDomainAcsStore.listContractsOnDomain(

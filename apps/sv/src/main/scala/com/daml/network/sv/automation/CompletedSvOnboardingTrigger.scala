@@ -76,5 +76,6 @@ class CompletedSvOnboardingTrigger(
     )
   }
 
-  override protected def isLeader(): Future[Boolean] = svcStore.svIsLeader()
+  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] =
+    svcStore.svIsLeader()
 }

@@ -27,5 +27,5 @@ trait SvTaskBasedTrigger[T] {
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
-  protected def isLeader(): Future[Boolean]
+  protected def isLeader()(implicit tc: TraceContext): Future[Boolean]
 }

@@ -11,6 +11,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,19 +23,24 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   protected[this] def domainConfig: SvcDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global
 
-  def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  def lookupCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, _ => true)
     )
 
   // needed for round automation
-  def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+  def getCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
     lookupCoinRules().map(
       _.getOrElse(
         throw new StatusRuntimeException(
@@ -45,7 +51,8 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
   // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
   def lookupSvcRules()(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(cn.svcrules.SvcRules.COMPANION)(_, (_: Any) => true)
@@ -53,6 +60,8 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupFeaturedAppByProviderWithOffset(
       provider: String
+  )(implicit
+      tc: TraceContext
   ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomainWithOffset(FeaturedAppRight.COMPANION)(

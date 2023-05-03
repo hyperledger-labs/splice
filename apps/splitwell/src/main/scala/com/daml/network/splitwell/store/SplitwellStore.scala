@@ -13,6 +13,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -94,7 +95,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
     * @note Invariant: every key is an ID associated with `others`
     * @note Invariant: every value is non-empty
     */
-  def listTransferrableGroups(): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
+  def listTransferrableGroups()(implicit
+      tc: TraceContext
+  ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
 
   def listSplitwellInstalls(user: PartyId): Future[Seq[
     ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]

@@ -109,7 +109,7 @@ class ExecuteConfirmedActionTrigger(
 
   private def isStaleAction(
       confirmation: ReadyContract[Confirmation.ContractId, Confirmation]
-  ): Future[Boolean] = {
+  )(implicit tc: TraceContext): Future[Boolean] = {
     // Add new cases as we port more triggers which require confirmation
     confirmation.contract.payload.action match {
       case arcCoinRules: ARC_CoinRules =>
@@ -171,5 +171,5 @@ class ExecuteConfirmedActionTrigger(
     }
   }
 
-  override protected def isLeader(): Future[Boolean] = store.svIsLeader()
+  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

@@ -51,7 +51,7 @@ class ArchiveClosedMiningRoundsTrigger(
 
   private def existsClosedRoundArchivalConfirmation(
       closedRoundId: ClosedMiningRound.ContractId
-  ): Future[Boolean] = {
+  )(implicit tc: TraceContext): Future[Boolean] = {
     for {
       coinRules <- store.getCoinRules()
       action = coinRulesArchiveMiningRoundAction(

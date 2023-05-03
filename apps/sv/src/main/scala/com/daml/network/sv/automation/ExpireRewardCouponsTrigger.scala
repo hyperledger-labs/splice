@@ -29,7 +29,7 @@ class ExpireRewardCouponsTrigger(
       closedRound: Contract[ClosedMiningRound.ContractId, ClosedMiningRound],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
-  ): Future[Seq[Update[Exercised[Optional[ContractId]]]]] = {
+  )(implicit tc: TraceContext): Future[Seq[Update[Exercised[Optional[ContractId]]]]] = {
     for {
       appRewards <- store.listAppRewardCouponsGroupedByCounterparty(
         closedRound.payload.round.number,

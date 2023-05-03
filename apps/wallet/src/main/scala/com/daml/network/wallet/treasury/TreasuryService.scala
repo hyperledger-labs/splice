@@ -187,7 +187,9 @@ class TreasuryService(
       .asRuntimeException
 
   // Try looking up the contracts relevant for identifying operation staleness. Will throw a [[io.grpc.StatusRuntimeException]] if not found.
-  private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] =
+  private def tryLookupCoinOperation(
+      op0: installCodegen.CoinOperation
+  )(implicit tc: TraceContext): Future[Unit] =
     userStore.domains.signalWhenConnected(userStore.defaultAcsDomain).flatMap { domainId =>
       op0 match {
         case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
@@ -653,6 +655,8 @@ class TreasuryService(
   private def getAppRewardsAndQuantity(
       maxNumInputs: Int,
       issuingRoundsMap: Map[roundApi.Round, IssuingMiningRound],
+  )(implicit
+      tc: TraceContext
   ): Future[(BigDecimal, Seq[(roundApi.Round, BigDecimal, InputAppRewardCoupon)])] = {
     for {
       appRewardCouponInputs <- userStore.listSortedAppRewards(

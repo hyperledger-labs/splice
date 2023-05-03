@@ -18,6 +18,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,7 +27,8 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   protected[this] def domainConfig: ValidatorDomainConfig
 
@@ -34,7 +36,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   def lookupWalletInstallByNameWithOffset(
       endUserName: String
-  ): Future[QueryResult[
+  )(implicit tc: TraceContext): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
   ]] =
     defaultAcsDomainIdF.flatMap(
@@ -44,7 +46,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupValidatorLicenseWithOffset(): Future[
+  def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
       validatorLicenseCodegen.ValidatorLicense,
@@ -58,7 +60,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -68,14 +70,14 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupValidatorTraffic: Future[
+  def lookupValidatorTraffic(implicit tc: TraceContext): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
   ] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(_, _ => true)
     )
 
-  def listUsers(): Future[Seq[String]] = {
+  def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
       domainId <- defaultAcsDomainIdF
       installs <- multiDomainAcsStore.listContractsOnDomain(

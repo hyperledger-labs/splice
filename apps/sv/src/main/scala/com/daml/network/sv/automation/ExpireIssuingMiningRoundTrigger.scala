@@ -41,8 +41,7 @@ class ExpireIssuingMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[
         ReadyContract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ],
-  )(
-  ): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
       coinRules <- store.getCoinRules()
@@ -77,7 +76,7 @@ class ExpireIssuingMiningRoundTrigger(
           store
             .svIsLeader()
             .flatMap(if (_) {
-              performWorkAsLeader(svcRules, task)()
+              performWorkAsLeader(svcRules, task)
             } else {
               Future.successful(
                 TaskSuccess(

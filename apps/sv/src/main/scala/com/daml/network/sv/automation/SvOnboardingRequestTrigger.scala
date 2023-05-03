@@ -65,7 +65,7 @@ class SvOnboardingRequestTrigger(
         SvOnboardingRequest.ContractId,
         SvOnboardingRequest,
       ],
-  )(): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       approval <- SvApp
         .isApprovedSvIdentity(
@@ -141,7 +141,7 @@ class SvOnboardingRequestTrigger(
             )
           )
         } else {
-          attemptConfirmation(svcRules, svOnboarding)()
+          attemptConfirmation(svcRules, svOnboarding)
         }
     } yield outcome
   }
@@ -152,7 +152,7 @@ class SvOnboardingRequestTrigger(
       reason: String,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
       domainId: DomainId,
-  ): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = svcRulesConfirmSvOnboardingAction(party, name, reason)
     for {
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)

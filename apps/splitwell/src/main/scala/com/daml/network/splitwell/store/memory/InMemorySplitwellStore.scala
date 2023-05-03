@@ -12,6 +12,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -25,8 +26,9 @@ class InMemorySplitwellStore(
     extends InMemoryCNNodeAppStoreWithoutHistory
     with SplitwellStore {
 
-  override def listTransferrableGroups()
-      : Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]] = for {
+  override def listTransferrableGroups()(implicit
+      tc: TraceContext
+  ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]] = for {
     // find all groups still on 'others' domains
     othersGroups <- Future
       .traverse(domainConfig.splitwell.others) { otherDomain =>

@@ -32,7 +32,7 @@ abstract class MultiDomainExpiredContractTrigger[
   override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[ReadyContract[TCid, T]]] =
-    listExpiredContracts(now, limit)
+    listExpiredContracts(now, limit)(tc)
 
   override final protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[ReadyContract[TCid, T]]
@@ -48,5 +48,5 @@ object MultiDomainExpiredContractTrigger {
   type Template[TCid <: ContractId[_], T] =
     MultiDomainExpiredContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
   type ListExpiredContracts[TCid <: ContractId[_], T] =
-    (CantonTimestamp, Int) => Future[Seq[ReadyContract[TCid, T]]]
+    (CantonTimestamp, Int) => TraceContext => Future[Seq[ReadyContract[TCid, T]]]
 }

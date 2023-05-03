@@ -29,7 +29,7 @@ trait ScanStore
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
-  def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  def defaultAcsDomainIdF(implicit tc: TraceContext) = domains.signalWhenConnected(defaultAcsDomain)
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -38,12 +38,14 @@ trait ScanStore
 
   override final def defaultAcsDomain = scanConfig.domains.global
 
-  def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  def lookupCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
     )
 
-  def lookupCoinRulesV1Test(): Future[
+  def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
     Option[Contract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -51,7 +53,7 @@ trait ScanStore
         .findContractOnDomain(ccV1Test.coin.CoinRulesV1Test.COMPANION)(_, (_: Any) => true)
     )
 
-  def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)]
+  def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)]
 
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
@@ -71,7 +73,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
 
-  def lookupValidatorTraffic(validatorParty: PartyId): Future[
+  def lookupValidatorTraffic(validatorParty: PartyId)(implicit tc: TraceContext): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
   ] =
     defaultAcsDomainIdF.flatMap(

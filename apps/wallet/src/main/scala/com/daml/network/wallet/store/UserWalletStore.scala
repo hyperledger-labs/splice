@@ -54,12 +54,13 @@ trait UserWalletStore
     ]
     with NamedLogging {
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit traceContext: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  def lookupInstall()(implicit ec: ExecutionContext): Future[
+  def lookupInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ] = for {
     domainId <- defaultAcsDomainIdF
@@ -67,7 +68,7 @@ trait UserWalletStore
       .findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(domainId, (_: Any) => true)
   } yield ct
 
-  def getInstall()(implicit ec: ExecutionContext): Future[
+  def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] = for {
     ct <- lookupInstall()
@@ -98,7 +99,7 @@ trait UserWalletStore
       _.expiresAt
     )
 
-  def listAppPaymentRequests: Future[Seq[AppPaymentRequest]] = {
+  def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
     for {
       domainId <- defaultAcsDomainIdF
       contracts <- multiDomainAcsStore.listContractsOnDomain(
@@ -124,7 +125,7 @@ trait UserWalletStore
 
   def getAppPaymentRequest(
       cid: walletCodegen.AppPaymentRequest.ContractId
-  ): Future[AppPaymentRequest] = {
+  )(implicit tc: TraceContext): Future[AppPaymentRequest] = {
     for {
       domainId <- defaultAcsDomainIdF
       appPaymentRequest <- multiDomainAcsStore.getContractByIdOnDomain(
@@ -147,25 +148,30 @@ trait UserWalletStore
       _.expiresAt
     )
 
-  def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int): Future[Seq[
-    ReadyContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
-  ]] = {
-    def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
-      now.toInstant.isAfter(
-        state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
+  def listSubscriptionStatesReadyForPayment: ListExpiredContracts[
+    subsCodegen.SubscriptionIdleState.ContractId,
+    subsCodegen.SubscriptionIdleState,
+  ] = (now: CantonTimestamp, limit: Int) =>
+    _ => {
+      def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
+        now.toInstant.isAfter(
+          state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
+        )
+
+      multiDomainAcsStore.listReadyContracts(
+        subsCodegen.SubscriptionIdleState.COMPANION,
+        (c: Contract[
+          subsCodegen.SubscriptionIdleState.ContractId,
+          subsCodegen.SubscriptionIdleState,
+        ]) => isReadyForPayment(c.payload),
+        Some(limit.toLong),
       )
+    }
 
-    multiDomainAcsStore.listReadyContracts(
-      subsCodegen.SubscriptionIdleState.COMPANION,
-      (c: Contract[
-        subsCodegen.SubscriptionIdleState.ContractId,
-        subsCodegen.SubscriptionIdleState,
-      ]) => isReadyForPayment(c.payload),
-      Some(limit.toLong),
-    )
-  }
-
-  def listSubscriptions()(implicit ec: ExecutionContext): Future[Seq[Subscription]] = {
+  def listSubscriptions()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[Subscription]] = {
     // This is racy: you can miss subscriptions if their state change concurrently, i.e., you don't see them
     // as either idle or payment. This is okay since it'll just refresh in the UI.
     for {
@@ -212,7 +218,7 @@ trait UserWalletStore
 
   def getSubscriptionRequest(
       cid: subsCodegen.SubscriptionRequest.ContractId
-  )(implicit ec: ExecutionContext): Future[SubscriptionRequest] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[SubscriptionRequest] = {
     for {
       domainId <- defaultAcsDomainIdF
       contract <- multiDomainAcsStore.getContractByIdOnDomain(
@@ -231,7 +237,8 @@ trait UserWalletStore
   }
 
   def listSubscriptionRequests()(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[Seq[SubscriptionRequest]] = {
     for {
       domainId <- defaultAcsDomainIdF
@@ -259,7 +266,7 @@ trait UserWalletStore
   def listSortedCoinsAndQuantity(
       maxNumInputs: Int,
       submittingRound: Long,
-  ): Future[Seq[(BigDecimal, InputCoin)]] = for {
+  )(implicit tc: TraceContext): Future[Seq[(BigDecimal, InputCoin)]] = for {
     domainId <- defaultAcsDomainIdF
     coins <- multiDomainAcsStore.listContractsOnDomain(coinCodegen.Coin.COMPANION, domainId)
   } yield coins
@@ -291,7 +298,7 @@ trait UserWalletStore
   def listSortedValidatorRewards(
       maxNumInputs: Option[Int],
       activeIssuingRoundsO: Option[Set[Long]],
-  ): Future[Seq[
+  )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]] = {
     def filterActiveRounds(round: Long) = activeIssuingRoundsO match {
@@ -317,7 +324,7 @@ trait UserWalletStore
   def listSortedAppRewards(
       maxNumInputs: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
-  ): Future[Seq[
+  )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
     domainId <- defaultAcsDomainIdF
@@ -349,7 +356,7 @@ trait UserWalletStore
     )
     .take(maxNumInputs)
 
-  def lookupFeaturedAppRight()(implicit ec: ExecutionContext): Future[
+  def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -357,8 +364,9 @@ trait UserWalletStore
     )
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
-  def getValidatorRightsWhereUserIsValidator()
-      : Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
+  def getValidatorRightsWhereUserIsValidator()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, _)
     )

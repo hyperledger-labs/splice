@@ -35,7 +35,9 @@ class InMemoryScanStore(
 
   override lazy val acsContractFilter = ScanStore.contractFilter(svcParty, scanConfig)
 
-  override def getTotalCoinBalance(): Future[(BigDecimal, BigDecimal)] = {
+  override def getTotalCoinBalance()(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, BigDecimal)] = {
     for {
       // TODO(#2930): This is a very naive preliminary implementation that will be completely replaced soon
       domainId <- defaultAcsDomainIdF

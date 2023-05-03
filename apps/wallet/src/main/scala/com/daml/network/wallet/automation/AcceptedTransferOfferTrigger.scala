@@ -90,7 +90,7 @@ class AcceptedTransferOfferTrigger(
   private def abortAcceptedTransferOffer(
       acceptedOffer: ReadyContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
-  ): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(

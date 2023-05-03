@@ -31,8 +31,9 @@ class TopupValidatorTrafficBalanceTrigger(
     mat: Materializer,
 ) extends PollingTrigger {
 
-  private def getValidatorTraffic
-      : Future[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]] = {
+  private def getValidatorTraffic(implicit
+      tc: TraceContext
+  ): Future[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]] = {
     store.lookupValidatorTraffic.map(
       _.getOrElse(
         throw new StatusRuntimeException(
@@ -53,7 +54,7 @@ class TopupValidatorTrafficBalanceTrigger(
       .sum
   }
 
-  private def getValidatorTreasury: Future[TreasuryService] = {
+  private def getValidatorTreasury(implicit tc: TraceContext): Future[TreasuryService] = {
     for {
       walletInstall <- store
         .lookupInstallByParty(store.key.validatorParty)

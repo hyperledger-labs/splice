@@ -28,7 +28,12 @@ abstract class InMemoryCNNodeAppStore[
   override def txLog = multiDomainAcsStore
 
   override lazy val domains: DomainStore =
-    new InMemoryDomainStore(acsContractFilter.ingestionFilter.primaryParty, loggerFactory)
+    new InMemoryDomainStore(
+      acsContractFilter.ingestionFilter.primaryParty,
+      loggerFactory,
+      futureSupervisor,
+      retryProvider,
+    )
 
   override val offset: OffsetStore = new OffsetStore(loggerFactory)
 

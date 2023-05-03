@@ -40,8 +40,7 @@ class ExpireStaleConfirmationsTrigger(
       task: ScheduledTaskTrigger.ReadyTask[
         ReadyContract[Confirmation.ContractId, Confirmation]
       ],
-  )(
-  ): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_ExpireStaleConfirmation(
@@ -73,7 +72,7 @@ class ExpireStaleConfirmationsTrigger(
           store
             .svIsLeader()
             .flatMap(if (_) {
-              performWorkAsLeader(svcRules, task)()
+              performWorkAsLeader(svcRules, task)
             } else {
               Future.successful(
                 TaskSuccess(

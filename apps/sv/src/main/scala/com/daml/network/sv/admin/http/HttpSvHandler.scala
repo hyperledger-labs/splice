@@ -24,7 +24,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
@@ -124,49 +124,50 @@ class HttpSvHandler(
 
   def getSvOnboardingStatus(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
-  )(svPartyOrName: String)(fake: Unit): Future[SvResource.GetSvOnboardingStatusResponse] = {
-    PartyId.fromProtoPrimitive(svPartyOrName) match {
-      case Left(error) =>
-        for {
-          svcRules <- svcStore.getSvcRules()
-          result <- OptionT
-            .fromOption[Future](
-              isCompleted(svPartyOrName, svcRules)
-            )
-            .orElse(isConfirmed(svPartyOrName, svcStore))
-            .orElse(isRequested(svPartyOrName, svcRules))
-            .value
-        } yield result match {
-          case Some(result) => result
-          case None =>
-            if (svPartyOrName.nonEmpty) {
-              definitions.GetSvOnboardingStatusResponse(state = "unknown")
-            } else {
-              throw HttpErrorHandler.badRequest(
-                s"Could not find any party ID or name matching: $svPartyOrName; error: $error"
+  )(svPartyOrName: String)(fake: Unit): Future[SvResource.GetSvOnboardingStatusResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      PartyId.fromProtoPrimitive(svPartyOrName) match {
+        case Left(error) =>
+          for {
+            svcRules <- svcStore.getSvcRules()
+            result <- OptionT
+              .fromOption[Future](
+                isCompleted(svPartyOrName, svcRules)
               )
-            }
-        }
-      case Right(svPartyId) =>
-        for {
-          svcRules <- svcStore.getSvcRules()
-          result <- OptionT
-            .fromOption[Future](
-              isCompleted(svPartyId, svcRules)
-            )
-            .orElse(
-              isConfirmed(svPartyId, svcStore)
-            )
-            .orElse(
-              isRequested(svPartyId, svcRules)
-            )
-            .value
-        } yield result match {
-          case Some(result) => result
-          case None => definitions.GetSvOnboardingStatusResponse(state = "unknown")
-        }
+              .orElse(isConfirmed(svPartyOrName, svcStore))
+              .orElse(isRequested(svPartyOrName, svcRules))
+              .value
+          } yield result match {
+            case Some(result) => result
+            case None =>
+              if (svPartyOrName.nonEmpty) {
+                definitions.GetSvOnboardingStatusResponse(state = "unknown")
+              } else {
+                throw HttpErrorHandler.badRequest(
+                  s"Could not find any party ID or name matching: $svPartyOrName; error: $error"
+                )
+              }
+          }
+        case Right(svPartyId) =>
+          for {
+            svcRules <- svcStore.getSvcRules()
+            result <- OptionT
+              .fromOption[Future](
+                isCompleted(svPartyId, svcRules)
+              )
+              .orElse(
+                isConfirmed(svPartyId, svcStore)
+              )
+              .orElse(
+                isRequested(svPartyId, svcRules)
+              )
+              .value
+          } yield result match {
+            case Some(result) => result
+            case None => definitions.GetSvOnboardingStatusResponse(state = "unknown")
+          }
+      }
     }
-  }
 
   def devNetOnboardValidatorPrepare(
       respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type
@@ -306,7 +307,7 @@ class HttpSvHandler(
   private def isRequested(
       svParty: PartyId,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
-  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+  )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
       svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateParty(svParty))
       result <- getOnboardedStatus(svOnboardingRequest, svcRules)
@@ -316,7 +317,7 @@ class HttpSvHandler(
   private def isRequested(
       svParty: String,
       svcRules: Contract[SvcRules.ContractId, SvcRules],
-  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+  )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
       svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateName(svParty))
       result <- getOnboardedStatus(svOnboardingRequest, svcRules)
@@ -326,7 +327,7 @@ class HttpSvHandler(
   private def getOnboardedStatus(
       svOnboardingRequest: Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
-  ) = {
+  )(implicit tc: TraceContext) = {
     for {
       confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboardingRequest))
       confirmedBy = confirmations
@@ -349,7 +350,7 @@ class HttpSvHandler(
   private def isConfirmed(
       svParty: PartyId,
       svcStore: SvSvcStore,
-  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+  )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
       svcStore
         .lookupSvOnboardingConfirmedByParty(svParty)
@@ -365,7 +366,7 @@ class HttpSvHandler(
   private def isConfirmed(
       svName: String,
       svcStore: SvSvcStore,
-  ): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
+  )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
       svcStore
         .lookupSvOnboardingConfirmedByName(svName)
@@ -382,7 +383,7 @@ class HttpSvHandler(
       candidateParty: PartyId,
       secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
-  ): Future[Unit] =
+  )(implicit tc: TraceContext): Future[Unit] =
     // TODO(#2241) Add check to ensure that a validator can't get onboarded twice
     for {
       svcRules <- svcStore.getSvcRules()
@@ -461,7 +462,7 @@ class HttpSvHandler(
       } yield outcome
     }
 
-  private def lockSvcRulesAndCoinRules() = for {
+  private def lockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
     svcRules <- svcStore.getSvcRules()
     coinRules <- svcStore.getCoinRules()
     res <- ledgerConnection.submitWithResultNoDedup(
@@ -472,7 +473,7 @@ class HttpSvHandler(
     )
   } yield res
 
-  private def unlockSvcRulesAndCoinRules() = for {
+  private def unlockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
     svcRules <- svcStore.getSvcRules()
     coinRules <- svcStore.getCoinRules()
     res <- ledgerConnection.submitWithResultNoDedup(

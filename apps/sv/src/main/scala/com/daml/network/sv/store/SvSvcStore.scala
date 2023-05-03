@@ -30,6 +30,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
@@ -45,10 +46,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = appConfig.domains.global
 
-  private def defaultAcsDomainIdF = domains.signalWhenConnected(defaultAcsDomain)
+  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
+    domains.signalWhenConnected(defaultAcsDomain)
 
   def lookupSvcRulesWithOffset(
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
     ]]
@@ -58,11 +60,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         .findContractOnDomainWithOffset(cn.svcrules.SvcRules.COMPANION)(_, (_: Any) => true)
     )
 
-  def lookupSvcRules()
-      : Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
+  def lookupSvcRules()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
   def getSvcRules(
+  )(implicit
+      tc: TraceContext
   ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
       _.getOrElse(
@@ -72,11 +77,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def svIsLeader(): Future[Boolean] =
+  def svIsLeader()(implicit tc: TraceContext): Future[Boolean] =
     getSvcRules().map(_.payload.leader == key.svParty.toProtoPrimitive)
 
   def lookupCoinRulesWithOffset(
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
     ]]
@@ -87,7 +92,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     )
 
   def lookupCoinRulesV1TestWithOffset(
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       Contract[v1testcc.coin.CoinRulesV1Test.ContractId, v1testcc.coin.CoinRulesV1Test]
     ]]
@@ -100,10 +105,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         )
     )
 
-  def lookupCoinRules(): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  def lookupCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 
-  def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+  def getCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
     lookupCoinRules().map(
       _.getOrElse(
         throw new StatusRuntimeException(
@@ -113,7 +122,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     )
 
   def lookupAgreedCoinPriceWithOffset(
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[
       Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
     ]
@@ -123,13 +132,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         .findContractOnDomainWithOffset(cn.svcrules.AgreedCoinPrice.COMPANION)(_, (_: Any) => true)
     )
 
-  def lookupAgreedCoinPrice(): Future[
+  def lookupAgreedCoinPrice()(implicit tc: TraceContext): Future[
     Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
   ] =
     lookupAgreedCoinPriceWithOffset().map(_.value)
 
-  def getAgreedCoinPrice()
-      : Future[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]] =
+  def getAgreedCoinPrice()(implicit
+      tc: TraceContext
+  ): Future[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]] =
     lookupAgreedCoinPrice().map(
       _.getOrElse(
         throw new StatusRuntimeException(
@@ -140,7 +150,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
   def lookupOpenMiningRoundTriple()(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[Option[SvSvcStore.OpenMiningRoundTriple]] =
     for {
       domain <- defaultAcsDomainIdF
@@ -156,13 +167,15 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     } yield result
 
   def lookupLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[Option[SvSvcStore.OpenMiningRoundContract]] =
     lookupOpenMiningRoundTriple().map(_.map(_.newest))
 
   /** get the latest active open mining round contract, which should always be present after bootstrapping. */
   def getLatestActiveOpenMiningRound()(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[SvSvcStore.OpenMiningRoundContract] = lookupLatestActiveOpenMiningRound().map(
     _.getOrElse(
       throw new StatusRuntimeException(
@@ -182,6 +195,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def listConfirmations(
       action: cn.svcrules.ActionRequiringConfirmation
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
     for {
       domain <- defaultAcsDomainIdF
@@ -195,6 +210,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   def listAppRewardCoupons(
       round: Long,
       limit: Option[Long] = None,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(
@@ -209,7 +226,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   def listAppRewardCouponsGroupedByCounterparty(
       round: Long,
       totalCouponsLimit: Option[Long],
-  ): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]] = {
+  )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]] = {
     for {
       appRewards <- listAppRewardCoupons(round, totalCouponsLimit)
       providerToCoupons = appRewards.foldLeft(
@@ -228,7 +245,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   def listValidatorRewardCoupons(
       round: Long,
       limit: Option[Long] = None,
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -244,7 +261,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   def listValidatorRewardCouponsGroupedByCounterparty(
       round: Long,
       totalCouponsLimit: Option[Long],
-  ): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]] = {
+  )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]] = {
     for {
       validatorRewards <- listValidatorRewardCoupons(round, totalCouponsLimit)
       validatorToCoupons = validatorRewards.foldLeft(
@@ -260,7 +277,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     } yield validatorRewardCouponsGrouped
   }
 
-  def lookupOldestClosedMiningRound(): Future[
+  def lookupOldestClosedMiningRound()(implicit tc: TraceContext): Future[
     Option[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
   ] =
     for {
@@ -280,7 +297,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     * Note: The QueryResult in the return value is composed of the closed mining round contract
     * and the offset from the query for the confirmation contract.
     */
-  def listArchivableClosedMiningRounds(): Future[
+  def listArchivableClosedMiningRounds()(implicit tc: TraceContext): Future[
     Seq[QueryResult[
       Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]
     ]]
@@ -327,7 +344,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   def lookupConfirmationByActionWithOffset(
       confirmer: PartyId,
       action: ActionRequiringConfirmation,
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]
     ]]
@@ -342,7 +359,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupSvOnboardingRequestByTokenWithOffset(
       token: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -354,13 +371,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupSvOnboardingRequestByCandidateParty(
       candidateParty: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]
   ] = lookupSvOnboardingRequestByCandidatePartyWithOffset(candidateParty).map(_.value)
 
   def lookupSvOnboardingRequestByCandidateName(
       candidateName: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]
   ] = lookupSvOnboardingRequestByCandidateNameWithOffset(candidateName).map(_.value)
 
@@ -378,20 +395,22 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupSvOnboardingConfirmedByParty(
       svParty: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
     lookupSvOnboardingConfirmedByPartyWithOffset(svParty).map(_.value)
 
   def lookupSvOnboardingConfirmedByName(
       svName: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
     lookupSvOnboardingConfirmedByNameWithOffset(svName).map(_.value)
 
   def listSvOnboardingConfirmations(
       svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
     val expectedAction = new ARC_SvcRules(
       new SRARC_ConfirmSvOnboarding(
@@ -407,6 +426,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def listSvOnboardingRequestsBySvcMembers(
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]] =
     for {
       domain <- defaultAcsDomainIdF
@@ -423,26 +444,31 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   private[this] def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T] = (_, limit) =>
-    for {
-      maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
-      result <- maybeLatestOpenMiningRound.fold(
-        Future.successful(Seq.empty[ReadyContract[Id, T]])
-      ) { latest =>
-        for {
-          domainId <- defaultAcsDomainIdF
-          allExpired <- multiDomainAcsStore
-            .listContractsOnDomain(
-              companion,
-              domainId,
-              (e: Contract[Id, T]) =>
-                CNNodeUtil.coinExpiresAt(coin(e.payload)).number <= latest.payload.round.number - 2,
-            )
-        } yield allExpired.view.take(limit).map(ReadyContract(_, domainId)).toSeq
-      }
-    } yield result
+    implicit tc =>
+      for {
+        maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
+        result <- maybeLatestOpenMiningRound.fold(
+          Future.successful(Seq.empty[ReadyContract[Id, T]])
+        ) { latest =>
+          for {
+            domainId <- defaultAcsDomainIdF
+            allExpired <- multiDomainAcsStore
+              .listContractsOnDomain(
+                companion,
+                domainId,
+                (e: Contract[Id, T]) =>
+                  CNNodeUtil
+                    .coinExpiresAt(coin(e.payload))
+                    .number <= latest.payload.round.number - 2,
+              )
+          } yield allExpired.view.take(limit).map(ReadyContract(_, domainId)).toSeq
+        }
+      } yield result
 
   def listUnclaimedRewards(
       limit: Long
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
     for {
       domain <- defaultAcsDomainIdF
@@ -470,7 +496,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   private def lookupSvOnboardingRequestByCandidatePartyWithOffset(
       candidateParty: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -482,7 +508,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   private def lookupSvOnboardingRequestByCandidateNameWithOffset(
       candidateName: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -494,7 +520,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   private def lookupSvOnboardingConfirmedByPartyWithOffset(
       svParty: PartyId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(
@@ -506,7 +532,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   private def lookupSvOnboardingConfirmedByNameWithOffset(
       svName: String
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ] =
     defaultAcsDomainIdF.flatMap(

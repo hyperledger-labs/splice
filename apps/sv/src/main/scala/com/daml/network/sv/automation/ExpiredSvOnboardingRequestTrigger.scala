@@ -61,5 +61,5 @@ class ExpiredSvOnboardingRequestTrigger(
     )
   }
 
-  override def isLeader(): Future[Boolean] = store.svIsLeader()
+  override def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

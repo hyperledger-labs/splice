@@ -1044,7 +1044,7 @@ object SvApp {
       candidateParty: PartyId,
       rawToken: String,
       svStore: SvSvStore,
-  )(implicit ec: ExecutionContext): Future[Either[String, (PartyId, String)]] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Either[String, (PartyId, String)]] = {
     svStore
       .lookupApprovedSvIdentityByName(candidateName)
       .map(approvedSvO =>

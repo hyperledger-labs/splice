@@ -263,7 +263,7 @@ class HttpScanHandler(
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
   )(): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
       } yield {
