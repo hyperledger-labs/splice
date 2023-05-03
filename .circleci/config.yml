@@ -1128,7 +1128,7 @@ jobs:
          path: cluster/images/docs/docs.tar.gz
          destination: docs.tar.gz
 
-  docker_images_push:
+  docker_images_build:
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -1139,8 +1139,15 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build app
          cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - docker_build
+      - cleanup_sbt_test_job
+
+  docker_images_push:
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+    steps:
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
@@ -1170,13 +1177,6 @@ jobs:
                  exit 1
              fi
              echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
-      - checkout
-      - setup_sbt_test_job
-      - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
-      - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
@@ -1210,20 +1210,6 @@ jobs:
            RELEASE_TAG=$(get-snapshot-version)
            hub tag "${RELEASE_TAG}"
            hub push origin "${RELEASE_TAG}"
-
-  docker_images_build:
-    machine:
-      image: ubuntu-2004:202010-01
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_sbt_test_job
-      - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-      - docker_build
-      - cleanup_sbt_test_job
 
   wait_for_previous_pipeline:
     docker:
@@ -1275,33 +1261,35 @@ workflows:
     when:
       equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
     jobs:
+      - docker_images_build:
+          context:
+            - artifactory
+            - slack-context
       - push_artifactory_release:
           context:
             - artifactory
+          requires:
+            - docker_images_build
 
   build:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
-    # Documentation
     - docs:
         <<: *notify-fail
         context:
           - artifactory
           - slack-context
-    # Linting and formatting
     - static_tests:
         <<: *notify-fail
         context:
           - artifactory
           - slack-context
-    # Daml
     - daml_test:
         <<: *notify-fail
         context:
           - artifactory
           - slack-context
-    # Scala
     - scala_test:
         <<: *notify-fail
         context:
@@ -1327,7 +1315,6 @@ workflows:
         context:
           - artifactory
           - slack-context
-    # Ops
     - update_pipeline_schedule:
         <<: *notify-fail
         <<: *main-branch-only
@@ -1344,51 +1331,6 @@ workflows:
         context:
           - artifactory
           - slack-context
-
-  deploy_scratchnet:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: scratchnet
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          <<: *main-branch-never
-          cluster: scratchnet
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
 
   pulumi:
     when:
@@ -1446,6 +1388,58 @@ workflows:
           requires:
             - run_preview
 
+  ##### Environment Deploy Workflows
+
+  deploy_scratchnet:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_build:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - docker_images_build
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: scratchnet
+          requires:
+            - deployment_test
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-never
+          cluster: scratchnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deployment_test
+            - docker_images_push
+            - deploy_cluster
+
 
   deploy_scratchnet_B:
     when:
@@ -1455,6 +1449,13 @@ workflows:
           <<: *main-branch-never
           type: approval
       # Deployment
+      - docker_images_build:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold
       - docker_images_push:
           <<: *main-branch-never
           context:
@@ -1462,6 +1463,7 @@ workflows:
             - slack-context
           requires:
             - hold
+            - docker_images_build
       - deployment_test:
           <<: *main-branch-never
           context:
@@ -1476,7 +1478,6 @@ workflows:
             - slack-context
           cluster: scratchnetb
           requires:
-            - hold
             - deployment_test
             - docker_images_push
       - preflight_check:
@@ -1500,13 +1501,20 @@ workflows:
           <<: *main-branch-never
           type: approval
       # Deployment
-      - docker_images_push:
+      - docker_images_build:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
             - hold
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - docker_images_build
       - deployment_test:
           <<: *main-branch-never
           context:
@@ -1542,12 +1550,18 @@ workflows:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
     # Deployment
+    - docker_images_build:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
           - slack-context
+          - docker_images_build
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
@@ -1587,12 +1601,19 @@ workflows:
     when:
       equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
     jobs:
+    - docker_images_build:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
           - slack-context
+        requires:
+          - docker_images_build
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
@@ -1628,21 +1649,29 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - push_artifactory_release:
-        requires:
-          - preflight_check
         context:
           - artifactory
+        requires:
+          - preflight_check
+          - docker_images_build
 
   deploy_testnet:
     when:
       equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
     jobs:
+    - docker_images_build:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
           - slack-context
+        requires:
+          - docker_images_build
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
@@ -1678,10 +1707,11 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - push_artifactory_release:
-        requires:
-          - preflight_check
         context:
           - artifactory
+        requires:
+          - docker_images_build
+          - preflight_check
 
   daily_refresh_tokens:
     when:
