@@ -125,8 +125,7 @@ class CNNodeConsoleEnvironment(
     mergeLocalCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       svcOpt.toList,
-      // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
-      svs.local.filter(sv => sv.name != "sv5"),
+      svs.local,
       scans.local,
       directories.local,
       validators.local.filter(v => v.name.startsWith("sv")),
@@ -134,8 +133,7 @@ class CNNodeConsoleEnvironment(
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       remoteSvcOpt.toList,
-      // TODO(#4285) SV5 is not hosted by the SVC, we can remove this filtering when sv5 is completed removed
-      svs.remote.filter(sv => sv.name != "sv5"),
+      svs.remote,
       scans.remote,
       directories.remote,
       validators.remote.filter(v => v.name.startsWith("sv")),

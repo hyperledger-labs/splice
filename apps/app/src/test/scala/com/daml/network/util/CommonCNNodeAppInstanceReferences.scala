@@ -46,8 +46,6 @@ trait CommonCNNodeAppInstanceReferences {
 
   def sv4(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
 
-  def sv5(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv5")
-
   def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = svcl("sv1")
 
   def scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference =
@@ -115,10 +113,6 @@ trait CommonCNNodeAppInstanceReferences {
 
   def sv4Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "sv4Validator"
-  )
-
-  def sv5Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
-    "sv5Validator"
   )
 
   def splitwellValidator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference =

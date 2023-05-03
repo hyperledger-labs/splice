@@ -69,21 +69,21 @@ testLeaderElection = do
   runNextIssuanceD app 1.2
 
   -- add a new SV member
-  sv5 <- allocateParty "sv5"
+  svX <- allocateParty "svX"
   forA_ [sv2, sv3, sv4] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
-          newMemberParty = sv5
-          newMemberName = "sv5"
+          newMemberParty = svX
+          newMemberName = "svX"
           reason = "decision:123"  -- unambiguous reference to the decision
           -- TODO(M3-46): streamline references to off-ledger decisions
   executeAllConfirmedActions app
 
   -- kick out mallory, now that we have enough members to then still tolerate a failure
   [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ [sv3, sv4, sv5] $ \sv ->
+  forA_ [sv3, sv4, svX] $ \sv ->
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
@@ -95,7 +95,7 @@ testLeaderElection = do
 
   -- check that mallory is no longer present
   [(_, svcRules)] <- query @SvcRules svc
-  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv2, sv3, sv4, sv5])
+  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv2, sv3, sv4, svX])
 
   -- wow! stuff works :D
   return ()

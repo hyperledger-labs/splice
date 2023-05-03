@@ -72,7 +72,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     startSv(2, sv2, sv2Validator)
     startSv(3, sv3, sv3Validator)
     startSv(4, sv4, sv4Validator)
-    startSv(5, sv5, sv5Validator)
   }
 
   "The SVC is bootstrapped correctly" in { implicit env =>
@@ -212,7 +211,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
       .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
         sv1.getSvcInfo().svParty
-      ) should have length 4
+      ) should have length 3
     val svXName = "svX"
     val svXKey =
       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
@@ -222,7 +221,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getSvcInfo().svParty)
     ) {
       case approvedSvIds => {
-        approvedSvIds should have size 5
+        approvedSvIds should have size 4
         val maybeSvXApprovedSvId = approvedSvIds.find(_.data.candidateName == svXName)
         inside(maybeSvXApprovedSvId) { case Some(svXApprovedSvId) =>
           svXApprovedSvId.data.candidateKey shouldBe svXKey
@@ -262,7 +261,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         case approvedSvIds => {
           // if this check fails:
           // make sure that the values (especially the key) are in sync with sv1's config file
-          approvedSvIds should have size 4
+          approvedSvIds should have size 3
           val maybeSv2ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv2")
           inside(maybeSv2ApprovedSvId) { case Some(sv2ApprovedSvId) =>
             sv2ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVdt8tLAfv+6H6s6EGpYMbthSdtEbykUO2Fau0k2wipf/6C0A/+xzKtqKJlBkybcBiICG/ZonGkuKgWBAC1jVAg=="
@@ -274,10 +273,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           val maybeSv4ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv4")
           inside(maybeSv4ApprovedSvId) { case Some(sv4ApprovedSvId) =>
             sv4ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
-          }
-          val maybeSv5ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv5")
-          inside(maybeSv5ApprovedSvId) { case Some(sv5ApprovedSvId) =>
-            sv5ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+fFVXv7BtvclgrzJTEELbtSn6Vm9pMxsBQbZYyzIG6udZ85glJCkinvWvxcD6wsMIsuDHM7j7JGygIdFWQ5prA=="
           }
         }
       }
@@ -607,23 +602,30 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
-      initSvc()
+      clue("Starting SVC app and SV1 app") {
+        // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
+        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(_.start())
+        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(
+          _.waitForInitialization()
+        )
+      }
 
       val svcParty = svcClient.getDebugInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
       val svcParticipant = svc.remoteParticipant
-      val sv5Participant = sv5.remoteParticipant
+      val sv4Participant = sv4.remoteParticipant
 
       createCoinOwnBySvc(svcParticipant, 1.0)
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
-        // SV5 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
-        sv5.startSync()
+        // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
+        sv4Validator.startSync()
+        sv4.startSync()
       }
 
       createCoinOwnBySvc(svcParticipant, 2.0)
 
-      val globalDomainId = inside(sv5Participant.domains.list_connected()) { case Seq(domain) =>
+      val globalDomainId = inside(sv4Participant.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
       }
 
@@ -633,72 +635,72 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             operation = Some(TopologyChangeOp.Add),
             filterStore = globalDomainId.toProtoPrimitive,
             filterParty = svcPartyStr,
-            filterParticipant = sv5Participant.id.uid.id.unwrap,
+            filterParticipant = sv4Participant.id.uid.id.unwrap,
             filterRequestSide = Some(RequestSide.From),
             filterPermission = Some(ParticipantPermission.Observation),
           ) should have size 1
 
-        sv5Participant.topology.party_to_participant_mappings
+        sv4Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOp.Add),
             filterStore = globalDomainId.toProtoPrimitive,
             filterParty = svcPartyStr,
-            filterParticipant = sv5Participant.id.uid.id.unwrap,
+            filterParticipant = sv4Participant.id.uid.id.unwrap,
             filterRequestSide = Some(RequestSide.To),
             filterPermission = Some(ParticipantPermission.Observation),
           ) should have size 1
-        val coinFromSv5Participant = getCoins(sv5Participant, svcParty)
+        val coinFromSv4Participant = getCoins(sv4Participant, svcParty)
         val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)
 
-        coinFromSv5Participant should have size 2
-        coinFromSv5Participant shouldBe coinFromSvcParticipant
+        coinFromSv4Participant should have size 2
+        coinFromSv4Participant shouldBe coinFromSvcParticipant
 
-        sv5Participant.ledger_api.acs.of_party(svcParty) should not be empty
+        sv4Participant.ledger_api.acs.of_party(svcParty) should not be empty
       }
 
-      clue("sv5 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
-        val sv5Party = sv5.getSvcInfo().svParty
+      clue("sv4 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
+        val sv4Party = sv4.getSvcInfo().svParty
 
-        val coinRules = sv5Participant.ledger_api_extensions.acs
+        val coinRules = sv4Participant.ledger_api_extensions.acs
           .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
           .head
 
-        val openRound = sv5Participant.ledger_api_extensions.acs
+        val openRound = sv4Participant.ledger_api_extensions.acs
           .filterJava(cc.round.OpenMiningRound.COMPANION)(
             svcParty,
             _.data.opensAt.isBefore(Instant.now),
           )
           .maxBy(_.data.round.number)
 
-        sv5Participant.ledger_api_extensions.commands.submitWithResult(
-          sv5.config.ledgerApiUser,
-          actAs = Seq(sv5Party),
+        sv4Participant.ledger_api_extensions.commands.submitWithResult(
+          sv4.config.ledgerApiUser,
+          actAs = Seq(sv4Party),
           readAs = Seq(svcParty),
           update = coinRules.id.exerciseCoinRules_DevNet_Tap(
-            sv5Party.toProtoPrimitive,
+            sv4Party.toProtoPrimitive,
             BigDecimal(100.0).bigDecimal,
             openRound.id,
           ),
         )
 
         def checkCoinContract(participant: CNRemoteParticipantReference, party: PartyId) = {
-          val coins = getCoins(participant, party, _.data.owner == sv5Party.toProtoPrimitive)
+          val coins = getCoins(participant, party, _.data.owner == sv4Party.toProtoPrimitive)
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
             coin.data.amount.initialAmount shouldBe BigDecimal(100.0).bigDecimal.setScale(10)
-            coin.data.owner shouldBe sv5Party.toProtoPrimitive
+            coin.data.owner shouldBe sv4Party.toProtoPrimitive
           }
         }
 
         eventually() {
           checkCoinContract(svcParticipant, svcParty)
-          checkCoinContract(sv5Participant, sv5Party)
+          checkCoinContract(sv4Participant, sv4Party)
         }
       }
 
-      clue("sv5 can restart") {
-        sv5.stop()
-        sv5.startSync()
+      clue("sv4 can restart") {
+        sv4.stop()
+        sv4.startSync()
       }
   }
 

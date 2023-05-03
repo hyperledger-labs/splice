@@ -69,7 +69,6 @@ Seq(
   ("sv2", sv2Participant),
   ("sv3", sv3Participant),
   ("sv4", sv4Participant),
-  ("sv5", sv5Participant),
 ).foreach { case (sv, participant) =>
   val svParty = createUser(participant, s"${sv}_validator_user")
   participant.ledger_api.users.create(
