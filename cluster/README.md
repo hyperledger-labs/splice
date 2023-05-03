@@ -915,7 +915,6 @@ gcloud and local helm charts.
    This will configure Helm to fetch docker images from GCP and enable
    the fixed token mode which is used for all scratchnet clusters.
 3. Run `make docker-push-force -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
-   By default, this does **NOT** disable makefile caching. If that's what you want, you can set the environment variable `DISABLE_MAKEFILE_CACHING`.
 4. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
 5. Following the runbook, create `participant-values.yaml`,
    `validator-values.yaml` and `sv-values.yaml`. Replace
