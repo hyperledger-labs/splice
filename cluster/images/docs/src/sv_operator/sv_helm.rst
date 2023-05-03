@@ -57,6 +57,7 @@ Create the three application namespaces within Kubernetes and ensure they have i
             -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
     done
 
+.. _helm-sv-auth0:
 
 Configuring an Auth0 Tenant
 ---------------------------

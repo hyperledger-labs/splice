@@ -8,7 +8,14 @@ Release Notes
 
 * Add wallet UI for SV user to SV runbook. Instructions exist for
   :ref:`deployment using Helm <helm-sv-wallet-ui>` and :ref:`local
-  deployment <local-sv-wallet-ui>`.
+  deployment <local-sv-wallet-ui>`. This allows the SV operator to
+  login to their wallet and e.g. observe SV rewards accumulating.
+
+* Various simplifications and extensions of :ref:`SV Helm-based runbook <sv-helm>`:
+
+  * Added :ref:`instructions <helm-sv-auth0>` for setting up Auth0, and creating the corresponding k8s secrets.
+  * Consolidate namespaces. Everything other than docs now resides in the sv-1 namespace.
+  * Simplify the ingress setup.
 
 2023-04-30
 ----------
