@@ -8,6 +8,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -152,6 +153,9 @@ private[validator] object ValidatorUtil {
               )
           },
         logger,
+        // once the validator's actAs and readAs rights have been revoked,
+        // this command could fail with PERMISSION_DENIED errors (#4425).
+        additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
       _ <- retryProvider.retryForClientCalls(
         "Remove validator right",
@@ -180,6 +184,9 @@ private[validator] object ValidatorUtil {
               )
           },
         logger,
+        // once the validator's actAs and readAs rights have been revoked,
+        // this command could fail with PERMISSION_DENIED errors (#4425).
+        additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
       _ <- connection.revokeUserRights(validatorUserName, Seq(endUserParty), Seq(endUserParty))
     } yield {
