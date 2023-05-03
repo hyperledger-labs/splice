@@ -7,9 +7,9 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 

@@ -8,8 +8,8 @@ import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
 import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -19,6 +19,7 @@ import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.resource.StorageFactory
+import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
@@ -27,11 +28,10 @@ import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 
 object CNNodeBootstrap {
   type HealthDumpFunction = () => Future[File]

@@ -6,23 +6,23 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   coinconfig as coinConfigCodegen,
   round as roundCodegen,
 }
-import com.daml.network.http.v0.definitions.GetCoinRulesRequest
+import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.http.v0.{definitions, scan as http}
+import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
 object HttpScanAppClient {
 

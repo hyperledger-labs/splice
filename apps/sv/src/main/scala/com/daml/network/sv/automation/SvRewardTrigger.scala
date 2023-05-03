@@ -9,8 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 

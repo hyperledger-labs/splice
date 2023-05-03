@@ -7,7 +7,7 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.http.v0.directory as http
-import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}

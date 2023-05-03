@@ -10,13 +10,13 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.environment.*
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
@@ -28,11 +28,11 @@ import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
+import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,

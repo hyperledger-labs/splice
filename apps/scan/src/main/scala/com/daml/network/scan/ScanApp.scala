@@ -3,18 +3,25 @@ package com.daml.network.scan
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.scan.ScanResource
+import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -24,15 +31,6 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import com.digitalasset.canton.lifecycle.AsyncCloseable
-import com.daml.network.scan.admin.http.HttpScanHandler
-import com.daml.network.http.v0.scan.ScanResource
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.daml.network.environment.CNNodeStatus
 
 /** Class representing a Scan app instance.
   *

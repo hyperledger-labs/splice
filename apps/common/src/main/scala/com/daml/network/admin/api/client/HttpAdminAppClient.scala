@@ -2,14 +2,14 @@ package com.daml.network.admin.api.client
 
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.http.v0.{definitions, commonAdmin as http}
-
-import scala.concurrent.{ExecutionContext, Future}
 import cats.data.EitherT
+import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.http.v0.{commonAdmin as http, definitions}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
+
 import java.time.OffsetDateTime
+import scala.concurrent.{ExecutionContext, Future}
 
 object HttpAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {

@@ -1,17 +1,17 @@
 package com.daml.network.automation
 
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.{Done, NotUsed}
+import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
+import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.AkkaUtil
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 
 /** A trigger receiving its tasks via an Akka source. */
 abstract class SourceBasedTrigger[T: Pretty](implicit

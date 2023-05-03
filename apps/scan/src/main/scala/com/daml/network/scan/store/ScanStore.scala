@@ -1,10 +1,10 @@
 package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cc.api.v1 as ccV1Api
 import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
@@ -13,10 +13,9 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.environment.CNLedgerConnection
-import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 

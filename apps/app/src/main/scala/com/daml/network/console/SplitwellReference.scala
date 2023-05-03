@@ -2,8 +2,8 @@ package com.daml.network.console
 
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.LedgerApiExtensions.*
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -11,16 +11,16 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.console.commands.{
-  BaseLedgerApiAdministration,
-  ParticipantAdministration,
-}
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
   GrpcRemoteInstanceReference,
-  LedgerApiCommandRunner,
   Help,
+  LedgerApiCommandRunner,
+}
+import com.digitalasset.canton.console.commands.{
+  BaseLedgerApiAdministration,
+  ParticipantAdministration,
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}

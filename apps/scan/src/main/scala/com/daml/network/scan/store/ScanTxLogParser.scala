@@ -1,21 +1,19 @@
 package com.daml.network.scan.store
 
-import com.daml.ledger.javaapi.data.*
-import com.daml.network.store.TxLogStore
-import com.daml.network.history.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.CNNodeUtil.dollarsToCC
 import cats.Monoid
 import cats.syntax.foldable.*
+import com.daml.ledger.javaapi.data.{TreeEvent, *}
+import com.daml.network.history.*
+import com.daml.network.store.TxLogStore
+import com.daml.network.util.{Codec, ExerciseNode}
+import com.daml.network.util.CNNodeUtil.dollarsToCC
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
-import com.daml.ledger.javaapi.data.TreeEvent
-import com.daml.network.util.ExerciseNode
-import com.digitalasset.canton.topology.PartyId
-import com.daml.network.util.Codec
-import io.grpc.Status
 
 import java.time.Instant
 

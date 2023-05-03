@@ -2,8 +2,8 @@ package com.daml.network.util
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi
-import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.util.ShowUtil.*
 import pprint.Tree
 

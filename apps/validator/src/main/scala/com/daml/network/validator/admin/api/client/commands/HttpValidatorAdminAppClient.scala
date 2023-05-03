@@ -4,13 +4,13 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.http.v0.validatorAdmin as http
+import com.daml.network.http.v0.definitions.OnboardUserRequest
+import com.daml.network.http.v0.validatorAdmin.OffboardUserResponse.NotFound
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.http.v0.validatorAdmin.OffboardUserResponse.NotFound
 
 object HttpValidatorAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {

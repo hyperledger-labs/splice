@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 
-import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.FiniteDuration
 
 object HttpSvAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {

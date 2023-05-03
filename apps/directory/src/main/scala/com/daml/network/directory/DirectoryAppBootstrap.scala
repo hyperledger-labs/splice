@@ -16,8 +16,9 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.*
-import com.digitalasset.canton.time.*
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
+import com.digitalasset.canton.time.*
+
 import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.Future
 

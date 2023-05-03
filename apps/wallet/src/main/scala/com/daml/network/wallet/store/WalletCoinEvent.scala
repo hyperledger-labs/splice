@@ -1,13 +1,15 @@
 package com.daml.network.wallet.store
 
 import com.daml.ledger.javaapi.data.{DamlList, DamlOptional}
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.codegen.java.cn.wallet.transferoffer as transferCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.svcrules as svcCodegen
-import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cn.svcrules as svcCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  install as installCodegen,
+  payment as paymentCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferCodegen,
+}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionPayment
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.util.ExerciseNodeCompanion

@@ -1,13 +1,12 @@
 package com.daml.network.splitwell.store
 
 import com.daml.network.automation.TransferFollowTrigger
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
-import MultiDomainAcsStore.ReadyContract
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -17,6 +16,8 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+
+import MultiDomainAcsStore.ReadyContract
 
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   import MultiDomainAcsStore.{ContractWithState, QueryResult}

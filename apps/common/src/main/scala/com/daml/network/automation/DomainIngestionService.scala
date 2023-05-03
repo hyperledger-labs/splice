@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

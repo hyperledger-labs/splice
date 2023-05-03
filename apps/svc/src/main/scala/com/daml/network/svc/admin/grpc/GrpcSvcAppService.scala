@@ -4,13 +4,13 @@ import com.daml.ledger.api.v1.value.Record.toJavaProto
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
-import com.daml.network.codegen.java.cc.coinconfig.USD
+import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection}
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
+import com.daml.network.svc.v0
 import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
@@ -19,7 +19,6 @@ import com.daml.network.svc.v0.{
   SvcServiceGrpc,
   WithdrawFeaturedAppRightRequest,
 }
-import com.daml.network.svc.v0
 import com.daml.network.util.Codec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}

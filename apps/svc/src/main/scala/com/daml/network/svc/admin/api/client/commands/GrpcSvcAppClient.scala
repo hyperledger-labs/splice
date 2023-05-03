@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.svc.v0
-import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
 import com.daml.network.svc.v0.{
   GetDebugInfoResponse,
   GrantFeaturedAppRightRequest,
@@ -15,6 +14,7 @@ import com.daml.network.svc.v0.{
   SetConfigScheduleRequest,
   WithdrawFeaturedAppRightRequest,
 }
+import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
 import com.daml.network.util.Codec
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId

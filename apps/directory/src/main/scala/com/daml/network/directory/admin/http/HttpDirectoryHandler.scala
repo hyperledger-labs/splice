@@ -1,5 +1,6 @@
 package com.daml.network.directory.admin.http
 
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.http.v0.{definitions, directory as v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -9,7 +10,6 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.admin.http.HttpErrorHandler
 
 class HttpDirectoryHandler(
     store: DirectoryStore,

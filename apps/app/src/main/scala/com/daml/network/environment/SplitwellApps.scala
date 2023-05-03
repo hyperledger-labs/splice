@@ -1,8 +1,8 @@
 package com.daml.network.environment
 
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.{SplitwellApp, SplitwellAppBootstrap}
+import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes

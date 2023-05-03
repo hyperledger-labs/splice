@@ -7,10 +7,10 @@ import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import io.grpc.StatusRuntimeException
 
 class HttpValidatorAdminHandler(
     ledgerClient: CNLedgerClient,

@@ -8,8 +8,8 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore

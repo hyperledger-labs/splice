@@ -8,11 +8,11 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
 }
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
 
 class CollectRewardsAndMergeCoinsTrigger(
     override protected val context: TriggerContext,

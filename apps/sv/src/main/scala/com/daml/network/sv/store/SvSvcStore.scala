@@ -3,10 +3,10 @@ package com.daml.network.sv.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cc.coin.UnclaimedReward
-import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
+import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
+import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
@@ -17,10 +17,9 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
-import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}

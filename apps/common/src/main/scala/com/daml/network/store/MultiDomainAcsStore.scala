@@ -2,13 +2,6 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, TransferEvent, TreeUpdate}
-import com.daml.ledger.javaapi.data.codegen.{
-  ContractCompanion as JavaContractCompanion,
-  ContractId,
-  DamlRecord,
-  InterfaceCompanion as JavaInterfaceCompanion,
-}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   Filter,
@@ -19,7 +12,14 @@ import com.daml.ledger.javaapi.data.{
   Template,
   TransactionFilter,
 }
+import com.daml.ledger.javaapi.data.codegen.{
+  ContractCompanion as JavaContractCompanion,
+  ContractId,
+  DamlRecord,
+  InterfaceCompanion as JavaInterfaceCompanion,
+}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, TransferEvent, TreeUpdate}
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}

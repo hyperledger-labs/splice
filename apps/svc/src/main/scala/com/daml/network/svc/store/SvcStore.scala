@@ -1,12 +1,13 @@
 package com.daml.network.svc.store
 
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -15,7 +16,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.environment.RetryProvider
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait SvcStore extends CNNodeAppStoreWithoutHistory {

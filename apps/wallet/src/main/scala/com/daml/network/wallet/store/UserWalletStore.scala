@@ -2,22 +2,22 @@ package com.daml.network.wallet.store
 
 import com.daml.network.automation.MultiDomainExpiredContractTrigger
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.InputCoin
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.ValidatorRight
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cn.{
+  directory as directoryCodegen,
+  splitwell as splitwellCodegen,
+}
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
-}
-import com.daml.network.codegen.java.cn.{
-  directory as directoryCodegen,
-  splitwell as splitwellCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{CNNodeAppStoreWithHistory, OffsetStore}

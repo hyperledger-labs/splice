@@ -10,12 +10,12 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc.coin.invalidtransferreason
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
-import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
+import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore

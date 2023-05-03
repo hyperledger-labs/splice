@@ -13,21 +13,23 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
+  CRARC_MiningRound_Archive,
+  CRARC_MiningRound_StartIssuing,
+}
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
-import io.opentelemetry.api.trace.Tracer
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*

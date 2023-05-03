@@ -11,19 +11,19 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryProvider,
 }
-import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
+import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{SvApp, SvcPartyHosting}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 

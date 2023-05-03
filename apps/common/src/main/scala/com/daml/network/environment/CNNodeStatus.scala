@@ -1,21 +1,20 @@
 package com.daml.network.environment
 
-import cats.syntax.functor.*
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.traverse.*
-
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.health.HealthReporting.ComponentStatus
-import com.digitalasset.canton.topology.UniqueIdentifier
-import java.time.Duration
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.health.admin.{v0 as protoV0}
 import com.daml.network.http.v0.{definitions as jsonV0}
-import com.digitalasset.canton.serialization.ProtoConverter.DurationConverter
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
-
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.health.HealthReporting.ComponentStatus
+import com.digitalasset.canton.health.admin.{v0 as protoV0}
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.serialization.ProtoConverter.DurationConverter
+import com.digitalasset.canton.topology.UniqueIdentifier
 import com.google.protobuf.ByteString
+
+import java.time.Duration
 
 // A fork of SimpleStatus from Canton for Coin apps, without topologyQueues member
 case class CNNodeStatus(

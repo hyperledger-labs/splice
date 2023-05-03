@@ -2,6 +2,9 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   InFlightTransferOutEvent,
   TransactionTreeUpdate,
@@ -10,9 +13,6 @@ import com.daml.network.environment.ledger.api.{
   TransferUpdate,
   TreeUpdate,
 }
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
-import com.daml.network.environment.RetryProvider
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor

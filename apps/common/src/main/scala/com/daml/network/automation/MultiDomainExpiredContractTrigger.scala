@@ -2,13 +2,14 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore
-import MultiDomainAcsStore.{ContractState, ReadyContract}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import MultiDomainAcsStore.{ContractState, ReadyContract}
 
 /** A trigger for processing expired contracts whose expiry archives exactly them.
   *

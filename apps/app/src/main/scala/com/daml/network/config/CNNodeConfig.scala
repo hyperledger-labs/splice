@@ -35,9 +35,6 @@ import com.daml.network.wallet.config.{
 }
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
-import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{
   CantonConfig,
   CantonFeatures,
@@ -47,6 +44,9 @@ import com.digitalasset.canton.config.{
   DeprecatedConfigUtils,
   MonitoringConfig,
 }
+import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.NonNegativeFiniteDuration.*
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -58,8 +58,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
-import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
+import pureconfig.generic.FieldCoproductHint
 
 import java.io.File
 import java.nio.charset.StandardCharsets

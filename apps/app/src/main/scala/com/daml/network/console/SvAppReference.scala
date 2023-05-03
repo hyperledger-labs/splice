@@ -1,7 +1,7 @@
 package com.daml.network.console
 
-import com.daml.network.auth.AuthUtil
 import akka.util.ByteString
+import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}

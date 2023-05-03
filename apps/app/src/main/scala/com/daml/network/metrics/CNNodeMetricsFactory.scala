@@ -11,9 +11,9 @@ import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
+import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryType}
 import com.digitalasset.canton.metrics.MetricHandle.CantonDropwizardMetricsFactory
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
-import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryType}
 import io.opentelemetry.api.metrics.Meter
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
 

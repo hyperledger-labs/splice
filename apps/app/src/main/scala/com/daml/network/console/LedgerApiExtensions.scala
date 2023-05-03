@@ -1,14 +1,13 @@
 package com.daml.network.console
 
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
-import com.daml.ledger.javaapi
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
+import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
@@ -18,11 +17,12 @@ import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleMacros,
   FeatureFlag,
-  LedgerApiCommandRunner,
   Help,
+  LedgerApiCommandRunner,
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import java.time.Instant

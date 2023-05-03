@@ -2,15 +2,15 @@ package com.daml.network.environment
 
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.admin.api.client.{GrpcVersionClient, HttpAdminAppClient}
+import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.{BuildInfo, RetryProvider}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
+import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -19,7 +19,7 @@ import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
 
 abstract class BaseAppConnection(
     override val timeouts: ProcessingTimeout,

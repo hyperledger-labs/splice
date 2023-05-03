@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.LedgerOffset
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 
 class OffsetStore(override protected val loggerFactory: NamedLoggerFactory)(implicit
     ec: ExecutionContext

@@ -13,9 +13,7 @@ import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.CNNodeEnvironment
 import com.daml.network.util.TemplateJsonDecoder
-
 import com.digitalasset.canton.config.{ClientConfig, ConsoleCommandTimeout, ProcessingTimeout}
-
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,

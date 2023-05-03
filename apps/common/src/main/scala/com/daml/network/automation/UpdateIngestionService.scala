@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Source}
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
-import com.daml.network.environment.ledger.api.{TreeUpdate, TransactionTreeUpdate, TransferUpdate}
+import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferUpdate, TreeUpdate}
 import com.daml.network.store.{MultiDomainAcsStore, OffsetStore}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout

@@ -12,8 +12,8 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.http.v0.{definitions, wallet as http}
+import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,

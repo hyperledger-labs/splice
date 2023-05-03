@@ -1,14 +1,8 @@
 package com.daml.network.automation
 
-import com.digitalasset.canton.error.ErrorCodeUtils
+import akka.stream.Materializer
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
-import com.daml.network.store.CNNodeAppStore
-import com.daml.network.store.MultiDomainAcsStore.TransferId
-import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.util.ShowUtil.*
-import akka.stream.Materializer
-import com.digitalasset.canton.topology.PartyId
 import com.daml.network.automation.{
   OnReadyForTransferInTrigger,
   TaskOutcome,
@@ -16,9 +10,14 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.environment.ledger.api.{LedgerClient, TransferEvent}
+import com.daml.network.store.CNNodeAppStore
+import com.daml.network.store.MultiDomainAcsStore.TransferId
+import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.error.ErrorCodeUtils
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 

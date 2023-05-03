@@ -1,7 +1,7 @@
 package com.daml.network.wallet.config
 
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.config.RemoteCNNodeConfig
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 
 case class WalletDomainConfig(

@@ -4,27 +4,29 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
+import akka.http.scaladsl.server.directives.BasicDirectives
 import cats.implicits.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.CNHttpClientConfig.*
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
+import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
-import com.daml.network.validator.admin.http.HttpValidatorHandler
-import com.daml.network.validator.admin.http.HttpValidatorAdminHandler
+import com.daml.network.validator.admin.http.{HttpValidatorAdminHandler, HttpValidatorHandler}
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
@@ -36,8 +38,8 @@ import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandler
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -49,10 +51,6 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
-import akka.http.scaladsl.server.directives.BasicDirectives
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
-import com.digitalasset.canton.config.ClientConfig
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(

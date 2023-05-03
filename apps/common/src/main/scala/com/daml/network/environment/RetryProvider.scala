@@ -16,6 +16,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.retry.{Backoff, Success}
 import com.digitalasset.canton.util.retry.RetryUtil.{
   ErrorKind,
   ExceptionRetryable,
@@ -23,12 +24,11 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
-import com.digitalasset.canton.util.retry.{Backoff, Success}
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration.*
 import scala.util.{Failure, Try}
 
 /** The RetryProvider class serves two purposes:

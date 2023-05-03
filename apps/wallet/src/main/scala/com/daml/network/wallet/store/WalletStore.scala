@@ -1,5 +1,6 @@
 package com.daml.network.wallet.store
 
+import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -9,7 +10,6 @@ import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import cats.syntax.traverseFilter.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation

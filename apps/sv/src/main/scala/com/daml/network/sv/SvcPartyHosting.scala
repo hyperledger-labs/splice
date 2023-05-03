@@ -2,21 +2,20 @@ package com.daml.network.sv
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.config.CNHttpClientConfig.*
-import com.daml.network.environment.RetryProvider
+import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.{RemoteSvAppConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
   TopologyChangeOp,
 }
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}

@@ -1,5 +1,6 @@
 package com.daml.network.admin.api.client
 
+import cats.implicits.*
 import com.daml.network.v0
 import com.daml.network.v0.GetVersionResponse
 import com.daml.network.v0.VersionServiceGrpc.VersionServiceStub
@@ -11,7 +12,6 @@ import io.grpc.ManagedChannel
 
 import java.time.Instant
 import scala.concurrent.Future
-import cats.implicits.*
 
 object GrpcVersionClient {
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {

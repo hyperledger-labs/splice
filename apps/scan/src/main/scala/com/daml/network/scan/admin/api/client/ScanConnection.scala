@@ -13,8 +13,8 @@ import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory

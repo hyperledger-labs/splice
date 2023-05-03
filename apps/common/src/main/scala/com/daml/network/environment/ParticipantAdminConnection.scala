@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -8,8 +9,8 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedDomainsResult,
   ListPartyToParticipantResult,
 }
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -20,7 +21,6 @@ import com.digitalasset.canton.topology.transaction.{
   RequestSide,
   TopologyChangeOp,
 }
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 

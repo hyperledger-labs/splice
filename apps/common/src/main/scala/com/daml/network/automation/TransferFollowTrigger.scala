@@ -1,19 +1,20 @@
 package com.daml.network.automation
 
-import com.daml.ledger.javaapi.data.codegen.{ContractTypeCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractTypeCompanion}
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
-import MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import MultiDomainAcsStore.ReadyContract
 
 /** Trigger that submits transfers to make contracts "follow" another contract, e.g.,
   * splitwell BalanceUpdates follow the corresponding Group contracts.

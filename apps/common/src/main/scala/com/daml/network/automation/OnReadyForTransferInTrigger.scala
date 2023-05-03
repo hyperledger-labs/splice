@@ -1,10 +1,10 @@
 package com.daml.network.automation
 
-import akka.stream.scaladsl.Source
-import akka.stream.Materializer
 import akka.NotUsed
-import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 

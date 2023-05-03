@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

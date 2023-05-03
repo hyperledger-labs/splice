@@ -1,10 +1,9 @@
 package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cc.validatorlicense as vl
-import com.daml.network.codegen.java.cn.svonboarding as so
-import com.daml.network.codegen.java.cn.validatoronboarding as vo
+import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore

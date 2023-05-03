@@ -7,42 +7,42 @@ import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{Template, Unit as DUnit}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
-import com.daml.network.codegen.java.cn.wallet.install.{
-  CoinOperationOutcome,
-  coinoperation,
-  coinoperationoutcome,
-}
+import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
+  payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.cn.wallet.install.{
+  coinoperation,
+  coinoperationoutcome,
+  CoinOperationOutcome,
+}
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
+import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
-import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.environment.CNLedgerConnection.CommandId
+import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.http.v0.wallet.WalletResource as r0
+import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.{CNNodeUtil, Codec, Contract}
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
+import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
+import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.opentelemetry.api.trace.Tracer
-import com.daml.network.util.{CNNodeUtil, Codec, Contract}
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
-import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.ShowStringSyntax
 import com.digitalasset.canton.util.retry.RetryUtil.{
@@ -52,15 +52,15 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
+import com.google.protobuf.Duration
 import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
-import com.google.protobuf.Duration
 import io.grpc.protobuf.StatusProto
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
-import com.daml.network.admin.http.HttpErrorHandler
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,

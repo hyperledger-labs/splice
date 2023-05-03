@@ -3,8 +3,8 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.{
-  HttpValidatorAppClient,
   HttpValidatorAdminAppClient,
+  HttpValidatorAppClient,
   UserInfo,
 }
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}

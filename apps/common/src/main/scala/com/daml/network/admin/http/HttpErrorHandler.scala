@@ -4,22 +4,27 @@ import akka.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
   HttpResponse,
+  MediaTypes,
   StatusCode,
   StatusCodes,
-  MediaTypes,
 }
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
 import akka.http.scaladsl.server.{Directive0, ExceptionHandler, StandardRoute}
-import akka.http.scaladsl.server.Directives.withRequestTimeoutResponse
-import akka.http.scaladsl.server.Directives.{complete, extractUri, handleExceptions}
+import akka.http.scaladsl.server.Directives.{
+  complete,
+  extractUri,
+  handleExceptions,
+  withRequestTimeoutResponse,
+}
 import akka.util.ByteString
+import com.daml.network.http.v0.definitions as d0
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
-import io.circe.syntax.*
 import io.circe.Printer
-import com.daml.network.http.v0.definitions as d0
-import scala.util.{Try, Success, Failure}
+import io.circe.syntax.*
+import io.grpc.{Status, StatusRuntimeException}
+
+import scala.util.{Failure, Success, Try}
 
 final case class HttpErrorWithGrpcCode(code: Status.Code, message: String) extends Exception
 final case class HttpErrorWithHttpCode(code: StatusCode, message: String) extends Exception

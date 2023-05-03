@@ -1,7 +1,7 @@
 package com.daml.network.splitwell
 
-import cats.syntax.traverse.*
 import akka.actor.ActorSystem
+import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters

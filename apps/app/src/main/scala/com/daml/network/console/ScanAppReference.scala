@@ -1,9 +1,10 @@
 package com.daml.network.console
 
+import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
-import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
@@ -16,7 +17,6 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 
 import java.time.Instant
 

@@ -1,21 +1,19 @@
 package com.daml.network.automation
 
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.DomainId
+import akka.NotUsed
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.DomainStore
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
-import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.tracing.Spanning
-import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 import DomainOrchestrator.*

@@ -9,8 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer

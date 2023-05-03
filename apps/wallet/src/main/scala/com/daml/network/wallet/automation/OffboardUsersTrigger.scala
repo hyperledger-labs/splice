@@ -1,16 +1,17 @@
 package com.daml.network.wallet.automation
 
-import com.daml.network.automation.TriggerContext
+import com.daml.network.automation.{
+  PollingParallelTaskExecutionTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.wallet.UserWalletManager
-import scala.concurrent.ExecutionContext
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import scala.concurrent.Future
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.automation.PollingParallelTaskExecutionTrigger
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.logging.pretty.Pretty
-import com.daml.network.automation.TaskOutcome
-import com.daml.network.automation.TaskSuccess
+
+import scala.concurrent.{ExecutionContext, Future}
 
 class OffboardUsersTrigger(
     override protected val context: TriggerContext,

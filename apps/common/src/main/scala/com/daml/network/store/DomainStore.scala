@@ -1,9 +1,9 @@
 package com.daml.network.store
 
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 

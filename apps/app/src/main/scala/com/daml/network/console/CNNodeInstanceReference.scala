@@ -7,11 +7,6 @@ import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.LocalCNNodeConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.digitalasset.canton.config.{ClientConfig, NodeConfig, NonNegativeDuration}
-import com.digitalasset.canton.console.commands.{
-  HealthAdministration,
-  PartiesAdministrationGroup,
-  TopologyAdministrationGroup,
-}
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleEnvironment,
@@ -20,6 +15,11 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
   RemoteParticipantReference,
+}
+import com.digitalasset.canton.console.commands.{
+  HealthAdministration,
+  PartiesAdministrationGroup,
+  TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}

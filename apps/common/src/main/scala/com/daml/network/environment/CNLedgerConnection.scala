@@ -1,18 +1,17 @@
 package com.daml.network.environment
 
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.{KillSwitch, KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.{Done, NotUsed}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exercised, Update}
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
-  GetActiveContractsRequest,
   ExercisedEvent,
+  GetActiveContractsRequest,
   Identifier,
   LedgerOffset,
   Template,
@@ -20,6 +19,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exercised, Update}
 import com.daml.network.environment.ledger.api.{
   DedupConfig,
   DedupOffset,
@@ -29,7 +29,6 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore
-import MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
@@ -61,6 +60,8 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
+
+import MultiDomainAcsStore.IngestionFilter
 
 class CNLedgerConnection(
     client: LedgerClient,

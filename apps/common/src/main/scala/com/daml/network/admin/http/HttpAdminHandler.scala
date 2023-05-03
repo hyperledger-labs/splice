@@ -1,15 +1,14 @@
 package com.daml.network.admin.http
 
-import com.daml.network.http.v0.{definitions, commonAdmin as v0}
+import com.daml.network.environment.{BuildInfo, CNNodeStatus}
+import com.daml.network.http.v0.{commonAdmin as v0, definitions}
+import com.digitalasset.canton.health.admin.data
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
-import com.digitalasset.canton.health.admin.{data}
 
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
-
-import com.daml.network.environment.{BuildInfo, CNNodeStatus}
-import java.time.{OffsetDateTime, Instant, ZoneOffset}
 
 class HttpAdminHandler(
     status: => Future[data.NodeStatus[CNNodeStatus]],

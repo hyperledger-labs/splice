@@ -1,10 +1,8 @@
 package com.daml.network.environment
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
-import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
-import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directive0
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -12,7 +10,8 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CNRemoteParticipantConfig, SharedCNNodeAppParameters}
-import com.daml.network.util.HasHealth
+import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
+import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -34,8 +33,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 /** A running instance of a canton node */

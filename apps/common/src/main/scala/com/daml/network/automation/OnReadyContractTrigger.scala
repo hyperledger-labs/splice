@@ -1,16 +1,17 @@
 package com.daml.network.automation
 
-import akka.stream.scaladsl.Source
-import akka.stream.Materializer
 import akka.NotUsed
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
-import MultiDomainAcsStore.{ContractState, ReadyContract}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import MultiDomainAcsStore.{ContractState, ReadyContract}
 
 /** A trigger for processing ready contracts. Note that the trigger
   * can get called multiple times for the same contract as it gets transferred betweend domains.

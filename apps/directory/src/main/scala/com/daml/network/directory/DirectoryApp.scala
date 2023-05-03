@@ -10,19 +10,22 @@ import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatch
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerClient, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -32,10 +35,6 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
-import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.environment.CNNodeStatus
-import com.digitalasset.canton.health.admin.data.NodeStatus
 
 /** Class representing a Directory app instance.
   *

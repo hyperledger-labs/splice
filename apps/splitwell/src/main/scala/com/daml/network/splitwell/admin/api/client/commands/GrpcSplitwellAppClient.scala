@@ -4,7 +4,7 @@ import cats.implicits.*
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
-import com.daml.network.util.{Contract, Codec}
+import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty

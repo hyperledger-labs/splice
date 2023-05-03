@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.{ReadyContract, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.DomainId

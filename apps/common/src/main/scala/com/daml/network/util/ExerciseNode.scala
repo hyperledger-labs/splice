@@ -3,13 +3,13 @@
 
 package com.daml.network.util
 
+import com.daml.ledger.javaapi.data.{ExercisedEvent, Value as CodegenValue}
 import com.daml.ledger.javaapi.data.codegen.{
   Choice,
   ContractCompanion,
   InterfaceCompanion,
   ValueDecoder,
 }
-import com.daml.ledger.javaapi.data.{ExercisedEvent, Value as CodegenValue}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ErrorUtil

@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   round as roundCodegen,
@@ -10,11 +11,10 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.http.v0.{definitions, scan as v0}
+import com.daml.network.http.v0.definitions.MaybeCachedContract
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -22,21 +22,19 @@ import com.daml.network.util.{
   DomainFeesConstants,
   RateLimiterWithExtraTraffic,
 }
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-
-import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.StatusRuntimeException
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
 
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.{ExecutionContext, Future}
 
 class HttpScanHandler(
     store: ScanStore,

@@ -1,42 +1,42 @@
 package com.daml.network.wallet.treasury
 
 import akka.Done
+import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Exercised
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.{
-  InputAppRewardCoupon,
-  InputCoin,
-  InputValidatorRewardCoupon,
-}
+import com.daml.network.codegen.java.cc.api.v1.round as roundApi
 import com.daml.network.codegen.java.cc.api.v1.coin.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
   ValidatorRight,
 }
-import com.daml.network.codegen.java.cc.api.v1.round as roundApi
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
-import com.daml.network.codegen.java.cn.wallet.install.{
-  CoinOperationOutcome,
-  WalletAppInstall,
-  coinoperation,
+import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.{
+  InputAppRewardCoupon,
+  InputCoin,
+  InputValidatorRewardCoupon,
 }
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.cn.wallet.install.{
+  coinoperation,
+  CoinOperationOutcome,
+  WalletAppInstall,
+}
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{CNNodeUtil, Contract, HasHealth}
+import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -50,13 +50,13 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseableAsync,
   RunOnShutdown,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -67,8 +67,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
   * that concurrent manipulations don't conflict.

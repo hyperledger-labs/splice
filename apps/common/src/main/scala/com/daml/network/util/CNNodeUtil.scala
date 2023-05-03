@@ -13,8 +13,8 @@ import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}

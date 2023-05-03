@@ -1,12 +1,12 @@
 package com.daml.network.splitwell.automation
 
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import akka.stream.Materializer
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
   TransferInTrigger,
 }
+import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection

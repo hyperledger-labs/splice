@@ -1,23 +1,20 @@
 package com.daml.network.scan.store.memory
 
+import cats.implicits.*
+import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.InMemoryCNNodeAppStore
+import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
-
-import scala.concurrent.*
-import com.daml.network.environment.CNLedgerConnection
-import io.grpc.Status
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.collection.immutable.Map
-import cats.implicits.*
-import cats.kernel.Monoid
-import com.daml.network.store.TxLogStore
+import scala.concurrent.*
 
 import java.time.Instant
 

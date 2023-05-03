@@ -7,7 +7,6 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules,
@@ -15,15 +14,15 @@ import com.daml.network.codegen.java.cn.svcrules.{
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.SvApp
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 

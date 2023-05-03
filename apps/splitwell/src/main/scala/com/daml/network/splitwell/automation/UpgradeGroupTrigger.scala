@@ -8,7 +8,6 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import store.SplitwellStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.TransferCommand
 import com.daml.network.util.PrettyInstances.prettyCodegenContractId
@@ -18,6 +17,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import store.SplitwellStore
 
 /** Transfer out certain `Group`s matching the criteria defined in
   * [[SplitwellStore#listTransferrableGroups]].  We expect separate automation

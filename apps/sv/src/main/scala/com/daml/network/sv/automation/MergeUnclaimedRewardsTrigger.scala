@@ -1,11 +1,10 @@
 package com.daml.network.sv.automation
 
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
+import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_MergeUnclaimedRewards}
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
-import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 

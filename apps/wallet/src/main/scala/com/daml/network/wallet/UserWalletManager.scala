@@ -6,26 +6,24 @@ import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{HasHealth, Contract}
+import com.daml.network.util.{Contract, HasHealth}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
-import io.grpc.StatusRuntimeException
-import io.grpc.Status
-import com.digitalasset.canton.lifecycle.RunOnShutdown
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(

@@ -1,13 +1,13 @@
 package com.daml.network.validator.store
 
-import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
+import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{MultiDomainAcsStore, CNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig

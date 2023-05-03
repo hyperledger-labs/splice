@@ -1,6 +1,5 @@
 package com.daml.network.splitwell.config
 
-import com.digitalasset.canton.DomainAlias
 import com.daml.network.config.{
   AutomationConfig,
   CNRemoteParticipantConfig,
@@ -8,6 +7,7 @@ import com.daml.network.config.{
   RemoteCNNodeConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 
 case class SplitwellDomainConfig(

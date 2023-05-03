@@ -3,8 +3,8 @@ package com.daml.network.wallet.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.*
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.CoinCreateSummary
 import com.daml.network.codegen.java.cn.wallet.install.CoinOperationOutcome
@@ -35,7 +35,7 @@ import java.time.{Instant, ZoneOffset}
 import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
-import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
+import scala.math.BigDecimal.{javaBigDecimal2bigDecimal, RoundingMode}
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,

@@ -10,10 +10,11 @@ import com.daml.network.splitwell.config.{
 }
 import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
-import com.daml.network.validator.config.ValidatorAppBackendConfig
+import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
@@ -21,8 +22,6 @@ import monocle.macros.syntax.lens.*
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
-import com.daml.network.validator.config.ValidatorAppClientConfig
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
 object CNNodeConfigTransforms {
 

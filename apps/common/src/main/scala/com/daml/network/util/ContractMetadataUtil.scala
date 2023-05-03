@@ -1,7 +1,7 @@
 package com.daml.network.util
 
-import com.daml.lf.data.Time.Timestamp
 import com.daml.ledger.javaapi.data.ContractMetadata
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.http.v0.definitions as http
 import com.google.protobuf.ByteString
 import org.apache.commons.codec.binary.Hex

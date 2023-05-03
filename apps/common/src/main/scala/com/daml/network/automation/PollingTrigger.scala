@@ -1,14 +1,14 @@
 package com.daml.network.automation
 
-import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 import akka.Done
 import com.daml.network.environment.RetryProvider
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.LoggerUtil
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future

@@ -1,6 +1,5 @@
 package com.daml.network.wallet
 
-import com.digitalasset.canton.DomainAlias
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -10,6 +9,7 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
