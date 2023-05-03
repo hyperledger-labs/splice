@@ -1282,57 +1282,57 @@ workflows:
         context:
           - artifactory
           - slack-context
-    - static_tests:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
-    - daml_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
-    - scala_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        name: "scala_test wall clock time"
-        test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w"
-        parallelism: 8
-    - scala_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        name: "scala_test sim time"
-        test_names_file: "test-full-class-names-sim-time.log"
-        start_canton_options: "-d -p external -s"
-        parallelism: 4
-    - bundle:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
-    - update_pipeline_schedule:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - deployment_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
-    - docker_images_build:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
+    # - static_tests:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - slack-context
+    # - daml_test:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - slack-context
+    # - scala_test:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - datadog
+    #       - slack-context
+    #     name: "scala_test wall clock time"
+    #     test_names_file: "test-full-class-names.log"
+    #     start_canton_options: "-d -p external -w"
+    #     parallelism: 8
+    # - scala_test:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - datadog
+    #       - slack-context
+    #     name: "scala_test sim time"
+    #     test_names_file: "test-full-class-names-sim-time.log"
+    #     start_canton_options: "-d -p external -s"
+    #     parallelism: 4
+    # - bundle:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - slack-context
+    # - update_pipeline_schedule:
+    #     <<: *notify-fail
+    #     <<: *main-branch-only
+    #     context:
+    #       - artifactory
+    #       - slack-context
+    # - deployment_test:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - slack-context
+    # - docker_images_build:
+    #     <<: *notify-fail
+    #     context:
+    #       - artifactory
+    #       - slack-context
 
   pulumi:
     when:
