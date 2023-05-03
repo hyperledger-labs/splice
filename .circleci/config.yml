@@ -1156,7 +1156,7 @@ jobs:
          cmd_retry_count: 5
       - cleanup_sbt_test_job
 
-  push_artifactory_release:
+  promote_images_to_public:
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -1173,26 +1173,14 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
+         cmd_name: Promote images
+         cmd: make docker-promote
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
-      - docker_build
       - run_bash_command_in_nix:
-         cmd_name: Push Docker images
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
-           --keep DOCKER_CERT_PATH \
-           --keep DOCKER_HOST \
-           --keep DOCKER_MACHINE_NAME \
-           --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
-         cmd: |
-           export PUSH_TO_ARTIFACTORY=1
-           make docker-push -j
-      - run_bash_command_in_nix:
+         cmd_name: Push Helm charts and tag git accordingly
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
            --keep GITHUB_TOKEN"
-         cmd_name: Push Helm charts and tag git accordingly
          cmd: |
            publish () {
              source=$1
@@ -1275,9 +1263,16 @@ workflows:
     when:
       equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
     jobs:
-      - push_artifactory_release:
+      - docker_images_push:
+          <<: *notify-fail
           context:
             - artifactory
+            - slack-context
+      - promote_images_to_public:
+          context:
+            - artifactory
+          requires:
+            - docker_images_push
 
   build:
     when:
@@ -1627,7 +1622,7 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
-    - push_artifactory_release:
+    - promote_images_to_public:
         requires:
           - preflight_check
         context:
@@ -1677,7 +1672,7 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
-    - push_artifactory_release:
+    - promote_images_to_public:
         requires:
           - preflight_check
         context:

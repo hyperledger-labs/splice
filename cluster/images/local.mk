@@ -36,6 +36,7 @@ endif
 
 docker-build := target/docker.id
 docker-push := target/docker.push
+docker-promote := target/docker.promote
 docker-local-image-tag := target/local-image-tag
 docker-image-tag := target/image-tag
 
@@ -62,6 +63,9 @@ $$(prefix)/docker-build: $$(prefix)/$(docker-build)
 
 .PHONY: $$(prefix)/docker-push
 $$(prefix)/docker-push: $$(prefix)/$(docker-push)
+
+.PHONY: $$(prefix)/docker-promote
+$$(prefix)/docker-promote: $$(prefix)/$(docker-promote)
 
 .PHONY: $$(prefix)/docker-check
 $$(prefix)/docker-check: $$(prefix)/$(docker-image-tag)
@@ -98,3 +102,8 @@ else
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
 endif
+
+%/$(docker-promote):  %/$(docker-image-tag)
+	cd $(@D)/.. && docker-promote \
+					$$(cat $(abspath $<)) \
+					$(shell image-tag-gen $$(basename $$(dirname $(@D))) --artifactory)
