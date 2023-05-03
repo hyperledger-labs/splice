@@ -8,6 +8,8 @@ import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClie
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
+import com.daml.network.v0 as cnv0
 import com.daml.network.util.Codec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -51,10 +53,7 @@ class GrpcSplitwellService(
         groups <- store.listGroups(userParty)
       } yield {
         // TODO(#3181) Expose state to frontend
-        v0.ListGroupsResponse(
-          groups
-            .map(_.contract.toProtoV0)
-        )
+        v0.ListGroupsResponse(groups map encodeContractWithState)
       }
     }
 
@@ -215,5 +214,16 @@ object GrpcSplitwellService {
       val p = party.toProtoPrimitive
       contract.signatories.contains(p) || contract.observers.contains(p)
     }
+  }
+
+  private def encodeContractWithState(cws: ContractWithState[?, ?]): cnv0.ContractWithState = {
+    import ContractState.*
+    cnv0.ContractWithState(
+      Some(cws.contract.toProtoV0),
+      cws.state match {
+        case Assigned(domain) => domain.toProtoPrimitive
+        case InFlight => ""
+      },
+    )
   }
 }

@@ -2,6 +2,7 @@ syntax = "proto3";
 package com.daml.network.splitwell.v0;
 
 import "com/daml/network/v0/contract.proto";
+import "com/daml/network/v0/contract_with_state.proto";
 import "com/daml/network/v0/connected_domains.proto";
 import "google/protobuf/empty.proto";
 
@@ -41,7 +42,7 @@ message ListGroupsRequest {
 }
 
 message ListGroupsResponse {
-  repeated com.daml.network.v0.Contract groups = 1;
+  repeated com.daml.network.v0.ContractWithState groups = 1;
 }
 
 message ListGroupInvitesRequest {

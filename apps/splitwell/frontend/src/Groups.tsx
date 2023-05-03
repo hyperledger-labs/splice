@@ -422,7 +422,13 @@ const Groups: React.FC<GroupsProps> = ({ party, provider, domainId }) => {
         undefined
       )
     ).getGroupsList();
-    const decoded = newGroups.map(c => Contract.decode(c, CodegenGroup));
+    const decoded = newGroups.flatMap(g => {
+      const c = g.getContract();
+      return c === undefined
+        ? []
+        : // TODO (#3991) use g.getDomainId(), ""=>in-flight
+          [Contract.decode(c, CodegenGroup)];
+    });
     setGroups(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [splitwellClient, party]);
 

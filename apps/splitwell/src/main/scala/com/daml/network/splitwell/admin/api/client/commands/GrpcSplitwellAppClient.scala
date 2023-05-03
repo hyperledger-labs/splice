@@ -4,7 +4,9 @@ import cats.implicits.*
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
-import com.daml.network.util.{Codec, Contract}
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
+import com.daml.network.util.{Contract, Codec}
+import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.google.protobuf.empty.Empty
@@ -42,7 +44,7 @@ object GrpcSplitwellAppClient {
 
   case class ListGroups(context: SplitwellContext)
       extends BaseCommand[v0.ListGroupsRequest, v0.ListGroupsResponse, Seq[
-        Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]
+        ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]
       ]] {
     override def createRequest(): Either[String, v0.ListGroupsRequest] =
       Right(v0.ListGroupsRequest(Some(context.toProtoV0)))
@@ -54,9 +56,22 @@ object GrpcSplitwellAppClient {
 
     override def handleResponse(
         response: v0.ListGroupsResponse
-    ): Either[String, Seq[Contract[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
+    ): Either[String, Seq[
+      ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]
+    ]] =
       response.groups
-        .traverse(Contract.fromProto(splitwellCodegen.Group.COMPANION)(_))
+        .traverse { encG =>
+          for {
+            encContract <- encG.contract.toRight(FieldNotSet("contract"))
+            contract <- Contract.fromProto(splitwellCodegen.Group.COMPANION)(encContract)
+            domainId <- Option
+              .when(encG.domainId.nonEmpty)(encG.domainId)
+              .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
+          } yield ContractWithState(
+            contract,
+            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+          )
+        }
         .leftMap(_.toString)
   }
 

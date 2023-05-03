@@ -137,13 +137,13 @@ class SplitwellUpgradeIntegrationTest
       val acceptedInvite = bobSplitwell.acceptInvite(invite)
       val contractDomains =
         providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
-          group.contractId,
-          invite.contractId,
+          group.contract.contractId,
+          invite.contract.contractId,
           acceptedInvite,
         )
       contractDomains shouldBe Seq[LfContractId](
-        group.contractId,
-        invite.contractId,
+        group.contract.contractId,
+        invite.contract.contractId,
         acceptedInvite,
       ).map(cid => cid -> splitwellAlias.unwrap).toMap
       bracket(
@@ -164,13 +164,13 @@ class SplitwellUpgradeIntegrationTest
               // and in by the TransferInTrigger.
               val contractDomains =
                 providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
-                  group.contractId,
-                  invite.contractId,
+                  group.contract.contractId,
+                  invite.contract.contractId,
                   acceptedInvite,
                 )
               contractDomains shouldBe Seq[LfContractId](
-                group.contractId,
-                invite.contractId,
+                group.contract.contractId,
+                invite.contract.contractId,
                 acceptedInvite,
               ).map(cid => cid -> splitwellUpgradeAlias.unwrap).toMap
             },

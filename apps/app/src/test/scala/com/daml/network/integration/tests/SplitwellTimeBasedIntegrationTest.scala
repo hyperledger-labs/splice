@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -64,8 +63,11 @@ class SplitwellTimeBasedIntegrationTest
         aliceSplitwell.joinGroup(accepted.contractId)
       }
 
-      splitwellValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.Group.COMPANION)(providerSplitwellBackend.getProviderPartyId())
+      eventually() {
+        inside(charlieSplitwell.listGroups()) { case Seq(singleGroup) =>
+          singleGroup.contract.payload.id shouldBe invite.contract.payload.group.id
+        }
+      }
 
       charlieSplitwell.listBalances(key) shouldBe Map.empty
       charlieSplitwell.enterPayment(key, 3300.0, "payment")
