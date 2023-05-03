@@ -145,8 +145,14 @@ class WalletTxLogTimeBasedIntegrationTest
       waitForWalletUser(aliceValidatorWallet)
       val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
 
+      // Advance time to make sure we capture at least one round change in the tx history.
+      val latestRound = eventuallySucceeds() {
+        advanceRoundsByOneTick
+        scan.getRoundOfLatestData()
+      }
+
       val coinConfig = clue("Get coin config") {
-        scan.getCoinConfigForRound(0)
+        scan.getCoinConfigForRound(latestRound)
       }
 
       val transferAmount = BigDecimal("32.1234567891").setScale(10)
