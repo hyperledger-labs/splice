@@ -1156,7 +1156,7 @@ jobs:
          cmd_retry_count: 5
       - cleanup_sbt_test_job
 
-  push_artifactory_release:
+  publish_public_release:
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -1173,12 +1173,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
-      - docker_build
-      - run_bash_command_in_nix:
-         cmd_name: Push Docker images
+         cmd_name: Promote images
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
@@ -1186,13 +1181,16 @@ jobs:
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
          cmd: |
-           export PUSH_TO_ARTIFACTORY=1
-           make docker-push -j
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+
+           make docker-promote
+         cmd_retry_count: 5 # Retry in case of connectivity issues
       - run_bash_command_in_nix:
+         cmd_name: Push Helm charts and tag git accordingly
          additional_nix_args: "--keep ARTIFACTORY_USER \
            --keep ARTIFACTORY_PASSWORD \
            --keep GITHUB_TOKEN"
-         cmd_name: Push Helm charts and tag git accordingly
          cmd: |
            publish () {
              source=$1
@@ -1200,6 +1198,8 @@ jobs:
              echo "Publishing ${source} to ${full_path}"
              curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
            }
+
+           make cluster/helm/build -j
 
            for chart in cluster/helm/target/*.tgz; do
               artifactory_url="https://digitalasset.jfrog.io/artifactory"
@@ -1275,9 +1275,16 @@ workflows:
     when:
       equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
     jobs:
-      - push_artifactory_release:
+      - docker_images_push:
+          <<: *notify-fail
           context:
             - artifactory
+            - slack-context
+      - publish_public_release:
+          context:
+            - artifactory
+          requires:
+            - docker_images_push
 
   build:
     when:
@@ -1627,7 +1634,8 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
-    - push_artifactory_release:
+    - publish_public_release:
+        <<: *main-branch-only
         requires:
           - preflight_check
         context:
@@ -1677,7 +1685,8 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
-    - push_artifactory_release:
+    - publish_public_release:
+        <<: *main-branch-only
         requires:
           - preflight_check
         context:
