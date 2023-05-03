@@ -79,7 +79,7 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
     }
 
     "show sv rewards collection in tx history" in { implicit env =>
-      val (_, txs) = withFrontEnd("sv1") { implicit webDriver =>
+      withFrontEnd("sv1") { implicit webDriver =>
         val sv1WalletUser = sv1Validator.config.validatorWalletUser.value
         browseToSv1Wallet(sv1WalletUser)
         actAndCheck(
@@ -89,20 +89,20 @@ class WalletTransactionHistoryTimeBasedIntegrationTest
           "Wait for SV rewards to be collected and show up in the tx history",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            txs should have size 1
-            txs
+            // We can get more than one entry, e.g., coin merging can also kick in
+            // so we only match on at least one entry being the reward collection.
+            forAtLeast(1, txs) { tx =>
+              matchTransactionAmountRange(tx)(
+                coinPrice = 2,
+                expectedAction = "Balance Change",
+                expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.SvRewardCollected,
+                expectedPartyDescription = None,
+                // Rewards depend on round activity which can fluctuate a bit due to automation so we accept a wide range.
+                expectedAmountCC = (BigDecimal(66500), BigDecimal(66600)),
+                expectedAmountUSD = (BigDecimal(133000), BigDecimal(133200)),
+              )
+            }
           },
-        )
-      }
-      inside(txs) { case Seq(svRewardCollection) =>
-        matchTransactionAmountRange(svRewardCollection)(
-          coinPrice = 2,
-          expectedAction = "Balance Change",
-          expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.SvRewardCollected,
-          expectedPartyDescription = None,
-          // Rewards depend on round activity which can fluctuate a bit due to automation so we accept a wide range.
-          expectedAmountCC = (BigDecimal(66500), BigDecimal(66600)),
-          expectedAmountUSD = (BigDecimal(133000), BigDecimal(133200)),
         )
       }
     }
