@@ -5,7 +5,8 @@ import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import monocle.macros.syntax.lens.*
 import org.scalatest.OptionValues.*
 
-import java.net.URI
+import java.io.IOException
+import java.net.{HttpURLConnection, URI}
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 
 trait PreflightIntegrationTestUtil {
@@ -47,8 +48,10 @@ trait PreflightIntegrationTestUtil {
       .build()
 
     val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-
-    response.body
+    if (response.statusCode() == HttpURLConnection.HTTP_OK)
+      response.body
+    else
+      throw new IOException(response.body)
   }
 
 }
