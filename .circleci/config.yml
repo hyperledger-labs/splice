@@ -1169,6 +1169,8 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
+      - setup_nix
       - run:
           name: Login to artifactory
           command: |
