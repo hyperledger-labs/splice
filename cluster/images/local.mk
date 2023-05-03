@@ -91,5 +91,12 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	@echo docker build triggered because these files changed: $?
 	docker build $(platform_opt) --iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
-%/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+ifdef DISABLE_MAKEFILE_CACHING
+	%/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
+		echo "Disabling makefile caching."
+		cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+else
+	%/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
+		echo "Using makefile caching."
+		cd $(@D)/.. && docker push --force $$(cat $(abspath $<))
+endif
