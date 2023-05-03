@@ -81,7 +81,7 @@ object DamlPlugin extends AutoPlugin {
       damlGenerateCode := {
         // for the time being we assume if we're using code generation then the DARs must first be built
         val dars = damlBuild.value
-
+        val damlProjectFiles = (damlSourceDirectory.value ** "daml.yaml").get
         val settings = damlCodeGeneration.value
         val scalaOutputDirectory = damlScalaCodegenOutput.value
         val javaOutputDirectory = damlJavaCodegenOutput.value
@@ -110,7 +110,7 @@ object DamlPlugin extends AutoPlugin {
               }
           }.toSet
         }
-        cache((settings.map(_._1) ++ dars).toSet).toSeq
+        cache((settings.map(_._1) ++ damlProjectFiles ++ dars).toSet).toSeq
       },
       damlBuild := {
         val dependencies = damlDependencies.value
@@ -162,7 +162,7 @@ object DamlPlugin extends AutoPlugin {
             }.toSet
           }
 
-        cache(allDamlFiles.get.toSet ++ dependencies).toSeq
+        cache(allDamlFiles.get.toSet ++ damlProjectFiles.get.toSet ++ dependencies).toSeq
       },
       // Declare dependency so that Daml packages in test scope may depend on packages in compile scope.
       (Test / damlBuild) := (Test / damlBuild).dependsOn(Compile / damlBuild).value,
