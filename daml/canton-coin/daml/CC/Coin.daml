@@ -270,13 +270,16 @@ template CoinRules
         validator: Party
         trafficCid: ContractId API.ValidatorTraffic
         extraTraffic : Decimal
+        minTopupWaitTime: RelTime
       controller validator
       do
         requireUnlocked lock
         traffic <- fetch trafficCid
+        now <- getTime
         require "validator party and ValidatorTraffic match" (validator == traffic.validator)
         require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
         require "extraTraffic is positive" (extraTraffic > 0.0)
+        require "enough time has elapsed since the last topup" (addRelTime traffic.lastUpdatedAt minTopupWaitTime <= now)
         let transfer = API.Transfer with
               sender = validator
               -- TODO(#3499): make this a parameter so callers can decide who should get the rewards
@@ -296,6 +299,7 @@ template CoinRules
         archive trafficCid
         newTraffic <- create API.ValidatorTraffic with
               amount = traffic.amount + extraTraffic
+              lastUpdatedAt = now
               ..
         return (newTraffic, result.senderChangeCoin)
 

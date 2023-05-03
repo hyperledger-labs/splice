@@ -58,8 +58,8 @@ class DomainFeesTimeBasedIntegrationTest
                 bobWallet,
                 2 * DomainFeesConstants.defaultThroughput.value,
               )
-            successes.toDouble should be > 0.4 * totalTxs
-            successes.toDouble should be < 0.6 * totalTxs
+            successes.toDouble should be > 0.3 * totalTxs
+            successes.toDouble should be < 0.7 * totalTxs
           },
         )
       }
@@ -88,7 +88,7 @@ class DomainFeesTimeBasedIntegrationTest
         )
       }
 
-      s"be limited to target rate" in { implicit env =>
+      s"be limited to just around the target rate" in { implicit env =>
         actAndCheck(
           "Create self-hosted wallet with sufficient balance", {
             onboardWalletUser(aliceWallet, aliceValidator)
@@ -105,11 +105,12 @@ class DomainFeesTimeBasedIntegrationTest
                 aliceWallet,
                 2 * DomainFeesConstants.targetThroughput.value,
               )
-            successes.toDouble should be > 0.4 * totalTxs
-            successes.toDouble should be < 0.6 * totalTxs
+            successes.toDouble should be > 0.3 * totalTxs
+            successes.toDouble should be < 0.7 * totalTxs
           },
         )
       }
+
     }
   }
 

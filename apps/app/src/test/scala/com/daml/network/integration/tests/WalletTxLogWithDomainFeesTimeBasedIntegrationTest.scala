@@ -4,10 +4,12 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{DomainFeesConstants, SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import monocle.Monocle.toAppliedFocusOps
+
+import java.time.Duration
 
 class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -39,14 +41,12 @@ class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
         onboardWalletUser(bobWallet, bobValidator)
         bobValidatorWallet.tap(20)
       }
-      actAndCheck(
-        "Purchase extra traffic",
-        // Advance time by 1 polling interval to allow the automation
-        // to kick in and purchase extra traffic.
-        advanceTimeByPollingInterval(bobValidator),
-      )(
-        "Verify the transaction history",
-        _ => {
+      clue("Purchase extra traffic and verify the transaction history") {
+        eventually() {
+          // Advance time till the automation kicks in and purchases extra traffic.
+          val minTopupWaitTime =
+            Duration.ofMillis((DomainFeesConstants.minTopupWaitTime.value * 1e3).toLong)
+          advanceTime(minTopupWaitTime)
           bobValidatorWallet.balance().unlockedQty should be < BigDecimal(20)
           checkTxHistory(
             bobValidatorWallet,
@@ -69,8 +69,8 @@ class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
               },
             ),
           )
-        },
-      )
+        }
+      }
     }
 
   }

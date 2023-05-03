@@ -1,6 +1,7 @@
 module CN.Wallet.Install where
 
 import DA.Exception
+import DA.Time
 
 import qualified CC.API.V1.Coin as API
 
@@ -36,8 +37,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    CO_BuyExtraTraffic extraAmount trafficCid -> do
-      resultE <- catchAll $ exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraAmount)
+    CO_BuyExtraTraffic extraAmount trafficCid minTopupWaitTime -> do
+      resultE <- catchAll $ exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraAmount minTopupWaitTime)
       handleResult COO_BuyExtraTraffic resultE
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
@@ -102,6 +103,7 @@ data CoinOperation
   | CO_BuyExtraTraffic with
       extraTrafficAmount: Decimal
       validatorTraffic : ContractId API.ValidatorTraffic
+      minTopupWaitTime: RelTime
   | CO_Tap with
       tapAmount: Decimal
 

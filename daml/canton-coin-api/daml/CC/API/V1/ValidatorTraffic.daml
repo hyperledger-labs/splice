@@ -8,6 +8,7 @@ template ValidatorTraffic with
     svc : Party
     validator : Party
     amount : Decimal
+    lastUpdatedAt: Time
   where
     signatory svc
     observer validator

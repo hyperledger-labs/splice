@@ -4,10 +4,12 @@ import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{DomainFeesConstants, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
+
+import java.time.Duration
 
 class DomainFeesTimeBasedConnectivityIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -58,10 +60,12 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
           clue("Give the validator sufficient coins") {
             aliceValidatorWallet.tap(1000)
           }
-          clue("Advance time by a few polliing intervals to trigger top-up loop a few times") {
-            advanceTimeByPollingInterval(aliceValidator)
-            advanceTimeByPollingInterval(aliceValidator)
-            advanceTimeByPollingInterval(aliceValidator)
+          clue("Advance time to trigger top-up loop a few times") {
+            val minTopupWaitTime =
+              Duration.ofMillis((DomainFeesConstants.minTopupWaitTime.value * 1e3).toLong)
+            advanceTime(minTopupWaitTime)
+            advanceTime(minTopupWaitTime)
+            advanceTime(minTopupWaitTime)
           }
         },
         entries => {

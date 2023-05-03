@@ -9,11 +9,13 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_BuyExtraTraffic,
   COO_Error,
 }
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CNNodeUtil, Contract, DomainFeesConstants}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -22,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TopupValidatorTrafficBalanceTrigger(
     override protected val context: TriggerContext,
+    clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
     scanConnection: ScanConnection,
@@ -84,9 +87,14 @@ class TopupValidatorTrafficBalanceTrigger(
       validatorTreasury: TreasuryService,
       validatorTrafficCid: ValidatorTraffic.ContractId,
       amount: BigDecimal,
+      minTopupWaitTimeMillis: Long,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     logger.info(s"Topping up traffic balance by $amount")
-    val coBuyExtraTraffic = new CO_BuyExtraTraffic(amount.bigDecimal, validatorTrafficCid)
+    val coBuyExtraTraffic = new CO_BuyExtraTraffic(
+      amount.bigDecimal,
+      validatorTrafficCid,
+      new RelTime(minTopupWaitTimeMillis * 1000),
+    )
     // borrowed liberally from CollectRewardsAndMergeCoinsTrigger
     validatorTreasury
       .enqueueCoinOperation(coBuyExtraTraffic)
@@ -107,6 +115,7 @@ class TopupValidatorTrafficBalanceTrigger(
   }
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+    logger.debug("Executing top-up validator traffic balance trigger")
     for {
       validatorTreasury <- getValidatorTreasury
       validatorTrafficContract <- getValidatorTraffic
@@ -114,22 +123,44 @@ class TopupValidatorTrafficBalanceTrigger(
         store.key.validatorParty
       )
       validatorWalletBalance <- getValidatorWalletBalance()
-      pollingIntervalInSecs = context.config.pollingInterval.duration.toSeconds
-      topUpAmount =
-        (DomainFeesConstants.targetThroughput.value - DomainFeesConstants.defaultThroughput.value)
-          * pollingIntervalInSecs
+      millisSinceLastTopUp =
+        clock.nowInMicrosecondsSinceEpoch / 1e3 - validatorTrafficContract.payload.lastUpdatedAt.toEpochMilli
+      pollingIntervalMillis = context.config.pollingInterval.duration.toMillis
+      // the wait time between top-ups must be at least equal to the polling interval
+      minTopupWaitTimeMillis = Math.max(
+        DomainFeesConstants.minTopupWaitTime.value * 1e3,
+        pollingIntervalMillis.toDouble,
+      )
       result <-
         if (
           // check that current traffic balance from scan app is not stale
-          currentTrafficBalance.totalPaid >= validatorTrafficContract.payload.amount
-            .doubleValue() &&
-          // check to prevent topup attempt if validator clearly does not have enough coins (1 CC = 1 Traffic Unit)
-          validatorWalletBalance > topUpAmount &&
-          // check if traffic balance has fallen below minimum threshold
-          currentTrafficBalance.remainingBalance < topUpAmount
+          currentTrafficBalance.totalPaid < validatorTrafficContract.payload.amount
+            .doubleValue() ||
+          // check that you're not trying to top-up too soon after the previous top-up
+          millisSinceLastTopUp < minTopupWaitTimeMillis
         )
-          topUpValidatorTraffic(validatorTreasury, validatorTrafficContract.contractId, topUpAmount)
-        else Future.successful(false)
+          Future.successful(false)
+        else {
+          val nextTopupAfterMillis =
+            Math.ceil(minTopupWaitTimeMillis / pollingIntervalMillis) * pollingIntervalMillis
+          val topupAmount =
+            (DomainFeesConstants.targetThroughput.value - DomainFeesConstants.defaultThroughput.value)
+              * nextTopupAfterMillis / 1e3
+          val finalTopupAmount = Math.max(topupAmount, DomainFeesConstants.minTopupAmount.value)
+          if (
+            // check to prevent topup attempt if validator clearly does not have enough coins (1 CC = 1 Traffic Unit)
+            validatorWalletBalance > finalTopupAmount &&
+            // check if traffic balance has fallen below minimum threshold
+            currentTrafficBalance.remainingBalance < finalTopupAmount
+          )
+            topUpValidatorTraffic(
+              validatorTreasury,
+              validatorTrafficContract.contractId,
+              finalTopupAmount,
+              minTopupWaitTimeMillis.toLong,
+            )
+          else Future.successful(false)
+        }
     } yield result
   }
 }

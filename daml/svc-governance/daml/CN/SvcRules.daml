@@ -7,6 +7,7 @@ import DA.Optional (fromSome, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import DA.Time
+import DA.Date
 
 import CC.Coin
 import CC.Round
@@ -382,6 +383,7 @@ template SvcRules with
         license <- create ValidatorLicense with ..
         _ <- create ValidatorTraffic with
               amount = 0.0
+              lastUpdatedAt = time (date 1 Jan 1) 00 00 00
               ..
         return license
 

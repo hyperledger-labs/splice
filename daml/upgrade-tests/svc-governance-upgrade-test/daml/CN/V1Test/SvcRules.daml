@@ -5,6 +5,7 @@ import DA.Foldable (forA_)
 import DA.List as List
 import qualified DA.Map as Map
 import DA.Time
+import DA.Date
 
 -- TODO(tech-debt) factor this one out of CC into its own library
 import CN.Util.Assert
@@ -255,6 +256,7 @@ template SvcRulesV1Test with
         license <- create ValidatorLicense with ..
         _ <- create ValidatorTraffic with
               amount = 0.0
+              lastUpdatedAt = time (date 1 Jan 1) 00 00 00
               ..
         return license
 

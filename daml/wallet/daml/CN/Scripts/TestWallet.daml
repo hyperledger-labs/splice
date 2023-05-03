@@ -2,6 +2,7 @@ module CN.Scripts.TestWallet where
 
 import DA.Assert
 import DA.Time
+import DA.Date
 import Daml.Script
 import DA.List
 
@@ -557,17 +558,28 @@ testBuyExtraTraffic = script do
             amount = 0.0
             svc = app.svc
             validator = validator.primaryParty
+            lastUpdatedAt = time (date 1 Jan 1) 00 00 00
   traffic <- submit app.svc $ createCmd initialTraffic
   context <- getPaymentTransferContext app validator
   outcomes <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
-    operations = [(CO_BuyExtraTraffic 10.0 traffic)]
+    operations = [(CO_BuyExtraTraffic 10.0 traffic (minutes 1))]
     context
 
   let [COO_BuyExtraTraffic updatedTrafficCid] = outcomes
-  [(updatedTraffic2Cid, udpatedTraffic)] <- query @API.ValidatorTraffic validator.primaryParty
+  now <- getTime
+  [(updatedTraffic2Cid, updatedTraffic)] <- query @API.ValidatorTraffic validator.primaryParty
   updatedTrafficCid === updatedTraffic2Cid
-  udpatedTraffic.amount === 10.0
+  updatedTraffic.amount === 10.0
+  updatedTraffic.lastUpdatedAt === now
+
+  coin2 <- tap app validator 42.0
+  outcomes2 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin2]
+    operations = [(CO_BuyExtraTraffic 10.0 updatedTrafficCid (minutes 1))]
+    context
+  outcomes2 === [COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met.") )]
+
   pure ()
 
 testInsufficientFundsBatchSubscriptions : Script ()

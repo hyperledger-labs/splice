@@ -40,6 +40,12 @@ class ValidatorAutomationService(
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager))
   if (automationConfig.enableAutomaticValidatorTrafficBalanceTopup)
     registerTrigger(
-      new TopupValidatorTrafficBalanceTrigger(triggerContext, walletManager, store, scanConnection)
+      new TopupValidatorTrafficBalanceTrigger(
+        triggerContext,
+        clock,
+        walletManager,
+        store,
+        scanConnection,
+      )
     )
 }
