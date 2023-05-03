@@ -19,7 +19,7 @@ parameters:
     default: "16"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup]
     default: build
 
 notify-fail: &notify-fail
@@ -1078,6 +1078,22 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
 
+  auth0_user_cleanup:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - restore_precompiled_classes
+      - restore_sbt_cache
+      - execute_sbt_command:
+          cmd: "\"tools/run\""
+          additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
+      - save_sbt_cache
+      - save_compiled_classes
+
   update_pipeline_schedule:
     docker:
     - image: cimg/base:2021.04
@@ -1739,3 +1755,9 @@ workflows:
             - slack-context
           requires:
              - wait_for_previous_pipeline
+
+  auth0_user_cleanup:
+    when:
+      equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]
+    jobs:
+      - auth0_user_cleanup

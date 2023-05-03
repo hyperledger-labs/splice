@@ -23,6 +23,8 @@ object Dependencies {
   lazy val daml_ledger_api_proto =
     "com.daml" % "ledger-api-proto" % CantonDependencies.daml_libraries_version
 
+  lazy val auth0 = "com.auth0" % "auth0" % "1.44.1"
+
   lazy val java_jwt =
     "com.auth0" % "java-jwt" % "4.1.0"
 

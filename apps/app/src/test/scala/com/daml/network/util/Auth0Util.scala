@@ -2,7 +2,9 @@ package com.daml.network.util
 
 import com.auth0.client.auth.AuthAPI
 import com.auth0.client.mgmt.ManagementAPI
+import com.auth0.client.mgmt.filter.UserFilter
 import com.auth0.json.mgmt.users.User
+import scala.jdk.CollectionConverters.*
 
 class Auth0User(val id: String, val email: String, val password: String, val auth0: Auth0Util)
     extends AutoCloseable {
@@ -32,6 +34,13 @@ class Auth0Util(
 
   def deleteUser(id: String): Unit = {
     api.users.delete(id).execute()
+  }
+
+  def listUsers(filter: UserFilter): List[User] = {
+    val page = api.users().list(filter).execute()
+
+    println(s"Found ${page.getTotal} total users, returning limit of ${page.getLimit()}")
+    page.getItems().asScala.toList
   }
 
   private def requestManagementAPIToken(): String =

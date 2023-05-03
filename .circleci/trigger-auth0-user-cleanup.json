@@ -1,0 +1,29 @@
+{
+  "name": "Auth0 user cleanup (weekly)",
+  "description": "Weekly cleanup of auth0 test users",
+  "attribution-actor": "system",
+  "parameters": {
+    "branch": "main",
+    "run-job": "auth0-user-cleanup"
+  },
+  "timetable": {
+    "per-hour": 1,
+    "hours-of-day": [6],
+    "days-of-week": ["WED"],
+    "days-of-month": [],
+    "months": [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC"
+    ]
+  }
+}
