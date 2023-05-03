@@ -1002,7 +1002,7 @@ function subcmd_update_secrets() {
     _set_auth0_secret "$1" "$client_id" "$secret" "$3"
   done
 
-  for i in sv1 sv2 sv3 sv4 sv1_validator
+  for i in sv1 sv1_validator
   do
       client_id="${appToClientId[$i]}"
       _set_auth0_api_user "$i" svc "$client_id"

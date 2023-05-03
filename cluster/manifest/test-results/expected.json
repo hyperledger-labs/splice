@@ -534,17 +534,7 @@
                               "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
-                              "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-svc-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_SV1_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
@@ -554,31 +544,11 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SV2_LEDGER_API_AUTH_USER_NAME",
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-sv2-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_SV3_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-sv3-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_SV4_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-sv4-ledger-api-auth",
+                                    "name": "cn-app-svc-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -613,7 +583,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV1_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv1\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV2_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv2\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV3_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv3\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV4_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv4\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv1\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -1046,6 +1016,10 @@
                               "value": "true"
                            },
                            {
+                              "name": "CN_APP_SV_ONBOARDING_NAME",
+                              "value": "sv1"
+                           },
+                           {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
                               "value": "found-collective"
                            },
@@ -1204,12 +1178,32 @@
                               "value": "true"
                            },
                            {
+                              "name": "CN_APP_SV_ONBOARDING_NAME",
+                              "value": "sv2"
+                           },
+                           {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
-                              "value": "join-via-svc-app"
+                              "value": "join-with-key"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "value": "5014"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "value": "http://sv-app.sv-1"
+                           },
+                           {
+                              "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
+                              "value": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
                            },
                            {
                               "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
-                              "value": "participant.svc"
+                              "value": "participant"
+                           },
+                           {
+                              "name": "ADDITIONAL_CONFIG",
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1259,6 +1253,284 @@
             ],
             "selector": {
                "app": "sv-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres-configuration",
+            "namespace": "sv-2"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "postgres"
+               }
+            },
+            "serviceName": "postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "postgres",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
+                  },
+                  "namespace": "sv-2"
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           }
+                        },
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "labels": {
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
+                     },
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "20Gi"
+                        }
+                     },
+                     "storageClassName": "standard-rwo"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "postgres"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "participant",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "canton-participant"
+            },
+            "name": "participant",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "participant"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "participant",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "canton-participant"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                              "value": "postgres"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                              "value": "sv2_participant"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_USERS",
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv2\"}, \"readAs\": [ ]}]"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "participant",
+                        "ports": [
+                           {
+                              "containerPort": 5002,
+                              "name": "sv2-adm-api"
+                           },
+                           {
+                              "containerPort": 5001,
+                              "name": "sv2-lg-api"
+                           },
+                           {
+                              "containerPort": 10013,
+                              "name": "sv2-metrics"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "32768Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "32768Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "participant",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv2-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv2-lg-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv2-metrics",
+                  "port": 10013,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "participant"
             }
          }
       },
@@ -1362,12 +1634,32 @@
                               "value": "true"
                            },
                            {
+                              "name": "CN_APP_SV_ONBOARDING_NAME",
+                              "value": "sv3"
+                           },
+                           {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
-                              "value": "join-via-svc-app"
+                              "value": "join-with-key"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "value": "5014"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "value": "http://sv-app.sv-1"
+                           },
+                           {
+                              "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
+                              "value": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA=="
                            },
                            {
                               "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
-                              "value": "participant.svc"
+                              "value": "participant"
+                           },
+                           {
+                              "name": "ADDITIONAL_CONFIG",
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1417,6 +1709,284 @@
             ],
             "selector": {
                "app": "sv-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres-configuration",
+            "namespace": "sv-3"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "postgres"
+               }
+            },
+            "serviceName": "postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "postgres",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
+                  },
+                  "namespace": "sv-3"
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           }
+                        },
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "labels": {
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
+                     },
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "20Gi"
+                        }
+                     },
+                     "storageClassName": "standard-rwo"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "postgres"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "participant",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "canton-participant"
+            },
+            "name": "participant",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "participant"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "participant",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "canton-participant"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                              "value": "postgres"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                              "value": "sv3_participant"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_USERS",
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv3\"}, \"readAs\": [ ]}]"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "participant",
+                        "ports": [
+                           {
+                              "containerPort": 5002,
+                              "name": "sv3-adm-api"
+                           },
+                           {
+                              "containerPort": 5001,
+                              "name": "sv3-lg-api"
+                           },
+                           {
+                              "containerPort": 10013,
+                              "name": "sv3-metrics"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "32768Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "32768Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "participant",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv3-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv3-lg-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv3-metrics",
+                  "port": 10013,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "participant"
             }
          }
       },
@@ -1520,12 +2090,32 @@
                               "value": "true"
                            },
                            {
+                              "name": "CN_APP_SV_ONBOARDING_NAME",
+                              "value": "sv4"
+                           },
+                           {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
-                              "value": "join-via-svc-app"
+                              "value": "join-with-key"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "value": "5014"
+                           },
+                           {
+                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "value": "http://sv-app.sv-1"
+                           },
+                           {
+                              "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
+                              "value": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ=="
                            },
                            {
                               "name": "CN_APP_SV_PARTICIPANT_ADDRESS",
-                              "value": "participant.svc"
+                              "value": "participant"
+                           },
+                           {
+                              "name": "ADDITIONAL_CONFIG",
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1575,6 +2165,284 @@
             ],
             "selector": {
                "app": "sv-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "data": {
+            "PGDATA": "/var/lib/postgresql/data/pgdata",
+            "POSTGRES_DB": "cantonnet",
+            "POSTGRES_PASSWORD": "cnadmin",
+            "POSTGRES_USER": "cnadmin"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres-configuration",
+            "namespace": "sv-4"
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "StatefulSet",
+         "metadata": {
+            "labels": {
+               "app": "postgres",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "postgres"
+               }
+            },
+            "serviceName": "postgres",
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "postgres",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster"
+                  },
+                  "namespace": "sv-4"
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "envFrom": [
+                           {
+                              "configMapRef": {
+                                 "name": "postgres-configuration"
+                              }
+                           }
+                        ],
+                        "image": "postgres:14",
+                        "livenessProbe": {
+                           "exec": {
+                              "command": [
+                                 "psql",
+                                 "-U",
+                                 "cnadmin",
+                                 "-d",
+                                 "template1",
+                                 "-c",
+                                 "SELECT 1"
+                              ]
+                           }
+                        },
+                        "name": "postgres",
+                        "ports": [
+                           {
+                              "containerPort": 5432,
+                              "name": "postgresdb"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           },
+                           "requests": {
+                              "cpu": 2,
+                              "memory": "8192Mi"
+                           }
+                        },
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/var/lib/postgresql/data",
+                              "name": "pg-data"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            },
+            "volumeClaimTemplates": [
+               {
+                  "metadata": {
+                     "labels": {
+                        "clusterName": "cluster",
+                        "cnjClusterName": "cluster"
+                     },
+                     "name": "pg-data"
+                  },
+                  "spec": {
+                     "accessModes": [
+                        "ReadWriteOnce"
+                     ],
+                     "resources": {
+                        "requests": {
+                           "storage": "20Gi"
+                        }
+                     },
+                     "storageClassName": "standard-rwo"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "postgres",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "postgresdb",
+                  "port": 5432,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "postgres"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "participant",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "canton-participant"
+            },
+            "name": "participant",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "participant"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "participant",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "canton-participant"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                              "value": "postgres"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                              "value": "sv4_participant"
+                           },
+                           {
+                              "name": "CANTON_PARTICIPANT_USERS",
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv4\"}, \"readAs\": [ ]}]"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "participant",
+                        "ports": [
+                           {
+                              "containerPort": 5002,
+                              "name": "sv4-adm-api"
+                           },
+                           {
+                              "containerPort": 5001,
+                              "name": "sv4-lg-api"
+                           },
+                           {
+                              "containerPort": 10013,
+                              "name": "sv4-metrics"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "32768Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "32768Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "participant",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv4-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv4-lg-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "sv4-metrics",
+                  "port": 10013,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "participant"
             }
          }
       },

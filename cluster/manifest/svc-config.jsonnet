@@ -4,6 +4,22 @@ local c = import "./cluster.jsonnet";
 
 local svnode = import "./svnode-config.jsonnet";
 
+// TODO(#4459) Move these keys to k8s secrets
+local svKeys = {
+  sv2: {
+    publicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
+    privateKey: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA",
+  },
+  sv3: {
+    publicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
+    privateKey: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI",
+  },
+  sv4: {
+    publicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
+    privateKey: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ",
+  },
+};
+
 local deployments(config) = [
   c.namespace("svc", config),
   postgres.database("postgres", config, namespace="svc"),
@@ -69,7 +85,7 @@ local deployments(config) = [
       externalPort: 10013,
     },
   ], image="canton-participant", namespace="svc", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
-               c.appUserNameEnvBindings(["svc", "sv1", "sv2", "sv3", "sv4", "scan", "directory"]) + [
+               c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBindings(["svc", "scan", "directory"]) + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
     { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -95,34 +111,12 @@ local deployments(config) = [
         admin: true,
       },
       {
-        name: { env: "CN_APP_SV1_LEDGER_API_AUTH_USER_NAME" },
+        name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
         primaryParty: { allocate: "sv1" },
         actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
         readAs: [],
         admin: true,
       },
-      {
-        name: { env: "CN_APP_SV2_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "sv2" },
-        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: "CN_APP_SV3_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "sv3" },
-        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: "CN_APP_SV4_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "sv4" },
-        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        readAs: [],
-        admin: true,
-      },
-
     ] },
   ]),
 
@@ -140,7 +134,7 @@ local deployments(config) = [
     },
   ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "svc")),
 
-  [svnode.deployments(num, config) for num in std.range(1, config.numberOfSvNodes)],
+  [svnode.deployments(num, std.get(svKeys, std.format("sv%d", num)), config) for num in std.range(1, config.numberOfSvNodes)],
 
   c.deployment(config, "scan-app", [
     {
