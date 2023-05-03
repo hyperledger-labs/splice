@@ -3,7 +3,7 @@ import * as k8s from "@pulumi/kubernetes";
 import * as certmanager from "@pulumi/kubernetes-cert-manager";
 import * as pulumi from "@pulumi/pulumi";
 
-function clusterIpAddress(addressName: string): gcp.compute.Address {
+function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
     name: addressName,
     networkTier: "PREMIUM",
@@ -152,8 +152,59 @@ function clusterCertificate(
   );
 }
 
+const project = gcp.organizations.getProjectOutput({});
+
+function natGateway(
+  clusterName: string,
+  externalIp: gcp.compute.Address,
+  options = {}
+): gcp.compute.RouterNat {
+  const privateNetwork = gcp.compute.Network.get(
+    "default",
+    pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
+  );
+
+  const subnet = gcp.compute.getSubnetworkOutput({
+    name: `cn-${clusterName}net-subnet`,
+  });
+
+  const router = new gcp.compute.Router(
+    `router-${clusterName}`,
+    {
+      network: privateNetwork.id,
+    },
+    options
+  );
+
+  // Create a Cloud NAT gateway to configure the outbound IP address
+  const natGateway = new gcp.compute.RouterNat(
+    `nat-${clusterName}-gw`,
+    {
+      router: router.name,
+      region: router.region,
+      natIpAllocateOption: "MANUAL_ONLY",
+      natIps: [externalIp.selfLink],
+      sourceSubnetworkIpRangesToNat: "LIST_OF_SUBNETWORKS",
+      subnetworks: [
+        {
+          name: subnet.id,
+          sourceIpRangesToNats: ["ALL_IP_RANGES"],
+        },
+      ],
+      logConfig: {
+        enable: true,
+        filter: "ERRORS_ONLY",
+      },
+    },
+    options
+  );
+
+  return natGateway;
+}
+
 class CantonNetwork extends pulumi.ComponentResource {
   clusterIp: gcp.compute.Address;
+  externalIp: gcp.compute.Address;
   ingressNs: k8s.core.v1.Namespace;
 
   constructor(
@@ -164,7 +215,9 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const dnsName = `${clusterName}.network.canton.global`;
 
-    const clusterIp = clusterIpAddress(`cn-${clusterName}net-ip`);
+    const clusterIp = ipAddress(`cn-${clusterName}net-ip`);
+
+    const externalIp = ipAddress(`cn-${clusterName}-out`);
 
     const certManagerDeployment = certManager("cert-manager");
 
@@ -176,6 +229,8 @@ class CantonNetwork extends pulumi.ComponentResource {
       },
     });
 
+    natGateway(clusterName, externalIp, { parent: this });
+
     clusterCertificate(
       clusterName,
       dnsName,
@@ -185,6 +240,7 @@ class CantonNetwork extends pulumi.ComponentResource {
     );
 
     this.clusterIp = clusterIp;
+    this.externalIp = externalIp;
     this.ingressNs = ingressNs;
 
     this.registerOutputs();
