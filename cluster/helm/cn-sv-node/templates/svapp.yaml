@@ -30,12 +30,6 @@ spec:
               value: "5014"
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
-            - name: CN_APP_SV_ENABLE_VALIDATOR_DEPENDENCY
-              {{ if .Values.svEnableValidatorDependency }}
-              value: {{ .Values.svEnableValidatorDependency | quote }}
-              {{ else }}
-              value: "true"
-              {{ end }}
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
               {{ if .Values.participantAddress }}
               value: {{ .Values.participantAddress | quote }}

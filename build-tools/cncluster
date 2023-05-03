@@ -968,12 +968,18 @@ function subcmd_update_secrets() {
       [sv3]='SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk'
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
       [sv1_validator]='7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov'
+      [sv2_validator]='5N2kwYLOqrHtnnikBqw8A7foa01kui7h'
+      [sv3_validator]='V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh'
+      [sv4_validator]='FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL'
   )
 
   local -Ar namespaceToUiClientId=(
     [validator1]='5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK'
     [splitwell]='eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL'
     [sv-1]='Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J'
+    [sv-2]='G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6'
+    [sv-3]='cgxHguMv32JLeew9S6wBDgNPHmPCIKaP'
+    [sv-4]='VoSuAamXhvwISHGgaCtULYmbRIWbQeTb'
   )
 
   for i in \
@@ -983,8 +989,11 @@ function subcmd_update_secrets() {
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
     "cn-app-validator-ledger-api-auth sv1_validator sv-1" \
     "cn-app-sv-ledger-api-auth sv2 sv-2" \
+    "cn-app-validator-ledger-api-auth sv2_validator sv-2" \
     "cn-app-sv-ledger-api-auth sv3 sv-3" \
+    "cn-app-validator-ledger-api-auth sv3_validator sv-3" \
     "cn-app-sv-ledger-api-auth sv4 sv-4" \
+    "cn-app-validator-ledger-api-auth sv4_validator sv-4" \
     "cn-app-scan-ledger-api-auth scan svc" \
     "cn-app-directory-ledger-api-auth directory svc" \
     "cn-app-splitwell-ledger-api-auth splitwell splitwell" \
@@ -1013,7 +1022,10 @@ function subcmd_update_secrets() {
     "cn-app-directory-ui-auth validator1" \
     "cn-app-splitwell-ui-auth validator1" \
     "cn-app-wallet-ui-auth splitwell" \
-    "cn-app-wallet-ui-auth sv-1"
+    "cn-app-wallet-ui-auth sv-1" \
+    "cn-app-wallet-ui-auth sv-2" \
+    "cn-app-wallet-ui-auth sv-3" \
+    "cn-app-wallet-ui-auth sv-4"
   do
     # shellcheck disable=SC2086
     set -- $i

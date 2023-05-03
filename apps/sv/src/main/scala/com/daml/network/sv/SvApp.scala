@@ -303,10 +303,7 @@ class SvApp(
           case Right(privateKey_) =>
             for {
               _ <- uploadDars(ledgerConnection)
-              _ <-
-                if (config.enableValidatorDependency) {
-                  waitForValidatorLicense(svStore)
-                } else Future.unit
+              _ <- waitForValidatorLicense(svStore)
               _ <- requestOnboarding(
                 remoteSv.adminApi,
                 name,

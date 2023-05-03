@@ -544,6 +544,16 @@
                               }
                            },
                            {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv1-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -583,7 +593,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv1\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv1\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -1079,6 +1089,264 @@
          }
       },
       {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "validator-app"
+            },
+            "name": "validator-app",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "validator-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_WALLET_USER_NAME",
+                              "value": "auth0|64529b128448ded6aa68048f"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator-app",
+                        "ports": [
+                           {
+                              "containerPort": 5003,
+                              "name": "sv1-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "validator-app",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv1-api",
+                  "port": 5003,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "wallet-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "wallet-web-ui"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "wallet-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "wallet-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "wallet-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "wallet-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "wallet-web-ui"
+            }
+         }
+      },
+      {
          "apiVersion": "v1",
          "kind": "Namespace",
          "metadata": {
@@ -1253,6 +1521,264 @@
             ],
             "selector": {
                "app": "sv-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "validator-app"
+            },
+            "name": "validator-app",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "validator-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                              "value": "participant"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_WALLET_USER_NAME",
+                              "value": "auth0|64529b6852dd694167351045"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator-app",
+                        "ports": [
+                           {
+                              "containerPort": 5003,
+                              "name": "sv2-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "validator-app",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv2-api",
+                  "port": 5003,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "wallet-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "wallet-web-ui"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "wallet-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "wallet-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "wallet-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "wallet-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "wallet-web-ui"
             }
          }
       },
@@ -1454,6 +1980,16 @@
                               }
                            },
                            {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -1463,7 +1999,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv2\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv2\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -1713,6 +2249,264 @@
          }
       },
       {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "validator-app"
+            },
+            "name": "validator-app",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "validator-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                              "value": "participant"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_WALLET_USER_NAME",
+                              "value": "auth0|64529bb10c1aee4f2c819218"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator-app",
+                        "ports": [
+                           {
+                              "containerPort": 5003,
+                              "name": "sv3-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "validator-app",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv3-api",
+                  "port": 5003,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "wallet-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "wallet-web-ui"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "wallet-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "wallet-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "wallet-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "wallet-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "wallet-web-ui"
+            }
+         }
+      },
+      {
          "apiVersion": "v1",
          "data": {
             "PGDATA": "/var/lib/postgresql/data/pgdata",
@@ -1910,6 +2704,16 @@
                               }
                            },
                            {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -1919,7 +2723,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv3\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv3\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2169,6 +2973,264 @@
          }
       },
       {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "validator-app"
+            },
+            "name": "validator-app",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "validator-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                              "value": "participant"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_WALLET_USER_NAME",
+                              "value": "auth0|64529bc58d30358eacae5611"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator-app",
+                        "ports": [
+                           {
+                              "containerPort": 5003,
+                              "name": "sv4-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "validator-app",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "sv4-api",
+                  "port": 5003,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "wallet-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "wallet-web-ui"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "wallet-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "wallet-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "wallet-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "wallet-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "wallet-web-ui",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "wallet-web-ui"
+            }
+         }
+      },
+      {
          "apiVersion": "v1",
          "data": {
             "PGDATA": "/var/lib/postgresql/data/pgdata",
@@ -2366,6 +3428,16 @@
                               }
                            },
                            {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -2375,7 +3447,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv4\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv4\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
