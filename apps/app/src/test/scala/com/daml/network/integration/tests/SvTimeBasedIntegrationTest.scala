@@ -124,7 +124,7 @@ class SvTimeBasedIntegrationTest
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
     svcClient.setConfigSchedule(
       createConfigSchedule(
-        (defaultTickDuration.asJavaApproximation, mkCoinConfig(doubledTickDuration))
+        (defaultTickDuration.asJava, mkCoinConfig(doubledTickDuration))
       )
     )
     advanceRoundsByOneTick
@@ -148,7 +148,7 @@ class SvTimeBasedIntegrationTest
       // First IssuingRounds is active
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation
+          0L -> defaultTickDuration.asJava
         )
       )
 
@@ -163,8 +163,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 5") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation,
-          1L -> defaultTickDuration.asJavaApproximation,
+          0L -> defaultTickDuration.asJava,
+          1L -> defaultTickDuration.asJava,
         )
       )
 
@@ -182,8 +182,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 6") {
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.asJavaApproximation,
-          2L -> defaultTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJava,
+          2L -> defaultTickDuration.asJava,
         )
       )
 
@@ -201,8 +201,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 7") {
       assertTickDurationOfIssuingRound(
         Map(
-          2L -> defaultTickDuration.asJavaApproximation,
-          3L -> doubledTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJava,
+          3L -> doubledTickDuration.asJava,
         )
       )
 
@@ -219,7 +219,7 @@ class SvTimeBasedIntegrationTest
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     svcClient.setConfigSchedule(
       createConfigSchedule(
-        (defaultTickDuration.asJavaApproximation, mkCoinConfig(reducedTickDuration))
+        (defaultTickDuration.asJava, mkCoinConfig(reducedTickDuration))
       )
     )
     advanceRoundsByOneTick
@@ -243,7 +243,7 @@ class SvTimeBasedIntegrationTest
       // First IssuingRounds is active
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation
+          0L -> defaultTickDuration.asJava
         )
       )
 
@@ -263,8 +263,8 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 5") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation,
-          1L -> defaultTickDuration.asJavaApproximation,
+          0L -> defaultTickDuration.asJava,
+          1L -> defaultTickDuration.asJava,
         )
       )
 
@@ -285,9 +285,9 @@ class SvTimeBasedIntegrationTest
     clue("advance to OpenMiningRound 6") {
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation,
-          1L -> defaultTickDuration.asJavaApproximation,
-          2L -> defaultTickDuration.asJavaApproximation,
+          0L -> defaultTickDuration.asJava,
+          1L -> defaultTickDuration.asJava,
+          2L -> defaultTickDuration.asJava,
         )
       )
 
@@ -309,10 +309,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          0L -> defaultTickDuration.asJavaApproximation,
-          1L -> defaultTickDuration.asJavaApproximation,
-          2L -> defaultTickDuration.asJavaApproximation,
-          3L -> reducedTickDuration.asJavaApproximation,
+          0L -> defaultTickDuration.asJava,
+          1L -> defaultTickDuration.asJava,
+          2L -> defaultTickDuration.asJava,
+          3L -> reducedTickDuration.asJava,
         )
       )
 
@@ -328,10 +328,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.asJavaApproximation,
-          2L -> defaultTickDuration.asJavaApproximation,
-          3L -> reducedTickDuration.asJavaApproximation,
-          4L -> reducedTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJava,
+          2L -> defaultTickDuration.asJava,
+          3L -> reducedTickDuration.asJava,
+          4L -> reducedTickDuration.asJava,
         )
       )
 
@@ -347,11 +347,11 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          1L -> defaultTickDuration.asJavaApproximation,
-          2L -> defaultTickDuration.asJavaApproximation,
-          3L -> reducedTickDuration.asJavaApproximation,
-          4L -> reducedTickDuration.asJavaApproximation,
-          5L -> reducedTickDuration.asJavaApproximation,
+          1L -> defaultTickDuration.asJava,
+          2L -> defaultTickDuration.asJava,
+          3L -> reducedTickDuration.asJava,
+          4L -> reducedTickDuration.asJava,
+          5L -> reducedTickDuration.asJava,
         )
       )
 
@@ -367,10 +367,10 @@ class SvTimeBasedIntegrationTest
       // There are still issuing mining rounds with longer tick duration not yet closed
       assertTickDurationOfIssuingRound(
         Map(
-          2L -> defaultTickDuration.asJavaApproximation,
-          4L -> reducedTickDuration.asJavaApproximation,
-          5L -> reducedTickDuration.asJavaApproximation,
-          6L -> reducedTickDuration.asJavaApproximation,
+          2L -> defaultTickDuration.asJava,
+          4L -> reducedTickDuration.asJava,
+          5L -> reducedTickDuration.asJava,
+          6L -> reducedTickDuration.asJava,
         )
       )
 
@@ -1001,8 +1001,8 @@ class SvTimeBasedIntegrationTest
     ) {
       // It doesn't really matter which sv we pick
       val automationConfig = sv2.config.automation
-      val effectiveTimeout = automationConfig.leaderInactiveTimeout.asJavaApproximation.plus(
-        automationConfig.pollingInterval.asJavaApproximation
+      val effectiveTimeout = automationConfig.leaderInactiveTimeout.asJava.plus(
+        automationConfig.pollingInterval.asJava
       )
       val bufferDuration = java.time.Duration.ofSeconds(5)
 

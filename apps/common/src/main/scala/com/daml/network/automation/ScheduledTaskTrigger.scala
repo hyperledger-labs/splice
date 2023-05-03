@@ -22,7 +22,7 @@ abstract class ScheduledTaskTrigger[T: Pretty](implicit
       tc: TraceContext
   ): Future[Seq[ScheduledTaskTrigger.ReadyTask[T]]] = {
     // We shift the clock-reading by a small grace period to account for potential clock skew
-    val now = context.clock.now.minus(context.config.clockSkewAutomationDelay.asJavaApproximation)
+    val now = context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava)
     // TODO(M3-83): review whether we should introduce a separate task list size parameter
     listReadyTasks(now, context.config.parallelism)
       .map(_.map(ScheduledTaskTrigger.ReadyTask(now, _)))

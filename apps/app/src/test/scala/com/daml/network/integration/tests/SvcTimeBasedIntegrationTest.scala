@@ -44,7 +44,7 @@ class SvcTimeBasedIntegrationTest
       val configSchedule =
         createConfigSchedule(
           (
-            defaultTickDuration.asJavaApproximation,
+            defaultTickDuration.asJava,
             mkCoinConfig(tickDuration = defaultTickDuration, maxNumInputs = 101),
           )
         )

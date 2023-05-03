@@ -85,7 +85,7 @@ class ScanTimeBasedIntegrationTest
       val configSchedule =
         createConfigSchedule(
           (
-            defaultTickDuration.asJavaApproximation,
+            defaultTickDuration.asJava,
             mkCoinConfig(tickDuration = defaultTickDuration, holdingFee = newHoldingFee),
           )
         )

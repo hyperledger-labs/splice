@@ -183,13 +183,13 @@ object CNNodeTests {
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds((sv1.config.onboarding match {
         case foundCollective: FoundCollective =>
-          foundCollective.initialTickDuration.asJavaApproximation
+          foundCollective.initialTickDuration.asJava
         case _ =>
           fail("Failed to retrieve defaultTickDuration from sv1. sv1 is not part of the SVC.")
       }).toSeconds)
 
     def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
-      defaultTickDuration.asJavaApproximation.plus(java.time.Duration.ofSeconds(10))
+      defaultTickDuration.asJava.plus(java.time.Duration.ofSeconds(10))
 
     protected def mkCoinConfig(
         tickDuration: NonNegativeFiniteDuration,

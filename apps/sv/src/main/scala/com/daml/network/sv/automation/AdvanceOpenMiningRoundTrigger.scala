@@ -96,8 +96,8 @@ class AdvanceOpenMiningRoundTrigger(
                   }
                 })
               },
-              context.config.leaderInactiveTimeout.asJavaApproximation
-                .plus(context.config.pollingInterval.asJavaApproximation),
+              context.config.leaderInactiveTimeout.asJava
+                .plus(context.config.pollingInterval.asJava),
             )
         )
         continueOrShutdownSignal.unwrap.flatMap {

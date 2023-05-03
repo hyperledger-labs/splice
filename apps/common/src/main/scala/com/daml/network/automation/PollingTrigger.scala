@@ -70,7 +70,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                     // No work done here, as we are only interested in the scheduling notification
                     ()
                   },
-                  context.config.pollingInterval.asJavaApproximation,
+                  context.config.pollingInterval.asJava,
                 )
             )
             // Continue looping

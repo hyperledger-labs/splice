@@ -302,7 +302,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   def advanceTimeByPollingInterval(appRef: LocalCNNodeAppReference)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = advanceTime(
-    appRef.config.automation.pollingInterval.asJavaApproximation
+    appRef.config.automation.pollingInterval.asJava
   )
 
   def getSortedOpenMiningRounds(

@@ -136,7 +136,7 @@ final class ScanConnection private (
             coinRulesCache.set(
               Some(
                 CachedCoinRules(
-                  now.add(config.coinRulesCacheTimeToLive.asJavaApproximation),
+                  now.add(config.coinRulesCacheTimeToLive.asJava),
                   coinRules,
                 )
               )
