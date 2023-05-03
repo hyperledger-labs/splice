@@ -91,5 +91,10 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	@echo docker build triggered because these files changed: $?
 	docker build $(platform_opt) --iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
+ifdef OVERWRITE_DOCKER_IMAGE
+%/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
+	cd $(@D)/.. && docker-push $$(cat $(abspath $<)) --force
+else
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+endif
