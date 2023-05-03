@@ -3,11 +3,12 @@ package com.daml.network.admin.api.client
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpCommand
+
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.{commonAdmin as http, definitions}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
-
+import com.digitalasset.canton.tracing.TraceContext
 import java.time.OffsetDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,10 +18,14 @@ object HttpAdminAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.CommonAdminClient(host)
+      http.CommonAdminClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
   }
 
   case class GetHealthStatus[S <: NodeStatus.Status](
@@ -32,9 +37,9 @@ object HttpAdminAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetHealthStatusResponse] =
       client.getHealthStatus(headers)
 
-    override def handleResponse(response: http.GetHealthStatusResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, NodeStatus[S]] = response match {
+    ) = {
       case http.GetHealthStatusResponse.OK(response) => {
         response match {
           case definitions.NodeStatus(None, Some(success)) => {
@@ -58,12 +63,9 @@ object HttpAdminAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetVersionResponse] =
       client.getVersion(headers)
 
-    override def handleResponse(
-        response: http.GetVersionResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, VersionInfo] =
-      response match {
-        case http.GetVersionResponse.OK(response) =>
-          Right(VersionInfo(response.version, response.commitTs))
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetVersionResponse.OK(response) =>
+        Right(VersionInfo(response.version, response.commitTs))
+    }
   }
 }

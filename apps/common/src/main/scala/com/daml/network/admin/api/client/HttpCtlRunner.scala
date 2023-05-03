@@ -11,6 +11,8 @@ import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.digitalasset.canton.tracing.TraceContext
+import com.daml.network.admin.api.client.commands.HttpCommandException
 
 /** HTTP Variant of Canton’s GrpcCtlRunner.
   * Canton also has an HttpCtlRunner but it’s written
@@ -28,6 +30,7 @@ class HttpCtlRunner(
   )(implicit
       templateDecoder: TemplateJsonDecoder,
       httpClient: HttpRequest => Future[HttpResponse],
+      tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): EitherT[Future, String, Result] = {
@@ -36,7 +39,14 @@ class HttpCtlRunner(
       .createClient(host)
 
     for {
-      response <- command.submitRequest(client, headers).leftMap(_.toString)
+      response <- command
+        .submitRequest(client, headers)
+        .leftMap(resp =>
+          resp match {
+            case Left(httpErr: HttpCommandException) => throw httpErr
+            case err => err.toString()
+          }
+        )
       result <- EitherT.fromEither[Future](command.handleResponse(response))
     } yield result
   }

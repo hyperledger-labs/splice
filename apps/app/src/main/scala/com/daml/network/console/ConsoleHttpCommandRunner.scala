@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.network.admin.api.client.HttpCtlRunner
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.CNNodeEnvironment
 import com.daml.network.util.TemplateJsonDecoder
@@ -103,6 +103,8 @@ class ConsoleHttpCommandRunner(
         logger.trace(s"$commandDescription, HTTP request took ${end - start} ms to complete")
         apiResult.toResult
       } catch {
+        case httpErr: HttpCommandException =>
+          CommandErrors.GenericCommandError(httpErr.toString())
         case _: TimeoutException =>
           logger.debug(
             s"$commandDescription, HTTP request timed out on commandTimeout: ${commandTimeout} "

@@ -254,7 +254,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
           case None => err.cause
         }
         logger.error(errMsg)
-        errorHandler.handleCommandFailure()
+        errorHandler.handleCommandFailure(Some(errMsg))
     }
   }
 

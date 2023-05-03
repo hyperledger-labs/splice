@@ -4,11 +4,12 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.http.v0.directory as http
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,10 +20,14 @@ object HttpDirectoryAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.DirectoryClient(host)
+      http.DirectoryClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
   }
 
   case class ListEntries(
@@ -35,17 +40,13 @@ object HttpDirectoryAppClient {
     def submitRequest(client: Client, headers: List[HttpHeader]) =
       client.listEntries(Some(namePrefix), pageSize)
 
-    override def handleResponse(
-        response: http.ListEntriesResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]]] =
-      response match {
-        case http.ListEntriesResponse.OK(response) =>
-          response.entries
-            .traverse(entry => Contract.fromJson(codegen.DirectoryEntry.COMPANION)(entry))
-            .leftMap(_.toString)
-      }
+    ) = { case http.ListEntriesResponse.OK(response) =>
+      response.entries
+        .traverse(entry => Contract.fromJson(codegen.DirectoryEntry.COMPANION)(entry))
+        .leftMap(_.toString)
+    }
   }
 
   case class LookupEntryByParty(
@@ -60,20 +61,14 @@ object HttpDirectoryAppClient {
         headers: List[HttpHeader],
     ) = client.lookupEntryByParty(party.toProtoPrimitive)
 
-    override def handleResponse(
-        response: http.LookupEntryByPartyResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] = {
-      response match {
-        case http.LookupEntryByPartyResponse.OK(response) =>
-          val r = for {
-            entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
-          } yield entry
-          r.leftMap(_.toString)
-        case http.LookupEntryByPartyResponse.NotFound(r) =>
-          Left(r.error)
-      }
+    ) = { case http.LookupEntryByPartyResponse.OK(response) =>
+      for {
+        entry <- Contract
+          .fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          .leftMap(_.toString)
+      } yield entry
     }
   }
 
@@ -89,20 +84,15 @@ object HttpDirectoryAppClient {
         headers: List[HttpHeader],
     ) = client.lookupEntryByName(name)
 
-    override def handleResponse(
-        response: http.LookupEntryByNameResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
-      response match {
-        case http.LookupEntryByNameResponse.OK(response) =>
-          val r = for {
-            entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
-          } yield entry
-          r.leftMap(_.toString)
-        case http.LookupEntryByNameResponse.NotFound(r) =>
-          Left(r.error)
-      }
+    ) = { case http.LookupEntryByNameResponse.OK(response) =>
+      for {
+        entry <- Contract
+          .fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          .leftMap(_.toString)
+      } yield entry
+    }
   }
 
   case class GetProviderPartyId() extends BaseCommand[http.GetProviderPartyIdResponse, PartyId] {
@@ -113,9 +103,7 @@ object HttpDirectoryAppClient {
     ) =
       client.getProviderPartyId()
 
-    override def handleResponse(
-        response: http.GetProviderPartyIdResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, PartyId] = response match {
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetProviderPartyIdResponse.OK(response) =>
         Codec.decode(Codec.Party)(response.providerPartyId)
     }

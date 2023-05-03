@@ -3,10 +3,11 @@ package com.daml.network.validator.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validator as http
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -22,10 +23,14 @@ object HttpValidatorAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ValidatorClient(host)
+      http.ValidatorClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
   }
 
   case object GetValidatorUserInfo
@@ -37,15 +42,10 @@ object HttpValidatorAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorUserInfoResponse] =
       client.getValidatorUserInfo(headers = headers)
 
-    override def handleResponse(
-        response: http.GetValidatorUserInfoResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, UserInfo] = {
-      response match {
-        case http.GetValidatorUserInfoResponse.OK(response) =>
-          PartyId.fromProtoPrimitive(response.partyId).map(pid => UserInfo(pid, response.userName))
-      }
+    ) = { case http.GetValidatorUserInfoResponse.OK(response) =>
+      PartyId.fromProtoPrimitive(response.partyId).map(pid => UserInfo(pid, response.userName))
     }
   }
   case object Register extends BaseCommand[http.RegisterResponse, PartyId] {
@@ -56,15 +56,10 @@ object HttpValidatorAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterResponse] =
       client.register(headers = headers)
 
-    override def handleResponse(
-        response: http.RegisterResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, PartyId] = {
-      response match {
-        case http.RegisterResponse.OK(response) =>
-          PartyId.fromProtoPrimitive(response.partyId)
-      }
+    ) = { case http.RegisterResponse.OK(response) =>
+      PartyId.fromProtoPrimitive(response.partyId)
     }
   }
 }

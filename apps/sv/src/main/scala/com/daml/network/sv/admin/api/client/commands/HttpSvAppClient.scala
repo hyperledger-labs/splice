@@ -4,13 +4,14 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import akka.util.ByteString
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{TemplateJsonDecoder, Contract, Codec}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,10 +22,12 @@ object HttpSvAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): Client =
-      http.SvClient(host)
+    ): Client = {
+      http.SvClient.httpClient(HttpClientBuilder().buildClient, host)
+    }
   }
 
   final case class SvcInfo(
@@ -66,12 +69,10 @@ object HttpSvAppClient {
         headers = headers,
       )
 
-    override def handleResponse(response: http.OnboardValidatorResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Unit] = response match {
-      case http.OnboardValidatorResponse.OK => Right(())
-      case http.OnboardValidatorResponse.BadRequest(e) => Left(e.error)
-      case http.OnboardValidatorResponse.Unauthorized(e) => Left(e.error)
+    ) = { case http.OnboardValidatorResponse.OK =>
+      Right(())
     }
   }
 
@@ -87,12 +88,10 @@ object HttpSvAppClient {
         headers = headers,
       )
 
-    override def handleResponse(response: http.StartSvOnboardingResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Unit] = response match {
-      case http.StartSvOnboardingResponse.OK => Right(())
-      case http.StartSvOnboardingResponse.BadRequest(e) => Left(e.error)
-      case http.StartSvOnboardingResponse.Unauthorized(e) => Left(e.error)
+    ) = { case http.StartSvOnboardingResponse.OK =>
+      Right(())
     }
   }
 
@@ -106,59 +105,52 @@ object HttpSvAppClient {
       client.getSvOnboardingStatus(candidatePartyIdOrName = candidate, headers = headers)
     }
 
-    override def handleResponse(
-        response: http.GetSvOnboardingStatusResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, SvOnboardingStatus] = {
-      response match {
-        case http.GetSvOnboardingStatusResponse.OK(response) =>
-          (response.state match {
-            case "unknown" => Some(SvOnboardingStatus.Unknown())
-            case "requested" =>
-              for {
-                name <- response.name
-                cidString <- response.contractId
-                svOnboardingRequestCid <- Codec
-                  .decodeJavaContractId(SvOnboardingRequest.COMPANION)(cidString)
-                  .toOption
-                confirmedBy <- response.confirmedBy
-                requiredNumConfirmations <- response.requiredNumConfirmations
-              } yield SvOnboardingStatus.Requested(
-                name,
-                svOnboardingRequestCid,
-                confirmedBy,
-                requiredNumConfirmations,
-              )
-            case "confirmed" =>
-              for {
-                name <- response.name
-                cidString <- response.contractId
-                svOnboardingConfirmedCid <- Codec
-                  .decodeJavaContractId(SvOnboardingConfirmed.COMPANION)(cidString)
-                  .toOption
-              } yield SvOnboardingStatus.Confirmed(
-                name,
-                svOnboardingConfirmedCid,
-              )
-            case "completed" =>
-              for {
-                name <- response.name
-                cidString <- response.contractId
-                svcRulesCid <- Codec
-                  .decodeJavaContractId(SvcRules.COMPANION)(cidString)
-                  .toOption
-              } yield SvOnboardingStatus.Completed(
-                name,
-                svcRulesCid,
-              )
-            case _ => None
-          }) match {
-            case Some(status) => Right(status: SvOnboardingStatus)
-            case None => Left(s"Could not parse response: $response.")
-          }
-        case http.GetSvOnboardingStatusResponse.BadRequest(e) => Left(e.error)
-        case http.GetSvOnboardingStatusResponse.InternalServerError(e) => Left(e.error)
+    ) = { case http.GetSvOnboardingStatusResponse.OK(response) =>
+      (response.state match {
+        case "unknown" => Some(SvOnboardingStatus.Unknown())
+        case "requested" =>
+          for {
+            name <- response.name
+            cidString <- response.contractId
+            svOnboardingRequestCid <- Codec
+              .decodeJavaContractId(SvOnboardingRequest.COMPANION)(cidString)
+              .toOption
+            confirmedBy <- response.confirmedBy
+            requiredNumConfirmations <- response.requiredNumConfirmations
+          } yield SvOnboardingStatus.Requested(
+            name,
+            svOnboardingRequestCid,
+            confirmedBy,
+            requiredNumConfirmations,
+          )
+        case "confirmed" =>
+          for {
+            name <- response.name
+            cidString <- response.contractId
+            svOnboardingConfirmedCid <- Codec
+              .decodeJavaContractId(SvOnboardingConfirmed.COMPANION)(cidString)
+              .toOption
+          } yield SvOnboardingStatus.Confirmed(
+            name,
+            svOnboardingConfirmedCid,
+          )
+        case "completed" =>
+          for {
+            name <- response.name
+            cidString <- response.contractId
+            svcRulesCid <- Codec
+              .decodeJavaContractId(SvcRules.COMPANION)(cidString)
+              .toOption
+          } yield SvOnboardingStatus.Completed(
+            name,
+            svcRulesCid,
+          )
+        case _ => None
+      }) match {
+        case Some(status) => Right(status: SvOnboardingStatus)
+        case None => Left(s"Could not parse response: $response.")
       }
     }
   }
@@ -175,12 +167,10 @@ object HttpSvAppClient {
     ], http.DevNetOnboardValidatorPrepareResponse] =
       client.devNetOnboardValidatorPrepare(headers = headers)
 
-    override def handleResponse(response: http.DevNetOnboardValidatorPrepareResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, String] = response match {
-      case http.DevNetOnboardValidatorPrepareResponse.OK(secret) => Right(secret)
-      case http.DevNetOnboardValidatorPrepareResponse.InternalServerError(e) => Left(e.error)
-      case http.DevNetOnboardValidatorPrepareResponse.NotImplemented(e) => Left(e.error)
+    ) = { case http.DevNetOnboardValidatorPrepareResponse.OK(secret) =>
+      Right(secret)
     }
   }
 
@@ -192,33 +182,29 @@ object HttpSvAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcInfoResponse] =
       client.getSvcInfo(headers = headers)
 
-    override def handleResponse(
-        response: http.GetSvcInfoResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, SvcInfo] = {
-      response match {
-        case http.GetSvcInfoResponse.OK(
-              definitions.GetSvcInfoResponse(
-                svUser,
-                svPartyId,
-                svcPartyId,
-                coinRulesContractId,
-                svcRules,
-              )
-            ) =>
-          for {
-            svPartyId <- PartyId.fromProtoPrimitive(svPartyId)
-            svcPartyId <- PartyId.fromProtoPrimitive(svcPartyId)
-            svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
-          } yield SvcInfo(
-            svUser,
-            svPartyId,
-            svcPartyId,
-            new CoinRules.ContractId(coinRulesContractId),
-            svcRules,
-          )
-      }
+    ) = {
+      case http.GetSvcInfoResponse.OK(
+            definitions.GetSvcInfoResponse(
+              svUser,
+              svPartyId,
+              svcPartyId,
+              coinRulesContractId,
+              svcRules,
+            )
+          ) =>
+        for {
+          svPartyId <- PartyId.fromProtoPrimitive(svPartyId)
+          svcPartyId <- PartyId.fromProtoPrimitive(svcPartyId)
+          svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
+        } yield SvcInfo(
+          svUser,
+          svPartyId,
+          svcPartyId,
+          new CoinRules.ContractId(coinRulesContractId),
+          svcRules,
+        )
     }
   }
 
@@ -237,19 +223,13 @@ object HttpSvAppClient {
         headers = headers,
       )
 
-    override def handleResponse(
-        response: http.OnboardSvPartyMigrationAuthorizeResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, ByteString] = {
-      response match {
-        case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
-              definitions.OnboardSvPartyMigrationAuthorizeResponse(encodedAcsSnapshot)
-            ) =>
-          Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
-        case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(e) => Left(e.error)
-        case http.OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(e) => Left(e.error)
-      }
+    ) = {
+      case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
+            definitions.OnboardSvPartyMigrationAuthorizeResponse(encodedAcsSnapshot)
+          ) =>
+        Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
     }
   }
 }

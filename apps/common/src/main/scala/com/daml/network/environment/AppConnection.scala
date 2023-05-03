@@ -46,6 +46,7 @@ abstract class BaseAppConnection(
   )(implicit
       templateDecoder: TemplateJsonDecoder,
       httpClient: HttpRequest => Future[HttpResponse],
+      tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Result] = {

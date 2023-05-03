@@ -6,8 +6,6 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithS
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level
 
 import java.time.Duration
 import java.util.UUID
@@ -22,26 +20,12 @@ class WalletPaymentIntegrationTest
       onboardWalletUser(aliceWallet, aliceValidator)
 
       val nonExistentName = "does not exist"
+      val errorString =
+        s"status: 404 Not Found, message: contract id not found: ContractId(id = $nonExistentName"
 
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        assertThrows[CommandFailure](
-          aliceWallet.getAppPaymentRequest(new AppPaymentRequest.ContractId(nonExistentName))
-        ),
-        entries => {
-          forExactly(
-            1,
-            entries,
-          )(
-            _.errorMessage should include(nonExistentName)
-          )
-          forExactly(
-            1,
-            entries,
-          ) { log =>
-            log.message should include("HTTP GET /wallet/app-payment-requests/does%20not%20exist")
-            log.message should include("Responding with status code: 404 Not Found")
-          }
-        },
+      assertThrowsAndLogsCommandFailures(
+        aliceWallet.getAppPaymentRequest(new AppPaymentRequest.ContractId(nonExistentName)),
+        _.errorMessage should include(errorString),
       )
     }
 

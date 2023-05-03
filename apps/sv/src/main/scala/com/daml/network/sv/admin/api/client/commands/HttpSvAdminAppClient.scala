@@ -4,10 +4,11 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.{toBifunctorOps, toTraverseOps}
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
@@ -18,10 +19,14 @@ object HttpSvAdminAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.SvAdminClient(host)
+      http.SvAdminClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
   }
 
   case object ListOngoingValidatorOnboardings
@@ -37,15 +42,13 @@ object HttpSvAdminAppClient {
     ], http.ListOngoingValidatorOnboardingsResponse] =
       client.listOngoingValidatorOnboardings(headers = headers)
 
-    override def handleResponse(response: http.ListOngoingValidatorOnboardingsResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]]] =
-      response match {
-        case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
-          response.ongoingValidatorOnboardings
-            .traverse(req => Contract.fromJson(ValidatorOnboarding.COMPANION)(req))
-            .leftMap(_.toString)
-      }
+    ) = { case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
+      response.ongoingValidatorOnboardings
+        .traverse(req => Contract.fromJson(ValidatorOnboarding.COMPANION)(req))
+        .leftMap(_.toString)
+    }
   }
 
   case class PrepareValidatorOnboarding(expiresIn: FiniteDuration)
@@ -60,15 +63,13 @@ object HttpSvAdminAppClient {
         headers = headers,
       )
 
-    override def handleResponse(response: http.PrepareValidatorOnboardingResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, String] = response match {
+    ) = {
       case http.PrepareValidatorOnboardingResponse.OK(
             definitions.PrepareValidatorOnboardingResponse(secret)
           ) =>
         Right(secret)
-      case http.PrepareValidatorOnboardingResponse.InternalServerError(e) =>
-        Left(e.error)
     }
   }
 
@@ -84,12 +85,10 @@ object HttpSvAdminAppClient {
         headers = headers,
       )
 
-    override def handleResponse(response: http.ApproveSvIdentityResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Unit] = response match {
-      case http.ApproveSvIdentityResponse.OK => Right(())
-      case http.ApproveSvIdentityResponse.BadRequest(e) => Left(e.error)
+    ) = { case http.ApproveSvIdentityResponse.OK =>
+      Right(())
     }
   }
-
 }

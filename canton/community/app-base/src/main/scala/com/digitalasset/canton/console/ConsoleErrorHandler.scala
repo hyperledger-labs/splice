@@ -9,7 +9,7 @@ import scala.util.control.NoStackTrace
   * We expect this implementation will either throw or exit, hence the [[scala.Nothing]] return type.
   */
 trait ConsoleErrorHandler {
-  def handleCommandFailure(): Nothing
+  def handleCommandFailure(cause: Option[String] = None): Nothing
 
   def handleInternalError(): Nothing
 }
@@ -18,8 +18,8 @@ trait ConsoleErrorHandler {
   */
 trait CommandExecutionFailedException extends Throwable
 
-class CommandFailure()
-    extends Throwable(s"Command execution failed.")
+class CommandFailure(cause: Option[String] = None)
+    extends Throwable(s"Command execution failed. ${cause.getOrElse("")}")
     with NoStackTrace
     with CommandExecutionFailedException
 
@@ -34,7 +34,8 @@ class CantonInternalError()
   * The throwables do not have a stacktraces, to avoid noise in the interactive console.
   */
 object ThrowErrorHandler extends ConsoleErrorHandler {
-  override def handleCommandFailure(): Nothing = throw new CommandFailure()
+  override def handleCommandFailure(cause: Option[String] = None): Nothing =
+    throw new CommandFailure(cause)
 
   override def handleInternalError(): Nothing = throw new CantonInternalError()
 }

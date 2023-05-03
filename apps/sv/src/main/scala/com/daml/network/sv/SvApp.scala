@@ -1027,7 +1027,6 @@ object SvApp {
                     deduplicationOffset = result.deduplicationOffset,
                     domainId = globalDomain,
                   )
-                // TODO(#3815) Consider removing this once retries work properly.
                 _ <- svStore.multiDomainAcsStore
                   .signalWhenIngestedOrShutdown(globalDomain, transaction.getOffset)
               } yield {

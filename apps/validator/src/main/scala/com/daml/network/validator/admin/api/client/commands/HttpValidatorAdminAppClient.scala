@@ -3,12 +3,12 @@ package com.daml.network.validator.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validatorAdmin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
-import com.daml.network.http.v0.validatorAdmin.OffboardUserResponse.NotFound
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,10 +18,14 @@ object HttpValidatorAdminAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ValidatorAdminClient(host)
+      http.ValidatorAdminClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
   }
 
   case class OnboardUser(name: String) extends BaseCommand[http.OnboardUserResponse, PartyId] {
@@ -32,15 +36,10 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardUserResponse] =
       client.onboardUser(OnboardUserRequest(name), headers)
 
-    override def handleResponse(
-        response: http.OnboardUserResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, PartyId] = {
-      response match {
-        case http.OnboardUserResponse.OK(response) =>
-          Codec.decode(Codec.Party)(response.partyId)
-      }
+    ) = { case http.OnboardUserResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.partyId)
     }
   }
 
@@ -51,13 +50,8 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListUsersResponse] =
       client.listUsers(headers = headers)
 
-    override def handleResponse(
-        response: http.ListUsersResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Seq[String]] = {
-      response match {
-        case http.ListUsersResponse.OK(response) =>
-          Right(response.usernames.toSeq)
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListUsersResponse.OK(response) => Right(response.usernames.toSeq)
     }
   }
 
@@ -69,15 +63,8 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OffboardUserResponse] =
       client.offboardUser(username, headers)
 
-    override def handleResponse(
-        response: http.OffboardUserResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Unit] = {
-      response match {
-        case http.OffboardUserResponse.OK =>
-          Right(())
-        case NotFound(value) =>
-          Left(value.error)
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.OffboardUserResponse.OK => Right(())
     }
   }
 }

@@ -5,7 +5,7 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   coinconfig as coinConfigCodegen,
@@ -19,6 +19,7 @@ import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,10 +32,11 @@ object HttpScanAppClient {
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ScanClient(host)
+      http.ScanClient.httpClient(HttpClientBuilder().buildClient, host)
   }
 
   case class GetSvcPartyId(headers: List[HttpHeader])
@@ -46,13 +48,11 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcPartyIdResponse] =
       client.getSvcPartyId(headers)
 
-    override def handleResponse(response: http.GetSvcPartyIdResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, PartyId] =
-      response match {
-        case http.GetSvcPartyIdResponse.OK(response) =>
-          Codec.decode(Codec.Party)(response.svcPartyId)
-      }
+    ) = { case http.GetSvcPartyIdResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.svcPartyId)
+    }
   }
 
   /** Very similar to the AppTransferContext we use in Daml, except
@@ -116,39 +116,29 @@ object HttpScanAppClient {
         headers,
       )
 
-    override def handleResponse(
-        response: http.GetOpenAndIssuingMiningRoundsResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[
-      String,
-      (
-          Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-          Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
-          BigInt,
-      ),
-    ] =
-      response match {
-        case http.GetOpenAndIssuingMiningRoundsResponse.OK(response) =>
-          for {
-            issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
-              case (contractId, maybeIssuingRound) =>
-                Contract.handleMaybeCachedContract(roundCodegen.IssuingMiningRound.COMPANION)(
-                  cachedIssuingRoundsMap.get(contractId),
-                  maybeIssuingRound,
-                )
-            }
-            openMiningRounds <- response.openMiningRounds.toSeq.traverse {
-              case (contractId, maybeOpenRound) =>
-                Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
-                  cachedOpenRoundsMap.get(contractId),
-                  maybeOpenRound,
-                )
-            }
-          } yield (
-            openMiningRounds.sortBy(_.payload.round.number),
-            issuingMiningRounds.sortBy(_.payload.round.number),
-            response.timeToLiveInMicroseconds,
-          )
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetOpenAndIssuingMiningRoundsResponse.OK(response) =>
+        for {
+          issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
+            case (contractId, maybeIssuingRound) =>
+              Contract.handleMaybeCachedContract(roundCodegen.IssuingMiningRound.COMPANION)(
+                cachedIssuingRoundsMap.get(contractId),
+                maybeIssuingRound,
+              )
+          }
+          openMiningRounds <- response.openMiningRounds.toSeq.traverse {
+            case (contractId, maybeOpenRound) =>
+              Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
+                cachedOpenRoundsMap.get(contractId),
+                maybeOpenRound,
+              )
+          }
+        } yield (
+          openMiningRounds.sortBy(_.payload.round.number),
+          issuingMiningRounds.sortBy(_.payload.round.number),
+          response.timeToLiveInMicroseconds,
+        )
+    }
   }
 
   case class GetCoinRules(
@@ -168,21 +158,15 @@ object HttpScanAppClient {
       )
     }
 
-    override def handleResponse(
-        response: http.GetCoinRulesResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[
-      String,
-      Contract[CoinRules.ContractId, CoinRules],
-    ] =
-      response match {
-        case http.GetCoinRulesResponse.OK(response) =>
-          for {
-            coinRules <- Contract.handleMaybeCachedContract(coinCodegen.CoinRules.COMPANION)(
-              cachedCoinRules,
-              response.coinRulesUpdate,
-            )
-          } yield coinRules
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetCoinRulesResponse.OK(response) =>
+        for {
+          coinRules <- Contract.handleMaybeCachedContract(coinCodegen.CoinRules.COMPANION)(
+            cachedCoinRules,
+            response.coinRulesUpdate,
+          )
+        } yield coinRules
+    }
   }
 
   case class GetCoinRulesV1Test(
@@ -202,21 +186,15 @@ object HttpScanAppClient {
       )
     }
 
-    override def handleResponse(
-        response: http.GetCoinRulesV1TestResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[
-      String,
-      Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test],
-    ] =
-      response match {
-        case http.GetCoinRulesV1TestResponse.OK(response) =>
-          for {
-            coinRules <- Contract.handleMaybeCachedContract(CoinRulesV1Test.COMPANION)(
-              cachedCoinRules,
-              response.coinRulesUpdate,
-            )
-          } yield coinRules
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetCoinRulesV1TestResponse.OK(response) =>
+        for {
+          coinRules <- Contract.handleMaybeCachedContract(CoinRulesV1Test.COMPANION)(
+            cachedCoinRules,
+            response.coinRulesUpdate,
+          )
+        } yield coinRules
+    }
   }
 
   case object GetClosedRounds
@@ -231,19 +209,12 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetClosedRoundsResponse] =
       client.getClosedRounds(headers)
 
-    override def handleResponse(
-        response: http.GetClosedRoundsResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[
-      Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]
-    ]] = {
-      response match {
-        case http.GetClosedRoundsResponse.OK(response) =>
-          response.rounds
-            .traverse(round => Contract.fromJson(roundCodegen.ClosedMiningRound.COMPANION)(round))
-            .leftMap(_.toString)
-      }
+    ) = { case http.GetClosedRoundsResponse.OK(response) =>
+      response.rounds
+        .traverse(round => Contract.fromJson(roundCodegen.ClosedMiningRound.COMPANION)(round))
+        .leftMap(_.toString)
     }
   }
 
@@ -259,17 +230,13 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListFeaturedAppRightsResponse] =
       client.listFeaturedAppRights(headers)
 
-    override def handleResponse(
-        response: http.ListFeaturedAppRightsResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-      response match {
-        case http.ListFeaturedAppRightsResponse.OK(response) =>
-          response.featuredApps
-            .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
-            .leftMap(_.toString)
-      }
+    ) = { case http.ListFeaturedAppRightsResponse.OK(response) =>
+      response.featuredApps
+        .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
+    }
   }
 
   case class LookupFeaturedAppRight(providerPartyId: PartyId)
@@ -284,17 +251,13 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupFeaturedAppRightResponse] =
       client.lookupFeaturedAppRight(providerPartyId.toProtoPrimitive, headers)
 
-    override def handleResponse(
-        response: http.LookupFeaturedAppRightResponse
-    )(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-      response match {
-        case http.LookupFeaturedAppRightResponse.OK(response) =>
-          response.featuredAppRight
-            .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
-            .leftMap(_.toString)
-      }
+    ) = { case http.LookupFeaturedAppRightResponse.OK(response) =>
+      response.featuredAppRight
+        .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
+    }
   }
 
   final case class TotalBalances(
@@ -311,21 +274,18 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalCoinBalanceResponse] =
       client.getTotalCoinBalance(headers)
 
-    override def handleResponse(
-        response: http.GetTotalCoinBalanceResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, TotalBalances] =
-      response match {
-        case http.GetTotalCoinBalanceResponse.OK(response) =>
-          for {
-            unlocked <- Codec.decode(Codec.BigDecimal)(response.totalUnlockedBalance)
-            locked <- Codec.decode(Codec.BigDecimal)(response.totalLockedBalance)
-          } yield {
-            TotalBalances(
-              totalUnlocked = unlocked,
-              totalLocked = locked,
-            )
-          }
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetTotalCoinBalanceResponse.OK(response) =>
+        for {
+          unlocked <- Codec.decode(Codec.BigDecimal)(response.totalUnlockedBalance)
+          locked <- Codec.decode(Codec.BigDecimal)(response.totalLockedBalance)
+        } yield {
+          TotalBalances(
+            totalUnlocked = unlocked,
+            totalLocked = locked,
+          )
+        }
+    }
   }
 
   final case class RateStep(
@@ -362,31 +322,27 @@ object HttpScanAppClient {
     ): Either[String, Seq[RateStep]] =
       tf.map(decodeStep(_)).sequence
 
-    override def handleResponse(response: http.GetCoinConfigForRoundResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, CoinConfig] =
-      response match {
-        case http.GetCoinConfigForRoundResponse.OK(response) =>
-          for {
-            coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
-            holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
-            lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
-            initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
-            steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
-          } yield {
-            CoinConfig(
-              coinCreateFee = coinCreate,
-              holdingFee = holding,
-              lockHolderFee = lockHolder,
-              transferFee = SteppedRate(
-                initial = initial,
-                steps = steps,
-              ),
-            )
-          }
-        case http.GetCoinConfigForRoundResponse.NotFound(value) =>
-          Left(value.error)
+    ) = { case http.GetCoinConfigForRoundResponse.OK(response) =>
+      for {
+        coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
+        holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
+        lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
+        initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
+        steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
+      } yield {
+        CoinConfig(
+          coinCreateFee = coinCreate,
+          holdingFee = holding,
+          lockHolderFee = lockHolder,
+          transferFee = SteppedRate(
+            initial = initial,
+            steps = steps,
+          ),
+        )
       }
+    }
   }
 
   case class GetRoundOfLatestData()
@@ -398,16 +354,10 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetRoundOfLatestDataResponse] =
       client.getRoundOfLatestData(headers)
 
-    override def handleResponse(
-        response: http.GetRoundOfLatestDataResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, (Long, Instant)] =
-      response match {
-        case http.GetRoundOfLatestDataResponse.OK(response) =>
-          Right((response.round, response.effectiveAt.toInstant))
-        case http.GetRoundOfLatestDataResponse.NotFound(value) =>
-          Left(value.error)
-      }
-
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetRoundOfLatestDataResponse.OK(response) =>
+        Right((response.round, response.effectiveAt.toInstant))
+    }
   }
 
   private def decodePartiesAndRewards(
@@ -428,13 +378,10 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTopProvidersByAppRewardsResponse] =
       client.getTopProvidersByAppRewards(asOfEndOfRound, limit, headers)
 
-    override def handleResponse(response: http.GetTopProvidersByAppRewardsResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[(PartyId, BigDecimal)]] = response match {
-      case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
-        decodePartiesAndRewards(response.providersAndRewards)
-      case http.GetTopProvidersByAppRewardsResponse.NotFound(value) =>
-        Left(value.error)
+    ) = { case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
+      decodePartiesAndRewards(response.providersAndRewards)
     }
   }
 
@@ -451,13 +398,10 @@ object HttpScanAppClient {
     ], http.GetTopValidatorsByValidatorRewardsResponse] =
       client.getTopValidatorsByValidatorRewards(asOfEndOfRound, limit, headers)
 
-    override def handleResponse(response: http.GetTopValidatorsByValidatorRewardsResponse)(implicit
+    override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ): Either[String, Seq[(PartyId, BigDecimal)]] = response match {
-      case http.GetTopValidatorsByValidatorRewardsResponse.OK(response) =>
-        decodePartiesAndRewards(response.validatorsAndRewards)
-      case http.GetTopValidatorsByValidatorRewardsResponse.NotFound(value) =>
-        Left(value.error)
+    ) = { case http.GetTopValidatorsByValidatorRewardsResponse.OK(response) =>
+      decodePartiesAndRewards(response.validatorsAndRewards)
     }
   }
 
@@ -474,15 +418,10 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorTrafficBalanceResponse] =
       client.getValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
 
-    override def handleResponse(
-        response: http.GetValidatorTrafficBalanceResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, ValidatorTrafficBalance] =
-      response match {
-        case http.GetValidatorTrafficBalanceResponse.OK(response) =>
-          Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPaid))
-        case http.GetValidatorTrafficBalanceResponse.NotFound(value) =>
-          Left(value.error)
-      }
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetValidatorTrafficBalanceResponse.OK(response) =>
+        Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPaid))
+    }
   }
 
   case class CheckAndUpdateValidatorTrafficBalance(validatorParty: PartyId)
@@ -496,15 +435,11 @@ object HttpScanAppClient {
     ], http.CheckAndUpdateValidatorTrafficBalanceResponse] =
       client.checkAndUpdateValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
 
-    override def handleResponse(
-        response: http.CheckAndUpdateValidatorTrafficBalanceResponse
-    )(implicit decoder: TemplateJsonDecoder): Either[String, Boolean] =
-      response match {
-        case http.CheckAndUpdateValidatorTrafficBalanceResponse.OK(response) =>
-          Right(response.approved)
-        case http.CheckAndUpdateValidatorTrafficBalanceResponse.NotFound(value) =>
-          Left(value.error)
-      }
-
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.CheckAndUpdateValidatorTrafficBalanceResponse.OK(response) =>
+        Right(response.approved)
+      case http.CheckAndUpdateValidatorTrafficBalanceResponse.NotFound(value) =>
+        Left(value.error)
+    }
   }
 }

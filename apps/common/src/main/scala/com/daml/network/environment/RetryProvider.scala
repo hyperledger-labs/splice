@@ -2,9 +2,11 @@ package com.daml.network.environment
 
 import akka.Done
 import akka.stream.StreamTcpException
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
+import com.daml.network.admin.api.client.commands.HttpCommandException
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
@@ -292,6 +294,16 @@ object RetryProvider {
       Status.Code.FAILED_PRECONDITION,
     ) ++ additionalCodes
 
+    private val retryableHttpStatusCodes: Set[StatusCode] = Set(
+      StatusCodes.RequestTimeout,
+      StatusCodes.NotFound,
+      StatusCodes.TooManyRequests,
+      StatusCodes.InternalServerError,
+      StatusCodes.BadGateway,
+      StatusCodes.ServiceUnavailable,
+      StatusCodes.GatewayTimeout,
+    )
+
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
     ): ErrorKind = outcome match {
@@ -360,6 +372,18 @@ object RetryProvider {
           s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
+      case Failure(ex @ HttpCommandException(status, _)) =>
+        if (retryableHttpStatusCodes.contains(status)) {
+          logger.info(
+            s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
+          )
+          TransientErrorKind
+        } else {
+          logger.warn(
+            s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription HTTP error, $fatalBehavior: $ex"
+          )
+          FatalErrorKind
+        }
       // We encounter this with toxiproxy if the upstream is not yet up.
       // The exception type is akka.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
       // but akka-http does not expose that so we match on the message instead.
