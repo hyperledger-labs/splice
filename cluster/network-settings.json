@@ -35,8 +35,22 @@
     "18.210.210.130/32",
 
     // DA Clusters
-    // da-cn-scratchnet gcp project: sratchnet + staging
+    // da-cn-scratchnet gcp project
+    // 1. scratchnet
+    "35.188.147.4/32",
+
+    // 2. scratchnetb
     "34.70.206.199/32",
+
+    // 3. scratchnetc
+    "35.224.88.220/32",
+
+    // 4. sqlscratch
+    "104.198.152.233/32",
+
+    // 5. staging
+    "34.69.77.22/32",
+
     // da-cn-devnet gcp project: devnet + testnet
     "34.121.47.27/32",
 
