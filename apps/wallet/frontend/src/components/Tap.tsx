@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { useState } from 'react';
 
@@ -10,14 +11,13 @@ const Tap: React.FC = () => {
   const [tapValue, setTapValue] = useState<BigNumber>(new BigNumber(0));
   const { tap } = useWalletClient();
 
-  const onTapClicked = () => {
-    const decVal = tapValue;
-    const strVal = decVal.isInteger() ? decVal.toFixed(1) : decVal.toString();
-    tap(strVal).then(
-      _ => setTapValue(new BigNumber(0)),
-      err => console.error('Failed to tap.', err)
-    );
-  };
+  const mutation = useMutation({
+    mutationFn: () => {
+      const decVal = tapValue;
+      const strVal = decVal.isInteger() ? decVal.toFixed(1) : decVal.toString();
+      return tap(strVal);
+    },
+  });
 
   const isInvalidAmount = tapValue.lte(0.0);
   return (
@@ -30,7 +30,12 @@ const Tap: React.FC = () => {
         type="number"
         id="tap-amount-field"
       />
-      <Button variant="contained" disabled={isInvalidAmount} onClick={onTapClicked} id="tap-button">
+      <Button
+        variant="contained"
+        disabled={isInvalidAmount}
+        onClick={() => mutation.mutate()}
+        id="tap-button"
+      >
         Tap
       </Button>
     </Stack>

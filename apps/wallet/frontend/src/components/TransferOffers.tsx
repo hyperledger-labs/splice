@@ -18,15 +18,15 @@ import Typography from '@mui/material/Typography';
 
 import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const TransferOffers: React.FC = () => {
   const { listTransferOffers } = useWalletClient();
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
   const { primaryPartyId } = useUserState();
 
   const toWalletTransferOffer = useCallback(
@@ -56,16 +56,16 @@ export const TransferOffers: React.FC = () => {
   );
 
   const fetchTransferOffers = useCallback(async () => {
-    if (coinPrice) {
+    if (coinPriceQuery.data) {
       const { offersList } = await listTransferOffers();
-      let walletTransferOffers = await toWalletTransferOffer(offersList, coinPrice);
+      let walletTransferOffers = await toWalletTransferOffer(offersList, coinPriceQuery.data);
       setOffers(walletTransferOffers);
     }
-  }, [coinPrice, listTransferOffers, toWalletTransferOffer]);
+  }, [coinPriceQuery.data, listTransferOffers, toWalletTransferOffer]);
 
   useInterval(fetchTransferOffers);
 
-  if (!coinPrice) {
+  if (coinPriceQuery.isLoading) {
     return <Loading />;
   }
 

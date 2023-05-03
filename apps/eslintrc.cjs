@@ -1,5 +1,5 @@
 module.exports = {
-  extends: ["react-app", "react-app/jest"],
+  extends: ["react-app", "react-app/jest", "plugin:@tanstack/eslint-plugin-query/recommended"],
   rules: {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-module-boundary-types": "warn",
@@ -20,4 +20,5 @@ module.exports = {
       },
     ],
   },
+  plugins: ["@tanstack/query"]
 };

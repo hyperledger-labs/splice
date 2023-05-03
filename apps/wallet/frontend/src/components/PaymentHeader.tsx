@@ -6,8 +6,8 @@ import { useCallback, useState } from 'react';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { WalletBalance } from '../models/models';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
@@ -15,7 +15,7 @@ import { LogoutButton } from './LogoutButton';
 const PaymentHeader: React.FC = () => {
   const walletClient = useWalletClient();
 
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
 
   const [walletBalance, setWalletBalance] = useState<WalletBalance>({
     availableCC: new BigNumber(0),
@@ -28,7 +28,7 @@ const PaymentHeader: React.FC = () => {
 
   useInterval(fetchBalance);
 
-  if (!coinPrice) {
+  if (coinPriceQuery.isLoading) {
     return <Loading />;
   }
 
@@ -53,7 +53,7 @@ const PaymentHeader: React.FC = () => {
               amount={walletBalance.availableCC}
               currency="CC"
               convert="CCtoUSD"
-              coinPrice={coinPrice}
+              coinPrice={coinPriceQuery.data}
             />
           </Typography>
         </Stack>

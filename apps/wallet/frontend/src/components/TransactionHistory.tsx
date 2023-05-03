@@ -30,8 +30,8 @@ import Typography from '@mui/material/Typography';
 
 import { Party } from '@daml/types';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { Transaction } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
@@ -53,10 +53,10 @@ const TransactionHistory: React.FC = () => {
 
   useInterval(fetchTransactions);
 
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
   const { primaryPartyId } = useUserState();
 
-  if (!coinPrice || !primaryPartyId) {
+  if (coinPriceQuery.isLoading || !primaryPartyId) {
     return <Loading />;
   }
 

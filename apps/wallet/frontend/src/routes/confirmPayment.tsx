@@ -21,8 +21,8 @@ import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { AppPaymentRequest } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
@@ -53,15 +53,23 @@ export const ConfirmPayment: React.FC = () => {
     };
   }, [cid, getAppPaymentRequest]);
 
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
 
-  if (!appPayment || !coinPrice) {
+  if (!appPayment || coinPriceQuery.isLoading) {
     return <Loading />;
+  }
+
+  // TODO(#4139) implement error state from design
+  if (coinPriceQuery.isError) {
+    return <p>Error, something went wrong.</p>;
   }
 
   const { appPaymentRequest, deliveryOffer } = appPayment;
 
-  const total = computeTotal(appPayment.appPaymentRequest.payload.receiverAmounts, coinPrice);
+  const total = computeTotal(
+    appPayment.appPaymentRequest.payload.receiverAmounts,
+    coinPriceQuery.data
+  );
 
   if (!total) {
     console.error('No receivers in app payment.');
@@ -79,7 +87,7 @@ export const ConfirmPayment: React.FC = () => {
     <MultiRecipientsInfo
       receiverAmounts={appPaymentRequest.payload.receiverAmounts}
       currencyForAllReceivers={total.currencyForAllReceivers}
-      coinPrice={coinPrice}
+      coinPrice={coinPriceQuery.data}
       provider={appPaymentRequest.payload.provider}
     />
   );
@@ -92,7 +100,7 @@ export const ConfirmPayment: React.FC = () => {
         <TotalPaymentContainer
           contractId={appPaymentRequest.contractId}
           total={total}
-          coinPrice={coinPrice}
+          coinPrice={coinPriceQuery.data}
         />
       </Stack>
     </Container>

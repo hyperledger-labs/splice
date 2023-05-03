@@ -19,12 +19,12 @@ import {
   Typography,
 } from '@mui/material';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer } = useWalletClient();
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
 
   const [receiver, setReceiver] = useState<string>('');
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
@@ -68,10 +68,10 @@ const SendTransfer: React.FC = () => {
   };
 
   const convertUsd = useCallback(() => {
-    if (coinPrice) {
-      setUsdAmount(coinPrice.times(ccAmount));
+    if (coinPriceQuery.data) {
+      setUsdAmount(coinPriceQuery.data.times(ccAmount));
     }
-  }, [ccAmount, coinPrice]);
+  }, [ccAmount, coinPriceQuery.data]);
 
   const onCCAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCCAmount(BigNumber(e.target.value));

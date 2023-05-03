@@ -30,8 +30,8 @@ import {
 import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
@@ -48,10 +48,15 @@ const Subscriptions: React.FC = () => {
 
   useInterval(fetchSubscriptions);
 
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
 
-  if (!coinPrice) {
+  if (coinPriceQuery.isLoading) {
     return <Loading />;
+  }
+
+  // TODO(#4139) implement error state from design
+  if (coinPriceQuery.isError) {
+    return <p>Error, something went wrong.</p>;
   }
 
   return (
@@ -83,7 +88,7 @@ const Subscriptions: React.FC = () => {
                   key={subscription.subscription.contractId}
                   subscription={subscription}
                   cancelSubscription={onCancel}
-                  coinPrice={coinPrice}
+                  coinPrice={coinPriceQuery.data}
                 />
               );
             })}

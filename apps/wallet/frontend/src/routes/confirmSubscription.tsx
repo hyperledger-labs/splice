@@ -9,8 +9,8 @@ import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
-import { useCoinPrice } from '../contexts/CoinPriceContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useCoinPrice } from '../hooks/useCoinPrice';
 import { SubscriptionRequestWithContext } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
@@ -61,16 +61,21 @@ export default ConfirmSubscription;
 const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithContext }> = ({
   subscription,
 }) => {
-  const coinPrice = useCoinPrice();
+  const coinPriceQuery = useCoinPrice();
 
-  if (!coinPrice) {
+  if (coinPriceQuery.isLoading) {
     return <Loading />;
+  }
+
+  // TODO(#4139) implement error state from design
+  if (coinPriceQuery.isError) {
+    return <p>Error, something went wrong.</p>;
   }
 
   const payData = subscription.subscriptionRequest.payload.payData;
   const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
-  const converted = convertCurrency(amount, currency, coinPrice);
+  const converted = convertCurrency(amount, currency, coinPriceQuery.data);
 
   return (
     <Container maxWidth="xl">
@@ -90,7 +95,8 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
             </Typography>
             <Typography variant="body2" className="sub-request-price-converted">
               <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
-              <AmountDisplay amount={coinPrice} currency={currency} />/{converted.currency}
+              <AmountDisplay amount={coinPriceQuery.data} currency={currency} />/
+              {converted.currency}
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
           </Stack>
