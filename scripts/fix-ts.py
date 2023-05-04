@@ -18,11 +18,11 @@ import shlex
 import subprocess
 from collections import defaultdict
 
-def get_package_dir(path):
+def get_package_dir(path, package_file = 'package.json'):
     """walk up the directory tree until we find a package.json file"""
 
     directory = os.path.dirname(path)
-    package_json = os.path.join(directory, 'package.json')
+    package_json = os.path.join(directory, package_file)
 
     if os.path.exists(package_json):
         return directory
@@ -56,6 +56,14 @@ def npm_exec(command, files, cwd):
     if command:
         subprocess.check_call(['npm', 'exec', '--'] + command + files, cwd=cwd)
 
+
+def npm_install(cwd):
+    # need to find the top-level worktree directory first
+    toplevel = get_package_dir(cwd, 'package-lock.json') or cwd
+
+    subprocess.check_call(['npm', 'install'], cwd=toplevel)
+
+
 def main():
     runs = defaultdict(list)
 
@@ -74,7 +82,12 @@ def main():
         format_command = get_command(package_json, scripts, 'format:fix')
         lint_command = get_command(package_json, scripts, 'lint:fix')
 
+        print("[info] directory:", package_dir, file=sys.stderr)
+
         try:
+            if not os.path.isdir(os.path.join(package_dir, 'node_modules')):
+                npm_install(package_dir)
+
             npm_exec(format_command, files, cwd=package_dir)
             npm_exec(lint_command, files, cwd=package_dir)
         except subprocess.CalledProcessError:
