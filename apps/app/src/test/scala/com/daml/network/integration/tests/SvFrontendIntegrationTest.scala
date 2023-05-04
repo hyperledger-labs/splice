@@ -18,26 +18,29 @@ class SvFrontendIntegrationTest
 
   "A SV UI" should {
 
-    "have basic functionalities" in { implicit env =>
+    "have basic login functionality" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "sv1 can login", {
-            login(3010, "sv1")
+          "login works with correct password", {
+            login(3010, sv1.config.ledgerApiUser)
           },
         )(
-          "We see a UI with an expected title",
+          "login does not work with wrong password",
           _ => find(id("app-title")).value.text should matchText("SV OPERATIONS"),
         )
+      }
+    }
 
+    "have a proper table" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "svc infos are displayed", {
-            go to s"http://localhost:3010/svc"
+            login(3010, sv1.config.ledgerApiUser)
           },
         )(
           "We see a table with sv1 as SV Name",
           _ => {
             val rows = findAll(className("value-name")).toSeq
-            println(rows)
             rows should have length 15
             forExactly(1, rows)(
               _.text should matchText(sv1.getSvcInfo().svUser)

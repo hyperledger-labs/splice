@@ -1,9 +1,19 @@
 package com.daml.network.integration.tests
 
+import akka.Done
+import akka.actor.CoordinatedShutdown
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.client.RequestBuilding.Get
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
+import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.config.CNHttpClientConfig.CNHttpClientConfig
 import com.daml.network.console.{
   CNRemoteParticipantReference,
   LocalCNNodeAppReference,
@@ -31,6 +41,7 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import scala.util.Random
 
 class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
@@ -119,6 +130,93 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             visible.contractId shouldBe created.contractId
           },
       )
+  }
+
+  "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
+    initSvc()
+    sv1.startSync()
+
+    implicit val sys = env.actorSystem
+    implicit val ec = env.executionContext
+    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+      () =>
+        Http().shutdownAllConnectionPools().map(_ => Done)
+    }
+
+    val registerGet = Get(s"${sv1.httpClientConfig.url}/admin/authorization")
+    def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
+
+    val invalidSignatureToken = JWT
+      .create()
+      .withAudience(sv1.config.auth.audience)
+      .withSubject(sv1.config.ledgerApiUser)
+      .sign(Algorithm.HMAC256("wrong-secret"))
+    val responseForInvalidSignature = Http()
+      .singleRequest(registerGet.withHeaders(tokenHeader(invalidSignatureToken)))
+      .futureValue
+    responseForInvalidSignature.status should be(StatusCodes.Unauthorized)
+
+    val invalidAudienceToken = JWT
+      .create()
+      .withAudience("wrong-audience")
+      .withSubject(sv1.config.ledgerApiUser)
+      .sign(AuthUtil.testSignatureAlgorithm)
+    val responseForInvalidAudience = Http()
+      .singleRequest(registerGet.withHeaders(tokenHeader(invalidAudienceToken)))
+      .futureValue
+    responseForInvalidAudience.status should be(StatusCodes.Unauthorized)
+    loggerFactory.assertLogs(
+      {
+        val invalidUserToken = JWT
+          .create()
+          .withAudience(sv1.config.auth.audience)
+          .withSubject(sv2.config.ledgerApiUser)
+          .sign(AuthUtil.testSignatureAlgorithm)
+        val responseForInvalidUser = Http()
+          .singleRequest(registerGet.withHeaders(tokenHeader(invalidUserToken)))
+          .futureValue
+        responseForInvalidUser.status should be(StatusCodes.Forbidden)
+        responseForInvalidUser.entity.getContentType().toString should be("application/json")
+      },
+      _.warningMessage should include(
+        "Authorization Failed"
+      ),
+    )
+    loggerFactory.assertLogs(
+      {
+        val svParty = sv1.remoteParticipantWithAdminToken.ledger_api.users
+          .get(sv1.config.ledgerApiUser)
+          .primaryParty
+          .value
+
+        val testUser = sv1.remoteParticipantWithAdminToken.ledger_api.users.create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set.empty[PartyId],
+          primaryParty = Some(svParty),
+        )
+        val userWithWrongActAs = JWT
+          .create()
+          .withAudience(sv1.config.auth.audience)
+          .withSubject(testUser.id)
+          .sign(AuthUtil.testSignatureAlgorithm)
+        val responseForUserWithWrongActAs =
+          Http()
+            .singleRequest(registerGet.withHeaders(tokenHeader(userWithWrongActAs)))
+            .futureValue
+        responseForUserWithWrongActAs.status should be(StatusCodes.Forbidden)
+        responseForUserWithWrongActAs.entity.getContentType().toString should be("application/json")
+      },
+      _.warningMessage should include(
+        "Authorization Failed"
+      ),
+    )
+
+    val headers = sv1.headers
+    val validResponse = Http()
+      .singleRequest(registerGet.withHeaders(headers))
+      .futureValue
+    validResponse.status should be(StatusCodes.OK)
+
   }
 
   "Non-leader SVs can onboard new validators" in { implicit env =>

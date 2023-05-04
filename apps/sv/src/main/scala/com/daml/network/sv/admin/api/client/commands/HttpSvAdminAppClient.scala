@@ -10,8 +10,8 @@ import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -91,4 +91,29 @@ object HttpSvAdminAppClient {
       Right(())
     }
   }
+
+  case class IsAuthorized() extends BaseCommand[http.IsAuthorizedResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.IsAuthorizedResponse] =
+      client.isAuthorized(
+        headers = headers
+      )
+
+    override def handleResponse(response: http.IsAuthorizedResponse)(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Unit] = response match {
+      case http.IsAuthorizedResponse.OK => Right(())
+      case http.IsAuthorizedResponse.Forbidden(e) => Left(e.error)
+    }
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.IsAuthorizedResponse.OK =>
+      Right(())
+    }
+  }
+
 }

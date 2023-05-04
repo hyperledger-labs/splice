@@ -544,6 +544,17 @@ class CNLedgerConnection(
     } yield partyId
   }
 
+  def getUserActAs(
+      username: String
+  ): Future[Set[PartyId]] = {
+    val userId = com.daml.lf.data.Ref.UserId.assertFromString(username)
+    for {
+      userRights <- client.listUserRights(userId)
+    } yield userRights.collect { case actAs: User.Right.CanActAs =>
+      PartyId.tryFromProtoPrimitive(actAs.party)
+    }.toSet
+  }
+
   def getUserReadAs(
       username: String
   ): Future[Set[PartyId]] = {

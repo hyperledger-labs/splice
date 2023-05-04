@@ -9,7 +9,7 @@ import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifier}
+import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
@@ -23,6 +23,7 @@ import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
+import com.daml.network.sv.auth.SvAuthExtractor
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
@@ -183,7 +184,13 @@ class SvApp(
                 ),
                 SvAdminResource.routes(
                   adminHandler,
-                  AuthExtractor(verifier, loggerFactory, "canton network sv admin realm"),
+                  SvAuthExtractor(
+                    verifier,
+                    svPartyId,
+                    ledgerConnection,
+                    loggerFactory,
+                    "canton network sv admin realm",
+                  ),
                 ),
                 CommonAdminResource.routes(commonAdminHandler),
               )

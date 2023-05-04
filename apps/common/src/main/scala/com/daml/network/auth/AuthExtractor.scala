@@ -16,7 +16,7 @@ object AuthExtractor {
   }
 }
 
-final class AuthExtractor(
+class AuthExtractor(
     verifier: SignatureVerifier,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,

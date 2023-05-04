@@ -1,4 +1,4 @@
-import { OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
+import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
   Middleware,
@@ -8,8 +8,6 @@ import {
   RequestContext,
   ResponseContext,
 } from 'validator-openapi';
-
-import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
 const ValidatorContext = React.createContext<ValidatorClient | undefined>(undefined);
 

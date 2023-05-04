@@ -11,6 +11,7 @@ import {
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
 
+import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AuthCheck from './routes/authCheck';
 import Root from './routes/root';
 import Svc from './routes/svc';
@@ -21,7 +22,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        {children}
+        <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
       </UserProvider>
     </AuthProvider>
   );

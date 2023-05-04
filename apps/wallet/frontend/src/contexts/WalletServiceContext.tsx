@@ -1,5 +1,6 @@
 import BigNumber from 'bignumber.js';
 import {
+  BaseApiMiddleware,
   Contract,
   OpenAPILoggingMiddleware,
   UserStatusResponse,
@@ -39,7 +40,6 @@ import {
   SubscriptionRequestWithContext,
   AppPaymentRequest,
 } from '../models/models';
-import { BaseApiMiddleware } from '../utils/BaseApiMiddleware';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 

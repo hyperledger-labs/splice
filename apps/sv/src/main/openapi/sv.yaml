@@ -37,24 +37,6 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
-  /onboard/validator:
-    post:
-      tags: [sv]
-      x-jvm-package: sv
-      operationId: "onboardValidator"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/OnboardValidatorRequest"
-      responses:
-        "200":
-          description: ok
-        "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
-        "401":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
   /admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -71,6 +53,34 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /admin/authorization:
+    get:
+      tags: [ sv ]
+      x-jvm-package: svAdmin
+      operationId: "isAuthorized"
+      responses:
+        "200":
+          description: ok
+        "403":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/403"
+  /onboard/validator:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv
+      operationId: "onboardValidator"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardValidatorRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
   /onboard/sv/start:
     post:
       tags: [sv]

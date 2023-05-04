@@ -93,4 +93,12 @@ class HttpSvAdminHandler(
           case Right(()) => Future.successful(v0.SvAdminResource.ApproveSvIdentityResponseOK)
         }
     }
+
+  def isAuthorized(
+      respond: v0.SvAdminResource.IsAuthorizedResponse.type
+  )(
+  )(adminUser: String): Future[v0.SvAdminResource.IsAuthorizedResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
+    }
 }
