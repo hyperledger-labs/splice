@@ -1,0 +1,3 @@
+name: sv-customer
+runtime: nodejs
+description: Deploy an SV Node in a customer-like setting
