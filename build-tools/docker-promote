@@ -12,10 +12,6 @@ fi
 
 [[ -z "${MAKE}"  ]] && _error 'must be run from within from make'
 
-if ! docker-check "${fromImageTag}" --optional; then
-   _error "Cannot promote missing image: ${fromImageTag}"
-fi
-
 docker pull "${fromImageTag}"
 docker tag "${fromImageTag}" "${toImageTag}"
 docker push "${toImageTag}"
