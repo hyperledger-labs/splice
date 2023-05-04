@@ -26,7 +26,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences & WalletTestUtil =>
 
   def getLedgerTime(implicit env: CNNodeTestConsoleEnvironment) =
-    svc.remoteParticipant.ledger_api.time.get()
+    svc.participantClient.ledger_api.time.get()
 
   // Advance time by `duration`; works only if the used Canton instance uses simulated time.
   protected def advanceTime(
@@ -59,7 +59,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
         //
         clue("wait for the system to quiet down after a round change") {
           eventually() {
-            svc.remoteParticipant.ledger_api_extensions.acs
+            svc.participantClient.ledger_api_extensions.acs
               .filterJava(SvcReward.COMPANION)(scan.getSvcPartyId()) shouldBe empty
           }
           // We additionally sleep 1.5s to give some extra time for activity to quiesce.
@@ -67,11 +67,11 @@ trait TimeTestUtil extends CNNodeTestCommon {
         }
 
         // it doesn't seem to matter which participant we run these from - all get synced
-        val now = svc.remoteParticipant.ledger_api.time.get()
+        val now = svc.participantClient.ledger_api.time.get()
         try {
           // actually advance the time
           logger.info(s"advancing time by $duration ...")
-          svc.remoteParticipant.ledger_api.time.set(now, now.plus(duration))
+          svc.participantClient.ledger_api.time.set(now, now.plus(duration))
         } catch {
           case _: CommandFailure =>
             fail(
@@ -80,7 +80,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
             )
         }
         // We don't get feedback about the success of setting the time here, so we check ourselves.
-        if (svc.remoteParticipant.ledger_api.time.get() == now) {
+        if (svc.participantClient.ledger_api.time.get() == now) {
           fail(
             "Could not advance time. " +
               "Are participants configured with `testing-time.type = monotonic-time`?"
@@ -141,7 +141,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
       val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
 
-      userValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+      userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         optTimeout = None,
         commands = transferContext.coinRules
@@ -198,7 +198,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
 
-    userValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+    userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = authorizers.distinct,
       readAs = Seq.empty,
@@ -288,7 +288,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     *  mining round exists where this is possible.
     */
   def advanceTimeToRoundOpen(implicit env: CNNodeTestConsoleEnvironment) = {
-    val now = svc.remoteParticipant.ledger_api.time.get().toInstant
+    val now = svc.participantClient.ledger_api.time.get().toInstant
     val (openRounds, _) = scan.getOpenAndIssuingMiningRounds()
     val earliestOpen = openRounds
       .filter(round => now.isBefore(round.payload.targetClosesAt))
@@ -299,23 +299,23 @@ trait TimeTestUtil extends CNNodeTestCommon {
     }
   }
 
-  def advanceTimeByPollingInterval(appRef: LocalCNNodeAppReference)(implicit
+  def advanceTimeByPollingInterval(appRef: CNNodeAppBackendReference)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = advanceTime(
     appRef.config.automation.pollingInterval.asJava
   )
 
   def getSortedOpenMiningRounds(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       validatorPartyId: PartyId,
-  ): Seq[OpenMiningRound.Contract] = remoteParticipant.ledger_api_extensions.acs
+  ): Seq[OpenMiningRound.Contract] = participantClient.ledger_api_extensions.acs
     .filterJava(OpenMiningRound.COMPANION)(validatorPartyId)
     .sortBy(_.data.round.number)
 
   def getSortedIssuingRounds(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       validatorPartyId: PartyId,
-  ): Seq[IssuingMiningRound.Contract] = remoteParticipant.ledger_api_extensions.acs
+  ): Seq[IssuingMiningRound.Contract] = participantClient.ledger_api_extensions.acs
     .filterJava(IssuingMiningRound.COMPANION)(
       validatorPartyId
     )
@@ -324,7 +324,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   def createConfigSchedule(
       newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val now = svc.participantClientWithAdminToken.ledger_api.time.get()
     val configSchedule = {
       new cc.schedule.Schedule(
         mkCoinConfig(defaultTickDuration),
@@ -344,7 +344,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
 
   def cancelAllSubscriptions(
       walletClient: WalletAppClientReference,
-      walletBackend: LocalCNNodeAppReference,
+      walletBackend: CNNodeAppBackendReference,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Assertion = {

@@ -6,7 +6,7 @@ import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.CNNodeBootstrapBase
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -28,7 +28,7 @@ import scala.concurrent.Future
   */
 class SvAppBootstrap(
     override val name: InstanceName,
-    val config: LocalSvAppConfig,
+    val config: SvAppBackendConfig,
     val svAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -44,7 +44,7 @@ class SvAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CNNodeBootstrapBase[
       SvApp,
-      LocalSvAppConfig,
+      SvAppBackendConfig,
       SharedCNNodeAppParameters,
     ](
       name,
@@ -82,7 +82,7 @@ object SvAppBootstrap {
 
   def apply(
       name: String,
-      svConfig: LocalSvAppConfig,
+      svConfig: SvAppBackendConfig,
       svAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       svMetrics: SvAppMetrics,

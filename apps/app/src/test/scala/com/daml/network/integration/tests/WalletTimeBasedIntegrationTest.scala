@@ -41,10 +41,10 @@ class WalletTimeBasedIntegrationTest
         )(config)
       })
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
-        bobValidator.remoteParticipant.dars.upload(splitwellDarPath)
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-        bobValidator.remoteParticipant.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.dars.upload(splitwellDarPath)
+        bobValidator.participantClient.dars.upload(splitwellDarPath)
+        aliceValidator.participantClient.dars.upload(directoryDarPath)
+        bobValidator.participantClient.dars.upload(directoryDarPath)
       })
 
   "A wallet" should {
@@ -149,7 +149,7 @@ class WalletTimeBasedIntegrationTest
       }
       clue("Setting up directory as provider for the created subscriptions") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
       aliceWallet.listSubscriptions() shouldBe empty
@@ -227,7 +227,7 @@ class WalletTimeBasedIntegrationTest
       actAndCheck(
         "Create a payment request, which expires after 1 minute",
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           expirationTime = Duration.ofMinutes(1),
@@ -250,7 +250,7 @@ class WalletTimeBasedIntegrationTest
       val (_, bob) = onboardAliceAndBob()
       aliceWallet.tap(100.0)
 
-      val now = aliceValidator.remoteParticipant.ledger_api.time.get()
+      val now = aliceValidator.participantClient.ledger_api.time.get()
       val expiration = now.plus(Duration.ofMinutes(1))
 
       val (_, _) = actAndCheck(
@@ -397,7 +397,7 @@ class WalletTimeBasedIntegrationTest
       actAndCheck(
         "Alice creates a self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -541,7 +541,7 @@ class WalletTimeBasedIntegrationTest
 
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
 
@@ -565,7 +565,7 @@ class WalletTimeBasedIntegrationTest
           eventually()({
             aliceValidatorWallet.listAppRewardCoupons() should have length 1
             aliceValidatorWallet.listValidatorRewardCoupons() should have length 2
-            directory.remoteParticipant.ledger_api_extensions.acs
+            directory.participantClient.ledger_api_extensions.acs
               .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
                 dirParty,
                 _.data.provider == dirParty.toProtoPrimitive,
@@ -581,7 +581,7 @@ class WalletTimeBasedIntegrationTest
           _ => {
             aliceValidatorWallet.listAppRewardCoupons() should be(empty)
             aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
-            directory.remoteParticipant.ledger_api_extensions.acs
+            directory.participantClient.ledger_api_extensions.acs
               .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
                 dirParty,
                 _.data.provider == dirParty.toProtoPrimitive,

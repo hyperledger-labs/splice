@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.LocalCNNodeConfig
+import com.daml.network.config.CNNodeBackendConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.digitalasset.canton.config.{ClientConfig, NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.{
@@ -177,8 +177,8 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
     }
 }
 
-trait LocalCNNodeAppReference extends CNNodeAppReference with LocalInstanceReference {
-  override def config: LocalCNNodeConfig
+trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReference {
+  override def config: CNNodeBackendConfig
 
   @Help.Summary("Start node and wait for initialization to complete")
   def startSync(): Unit = {
@@ -187,10 +187,10 @@ trait LocalCNNodeAppReference extends CNNodeAppReference with LocalInstanceRefer
   }
 }
 
-/** Subclass of RemoteParticipant that takes the config as an argument
+/** Subclass of participantClient that takes the config as an argument
   * instead of relying on remoteParticipantsByName.
   */
-class CNRemoteParticipantReference(
+class CNParticipantClientReference(
     consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,

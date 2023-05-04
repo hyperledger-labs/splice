@@ -34,8 +34,8 @@ class SplitwellUpgradeIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(darPath)
-        bobValidator.remoteParticipant.dars.upload(darPath)
+        aliceValidator.participantClient.dars.upload(darPath)
+        bobValidator.participantClient.dars.upload(darPath)
       })
 
   "splitwell with upgraded domain" should {
@@ -99,15 +99,15 @@ class SplitwellUpgradeIntegrationTest
       val (_, install) = installFirstAlice(alice)
 
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
-        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
       ) {
         actAndCheck("alice creates install requests", createInstalls(aliceSplitwell))(
           "alice sees one install contracts",
           _ => {
             val (contracts, newInstall) = twoInstalls(alice, install)
             val contractDomains =
-              aliceValidator.remoteParticipant.transfer.lookup_contract_domain(
+              aliceValidator.participantClient.transfer.lookup_contract_domain(
                 contracts.map[LfContractId](_.id): _*
               )
             contractDomains shouldBe Map[LfContractId, DomainAlias](
@@ -136,7 +136,7 @@ class SplitwellUpgradeIntegrationTest
       )
       val acceptedInvite = bobSplitwell.acceptInvite(invite)
       val contractDomains =
-        providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+        providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
           group.contract.contractId,
           invite.contract.contractId,
           acceptedInvite,
@@ -147,12 +147,12 @@ class SplitwellUpgradeIntegrationTest
         acceptedInvite,
       ).map(cid => cid -> splitwellAlias.unwrap).toMap
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
-        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
       ) {
         bracket(
-          connectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
-          disconnectSplitwellUpgradeDomain(bobValidator.remoteParticipant),
+          connectSplitwellUpgradeDomain(bobValidator.participantClient),
+          disconnectSplitwellUpgradeDomain(bobValidator.participantClient),
         ) {
           actAndCheck(
             "new installs for alice and bob",
@@ -163,7 +163,7 @@ class SplitwellUpgradeIntegrationTest
               // group is transferred out by UpgradeGroupTrigger,
               // and in by the TransferInTrigger.
               val contractDomains =
-                providerSplitwellBackend.remoteParticipant.transfer.lookup_contract_domain(
+                providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
                   group.contract.contractId,
                   invite.contract.contractId,
                   acceptedInvite,

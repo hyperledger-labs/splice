@@ -5,7 +5,7 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
-import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -66,7 +66,7 @@ abstract class SvAppReference(
 class SvAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-    override val config: RemoteSvAppConfig,
+    override val config: SvAppClientConfig,
 ) extends SvAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
@@ -81,7 +81,7 @@ class SvAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SvAppReference(consoleEnvironment, name)
-    with LocalCNNodeAppReference
+    with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SV"
@@ -101,7 +101,7 @@ class SvAppBackendReference(
   protected val nodes = consoleEnvironment.environment.svs
 
   @Help.Summary("Return sv app config")
-  def config: LocalSvAppConfig =
+  def config: SvAppBackendConfig =
     consoleEnvironment.environment.config.svsByString(name)
 
   def listOngoingValidatorOnboardings()
@@ -121,19 +121,19 @@ class SvAppBackendReference(
     }
 
   /** Remote participant this sv app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
+  lazy val participantClient =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name``",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this sv app is configured to interact with. Uses admin tokens to bypass auth. */
-  lazy val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
+  lazy val participantClientWithAdminToken =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
+      config.participantClient.participantClientConfigWithAdminToken,
     )
 
   /** secret, not publicly documented way to get the admin token */

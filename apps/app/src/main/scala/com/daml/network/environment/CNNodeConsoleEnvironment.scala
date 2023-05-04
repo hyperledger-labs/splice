@@ -4,9 +4,9 @@ import com.daml.network.console.{
   CNNodeAppReference,
   ConsoleHttpCommandRunner,
   DirectoryAppReference,
-  LocalCNNodeAppReference,
-  LocalDirectoryAppReference,
-  RemoteDirectoryAppReference,
+  CNNodeAppBackendReference,
+  DirectoryAppBackendReference,
+  DirectoryAppClientReference,
   ScanAppBackendReference,
   ScanAppClientReference,
   ScanAppReference,
@@ -23,7 +23,7 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.config.RemoteSvAppConfig
+import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.ValidatorAppClientConfig
@@ -80,8 +80,8 @@ class CNNodeConsoleEnvironment(
   override type Status = CommunityCantonStatus
 
   def mergeLocalCNNodeInstances(
-      locals: Seq[LocalCNNodeAppReference]*
-  ): Seq[LocalCNNodeAppReference] =
+      locals: Seq[CNNodeAppBackendReference]*
+  ): Seq[CNNodeAppBackendReference] =
     locals.flatten
 
   def mergeRemoteCNNodeInstances(remotes: Seq[CNNodeAppReference]*): Seq[CNNodeAppReference] =
@@ -104,7 +104,7 @@ class CNNodeConsoleEnvironment(
   lazy val coinNodes: NodeReferences[
     CNNodeAppReference,
     CNNodeAppReference,
-    LocalCNNodeAppReference,
+    CNNodeAppBackendReference,
   ] = {
     NodeReferences(
       mergeLocalCNNodeInstances(
@@ -132,7 +132,7 @@ class CNNodeConsoleEnvironment(
     ),
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      remoteSvcOpt.toList,
+      svcClientOpt.toList,
       svs.remote,
       scans.remote,
       directories.remote,
@@ -151,7 +151,7 @@ class CNNodeConsoleEnvironment(
     ),
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      remoteSvcOpt.toList,
+      svcClientOpt.toList,
       svs.remote.filter(sv => sv.name == "sv1"),
       scans.remote,
       directories.remote,
@@ -197,9 +197,9 @@ class CNNodeConsoleEnvironment(
       .map(createSvcReference)
       .headOption
 
-  lazy val remoteSvcOpt: Option[SvcAppClientReference] =
-    environment.config.remoteSvcApps.toSeq
-      .map(createRemoteSvcReference)
+  lazy val svcClientOpt: Option[SvcAppClientReference] =
+    environment.config.svcAppClients.toSeq
+      .map(createSvcClientReference)
       .headOption
 
   lazy val svs: NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] =
@@ -213,15 +213,15 @@ class CNNodeConsoleEnvironment(
 
   lazy val directories: NodeReferences[
     DirectoryAppReference,
-    RemoteDirectoryAppReference,
-    LocalDirectoryAppReference,
+    DirectoryAppClientReference,
+    DirectoryAppBackendReference,
   ] =
     NodeReferences(
       environment.config.directoriesByString.keys
         .map(createDirectoryReference)
         .toSeq,
-      environment.config.remoteDirectoriesByString.keys
-        .map(createRemoteDirectoryReference)
+      environment.config.directoryClientsByString.keys
+        .map(createDirectoryClientReference)
         .toSeq,
     )
 
@@ -232,7 +232,7 @@ class CNNodeConsoleEnvironment(
   ] =
     NodeReferences(
       environment.config.splitwellsByString.keys.map(createSplitwellReference).toSeq,
-      environment.config.remoteSplitwellsByString.keys.map(createRemoteSplitwellReference).toSeq,
+      environment.config.splitwellClientsByString.keys.map(createRemoteSplitwellReference).toSeq,
     )
 
   private def createValidatorReference(name: String): ValidatorAppBackendReference =
@@ -254,7 +254,7 @@ class CNNodeConsoleEnvironment(
   private def createSvcReference(name: String): SvcAppBackendReference =
     new SvcAppBackendReference(this, name)
 
-  private def createRemoteSvcReference(
+  private def createSvcClientReference(
       conf: (InstanceName, SvcAppClientConfig)
   ): SvcAppClientReference =
     new SvcAppClientReference(this, conf._1.unwrap, conf._2)
@@ -263,7 +263,7 @@ class CNNodeConsoleEnvironment(
     new SvAppBackendReference(this, name)
 
   private def createSvAppClientReference(
-      conf: (InstanceName, RemoteSvAppConfig)
+      conf: (InstanceName, SvAppClientConfig)
   ): SvAppClientReference =
     new SvAppClientReference(this, conf._1.unwrap, conf._2)
 
@@ -272,21 +272,21 @@ class CNNodeConsoleEnvironment(
   ): WalletAppClientReference =
     new WalletAppClientReference(this, conf._1.unwrap, conf._2)
 
-  private def createDirectoryReference(name: String): LocalDirectoryAppReference =
-    new LocalDirectoryAppReference(this, name)
+  private def createDirectoryReference(name: String): DirectoryAppBackendReference =
+    new DirectoryAppBackendReference(this, name)
 
-  private def createRemoteDirectoryReference(name: String): RemoteDirectoryAppReference =
-    new RemoteDirectoryAppReference(
+  private def createDirectoryClientReference(name: String): DirectoryAppClientReference =
+    new DirectoryAppClientReference(
       this,
       name,
-      this.environment.config.remoteDirectoriesByString(name),
+      this.environment.config.directoryClientsByString(name),
     )
 
   private def createSplitwellReference(name: String): SplitwellAppBackendReference =
     new SplitwellAppBackendReference(this, name)
 
   private def createRemoteSplitwellReference(name: String): SplitwellAppClientReference =
-    new SplitwellAppClientReference(this, name, environment.config.remoteSplitwellsByString(name))
+    new SplitwellAppClientReference(this, name, environment.config.splitwellClientsByString(name))
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -363,7 +363,7 @@ class CNNodeConsoleEnvironment(
           Seq("App References"),
         )
       ) :+ TopLevelValue(
-        "remoteDirectories",
+        "directoryClients",
         helpText(
           "All remote directory app instances" + genericNodeReferencesDoc,
           "Remote directory apps",
@@ -392,7 +392,7 @@ class CNNodeConsoleEnvironment(
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
-        .toList :++ remoteSvcOpt
+        .toList :++ svcClientOpt
         .map(svc => TopLevelValue(svc.name, helpText("Remote SVC app", svc.name), svc, Seq("SVC")))
         .toList :++ scans.local.headOption
         .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))

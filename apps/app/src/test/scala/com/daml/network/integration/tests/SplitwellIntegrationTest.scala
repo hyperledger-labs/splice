@@ -28,8 +28,8 @@ class SplitwellIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(darPath)
-        bobValidator.remoteParticipant.dars.upload(darPath)
+        aliceValidator.participantClient.dars.upload(darPath)
+        bobValidator.participantClient.dars.upload(darPath)
       })
 
   "splitwell" should {
@@ -110,7 +110,7 @@ class SplitwellIntegrationTest
         "alice sees balance update on splitwell domain",
         _ =>
           inside(aliceSplitwell.listBalanceUpdates(key)) { case Seq(update) =>
-            aliceValidator.remoteParticipant.transfer
+            aliceValidator.participantClient.transfer
               .lookup_contract_domain(update.contractId) shouldBe Map(
               javaToScalaContractId(update.contractId) -> "splitwell"
             )
@@ -119,7 +119,7 @@ class SplitwellIntegrationTest
     }
 
     "return the primary party of the user" in { implicit env =>
-      val user = providerSplitwellBackend.remoteParticipantWithAdminToken.ledger_api.users
+      val user = providerSplitwellBackend.participantClientWithAdminToken.ledger_api.users
         .get(providerSplitwellBackend.config.providerUser)
       Some(providerSplitwellBackend.getProviderPartyId()) shouldBe user.primaryParty
     }
@@ -133,7 +133,7 @@ class SplitwellIntegrationTest
       )
       try {
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          providerSplitwellBackend.remoteParticipant.domains
+          providerSplitwellBackend.participantClient.domains
             .disconnect(DomainAlias.tryCreate("splitwell")),
           logs =>
             logs.filter(
@@ -143,7 +143,7 @@ class SplitwellIntegrationTest
             ) should have size 4,
         )
       } finally {
-        providerSplitwellBackend.remoteParticipant.domains.reconnect(
+        providerSplitwellBackend.participantClient.domains.reconnect(
           DomainAlias.tryCreate("splitwell")
         )
       }

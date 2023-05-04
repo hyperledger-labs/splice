@@ -65,10 +65,10 @@ case class CNNodeEnvironmentDefinition(
       this.preSetup(env)
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
-        val svcParty = svc.remoteParticipantWithAdminToken.ledger_api.parties
+        val svcParty = svc.participantClientWithAdminToken.ledger_api.parties
           .allocate(svc.config.ledgerApiUser, svc.config.ledgerApiUser)
           .party
-        svc.remoteParticipantWithAdminToken.ledger_api.users.create(
+        svc.participantClientWithAdminToken.ledger_api.users.create(
           id = svc.config.ledgerApiUser,
           actAs = Set(svcParty),
           primaryParty = Some(svcParty),
@@ -84,10 +84,10 @@ case class CNNodeEnvironmentDefinition(
             case user => fail(s"SV user name did not match expected format: $user")
           }
           val validatorUserName = s"sv${svNumber}_validator_user-$suffix"
-          val user = sv.remoteParticipantWithAdminToken.ledger_api.users
+          val user = sv.participantClientWithAdminToken.ledger_api.users
             .get(validatorUserName)
           val svParty = user.primaryParty.value
-          sv.remoteParticipantWithAdminToken.ledger_api.users.create(
+          sv.participantClientWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs = sv.config.onboarding match {
               case _: SvOnboardingConfig.FoundCollective => Set(svParty, svcParty)
@@ -99,7 +99,7 @@ case class CNNodeEnvironmentDefinition(
           )
         })
         directories.local.foreach(directory =>
-          svc.remoteParticipantWithAdminToken.ledger_api.users.create(
+          svc.participantClientWithAdminToken.ledger_api.users.create(
             id = directory.config.ledgerApiUser,
             actAs = Set(svcParty),
             primaryParty = Some(svcParty),
@@ -229,7 +229,7 @@ object CNNodeEnvironmentDefinition {
               // This reads the right port as the bump is added to the front
               conf.svcApp
                 .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
-                .remoteParticipant
+                .participantClient
                 .clientAdminApi
             )
           )
@@ -240,7 +240,7 @@ object CNNodeEnvironmentDefinition {
       // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy
       .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
+        CNNodeConfigTransforms.bumpDirectoryClientsPortsBy(10_000)(conf)
       )
       .addConfigTransformsToFront((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
@@ -273,10 +273,10 @@ object CNNodeEnvironmentDefinition {
     env.coinNodes.local.foreach(_.waitForInitialization())
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
-    val validatorParty = validator.remoteParticipantWithAdminToken.ledger_api.parties
+    val validatorParty = validator.participantClientWithAdminToken.ledger_api.parties
       .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
       .party
-    validator.remoteParticipantWithAdminToken.ledger_api.users.create(
+    validator.participantClientWithAdminToken.ledger_api.users.create(
       id = validator.config.ledgerApiUser,
       actAs = Set(validatorParty),
       primaryParty = Some(validatorParty),

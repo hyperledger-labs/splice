@@ -15,8 +15,8 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.CNHttpClientConfig.CNHttpClientConfig
 import com.daml.network.console.{
-  CNRemoteParticipantReference,
-  LocalCNNodeAppReference,
+  CNParticipantClientReference,
+  CNNodeAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
@@ -103,7 +103,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       initSvc()
       svs.foreach(sv => {
-        val rights = sv.remoteParticipant.ledger_api.users.rights.list(sv.config.ledgerApiUser)
+        val rights = sv.participantClient.ledger_api.users.rights.list(sv.config.ledgerApiUser)
         rights.actAs should not contain svcParty
         rights.readAs should contain(svcParty)
       })
@@ -112,7 +112,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           val sv = sv3 // it doesn't really matter which sv we pick
           val svParty = sv.getSvcInfo().svParty
           sv.listOngoingValidatorOnboardings() shouldBe empty
-          sv.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+          sv.participantClient.ledger_api_extensions.commands.submitWithResult(
             sv.config.ledgerApiUser,
             actAs = Seq(svParty),
             readAs = Seq.empty,
@@ -184,12 +184,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )
     loggerFactory.assertLogs(
       {
-        val svParty = sv1.remoteParticipantWithAdminToken.ledger_api.users
+        val svParty = sv1.participantClientWithAdminToken.ledger_api.users
           .get(sv1.config.ledgerApiUser)
           .primaryParty
           .value
 
-        val testUser = sv1.remoteParticipantWithAdminToken.ledger_api.users.create(
+        val testUser = sv1.participantClientWithAdminToken.ledger_api.users.create(
           s"testUser-${Random.nextInt()}",
           actAs = Set.empty[PartyId],
           primaryParty = Some(svParty),
@@ -223,7 +223,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     initSvc()
     // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
     // but because here we don't start one, we need to perform this step manually.
-    bobValidator.remoteParticipant.dars.upload(cantonCoinDarPath)
+    bobValidator.participantClient.dars.upload(cantonCoinDarPath)
     val sv = sv4 // not a leader
     val svParty = sv.getSvcInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
@@ -243,7 +243,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )._1
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
-      bobValidator.remoteParticipantWithAdminToken.ledger_api.parties
+      bobValidator.participantClientWithAdminToken.ledger_api.parties
         .allocate(
           name,
           name,
@@ -265,7 +265,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "the candidate's secret is marked as used",
       _ => {
         inside(
-          sv.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          sv.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)
         ) {
           case Seq(usedSecret) => {
@@ -306,7 +306,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "SV Identity can be approved at runtime" in { implicit env =>
     initSvc()
-    svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+    svc.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
         sv1.getSvcInfo().svParty
       ) should have length 3
@@ -315,7 +315,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
     sv1.approveSvIdentity(svXName, svXKey)
     inside(
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getSvcInfo().svParty)
     ) {
       case approvedSvIds => {
@@ -353,7 +353,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     initSvc()
     clue("SV1 has created an ApprovedSvIdentity contract as it's configured to.") {
       inside(
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getSvcInfo().svParty)
       ) {
         case approvedSvIds => {
@@ -380,8 +380,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -392,8 +392,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         _.start()
       )
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -407,14 +407,14 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
-        sv3.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        sv3.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
             sv3.getSvcInfo().svParty,
             c => c.data.candidateName == "sv4",
           )
       ) {
         case Seq(approvedSvId) => {
-          sv3.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+          sv3.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
             sv3.config.ledgerApiUser,
             actAs = Seq(sv3.getSvcInfo().svParty),
             readAs = Seq.empty,
@@ -437,7 +437,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     val sv1Party = sv1.getSvcInfo().svParty
     // We are not using sv4.getSvcInfo() to get sv4's party id
     // because the SvApp is not completely initialized yet and hence the http service is not available.
-    val sv4Party = sv4.remoteParticipant.ledger_api.users
+    val sv4Party = sv4.participantClient.ledger_api.users
       .get(sv4.config.ledgerApiUser)
       .primaryParty
       .value
@@ -447,7 +447,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         eventually()(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
-            svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+            svc.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
@@ -472,7 +472,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       }
     clue("Attempting to start an onboarding multiple times has no effect") {
       sv1.startSvOnboarding(token)
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
     }
     clue(
@@ -485,7 +485,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
     clue("All online and approving SVs confirm SV4's onboarding") {
       eventually() {
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action match {
             case a: ARC_SvcRules =>
@@ -513,7 +513,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     actAndCheck("SV2 comes back online", sv2.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
         getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive)
       },
@@ -534,10 +534,10 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       // only 1 SV => slightly faster test
       clue("Initialize SVC with 1 SV") {
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(
+        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
           _.start()
         )
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(
+        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
           _.waitForInitialization()
         )
         getSvcRules().data.members should have size 1
@@ -545,7 +545,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       // We are not using sv2.getSvcInfo() to get sv2's party id because we
       // don't want SV2 to actually start and get onboarded for this test
       // and hence the http service is not available.
-      val sv2Party = sv2.remoteParticipant.ledger_api.users
+      val sv2Party = sv2.participantClient.ledger_api.users
         .get(sv2.config.ledgerApiUser)
         .primaryParty
         .value
@@ -557,7 +557,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       }
       actAndCheck(
         "Moving sv2 to confirmed state",
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+        svc.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
             userId = "svc",
             actAs = Seq(svcParty),
@@ -587,8 +587,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
         Seq(
-          svc: LocalCNNodeAppReference,
-          scan: LocalCNNodeAppReference,
+          svc: CNNodeAppBackendReference,
+          scan: CNNodeAppBackendReference,
           sv1,
           sv2,
           sv3,
@@ -599,8 +599,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           _.start()
         )
         Seq(
-          svc: LocalCNNodeAppReference,
-          scan: LocalCNNodeAppReference,
+          svc: CNNodeAppBackendReference,
+          scan: CNNodeAppBackendReference,
           sv1,
           sv2,
           sv3,
@@ -616,7 +616,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       val fakeSv4Party = allocateRandomSvParty("sv4")
       actAndCheck(
         "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
-          svc.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+          svc.participantClient.ledger_api_extensions.commands.submitWithResult(
             svc.config.ledgerApiUser,
             actAs = Seq(svcParty),
             readAs = Seq.empty,
@@ -689,7 +689,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "There are 10 SVC members in total but only 4 confirmations are required to confirm a SV",
       _ =>
         inside(
-          svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          svc.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
         ) { case Seq(svOnboardingConfirmed) =>
           svOnboardingConfirmed.data.svName shouldBe "svX"
@@ -701,16 +701,16 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
         // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(_.start())
-        Seq(svc: LocalCNNodeAppReference, scan: LocalCNNodeAppReference, sv1).foreach(
+        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(_.start())
+        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
           _.waitForInitialization()
         )
       }
 
       val svcParty = svcClient.getDebugInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
-      val svcParticipant = svc.remoteParticipant
-      val sv4Participant = sv4.remoteParticipant
+      val svcParticipant = svc.participantClient
+      val sv4Participant = sv4.participantClient
 
       createCoinOwnBySvc(svcParticipant, 1.0)
 
@@ -780,7 +780,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           ),
         )
 
-        def checkCoinContract(participant: CNRemoteParticipantReference, party: PartyId) = {
+        def checkCoinContract(participant: CNParticipantClientReference, party: PartyId) = {
           val coins = getCoins(participant, party, _.data.owner == sv4Party.toProtoPrimitive)
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
@@ -814,7 +814,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   )
 
   private def createCoinOwnBySvc(
-      participant: CNRemoteParticipantReference,
+      participant: CNParticipantClientReference,
       amount: Double,
   )(implicit env: CNNodeTestConsoleEnvironment) =
     participant.ledger_api_extensions.commands.submitWithResult(
@@ -825,7 +825,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )
 
   def getCoins(
-      participant: CNRemoteParticipantReference,
+      participant: CNParticipantClientReference,
       party: PartyId,
       predicate: cc.coin.Coin.Contract => Boolean = _ => true,
   ): Seq[cc.coin.Coin.Contract] = {
@@ -836,7 +836,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   def getCoinRules()(implicit env: CNNodeTestConsoleEnvironment) =
     clue("There is exactly one CoinRules contract") {
-      val foundCoinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      val foundCoinRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
       foundCoinRules should have length 1
       foundCoinRules.head
@@ -849,7 +849,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       newMemberName: String,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val svParty = svApp.getSvcInfo().svParty
-    svApp.remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    svApp.participantClient.ledger_api_extensions.commands.submitWithResult(
       svApp.config.ledgerApiUser,
       actAs = Seq(svParty),
       readAs = Seq(svcParty),

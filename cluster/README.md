@@ -989,7 +989,7 @@ NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}
 ```
 val name = "SV name"
 val publicKey = "SV key"
-remoteSvs.foreach(sv => { println(s"approving ${name} on ${sv.name}"); sv.approveSvIdentity(name, publicKey) })
+svAppClients.foreach(sv => { println(s"approving ${name} on ${sv.name}"); sv.approveSvIdentity(name, publicKey) })
 ```
 
 Note: It will also be possible to approve SV identities via the SV UI.

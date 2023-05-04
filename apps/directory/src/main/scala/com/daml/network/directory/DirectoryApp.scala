@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
-import com.daml.network.directory.config.LocalDirectoryAppConfig
+import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
@@ -42,7 +42,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class DirectoryApp(
     override val name: InstanceName,
-    val config: LocalDirectoryAppConfig,
+    val config: DirectoryAppBackendConfig,
     val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
@@ -57,7 +57,7 @@ class DirectoryApp(
     tracer: Tracer,
 ) extends CNNode[DirectoryApp.State](
       config.ledgerApiUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,
@@ -70,7 +70,7 @@ class DirectoryApp(
     for {
       scanConnection <- ScanConnection(
         ledgerClient,
-        config.remoteScan,
+        config.scanClient,
         clock,
         retryProvider,
         coinAppParameters.processingTimeouts,

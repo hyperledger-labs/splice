@@ -1,8 +1,8 @@
 package com.daml.network.util
 
 import com.daml.network.console.{
-  LocalDirectoryAppReference,
-  RemoteDirectoryAppReference,
+  DirectoryAppBackendReference,
+  DirectoryAppClientReference,
   ScanAppBackendReference,
   SplitwellAppBackendReference,
   SplitwellAppClientReference,
@@ -29,9 +29,9 @@ trait CommonCNNodeAppInstanceReferences {
     )
 
   def svcClient(implicit env: CNNodeTestConsoleEnvironment): SvcAppClientReference =
-    env.remoteSvcOpt.getOrElse(
+    env.svcClientOpt.getOrElse(
       sys.error(
-        "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
+        "Tried to access the SVC app client but it isn't defined in the test's configuration file"
       )
     )
 
@@ -129,7 +129,7 @@ trait CommonCNNodeAppInstanceReferences {
 
   def directory(implicit
       env: CNNodeTestConsoleEnvironment
-  ): LocalDirectoryAppReference =
+  ): DirectoryAppBackendReference =
     env.directories.local.headOption.getOrElse(
       sys.error(
         "Tried to access the Directory app but it isn't defined in the test's configuration file"
@@ -138,19 +138,19 @@ trait CommonCNNodeAppInstanceReferences {
 
   def aliceDirectory(implicit
       env: CNNodeTestConsoleEnvironment
-  ): RemoteDirectoryAppReference = rdp(
+  ): DirectoryAppClientReference = rdp(
     "aliceDirectory"
   )
 
   def bobDirectory(implicit
       env: CNNodeTestConsoleEnvironment
-  ): RemoteDirectoryAppReference = rdp(
+  ): DirectoryAppClientReference = rdp(
     "bobDirectory"
   )
 
   def charlieDirectory(implicit
       env: CNNodeTestConsoleEnvironment
-  ): RemoteDirectoryAppReference = rdp(
+  ): DirectoryAppClientReference = rdp(
     "charlieDirectory"
   )
 
@@ -210,7 +210,7 @@ trait CommonCNNodeAppInstanceReferences {
 
   def rdp(
       name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): RemoteDirectoryAppReference =
+  )(implicit env: CNNodeTestConsoleEnvironment): DirectoryAppClientReference =
     env.directories.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"remote directory [$name] not configured"))

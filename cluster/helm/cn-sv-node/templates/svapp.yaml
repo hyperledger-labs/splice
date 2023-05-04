@@ -51,14 +51,14 @@ spec:
             {{- with .Values.joinWithKeyOnboarding }}
             - name: ADDITIONAL_CONFIG_SV_ONBOARDING
               value: |
-                _svc_remote {
+                _svc_client {
                   admin-api.port = 5005
                   admin-api.address = "{{ .svcApiAddress }}"
                 }
                 _onboarding {
                   type = "join-with-key"
-                  remote-sv.admin-api.port = {{ .sponsorApiPort }}
-                  remote-sv.admin-api.address = "{{ .sponsorApiUrl }}"
+                  sv-client.admin-api.port = {{ .sponsorApiPort }}
+                  sv-client.admin-api.address = "{{ .sponsorApiUrl }}"
                   name = "{{ .keyName }}"
                   public-key = "{{ .publicKey }}"
                   private-key = "{{ .privateKey }}"

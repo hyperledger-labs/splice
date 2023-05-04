@@ -115,7 +115,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
     Using.resource(startCanton(cantonArgs, "self-hosted-splitwell")) { _ =>
       runScript(validatorPath / "validator.sc")(env.environment)
 
-      v("validatorApp").remoteParticipant.dars
+      v("validatorApp").participantClient.dars
         .upload("./daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
 
       val aliceUserName = aliceWallet.config.ledgerApiUser

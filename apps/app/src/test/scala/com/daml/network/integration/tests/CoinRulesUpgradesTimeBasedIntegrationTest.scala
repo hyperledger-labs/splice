@@ -44,8 +44,8 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
           })
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
-        bobValidator.remoteParticipant.dars.upload(splitwellDarPath)
+        aliceValidator.participantClient.dars.upload(splitwellDarPath)
+        bobValidator.participantClient.dars.upload(splitwellDarPath)
       })
 
   "App transfers through upgraded coinRules" in { implicit env =>

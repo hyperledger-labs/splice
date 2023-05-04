@@ -211,7 +211,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "respect scheduled change of maxNumInputs" in { implicit env =>
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val now = svc.participantClientWithAdminToken.ledger_api.time.get()
     val configSchedule = new cc.schedule.Schedule(
       mkCoinConfig(defaultTickDuration, 4),
       List(
@@ -238,7 +238,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     aliceValidatorWallet.tap(5)
     eventually() {
-      val currentInstant = svc.remoteParticipantWithAdminToken.ledger_api.time.get().toInstant
+      val currentInstant = svc.participantClientWithAdminToken.ledger_api.time.get().toInstant
       getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(1, 2)
       aliceValidatorWallet.list().coins should have length 2
       aliceValidatorWallet
@@ -291,7 +291,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         5,
       )
       eventually() {
-        val currentInstant = svc.remoteParticipantWithAdminToken.ledger_api.time.get().toInstant
+        val currentInstant = svc.participantClientWithAdminToken.ledger_api.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
         // As the max number of input is reduced to 3
         // only 3 inputs are used: 1 coin, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2
@@ -483,7 +483,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   }
 
   private def getOpenIssuingRounds(now: Instant)(implicit env: CNNodeTestConsoleEnvironment) = {
-    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))
   }
 

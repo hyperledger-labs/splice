@@ -40,7 +40,7 @@ class WalletPaymentIntegrationTest
 
       val (_, cid, reqC) =
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           description = description,
@@ -78,7 +78,7 @@ class WalletPaymentIntegrationTest
 
       val (referenceId, cid, reqC) =
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         )

@@ -8,7 +8,7 @@ import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClie
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.console.{
-  CNRemoteParticipantReference,
+  CNParticipantClientReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
@@ -20,10 +20,10 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
   protected def splitwellUpgradeAlias = DomainAlias.tryCreate("splitwellUpgrade")
   protected def splitwellAlias = DomainAlias.tryCreate("splitwell")
   protected def connectSplitwellUpgradeDomain(
-      participant: CNRemoteParticipantReference
+      participant: CNParticipantClientReference
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val upgradeConfig =
-      providerSplitwellBackend.remoteParticipant.domains.config(splitwellUpgradeAlias).value
+      providerSplitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
 
     import com.daml.nonempty.+-:
     val url = inside(upgradeConfig.sequencerConnection) {
@@ -34,7 +34,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
     participant.domains.connect(splitwellUpgradeAlias, url)
   }
 
-  protected def disconnectSplitwellUpgradeDomain(participant: CNRemoteParticipantReference) =
+  protected def disconnectSplitwellUpgradeDomain(participant: CNParticipantClientReference) =
     participant.domains.disconnect(splitwellUpgradeAlias)
 
   protected def createSplitwellInstalls(splitwell: SplitwellAppClientReference, party: PartyId) = {

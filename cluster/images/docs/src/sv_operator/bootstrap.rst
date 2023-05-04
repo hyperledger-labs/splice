@@ -106,7 +106,7 @@ An example SV node configuration with defaults that match the Canton participant
 While this configuration is sufficient to operate an SV node that is already an established member of the SVC, an additional *onboarding* configuration is required for initializing your SV on its first start.
 Edit the example ``examples/sv/sv-onboarding.conf`` to:
 
-- (optional) Chose a different existing SV as an onboarding sponsor (via the ``remote-sv`` key).
+- (optional) Chose a different existing SV as an onboarding sponsor (via the ``sv-client`` key).
   This SV is going to play a key role in orchestrating the initialization of your SV into a fully operational SV.
   SV1 is operated by DA and is a safe default choice here, assuming that it has been configured to approve your SV (see previous step).
 

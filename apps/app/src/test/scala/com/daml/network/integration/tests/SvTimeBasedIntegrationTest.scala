@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.console.LocalCNNodeAppReference
+import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -58,27 +58,27 @@ class SvTimeBasedIntegrationTest
 
     // Sync with background automation that onboards validator.
     eventually()({
-      val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
       rounds should have size 3
     })
 
     // one tick - round 0 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
     )
     // next tick - round 1 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 2
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 2
     )
     // next tick - round 2 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 3
     )
 
-    val offsetBefore = svc.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+    val offsetBefore = svc.participantClientWithAdminToken.ledger_api.transactions.end()
     // next tick - issuing round 0 can be closed
     // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
     advanceTime(tickDurationWithBuffer)
@@ -86,7 +86,7 @@ class SvTimeBasedIntegrationTest
       // Check for closing mining round in transactions instead of acs
       // to guard against automation archiving it concurrently.
       val transactions =
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+        svc.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(svcParty),
             completeAfter = Int.MaxValue,
@@ -101,7 +101,7 @@ class SvTimeBasedIntegrationTest
       rounds should have size 1
     }
     eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 3
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 3
     )
 
     // advance time by 2 polling intervals to ensure that the automations
@@ -111,7 +111,7 @@ class SvTimeBasedIntegrationTest
     advanceTimeByPollingInterval(sv1)
     clue("Wait until the closed round is archived") {
       eventually()(
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
       )
     }
@@ -131,7 +131,7 @@ class SvTimeBasedIntegrationTest
 
     // latest OpenMiningRound was created with doubled tick duration.
     eventually()({
-      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
@@ -226,7 +226,7 @@ class SvTimeBasedIntegrationTest
 
     // latest OpenMiningRound was created with reduced tick duration.
     eventually()({
-      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
@@ -409,7 +409,7 @@ class SvTimeBasedIntegrationTest
     val config202 = mkCoinConfig(defaultTickDuration, 202)
 
     {
-      val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
       val configSchedule = {
         new cc.schedule.Schedule(
           mkCoinConfig(defaultTickDuration),
@@ -451,10 +451,10 @@ class SvTimeBasedIntegrationTest
     initSvc()
 
     eventually() {
-      val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
       rounds should have size 3
       svs.map { sv =>
-        val coins = sv.remoteParticipant.ledger_api_extensions.acs
+        val coins = sv.participantClient.ledger_api_extensions.acs
           .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         coins shouldBe empty
       }
@@ -473,11 +473,11 @@ class SvTimeBasedIntegrationTest
       )
       .divide(RoundsPerYear, RoundingMode.HALF_UP)
     eventually() {
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
 
       // Only Sv1 get svc reward from round 0 as Sv2, Sv3 and Sv4 only joined in round 1
       inside(
-        svs.head.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svs.head.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
       ) { case Seq(newCoin) =>
         newCoin.data.svc shouldBe svcParty.toProtoPrimitive
@@ -487,7 +487,7 @@ class SvTimeBasedIntegrationTest
       }
 
       svs.tail.map { sv =>
-        val coins = sv.remoteParticipant.ledger_api_extensions.acs
+        val coins = sv.participantClient.ledger_api_extensions.acs
           .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         coins shouldBe empty
       }
@@ -496,7 +496,7 @@ class SvTimeBasedIntegrationTest
     // one tick - round 1 closes.
     advanceRoundsByOneTick
     eventually() {
-      getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 2
+      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 2
 
       val eachSvGetInRound1 =
         coinsToIssueToSvc
@@ -505,7 +505,7 @@ class SvTimeBasedIntegrationTest
 
       // All Svs get reward from round 1
       inside(
-        svs.head.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svs.head.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
       ) { case Seq(_, newCoin) =>
         newCoin.data.svc shouldBe svcParty.toProtoPrimitive
@@ -515,7 +515,7 @@ class SvTimeBasedIntegrationTest
 
       svs.tail.map { sv =>
         inside(
-          sv.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          sv.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         ) { case Seq(newCoin) =>
           newCoin.data.svc shouldBe svcParty.toProtoPrimitive
@@ -597,7 +597,7 @@ class SvTimeBasedIntegrationTest
       ),
     )
     // Create a bunch of rewards directly
-    svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+    svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svcParty),
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
@@ -607,7 +607,7 @@ class SvTimeBasedIntegrationTest
       {
         advanceRoundsByOneTick
         eventually() {
-          getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty) should have size 1
+          getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
         }
       },
       entries =>
@@ -620,7 +620,7 @@ class SvTimeBasedIntegrationTest
 
     def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
 
-    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty)
 
     inside(issuingRounds) { case Seq(issuingRound) =>
       issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
@@ -633,12 +633,12 @@ class SvTimeBasedIntegrationTest
     def getRewardCoupons(
         round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
     ) = {
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(AppRewardCoupon.COMPANION)(
           svcParty,
           co => co.data.round.number == round.payload.round.number,
         ) ++
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(ValidatorRewardCoupon.COMPANION)(
             svcParty,
             co => co.data.round.number == round.payload.round.number,
@@ -693,8 +693,8 @@ class SvTimeBasedIntegrationTest
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -705,8 +705,8 @@ class SvTimeBasedIntegrationTest
         _.start()
       )
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -733,14 +733,14 @@ class SvTimeBasedIntegrationTest
     clue("An `SvOnboarding` contract is created") {
       eventually()(
         // The onboarding is requested by SV4 during SvApp init.
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
       )
     }
     actAndCheck("No onboarding happens for a long time", advanceTime(Duration.ofHours(25)))(
       "The `SvOnboarding` contract expires and is archived",
       _ =>
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty,
     )
   }
@@ -748,8 +748,8 @@ class SvTimeBasedIntegrationTest
   "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -760,8 +760,8 @@ class SvTimeBasedIntegrationTest
         _.start()
       )
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -776,7 +776,7 @@ class SvTimeBasedIntegrationTest
     val svXParty = allocateRandomSvParty("svX")
     actAndCheck(
       "Create a new `SvOnboardingConfirmed` Contract with new party \"svX\"",
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+      svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
         commands = getSvcRules().id
@@ -792,7 +792,7 @@ class SvTimeBasedIntegrationTest
     )(
       "SvX's `SvOnboardingConfirmed` contract is created'",
       _ =>
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
             svcParty
           ) should have length 1,
@@ -803,7 +803,7 @@ class SvTimeBasedIntegrationTest
     )(
       "The `SvOnboardingConfirmed` contract expires and is archived",
       _ =>
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty) shouldBe empty,
     )
   }
@@ -817,7 +817,7 @@ class SvTimeBasedIntegrationTest
     val rewardAmount = 0.1
 
     def getUnclaimedRewardContracts() =
-      svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+      svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(UnclaimedReward.COMPANION)(svcParty)
 
     val existingUnclaimedRewards = getUnclaimedRewardContracts().length
@@ -828,7 +828,7 @@ class SvTimeBasedIntegrationTest
           new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
         )
         if (!unclaimedRewards.isEmpty) {
-          svc.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+          svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
             actAs = Seq(svcParty),
             optTimeout = None,
             commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
@@ -847,8 +847,8 @@ class SvTimeBasedIntegrationTest
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -861,8 +861,8 @@ class SvTimeBasedIntegrationTest
         _.start()
       )
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -890,7 +890,7 @@ class SvTimeBasedIntegrationTest
       "Sync with background automation that onboards validator"
     ) {
       eventually()({
-        val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+        val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -901,7 +901,7 @@ class SvTimeBasedIntegrationTest
     )(
       "Find confirmation (for issuing rounds)",
       _ => {
-        val contractList = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        val contractList = svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -925,7 +925,7 @@ class SvTimeBasedIntegrationTest
     )(
       "The Confirmation expires and is archived",
       _ => {
-        svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
           .filter(_.id == confirmationCid) should have length 0
@@ -938,7 +938,7 @@ class SvTimeBasedIntegrationTest
     )(
       "Find new confirmation (for issuing rounds)",
       _ => {
-        val contractList = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        val contractList = svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -950,8 +950,8 @@ class SvTimeBasedIntegrationTest
   "detect an inactive leader" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -964,8 +964,8 @@ class SvTimeBasedIntegrationTest
         _.start()
       )
       Seq(
-        svc: LocalCNNodeAppReference,
-        scan: LocalCNNodeAppReference,
+        svc: CNNodeAppBackendReference,
+        scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -984,7 +984,7 @@ class SvTimeBasedIntegrationTest
       "Wait for first three rounds to be opened"
     ) {
       eventually()({
-        val rounds = getSortedOpenMiningRounds(svc.remoteParticipantWithAdminToken, svcParty)
+        val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -1039,7 +1039,7 @@ class SvTimeBasedIntegrationTest
       )
 
       eventually() {
-        val electionRequests = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        val electionRequests = svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
         electionRequests should have length 3
         val requestsData = electionRequests.map(req => req.data)
@@ -1075,7 +1075,7 @@ class SvTimeBasedIntegrationTest
       env: CNNodeTestConsoleEnvironment
   ): OpenMiningRoundsTriplet = {
     val rounds = getSortedOpenMiningRounds(
-      svc.remoteParticipantWithAdminToken,
+      svc.participantClientWithAdminToken,
       svcParty,
     )
     rounds should have length 3
@@ -1085,7 +1085,7 @@ class SvTimeBasedIntegrationTest
   private def advanceTimeAndCheckOpenRounds(
       toAdvanceAt: Instant
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-    val now = svc.remoteParticipantWithAdminToken.ledger_api.time.get()
+    val now = svc.participantClientWithAdminToken.ledger_api.time.get()
     val duration = Duration.between(now.toInstant, toAdvanceAt)
     val timeShift = Duration.ofSeconds(10)
     val skew = timeShift
@@ -1122,7 +1122,7 @@ class SvTimeBasedIntegrationTest
   private def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, Duration]
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
-    val issuingRounds = getSortedIssuingRounds(svc.remoteParticipantWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>
       val expectedDuration = roundNumberToTickDuration(issuingRound.data.round.number)

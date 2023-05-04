@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.network.codegen.java.cn.directory as dirCodegen
-import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
+import com.daml.network.console.{DirectoryAppClientReference, WalletAppClientReference}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.digitalasset.canton.topology.PartyId
 
@@ -11,7 +11,7 @@ trait DirectoryTestUtil extends CNNodeTestCommon with CnsTestUtil {
   def initialiseDirectoryApp(
       userName: String,
       userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
+      directory: DirectoryAppClientReference,
       wallet: WalletAppClientReference,
   ): Unit = {
     actAndCheck("Request directory install", directory.requestDirectoryInstall())(

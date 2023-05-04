@@ -3,9 +3,9 @@ package com.daml.network.sv.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
-  CNRemoteParticipantConfig,
-  LocalCNNodeConfig,
-  RemoteCNNodeConfig,
+  CNParticipantClientConfig,
+  CNNodeBackendConfig,
+  CNNodeClientConfig,
 }
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
@@ -43,7 +43,7 @@ object SvOnboardingConfig {
 
   case class JoinWithKey(
       name: String,
-      remoteSv: RemoteSvAppConfig, // an SV that we'll contact to start our onboarding
+      svClient: SvAppClientConfig, // an SV that we'll contact to start our onboarding
       publicKey: String, // the key that identifies us together with our name
       privateKey: String, // the private key we use for authenticating ourselves
   ) extends SvOnboardingConfig
@@ -53,21 +53,21 @@ object SvOnboardingConfig {
   def hideConfidential(config: SvOnboardingConfig): SvOnboardingConfig = {
     val hidden = "****"
     config match {
-      case JoinWithKey(name, remoteSv, publicKey, _) =>
-        JoinWithKey(name, remoteSv, publicKey, hidden)
+      case JoinWithKey(name, svClient, publicKey, _) =>
+        JoinWithKey(name, svClient, publicKey, hidden)
       case other => other
     }
   }
 }
 
-case class LocalSvAppConfig(
+case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
     auth: AuthConfig,
-    remoteParticipant: CNRemoteParticipantConfig,
+    participantClient: CNParticipantClientConfig,
     // TODO(#3856): consider if we can remove this already
-    remoteSvc: SvcAppClientConfig,
+    svcClient: SvcAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     isDevNet: Boolean = false,
@@ -76,14 +76,14 @@ case class LocalSvAppConfig(
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
     enableCoinRulesUpgrade: Boolean = false,
-) extends LocalCNNodeConfig {
+) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
-case class RemoteSvAppConfig(
+case class SvAppClientConfig(
     adminApi: ClientConfig
-) extends RemoteCNNodeConfig {
+) extends CNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

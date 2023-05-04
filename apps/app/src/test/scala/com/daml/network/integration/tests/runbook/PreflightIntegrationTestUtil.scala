@@ -23,7 +23,7 @@ trait PreflightIntegrationTestUtil {
       val secret = validatorOnboardingSecret match {
         case Some(s) => s
         case None => {
-          val s = prepareValidatorOnboarding(oc.remoteSv.adminApi.url)
+          val s = prepareValidatorOnboarding(oc.svClient.adminApi.url)
           validatorOnboardingSecret = Some(s)
           s
         }

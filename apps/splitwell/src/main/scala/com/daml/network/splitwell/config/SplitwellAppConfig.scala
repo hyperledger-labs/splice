@@ -2,9 +2,9 @@ package com.daml.network.splitwell.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNRemoteParticipantConfig,
-  LocalCNNodeConfig,
-  RemoteCNNodeConfig,
+  CNParticipantClientConfig,
+  CNNodeBackendConfig,
+  CNNodeClientConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.DomainAlias
@@ -29,11 +29,11 @@ case class SplitwellAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     providerUser: String,
-    remoteParticipant: CNRemoteParticipantConfig,
-    remoteScan: ScanAppClientConfig,
+    participantClient: CNParticipantClientConfig,
+    scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SplitwellDomainConfig,
-) extends LocalCNNodeConfig // TODO(#736): fork or generalize this trait.
+) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
 
@@ -45,9 +45,9 @@ case class SplitwellAppClientConfig(
     // Admin API for reads.
     adminApi: ClientConfig,
     // Ledger API for writes.
-    remoteParticipant: CNRemoteParticipantConfig,
-    remoteScan: ScanAppClientConfig,
+    participantClient: CNParticipantClientConfig,
+    scanClient: ScanAppClientConfig,
     ledgerApiUser: String,
-) extends RemoteCNNodeConfig {
+) extends CNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

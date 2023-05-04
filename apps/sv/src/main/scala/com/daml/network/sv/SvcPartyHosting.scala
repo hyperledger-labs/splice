@@ -6,7 +6,7 @@ import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.config.{RemoteSvAppConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -82,7 +82,7 @@ class SvcPartyHosting(
 
   private def getSponsorSvConfig(
       onboardingConfig: SvOnboardingConfig
-  ): Option[RemoteSvAppConfig] =
+  ): Option[SvAppClientConfig] =
     onboardingConfig match {
       case SvOnboardingConfig.JoinWithKey(_, sponsorSv, _, _) =>
         Some(sponsorSv)
@@ -90,7 +90,7 @@ class SvcPartyHosting(
     }
 
   private def getAuthorizationAndAcsFromSponsor(
-      sponsorSvConfig: RemoteSvAppConfig,
+      sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     logger.info(

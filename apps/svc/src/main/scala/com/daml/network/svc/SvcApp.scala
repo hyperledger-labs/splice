@@ -42,7 +42,7 @@ class SvcApp(
     tracer: Tracer,
 ) extends CNNode[SvcApp.State](
       config.ledgerApiUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,

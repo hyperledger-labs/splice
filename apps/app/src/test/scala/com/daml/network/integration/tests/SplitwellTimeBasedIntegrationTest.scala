@@ -28,8 +28,8 @@ class SplitwellTimeBasedIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(darPath)
-        bobValidator.remoteParticipant.dars.upload(darPath)
+        aliceValidator.participantClient.dars.upload(darPath)
+        bobValidator.participantClient.dars.upload(darPath)
       })
 
   "splitwell" should {

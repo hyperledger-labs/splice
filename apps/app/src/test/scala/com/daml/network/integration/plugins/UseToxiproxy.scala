@@ -1,6 +1,6 @@
 package com.daml.network.integration.plugins.toxiproxy
 
-import com.daml.network.config.{CNNodeConfig, CNRemoteParticipantConfig}
+import com.daml.network.config.{CNNodeConfig, CNParticipantClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -34,16 +34,16 @@ case class UseToxiproxy(
   override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     def addLedgerApiProxy(
         instanceName: String,
-        remoteParticipant: CNRemoteParticipantConfig,
+        participantClient: CNParticipantClientConfig,
         extraPortBump: Int,
-    ): CNRemoteParticipantConfig = {
+    ): CNParticipantClientConfig = {
       val bump = 20000 + extraPortBump
-      val lapiHost = remoteParticipant.ledgerApi.clientConfig.address
-      val lapiPort = remoteParticipant.ledgerApi.clientConfig.port
+      val lapiHost = participantClient.ledgerApi.clientConfig.address
+      val lapiPort = participantClient.ledgerApi.clientConfig.port
       val upstream = s"${lapiHost}:${lapiPort}"
       val listenPort = lapiPort + bump
       addProxy(s"${instanceName}-ledger-api", s"localhost:${listenPort}", upstream)
-      remoteParticipant.focus(_.ledgerApi.clientConfig).modify(c => c.copy(port = c.port + bump))
+      participantClient.focus(_.ledgerApi.clientConfig).modify(c => c.copy(port = c.port + bump))
     }
 
     def addScanAppHttpProxy(
@@ -77,7 +77,7 @@ case class UseToxiproxy(
               .sortBy(_._1.unwrap) // sv1, sv2, ...
               .zipWithIndex // for adapting the port bump
               .map { case ((n, c), i) =>
-                (n, c.copy(remoteParticipant = addLedgerApiProxy(n.unwrap, c.remoteParticipant, i)))
+                (n, c.copy(participantClient = addLedgerApiProxy(n.unwrap, c.participantClient, i)))
               }
               .toMap
           )
@@ -92,7 +92,7 @@ case class UseToxiproxy(
               .sortBy(_._1.unwrap)
               .zipWithIndex // for adapting the port bump
               .map { case ((n, c), i) =>
-                (n, c.copy(remoteScan = addScanAppHttpProxy(n.unwrap, c.remoteScan, i)))
+                (n, c.copy(scanClient = addScanAppHttpProxy(n.unwrap, c.scanClient, i)))
               }
               .toMap
           )
@@ -105,7 +105,7 @@ case class UseToxiproxy(
           .modify(
             _.map(c =>
               c.copy(
-                remoteParticipant = addLedgerApiProxy("scan-app", c.remoteParticipant, 0)
+                participantClient = addLedgerApiProxy("scan-app", c.participantClient, 0)
               )
             )
           )

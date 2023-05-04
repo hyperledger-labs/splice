@@ -1,14 +1,14 @@
 package com.daml.network.config
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
+import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -77,7 +77,7 @@ object CNNodeConfigTransforms {
       updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
-      updateAllRemoteDirectoryAppConfigs_(c =>
+      updateAllDirectoryAppClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
     )
@@ -150,8 +150,8 @@ object CNNodeConfigTransforms {
   }
 
   type CnAppConfigTransform[A <: NodeConfig] = A => A
-  type DirectoryAppTransform = CnAppConfigTransform[LocalDirectoryAppConfig]
-  type RemoteDirectoryAppTransform = CnAppConfigTransform[RemoteDirectoryAppConfig]
+  type DirectoryAppTransform = CnAppConfigTransform[DirectoryAppBackendConfig]
+  type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type SvcAppTransform = CnAppConfigTransform[SvcAppBackendConfig]
@@ -176,10 +176,10 @@ object CNNodeConfigTransforms {
           case Some(directoryApp) => Some(update(directoryApp))
         })
 
-  def updateAllRemoteDirectoryAppConfigs_(
-      update: RemoteDirectoryAppTransform
+  def updateAllDirectoryAppClientConfigs_(
+      update: DirectoryClientConfigReader
   ): CNNodeConfigTransform =
-    _.focus(_.remoteDirectoryApps).modify(_.map { case (name, config) =>
+    _.focus(_.directoryAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -209,7 +209,7 @@ object CNNodeConfigTransforms {
         })
 
   def updateAllSvAppConfigs(
-      update: (String, LocalSvAppConfig) => LocalSvAppConfig
+      update: (String, SvAppBackendConfig) => SvAppBackendConfig
   ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
@@ -217,7 +217,7 @@ object CNNodeConfigTransforms {
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateAllSvAppConfigs_(
-      update: LocalSvAppConfig => LocalSvAppConfig
+      update: SvAppBackendConfig => SvAppBackendConfig
   ): CNNodeConfigTransform =
     updateAllSvAppConfigs((_, config) => update(config))
 
@@ -301,17 +301,17 @@ object CNNodeConfigTransforms {
   def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
 
     val transforms = Seq(
-      updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
-      updateAllSvAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
-      updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
+      updateSvcAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
+      updateAllSvAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
+      updateScanAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+        _.focus(_.participantClient).modify(portTransform(bump, _))
       ),
       updateDirectoryAppConfig(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+        _.focus(_.participantClient).modify(portTransform(bump, _))
       ),
       updateAllSplitwellAppConfigs_(
-        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+        _.focus(_.participantClient).modify(portTransform(bump, _))
       ),
     )
 
@@ -319,15 +319,15 @@ object CNNodeConfigTransforms {
 
   }
 
-  def bumpRemoteDirectoryPortsBy(bump: Int): CNNodeConfigTransform = {
-    updateAllRemoteDirectoryAppConfigs_(
+  def bumpDirectoryClientsPortsBy(bump: Int): CNNodeConfigTransform = {
+    updateAllDirectoryAppClientConfigs_(
       _.focus(_.ledgerApi).modify(portTransform(bump, _))
     )
   }
 
   def bumpRemoteSplitwellPortsBy(bump: Int): CNNodeConfigTransform = {
     updateAllRemoteSplitwellAppConfigs_(
-      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      _.focus(_.participantClient).modify(portTransform(bump, _))
     )
   }
 
@@ -336,7 +336,7 @@ object CNNodeConfigTransforms {
       updateAllValidatorConfigs { case (name, config) =>
         if (name.startsWith("sv")) config
         else
-          config.focus(_.remoteParticipant).modify(portTransform(bump, _))
+          config.focus(_.participantClient).modify(portTransform(bump, _))
       }
     )
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
@@ -350,8 +350,8 @@ object CNNodeConfigTransforms {
 
   private def portTransform(
       bump: Int,
-      c: CNRemoteParticipantConfig,
-  ): CNRemoteParticipantConfig =
+      c: CNParticipantClientConfig,
+  ): CNParticipantClientConfig =
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
       .focus(_.ledgerApi)
@@ -371,28 +371,28 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform = { config =>
     val transforms: Seq[CNNodeConfigTransform] = Seq(
       updateAllValidatorConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateSvcAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllSvAppConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateScanAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.svcUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svcUser, _))
       }),
       updateDirectoryAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
-      updateAllRemoteDirectoryAppConfigs_(c => {
+      updateAllDirectoryAppClientConfigs_(c => {
         c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateAllSplitwellAppConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.providerUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
       updateAllRemoteSplitwellAppConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))
@@ -450,7 +450,7 @@ object CNNodeConfigTransforms {
     tokens.toMap
   }
 
-  def getAdminToken(clockConfig: ClockConfig, config: CNRemoteParticipantConfig): String = {
+  def getAdminToken(clockConfig: ClockConfig, config: CNParticipantClientConfig): String = {
     getAdminToken(clockConfig, config.ledgerApi.clientConfig)
   }
 

@@ -2,9 +2,9 @@ package com.daml.network.scan.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNRemoteParticipantConfig,
-  LocalCNNodeConfig,
-  RemoteCNNodeConfig,
+  CNParticipantClientConfig,
+  CNNodeBackendConfig,
+  CNNodeClientConfig,
 }
 import com.digitalasset.canton.config.*
 
@@ -14,11 +14,11 @@ case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     svcUser: String,
-    override val remoteParticipant: CNRemoteParticipantConfig,
+    override val participantClient: CNParticipantClientConfig,
     domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     enableCoinRulesUpgrade: Boolean = false,
-) extends LocalCNNodeConfig
+) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
@@ -36,7 +36,7 @@ case class ScanAppClientConfig(
       * if its CoinRules cache is outdated and the client never notices and rehydrates it.
       */
     coinRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-) extends RemoteCNNodeConfig
+) extends CNNodeClientConfig
     with BaseScanAppConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

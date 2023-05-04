@@ -355,7 +355,7 @@ abstract class WalletAppReference(
   }
 }
 
-/** Client (aka remote) reference to a wallet app in the style of CNRemoteParticipantReference, i.e.,
+/** Client (aka remote) reference to a wallet app in the style of CNParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class WalletAppClientReference(

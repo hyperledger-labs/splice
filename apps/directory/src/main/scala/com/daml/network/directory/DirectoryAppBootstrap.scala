@@ -5,7 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.directory.config.LocalDirectoryAppConfig
+import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
@@ -28,7 +28,7 @@ import scala.concurrent.Future
   */
 class DirectoryAppBootstrap(
     override val name: InstanceName,
-    val config: LocalDirectoryAppConfig,
+    val config: DirectoryAppBackendConfig,
     val directoryAppParameters: SharedCNNodeAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -44,7 +44,7 @@ class DirectoryAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CNNodeBootstrapBase[
       DirectoryApp,
-      LocalDirectoryAppConfig,
+      DirectoryAppBackendConfig,
       SharedCNNodeAppParameters,
     ](
       name,
@@ -82,7 +82,7 @@ object DirectoryAppBootstrap {
 
   def apply(
       name: String,
-      directoryConfig: LocalDirectoryAppConfig,
+      directoryConfig: DirectoryAppBackendConfig,
       coinAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       directoryMetrics: DirectoryAppMetrics,

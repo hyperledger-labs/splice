@@ -52,7 +52,7 @@ class ScanApp(
     tracer: Tracer,
 ) extends CNNode[ScanApp.State](
       config.svcUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,

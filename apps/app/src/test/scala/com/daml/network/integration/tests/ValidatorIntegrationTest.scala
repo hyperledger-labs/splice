@@ -44,11 +44,11 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   "initialize svc and validator apps" in { implicit env =>
     initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
-    val coinRules = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+    val coinRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
-    val openRounds = svc.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+    val openRounds = svc.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
     openRounds should have length 3
 
@@ -57,7 +57,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
     // check that alice's validator can see its license.
     val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-    aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+    aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
       .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorParty)
 
     // onboard end user
@@ -75,7 +75,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
     clue("Bob's validator can see its own ValidatorLicense") {
       inside(
-        bobValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        bobValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
             bobValidatorParty
           )

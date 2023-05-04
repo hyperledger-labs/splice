@@ -33,7 +33,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
       createSelfSubscription(
-        aliceValidator.remoteParticipantWithAdminToken,
+        aliceValidator.participantClientWithAdminToken,
         aliceDamlUser,
         alicePartyId,
         paymentAmount(42.0, paymentCodegen.Currency.CC),
@@ -98,7 +98,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       aliceWallet.tap(50) // she'll need this for MakePayment to happen (but not collection)
       clue("Create subscription, the payment on which won't be collected") {
         createSelfSubscription(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceDamlUser,
           alicePartyId,
         )

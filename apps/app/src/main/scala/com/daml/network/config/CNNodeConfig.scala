@@ -4,7 +4,7 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
-import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
+import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -15,8 +15,8 @@ import com.daml.network.splitwell.config.{
 import com.daml.network.sv.config.{
   ApprovedSvIdentityConfig,
   ExpectedOnboardingConfig,
-  LocalSvAppConfig,
-  RemoteSvAppConfig,
+  SvAppBackendConfig,
+  SvAppClientConfig,
   SvOnboardingConfig,
 }
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
@@ -31,7 +31,7 @@ import com.daml.network.wallet.config.{
   TreasuryConfig,
   WalletAppClientConfig,
   WalletDomainConfig,
-  WalletRemoteValidatorAppConfig,
+  WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
@@ -73,13 +73,13 @@ case class CNNodeConfig(
     validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
     svcApp: Option[SvcAppBackendConfig] = None,
     svcAppClient: Option[SvcAppClientConfig] = None,
-    svApps: Map[InstanceName, LocalSvAppConfig] = Map.empty,
-    svAppClients: Map[InstanceName, RemoteSvAppConfig] = Map.empty,
+    svApps: Map[InstanceName, SvAppBackendConfig] = Map.empty,
+    svAppClients: Map[InstanceName, SvAppClientConfig] = Map.empty,
     scanApp: Option[ScanAppBackendConfig] = None,
     ScanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
-    directoryApp: Option[LocalDirectoryAppConfig] = None,
-    remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
+    directoryApp: Option[DirectoryAppBackendConfig] = None,
+    directoryAppClients: Map[InstanceName, DirectoryAppClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
@@ -142,9 +142,9 @@ case class CNNodeConfig(
   // Since the rest of the code generally expects a map of nodes, we'll create one.
   private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
   lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
-  private lazy val remoteSvcAppInstanceName = InstanceName.tryCreate("svc-app-client")
-  lazy val remoteSvcApps =
-    svcAppClient.toList.map(config => remoteSvcAppInstanceName -> config).toMap
+  private lazy val svcAppClientInstanceName = InstanceName.tryCreate("svc-app-client")
+  lazy val svcAppClients =
+    svcAppClient.toList.map(config => svcAppClientInstanceName -> config).toMap
 
   private lazy val svcAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     svcApps.fmap { svcConfig =>
@@ -218,7 +218,7 @@ case class CNNodeConfig(
 
   /** Use `svs` instead!
     */
-  def svsByString: Map[String, LocalSvAppConfig] = svApps.map { case (n, c) =>
+  def svsByString: Map[String, SvAppBackendConfig] = svApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -306,13 +306,13 @@ case class CNNodeConfig(
 
   /** Use `directories` instead!
     */
-  def directoriesByString: Map[String, LocalDirectoryAppConfig] =
+  def directoriesByString: Map[String, DirectoryAppBackendConfig] =
     directoryApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
-  def remoteDirectoriesByString: Map[String, RemoteDirectoryAppConfig] =
-    remoteDirectoryApps.map { case (n, c) =>
+  def directoryClientsByString: Map[String, DirectoryAppClientConfig] =
+    directoryAppClients.map { case (n, c) =>
       n.unwrap -> c
     }
 
@@ -355,7 +355,7 @@ case class CNNodeConfig(
       n.unwrap -> c
     }
 
-  def remoteSplitwellsByString: Map[String, SplitwellAppClientConfig] =
+  def splitwellClientsByString: Map[String, SplitwellAppClientConfig] =
     splitwellAppClients.map { case (n, c) =>
       n.unwrap -> c
     }
@@ -423,11 +423,11 @@ object CNNodeConfig {
       deriveReader[AutomationConfig]
     implicit val cnNodeLedgerApiClientConfigReader: ConfigReader[CNLedgerApiClientConfig] =
       deriveReader[CNLedgerApiClientConfig]
-    implicit val cnNodeRemoteParticipantConfigReader: ConfigReader[CNRemoteParticipantConfig] =
-      deriveReader[CNRemoteParticipantConfig]
+    implicit val cnNodeParticipantClientConfigReader: ConfigReader[CNParticipantClientConfig] =
+      deriveReader[CNParticipantClientConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
-    implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
+    implicit val scanClientConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
     implicit val globalOnlyDomainConfigReader: ConfigReader[GlobalOnlyDomainConfig] =
       deriveReader[GlobalOnlyDomainConfig]
@@ -435,11 +435,11 @@ object CNNodeConfig {
       deriveReader[ScanAppBackendConfig]
     implicit val svcConfigReader: ConfigReader[SvcAppBackendConfig] =
       deriveReader[SvcAppBackendConfig]
-    implicit val remoteSvcConfigReader: ConfigReader[SvcAppClientConfig] =
+    implicit val svcClientConfigReader: ConfigReader[SvcAppClientConfig] =
       deriveReader[SvcAppClientConfig]
 
-    implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
-      deriveReader[RemoteSvAppConfig]
+    implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
+      deriveReader[SvAppClientConfig]
 
     implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val svOnboardingFoundCollectiveReader
@@ -455,8 +455,8 @@ object CNNodeConfig {
       deriveReader[ExpectedOnboardingConfig]
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
-    implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
-      deriveReader[LocalSvAppConfig]
+    implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
+      deriveReader[SvAppBackendConfig]
 
     implicit val cnNodeAppParametersReader: ConfigReader[SharedCNNodeAppParameters] =
       deriveReader[SharedCNNodeAppParameters]
@@ -466,25 +466,25 @@ object CNNodeConfig {
       deriveReader[TreasuryConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig]
-    implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
+    implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
       deriveReader[ValidatorAppClientConfig]
-    implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
-      deriveReader[WalletRemoteValidatorAppConfig]
+    implicit val walletvalidatorClientConfigReader: ConfigReader[WalletValidatorAppClientConfig] =
+      deriveReader[WalletValidatorAppClientConfig]
     implicit val walletDomainConfigReader: ConfigReader[WalletDomainConfig] =
       deriveReader[WalletDomainConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
-    implicit val directoryConfigReader: ConfigReader[LocalDirectoryAppConfig] =
-      deriveReader[LocalDirectoryAppConfig]
-    implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
-      deriveReader[RemoteDirectoryAppConfig]
+    implicit val directoryConfigReader: ConfigReader[DirectoryAppBackendConfig] =
+      deriveReader[DirectoryAppBackendConfig]
+    implicit val directoryClientConfigReader: ConfigReader[DirectoryAppClientConfig] =
+      deriveReader[DirectoryAppClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
       deriveReader[SplitwellDomains]
     implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
       deriveReader[SplitwellDomainConfig]
     implicit val splitwellConfigReader: ConfigReader[SplitwellAppBackendConfig] =
       deriveReader[SplitwellAppBackendConfig]
-    implicit val remoteSplitwellConfigReader: ConfigReader[SplitwellAppClientConfig] =
+    implicit val splitwellClientConfigReader: ConfigReader[SplitwellAppClientConfig] =
       deriveReader[SplitwellAppClientConfig]
 
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
@@ -533,21 +533,21 @@ object CNNodeConfig {
       deriveWriter[AutomationConfig]
     implicit val cnNodeLedgerApiClientConfigWriter: ConfigWriter[CNLedgerApiClientConfig] =
       deriveWriter[CNLedgerApiClientConfig]
-    implicit val cnNodeRemoteParticipantConfigWriter: ConfigWriter[CNRemoteParticipantConfig] =
-      deriveWriter[CNRemoteParticipantConfig]
+    implicit val cnNodeParticipantClientConfigWriter: ConfigWriter[CNParticipantClientConfig] =
+      deriveWriter[CNParticipantClientConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
-    implicit val remoteScanConfigWriter: ConfigWriter[ScanAppClientConfig] =
+    implicit val scanClientConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
     implicit val svcConfigWriter: ConfigWriter[SvcAppBackendConfig] =
       deriveWriter[SvcAppBackendConfig]
-    implicit val remoteSvcConfigWriter: ConfigWriter[SvcAppClientConfig] =
+    implicit val svcClientConfigWriter: ConfigWriter[SvcAppClientConfig] =
       deriveWriter[SvcAppClientConfig]
 
-    implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
-      deriveWriter[RemoteSvAppConfig]
+    implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
+      deriveWriter[SvAppClientConfig]
 
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
@@ -565,8 +565,8 @@ object CNNodeConfig {
       confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)
     implicit val approvedSvIdentityConfigWriter: ConfigWriter[ApprovedSvIdentityConfig] =
       deriveWriter[ApprovedSvIdentityConfig]
-    implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
-      deriveWriter[LocalSvAppConfig]
+    implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
+      deriveWriter[SvAppBackendConfig]
 
     implicit val cnNodeAppParametersWriter: ConfigWriter[SharedCNNodeAppParameters] =
       deriveWriter[SharedCNNodeAppParameters]
@@ -576,27 +576,27 @@ object CNNodeConfig {
       confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
-    implicit val remoteValidatorConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
+    implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
       deriveWriter[ValidatorAppClientConfig]
-    implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =
-      deriveWriter[WalletRemoteValidatorAppConfig]
+    implicit val walletvalidatorClientConfigWriter: ConfigWriter[WalletValidatorAppClientConfig] =
+      deriveWriter[WalletValidatorAppClientConfig]
     implicit val treasuryConfigWriter: ConfigWriter[TreasuryConfig] =
       deriveWriter[TreasuryConfig]
     implicit val walletDomainConfigWriter: ConfigWriter[WalletDomainConfig] =
       deriveWriter[WalletDomainConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
-    implicit val directoryConfigWriter: ConfigWriter[LocalDirectoryAppConfig] =
-      deriveWriter[LocalDirectoryAppConfig]
-    implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
-      deriveWriter[RemoteDirectoryAppConfig]
+    implicit val directoryConfigWriter: ConfigWriter[DirectoryAppBackendConfig] =
+      deriveWriter[DirectoryAppBackendConfig]
+    implicit val directoryClientConfigWriter: ConfigWriter[DirectoryAppClientConfig] =
+      deriveWriter[DirectoryAppClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
       deriveWriter[SplitwellDomains]
     implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =
       deriveWriter[SplitwellDomainConfig]
     implicit val splitwellConfigWriter: ConfigWriter[SplitwellAppBackendConfig] =
       deriveWriter[SplitwellAppBackendConfig]
-    implicit val remoteSplitwellConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
+    implicit val splitwellClientConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
       deriveWriter[SplitwellAppClientConfig]
 
     implicit val communityDomainConfigWriter: ConfigWriter[CommunityDomainConfig] =

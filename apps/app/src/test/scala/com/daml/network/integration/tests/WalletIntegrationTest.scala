@@ -73,7 +73,7 @@ class WalletIntegrationTest
       // create and reject request such that...
       val request =
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           alice,
         )._2
@@ -111,13 +111,13 @@ class WalletIntegrationTest
         val requestIds =
           (1 to 3).map(_ =>
             createSelfPaymentRequest(
-              aliceValidator.remoteParticipantWithAdminToken,
+              aliceValidator.participantClientWithAdminToken,
               aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
         val offsetBefore =
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+          aliceValidator.participantClientWithAdminToken.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
@@ -126,7 +126,7 @@ class WalletIntegrationTest
         )
 
         // Wait until 2 transactions have been received
-        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+        val txs = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
@@ -152,20 +152,20 @@ class WalletIntegrationTest
         val requests =
           (0 to batchSize + 1).map(_ =>
             createSelfPaymentRequest(
-              aliceValidator.remoteParticipantWithAdminToken,
+              aliceValidator.participantClientWithAdminToken,
               aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
 
         eventually() {
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs.filterJava(
+          aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs.filterJava(
             walletCodegen.AppPaymentRequest.COMPANION
           )(alice) should have size (batchSize.toLong + 2)
         }
 
         val offsetBefore =
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+          aliceValidator.participantClientWithAdminToken.ledger_api.transactions.end()
 
         requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
 
@@ -173,7 +173,7 @@ class WalletIntegrationTest
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
-        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+        val txs = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
@@ -198,7 +198,7 @@ class WalletIntegrationTest
         // creating payment request
         val request =
           createSelfPaymentRequest(
-            aliceValidator.remoteParticipantWithAdminToken,
+            aliceValidator.participantClientWithAdminToken,
             aliceWallet.config.ledgerApiUser,
             alice,
           )._2
@@ -348,7 +348,7 @@ class WalletIntegrationTest
     }
 
     "transfer AppPaymentRequest and DeliveryOffer to global domain" in { implicit env =>
-      val splitwellDomainId = aliceValidator.remoteParticipantWithAdminToken.domains.id_of(
+      val splitwellDomainId = aliceValidator.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
       val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
@@ -356,7 +356,7 @@ class WalletIntegrationTest
       val (_, (deliveryOfferId, requestId)) = actAndCheck(
         "Create payment request on private domain",
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceParty,
           domainId = Some(splitwellDomainId),
@@ -364,7 +364,7 @@ class WalletIntegrationTest
       )(
         "request and delivery offer get transferred to public domain",
         { case (offer, request, _) =>
-          val domains = aliceValidator.remoteParticipantWithAdminToken.transfer
+          val domains = aliceValidator.participantClientWithAdminToken.transfer
             .lookup_contract_domain(offer, request)
           domains shouldBe Map[LfContractId, String](
             javaToScalaContractId(request) -> "global",

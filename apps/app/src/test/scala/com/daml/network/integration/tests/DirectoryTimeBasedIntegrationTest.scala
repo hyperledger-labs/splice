@@ -36,8 +36,8 @@ class DirectoryTimeBasedIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-        bobValidator.remoteParticipant.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.dars.upload(directoryDarPath)
+        bobValidator.participantClient.dars.upload(directoryDarPath)
       })
 
   "Directory service" should {
@@ -45,8 +45,8 @@ class DirectoryTimeBasedIntegrationTest
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
-        val now = directory.remoteParticipant.ledger_api.time.get()
-        directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+        val now = directory.participantClient.ledger_api.time.get()
+        directory.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -74,7 +74,7 @@ class DirectoryTimeBasedIntegrationTest
 
         clue("Request install and wait for provider to auto-accept") {
           aliceDirectory.requestDirectoryInstall()
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+          aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
             .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
         }
 
@@ -128,7 +128,7 @@ class DirectoryTimeBasedIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
 
@@ -157,11 +157,11 @@ class DirectoryTimeBasedIntegrationTest
       }
       // Wait for subscription to be expired.
       eventually() {
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(codegen.DirectoryEntryContext.COMPANION)(aliceUserParty) shouldBe empty
       }
     }
@@ -172,7 +172,7 @@ class DirectoryTimeBasedIntegrationTest
 
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
 

@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -41,7 +41,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   def key: SvStore.Key
 
-  protected[this] def appConfig: LocalSvAppConfig
+  protected[this] def appConfig: SvAppBackendConfig
 
   override final def defaultAcsDomain = appConfig.domains.global
 
@@ -546,7 +546,7 @@ object SvSvcStore {
   def apply(
       key: SvStore.Key,
       storage: Storage,
-      config: LocalSvAppConfig,
+      config: SvAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
       futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
@@ -567,7 +567,7 @@ object SvSvcStore {
   def contractFilter(
       svcParty: PartyId,
       svParty: PartyId,
-      appConfig: LocalSvAppConfig,
+      appConfig: SvAppBackendConfig,
   ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive

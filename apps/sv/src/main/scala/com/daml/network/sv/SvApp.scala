@@ -25,7 +25,7 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.auth.SvAuthExtractor
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
-import com.daml.network.sv.config.{LocalSvAppConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
@@ -58,7 +58,7 @@ import scala.util.{Failure, Success}
 
 class SvApp(
     override val name: InstanceName,
-    val config: LocalSvAppConfig,
+    val config: SvAppBackendConfig,
     val coinAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
@@ -72,7 +72,7 @@ class SvApp(
     tracer: Tracer,
 ) extends CNNode[SvApp.State](
       config.ledgerApiUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,
@@ -80,7 +80,7 @@ class SvApp(
 
   override def initialize(ledgerClient: CNLedgerClient, svPartyId: PartyId): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
-      config.remoteParticipant.adminApi,
+      config.participantClient.adminApi,
       timeouts,
       loggerFactory,
     )
@@ -305,14 +305,14 @@ class SvApp(
       svcPartyHosting: SvcPartyHosting,
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
     config.onboarding match {
-      case SvOnboardingConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
+      case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
               _ <- uploadDars(ledgerConnection)
               _ <- waitForValidatorLicense(svStore)
               _ <- requestOnboarding(
-                remoteSv.adminApi,
+                svClient.adminApi,
                 name,
                 svStore.key.svParty,
                 publicKey,
@@ -361,12 +361,12 @@ class SvApp(
         foundCollective(foundingConfig, svcStore, ledgerConnection, globalDomain)
       case _: SvOnboardingConfig.JoinViaSvcApp =>
         joinCollective(svcStore.key.svParty)
-      case SvOnboardingConfig.JoinWithKey(name, remoteSv, publicKey, privateKey) =>
+      case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
               _ <- requestOnboarding(
-                remoteSv.adminApi,
+                svClient.adminApi,
                 name,
                 svcStore.key.svParty,
                 publicKey,
@@ -405,7 +405,7 @@ class SvApp(
   private def getSvcPartyId: Future[PartyId] = {
     // From SVC app for now
     val svcConnection = new SvcConnection(
-      config.remoteSvc.clientAdminApi,
+      config.svcClient.clientAdminApi,
       coinAppParameters.processingTimeouts,
       loggerFactory,
     )
@@ -606,7 +606,7 @@ class SvApp(
     retryProvider.retryForAutomation(
       "join existing SV collective", {
         val svcConnection = new SvcConnection(
-          config.remoteSvc.clientAdminApi,
+          config.svcClient.clientAdminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )

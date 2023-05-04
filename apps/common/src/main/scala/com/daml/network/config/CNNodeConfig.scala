@@ -23,21 +23,21 @@ import com.digitalasset.canton.version.ProtocolVersion
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
   */
-abstract class LocalCNNodeConfig extends LocalNodeConfig {
+abstract class CNNodeBackendConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
   override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
-  def remoteParticipant: CNRemoteParticipantConfig
+  def participantClient: CNParticipantClientConfig
   def automation: AutomationConfig
 }
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
   */
-abstract class RemoteCNNodeConfig extends NodeConfig {}
+abstract class CNNodeClientConfig extends NodeConfig {}
 
 /** This class aggregates binary-level configuration options that are shared between each CN app instance.
   * For example, the [[TracingConfig]] is configured once for all CN apps that are started by a CN binary as part of the

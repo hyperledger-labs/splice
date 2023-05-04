@@ -41,7 +41,7 @@ class WalletPaymentFrontendIntegrationTest
         val description = "this will be accepted (in CC)"
 
         val (_, paymentRequestContractId, _) = createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -77,7 +77,7 @@ class WalletPaymentFrontendIntegrationTest
           actAndCheck(
             "The payment is collected", {
               collectAcceptedAppPaymentRequest(
-                aliceValidator.remoteParticipantWithAdminToken,
+                aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
@@ -113,7 +113,7 @@ class WalletPaymentFrontendIntegrationTest
         val description = "this will be accepted (in USD)"
 
         val (_, paymentRequestContractId, _) = createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -149,7 +149,7 @@ class WalletPaymentFrontendIntegrationTest
           actAndCheck(
             "The payment is collected", {
               collectAcceptedAppPaymentRequest(
-                aliceValidator.remoteParticipantWithAdminToken,
+                aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
@@ -189,7 +189,7 @@ class WalletPaymentFrontendIntegrationTest
         val description = "this will be accepted (in CC)"
 
         val (_, paymentRequestContractId, _) = createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -228,7 +228,7 @@ class WalletPaymentFrontendIntegrationTest
           actAndCheck(
             "The payment is collected", {
               collectAcceptedAppPaymentRequest(
-                aliceValidator.remoteParticipantWithAdminToken,
+                aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
@@ -264,7 +264,7 @@ class WalletPaymentFrontendIntegrationTest
         val description = "this will be accepted (in USD)"
 
         val (_, paymentRequestContractId, _) = createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -303,7 +303,7 @@ class WalletPaymentFrontendIntegrationTest
           actAndCheck(
             "The payment is collected", {
               collectAcceptedAppPaymentRequest(
-                aliceValidator.remoteParticipantWithAdminToken,
+                aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,
@@ -339,7 +339,7 @@ class WalletPaymentFrontendIntegrationTest
         val description = "this will be accepted (in USD)"
 
         val (_, paymentRequestContractId, _) = createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -378,7 +378,7 @@ class WalletPaymentFrontendIntegrationTest
           actAndCheck(
             "The payment is collected", {
               collectAcceptedAppPaymentRequest(
-                aliceValidator.remoteParticipantWithAdminToken,
+                aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
                 acceptedPayment.contractId,

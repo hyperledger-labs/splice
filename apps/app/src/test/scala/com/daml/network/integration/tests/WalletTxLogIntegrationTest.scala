@@ -35,8 +35,8 @@ class WalletTxLogIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(splitwellDarPath)
-        bobValidator.remoteParticipant.dars.upload(splitwellDarPath)
+        aliceValidator.participantClient.dars.upload(splitwellDarPath)
+        bobValidator.participantClient.dars.upload(splitwellDarPath)
       })
   }
 
@@ -72,7 +72,7 @@ class WalletTxLogIntegrationTest
 
       clue("Mint to get some coins") {
         mintCoin(
-          sv1Validator.remoteParticipantWithAdminToken,
+          sv1Validator.participantClientWithAdminToken,
           sv1UserParty,
           47.0,
         )
@@ -102,7 +102,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -122,7 +122,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice collects self-payment request",
         collectAcceptedAppPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty),
           acceptedPaymentCid,
@@ -189,7 +189,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -209,7 +209,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice rejects the self-payment request",
         rejectAcceptedAppPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           acceptedPaymentCid,
@@ -278,7 +278,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates payment request",
         createPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -302,7 +302,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Receivers collect the payment request",
         collectAcceptedAppPaymentRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
           acceptedPaymentCid,
@@ -560,7 +560,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -587,7 +587,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -617,7 +617,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the second payment",
         collectSubscriptionPayment(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -720,7 +720,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -748,7 +748,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the initial payment",
         rejectAcceptedSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           initialPaymentCid,
@@ -810,7 +810,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -837,7 +837,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -867,7 +867,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the second payment",
         rejectSubscriptionPayment(
-          aliceValidator.remoteParticipantWithAdminToken,
+          aliceValidator.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           paymentCid,

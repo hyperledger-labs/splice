@@ -192,7 +192,7 @@ final class ScanAppBackendReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends ScanAppReference(cnNodeConsoleEnvironment, name)
-    with LocalCNNodeAppReference
+    with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Scan Backend"
@@ -206,23 +206,23 @@ final class ScanAppBackendReference(
     cnNodeConsoleEnvironment.environment.config.scansByString(name)
 
   /** Remote participant this scan app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
+  lazy val participantClient =
+    new CNParticipantClientReference(
       cnNodeConsoleEnvironment,
       s"remote participant for `$name``",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
-  lazy val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
+  lazy val participantClientWithAdminToken =
+    new CNParticipantClientReference(
       cnNodeConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
+      config.participantClient.participantClientConfigWithAdminToken,
     )
 }
 
-/** Remote reference to a scan app in the style of CNRemoteParticipantReference, i.e.,
+/** Remote reference to a scan app in the style of CNParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class ScanAppClientReference(

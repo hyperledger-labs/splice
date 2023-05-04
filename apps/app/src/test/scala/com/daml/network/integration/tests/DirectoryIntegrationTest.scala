@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.{
-  RemoteDirectoryAppReference,
+  DirectoryAppClientReference,
   ValidatorAppBackendReference,
   WalletAppClientReference,
 }
@@ -44,8 +44,8 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-        bobValidator.remoteParticipant.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.dars.upload(directoryDarPath)
+        bobValidator.participantClient.dars.upload(directoryDarPath)
       })
 
   "Directory service" should {
@@ -61,7 +61,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       // The user of the directory service.
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val offsetBefore =
-        directory.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+        directory.participantClientWithAdminToken.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
       for (_ <- 1 to 3)
@@ -71,7 +71,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
       // Wait for one transaction, so that automation likely kicks-off but shutdown initiates quickly
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
-      directory.remoteParticipantWithAdminToken.ledger_api.transactions
+      directory.participantClientWithAdminToken.ledger_api.transactions
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 
@@ -98,7 +98,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
                           new com.daml.network.codegen.java.da.internal.template.Archive()
                         )
                       try {
-                        aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+                        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
                           .submitJava(
                             actAs = Seq(aliceUserParty),
                             optTimeout = None,
@@ -120,7 +120,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
               }
               clue("Waiting for all install requests to be archived") {
                 eventually() {
-                  aliceValidator.remoteParticipant.ledger_api_extensions.acs.filterJava(
+                  aliceValidator.participantClient.ledger_api_extensions.acs.filterJava(
                     codegen.DirectoryInstallRequest.COMPANION
                   )(aliceUserParty) shouldBe empty
                 }
@@ -130,11 +130,11 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
             "there is exactly one install and no left-over request",
             _ => {
               val installs =
-                aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+                aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
                   .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
               installs should have size (1)
               val requests =
-                aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+                aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
                   .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
               requests shouldBe Seq.empty
               // return install-cid
@@ -213,7 +213,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
               .commands
               .asScala
               .toSeq
-            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 commands = cmds,
@@ -223,7 +223,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
         )(
           "There is no install contract left",
           _ =>
-            aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(codegen.DirectoryInstall.COMPANION)(
                 aliceUserParty
               ) shouldBe empty,
@@ -246,7 +246,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       })
       // Wait for the SubscriptionInitialPayment to be archived
       eventually() {
-        refs.validator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        refs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
             refs.userParty,
             (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
@@ -319,7 +319,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
-        directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+        directory.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -376,7 +376,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()
-        refs.validator.remoteParticipantWithAdminToken.ledger_api_extensions.acs
+        refs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(userParty)
       }
 
@@ -390,14 +390,14 @@ object DirectoryIntegrationTest {
   // Helper classes to make it easier to write test code interacting with a users' services
   case class StaticUserRefs(
       validator: ValidatorAppBackendReference,
-      directory: RemoteDirectoryAppReference,
+      directory: DirectoryAppClientReference,
       wallet: WalletAppClientReference,
   )
 
   case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
     def validator: ValidatorAppBackendReference = static.validator
 
-    def directory: RemoteDirectoryAppReference = static.directory
+    def directory: DirectoryAppClientReference = static.directory
 
     def wallet: WalletAppClientReference = static.wallet
   }

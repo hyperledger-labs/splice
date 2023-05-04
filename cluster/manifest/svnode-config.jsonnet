@@ -47,11 +47,11 @@ local deployments(num, svConfig, config) =
             value: "join-with-key",
           },
           {
-            name: "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+            name: "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
             value: "5014",
           },
           {
-            name: "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+            name: "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
             value: "http://sv-app.sv-1",
           },
           {
@@ -68,8 +68,8 @@ local deployments(num, svConfig, config) =
             value: |||
               _onboarding {
                 type = "join-with-key"
-                remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}
-                remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}
+                sv-client.admin-api.port = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}
+                sv-client.admin-api.address = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}
                 public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}
                 private-key = "%s"
               }

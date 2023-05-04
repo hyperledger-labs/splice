@@ -23,7 +23,7 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(darPath)
+        aliceValidator.participantClient.dars.upload(darPath)
       })
 
   val globalDomain = DomainAlias.tryCreate("global")
@@ -42,14 +42,14 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
   }
 
   "duplicate transfer in" in { implicit env =>
-    val alice = aliceValidator.remoteParticipantWithAdminToken.ledger_api.parties
+    val alice = aliceValidator.participantClientWithAdminToken.ledger_api.parties
       .allocate(aliceWallet.config.ledgerApiUser, aliceWallet.config.ledgerApiUser)
       .party
     Using.resource(
       new CNLedgerClient(
-        config = aliceValidator.remoteParticipantWithAdminToken.config.ledgerApi,
+        config = aliceValidator.participantClientWithAdminToken.config.ledgerApi,
         applicationId = "test",
-        token = aliceValidator.remoteParticipantWithAdminToken.config.token,
+        token = aliceValidator.participantClientWithAdminToken.config.token,
         timeouts = env.environment.config.parameters.timeouts.processing,
         apiLoggingConfig = env.environment.config.monitoring.logging.api,
         loggerFactory = loggerFactory,
@@ -66,12 +66,12 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
       val connection = client.connection("test", loggerFactory)
 
       val globalDomainId =
-        aliceValidator.remoteParticipantWithAdminToken.domains.id_of(globalDomain)
+        aliceValidator.participantClientWithAdminToken.domains.id_of(globalDomain)
       val splitwellDomainId =
-        aliceValidator.remoteParticipantWithAdminToken.domains.id_of(splitwellDomain)
+        aliceValidator.participantClientWithAdminToken.domains.id_of(splitwellDomain)
 
       // We do the setup through console commands which are a bit simpler to use.
-      val cid = aliceValidator.remoteParticipantWithAdminToken.ledger_api_extensions.commands
+      val cid = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
         .submitWithResult(
           aliceWallet.config.ledgerApiUser,
           actAs = Seq(alice),
@@ -83,7 +83,7 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
           ).create,
         )
         .contractId
-      val outId = aliceValidator.remoteParticipantWithAdminToken.transfer.out(
+      val outId = aliceValidator.participantClientWithAdminToken.transfer.out(
         alice,
         cid,
         globalDomain,

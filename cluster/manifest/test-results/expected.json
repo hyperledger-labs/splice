@@ -1454,11 +1454,11 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
                               "value": "5014"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
                               "value": "http://sv-app.sv-1"
                            },
                            {
@@ -1471,7 +1471,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.port = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  sv-client.admin-api.address = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -2178,11 +2178,11 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
                               "value": "5014"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
                               "value": "http://sv-app.sv-1"
                            },
                            {
@@ -2195,7 +2195,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.port = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  sv-client.admin-api.address = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -2902,11 +2902,11 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
                               "value": "5014"
                            },
                            {
-                              "name": "CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS",
+                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
                               "value": "http://sv-app.sv-1"
                            },
                            {
@@ -2919,7 +2919,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  remote-sv.admin-api.port = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_PORT}\n  remote-sv.admin-api.address = ${CN_APP_SV_REMOTE_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.port = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  sv-client.admin-api.address = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",

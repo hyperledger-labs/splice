@@ -80,7 +80,7 @@ class SelfHostedPreflightIntegrationTest
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 
-      v("validatorApp").remoteParticipant.dars
+      v("validatorApp").participantClient.dars
         .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 
       val walletUiPort = 3000

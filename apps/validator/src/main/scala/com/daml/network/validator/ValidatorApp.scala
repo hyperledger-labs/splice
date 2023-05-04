@@ -69,7 +69,7 @@ class ValidatorApp(
     tracer: Tracer,
 ) extends CNNode[ValidatorApp.State](
       config.ledgerApiUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,
@@ -160,7 +160,7 @@ class ValidatorApp(
         onboardingConfig match {
           case Some(oc) =>
             for {
-              _ <- requestOnboarding(oc.remoteSv.adminApi, validatorParty, oc.secret)
+              _ <- requestOnboarding(oc.svClient.adminApi, validatorParty, oc.secret)
               _ <- waitForValidatorLicense(store)
             } yield ()
           case None => sys.error("Not onboarded but no onboarding config found; exiting.")
@@ -219,7 +219,7 @@ class ValidatorApp(
     for {
       scanConnection <- ScanConnection(
         ledgerClient,
-        config.remoteScan,
+        config.scanClient,
         clock,
         retryProvider,
         coinAppParameters.processingTimeouts,

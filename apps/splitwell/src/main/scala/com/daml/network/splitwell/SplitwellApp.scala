@@ -48,7 +48,7 @@ class SplitwellApp(
     tracer: Tracer,
 ) extends CNNode[SplitwellApp.State](
       config.providerUser,
-      config.remoteParticipant,
+      config.participantClient,
       coinAppParameters,
       loggerFactory,
       tracerProvider,
@@ -66,7 +66,7 @@ class SplitwellApp(
     scanConnection <-
       ScanConnection(
         ledgerClient,
-        config.remoteScan,
+        config.scanClient,
         clock,
         retryProvider,
         coinAppParameters.processingTimeouts,

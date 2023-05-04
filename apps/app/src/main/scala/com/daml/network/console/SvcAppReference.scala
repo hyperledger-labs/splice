@@ -62,7 +62,7 @@ class SvcAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SvcAppReference(consoleEnvironment, name)
-    with LocalCNNodeAppReference
+    with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC"
@@ -74,19 +74,19 @@ class SvcAppBackendReference(
     consoleEnvironment.environment.config.svcsByString(name)
 
   /** Remote participant this SVC app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
+  lazy val participantClient =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name``",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this SVC app is configured to interact with. Uses admin tokens to bypass auth. */
-  lazy val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
+  lazy val participantClientWithAdminToken =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
+      config.participantClient.participantClientConfigWithAdminToken,
     )
 
   /** secret, not publicly documented way to get the admin token */

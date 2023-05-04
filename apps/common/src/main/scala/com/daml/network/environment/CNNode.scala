@@ -9,7 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.AuthTokenSource
-import com.daml.network.config.{CNRemoteParticipantConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 /** A running instance of a canton node */
 abstract class CNNode[State <: AutoCloseable & HasHealth](
     serviceUser: String,
-    remoteParticipant: CNRemoteParticipantConfig,
+    participantClient: CNParticipantClientConfig,
     parameters: SharedCNNodeAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -223,7 +223,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     _ <- Future.successful(())
     _ = logger.info("Creating ledger API auth token source")
     authTokenSource = AuthTokenSource.fromConfig(
-      remoteParticipant.ledgerApi.authConfig,
+      participantClient.ledgerApi.authConfig,
       loggerFactory,
     )
     token <- retryProvider.retryForAutomation(
@@ -234,7 +234,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   } yield {
     logger.debug(s"Using token $token for this ledger client")
     new CNLedgerClient(
-      remoteParticipant.ledgerApi.clientConfig,
+      participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
       serviceUser,
       // TODO(#1596): Make sure the client correctly refreshes tokens.

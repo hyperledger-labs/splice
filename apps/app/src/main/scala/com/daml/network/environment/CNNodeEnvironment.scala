@@ -3,14 +3,14 @@ package com.daml.network.environment
 import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.directory.DirectoryAppBootstrap
-import com.daml.network.directory.config.LocalDirectoryAppConfig
+import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.SplitwellAppBootstrap
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.sv.SvAppBootstrap
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
@@ -105,7 +105,7 @@ trait CNNodeEnvironment extends Environment {
 
   protected def createSv(
       name: String,
-      svConfig: LocalSvAppConfig,
+      svConfig: SvAppBackendConfig,
   ): SvAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(SvAppBootstrap.LoggerFactoryKeyName, name)
     SvAppBootstrap(
@@ -169,7 +169,7 @@ trait CNNodeEnvironment extends Environment {
 
   protected def createDirectory(
       name: String,
-      directoryConfig: LocalDirectoryAppConfig,
+      directoryConfig: DirectoryAppBackendConfig,
   ): DirectoryAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(DirectoryAppBootstrap.LoggerFactoryKeyName, name)
     DirectoryAppBootstrap(

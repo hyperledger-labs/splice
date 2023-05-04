@@ -7,7 +7,7 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
   LedgerApiExtensions,
-  RemoteDirectoryAppReference,
+  DirectoryAppClientReference,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
@@ -106,7 +106,7 @@ object CNNodeTests {
     // make `aliceDirectory` etc. use updated usernames
     override def rdp(name: String)(implicit
         env: CNNodeTestConsoleEnvironment
-    ): RemoteDirectoryAppReference = extendLedgerApiUserWithCaseId(super.rdp(name))
+    ): DirectoryAppClientReference = extendLedgerApiUserWithCaseId(super.rdp(name))
 
     // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
@@ -127,12 +127,12 @@ object CNNodeTests {
     }
 
     private def extendLedgerApiUserWithCaseId(
-        ref: RemoteDirectoryAppReference
-    ): RemoteDirectoryAppReference = {
+        ref: DirectoryAppClientReference
+    ): DirectoryAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
-      new RemoteDirectoryAppReference(
+      new DirectoryAppClientReference(
         ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser, ledgerApi = newLedgerApiConfig),
@@ -143,16 +143,16 @@ object CNNodeTests {
         ref: SplitwellAppClientReference
     ): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
-      val newLedgerApiConfig = ref.config.remoteParticipant.ledgerApi
+      val newLedgerApiConfig = ref.config.participantClient.ledgerApi
         .copy(authConfig =
-          updateUser(ref.config.remoteParticipant.ledgerApi.authConfig, newLedgerApiUser)
+          updateUser(ref.config.participantClient.ledgerApi.authConfig, newLedgerApiUser)
         )
-      val newRemoteParticipant = ref.config.remoteParticipant.copy(ledgerApi = newLedgerApiConfig)
+      val newRemoteParticipant = ref.config.participantClient.copy(ledgerApi = newLedgerApiConfig)
       new SplitwellAppClientReference(
         ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config
-          .copy(ledgerApiUser = newLedgerApiUser, remoteParticipant = newRemoteParticipant),
+          .copy(ledgerApiUser = newLedgerApiUser, participantClient = newRemoteParticipant),
       )
     }
 

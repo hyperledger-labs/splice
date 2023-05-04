@@ -75,7 +75,7 @@ class WalletTransactionHistoryIntegrationTest
             )
             // one-time payment
             val (_, cid, _) = createPaymentRequest(
-              aliceValidator.remoteParticipantWithAdminToken,
+              aliceValidator.participantClientWithAdminToken,
               aliceDamlUser,
               aliceUserParty,
               receiverAmounts = Seq(

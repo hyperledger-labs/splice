@@ -87,7 +87,7 @@ final class ValidatorAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends ValidatorAppReference(consoleEnvironment, name)
-    with LocalCNNodeAppReference
+    with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Local Validator"
@@ -111,26 +111,26 @@ final class ValidatorAppBackendReference(
     consoleEnvironment.environment.config.validatorsByString(name)
 
   /** Remote participant this validator app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
+  lazy val participantClient =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this validator app is configured to interact with. Uses admin tokens to bypass auth. */
-  val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
+  val participantClientWithAdminToken =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
+      config.participantClient.participantClientConfigWithAdminToken,
     )
 
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
-/** Client (aka remote) reference to a validator app in the style of CNRemoteParticipantReference, i.e.,
+/** Client (aka remote) reference to a validator app in the style of CNParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
 final class ValidatorAppClientReference(

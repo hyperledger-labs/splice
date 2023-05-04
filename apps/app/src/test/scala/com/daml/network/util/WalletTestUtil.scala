@@ -95,7 +95,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     status.userOnboarded shouldBe true
     status.userWalletInstalled shouldBe true
 
-    val endUserParty = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users
+    val endUserParty = validatorAppBackend.participantClientWithAdminToken.ledger_api.users
       .get(walletAppClient.config.ledgerApiUser)
       .primaryParty
       .value
@@ -104,12 +104,12 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
     // Validator user must have rights for the end user party
     val validatorRights =
-      validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users.rights
+      validatorAppBackend.participantClientWithAdminToken.ledger_api.users.rights
         .list(validatorAppBackend.config.ledgerApiUser)
     validatorRights.actAs should contain(endUserParty)
 
     // There should be ValidatorRight and WalletInstall contracts
-    val ledgerApiEx = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api_extensions
+    val ledgerApiEx = validatorAppBackend.participantClientWithAdminToken.ledger_api_extensions
     ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
       endUserParty,
       c => c.data.user == endUserParty.toProtoPrimitive,
@@ -129,20 +129,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     status.userOnboarded shouldBe false
     status.userWalletInstalled shouldBe false
 
-    val endUserParty = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api.users
+    val endUserParty = validatorAppBackend.participantClientWithAdminToken.ledger_api.users
       .get(walletAppClient.config.ledgerApiUser)
       .primaryParty
       .value
 
     // Validator user must not have any rights for the end user party
-    val ledgerApi = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api
+    val ledgerApi = validatorAppBackend.participantClientWithAdminToken.ledger_api
     val validatorRights = ledgerApi.users.rights
       .list(validatorAppBackend.config.ledgerApiUser)
     validatorRights.readAs should not contain endUserParty
     validatorRights.actAs should not contain endUserParty
 
     // All validator right and wallet install contracts must be gone
-    val ledgerApiEx = validatorAppBackend.remoteParticipantWithAdminToken.ledger_api_extensions
+    val ledgerApiEx = validatorAppBackend.participantClientWithAdminToken.ledger_api_extensions
     ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
       endUserParty,
       c => c.data.user == endUserParty.toProtoPrimitive,
@@ -198,15 +198,15 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       )
     }
     val offsetBefore =
-      senderValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+      senderValidator.participantClientWithAdminToken.ledger_api.transactions.end()
     val acceptedCid = receiverWallet.acceptTransferOffer(transferOfferId)
 
     val senderParty = PartyId.tryFromProtoPrimitive(senderWallet.userStatus().party)
 
     eventually() {
-      val offset = senderValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+      val offset = senderValidator.participantClientWithAdminToken.ledger_api.transactions.end()
       val transactions =
-        senderValidator.remoteParticipantWithAdminToken.ledger_api_extensions.transactions
+        senderValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(senderParty),
             completeAfter = Int.MaxValue,
@@ -226,7 +226,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectAcceptedAppPaymentRequest(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       signatories: Seq[PartyId],
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
@@ -237,7 +237,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = signatories,
       readAs = Seq(),
@@ -252,7 +252,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Rejects an accepted app payment request. */
   def rejectAcceptedAppPaymentRequest(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
@@ -263,7 +263,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(),
@@ -276,7 +276,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Collects an accepted subscription payment request without doing anything useful in return. */
   def collectAcceptedSubscriptionRequest(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       sender: PartyId,
@@ -288,7 +288,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, sender),
       readAs = Seq(),
@@ -302,7 +302,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def rejectAcceptedSubscriptionRequest(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
@@ -313,7 +313,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(),
@@ -328,7 +328,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Collects an accepted app payment request without doing anything useful in return. */
   def collectSubscriptionPayment(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       senderParty: PartyId,
@@ -340,7 +340,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, senderParty),
       readAs = Seq(),
@@ -354,7 +354,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def rejectSubscriptionPayment(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
@@ -365,7 +365,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(),
@@ -385,7 +385,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       walletClient: WalletAppClientReference,
       validator: ValidatorAppBackendReference,
   ) = {
-    validator.remoteParticipant.dars.upload(directoryDarPath)
+    validator.participantClient.dars.upload(directoryDarPath)
     onboardWalletUser(walletClient, validator)
   }
 
@@ -394,7 +394,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ): String = {
     val dirEntryName = "directory.cns"
     val dirParty = directory.getProviderPartyId()
-    directory.remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitJava(
+    directory.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(dirParty),
       commands = new dirCodegen.DirectoryEntry(
         dirParty.toProtoPrimitive,
@@ -409,7 +409,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   protected def createDirectoryEntry(
       userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
+      directory: DirectoryAppClientReference,
       dirEntry: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
@@ -426,7 +426,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   protected def requestDirectoryEntry(
       userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
+      directory: DirectoryAppClientReference,
       dirEntry: String,
   ) = {
     // Whitelist the directory service on alice's validator
@@ -439,7 +439,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def createTestDeliveryOffer(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       domainId: Option[DomainId] = None,
@@ -451,7 +451,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       description,
     )
     clue("Create delivery offer") {
-      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -485,7 +485,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
 
   def createPaymentRequest(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       receiverAmounts: Seq[paymentCodegen.ReceiverAmount],
@@ -499,7 +499,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ) = {
     val deliveryOfferId =
       createTestDeliveryOffer(
-        remoteParticipantWithAdminToken,
+        participantClientWithAdminToken,
         userId,
         userParty,
         description = description,
@@ -520,7 +520,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       Seq(userParty) ++ receiverAmounts.map(a => PartyId.tryFromProtoPrimitive(a.receiver))
 
     val requestCid = clue("Create a payment request") {
-      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = signatories.distinct,
         readAs = Seq.empty,
@@ -534,7 +534,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def createSelfPaymentRequest(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: BigDecimal = defaultPaymentAmount.amount,
@@ -552,7 +552,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
 
     createPaymentRequest(
-      remoteParticipantWithAdminToken,
+      participantClientWithAdminToken,
       userId,
       userParty,
       receiverAmounts,
@@ -574,7 +574,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )
 
   protected def createSubscriptionContext(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       serviceParty: PartyId,
@@ -590,7 +590,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       description,
     )
     clue("Create a subscription context") {
-      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty, serviceParty).distinct,
         readAs = Seq.empty,
@@ -649,7 +649,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Note: all of the sender, receiver, and provider parties must be on the same participant */
   protected def createSubscriptionRequest(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       receiverParty: PartyId,
@@ -663,7 +663,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ) = {
     val contextId =
       createSubscriptionContext(
-        remoteParticipantWithAdminToken,
+        participantClientWithAdminToken,
         userId,
         userParty,
         receiverParty,
@@ -684,7 +684,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       payData,
     )
     clue("Create subscription request") {
-      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty, receiverParty, providerParty).distinct,
         readAs = Seq.empty,
@@ -696,7 +696,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   protected def createSelfSubscriptionRequest(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
@@ -709,7 +709,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ) = {
     val contextId =
       createSubscriptionContext(
-        remoteParticipantWithAdminToken,
+        participantClientWithAdminToken,
         userId,
         userParty,
         userParty,
@@ -723,7 +723,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       payData,
     )
     clue("Create subscription request") {
-      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -735,7 +735,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   protected def createSelfSubscription(
-      remoteParticipantWithAdminToken: CNRemoteParticipantReference,
+      participantClientWithAdminToken: CNParticipantClientReference,
       userId: String,
       userParty: PartyId,
       amount: paymentCodegen.PaymentAmount = defaultSubscriptionAmount,
@@ -748,7 +748,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ) = {
     val contextId =
       createSubscriptionContext(
-        remoteParticipantWithAdminToken,
+        participantClientWithAdminToken,
         userId,
         userParty,
         userParty,
@@ -765,7 +765,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         svcParty.toProtoPrimitive,
         contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
       )
-      val result = remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -783,7 +783,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         payData,
         nextPaymentDueAt,
       )
-      remoteParticipantWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -815,7 +815,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   /** Directly executes the CoinRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
   def mintCoin(
-      remoteParticipant: CNRemoteParticipantReference,
+      participantClient: CNParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
       domainId: Option[DomainId] = None,
@@ -825,7 +825,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
 
-    remoteParticipant.ledger_api_extensions.commands.submitWithResult(
+    participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = aliceWallet.config.ledgerApiUser,
       actAs = Seq(svcParty, receiver),
       readAs = Seq.empty,

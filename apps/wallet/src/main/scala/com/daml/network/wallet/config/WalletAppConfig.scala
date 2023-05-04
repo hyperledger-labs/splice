@@ -1,6 +1,6 @@
 package com.daml.network.wallet.config
 
-import com.daml.network.config.RemoteCNNodeConfig
+import com.daml.network.config.CNNodeClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 
@@ -9,15 +9,15 @@ case class WalletDomainConfig(
 )
 
 // Inlined to avoid a dependency
-case class WalletRemoteValidatorAppConfig(
+case class WalletValidatorAppClientConfig(
     adminApi: ClientConfig
-) extends RemoteCNNodeConfig {
+) extends CNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }
 
 case class WalletAppClientConfig(
     adminApi: ClientConfig,
     ledgerApiUser: String,
-) extends RemoteCNNodeConfig {
+) extends CNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

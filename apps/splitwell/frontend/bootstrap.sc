@@ -1,7 +1,7 @@
 import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
-import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
+import com.daml.network.console.{DirectoryAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
@@ -15,7 +15,7 @@ aliceValidator.waitForInitialization()
 bobValidator.waitForInitialization()
 
 println("Uploading DAR files...")
-Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
+Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
   p.dars.upload("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
   p.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 }
@@ -34,18 +34,18 @@ val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
 val charlieRequestCid = charlieDirectory.requestDirectoryInstall()
 
-aliceValidator.remoteParticipant.ledger_api_extensions.acs
+aliceValidator.participantClient.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
-bobValidator.remoteParticipant.ledger_api_extensions.acs
+bobValidator.participantClient.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
-charlieValidator.remoteParticipant.ledger_api_extensions.acs
+charlieValidator.participantClient.ledger_api_extensions.acs
   .awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
 println("Ensuring that directory entries are allocated correctly...")
 def ensureDirectoryEntry(
     user: PartyId,
     name: String,
-    directory: RemoteDirectoryAppReference,
+    directory: DirectoryAppClientReference,
     wallet: WalletAppClientReference,
 ) {
   try {

@@ -3,7 +3,7 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
-import com.daml.network.sv.config.LocalSvAppConfig
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -14,7 +14,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 class SvSvAutomationService(
     clock: Clock,
-    config: LocalSvAppConfig,
+    config: SvAppBackendConfig,
     svStore: SvSvStore,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,

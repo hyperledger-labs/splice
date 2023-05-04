@@ -42,7 +42,7 @@ class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with
 
     val (referenceId, _, reqC) =
       createSelfPaymentRequest(
-        aliceValidator.remoteParticipantWithAdminToken,
+        aliceValidator.participantClientWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
       )

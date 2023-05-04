@@ -42,13 +42,13 @@ abstract class SplitwellAppReference(
 
   def participantAdminApi: ParticipantAdministration
 
-  protected val remoteScanConfig: ScanAppClientConfig
+  protected val scanClientConfig: ScanAppClientConfig
 
-  lazy val remoteScan =
+  lazy val scanClient =
     new ScanAppClientReference(
       cnNodeConsoleEnvironment,
-      s"remote scan for `$name``",
-      remoteScanConfig,
+      s"scan client for `$name``",
+      scanClientConfig,
     )
 
   @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
@@ -79,17 +79,17 @@ final class SplitwellAppClientReference(
 
   override lazy val ledgerApi =
     new ExternalLedgerApiClient(
-      config.remoteParticipant.ledgerApi.clientConfig.address,
-      config.remoteParticipant.ledgerApi.clientConfig.port,
-      config.remoteParticipant.ledgerApi.clientConfig.tls,
-      config.remoteParticipant.ledgerApi.getToken(),
+      config.participantClient.ledgerApi.clientConfig.address,
+      config.participantClient.ledgerApi.clientConfig.port,
+      config.participantClient.ledgerApi.clientConfig.tls,
+      config.participantClient.ledgerApi.getToken(),
     )(consoleEnvironment)
 
   override lazy val participantAdminApi =
-    new CNRemoteParticipantReference(
+    new CNParticipantClientReference(
       cnNodeConsoleEnvironment,
       "splitwell participant admin api",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   val userId: String = config.ledgerApiUser
@@ -222,7 +222,7 @@ final class SplitwellAppClientReference(
   def requestGroup(id: String): splitwellCodegen.GroupRequest.ContractId = {
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
-    val svc = remoteScan.getSvcPartyId()
+    val svc = scanClient.getSvcPartyId()
     val (domain, install) = getFavoredSplitwellInstall()
     submitWithResult(
       actAs = Seq(party),
@@ -435,43 +435,43 @@ final class SplitwellAppClientReference(
       adminCommand(GrpcSplitwellAppClient.ListSplitwellInstalls(context))
     }
 
-  override val remoteScanConfig = config.remoteScan
+  override val scanClientConfig = config.scanClient
 }
 
 final class SplitwellAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
 ) extends SplitwellAppReference(consoleEnvironment, name)
-    with LocalCNNodeAppReference
+    with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Splitwell Backend"
 
   override protected val nodes = consoleEnvironment.environment.splitwells
 
-  override lazy val ledgerApi = remoteParticipant
+  override lazy val ledgerApi = participantClient
 
-  override lazy val participantAdminApi = remoteParticipant
+  override lazy val participantAdminApi = participantClient
 
   @Help.Summary("Return local splitwell app config")
   def config: SplitwellAppBackendConfig =
     consoleEnvironment.environment.config.splitwellsByString(name)
 
-  override val remoteScanConfig = config.remoteScan
+  override val scanClientConfig = config.scanClient
 
   /** Remote participant this splitwell app is configured to interact with. */
-  lazy val remoteParticipant =
-    new CNRemoteParticipantReference(
+  lazy val participantClient =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name``",
-      config.remoteParticipant.getRemoteParticipantConfig(),
+      config.participantClient.getParticipantClientConfig(),
     )
 
   /** Remote participant this splitwell app is configured to interact with. Uses admin tokens to bypass auth. */
-  lazy val remoteParticipantWithAdminToken =
-    new CNRemoteParticipantReference(
+  lazy val participantClientWithAdminToken =
+    new CNParticipantClientReference(
       consoleEnvironment,
       s"remote participant for `$name`, with admin token",
-      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
+      config.participantClient.participantClientConfigWithAdminToken,
     )
 }

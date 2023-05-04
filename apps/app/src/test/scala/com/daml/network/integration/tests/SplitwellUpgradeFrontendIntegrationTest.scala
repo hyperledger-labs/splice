@@ -23,7 +23,7 @@ class SplitwellUpgradeFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        aliceValidator.remoteParticipant.dars.upload(darPath)
+        aliceValidator.participantClient.dars.upload(darPath)
       })
 
   "splitwell frontend with upgraded domain" should {
@@ -44,8 +44,8 @@ class SplitwellUpgradeFrontendIntegrationTest
       }
 
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
-        disconnectSplitwellUpgradeDomain(aliceValidator.remoteParticipant),
+        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
       ) {
         withFrontEnd("aliceSplitwell") { implicit webDriver =>
           reloadPage()
@@ -60,7 +60,7 @@ class SplitwellUpgradeFrontendIntegrationTest
         // the provider’s backend automation times out on the reject call which can break shutdown.
         clue("Install requests get rejected") {
           eventually() {
-            val contracts = providerSplitwellBackend.remoteParticipant.ledger_api_extensions.acs
+            val contracts = providerSplitwellBackend.participantClient.ledger_api_extensions.acs
               .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
                 providerSplitwellBackend.getProviderPartyId()
               )
