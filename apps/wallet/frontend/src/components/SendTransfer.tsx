@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { DirectoryField } from 'common-frontend';
 import addHours from 'date-fns/addHours';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -65,15 +65,15 @@ const SendTransfer: React.FC = () => {
     },
   });
 
-  const convertUsd = useCallback(() => {
+  useMemo(() => {
     if (coinPriceQuery.data) {
-      setUsdAmount(coinPriceQuery.data.times(ccAmount));
+      const usdAmount = coinPriceQuery.data.times(ccAmount);
+      setUsdAmount(prev => (prev && prev.eq(usdAmount) ? prev : usdAmount));
     }
   }, [ccAmount, coinPriceQuery.data]);
 
   const onCCAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCCAmount(BigNumber(e.target.value));
-    convertUsd();
   };
 
   return (
@@ -170,4 +170,5 @@ const SendTransfer: React.FC = () => {
     </Stack>
   );
 };
+
 export default SendTransfer;
