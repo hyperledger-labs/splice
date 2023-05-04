@@ -781,7 +781,7 @@ function subcmd_preflight() {
     set -e
 
     _log "Stopping postgres..."
-    cd "${REPO_ROOT}" && scripts/postgres.sh stop
+    cd "${REPO_ROOT}" && scripts/stop-postgres-for-preflight.sh
 
     _log "Stopping frontends..."
     cd "${REPO_ROOT}" && ./stop-frontends.sh
