@@ -139,12 +139,11 @@ class GrpcSvcAppService(
                 update = svcRules.contractId.exerciseSvcRules_AddMember(
                   request.svParty,
                   s"mockName:${request.svParty}",
-                  "mock bootstrap",
                 ),
                 domainId = globalDomain,
               )
             }
-        },
+        }
       } yield Empty()
     }
 

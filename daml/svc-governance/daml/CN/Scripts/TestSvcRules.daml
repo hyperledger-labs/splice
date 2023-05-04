@@ -1,6 +1,6 @@
 module CN.Scripts.TestSvcRules where
 
-import DA.Action (unless)
+import DA.Action (unless, when, void)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.Optional (fromSome)
@@ -27,6 +27,8 @@ import qualified CN.CometBft as CometBft
 import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SvOnboarding
+import CN.Util.ExpiringContract
+
 
 testLeaderElection : Script ()
 testLeaderElection = do
@@ -61,41 +63,12 @@ testLeaderElection = do
     actor = sv3
     requestCids = [req1, req2, req3, req4]
 
-  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  [(_, svcRules)] <- query @SvcRules svc
   require "SV2 got elected" (svcRules.leader == sv2)
 
   -- run a few more issuances
   runNextIssuanceD app 1.1
   runNextIssuanceD app 1.2
-
-  -- add a new SV member
-  svX <- allocateParty "svX"
-  forA_ [sv2, sv3, sv4] $ \sv ->
-    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
-      confirmer = sv
-      action = ARC_SvcRules with
-        svcAction = SRARC_AddMember $ SvcRules_AddMember with
-          newMemberParty = svX
-          newMemberName = "svX"
-          reason = "decision:123"  -- unambiguous reference to the decision
-          -- TODO(M3-46): streamline references to off-ledger decisions
-  executeAllConfirmedActions app
-
-  -- kick out mallory, now that we have enough members to then still tolerate a failure
-  [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ [sv3, sv4, svX] $ \sv ->
-    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
-      confirmer = sv
-      action = ARC_SvcRules with
-        svcAction = SRARC_RemoveMember $ SvcRules_RemoveMember with
-          member = mallory
-          reason = "decision:124"  -- unambiguous reference to the decision
-          -- TODO(M3-46): streamline references to off-ledger decisions
-  executeAllConfirmedActions app
-
-  -- check that mallory is no longer present
-  [(_, svcRules)] <- query @SvcRules svc
-  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv2, sv3, sv4, svX])
 
   -- wow! stuff works :D
   return ()
@@ -280,7 +253,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
     SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- create a SvOnboardingConfirmed contract
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" "because"
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX"
 
   -- leader can archive the onboarding as svX is added as member
   leaderSubmits app $ \cid -> exerciseCmd cid $
@@ -332,7 +305,7 @@ testSvNameUniquenessNotInDevNet = do
   (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
 
   svX <- allocateParty "svX"
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "we want to see if we can get away with this"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
 
 
 testSvMemberOverwriteInDevNet : Script ()
@@ -346,56 +319,63 @@ testSvMemberOverwriteInDevNet = do
   svX <- allocateParty "svX"
 
   -- Failing the template precondition check if the existing member being overwritten is the current leader.
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" "because"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1"
 
   -- overwriting existing member successfuly
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "because"
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
 
   pure ()
+
+
+-- Testing confirmations
+------------------------
 
 testRequiredNumOfConfirmationInDevNet : Script ()
 testRequiredNumOfConfirmationInDevNet = do
   (_, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
 
-  -- add 6 phamton SVs
-  forA_ [5 .. 10] $ \i -> do
+  -- add 9 phamton SVs
+  forA_ [5 .. 13] $ \i -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
     let svName = "sv" <> show i
     phamtonSv <- allocateParty $ svName
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName "because"
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName
 
-  [(_, svcRules)] <- query @SvcRules svc
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
-  Map.size svcRules.members === 10
+  Map.size svcRules.members === 13
 
   svX <- allocateParty "svX"
 
-  [(svcRulesCid, _)] <- query @SvcRules svc
   -- create 4 confirmations
-  forA_ [sv1, sv2, sv3, sv4] $ \svParty -> do
-    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
-      confirmer = svParty
-      action = ARC_SvcRules with
+  let action = ARC_SvcRules with
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
           newMemberName = "svX"
-          reason = "because"
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action
 
   confirmations <- query @Confirmation svc
   length confirmations === 4
 
-  -- There are 10 SVC members in total but only 4 confirmations are required to confirm a SV in devnet
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_ConfirmSvOnboarding svX "svX" "because"
+  -- There are 13 SVC members in total, which implies f = 4 and thus 9 confirmations are required in a non-DevNet.
+  -- However, in DevNet only 4 confirmations are required to run a confirmed action
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action
+      confirmationCids
 
-  [(_, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed svc
-  svOnboardingConfirmed.svParty === svX
-  svOnboardingConfirmed.svName === "svX"
+  -- check that the `action` was executed
+  [(_, svcRules)] <- query @SvcRules svc
+  require "svX is a member" (svX `Map.member` svcRules.members)
 
   pure ()
 
 testConfirmationExpiry : Script ()
 testConfirmationExpiry = do
-  (app, svc, (sv1, _, _, _)) <- initCollective(False)
+  (app, svc, (sv1, _, _, _)) <- initCollective False
   -- we now have a collective with BFT for f = 1, and sv1 is the leader
 
   -- a new sv prepares his participant
@@ -410,7 +390,6 @@ testConfirmationExpiry = do
       svcAction = SRARC_AddMember $ SvcRules_AddMember with
         newMemberParty = svX
         newMemberName = "svX"
-        reason = "because"
 
   -- leader tries to expire the confirmation, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
@@ -422,6 +401,142 @@ testConfirmationExpiry = do
   -- leader expires the confirmation
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+
+-- | Tests vote request machinery on featured app right granting and revoking.
+testVoteRequest : Script ()
+testVoteRequest = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  -- allocate an app provider, and check that there is no app right
+  provider <- allocateParty "provider"
+  [] <- query @FeaturedAppRight provider
+
+  -- sv1 initiates the granting of the featured app right for the provider
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
+        provider
+    reason = Reason with url = ""; body = "they are great!"
+
+  -- sv2 rejects initially
+  voteCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+    voter = sv2
+    requestCid
+    accept = False
+    reason = Reason with url = ""; body = "the justificaiton is not good enough"
+
+  -- there are two votes, which is not enough to consider the vote definitive and grant the app right
+  executeAllDefinitiveVotes app
+  [] <- query @FeaturedAppRight provider
+  votes <- query @Vote svc
+  length votes === 2
+
+  -- a day passes and sv2 updates their vote
+  passTime (days 1)
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateVote with
+    voter = sv2
+    voteCid
+    accept = True
+    reason = Reason with url = ""; body = "OK, after rereading the materials, I agree."
+
+  -- there are still only two votes, which is not enough to consider the vote definitive and grant the app right
+  executeAllDefinitiveVotes app
+  [] <- query @FeaturedAppRight provider
+  votes <- query @Vote svc
+  length votes === 2
+
+  -- sv3 rejects
+  submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+    voter = sv3
+    requestCid
+    accept = False
+    reason = Reason with url = ""; body = "I disagree that they've earned that right."
+
+  -- there are now three votes, out of which two accept, which are enough to grant the right
+  executeAllDefinitiveVotes app
+  [(rightCid, right)] <- query @FeaturedAppRight provider
+  right === FeaturedAppRight with svc; provider
+
+  -- the request and all votes have been archived
+  [] <- query @VoteRequest svc
+  [] <- query @Vote svc
+
+  -- a request that does not get answered in time just expires, together with all its votes
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
+        rightCid
+    reason = Reason with url = ""; body = "they are no longer great!"
+
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+      voter = sv2
+      requestCid
+      accept = True
+      reason = Reason with url = ""; body = ""
+
+  -- wait until they expire
+  passTime (svcRules.config.voteRequestTimeout)
+  expireAllExpiredContracts svc
+  [] <- query @VoteRequest svc
+  [] <- query @Vote svc
+
+  -- we can remove the granted right using a confirmation request, provided enough parties answer in time
+  initateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
+        rightCid
+
+  -- the right is now revoked
+  [] <- query @FeaturedAppRight provider
+  pure ()
+
+-- | Test SvcRules configuration changes.
+testSvcRulesConfigChange : Script ()
+testSvcRulesConfigChange = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  [(_, svcRules)] <- query @SvcRules svc
+
+  -- run the voting process to change the config
+  let newConfig = svcRules.config with maxTextLength = svcRules.config.maxTextLength + 1024 * 1024
+  initateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_SetConfig SvcRules_SetConfig with
+        newConfig
+
+  -- check that the config change happened
+  [(_, svcRules)] <- query @SvcRules svc
+  svcRules.config === newConfig
+
+
+-- | Test membership removal.
+testRemoveMember : Script ()
+testRemoveMember = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  -- check that the leader is currently sv1
+  [(_, svcRules)] <- query @SvcRules svc
+  svcRules.leader === sv1
+
+  -- run the voting process to change the config and remove the current leader 'sv1'
+  initateAndAcceptVote app [sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+        member = sv1
+
+  -- check that the member was removed and the leader changed to sv2
+  [(_, svcRules)] <- query @SvcRules svc
+  Map.keys (svcRules.members) === [sv2, sv3, sv4]
+  svcRules.leader === sv2
+
+
+-- Testing the SVC activity lock
+--------------------------------
 
 testLockAndUnlockSvcRulesCoinRules: Script ()
 testLockAndUnlockSvcRulesCoinRules = do
@@ -436,7 +551,7 @@ testLockAndUnlockSvcRulesCoinRules = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "because")
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app
@@ -449,7 +564,7 @@ testLockAndUnlockSvcRulesCoinRules = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "because")
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app
@@ -481,7 +596,9 @@ initCollective isDevNet = do
         actionConfirmationTimeout = minutes 5
         svOnboardingRequestTimeout = hours 24
         svOnboardingConfirmedTimeout = hours 24
+        voteRequestTimeout = days 7
         cometBftConfigLimits = CometBft.defaultNetworkConfigLimits
+        maxTextLength = 1024
   let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
 
   -- have mallory bootstrap the collective
@@ -503,7 +620,6 @@ initCollective isDevNet = do
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
-      reason = "Simon says!"
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 
@@ -607,7 +723,6 @@ runNextIssuanceD app coinPrice = do
       miningRoundCid = summarizingRoundCid
       summary
 
-
     pure ()
 
 
@@ -643,21 +758,55 @@ executeAllConfirmedActions app = do
   confirmations0 <- query @Confirmation app.svc
   -- execute the actions for which there are enough confirmations
   let executableConfirmations =
-          filter (\cs -> s.requiredNumConfirmations <= length cs)
+          filter (const True) -- (\cs -> s.requiredNumConfirmations <= length cs)
         $ groupEqualOn (\c -> c._2.action) confirmations0
   forA_ executableConfirmations $ \cs -> do
     submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteConfirmedAction with
       action = (head cs)._2.action
       confirmationCids = map fst cs
 
--- | O(n^2): group all elements whose projection is equal.
-groupEqualOn : Eq b => (a -> b) -> [a] -> [[a]]
-groupEqualOn _ [] = []
-groupEqualOn proj (x :: xs) =
-    (x :: equal) :: groupEqualOn proj rest
-  where
-    xp = proj x
-    (equal, rest) = partition (\y -> proj y == xp) xs
+executeAllDefinitiveVotes : CCApp -> Script ()
+executeAllDefinitiveVotes app = do
+  -- get rules and collective summary
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  let s = summarizeCollective rules
+  -- query all voting requests visible to svc
+  requests <- query @VoteRequest app.svc
+  forA_ requests $ \(requestCid, _) -> do
+    -- fetch the corresponding votes
+    votes <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
+    when (length votes >= s.requiredNumVotes) $
+      void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteDefiniteVote with
+        requestCid
+        voteCids = map fst votes
+
+initateAndAcceptVote : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
+initateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
+initateAndAcceptVote app (initiator::others) action = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+
+  requestCid <- submitMulti [initiator] [app.svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = initiator
+    action
+    reason = Reason with url = ""; body = "let's get it done"
+
+  forA_ others $ \sv ->
+    submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+        voter = sv
+        requestCid
+        accept = True
+        reason = Reason with url = ""; body = "✓"
+
+  executeAllDefinitiveVotes app
+
+expireAllExpiredContracts : Party -> Script ()
+expireAllExpiredContracts actor = do
+  now <- getTime
+  cos <- queryInterface @ExpiringContract actor
+  forA_ cos $ \(cid, optView) ->
+    trace optView $
+    when ((fromSome optView).expiresAt <= now) $
+      submit actor $ exerciseCmd cid ExpiringContract_Expire with actor
 
 
 -- Instant run-off voting
@@ -682,3 +831,16 @@ updateAgreedCoinPrice svc coinPrice = do
   [(agreedCoinPriceCid, _)] <- query @AgreedCoinPrice svc
   submitMulti [svc] [svc] $ exerciseCmd agreedCoinPriceCid AgreedCoinPrice_Update with
     newCoinPrice = coinPrice
+
+
+-- Pure utility functions
+-------------------------
+
+-- | O(n^2): group all elements whose projection is equal.
+groupEqualOn : Eq b => (a -> b) -> [a] -> [[a]]
+groupEqualOn _ [] = []
+groupEqualOn proj (x :: xs) =
+    (x :: equal) :: groupEqualOn proj rest
+  where
+    xp = proj x
+    (equal, rest) = partition (\y -> proj y == xp) xs

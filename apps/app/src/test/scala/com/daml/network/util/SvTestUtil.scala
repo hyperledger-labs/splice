@@ -44,7 +44,6 @@ trait SvTestUtil extends CNNodeTestCommon {
           .exerciseSvcRules_AddMember(
             svParty.toProtoPrimitive,
             svName,
-            "addPhantomSv",
           )
           .commands
           .asScala

@@ -525,7 +525,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             update = getSvcRules().id.exerciseSvcRules_AddMember(
               fakeSv4Party.toProtoPrimitive,
               "sv4",
-              "want to see if it overwrite the existing member",
             ),
           )
         },

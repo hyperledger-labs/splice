@@ -27,7 +27,9 @@ object SvUtil {
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingConfirmedTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
     defaultCometBftNetworkLimits,
+    1024, // maxTextLength
   )
 
   def keyPairMatches(
