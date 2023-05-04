@@ -102,7 +102,7 @@ local appAuthEnvBinding(config, appName, varBaseName=appName) =
   if (config.fixedTokens) then
     [
       {
-        name: "ADDITIONAL_CONFIG",
+        name: "ADDITIONAL_CONFIG_AUTH",
         value: |||
           _client_credentials_auth_config = null
           _client_credentials_auth_config = {

@@ -25,8 +25,12 @@ if [ -f /app/app.conf ]; then
    ARGS+=( --config /app/app.conf )
 fi
 
-if [ -n "${ADDITIONAL_CONFIG:-}" ]; then
-   echo "${ADDITIONAL_CONFIG}" > /app/additional-config.conf
+# Concatenate all additional configurations passed through env variables of the form ADDITIONAL_CONFIG*
+for cfg in ${!ADDITIONAL_CONFIG@}; do
+   echo "${!cfg}"
+done >> /app/additional-config.conf
+
+if [ -s "/app/additional-config.conf" ]; then
    ARGS+=( --config /app/additional-config.conf )
 fi
 

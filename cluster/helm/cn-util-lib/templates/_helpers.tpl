@@ -2,7 +2,7 @@
 {{- $app := .appName }}
 {{- $fixedTokens := .fixedTokens }}
 {{ if .fixedTokens }}
-- name: ADDITIONAL_CONFIG
+- name: ADDITIONAL_CONFIG_AUTH
   value: |
     _client_credentials_auth_config = null
     _client_credentials_auth_config = {

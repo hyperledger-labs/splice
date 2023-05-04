@@ -45,7 +45,7 @@ spec:
           {{ end }}
         {{- end }}
         {{ if .Values.additionalConfig -}}
-        - name: ADDITIONAL_CONFIG
+        - name: ADDITIONAL_CONFIG_OTHER
           value: {{- .Values.additionalConfig | toYaml | indent 12 }}
         {{ end }}
         {{ if .Values.svSponsorPort -}}

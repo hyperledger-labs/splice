@@ -40,6 +40,7 @@
 1. [Participant User Configuration](#participant-user-configuration)
 1. [Token configuration](#token-configuration)
 1. [Pulumi and Helm](#pulumi-and-helm)
+1. [Testing the SV Helm Runbook against a local build](#testing-the-sv-helm-runbook-against-a-local-build)
 1. [SV Operations](#sv-operations)
    1. [Approving new SVs](#approving-new-svs)
       1. [Approving via SV API](#approving-via-sv-api)
@@ -908,7 +909,6 @@ gcloud and local helm charts.
    ```
    imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
    cluster:
-     # TODO(#4389) Fixed token mode currently does not work by default, take a look at the issue for workarounds.
      fixedTokens: true
    ```
 

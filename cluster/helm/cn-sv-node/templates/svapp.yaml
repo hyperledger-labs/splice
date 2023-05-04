@@ -49,7 +49,7 @@ spec:
               value: {{ .Values.auth.jwksUrl | quote }}
             {{ end }}
             {{- with .Values.joinWithKeyOnboarding }}
-            - name: ADDITIONAL_CONFIG
+            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
               value: |
                 _svc_remote {
                   admin-api.port = 5005

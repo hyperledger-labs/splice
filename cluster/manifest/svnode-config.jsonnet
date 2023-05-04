@@ -64,7 +64,7 @@ local deployments(num, svConfig, config) =
           },
           // TODO(#4459) Move privateKey to k8s secrets
           {
-            name: "ADDITIONAL_CONFIG",
+            name: "ADDITIONAL_CONFIG_SV_ONBOARDING",
             value: |||
               _onboarding {
                 type = "join-with-key"
