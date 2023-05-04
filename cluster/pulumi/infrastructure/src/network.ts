@@ -13,7 +13,7 @@ function ipAddress(addressName: string): gcp.compute.Address {
 function clusterDnsEntries(
   clusterName: string,
   dnsName: string,
-  clusterIp: gcp.compute.Address
+  ingressIp: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
   return [
     new gcp.dns.RecordSet(dnsName, {
@@ -22,7 +22,7 @@ function clusterDnsEntries(
       type: "A",
       project: process.env.GCP_DNS_PROJECT,
       managedZone: "canton-global",
-      rrdatas: [clusterIp.address],
+      rrdatas: [ingressIp.address],
     }),
     new gcp.dns.RecordSet(dnsName + "-subdomains", {
       name: `*.${dnsName}.`,
@@ -30,7 +30,7 @@ function clusterDnsEntries(
       type: "A",
       project: process.env.GCP_DNS_PROJECT,
       managedZone: "canton-global",
-      rrdatas: [clusterIp.address],
+      rrdatas: [ingressIp.address],
     }),
   ];
 }
@@ -156,7 +156,7 @@ const project = gcp.organizations.getProjectOutput({});
 
 function natGateway(
   clusterName: string,
-  externalIp: gcp.compute.Address,
+  egressIp: gcp.compute.Address,
   options = {}
 ): gcp.compute.RouterNat {
   const privateNetwork = gcp.compute.Network.get(
@@ -183,7 +183,7 @@ function natGateway(
       router: router.name,
       region: router.region,
       natIpAllocateOption: "MANUAL_ONLY",
-      natIps: [externalIp.selfLink],
+      natIps: [egressIp.selfLink],
       sourceSubnetworkIpRangesToNat: "LIST_OF_SUBNETWORKS",
       subnetworks: [
         {
@@ -203,8 +203,8 @@ function natGateway(
 }
 
 class CantonNetwork extends pulumi.ComponentResource {
-  clusterIp: gcp.compute.Address;
-  externalIp: gcp.compute.Address;
+  ingressIp: gcp.compute.Address;
+  egressIp: gcp.compute.Address;
   ingressNs: k8s.core.v1.Namespace;
 
   constructor(
@@ -215,13 +215,13 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const dnsName = `${clusterName}.network.canton.global`;
 
-    const clusterIp = ipAddress(`cn-${clusterName}net-ip`);
+    const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
 
-    const externalIp = ipAddress(`cn-${clusterName}-out`);
+    const egressIp = ipAddress(`cn-${clusterName}-out`);
 
     const certManagerDeployment = certManager("cert-manager");
 
-    const dnsEntries = clusterDnsEntries(clusterName, dnsName, clusterIp);
+    const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp);
 
     const ingressNs = new k8s.core.v1.Namespace("cluster-ingress", {
       metadata: {
@@ -229,7 +229,7 @@ class CantonNetwork extends pulumi.ComponentResource {
       },
     });
 
-    natGateway(clusterName, externalIp, { parent: this });
+    natGateway(clusterName, egressIp, { parent: this });
 
     clusterCertificate(
       clusterName,
@@ -239,8 +239,8 @@ class CantonNetwork extends pulumi.ComponentResource {
       dnsEntries
     );
 
-    this.clusterIp = clusterIp;
-    this.externalIp = externalIp;
+    this.ingressIp = ingressIp;
+    this.egressIp = egressIp;
     this.ingressNs = ingressNs;
 
     this.registerOutputs();
