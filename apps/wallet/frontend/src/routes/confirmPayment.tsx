@@ -22,7 +22,7 @@ import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useCoinPrice } from '../hooks';
 import { AppPaymentRequest } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 

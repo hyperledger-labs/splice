@@ -31,7 +31,7 @@ import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Walle
 import { Party } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useCoinPrice } from '../hooks';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 

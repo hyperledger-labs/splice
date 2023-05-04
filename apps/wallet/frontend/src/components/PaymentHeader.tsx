@@ -7,7 +7,7 @@ import { useCallback, useState } from 'react';
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useCoinPrice } from '../hooks';
 import { WalletBalance } from '../models/models';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';

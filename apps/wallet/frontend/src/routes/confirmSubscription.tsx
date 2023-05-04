@@ -10,7 +10,7 @@ import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useCoinPrice } from '../hooks';
 import { SubscriptionRequestWithContext } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 

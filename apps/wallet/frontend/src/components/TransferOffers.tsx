@@ -4,13 +4,12 @@ import {
   AmountDisplay,
   Contract,
   DirectoryEntry,
-  useInterval,
   DateDisplay,
   useUserState,
 } from 'common-frontend';
 import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import Loading from 'common-frontend/lib/components/Loading';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
@@ -19,12 +18,11 @@ import Typography from '@mui/material/Typography';
 import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useTransferOffers, useCoinPrice } from '../hooks';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const TransferOffers: React.FC = () => {
-  const { listTransferOffers } = useWalletClient();
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
   const coinPriceQuery = useCoinPrice();
   const { primaryPartyId } = useUserState();
@@ -55,15 +53,14 @@ export const TransferOffers: React.FC = () => {
     [primaryPartyId]
   );
 
-  const fetchTransferOffers = useCallback(async () => {
-    if (coinPriceQuery.data) {
-      const { offersList } = await listTransferOffers();
-      let walletTransferOffers = await toWalletTransferOffer(offersList, coinPriceQuery.data);
-      setOffers(walletTransferOffers);
+  const { data: transferOfferContracts } = useTransferOffers(coinPriceQuery.data);
+  useMemo(() => {
+    if (transferOfferContracts && coinPriceQuery.data) {
+      toWalletTransferOffer(transferOfferContracts, coinPriceQuery.data).then(offers =>
+        setOffers(offers)
+      );
     }
-  }, [coinPriceQuery.data, listTransferOffers, toWalletTransferOffer]);
-
-  useInterval(fetchTransferOffers);
+  }, [coinPriceQuery.data, toWalletTransferOffer, transferOfferContracts]);
 
   if (coinPriceQuery.isLoading) {
     return <Loading />;

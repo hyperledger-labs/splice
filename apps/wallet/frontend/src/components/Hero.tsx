@@ -4,8 +4,7 @@ import { AmountDisplay, Loading } from 'common-frontend';
 import { Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { useBalance } from '../hooks/useBalance';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useBalance, useCoinPrice } from '../hooks';
 
 const Hero: React.FC = () => {
   const balanceQuery = useBalance();

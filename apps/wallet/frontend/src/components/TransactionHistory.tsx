@@ -31,7 +31,7 @@ import Typography from '@mui/material/Typography';
 import { Party } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks/useCoinPrice';
+import { useCoinPrice } from '../hooks';
 import { Transaction } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
