@@ -1058,6 +1058,9 @@ subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the cur
 function subcmd_pulumi() {
     _production_gate
 
+    # Use an empty passphrase until we manage secrets
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+
     pulumi --stack "${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
             "$@"
@@ -1210,14 +1213,6 @@ function subcmd_infra_pulumi() {
                      | jq -r '.data["key.json"]')
 
       args+=( -c "DNS_SA_KEY=${dns_sa_key}" )
-  fi
-
-  local -x PULUMI_BACKEND_URL
-
-  if [[ "$GCP_CLUSTER_BASENAME" == @(dev|test) ]]; then
-    PULUMI_BACKEND_URL=gs://da-cn-pulumi-dev-stacks
-  else
-    PULUMI_BACKEND_URL=gs://da-cn-pulumi-stacks
   fi
 
   pulumi "${args[@]}" "$@"
