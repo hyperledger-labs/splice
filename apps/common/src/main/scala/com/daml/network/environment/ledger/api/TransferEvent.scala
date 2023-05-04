@@ -15,16 +15,10 @@ case class InFlightTransferOutEvent(
 
 object InFlightTransferOutEvent {
   private[api] def fromProto(
-      proto: multidomain.GetInFlightTransfersResponse.TransferredOutEvent
+      proto: multidomain.GetInFlightTransfersResponse.InFlightTransferredOutEvent
   ): InFlightTransferOutEvent =
     InFlightTransferOutEvent(
-      transferEvent = TransferEvent.Out(
-        submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
-        source = DomainId.tryFromString(proto.source),
-        target = DomainId.tryFromString(proto.target),
-        transferOutId = proto.transferOutId,
-        contractId = new ContractId(proto.contractId),
-      ),
+      transferEvent = TransferEvent.Out.fromProto(proto.getEvent),
       createdEvent =
         CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
     )

@@ -8,8 +8,8 @@ package com.digitalasset.canton.research.participant.multidomain;
 import "com/daml/ledger/api/v1/active_contracts_service.proto";
 import "com/daml/ledger/api/v1/transaction_filter.proto";
 import "com/digitalasset/canton/protocol/v0/topology.proto";
+import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
 import "com/daml/ledger/api/v1/event.proto";
-import "google/protobuf/timestamp.proto";
 
 option java_outer_classname = "UpdateServiceOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
@@ -69,58 +69,14 @@ message GetInFlightTransfersRequest {
 //   - All but the last GetInFlightTransfersResponse will have empty offset
 //   - The last GetInFlightTransfersResponse will have `offset` and empty `transfer_outs`
 message GetInFlightTransfersResponse {
-  // Records that a contract has been transferred-out, and it becomes unusable on the source domain
-  // This a copy of TransferredOutEvent with an additional field createdEvend
-  message TransferredOutEvent {
-    // The ID of the transfer-out event. This needs to be used as an input for a transfer-in TransferCommand.
-    // Must be a valid LedgerString (as described in ``value.proto``).
-    // Required
-    // TODO(#11002) currently, this is the ts.toMicros.toString of the transfer-out id
-    // re-evaluate
-    string transfer_out_id = 1;
 
-    // The ID of the transferred contract.
-    // Must be a valid LedgerString (as described in ``value.proto``).
-    // Required
-    string contract_id = 2;
-
-    //  The template of the transferred contract.
-    //  Required
-    string template_id = 3;
-
-    // The ID of the source domain
-    // Must be a valid domain ID
-    // Required
-    string source = 4;
-
-    // The ID of the target domain
-    // Must be a valid domain ID
-    // Required
-    string target = 5;
-
-    // Party on whose behalf the transfer command was executed.
-    // Must be a valid PartyIdString (as described in ``value.proto``).
-    // Required
-    string submitter = 6;
-
-    // Transfer-in exclusivity
-    // Before this time (measured on the target domain), only the submitter of the transfer-out can initiate the transfer-in
-    // Missing for everyone except on the submitting participant
-    // optional
-    google.protobuf.Timestamp transfer_in_exclusivity = 7;
-
-    // The parties that are notified of this event.
-    // Return the ``submitter`` if it's a stakeholder of the contract (i.e. either signatories or observers).
-    // Required
-    repeated string witness_parties = 8;
-
-    // Required
-    com.daml.ledger.api.v1.CreatedEvent created_event = 9;
+  message InFlightTransferredOutEvent {
+    TransferredOutEvent event = 1;
+    com.daml.ledger.api.v1.CreatedEvent created_event = 2;
   }
-
   string offset = 1;
 
-  repeated TransferredOutEvent transfer_outs = 2;
+  repeated InFlightTransferredOutEvent transfer_outs = 2;
 }
 
 message GetActiveContractsRequest {
