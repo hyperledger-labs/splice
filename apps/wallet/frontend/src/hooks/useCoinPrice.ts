@@ -9,5 +9,7 @@ export const useCoinPrice: () => UseQueryResult<BigNumber> = () => {
     queryFn: async () => {
       return await getCoinPrice();
     },
+    // BigNumber is not a plain object so default structural sharing fails.
+    structuralSharing: (oldData, newData) => (oldData && oldData.eq(newData) ? oldData : newData),
   });
 };
