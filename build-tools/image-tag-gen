@@ -4,14 +4,14 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
 if [ -z "$1" ]; then
-    _error "Usage: $0 <app-name>"
+    _error "Usage: $0 <app-name> [--artifactory]"
 else
     appname=$1
 fi
 
 set -euo pipefail
 
-if [ -z "${PUSH_TO_ARTIFACTORY:-}" ]; then
+if [ "${2-}" != "--artifactory" ]; then
     echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(version-gen)"
 else
     echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:$(version-gen)"
