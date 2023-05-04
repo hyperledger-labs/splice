@@ -84,7 +84,7 @@ theme = createTheme(theme, {
 theme = createTheme(theme, {
   fonts: {
     sansSerif: {
-      fontFamily: '"Lato", sans-serif',
+      fontFamily: '"Inter", sans-serif',
       fontWeight: 400,
     },
     monospace: {
