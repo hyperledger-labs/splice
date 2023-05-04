@@ -69,7 +69,7 @@ export const TransferOffers: React.FC = () => {
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
       <Typography mt={6} variant="h4">
-        Action needed{' '}
+        Action Needed{' '}
         <Chip label={offers.length} color="success" className="transfer-offers-count" />
       </Typography>
       {offers.map((offer, index) => (

@@ -16,7 +16,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
         <Header />
       </Container>
 
-      <Box bgcolor="colors.neutral.25" sx={{ flex: 1 }}>
+      <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>
         <Container maxWidth="lg">{props.children}</Container>
       </Box>
     </Box>

@@ -17,12 +17,12 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
         <Header />
       </Container>
 
-      <Container maxWidth="md">
+      <Container maxWidth="lg">
         <Hero />
       </Container>
 
-      <Box bgcolor="colors.neutral.25" sx={{ flex: 1 }}>
-        <Container maxWidth="md">{props.children}</Container>
+      <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>
+        <Container maxWidth="lg">{props.children}</Container>
       </Box>
     </Box>
   );

@@ -9,7 +9,7 @@ export const Confirmation: React.FC = () => {
   return (
     <Box display="flex" flexDirection="column" minHeight="100vh" id="confirm-payment">
       <PaymentHeader />
-      <Box bgcolor="colors.neutral.25" flex={1}>
+      <Box bgcolor="colors.neutral.15" flex={1}>
         <Outlet />
       </Box>
     </Box>

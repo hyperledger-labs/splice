@@ -36,7 +36,7 @@ export const ConfirmSubscription: React.FC = () => {
       <Stack alignItems="center" paddingTop={4} spacing={4}>
         <Stack alignItems="center" spacing={1}>
           <Stack alignItems="center" direction="row" spacing={1}>
-            <Typography variant="h5">Confirm Subscription to </Typography>
+            <Typography variant="h6">Confirm Subscription to </Typography>
             <DirectoryEntry
               partyId={subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver}
               variant="h5"
@@ -79,7 +79,7 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
 
   return (
     <Container maxWidth="xl">
-      <Box bgcolor="colors.neutral.20" border={1} borderColor="colors.neutral.30">
+      <Box bgcolor="colors.neutral.10" border={1} borderColor="colors.neutral.15">
         <Stack alignItems="center" spacing={4} marginY={4}>
           <Stack alignItems="center">
             <Typography variant="body1">Description</Typography>

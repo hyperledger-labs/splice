@@ -109,7 +109,7 @@ const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope
           <InputAdornment
             sx={{
               padding: theme.spacing(3.5, 2.5),
-              backgroundColor: theme.palette.colors.neutral[20],
+              backgroundColor: theme.palette.colors.neutral[10],
               borderRadius: '9999px 0 0 9999px',
             }}
             position="start"

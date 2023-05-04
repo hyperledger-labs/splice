@@ -53,7 +53,7 @@ let theme = createTheme({
   palette: {
     mode: 'dark',
     colors: {
-      neutral: generateHslPalette(215, 29, [20, 25, 30, 40, 50, 60, 70, 80]),
+      neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
     },
   },
 });
@@ -67,16 +67,22 @@ theme = createTheme(theme, {
    */
   palette: {
     primary: {
-      main: '#003AE1',
+      main: '#96E4FD',
     },
     secondary: {
-      main: '#71F9B0',
+      main: '#F3FF97',
     },
     warning: {
-      main: 'indianred',
+      main: '#FD8575',
+    },
+    error: {
+      main: '#FD8575',
+    },
+    success: {
+      main: '#33C200',
     },
     background: {
-      default: theme.palette.colors.neutral[25],
+      default: theme.palette.colors.neutral[10],
     },
   },
 });
@@ -156,6 +162,17 @@ theme = createTheme(theme, {
     MuiButton: {
       variants: [
         {
+          props: { variant: 'primary-button' },
+          style: {
+            color: 'black',
+            textTransform: 'none',
+            '.MuiButton-startIcon': {
+              color: theme.palette.primary.main,
+              marginRight: theme.spacing(0.5),
+            },
+          },
+        },
+        {
           props: { color: 'secondary' },
           style: {
             color: 'white',
@@ -171,7 +188,7 @@ theme = createTheme(theme, {
           style: {
             borderRadius: 9999,
             backgroundColor: theme.palette.primary.main,
-            color: 'white',
+            color: 'black',
           },
         },
         {
@@ -190,6 +207,13 @@ theme = createTheme(theme, {
         },
       ],
     },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          backgroundColor: theme.palette.primary.main,
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
@@ -202,7 +226,7 @@ theme = createTheme(theme, {
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderColor: theme.palette.colors.neutral[40],
+          borderColor: theme.palette.colors.neutral[15],
         },
         head: {
           ...theme.fonts.monospace,
@@ -244,6 +268,16 @@ theme = createTheme(theme, {
           '.MuiTabs-indicator': {
             backgroundColor: theme.palette.secondary.main,
             borderBottomSize: '4px',
+          },
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          '.MuiOutlinedInput-input': {
+            backgroundColor: theme.palette.colors.neutral[10],
+            webkitBoxShadow: theme.palette.colors.neutral[10],
           },
         },
       },

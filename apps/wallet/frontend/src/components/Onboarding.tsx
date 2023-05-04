@@ -49,7 +49,7 @@ const Onboarding: React.FC = () => {
       </Typography>
 
       <Button
-        variant="contained"
+        variant="pill"
         sx={{ margin: '15px' }}
         onClick={e => {
           e.preventDefault();
