@@ -1174,7 +1174,17 @@ jobs:
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Promote images
-         cmd: make docker-promote
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+
+           make docker-promote
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
       - run_bash_command_in_nix:
          cmd_name: Push Helm charts and tag git accordingly
