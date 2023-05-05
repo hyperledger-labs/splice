@@ -31,6 +31,23 @@ import qualified CN.CometBft as CometBft
 -- Types
 ---------
 
+
+-- | A coin price agreed for the leader to create new open mining round.
+template AgreedCoinPrice
+  with
+    svc : Party
+    coinPrice : Decimal
+  where
+    ensure coinPrice > 0.0
+    signatory svc
+
+    -- | Update the agreed coin price
+    choice AgreedCoinPrice_Update : ContractId AgreedCoinPrice
+      with
+        newCoinPrice : Decimal
+      controller svc
+      do create this with coinPrice = newCoinPrice
+
 -- | Every action that requires confirmations must be inherently one-shot.
 -- Each action must not be executable more than once.
 -- An action that violates this rule could be executed twice by a malicious leader or

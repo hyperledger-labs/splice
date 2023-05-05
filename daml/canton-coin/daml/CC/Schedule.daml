@@ -1,5 +1,7 @@
 module CC.Schedule where
 
+-- TODO(tech-debt): move this into utility library
+
 import DA.List (dedupSort, head)
 
 -- | A schedule of values that change over time.

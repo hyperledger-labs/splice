@@ -120,33 +120,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupAgreedCoinPriceWithOffset(
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
-    ]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomainWithOffset(cn.svcrules.AgreedCoinPrice.COMPANION)(_, (_: Any) => true)
-    )
-
-  def lookupAgreedCoinPrice()(implicit tc: TraceContext): Future[
-    Option[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]]
-  ] =
-    lookupAgreedCoinPriceWithOffset().map(_.value)
-
-  def getAgreedCoinPrice()(implicit
-      tc: TraceContext
-  ): Future[Contract[cn.svcrules.AgreedCoinPrice.ContractId, cn.svcrules.AgreedCoinPrice]] =
-    lookupAgreedCoinPrice().map(
-      _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active agreed coin price")
-        )
-      )
-    )
-
   /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
   def lookupOpenMiningRoundTriple()(implicit
       ec: ExecutionContext,
@@ -493,6 +466,29 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.expiresAt
     )
 
+  /** List the current coin price votes by the SVC members. */
+  def listMemberCoinPriceVotes()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+  ] =
+    for {
+      domain <- defaultAcsDomainIdF
+      svcRules <- getSvcRules()
+      votes <- multiDomainAcsStore.listContractsOnDomain(
+        cn.svc.coinprice.CoinPriceVote.COMPANION,
+        domain,
+      )
+    } yield {
+      // Only use votes cast by current members, and thereof pick only one
+      val eligibleVotes = votes.iterator.collect {
+        case vote if svcRules.payload.members.containsKey(vote.payload.sv) =>
+          (vote.payload.sv, vote)
+      }
+      val deduplicatedVotes = scala.collection.immutable.Map.from(eligibleVotes)
+      deduplicatedVotes.values.toSeq
+    }
+
   private def lookupSvOnboardingRequestByCandidatePartyWithOffset(
       candidateParty: PartyId
   )(implicit tc: TraceContext): Future[
@@ -576,7 +572,7 @@ object SvSvcStore {
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(cn.svcrules.AgreedCoinPrice.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>

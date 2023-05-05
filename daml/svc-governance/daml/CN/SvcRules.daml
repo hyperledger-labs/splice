@@ -3,7 +3,7 @@ module CN.SvcRules where
 import DA.Action (void, when, unless)
 import DA.Foldable (forA_)
 import DA.List as List
-import DA.Optional (fromSome, isSome)
+import DA.Optional (fromSome, isNone, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -12,6 +12,7 @@ import DA.Date
 
 import CC.Coin
 import CC.Round
+import qualified CC.Schedule
 import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
@@ -21,6 +22,7 @@ import CC.ValidatorLicense
 
 import qualified CN.CometBft as CometBft
 import CN.SvOnboarding
+import CN.SVC.CoinPrice
 import CN.Util.Assert
 import CN.Util.ExpiringContract
 
@@ -143,22 +145,6 @@ template SvReward with
     amount : Decimal
   where
     signatory svc
-
--- | A coin price agreed for the leader to create new open mining round.
-template AgreedCoinPrice
-  with
-    svc : Party
-    coinPrice : Decimal
-  where
-    ensure coinPrice > 0.0
-    signatory svc
-
-    -- | Update the agreed coin price
-    choice AgreedCoinPrice_Update : ContractId AgreedCoinPrice
-      with
-        newCoinPrice : Decimal
-      controller svc
-      do create this with coinPrice = newCoinPrice
 
 
 -- | A confirmation for the leader to take an action in the name of the SVC.
@@ -285,6 +271,12 @@ template SvcRules with
               joinedAsOfRound = nextMiningRound
               cometBftConfig = CometBft.emptySvNodeConfig
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
+        now <- getTime
+        create CoinPriceVote with
+          svc
+          sv = newMemberParty
+          coinPrice = None
+          lastUpdatedAt = now
         create SvcRules with
           svc
           epoch
@@ -305,11 +297,10 @@ template SvcRules with
         requireUnlocked lock
         require "Member exists" (member `Map.member` members)
         require "There is more than one member" (Map.size members > 1)
+        -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
+        -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
+        -- revoking that member's rights in the CometBFT network.
         let newMembers = Map.delete member members
-            -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
-            -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
-            -- revoking that member's rights in the CometBFT network.
-
         -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
         -- and instead just choose the member with the lexicographicall smallest name.
         let (newLeader, newEpoch)
@@ -594,6 +585,79 @@ template SvcRules with
           rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
 
 
+    -- Voting on the coin price
+    ---------------------------
+
+    nonconsuming choice SvcRules_UpdateCoinPriceVote : ContractId CoinPriceVote
+      with
+        sv : Party
+        voteCid : ContractId CoinPriceVote
+        coinPrice : Decimal
+        coinRulesCid : ContractId CoinRules
+      controller sv
+      do
+        requireUnlocked lock
+        -- fetch coin rules to access their config
+        coinRules <- fetch coinRulesCid
+        require "SVC matches" (coinRules.svc == svc)
+        now <- getTime
+        let coinConfig = CC.Schedule.getValueAsOf now coinRules.configSchedule
+        -- validate and archive existing vote
+        vote <- fetch voteCid
+        archive voteCid
+        require "SVC matches" (vote.svc == svc)
+        require "SV matches" (vote.sv == sv)
+        now <- getTime
+        unless (isNone $ vote.coinPrice) $
+          require "Last update happened at least one tick ago"
+            (vote.lastUpdatedAt `addRelTime` coinConfig.tickDuration <= now)
+        -- create new vote
+        create CoinPriceVote with
+          svc
+          sv
+          coinPrice = Some coinPrice
+          lastUpdatedAt = now
+
+    -- | Garbage-collect CoinPriceVotes from removed members and duplicate ones that might
+    -- happen due to a too quick removal and re-addition of a member.
+    -- We expect this to be run as an OnReadyContractTrigger for the SvcRules contract.
+    --
+    -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
+    -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.
+    -- Actions that require confirmation via ad-hoc voting must not become stale while the voting
+    -- process runs.
+    nonconsuming choice SvcRules_GarbageCollectCoinPriceVotes : ()
+      with
+        nonMemberVoteCids : [ContractId CoinPriceVote]
+        duplicateVoteCids : [[ContractId CoinPriceVote]]
+      controller leader
+      do
+        requireUnlocked lock
+        -- validate and archive non-member votes
+        forA_ nonMemberVoteCids $ \voteCid -> do
+          vote <- fetch voteCid
+          archive voteCid
+          require "SVC matches" (vote.svc == svc)
+          require "SV is no member" (not $ vote.sv `Map.member` members)
+        -- validate and archive duplicates
+        forA_ duplicateVoteCids $ \voteCids -> do
+          require "Unique references to duplicates" (unique voteCids)
+          votes <- forA voteCids $ \voteCid -> do
+            vote <- fetch voteCid
+            pure (voteCid, vote)
+          -- keep the most recently updated vote to avoid UI glitches
+          case sortOn (\(_, vote) -> Down (vote.lastUpdatedAt)) votes of
+            [] -> fail "empty list of duplicate votes"
+            [_] -> fail "singleton list of duplicate votes"
+            ((_, vote)::duplicates) -> do
+              require "SVC matches" (vote.svc == svc)
+              require "SV is a member" (vote.sv `Map.member` members)
+              forA_ duplicates $ \(duplicateCid, duplicate) -> do
+                archive duplicateCid
+                require "SVC matches" (duplicate.svc == svc)
+                require "SV of duplicate matches" (duplicate.sv == vote.sv)
+
+
     -- SVC rules config management
     ------------------------------
 
@@ -743,6 +807,7 @@ template SvcRules with
         requireUnlocked lock
         exercise cid choiceArg
 
+
     -- Round management driven directly by the leader
     -------------------------------------------------
 
@@ -753,13 +818,13 @@ template SvcRules with
         roundToArchiveCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
-        agreedCoinPriceCid : ContractId AgreedCoinPrice
+        coinPriceVoteCids : [ContractId CoinPriceVote]
       controller leader
       do
         requireUnlocked lock
-        coinPriceContract <- fetch agreedCoinPriceCid
-        let coinPrice = coinPriceContract.coinPrice
+        coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
         exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

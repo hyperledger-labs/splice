@@ -1,0 +1,46 @@
+-- | Templates and code for the SVC to agree on a coin price using median-based voting.
+--
+-- Every member can change its desired coin price at any time they like provided they
+-- wait at least one tick duration (2.5 minutes by default) between changes.
+--
+-- New `OpenMiningRounds` are always openened with the median of the coin prices desired
+-- by the members of the SVC.
+module CN.SVC.CoinPrice where
+
+import DA.List
+import DA.Optional
+
+import CN.Util.Assert
+
+-- | A vote by an SV for their desired coin price.
+template CoinPriceVote with
+    svc : Party
+    sv : Party
+    coinPrice : Optional Decimal
+    -- ^ Set to None for new members, but defined thereafter.
+    lastUpdatedAt : Time
+    -- ^ The last time this price was updated. Tracked to limit members from
+    -- changing their vote more than once per tick.
+  where
+    ensure optional True (0.0 <) coinPrice
+
+    signatory svc
+
+fetchMedianCoinPrice : Party -> [Party] -> [ContractId CoinPriceVote] -> Update Decimal
+fetchMedianCoinPrice svc members voteCids = do
+  votes <- forA voteCids $ \voteCid -> do
+    vote <- fetch voteCid
+    require "SVC matches" (vote.svc == svc)
+    pure vote
+  let voters = map (.sv) votes
+  require "Every member voted exactly once" (sort voters == sort members)
+  pure $ median $ mapOptional (.coinPrice) votes
+
+-- | See https://en.wikipedia.org/wiki/Median
+median : [Decimal] -> Decimal
+median [] = error "median: not defined for the empty list"
+median xs0 =
+    0.5 * (xs !! ((n - 1) / 2) + xs !! (n / 2))
+  where
+    xs = sort xs0
+    n = length xs

@@ -14,6 +14,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -45,13 +46,13 @@ class AdvanceOpenMiningRoundTrigger(
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
-      agreedCoinPrice <- store.getAgreedCoinPrice()
+      coinPriceVotes <- store.listMemberCoinPriceVotes()
       cmd = svcRules.contractId.exerciseSvcRules_AdvanceOpenMiningRounds(
         task.work.coinRulesId,
         rounds.oldest.contractId,
         rounds.middle.contractId,
         rounds.newest.contractId,
-        agreedCoinPrice.contractId,
+        coinPriceVotes.map(_.contractId).asJava,
       )
       (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
         Seq(store.key.svParty),
