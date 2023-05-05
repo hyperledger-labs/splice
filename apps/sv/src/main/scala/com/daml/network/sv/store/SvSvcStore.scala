@@ -536,6 +536,39 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         co => co.payload.svName == svName,
       )
     )
+
+  def listElectionRequests(
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svcrules.ElectionRequest.ContractId, cn.svcrules.ElectionRequest]]
+  ] =
+    defaultAcsDomainIdF
+      .flatMap(
+        multiDomainAcsStore.listContractsOnDomain(
+          cn.svcrules.ElectionRequest.COMPANION,
+          _,
+          {
+            c: Contract[
+              cn.svcrules.ElectionRequest.ContractId,
+              cn.svcrules.ElectionRequest,
+            ] =>
+              svcRules.payload.members.keySet
+                .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
+          },
+        )
+      )
+      .map(
+        _.foldLeft(
+          Map[String, Contract[
+            cn.svcrules.ElectionRequest.ContractId,
+            cn.svcrules.ElectionRequest,
+          ]]()
+        ) { (acc, contract) =>
+          if (acc.contains(contract.payload.requester)) acc
+          else acc + (contract.payload.requester -> contract)
+        }
+      )
+      .map(dict => dict.values.toSeq)
 }
 
 object SvSvcStore {
@@ -574,6 +607,7 @@ object SvSvcStore {
       Map(
         mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.ElectionRequest.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv

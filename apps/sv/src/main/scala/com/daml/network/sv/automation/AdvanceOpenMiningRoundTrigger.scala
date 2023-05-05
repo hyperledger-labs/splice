@@ -15,6 +15,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.util.Random
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -43,6 +44,11 @@ class AdvanceOpenMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
+    store
+      .getSvcRules()
+      .foreach(svcRules =>
+        logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
+      )
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
@@ -74,19 +80,18 @@ class AdvanceOpenMiningRoundTrigger(
     logger.debug(show"Starting check for leader inactivity for ${task.work}")
     store
       .getSvcRules()
-      .map(_.payload.leader)
-      .flatMap(monitoredLeader => {
-
+      .map(rules => (rules.payload.epoch, rules.payload.leader))
+      .flatMap({ case (monitoredEpoch, monitoredLeader) =>
         val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
           context.clock
             .scheduleAfter(
               _ => {
                 val isLeaderInactive = for {
-                  currentLeader <- store
+                  sameEpoch <- store
                     .getSvcRules()
-                    .map(_.payload.leader == monitoredLeader)
+                    .map(_.payload.epoch == monitoredEpoch)
                   taskStale <- isStaleTask(task)
-                } yield currentLeader && !taskStale
+                } yield sameEpoch && !taskStale
 
                 isLeaderInactive.foreach(isInactive => {
                   if (isInactive) {
@@ -97,8 +102,7 @@ class AdvanceOpenMiningRoundTrigger(
                   }
                 })
               },
-              context.config.leaderInactiveTimeout.asJava
-                .plus(context.config.pollingInterval.asJava),
+              context.config.effectiveLeaderInactiveTimeout.asJava,
             )
         )
         continueOrShutdownSignal.unwrap.flatMap {
@@ -141,17 +145,18 @@ class AdvanceOpenMiningRoundTrigger(
     } yield ()).isEmpty
   }
 
+  /** Handle leader failure by voting for a new leader
+    */
+  @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
   def handleLeaderFailure(currentLeader: String, msg: String)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
     logger.warn(msg)
 
-    import scala.jdk.CollectionConverters.*
-    import scala.util.Random
-
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
+      currentRequesters <- store.listElectionRequests(svcRules).map(_.map(_.payload.requester))
       self = store.key.svParty.toProtoPrimitive
       otherParties = Set.empty ++ svcRules.payload.members.keySet.asScala - currentLeader - self
       ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
@@ -162,17 +167,27 @@ class AdvanceOpenMiningRoundTrigger(
         ),
         ranking.asJava,
       )
-      (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        cmd,
-        domainId = domainId,
-      )
-    } yield {
-      TaskSuccess(
-        s"Successfully requested an election to replace inactive leader ${currentLeader}"
-      )
-    }
+      retVal <-
+        if (!currentRequesters.contains(self)) {
+          connection.submitWithResultAndOffsetNoDedup(
+            Seq(store.key.svParty),
+            Seq(store.key.svcParty),
+            cmd,
+            domainId = domainId,
+          ): Unit
+          Future.successful(
+            TaskSuccess(
+              s"Successfully requested an election to replace inactive leader ${currentLeader}"
+            )
+          )
+        } else {
+          Future.successful(
+            TaskSuccess(
+              s"Successfully requested an election to replace inactive leader ${currentLeader}"
+            )
+          )
+        }
+    } yield retVal
   }
 
   override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()

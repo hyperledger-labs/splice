@@ -373,7 +373,7 @@ template SvcRules with
         create ElectionRequest with
           ..
 
-    choice SvcRules_ElectLeader : ContractId SvcRules
+    choice SvcRules_ElectLeader : SvcRules
       with
         actor : Party
         requestCids : [ContractId ElectionRequest]
@@ -397,16 +397,9 @@ template SvcRules with
         require "There are enough requests" (numVotes >= summary.requiredNumVotes)
         let rankings = [ (req.requester, req.ranking) | req <- reqs ]
             newLeader = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
-        create SvcRules with
-          svc
-          epoch = epoch + 1
-          nextMiningRound
-          members
-          leader = newLeader
-          config
-          isDevNet
-          lock
-        pure self
+        let newSvcRules = SvcRules with epoch = epoch + 1, leader = newLeader, ..
+        create newSvcRules
+        pure newSvcRules
 
     nonconsuming choice SvcRules_ArchiveOutdatedElectionRequest : ()
       with

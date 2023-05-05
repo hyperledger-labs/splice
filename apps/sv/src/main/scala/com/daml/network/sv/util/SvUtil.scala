@@ -97,6 +97,14 @@ object SvUtil {
     else required
   }
 
+  def requiredNumVotes(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
+    val memberNum = svcRules.payload.members.size
+    // as per `SvcRules` / `summarizeCollective`
+    val required = 2 * (memberNum - 1) / 3 + 1
+    if (svcRules.payload.isDevNet) required min 4
+    else required
+  }
+
   def generateRandomOnboardingSecret(): String = {
     val rng = new SecureRandom();
     // 256 bits of entropy

@@ -980,11 +980,13 @@ class SvTimeBasedIntegrationTest
       getSvcRules().data.members should have size 4
     }
 
+    var rounds: Seq[OpenMiningRound.Contract] = Seq.empty[OpenMiningRound.Contract]
+
     clue(
       "Wait for first three rounds to be opened"
     ) {
       eventually()({
-        val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
+        rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -1001,9 +1003,7 @@ class SvTimeBasedIntegrationTest
     ) {
       // It doesn't really matter which sv we pick
       val automationConfig = sv2.config.automation
-      val effectiveTimeout = automationConfig.leaderInactiveTimeout.asJava.plus(
-        automationConfig.pollingInterval.asJava
-      )
+      val effectiveTimeout = automationConfig.effectiveLeaderInactiveTimeout.asJava
       val bufferDuration = java.time.Duration.ofSeconds(5)
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -1038,14 +1038,51 @@ class SvTimeBasedIntegrationTest
         },
       )
 
+      val currentLeader = getSvcRules().data.leader
+      val currentEpoch = getSvcRules().data.epoch
+
       eventually() {
         val electionRequests = svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
         electionRequests should have length 3
         val requestsData = electionRequests.map(req => req.data)
         requestsData.foreach(data => data.ranking.asScala.head shouldBe data.requester)
-        val currentLeader = getSvcRules().data.leader
         requestsData.foreach(_.ranking.asScala.last shouldBe currentLeader)
+      }
+
+      var newLeader: String = ""
+
+      eventually() {
+        val electionRequests = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
+        electionRequests should have length 0
+        newLeader = getSvcRules().data.leader
+        val newEpoch = getSvcRules().data.epoch
+        newEpoch should not be currentEpoch
+        newLeader should not be currentLeader
+      }
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          advanceTime(tickDurationWithBuffer)
+        },
+        entries => {
+          forExactly(1, entries) { line =>
+            line.message should include(
+              s"Starting work as leader ${newLeader}"
+            )
+          }
+        },
+      )
+
+      advanceTimeByPollingInterval(sv2)
+      eventually() {
+        val newRounds = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(OpenMiningRound.COMPANION)(
+            svcParty,
+            c => !rounds.contains(c),
+          )
+        newRounds should have length 1
       }
     }
   }
