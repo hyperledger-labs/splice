@@ -151,7 +151,14 @@ function _cluster_show() {
     _log ""
 }
 
+function _pulumi() {
+    if ! [ -v PULUMI_BACKEND_URL ]; then
+        # shellcheck disable=SC2016
+      	_error 'The `PULUMI_BACKEND_URL` variable is not set. It should point to a GCP bucket, e.g. `gs://a-bucket-name`.'
+    fi
 
+    pulumi "$@"
+}
 
 ### Cluster manageent
 
@@ -1061,7 +1068,7 @@ function subcmd_pulumi() {
     # Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    pulumi --stack "${GCP_CLUSTER_BASENAME}" \
+    _pulumi --stack "${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
             "$@"
 }
@@ -1215,7 +1222,7 @@ function subcmd_infra_pulumi() {
       args+=( -c "DNS_SA_KEY=${dns_sa_key}" )
   fi
 
-  pulumi "${args[@]}" "$@"
+  _pulumi "${args[@]}" "$@"
 }
 
 ###
