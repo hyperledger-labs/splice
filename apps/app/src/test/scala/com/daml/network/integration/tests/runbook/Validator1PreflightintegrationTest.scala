@@ -10,7 +10,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import scala.collection.mutable
-import scala.concurrent.duration.*
 
 /** Preflight test running against validator1.
   */
@@ -141,7 +140,7 @@ class Validator1PreflightIntegrationTest
 
       click on "navlink-transactions"
 
-      eventually(60.seconds) {
+      eventually() {
         inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
           val transaction = readTransactionFromRow(tx)
           transaction.action should matchText("Received")
