@@ -124,6 +124,9 @@ private[validator] object ValidatorUtil {
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    def waitForStoreIngestion(offsetAndResult: (String, Any)): Future[Unit] =
+      store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offsetAndResult._1)
+
     for {
       endUserParty <- connection.getPrimaryParty(endUserName)
       _ <- retryProvider.retryForClientCalls(
@@ -136,21 +139,19 @@ private[validator] object ValidatorUtil {
               logger.debug(s"No install contract found for user $endUserName, skipping")
               Future.unit
             case Some(c) =>
-              connection.submitCommandsNoDedup(
-                actAs = Seq(
-                  store.key.validatorParty,
-                  PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
-                ),
-                readAs = Seq.empty,
-                commands = c.contractId
-                  .exerciseArchive(
+              connection
+                .submitWithResultAndOffsetNoDedup(
+                  actAs = Seq(
+                    store.key.validatorParty,
+                    PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
+                  ),
+                  readAs = Seq.empty,
+                  update = c.contractId.exerciseArchive(
                     new com.daml.network.codegen.java.da.internal.template.Archive()
-                  )
-                  .commands
-                  .asScala
-                  .toSeq,
-                domainId = domainId,
-              )
+                  ),
+                  domainId = domainId,
+                )
+                .flatMap(waitForStoreIngestion) // wait for store update to avoid #4536
           },
         logger,
         // once the validator's actAs and readAs rights have been revoked,
@@ -167,21 +168,20 @@ private[validator] object ValidatorUtil {
               logger.debug(s"No validator right found for user $endUserName, skipping")
               Future.unit
             case Some(c) =>
-              connection.submitCommandsNoDedup(
-                actAs = Seq(
-                  store.key.validatorParty,
-                  endUserParty,
-                ),
-                readAs = Seq.empty,
-                commands = c.contractId
-                  .exerciseArchive(
-                    new com.daml.network.codegen.java.da.internal.template.Archive()
-                  )
-                  .commands
-                  .asScala
-                  .toSeq,
-                domainId = domainId,
-              )
+              connection
+                .submitWithResultAndOffsetNoDedup(
+                  actAs = Seq(
+                    store.key.validatorParty,
+                    endUserParty,
+                  ),
+                  readAs = Seq.empty,
+                  update = c.contractId
+                    .exerciseArchive(
+                      new com.daml.network.codegen.java.da.internal.template.Archive()
+                    ),
+                  domainId = domainId,
+                )
+                .flatMap(waitForStoreIngestion) // wait for store update to avoid #4536
           },
         logger,
         // once the validator's actAs and readAs rights have been revoked,
