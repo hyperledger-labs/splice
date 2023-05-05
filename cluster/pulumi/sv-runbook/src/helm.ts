@@ -26,7 +26,12 @@ export function installCNHelmChart(
             username: process.env.JFROG_USERNAME,
             password: process.env.JFROG_PASSWORD,
           },
-      values: values,
+      values: {
+        ...values,
+        imageRepo: local
+          ? "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+          : undefined,
+      },
     },
     {
       dependsOn: dependsOn.concat([ns]),

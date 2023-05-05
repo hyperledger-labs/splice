@@ -5,7 +5,7 @@
         "@types/node": "^16"
     },
     "dependencies": {
-        "@pulumi/auth0": "^2.16.0",
+        "@pulumi/auth0": "^2.19.0",
         "@pulumi/pulumi": "^3.0.0"
     },
     "scripts": {
