@@ -1,4 +1,4 @@
-import { callWithLogging, Contract } from 'common-frontend';
+import { callWithLogging, Contract, useUserState } from 'common-frontend';
 import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
 
@@ -216,26 +216,24 @@ const LedgerApiContext = React.createContext<LedgerApiClient | undefined>(undefi
 
 export interface LedgerApiProps {
   jsonApiUrl: string;
-  userId: string;
-  token: string;
 }
 
 export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiProps>> = ({
   jsonApiUrl,
-  userId,
-  token,
   children,
 }) => {
-  const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: token };
-  const ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId);
+  const { userAccessToken, userId } = useUserState();
+
+  let ledgerApiClient: LedgerApiClient | undefined;
+
+  if (userAccessToken && userId) {
+    const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
+    ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId);
+  }
 
   return <LedgerApiContext.Provider value={ledgerApiClient}>{children}</LedgerApiContext.Provider>;
 };
 
-export const useLedgerApiClient: () => LedgerApiClient = () => {
-  const client = useContext<LedgerApiClient | undefined>(LedgerApiContext);
-  if (!client) {
-    throw new Error('Directory client not initialized');
-  }
-  return client;
+export const useLedgerApiClient: () => LedgerApiClient | undefined = () => {
+  return useContext<LedgerApiClient | undefined>(LedgerApiContext);
 };

@@ -3,7 +3,6 @@ import {
   ApiException,
   GetProviderPartyIdResponse,
   ListEntriesResponse,
-  LookupEntryByNameResponse,
   ServerConfiguration,
 } from 'directory-openapi';
 import React, { useContext, useMemo } from 'react';
@@ -22,7 +21,7 @@ export interface DirectoryClient {
   getProviderPartyId: () => Promise<GetProviderPartyIdResponse>;
   lookupEntryByParty: (partyId: string) => Promise<DirectoryEntry | undefined>;
   listEntries: (pageSize: number, namePrefix?: string) => Promise<ListEntriesResponse>;
-  lookupEntryByName: (name: string) => Promise<LookupEntryByNameResponse>;
+  lookupEntryByName: (name: string) => Promise<Contract<DirectoryEntry>>;
 }
 
 export const DirectoryClientProvider: React.FC<React.PropsWithChildren<DirectoryProps>> = ({
@@ -58,8 +57,9 @@ export const DirectoryClientProvider: React.FC<React.PropsWithChildren<Directory
       listEntries: async (pageSize: number, namePrefix?: string): Promise<ListEntriesResponse> => {
         return await directoryClient.listEntries(pageSize, namePrefix);
       },
-      lookupEntryByName: async (name: string): Promise<LookupEntryByNameResponse> => {
-        return await directoryClient.lookupEntryByName(name);
+      lookupEntryByName: async (name: string): Promise<Contract<DirectoryEntry>> => {
+        const response = await directoryClient.lookupEntryByName(name);
+        return Contract.decodeOpenAPI(response.entry, DirectoryEntry);
       },
     };
   }, [url]);

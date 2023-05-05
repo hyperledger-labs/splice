@@ -1,9 +1,9 @@
-import { Login, ErrorBoundary, useUserState, PartyId } from 'common-frontend';
+import { ErrorBoundary, Login, PartyId, useUserState } from 'common-frontend';
+import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Container, Toolbar, Typography } from '@mui/material';
 
 import { config } from './utils/config';
-import Home from './views/Home';
 
 const App: React.FC = () => {
   const { isAuthenticated, logout, primaryPartyId } = useUserState();
@@ -37,7 +37,7 @@ const App: React.FC = () => {
           </Toolbar>
         </Box>
         {isAuthenticated ? (
-          <Home />
+          <Outlet />
         ) : (
           <Container style={{ height: '100%', flex: '1' }}>
             <Login

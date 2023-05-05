@@ -7,18 +7,18 @@ import { ContractId } from '@daml/types';
 interface Props<T> extends ButtonProps {
   text: string;
   createPaymentRequest: () => Promise<ContractId<T>>;
+  redirectPath?: string;
   walletPath: string;
 }
 
 const WalletButton = <T,>(props: Props<T>, walletPage: string) => {
-  const { text, createPaymentRequest, walletPath, ...buttonProps } = props;
+  const { text, createPaymentRequest, walletPath, redirectPath, ...buttonProps } = props;
 
   const onClick = async () => {
     const cid = await createPaymentRequest();
     const here = window.location.origin.toString();
-    window.location.assign(
-      `${walletPath}/${walletPage}/${cid}/?redirect=${encodeURIComponent(here)}`
-    );
+    const redirectTo = encodeURIComponent(here + (redirectPath || ''));
+    window.location.assign(`${walletPath}/${walletPage}/${cid}/?redirect=${redirectTo}`);
   };
 
   return (

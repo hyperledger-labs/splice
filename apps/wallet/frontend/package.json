@@ -25,7 +25,6 @@
     "common-frontend": "^0.1.0",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "^6.8.1",
     "react-scripts": "^5.0.1"
   },
   "devDependencies": {

@@ -37,6 +37,8 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       click on className("sub-request-accept-button")
 
       // And then back to directory, where they are already logged in
+      click on id("directory-entries-button")
+
       eventually() {
         findAll(className("entries-table-row")) should have size 1
       }

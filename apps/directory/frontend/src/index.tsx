@@ -1,12 +1,46 @@
-import { AuthProvider, theme, UserProvider } from 'common-frontend';
+import { AuthProvider, DirectoryClientProvider, theme, UserProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+  RouterProvider,
+} from 'react-router-dom';
 
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import App from './App';
+import { DirectoryUiStateProvider } from './contexts/DirectoryContext';
+import { LedgerApiClientProvider } from './contexts/LedgerApiContext';
 import reportWebVitals from './reportWebVitals';
 import { config } from './utils';
+import Home from './views/Home';
+import PostPayment from './views/PostPayment';
+
+const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  return (
+    <AuthProvider authConf={config.auth}>
+      <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+        <LedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
+          <DirectoryClientProvider url={config.services.directory.url}>
+            <DirectoryUiStateProvider>{children}</DirectoryUiStateProvider>
+          </DirectoryClientProvider>
+        </LedgerApiClientProvider>
+      </UserProvider>
+    </AuthProvider>
+  );
+};
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="/" element={<App />}>
+      <Route index element={<Home />} />
+      <Route path="home" element={<Home />} />
+      <Route path="post-payment" element={<PostPayment />} />
+    </Route>
+  )
+);
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
@@ -14,11 +48,9 @@ root.render(
     {
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AuthProvider authConf={config.auth}>
-          <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-            <App />
-          </UserProvider>
-        </AuthProvider>
+        <Providers>
+          <RouterProvider router={router} />
+        </Providers>
       </ThemeProvider>
     }
   </React.StrictMode>

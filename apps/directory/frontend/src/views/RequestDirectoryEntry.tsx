@@ -27,6 +27,7 @@ const RequestDirectoryEntry: React.FC = () => {
           id="request-entry-with-sub-button"
           text="Search"
           createPaymentRequest={() => requestEntry(entryName)}
+          redirectPath={`/post-payment?entryName=${entryName}`}
           walletPath={config.services.wallet.uiUrl}
         />
       </Stack>

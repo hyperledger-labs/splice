@@ -6,10 +6,10 @@ import {
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
-  DirectoryInstall,
   DirectoryEntry,
-  DirectoryInstallRequest,
   DirectoryEntryContext,
+  DirectoryInstall,
+  DirectoryInstallRequest,
 } from '@daml.js/directory/lib/CN/Directory';
 import {
   Subscription,
@@ -21,7 +21,7 @@ import {
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
-import { LedgerApiClient, useLedgerApiClient } from './LedgerApiContext';
+import { useLedgerApiClient } from './LedgerApiContext';
 
 type DirectoryUiState = {
   primaryPartyId?: string;
@@ -68,7 +68,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   const directoryClient = useDirectoryClient();
 
   // Get parties
-  const primaryPartyId = usePrimaryParty(ledgerApiClient);
+  const primaryPartyId = usePrimaryParty();
   const providerPartyId = useProviderParty(directoryClient);
 
   // Set up app install contract
@@ -78,7 +78,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
 
   useEffect(() => {
     const setupInstallContract = async () => {
-      if (primaryPartyId && providerPartyId) {
+      if (primaryPartyId && providerPartyId && ledgerApiClient) {
         console.debug('Searching for DirectoryInstall');
         const install = await ledgerApiClient.queryDirectoryInstall(
           primaryPartyId,
@@ -132,7 +132,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   const [subPayData, setSubPayData] = useState<SubPayData[]>([]);
 
   const fetchDirectoryEntries = useCallback(async () => {
-    if (primaryPartyId && providerPartyId) {
+    if (ledgerApiClient && primaryPartyId && providerPartyId) {
       const current = await ledgerApiClient.queryOwnedDirectoryEntries(
         primaryPartyId,
         providerPartyId
@@ -153,7 +153,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   }, [directoryEntries, directoryEntriesContexts]);
 
   const fetchDirectoryEntriesContexts = useCallback(async () => {
-    if (primaryPartyId && providerPartyId) {
+    if (ledgerApiClient && primaryPartyId && providerPartyId) {
       const current = await ledgerApiClient.queryEntryContexts(primaryPartyId, providerPartyId);
       setDirectoryEntriesContexts(prev => (sameContracts(prev, current) ? prev : current));
     }
@@ -161,7 +161,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   useInterval(fetchDirectoryEntriesContexts);
 
   const fetchSubscriptions = useCallback(async () => {
-    if (primaryPartyId && providerPartyId) {
+    if (ledgerApiClient && primaryPartyId && providerPartyId) {
       const current = await ledgerApiClient.querySubscriptions(primaryPartyId, providerPartyId);
       setSubscriptionContracts(prev => (sameContracts(prev, current) ? prev : current));
     }
@@ -188,7 +188,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   }, [entriesWithContextCid, subscriptionContracts]);
 
   const fetchSubscriptionIdleState = useCallback(async () => {
-    if (primaryPartyId && providerPartyId) {
+    if (ledgerApiClient && primaryPartyId && providerPartyId) {
       const current = await ledgerApiClient.querySubscriptionIdleState(
         primaryPartyId,
         providerPartyId
@@ -199,7 +199,7 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   useInterval(fetchSubscriptionIdleState);
 
   const fetchSubscriptionPaymentResults = useCallback(async () => {
-    if (primaryPartyId && providerPartyId) {
+    if (ledgerApiClient && primaryPartyId && providerPartyId) {
       const current = await ledgerApiClient.querySubscriptionPayment(
         primaryPartyId,
         providerPartyId
@@ -228,6 +228,9 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   }, [subscriptionIdleStates, subscriptionPaymentResults]);
 
   const requestEntry = async (entryName: string) => {
+    if (!ledgerApiClient) {
+      throw new Error('No ledgerAPIClient available while requesting entry');
+    }
     if (!primaryPartyId) {
       throw new Error('No primary party found while requesting entry');
     }
@@ -300,19 +303,22 @@ function useProviderParty(directoryClient: DirectoryClient): string | undefined 
   return providerPartyId;
 }
 
-function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | undefined {
+function usePrimaryParty(): string | undefined {
+  const ledgerApiClient = useLedgerApiClient();
   const [primaryParty, setPrimaryParty] = useState<string>();
 
   useEffect(() => {
     const fetchPrimaryParty = async () => {
-      try {
-        setPrimaryParty(await retry(100, 1000, () => ledgerApiClient.getPrimaryParty()));
-      } catch (err) {
-        console.error('Error finding primary party for user', err);
-        console.error(JSON.stringify(err));
-        throw new Error(
-          'Error finding primary party for user, please confirm user onboarded to this participant.'
-        );
+      if (ledgerApiClient) {
+        try {
+          setPrimaryParty(await retry(100, 1000, () => ledgerApiClient.getPrimaryParty()));
+        } catch (err) {
+          console.error('Error finding primary party for user', err);
+          console.error(JSON.stringify(err));
+          throw new Error(
+            'Error finding primary party for user, please confirm user onboarded to this participant.'
+          );
+        }
       }
     };
     fetchPrimaryParty();

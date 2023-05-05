@@ -57,6 +57,8 @@ class DirectoryFrontendIntegrationTest
         click on className("sub-request-accept-button")
 
         // And then back to directory, where she is already logged in
+        click on id("directory-entries-button")
+
         eventually(scaled(10 seconds)) {
           val row: Element = inside(findAll(className("entries-table-row")).toList) {
             case Seq(row) =>

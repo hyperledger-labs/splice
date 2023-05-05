@@ -57,13 +57,13 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
   const resolveUserInput = useCallback(
     async (input: string) => {
       try {
-        const entry = (await directoryClient.lookupEntryByName(input)).entry;
+        const entry = await directoryClient.lookupEntryByName(input);
         if (entry === undefined) {
           // Could not lookup cns name - assume input is a party ID
           return input;
         } else {
           // Lookup succeeded - the user typed a valid cns entry - use the resolved party ID
-          return Contract.decodeOpenAPI(entry, DirectoryEntry).payload.user;
+          return entry.payload.user;
         }
       } catch {
         // Input is not a known cns name - assume it is as a party ID
