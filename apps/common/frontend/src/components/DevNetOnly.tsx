@@ -1,11 +1,32 @@
-import React, { PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { UseQueryResult, useQuery } from '@tanstack/react-query';
+import React from 'react';
 
+import { CoinRules } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { useScanClient } from '../contexts';
+import { Contract } from '../utils';
 
-const IsDevNetContext = React.createContext<boolean>(false);
+const useGetCoinRules: () => UseQueryResult<Contract<CoinRules>> = () => {
+  const { getCoinRules } = useScanClient();
+
+  return useQuery({
+    queryKey: ['getCoinRules'],
+    queryFn: async () => {
+      return await getCoinRules();
+    },
+    refetchInterval: false, // No need to refresh: it'll stay the same.
+  });
+};
 
 export const DevNetOnly: React.FC<{ children: React.ReactElement }> = props => {
-  const isDevNet = useContext(IsDevNetContext);
+  const { data: coinRules, error } = useGetCoinRules();
+
+  if (error) {
+    console.error('Failed to resolve isDevNet', error);
+    return null;
+  }
+
+  const isDevNet = coinRules?.payload.isDevNet;
+
   if (!isDevNet) {
     return null;
   } else {
@@ -14,17 +35,3 @@ export const DevNetOnly: React.FC<{ children: React.ReactElement }> = props => {
 };
 
 export default DevNetOnly;
-
-export const IsDevNetProvider: React.FC<PropsWithChildren> = ({ children }) => {
-  const { getCoinRules } = useScanClient();
-  const [isDevNet, setIsDevNet] = useState(false);
-  // No need to refresh: it'll stay the same.
-  useEffect(() => {
-    getCoinRules().then(
-      coinRules => setIsDevNet(coinRules.payload.isDevNet),
-      err => console.error('Failed to resolve isDevNet', err)
-    );
-  }, [getCoinRules]);
-
-  return <IsDevNetContext.Provider value={isDevNet}>{children}</IsDevNetContext.Provider>;
-};

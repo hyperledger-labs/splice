@@ -8,7 +8,6 @@ import {
   theme,
   UserProvider,
 } from 'common-frontend';
-import { IsDevNetProvider } from 'common-frontend/lib/components/DevNetOnly';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -51,9 +50,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
             <WalletClientProvider url={config.services.validator.url}>
               <DirectoryClientProvider url={config.services.directory.url}>
                 <ScanClientProvider url={config.services.scan.url}>
-                  <CurrentUserProvider>
-                    <IsDevNetProvider>{children}</IsDevNetProvider>
-                  </CurrentUserProvider>
+                  <CurrentUserProvider>{children}</CurrentUserProvider>
                 </ScanClientProvider>
               </DirectoryClientProvider>
             </WalletClientProvider>

@@ -11,15 +11,16 @@
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
+    "@tanstack/react-query": "^4.29.5",
     "common-protobuf": "^0.1.0",
     "date-fns": "^2.29.3",
     "decimal.js-light": "^2.5.1",
     "directory-openapi": "^0.0.1",
-    "sv-openapi": "^0.0.1",
     "grpc-web": "^1.3.1",
     "jose": "^4.10.3",
     "react-oidc-context": "^2.2.2",
     "react-router-dom": "^6.8.1",
+    "sv-openapi": "^0.0.1",
     "web-vitals": "^2.1.4",
     "zod": "^3.19.1"
   },
@@ -46,6 +47,8 @@
     ]
   },
   "devDependencies": {
+    "@tanstack/eslint-plugin-query": "^4.29.4",
+    "@tanstack/react-query-devtools": "^4.29.6",
     "@trivago/prettier-plugin-sort-imports": "^3.3.0",
     "@types/node": "^18.11.0",
     "@types/react": "^18.0.21",
