@@ -17,12 +17,13 @@ class SvFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
 
   "A SV UI" should {
+    val port = 3010
 
     "have basic login functionality" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "login works with correct password", {
-            login(3010, sv1.config.ledgerApiUser)
+            login(port, sv1.config.ledgerApiUser)
           },
         )(
           "login does not work with wrong password",
@@ -35,7 +36,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "svc infos are displayed", {
-            login(3010, sv1.config.ledgerApiUser)
+            login(port, sv1.config.ledgerApiUser)
           },
         )(
           "We see a table with sv1 as SV Name",
@@ -50,7 +51,38 @@ class SvFrontendIntegrationTest
             )
           },
         )
+      }
+    }
 
+    "can prepare an onboarding secret for new validator" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        val (_, rowSize) = actAndCheck(
+          "sv1 operator can login and browse to the validator onboarding tab", {
+            go to s"http://localhost:$port/validator-onboarding"
+            loginOnCurrentPage(port, sv1.config.ledgerApiUser)
+          },
+        )(
+          "We see a button for creating onboarding secret",
+          _ => {
+            find(className("onboarding-secret-table")) should not be empty
+            val rows = findAll(className("onboarding-secret-table-row")).toSeq
+            find(id("create-validator-onboarding-secret")) should not be empty
+            rows.size
+          },
+        )
+
+        actAndCheck(
+          "click on the button to create an onboarding secret", {
+            click on "create-validator-onboarding-secret"
+          },
+        )(
+          "a new secret row is added",
+          _ => {
+            findAll(
+              className("onboarding-secret-table-row")
+            ).toSeq should have size (rowSize + 1L)
+          },
+        )
       }
     }
   }

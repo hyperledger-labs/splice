@@ -421,7 +421,8 @@ lazy val `apps-common-frontend` = {
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`directory-daml` / Compile / damlBuild).value ++
           (`svc-governance-daml` / Compile / damlBuild).value ++
-          (`splitwell-daml` / Compile / damlBuild).value,
+          (`splitwell-daml` / Compile / damlBuild).value ++
+          (`validator-lifecycle-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,

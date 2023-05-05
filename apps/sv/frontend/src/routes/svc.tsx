@@ -1,4 +1,4 @@
-import SvcView from '../views/Svc';
+import SvcView from '../components/Svc';
 
 const Svc: React.FC = () => {
   return <SvcView />;

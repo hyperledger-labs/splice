@@ -820,7 +820,7 @@ Don't forget to `cncluster unlock` the cluster once you are finished!
 
 ### Building the Wallet and Splitwell Frontend
 
-Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends
+Run `sbt apps-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends
 (specifically, all ts code for our daml models and protobuf definitions), and build anything required for the frontends (e.g. install dependencies in `node_modules`).
 
 ### Running the Wallet and Splitwell Frontend

@@ -3,7 +3,10 @@ import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'commo
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,
+  ListOngoingValidatorOnboardingsResponse,
   Middleware,
+  PrepareValidatorOnboardingRequest,
+  PrepareValidatorOnboardingResponse,
   RequestContext,
   ResponseContext,
   ServerConfiguration,
@@ -17,6 +20,8 @@ export interface SvAdminProps {
 
 export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
+  prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
+  listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
 }
 
 class ApiMiddleware
@@ -40,6 +45,16 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       isAuthorized: async (): Promise<void> => {
         return await svAdminClient.isAuthorized();
       },
+      prepareValidatorOnboarding: async (
+        expiresIn: number
+      ): Promise<PrepareValidatorOnboardingResponse> => {
+        const request: PrepareValidatorOnboardingRequest = { expiresIn };
+        return await svAdminClient.prepareValidatorOnboarding(request);
+      },
+      listOngoingValidatorOnboardings:
+        async (): Promise<ListOngoingValidatorOnboardingsResponse> => {
+          return await svAdminClient.listOngoingValidatorOnboardings();
+        },
     };
   }, [url, userAccessToken]);
 

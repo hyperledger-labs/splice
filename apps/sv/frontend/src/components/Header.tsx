@@ -9,7 +9,7 @@ import Link from '@mui/material/Link';
 const Header: React.FC = () => {
   const navLinks = [
     { name: 'Infos', path: 'svc' },
-    { name: 'Validator Onboarding', path: 'onboarding' },
+    { name: 'Validator Onboarding', path: 'validator-onboarding' },
   ];
 
   const applyNavStyle = (isActive: boolean) => {

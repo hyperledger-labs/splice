@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, theme, ErrorBoundary, UserProvider } from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 import {
@@ -15,15 +16,25 @@ import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AuthCheck from './routes/authCheck';
 import Root from './routes/root';
 import Svc from './routes/svc';
+import ValidatorOnboarding from './routes/validatorOnboarding';
 import { config } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const navigate = useNavigate();
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchInterval: 500, // re-fetch all queries every 500ms by default
+      },
+    },
+  });
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
-      <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-        <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
-      </UserProvider>
+      <QueryClientProvider client={queryClient}>
+        <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+          <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
+        </UserProvider>
+      </QueryClientProvider>
     </AuthProvider>
   );
 };
@@ -40,6 +51,7 @@ const router = createBrowserRouter(
       <Route path="/" element={<Root />}>
         <Route index element={<Svc />} />
         <Route path="svc" element={<Svc />} />
+        <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
       </Route>
     </Route>
   )
