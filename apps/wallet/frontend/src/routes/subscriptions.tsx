@@ -1,18 +1,10 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  Contract,
-  DirectoryEntry,
-  IntervalDisplay,
-  sameContracts,
-  useInterval,
-} from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, IntervalDisplay } from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';
-import { useCallback, useState } from 'react';
 
 import {
   Box,
@@ -31,33 +23,25 @@ import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Walle
 import { Party } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
+import { useCoinPrice, useSubscriptions } from '../hooks';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 const Subscriptions: React.FC = () => {
-  const { listSubscriptions, cancelSubscription } = useWalletClient();
-  const [subscriptionTuples, setSubscriptionTuples] = useState<WalletSubscription[]>([]);
-
-  const fetchSubscriptions = useCallback(async () => {
-    const { subscriptionsList } = await listSubscriptions();
-    setSubscriptionTuples(prev =>
-      unchangedSubscriptionTuples(subscriptionsList, prev) ? prev : subscriptionsList
-    );
-  }, [listSubscriptions]);
-
-  useInterval(fetchSubscriptions);
-
+  const { cancelSubscription } = useWalletClient();
+  const subscriptionQuery = useSubscriptions();
   const coinPriceQuery = useCoinPrice();
 
-  if (coinPriceQuery.isLoading) {
+  if (coinPriceQuery.isLoading || subscriptionQuery.isLoading) {
     return <Loading />;
   }
 
   // TODO(#4139) implement error state from design
-  if (coinPriceQuery.isError) {
+  if (coinPriceQuery.isError || subscriptionQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
+
+  const subscriptionTuples = subscriptionQuery.data;
 
   return (
     <Stack marginY={10} spacing={2}>
@@ -211,20 +195,4 @@ const PaymentDue: React.FC<{ state: SubscriptionState }> = ({ state }) => {
   );
 };
 
-const unchangedSubscriptionTuples = (a: WalletSubscription[], b: WalletSubscription[]): boolean => {
-  return (
-    sameContracts(
-      a.map(x => x.subscription),
-      b.map(x => x.subscription)
-    ) &&
-    sameContracts(
-      a.map(x => x.state.value as Contract<unknown>),
-      b.map(x => x.state.value as Contract<unknown>)
-    ) &&
-    sameContracts(
-      a.map(x => x.context),
-      b.map(x => x.context)
-    )
-  );
-};
 export default Subscriptions;
