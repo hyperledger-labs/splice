@@ -29,7 +29,6 @@ class InMemoryDomainStore(
   private var stateVar: InMemoryDomainStore.State = InMemoryDomainStore.State(
     Map.empty,
     Promise(),
-    Promise(),
     Map.empty,
   )
 
@@ -124,10 +123,9 @@ class InMemoryDomainStore(
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.setDomains(domains)
-      ).map { case (summary, stateChanged, oneDomainConnectedO, aliasSignals) =>
+      ).map { case (summary, stateChanged, aliasSignals) =>
         logger.debug(show"Ingested domain update $summary")
         stateChanged.success(())
-        oneDomainConnectedO.foreach(_.trySuccess(()))
         aliasSignals.foreach { case (domainId, promise) =>
           promise.success(domainId)
         }
@@ -154,7 +152,6 @@ object InMemoryDomainStore {
   private case class State(
       connectedDomains: Map[DomainAlias, DomainId],
       stateChanged: Promise[Unit],
-      oneDomainConnected: Promise[Unit],
       domainAliasIngestionsToSignal: Map[DomainAlias, Promise[DomainId]],
   ) {
     def setDomains(
@@ -164,13 +161,10 @@ object InMemoryDomainStore {
         (
             IngestionSummary,
             Promise[Unit],
-            Option[Promise[Unit]],
             Iterable[(DomainId, Promise[DomainId])],
         ),
     ) = {
       val summary = summarizeChanges(connectedDomains, newDomains)
-      val oneDomainConnectedO =
-        Option.when(summary.newNumConnectedDomains >= 1)(oneDomainConnected)
       val (readyToSignal, leftoverSignals) =
         domainAliasIngestionsToSignal.partition { case (alias, _) =>
           newDomains.contains(alias)
@@ -182,10 +176,9 @@ object InMemoryDomainStore {
         State(
           newDomains,
           Promise(),
-          oneDomainConnected,
           leftoverSignals,
         ),
-        (summary, stateChanged, oneDomainConnectedO, readyToSignalWithDomainId),
+        (summary, stateChanged, readyToSignalWithDomainId),
       )
     }
     def addAliasToSignal(alias: DomainAlias): (State, Promise[DomainId]) = {
