@@ -143,22 +143,33 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
         )
         .toFile
-    val (webDriver, biDi) = eventually() {
+
+    val (webDriver, biDi) = eventually(timeUntilSuccess = 40.seconds) {
+      logger.info(s"Attempting to start FirefoxDriver for $name...")
+
       val driver =
         Try {
           val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
           new FirefoxDriver(builder.build(), options)
         }.toEither.valueOr { e =>
-          logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
+          logger.info(s"FirefoxDriver failed to start ($name); retrying. The error was: $e")
           fail()
         }
-      logger.debug(s"FirefoxDriver started")
-      val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
-        logger.info(s"Failed to get BiDi connection to web driver. The error was $e")
+      logger.debug(s"FirefoxDriver started ($name)")
+      val bidi = Try(eventually() {
+        logger.debug(s"Attempting to open BiDi connection for FirefoxDriver ($name)")
+        Try(driver.getBiDi()).toEither.valueOr { e =>
+          logger.info(s"Failed to get BiDi connection to FirefoxDriver ($name). The error was $e")
+          fail()
+        }
+      }).toEither.valueOr { e =>
+        logger.info(
+          s"Failed to get BiDi connection to FirefoxDriver, even after retries ($name). The error was $e"
+        )
         driver.quit()
         fail()
       }
-      logger.debug(s"BiDi connection acquired")
+      logger.debug(s"FirefoxDriver started and BiDi connection acquired ($name)")
       (driver, bidi)
     }
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
