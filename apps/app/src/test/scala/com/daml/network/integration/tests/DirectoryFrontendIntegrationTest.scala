@@ -57,7 +57,10 @@ class DirectoryFrontendIntegrationTest
         click on className("sub-request-accept-button")
 
         // And then back to directory, where she is already logged in
-        click on id("directory-entries-button")
+        val goToDirectoryEntriesButton = eventually() {
+          find(id("directory-entries-button")).valueOrFail("The success page did not load.")
+        }
+        click on goToDirectoryEntriesButton
 
         eventually(scaled(10 seconds)) {
           val row: Element = inside(findAll(className("entries-table-row")).toList) {
