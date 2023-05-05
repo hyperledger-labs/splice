@@ -4,7 +4,7 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.sv.SvApp
-import com.daml.network.sv.store.SvSvStore
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -19,6 +19,7 @@ class HttpSvAdminHandler(
     ledgerClient: CNLedgerClient,
     globalDomain: DomainId,
     svStore: SvSvStore,
+    svcStore: SvSvcStore,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -39,6 +40,20 @@ class HttpSvAdminHandler(
       } yield {
         definitions.ListOngoingValidatorOnboardingsResponse(
           validatorOnboardings.map(_.toJson).toVector
+        )
+      }
+    }
+  }
+
+  def listValidatorLicenses(
+      respond: v0.SvAdminResource.ListValidatorLicensesResponse.type
+  )()(adminUser: String): Future[v0.SvAdminResource.ListValidatorLicensesResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        validatorLicenses <- svcStore.listValidatorLicenses()
+      } yield {
+        definitions.ListValidatorLicensesResponse(
+          validatorLicenses.map(_.toJson).toVector
         )
       }
     }

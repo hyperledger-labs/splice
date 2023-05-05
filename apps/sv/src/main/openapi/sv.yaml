@@ -37,6 +37,18 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /admin/validator/licenses:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "listValidatorLicenses"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListValidatorLicensesResponse"
   /admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -182,6 +194,16 @@ components:
         - ongoing_validator_onboardings
       properties:
         ongoing_validator_onboardings:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListValidatorLicensesResponse:
+      type: object
+      required:
+        - validator_licenses
+      properties:
+        validator_licenses:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"

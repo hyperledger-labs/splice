@@ -151,6 +151,7 @@ class SvApp(
         ledgerClient,
         globalDomain,
         svStore,
+        svcStore,
         clock,
         loggerFactory,
       )

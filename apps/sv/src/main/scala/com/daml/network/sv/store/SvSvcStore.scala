@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
 import com.daml.network.codegen.java.cn.svonboarding as so
+import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
@@ -501,6 +502,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
+  /** List all ValidatorLicenses */
+  def listValidatorLicenses()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(vl.ValidatorLicense.COMPANION, _)
+    )
+
   private def lookupSvOnboardingRequestByCandidateNameWithOffset(
       candidateName: String
   )(implicit tc: TraceContext): Future[
@@ -627,6 +636,7 @@ object SvSvcStore {
         mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ) ++
         (if (appConfig.enableCoinRulesUpgrade)

@@ -4,6 +4,7 @@ import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,
   ListOngoingValidatorOnboardingsResponse,
+  ListValidatorLicensesResponse,
   Middleware,
   PrepareValidatorOnboardingRequest,
   PrepareValidatorOnboardingResponse,
@@ -22,6 +23,7 @@ export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
   prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
+  listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
 }
 
 class ApiMiddleware
@@ -55,6 +57,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         async (): Promise<ListOngoingValidatorOnboardingsResponse> => {
           return await svAdminClient.listOngoingValidatorOnboardings();
         },
+      listValidatorLicenses: async (): Promise<ListValidatorLicensesResponse> => {
+        return await svAdminClient.listValidatorLicenses();
+      },
     };
   }, [url, userAccessToken]);
 

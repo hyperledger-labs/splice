@@ -71,16 +71,41 @@ class SvFrontendIntegrationTest
           },
         )
 
-        actAndCheck(
+        val (_, newSecret) = actAndCheck(
           "click on the button to create an onboarding secret", {
             click on "create-validator-onboarding-secret"
           },
         )(
           "a new secret row is added",
           _ => {
-            findAll(
-              className("onboarding-secret-table-row")
-            ).toSeq should have size (rowSize + 1L)
+            val secrets = findAll(
+              className("onboarding-secret-table-secret")
+            ).toSeq
+            secrets should have size (rowSize + 1L)
+            secrets.head.text
+          },
+        )
+
+        val licenseRows = findAll(className("validator-licenses-table-row")).toList
+        val newValidatorParty = allocateRandomSvParty("validatorX")
+
+        actAndCheck(
+          "onboard new validator using the secret",
+          sv1.onboardValidator(newValidatorParty, newSecret),
+        )(
+          "a new validator row is added",
+          _ => {
+            val newLicenseRows = findAll(className("validator-licenses-table-row")).toList
+            newLicenseRows should have size (licenseRows.size + 1L)
+            val row: Element = inside(newLicenseRows) { case row :: _ =>
+              row
+            }
+            val sponsor =
+              row.childElement(className("validator-licenses-sponsor")).text
+            val validator =
+              row.childElement(className("validator-licenses-validator")).text
+            sponsor shouldBe sv1.getSvcInfo().svParty.toProtoPrimitive
+            validator shouldBe newValidatorParty.toProtoPrimitive
           },
         )
       }

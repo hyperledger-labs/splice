@@ -42,7 +42,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
-        Validator Onboarding
+        Validator Onboarding Secrets
       </Typography>
       <Button
         id="create-validator-onboarding-secret"
@@ -97,7 +97,7 @@ const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, sponsor, secre
         {<PartyId partyId={sponsor} />}
       </TableCell>
       <TableCell>
-        <CopyableTypography text={secret} />
+        <CopyableTypography text={secret} className="onboarding-secret-table-secret" />
       </TableCell>
     </TableRow>
   );
