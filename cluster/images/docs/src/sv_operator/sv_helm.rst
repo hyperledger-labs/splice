@@ -1,11 +1,14 @@
 .. _sv-helm:
 
-Kubernetes-Based Deployment of an SV node
-=========================================
+Kubernetes-Based Deployment of a Super Validator node
+=====================================================
 
-This section describes deploying an SV node in kubernetes using Helm
+This section describes deploying a Super Validator (SV) node in kubernetes using Helm
 charts.  The Helm charts deploy a complete node and connect it to a
-target cluster, either `DevNet` or `TestNet`.
+target cluster. We currently operate two clusters: `TestNet` which is upgraded weekly with a stable release,
+and `DevNet` which is upgraded nightly with a nightly dev release. Please use `TestNet` unless you
+have a specific reason not to, as `DevNet` may be unstable, and will also introduce breaking changes on
+a daily basis.
 
 Requirements
 ------------
@@ -22,9 +25,10 @@ Requirements
     b. ``helm`` - At least v3.11.1
 
 4) You should have an SV key pair generated and approved by Digital Asset.
+See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 
 5) You should have completed the self hosted validator setup,
-   including Auth 0 setup.
+   including Auth 0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
 
 Preparing a Cluster for Installation
@@ -190,7 +194,7 @@ reaches a stable state prior to moving on to the next step.
     helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
     helm install postgres canton-network-helm/cn-postgres -n sv-1 --version ${CHART_VERSION}
     helm install participant canton-network-helm/cn-participant -n sv-1 --version ${CHART_VERSION} -f participant-values.yaml
-    helm install validator canton-network-helm/cn-validator-node -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
+    helm install validator canton-network-helm/cn-validator -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
     helm install sv-1 canton-network-helm/cn-sv-node -n sv-1 --version ${CHART_VERSION} -f sv-values.yaml
 
 Once this is running, you should be able to inspect the state of the
