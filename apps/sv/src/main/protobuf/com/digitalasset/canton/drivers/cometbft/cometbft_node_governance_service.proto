@@ -1,0 +1,235 @@
+// TODO(#4528): replace this plain copy of https://github.com/DACH-NY/canton-drivers/blob/main/proto/src/cometbft_node_governance_service.proto with a version pulled in from a versioned release
+
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates
+//
+// Proprietary code. All rights reserved.
+
+syntax = "proto3";
+
+package com.digitalasset.canton.drivers.cometbft;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "protobuf/";
+
+/*
+   Context:
+   --------
+
+   The following gRPC service is a proposal for the governance API that we expect to be used by the SV services (see
+   https://docs.google.com/document/d/1Ttu-Ig0O4ciQeosfi1UqwRp0__W5NdVSNXWNFfh3bLc/edit?usp=drive_open&ouid=108162427964339419065)
+   to coordinate the CometBFT nodes that form the ordering service network, which is used by the BFT Domain node to run
+   a BFT Canton domain talking to these CometBFT nodes using the Drivers' team CometBFT sequencer driver.
+
+   We expect there to be Daml contracts signed by the SVC party that define the target state for the CometBFT nodes.
+   These contracts are created, updated, and archived by the Daml workflows for bootstrapping a fresh network, adding a node
+   to an existing network, or removing a node from an existing network. We also expect there to be Daml workflows for
+   (a) coordinating the temporary removal of a validator node to restart it for an upgrade and
+   (b) pruning the CometBFT network's blockchain.
+
+   The SV service runs a uni-directional reconciliation loop that
+   1. compares the target state it knows about from the Daml contracts with the current network configuration; and
+   2. corrects mismatches by issuing corresponding governance transactions to the CometBFT network.
+
+   We expect network deployments for the MVP in June to roughly work as follows:
+   1. there is a static networking setup such that
+   a) every SV node operator has a static IP address for each kind of network (devnet, testnet, mainnet)
+   b) every SV node operator knows all other operator's static IP addresses
+   c) every SV node operator only allows ingress from the other operators' IP addresses
+   2. The network is initially bootstrapped as a single CometBFT node.
+   3. Upon joining, the SV node operator starts its new SV node with `genesis.json` that it received from another SV node,
+   and with a `config.toml` that lists the existing CometBFT nodes in the network as seed nodes.
+   4. The new CometBFT node starts in read-only mode copying blocks from the existing nodes and discovering their IP's
+   via the gossip protocol.
+   5. The SV service waits until its CometBFT node has caught up by polling the `catching_up` flag
+   from the status endpoint, https://docs.tendermint.com/v0.34/rpc/#/Info/status.
+   6. The SV service confirms via Daml that its CometBFT node is ready for service, which triggers two changes:
+   a) a Daml contract is created to mark the CometBFT node-id as a validator
+   b) a Daml contract is created to activate the SV service's CometBFT governance key.
+   7. The SV service monitors the CometBFT's GetNetworkConfig endpoint to detect when its governance key become active,
+   and when its CometBFT node becomes active as a validator.
+
+   At this point the SV service and CometBFT node are fully operational. What's missing it the onboarding of the
+   BFT domain services.
+
+
+   PoC Notes
+   ---------
+
+   The integration plan for the Drivers team's CometBFT work into CN is available here:
+   https://docs.google.com/document/d/1fd_ENXWuocO3zD7MyatwTn14HaxymxkxKyP5OMkQtqM/edit#bookmark=id.gqnesv7832ie
+
+   It's Milestone 2 aims to get a PoC of an integration up and running as quickly as possible. For the purpose,
+   the message definitions below contain comment prefixed with 'PoC' that explain shortcuts we'd expect to use to
+   lower the implementation effort of the ABCI app.
+*/
+
+// The following gRPC service serves as a *spec* of the RPCs that we expect a CometBFT node with the
+// 'canton_network' ABCI app to implement. The Drivers team does not plan, and is not expected, to implement a gRPC
+// proxy that offers this service.
+service NodeGovernanceService {
+  // Retrieve the current network config and the state of upcoming changes to it.
+  // Expected to be exposed this via https://docs.cometbft.com/v0.37/rpc/#/ABCI/abci_query
+  rpc GetNetworkConfig(google.protobuf.Empty) returns (GetNetworkConfigResponse);
+
+  // Request a change to the network config.
+  // We expect to submit an `UpdateNetworkConfigRequest`
+  // via https://docs.cometbft.com/v0.37/rpc/#/Tx/broadcast_tx_commit
+  rpc UpdateNetworkConfig(UpdateNetworkConfigRequest) returns (google.protobuf.Empty);
+}
+
+// Reading and changing the network config
+//****************************************
+
+// The network is operated by different business entities called SV operators.
+// Each of them operates exactly one SV node, which runs one or more CometBFT nodes.
+// These CometBFT nodes replicate all transactions in their mempools and all blocks produced.
+// All CometBFT transactions are signed and the network config explicitly
+// manages which keys are allowed to sign governance transactions, and which keys are allowed to sign sequencing transactions.
+// Both kinds of keys are associated with the business entity operating the SV node.
+//
+// All changes to the network config happen by confirmation from enough SV nodes. The confirmation is represented
+// as a governance transaction signed with a governance key associated with the SV node.
+//
+// Assuming there are `n > 0` SV nodes with at least one governance keys, then a config change is accepted if there are at least
+// `(n - 1) / 3 + 1` config changes that match and were submitted by different SV nodes.
+// Note that this way a CometBFT network tolerates `f_gov = (n - 1) / 3` dishonest SV nodes.
+//
+// For example, if there are between 1 and 3 SV nodes, any config change issued by any of nodes is accepted
+// immediately, as only one confirmation is required. If there are between 4 and 6 SV nodes, then at least two
+// matching confirmations are required.
+//
+// We expect the configuration for an ABCI app to be able to specify an initial set of SV node configurations in its
+// `genesis.json` or a like file, which should be accessible as the `app_state_bytes` on the `InitChain` callback:
+// https://docs.cometbft.com/v0.37/spec/abci/abci++_methods#initchain
+message GetNetworkConfigResponse {
+  // The identifier of the blockchain, which is used to distinguish between different sets of CometBFT nodes.
+  // This value is set in a CometBFT node's 'genesis.json' before start.
+  string chain_id = 1;
+
+  // A map from SV node identifiers to their configuration state.
+  // The genesis SV node identifier is called "initial".
+  // All entries have either a current config set or at least one pending change request.
+  //
+  // The initial state of this map contains all SV nodes configured in the initial app state.
+  //
+  // Map entries configured in `genesis.json` have a current config set and start at revision 1.
+  // Map entries for newly added nodes start at revision 0. They won't have a current config set, but they
+  // will have pending change requests for tracking the confirmations from existing SV nodes.
+  map<string, SvNodeConfigState> sv_node_config_states = 2;
+}
+
+// SV node configuration
+//----------------------
+
+// The configuration of an SV node.
+message SvNodeConfig {
+  // The CometBFT nodes run by this SV node represented as
+  // a map from CometBFT node-ids to their configuration.
+  map<string, CometBftNodeConfig> cometbft_nodes = 1;
+}
+
+message CometBftNodeConfig {
+  // The validator key to be used by this node when it is granted non-zero voting power.
+  // Base64 encoding of a CometBFT public key. This form was used in the PoC and makes it easy to distribute the
+  // public key via Daml.
+  string validator_pub_key = 1;
+
+  // The voting power granted to the `validator_pub_key`.
+  // Validator nodes are nodes with a voting power greater than 0. All other nodes are read-only nodes.
+  int64 voting_power = 2;
+}
+
+message SvNodeConfigState {
+  // The number of configs that were in effect before the current one.
+  // Initially set to 1, if the node was configured in `genesis.json`.
+  // Initially set to 0, when receiving a change request for an SV node id for which no configuration exists.
+  uint64 current_config_revision = 1;
+
+  // The configuration currently in effect.
+  // Only set if `current_config_revision > 0`.
+  SvNodeConfig current_config = 2;
+
+  // The timestamp of the block as of which the current config came into effect. Used for debugging only.
+  // Only set if `current_config_revision > 0`.
+  // PoC: do not set if hard to compute
+  google.protobuf.Timestamp current_config_since = 3;
+
+  // A map from SV node identifiers to pending changes to the current config requested by them.
+  // At most one change request can be pending per SV node. Later submissions overwrite earlier ones.
+  // As soon as there are at least f_gov + 1 change requests with the same new_config, the current_config gets updated and
+  // all change requests get deleted, as all of them were for the same config revision.
+  //
+  // Upon deletion of an `SvNodeConfig` all of their pending change requests in all parts of the network config
+  // get deleted as well.
+  map<string, SvNodeConfigPendingChange> pending_changes = 4;
+}
+
+message SvNodeConfigPendingChange {
+  // The timestamp of the block as of which the change was requested.
+  // PoC: do not set if hard to compute
+  google.protobuf.Timestamp requested_at = 1;
+
+  // The change that is pending.
+  SvNodeConfigChange change = 2;
+}
+
+message SvNodeConfigChange {
+  oneof kind {
+    // Request to delete the SV node's config entry.
+    google.protobuf.Empty delete_config = 1;
+
+    // Request to set the SV node's current config to this new value.
+    SvNodeConfig set_config = 2;
+  }
+}
+
+// Updating the network config
+//****************************
+
+// A request to change the network config.
+//
+// For a request to be valid it must hold that
+// 1. The `change_request_bytes.submitter_key_address` points to an active governance key `pub_key`.
+// 2. pub_key.VerifySignature(change_request_bytes, signature) returns true
+//    (defined in https://github.com/cometbft/cometbft/blob/v0.34.27/crypto/crypto.go#L25)
+// 3. The config change request itself must satisfy the conditions for config values and changes
+//    specified on the config proto messages defined in this file.
+message UpdateNetworkConfigRequest {
+  // A serialized `NetworkConfigChangeRequest`.
+  bytes change_request_bytes = 1;
+
+  // The signature of the submitter of the `NetworkConfigChangeRequest`.
+  // PoC: ignore signature
+  bytes signature = 2;
+}
+
+message NetworkConfigChangeRequest {
+  // The id of the chain whose configuration should be changed, which MUST match the chain_id
+  // configured in `genesis.json`.
+  // Prudent engineering to ensure configuration change requests cannot be replayed across networks,
+  // even if they happened to share keys, which they ideally don't.
+  string chain_id = 1;
+
+  // SV node identifier of the submitting node.
+  // PoC: despite not checking the signature, please check that this sv_node_id exists, as that will highlight bootstrapping problems
+  string submitter_sv_node_id = 2;
+
+  oneof kind {
+    SvNodeConfigChangeRequest node_config_change_request = 3;
+  }
+}
+
+message SvNodeConfigChangeRequest {
+  // The id of the node whose config should be updated.
+  string sv_node_id = 1;
+
+  // The current revision of the config.
+  // Requests that refer to a different version than the revision of the current configuration (initially revision 0)
+  // are discarded.
+  uint64 current_config_revision = 2;
+
+  // The change being requested.
+  SvNodeConfigChange change = 3;
+}
