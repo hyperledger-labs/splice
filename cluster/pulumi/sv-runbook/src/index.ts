@@ -1,4 +1,4 @@
-import { installCNHelmChart } from "./helm";
+import { installCNHelmChart, installCNHelmChartByNamespaceName } from "./helm";
 import {
   /*configureSecrets, */
   directoryUserParticipantSecret,
@@ -11,6 +11,7 @@ import {
   svcUserParticipantSecret,
 } from "./secrets";
 import * as k8s from "@pulumi/kubernetes";
+import * as pulumi from "@pulumi/pulumi";
 
 // Note that for now this assumes the entire cluster is under this scripts's control,
 // i.e. it was only initialized with the `infrastructure` pulumi, no other `cncluster` scripts (specifically, no other secrets or namespaces created).
@@ -24,9 +25,11 @@ const svNamespace = new k8s.core.v1.Namespace("sv-1", {
 // TODO(#4521): make these configurable
 const localCharts = true;
 const version = "0.1.1-snapshot.20230505.2313.0.48a0243f";
-const TARGET_CLUSTER = "staging";
+const TARGET_CLUSTER = "scratchc";
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
 const SV_WALLET_USER_ID = "auth0|64553aa683015a9687d9cc2e";
+const CLUSTER_BASENAME = "sv";
+const CLUSTER_IP = "34.133.96.35";
 
 // Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
 // TODO(#4521): make sure it's OK to reuse these once automated
@@ -100,7 +103,7 @@ const validator = installCNHelmChart(
   imagePullDeps.concat([participant]).concat(svValidatorSecrets(svNamespace))
 );
 
-installCNHelmChart(
+const sv = installCNHelmChart(
   svNamespace,
   "sv-1",
   "cn-sv-node",
@@ -125,4 +128,48 @@ installCNHelmChart(
   imagePullDeps
     .concat([validator, participant])
     .concat(svAppSecret(svNamespace))
+);
+
+const docsNamespace = new k8s.core.v1.Namespace("docs", {
+  metadata: {
+    name: "docs",
+  },
+});
+
+const docs = installCNHelmChart(
+  docsNamespace,
+  "docs",
+  "cn-docs",
+  {},
+  localCharts,
+  version
+);
+
+const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
+installCNHelmChartByNamespaceName(
+  infraStack.getOutput("ingressNs") as pulumi.Output<string>,
+  "cluster-ingress",
+  "cn-cluster-ingress",
+  // TODO(#4384): move these values into a file and distribute it with the release
+  {
+    enableIngressModes: "sv-external",
+    cluster: {
+      networkSettings: {
+        externalIPRanges: [
+          "35.194.81.56/32",
+          "35.198.147.95/32",
+          "35.189.40.124/32",
+          "34.132.91.75/32",
+        ],
+      },
+      ipAddress: CLUSTER_IP,
+      // TODO(#4521): using basename diverges from the runbook instructions, and is currently
+      // required because we store the tls in secret cn-<basename>net-tls, as opposed to
+      // cn-net-tls as in the runbook.
+      basename: "sv",
+    },
+  },
+  localCharts,
+  version,
+  imagePullDeps.concat([sv, validator, docs])
 );

@@ -1,8 +1,8 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 
-export function installCNHelmChart(
-  ns: k8s.core.v1.Namespace,
+export function installCNHelmChartByNamespaceName(
+  ns: pulumi.Output<string>,
   name: string,
   chartName: string,
   values: ChartValues,
@@ -17,7 +17,7 @@ export function installCNHelmChart(
       chart: local
         ? process.env.REPO_ROOT + "/cluster/helm/" + chartName + "/"
         : chartName,
-      namespace: ns.metadata.name,
+      namespace: ns,
       version: local ? undefined : version,
       repositoryOpts: local
         ? undefined
@@ -34,8 +34,28 @@ export function installCNHelmChart(
       },
     },
     {
-      dependsOn: dependsOn.concat([ns]),
+      dependsOn: dependsOn,
     }
+  );
+}
+
+export function installCNHelmChart(
+  ns: k8s.core.v1.Namespace,
+  name: string,
+  chartName: string,
+  values: ChartValues,
+  local: boolean,
+  version = "",
+  dependsOn: pulumi.Resource[] = []
+): k8s.helm.v3.Release {
+  return installCNHelmChartByNamespaceName(
+    ns.metadata.name,
+    name,
+    chartName,
+    values,
+    local,
+    version,
+    dependsOn.concat([ns])
   );
 }
 
