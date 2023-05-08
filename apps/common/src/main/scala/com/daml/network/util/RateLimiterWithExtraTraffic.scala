@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicReference
 class RateLimiterWithExtraTraffic(
     defaultMaxThroughput: NonNegativeNumeric[Double],
     maxBurstFactor: PositiveDouble,
+    requestCost: PositiveDouble,
     clock: Clock,
 ) {
 
@@ -23,6 +24,7 @@ class RateLimiterWithExtraTraffic(
     State(approvedLastRequest = false, 0, 0.0, 0.0)
   )
   private val maxBurst: Double = maxBurstFactor.value * defaultMaxThroughput.value
+  private val requestCost_ = requestCost.value
 
   private case class State(
       approvedLastRequest: Boolean,
@@ -46,14 +48,19 @@ class RateLimiterWithExtraTraffic(
 
     def update(now: Long, extraTrafficLimit: Double): State = {
       val adjustedApprovedRequests = computeApprovedRequests(now)
-      if (adjustedApprovedRequests + 1 <= maxBurst) {
+      if (adjustedApprovedRequests + requestCost_ <= maxBurst) {
         // if approving this request would not exceed the maxBurst threshold, the request is approved.
-        State(approvedLastRequest = true, now, adjustedApprovedRequests + 1, extraTrafficUsed)
+        State(
+          approvedLastRequest = true,
+          now,
+          adjustedApprovedRequests + requestCost_,
+          extraTrafficUsed,
+        )
       } else {
         val defaultTrafficBalance = maxBurst - adjustedApprovedRequests
         // consume remaining default traffic balance
         // and adjust the extra traffic used with the remaining amount
-        val adjustedExtraTrafficUsed = extraTrafficUsed - defaultTrafficBalance + 1
+        val adjustedExtraTrafficUsed = extraTrafficUsed - defaultTrafficBalance + requestCost_
         if (adjustedExtraTrafficUsed <= extraTrafficLimit) {
           // if approving this request would not exceed the supplied extraTrafficLimit, the request is approved.
           State(approvedLastRequest = true, now, maxBurst, adjustedExtraTrafficUsed)

@@ -40,23 +40,25 @@ class DomainFeesTimeBasedIntegrationTest
   private lazy val loadTestDuration = 10.seconds
 
   "A validator with a correctly configured traffic top-up loop" when {
-    s"default throughput is ${DomainFeesConstants.defaultThroughput} txs/s & target throughput is ${DomainFeesConstants.targetThroughput} txs/s" must {
+    s"target throughput is ${DomainFeesConstants.targetThroughput} MB/s" must {
       // bobValidator is used in this test as an example of a validator that will submit requests
-      // at the default rate only and will not purchase any extra traffic.
+      // at the base rate only and will not purchase any extra traffic.
       // TODO(M3-44): Once we're no longer mocking the canton sequencer and the top-up trigger is live for all tests,
       //  it may be worthwhile to create a separate validator for this purpose to properly isolate this test
       //  from other tests making use of bobValidator and any residual traffic balance that may be left over as a result.
-      s"be limited to default rate if unable to buy extra traffic" in { implicit env =>
+      s"be limited to base rate if unable to buy extra traffic" in { implicit env =>
         actAndCheck(
           "Create self-hosted wallet with insufficient balance",
           onboardWalletUser(bobWallet, bobValidator),
         )(
-          "Taps throttled to default throughput rate",
+          "Taps throttled to base rate",
           _ => {
+            val baseRateLimits = getBaseRateTrafficLimits()
             val (successes, totalTxs) =
-              testCoinTxsAndAssertLogs(
+              testProvidedRateAndAssertLogs(
                 bobWallet,
-                2 * DomainFeesConstants.defaultThroughput.value,
+                2 * baseRateLimits.rate.doubleValue(),
+                baseRateLimits.burstWindow.microseconds,
               )
             successes.toDouble should be > 0.3 * totalTxs
             successes.toDouble should be < 0.7 * totalTxs
@@ -78,10 +80,12 @@ class DomainFeesTimeBasedIntegrationTest
             // Advance time by 1 polling interval to ensure that the validator has
             // purchased extra traffic for the first time.
             advanceTimeByPollingInterval(aliceValidator)
+            val baseRateLimits = getBaseRateTrafficLimits()
             val (successes, totalTxs) =
-              testCoinTxsAndAssertLogs(
+              testProvidedRateAndAssertLogs(
                 aliceWallet,
                 DomainFeesConstants.targetThroughput.value,
+                baseRateLimits.burstWindow.microseconds,
               )
             successes shouldBe totalTxs
           },
@@ -95,15 +99,17 @@ class DomainFeesTimeBasedIntegrationTest
             aliceValidatorWallet.tap(1000)
           },
         )(
-          "Taps throttled to target throughput rate",
+          "Taps throttled to target rate",
           _ => {
             // Advance time by 1 polling interval to ensure that the validator has
             // purchased extra traffic for the first time.
             advanceTimeByPollingInterval(aliceValidator)
+            val baseRateLimits = getBaseRateTrafficLimits()
             val (successes, totalTxs) =
-              testCoinTxsAndAssertLogs(
+              testProvidedRateAndAssertLogs(
                 aliceWallet,
                 2 * DomainFeesConstants.targetThroughput.value,
+                baseRateLimits.burstWindow.microseconds,
               )
             successes.toDouble should be > 0.3 * totalTxs
             successes.toDouble should be < 0.7 * totalTxs
@@ -114,17 +120,24 @@ class DomainFeesTimeBasedIntegrationTest
     }
   }
 
-  private def testCoinTxsAndAssertLogs(
+  private def getBaseRateTrafficLimits()(implicit env: CNNodeTestConsoleEnvironment) = {
+    val coinRules = scan.getCoinRules()
+    coinRules.payload.configSchedule.currentValue.domainFeesConfig.baseRateTrafficLimits
+  }
+
+  private def testProvidedRateAndAssertLogs(
       wallet: WalletAppClientReference,
-      coinTxsPerSecond: Double,
+      testRateMBps: Double,
+      waitTimeMicros: Long,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
-        val result = tryCoinTxs(wallet, coinTxsPerSecond)
-        // Advance time to allow the default traffic limiter to reset.
+        val coinTxRate = testRateMBps * 1e6 / DomainFeesConstants.assumedCoinTxSizeBytes.value
+        val result = tryCoinTxs(wallet, coinTxRate)
+        // Advance time to allow the base rate traffic limiter to reset.
         // Without this, the initial tap in subsequent tests may get throttled.
         advanceTime(
-          Duration.ofMillis((DomainFeesConstants.defaultTrafficBurstWindow.value * 1e3).toLong)
+          Duration.ofNanos(waitTimeMicros * 1000)
         )
         result
       },

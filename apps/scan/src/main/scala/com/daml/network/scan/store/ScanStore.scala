@@ -2,8 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cc.api.v1 as ccV1Api
-import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
+import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
@@ -14,9 +13,9 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import java.time.Instant
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
@@ -84,7 +83,18 @@ trait ScanStore
 
   def getTotalPaidValidatorTraffic(validatorParty: PartyId)(implicit
       tc: TraceContext
-  ): Future[BigDecimal]
+  ): Future[Long]
+
+  def getBaseRateTrafficLimits()(implicit
+      tc: TraceContext
+  ): Future[cc.domainfees.BaseRateTrafficLimits] =
+    lookupCoinRules().map(
+      _.map(_.payload.configSchedule.currentValue.domainFeesConfig.baseRateTrafficLimits)
+        .getOrElse(
+          throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
+        )
+    )
+
 }
 
 object ScanStore {
@@ -130,7 +140,7 @@ object ScanStore {
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        mkFilter(ccV1Api.validatortraffic.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.domainfees.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
       ) ++
         (if (scanConfig.enableCoinRulesUpgrade)
            Map(mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

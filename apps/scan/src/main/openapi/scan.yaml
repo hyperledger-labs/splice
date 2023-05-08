@@ -381,12 +381,12 @@ components:
           format: date-time
     GetValidatorTrafficBalanceResponse:
       type: object
-      required: ["remainingBalance", "totalPaid"]
+      required: ["remainingBalance", "totalPurchased"]
       properties:
         remainingBalance:
           type: number
           format: double
-        totalPaid:
+        totalPurchased:
           type: number
           format: double
     CheckAndUpdateValidatorTrafficBalanceResponse:

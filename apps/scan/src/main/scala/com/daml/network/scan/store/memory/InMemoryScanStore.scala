@@ -192,10 +192,10 @@ class InMemoryScanStore(
 
   override def getTotalPaidValidatorTraffic(
       validatorParty: PartyId
-  )(implicit tc: TraceContext): Future[BigDecimal] = {
+  )(implicit tc: TraceContext): Future[Long] = {
     lookupValidatorTraffic(validatorParty).map {
-      case None => BigDecimal(0.0)
-      case Some(validatorTraffic) => validatorTraffic.payload.amount
+      case None => 0L
+      case Some(validatorTraffic) => validatorTraffic.payload.totalPurchased
     }
   }
 

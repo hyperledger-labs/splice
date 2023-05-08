@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, DamlOptional, ExercisedEvent,
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
@@ -125,7 +126,7 @@ object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.CoinRules
   override type Arg = coinCodegen.CoinRules_BuyExtraTraffic
   override type Res =
-    Tuple2[v1.validatortraffic.ValidatorTraffic.ContractId, Optional[v1.coin.Coin.ContractId]]
+    Tuple2[ValidatorTraffic.ContractId, Optional[v1.coin.Coin.ContractId]]
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyExtraTraffic
   override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
   override val argDecoder = coinCodegen.CoinRules_BuyExtraTraffic.valueDecoder()
@@ -133,7 +134,7 @@ object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg): Value = arg.toValue
 
   override val resDecoder = Tuple2.valueDecoder(
-    cid => new v1.validatortraffic.ValidatorTraffic.ContractId(cid.asContractId().get().getValue),
+    cid => new ValidatorTraffic.ContractId(cid.asContractId().get().getValue),
     PrimitiveValueDecoders.fromOptional(cid =>
       new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
     ),

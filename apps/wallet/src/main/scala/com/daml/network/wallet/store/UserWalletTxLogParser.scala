@@ -652,8 +652,8 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         event: ExercisedEvent,
     )(implicit lc: ErrorLoggingContext): State = {
-      // first child event is the transfer of CC from validator to SVC to buy extra traffic
-      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(0))
+      // second child event is the transfer of CC from validator to SVC to buy extra traffic
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
       // Calculate tx log entries from transfer of CC from validator to SVC
       val transferNode = (transferEvent match {
         case e: ExercisedEvent => Transfer.unapply(e)
@@ -664,8 +664,8 @@ object UserWalletTxLogParser {
       val stateFromTransfer =
         State.fromTransfer(tx, transferEvent, transferNode, TxLogEntry.Transfer.Transfer)
 
-      // second child event is burning of transferred coin by SVC
-      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      // third child event is burning of transferred coin by SVC
+      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
       // Adjust tx log entries for SVC since the coin it receives is immediately burnt
       val burntCoin = tx.getEventsById.asScala
         .collectFirst {

@@ -8,7 +8,6 @@ import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import DA.Time
-import DA.Date
 
 import CC.Coin
 import CC.Round
@@ -16,7 +15,7 @@ import qualified CC.Schedule
 import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
-import CC.API.V1.ValidatorTraffic (ValidatorTraffic(..))
+import CC.DomainFees
 
 import CC.ValidatorLicense
 
@@ -702,10 +701,7 @@ template SvcRules with
         requireUnlocked lock
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         license <- create ValidatorLicense with ..
-        _ <- create ValidatorTraffic with
-              amount = 0.0
-              lastUpdatedAt = time (date 1 Jan 1) 00 00 00
-              ..
+        _ <- create (initialValidatorTraffic svc validator)
         return license
 
 

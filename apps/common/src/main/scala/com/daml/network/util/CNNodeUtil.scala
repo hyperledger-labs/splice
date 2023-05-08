@@ -8,6 +8,7 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.cc.domainfees.{BaseRateTrafficLimits, DomainFeesConfig}
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -146,6 +147,17 @@ object CNNodeUtil {
 
   val defaultLockHolderFee = new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal)
 
+  val baseRateTrafficLimits = new BaseRateTrafficLimits(
+    new java.math.BigDecimal(2.0), // base rate
+    new RelTime(2_000_000), // burst window
+  )
+  val defaultDomainFeesConfig = new DomainFeesConfig(
+    baseRateTrafficLimits,
+    new java.math.BigDecimal(1.0), // extraTrafficPrice (in $/MB)
+    new java.math.BigDecimal(1.0), // readScalingFactor
+    1_000_000, // minTopupAmount (in bytes)
+  )
+
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
 
   def defaultCoinConfigSchedule(
@@ -167,6 +179,9 @@ object CNNodeUtil {
 
     // issuance curve from whitepaper
     defaultIssuanceCurve,
+
+    // domainFeesConfig
+    defaultDomainFeesConfig,
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),

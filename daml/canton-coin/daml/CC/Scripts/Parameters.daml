@@ -4,6 +4,7 @@ import DA.Time
 
 import CC.CoinConfig
 import CC.Fees
+import CC.DomainFees
 import CC.Issuance
 import CC.Schedule
 
@@ -50,6 +51,8 @@ defaultCoinConfig = CoinConfig with
 
     -- Using issuance curve defined in the CC whitepaper
     issuanceCurve = defaultIssuanceCurve
+
+    domainFeesConfig = defaultDomainFeesConfig
 
     -- Duration of one tick, which is half the target duration of one round
     -- default: 2.5 minutes
@@ -114,3 +117,20 @@ defaultIssuanceCurve =
   where
     hoursPerHalfYear = 12 * 365
     hoursPerYear = 24 * 365
+
+
+-- | Default domain fees configuration
+-- TODO(#4557) - Provide more reasonable default values after the Canton sequencer QoS is no longer mocked by the Scan app
+--  and the parameters here represents bytes sequenced by the domain instead of tap approvals.
+
+defaultBaseRateTrafficLimits : BaseRateTrafficLimits
+defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
+    rate = 2.0
+    burstWindow = seconds 2
+
+defaultDomainFeesConfig : DomainFeesConfig
+defaultDomainFeesConfig = DomainFeesConfig with
+    baseRateTrafficLimits = defaultBaseRateTrafficLimits
+    minTopupAmount = 1_000_000 -- 1MB
+    extraTrafficPrice = 1.0
+    readScalingFactor = 1.0

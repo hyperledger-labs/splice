@@ -1,6 +1,5 @@
 package com.daml.network.sv.util
 
-import com.daml.network.codegen.java.cn.cometbft
 import com.daml.network.codegen.java.cn.cometbft.NetworkConfigLimits
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -14,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 object SvUtil {
 
-  def defaultCometBftNetworkLimits: cometbft.NetworkConfigLimits = new NetworkConfigLimits(
+  def defaultCometBftNetworkLimits: NetworkConfigLimits = new NetworkConfigLimits(
     2, // maxNumCometBftNodes
     2, // maxNumGovernanceKeys
     2, // maxNumSequencingKeys

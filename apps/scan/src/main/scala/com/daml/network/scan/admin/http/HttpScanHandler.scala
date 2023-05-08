@@ -23,7 +23,7 @@ import com.daml.network.util.{
   RateLimiterWithExtraTraffic,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -359,17 +359,25 @@ class HttpScanHandler(
         )
     }
 
-  private def getOrCreateTrafficLimiter(validatorParty: PartyId): RateLimiterWithExtraTraffic = {
-    validatorTrafficRateLimiters
-      .putIfAbsent(
-        validatorParty,
-        new RateLimiterWithExtraTraffic(
-          DomainFeesConstants.defaultThroughput,
-          DomainFeesConstants.defaultTrafficBurstWindow,
-          clock,
-        ),
-      )
-    validatorTrafficRateLimiters.get(validatorParty)
+  private def getOrCreateTrafficLimiter(
+      validatorParty: PartyId
+  )(implicit tc: TraceContext): Future[RateLimiterWithExtraTraffic] = {
+    store
+      .getBaseRateTrafficLimits()
+      .map(baseRateLimits => {
+        validatorTrafficRateLimiters
+          .putIfAbsent(
+            validatorParty,
+            new RateLimiterWithExtraTraffic(
+              NonNegativeNumeric.tryCreate(baseRateLimits.rate.doubleValue() * 1e6),
+              PositiveNumeric
+                .tryCreate(baseRateLimits.burstWindow.microseconds.doubleValue() / 1e6),
+              DomainFeesConstants.assumedCoinTxSizeBytes,
+              clock,
+            ),
+          )
+        validatorTrafficRateLimiters.get(validatorParty)
+      })
   }
 
   def getValidatorTrafficBalance(
@@ -377,19 +385,18 @@ class HttpScanHandler(
   )(validatorParty: String): Future[v0.ScanResource.GetValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
-      store
-        .getTotalPaidValidatorTraffic(validatorPartyId)
-        .map(totalTraffic => {
-          val totalPaidTraffic = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
-          val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
-          val extraTrafficBalance =
-            validatorTrafficRateLimiter.getExtraTrafficBalance(totalPaidTraffic)
-          v0.ScanResource.GetValidatorTrafficBalanceResponse.OK(
-            definitions
-              .GetValidatorTrafficBalanceResponse(extraTrafficBalance, totalPaidTraffic.value)
-          )
-        })
-
+      for {
+        totalTraffic <- store.getTotalPaidValidatorTraffic(validatorPartyId)
+        totalTraffic_ = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
+        validatorTrafficRateLimiter <- getOrCreateTrafficLimiter(validatorPartyId)
+      } yield {
+        val extraTrafficBalance =
+          validatorTrafficRateLimiter.getExtraTrafficBalance(totalTraffic_)
+        v0.ScanResource.GetValidatorTrafficBalanceResponse.OK(
+          definitions
+            .GetValidatorTrafficBalanceResponse(extraTrafficBalance, totalTraffic.toDouble)
+        )
+      }
     }
 
   def checkAndUpdateValidatorTrafficBalance(
@@ -399,22 +406,23 @@ class HttpScanHandler(
   ): Future[v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
-      store
-        .getTotalPaidValidatorTraffic(validatorPartyId)
-        .map(totalTraffic => {
-          val totalPaidTraffic = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
-          val validatorTrafficRateLimiter = getOrCreateTrafficLimiter(validatorPartyId)
-          logger.debug(
-            s"Default traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter.getDefaultTrafficBalance()}"
-          )
-          logger.debug(
-            s"Extra traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter
-                .getExtraTrafficBalance(totalPaidTraffic)}"
-          )
-          val approved = validatorTrafficRateLimiter.checkAndUpdate(totalPaidTraffic)
-          v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
-            definitions.CheckAndUpdateValidatorTrafficBalanceResponse(approved)
-          )
-        })
+      for {
+        totalTraffic <- store.getTotalPaidValidatorTraffic(validatorPartyId)
+        totalTraffic_ = NonNegativeNumeric.tryCreate(totalTraffic.toDouble)
+        validatorTrafficRateLimiter <- getOrCreateTrafficLimiter(validatorPartyId)
+      } yield {
+        logger.debug(
+          s"Default traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter
+              .getDefaultTrafficBalance()}"
+        )
+        logger.debug(
+          s"Extra traffic balance remaining for validator ${validatorPartyId}: ${validatorTrafficRateLimiter
+              .getExtraTrafficBalance(totalTraffic_)}"
+        )
+        val approved = validatorTrafficRateLimiter.checkAndUpdate(totalTraffic_)
+        v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.OK(
+          definitions.CheckAndUpdateValidatorTrafficBalanceResponse(approved)
+        )
+      }
     }
 }

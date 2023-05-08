@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.api.v1.validatortraffic.ValidatorTraffic
+import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
@@ -19,6 +19,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -70,12 +71,26 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupValidatorTraffic(implicit tc: TraceContext): Future[
+  def lookupValidatorTraffic()(implicit tc: TraceContext): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
   ] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(_, _ => true)
     )
+
+  def getValidatorTraffic()(implicit
+      tc: TraceContext
+  ): Future[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]] = {
+    lookupValidatorTraffic().map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            s"No validator traffic contract for validator ${key.validatorParty}"
+          )
+          .asRuntimeException()
+      )
+    )
+  }
 
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {

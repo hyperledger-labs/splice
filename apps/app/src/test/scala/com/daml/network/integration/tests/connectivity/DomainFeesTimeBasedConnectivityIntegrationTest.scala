@@ -9,8 +9,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-import java.time.Duration
-
 class DomainFeesTimeBasedConnectivityIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
@@ -52,7 +50,9 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
       )
 
       clue("Verify that the scan app API is still up")(
-        scan.getValidatorTrafficBalance(aliceValidator.getValidatorPartyId()).totalPaid shouldBe 0
+        scan
+          .getValidatorTrafficBalance(aliceValidator.getValidatorPartyId())
+          .totalPurchased shouldBe 0
       )
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
@@ -61,8 +61,7 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
             aliceValidatorWallet.tap(1000)
           }
           clue("Advance time to trigger top-up loop a few times") {
-            val minTopupWaitTime =
-              Duration.ofMillis((DomainFeesConstants.minTopupWaitTime.value * 1e3).toLong)
+            val minTopupWaitTime = DomainFeesConstants.minTopupWaitTime.asJava
             advanceTime(minTopupWaitTime)
             advanceTime(minTopupWaitTime)
             advanceTime(minTopupWaitTime)

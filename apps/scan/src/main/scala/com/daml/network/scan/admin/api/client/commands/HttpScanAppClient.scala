@@ -407,7 +407,7 @@ object HttpScanAppClient {
 
   final case class ValidatorTrafficBalance(
       remainingBalance: Double,
-      totalPaid: Double,
+      totalPurchased: Double,
   )
 
   case class GetValidatorTrafficBalance(validatorParty: PartyId)
@@ -420,7 +420,7 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetValidatorTrafficBalanceResponse.OK(response) =>
-        Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPaid))
+        Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPurchased))
     }
   }
 

@@ -1,6 +1,7 @@
 module CC.CoinConfig where
 
 import CC.Fees
+import CC.DomainFees
 import CC.Issuance
 import CC.Schedule
 import DA.Time
@@ -14,6 +15,7 @@ data USD = USD deriving (Show, Eq)
 data CoinConfig currency = CoinConfig with
     transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
     issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    domainFeesConfig : DomainFeesConfig -- ^ Configuration determining fees and limits for domain fees
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   deriving (Eq, Show)
 

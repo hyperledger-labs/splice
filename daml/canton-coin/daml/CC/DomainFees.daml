@@ -1,0 +1,58 @@
+-- | Types and contracts for managing domain fees
+module CC.DomainFees where
+
+import DA.Date
+import DA.Time
+
+
+-- | The state of the extra domain traffic purchases of a validator operator
+template ValidatorTraffic with
+    svc : Party
+    validator : Party -- ^ The party representing the validator node and its operator
+    totalPurchased : Int -- ^ The total number of bytes of extra traffic purchased by the validator so far
+    numPurchases: Int -- ^ Number of times the validator has purchased extra traffic
+    ccSpent: Decimal -- ^ Total CC spent on extra traffic over the validator's lifetime
+    usdSpent: Decimal -- ^ Total USD spent on extra traffic over the validator's lifetime
+    lastPurchasedAt: Time -- ^ Time when validator traffic was last purchased
+  where
+    signatory svc
+    observer validator
+    ensure totalPurchased >= 0
+      && numPurchases >= 0
+      && ccSpent >= 0.0
+      && usdSpent >= 0.0
+
+
+initialValidatorTraffic : Party -> Party -> ValidatorTraffic
+initialValidatorTraffic svc validator = ValidatorTraffic with
+      svc = svc
+      validator = validator
+      totalPurchased = 0
+      numPurchases = 0
+      ccSpent = 0.0
+      usdSpent = 0.0
+      lastPurchasedAt = time (date 1 Jan 1) 00 00 00
+
+
+-- Domain fees configuration
+--------------------------------
+
+-- | The limits defining the free base rate delivered by the domain.
+-- It defines the base rate as allowing at most (rate * burstWindow) of sequencing traffic within a window of burstWindow seconds.
+data BaseRateTrafficLimits = BaseRateTrafficLimits with
+    rate: Decimal -- ^ The base domain traffic rate in MB/s
+    burstWindow: RelTime -- ^ Time window within base rate must not be exceeded
+  deriving (Eq, Show)
+
+
+-- | Domain fees related configuration to be tracked on the SvcRules contract
+data DomainFeesConfig = DomainFeesConfig with
+    baseRateTrafficLimits: BaseRateTrafficLimits -- ^ Configuration limits for base rate traffic
+    extraTrafficPrice: Decimal -- ^ The price of extra traffic denominated in $/MB
+    readScalingFactor: Decimal -- ^ How much the sending of a message to its recipient costs in terms of bytes written to the domain.
+    -- We charge for sending messages depending on the number of recipients,
+    -- as delivering the message incurs a cost as well, albeit usually a much
+    -- smaller one than the cost of a write.
+    minTopupAmount: Int -- ^ The minimum amount of extra traffic (in bytes) that must be bought when buying extra traffic.
+    -- This ensures that the SVC can amortize the cost of executing that transaction.
+  deriving (Eq, Show)

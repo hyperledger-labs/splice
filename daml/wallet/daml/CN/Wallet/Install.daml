@@ -5,10 +5,9 @@ import DA.Time
 
 import qualified CC.API.V1.Coin as API
 
-import qualified CC.API.V1.ValidatorTraffic as API
-
 import CC.Round (OpenMiningRound)
 import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
+import CC.DomainFees
 
 import CN.Util.ExpiringContract
 import CN.Wallet.Payment
@@ -101,8 +100,8 @@ data CoinOperation
   -- merge coin contracts
   | CO_MergeTransferInputs
   | CO_BuyExtraTraffic with
-      extraTrafficAmount: Decimal
-      validatorTraffic : ContractId API.ValidatorTraffic
+      extraTrafficAmount: Int
+      validatorTraffic : ContractId ValidatorTraffic
       minTopupWaitTime: RelTime
   | CO_Tap with
       tapAmount: Decimal
@@ -119,7 +118,7 @@ data CoinOperationOutcome
   -- Using `Optional` here as the wallet reuses that type for returning a result,
   -- and needs to communicate to the caller whether a merge happend.
   | COO_MergeTransferInputs (Optional (ContractId API.Coin))
-  | COO_BuyExtraTraffic (ContractId API.ValidatorTraffic)
+  | COO_BuyExtraTraffic (ContractId ValidatorTraffic)
   | COO_Tap (ContractId API.Coin)
   | COO_Error InvalidTransferReason
   deriving (Eq, Show)

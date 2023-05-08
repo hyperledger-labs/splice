@@ -62,6 +62,7 @@ class RateLimiterWithExtraTrafficTest extends BaseTestWordSpec with HasExecution
     val limiter = new RateLimiterWithExtraTraffic(
       NonNegativeNumeric.tryCreate(maxTasksPerSecond),
       PositiveNumeric.tryCreate(Math.max(initialBurst.toDouble / maxTasksPerSecond, 1e-6)),
+      PositiveNumeric.tryCreate(1.0),
       clock,
     )
     val total = (simTimeInSecs * taskRate).toInt
@@ -115,6 +116,7 @@ class RateLimiterWithExtraTrafficTest extends BaseTestWordSpec with HasExecution
   "zero is zero" in {
     val limiter = new RateLimiterWithExtraTraffic(
       NonNegativeNumeric.tryCreate(0.0),
+      PositiveNumeric.tryCreate(1.0),
       PositiveNumeric.tryCreate(1.0),
       new SimClock(loggerFactory = loggerFactory),
     )

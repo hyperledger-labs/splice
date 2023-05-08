@@ -5,14 +5,13 @@ import DA.Foldable (forA_)
 import DA.List as List
 import qualified DA.Map as Map
 import DA.Time
-import DA.Date
 
 -- TODO(tech-debt) factor this one out of CC into its own library
 import CN.Util.Assert
 import CC.Coin
 import CC.Round
 import CC.API.V1.Round (Round(..))
-import CC.API.V1.ValidatorTraffic (ValidatorTraffic(..))
+import CC.DomainFees
 
 import CC.ValidatorLicense
 import CN.SvOnboarding
@@ -271,10 +270,7 @@ template SvcRulesV1Test with
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         license <- create ValidatorLicense with ..
-        _ <- create ValidatorTraffic with
-              amount = 0.0
-              lastUpdatedAt = time (date 1 Jan 1) 00 00 00
-              ..
+        _ <- create (initialValidatorTraffic svc validator)
         return license
 
 

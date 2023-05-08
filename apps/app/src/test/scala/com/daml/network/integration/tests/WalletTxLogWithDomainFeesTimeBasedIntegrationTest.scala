@@ -9,8 +9,6 @@ import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletL
 import com.digitalasset.canton.HasExecutionContext
 import monocle.Monocle.toAppliedFocusOps
 
-import java.time.Duration
-
 class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
@@ -44,9 +42,7 @@ class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
       clue("Purchase extra traffic and verify the transaction history") {
         eventually() {
           // Advance time till the automation kicks in and purchases extra traffic.
-          val minTopupWaitTime =
-            Duration.ofMillis((DomainFeesConstants.minTopupWaitTime.value * 1e3).toLong)
-          advanceTime(minTopupWaitTime)
+          advanceTime(DomainFeesConstants.minTopupWaitTime.asJava)
           bobValidatorWallet.balance().unlockedQty should be < BigDecimal(20)
           checkTxHistory(
             bobValidatorWallet,
