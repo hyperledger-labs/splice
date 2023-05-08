@@ -290,7 +290,7 @@ class WalletTransfersFrontendIntegrationTest
         }
 
         actAndCheck(
-          "Alice accepts the offer", {
+          "Alice rejects the offer", {
             click on className("transfer-offer-reject")
           },
         )(
