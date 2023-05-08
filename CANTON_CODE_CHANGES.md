@@ -39,7 +39,8 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Switched FlagCloseable to append shutdown tasks so they get run in the order they're added
   rather than inverse order.
 * Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
-* Added a `cause` parameter to `CommandFailure` 
+* Added a `cause` parameter to `CommandFailure`
+* LogReporter logs location, message and throwable on TestFailed event.
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin
