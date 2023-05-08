@@ -7,4 +7,4 @@ commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
 
-echo "$prefix-snapshot.$commit_date.$number_of_commits.0.$commit_sha_8"
+echo "$prefix-snapshot.$commit_date.$number_of_commits.0.v$commit_sha_8"
