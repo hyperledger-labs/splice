@@ -35,7 +35,9 @@ if [ -z "$PROG_HOME" ] ; then
   PROG_HOME=`dirname "$PRG"`/..
 
   # make it fully qualified
-  PROG_HOME=`cd "$PROG_HOME" && pwd`
+  # cd can output the directory if CDPATH is set and it ends up completing using that.
+  # To avoid that we redirect its stdout.
+  PROG_HOME=`cd "$PROG_HOME" > /dev/null && pwd`
 
   cd "$saveddir"
 fi

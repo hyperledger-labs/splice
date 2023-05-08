@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+2023-05-14
+----------
+
+* Fix a bug where ``cn-node`` sometimes failed to start with a ``ClassNotFoundException``.
+
 2023-05-07
 ----------
 
