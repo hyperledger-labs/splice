@@ -94,7 +94,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        ipAddress: infraStack.getOutput('clusterIp'),
+        ipAddress: infraStack.getOutput('ingressIp'),
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
       },

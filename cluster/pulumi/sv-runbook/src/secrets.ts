@@ -1,3 +1,4 @@
+import { ExactNamespace, requiredEnv } from "./utils";
 import * as auth0 from "@pulumi/auth0";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
@@ -16,7 +17,7 @@ const validatorAuth0Secret = auth0.Client.get(
 const walletUIClientId = "l9MS11POtbvPaVvgzns3Tdj9IDnosLwl";
 
 function participantSecret(
-  ns: k8s.core.v1.Namespace,
+  ns: ExactNamespace,
   appName: string,
   appAuth0ClientId: string
 ): k8s.core.v1.Secret {
@@ -26,7 +27,7 @@ function participantSecret(
     {
       metadata: {
         name: secretName,
-        namespace: ns.metadata.name,
+        namespace: ns.logicalName,
       },
       type: "Opaque",
       data: {
@@ -34,13 +35,13 @@ function participantSecret(
       },
     },
     {
-      dependsOn: [ns],
+      dependsOn: [ns.ns],
     }
   );
 }
 
 function appSecret(
-  ns: k8s.core.v1.Namespace,
+  ns: ExactNamespace,
   appName: string,
   appAuth0ClientId: string,
   appAuth0Secret: pulumi.Output<string>
@@ -51,14 +52,14 @@ function appSecret(
     {
       metadata: {
         name: secretName,
-        namespace: ns.metadata.name,
+        namespace: ns.logicalName,
       },
       type: "Opaque",
       data: {
         "ledger-api-user": btoa(appAuth0ClientId + "@clients"),
         url: btoa(
           "https://" +
-            process.env.AUTH0_DOMAIN +
+            requiredEnv("AUTH0_DOMAIN", "domain of your auth0 tenant") +
             "/.well-known/openid-configuration"
         ),
         "client-id": btoa(appAuth0ClientId),
@@ -66,13 +67,13 @@ function appSecret(
       },
     },
     {
-      dependsOn: [ns],
+      dependsOn: [ns.ns],
     }
   );
 }
 
 function uiSecret(
-  ns: k8s.core.v1.Namespace,
+  ns: ExactNamespace,
   appName: string,
   clientId: string
 ): k8s.core.v1.Secret {
@@ -82,30 +83,39 @@ function uiSecret(
     {
       metadata: {
         name: secretName,
-        namespace: ns.metadata.name,
+        namespace: ns.logicalName,
       },
       type: "Opaque",
       data: {
-        url: btoa("https://" + process.env.AUTH0_DOMAIN),
+        url: btoa(
+          "https://" +
+            requiredEnv("AUTH0_DOMAIN", "domain of your auth0 tenant")
+        ),
         "client-id": btoa(clientId),
       },
     },
     {
-      dependsOn: [ns],
+      dependsOn: [ns.ns],
     }
   );
 }
 
-export function imagePullSecret(ns: k8s.core.v1.Namespace): pulumi.Resource[] {
+const k8sProvider = new k8s.Provider("k8s", { enableServerSideApply: true });
+
+export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   const artifactory = "digitalasset-canton-network-docker.jfrog.io";
-  const username = process.env.ARTIFACTORY_USERNAME;
-  const password = process.env.ARTIFACTORY_PASSWORD;
-  const email = process.env.ARTIFACTORY_EMAIL;
-  const secretName = "docker-reg-cred";
-  const secret = new k8s.core.v1.Secret(secretName, {
+  const username = requiredEnv(
+    "ARTIFACTORY_USER",
+    "Username for jfrog artifactory"
+  );
+  const password = requiredEnv(
+    "ARTIFACTORY_PASSWORD",
+    "Password for jfrog artifactory"
+  );
+  const secret = new k8s.core.v1.Secret(ns + "-docker-reg-cred", {
     metadata: {
-      name: secretName,
-      namespace: ns.metadata.name,
+      name: "docker-reg-cred",
+      namespace: ns,
     },
     type: "kubernetes.io/dockerconfigjson",
     stringData: {
@@ -114,16 +124,14 @@ export function imagePullSecret(ns: k8s.core.v1.Namespace): pulumi.Resource[] {
           [artifactory]: {
             auth: btoa(username + ":" + password),
             username: username,
-            email: email,
             password: password,
           },
         },
       }),
     },
   });
-  const provider = new k8s.Provider("k8s", { enableServerSideApply: true });
   const patch = new k8s.core.v1.ServiceAccountPatch(
-    "default",
+    ns + "-default",
     {
       imagePullSecrets: [
         {
@@ -132,57 +140,59 @@ export function imagePullSecret(ns: k8s.core.v1.Namespace): pulumi.Resource[] {
       ],
       metadata: {
         name: "default",
-        namespace: ns.metadata.name,
+        namespace: ns,
       },
     },
     {
-      provider: provider,
+      provider: k8sProvider,
     }
   );
 
   return [secret, patch];
 }
 
+export function imagePullSecret(ns: ExactNamespace): pulumi.Resource[] {
+  return imagePullSecretByNamespaceName(ns.logicalName);
+}
+
 export function sv1UserParticipantSecret(
-  ns: k8s.core.v1.Namespace
+  ns: ExactNamespace
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "sv1", sv1Auth0ClientId);
 }
 
 export function sv1UserValidatorParticipantSecret(
-  ns: k8s.core.v1.Namespace
+  ns: ExactNamespace
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "sv1-validator", validatorAuth0ClientId);
 }
 
-export function svValidatorSecrets(
-  ns: k8s.core.v1.Namespace
-): k8s.core.v1.Secret[] {
+export function svValidatorSecrets(ns: ExactNamespace): k8s.core.v1.Secret[] {
   return [
     appSecret(ns, "validator", validatorAuth0ClientId, validatorAuth0Secret),
     uiSecret(ns, "wallet-ui", walletUIClientId),
   ];
 }
 
-export function svAppSecret(ns: k8s.core.v1.Namespace): k8s.core.v1.Secret {
+export function svAppSecret(ns: ExactNamespace): k8s.core.v1.Secret {
   return appSecret(ns, "sv", sv1Auth0ClientId, sv1Auth0Secret);
 }
 
 // TODO(#4374): get rid of the dummy secrets
 export function scanUserParticipantSecret(
-  ns: k8s.core.v1.Namespace
+  ns: ExactNamespace
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "scan", "dummy");
 }
 
 export function directoryUserParticipantSecret(
-  ns: k8s.core.v1.Namespace
+  ns: ExactNamespace
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "directory", "dummy");
 }
 
 export function svcUserParticipantSecret(
-  ns: k8s.core.v1.Namespace
+  ns: ExactNamespace
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "svc", "dummy");
 }

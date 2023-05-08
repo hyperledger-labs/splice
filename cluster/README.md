@@ -907,15 +907,20 @@ The Pulumi script depends on the following env variables to be defined (e.g. by 
 - AUTH0_DOMAIN: please use our sv-test domain: canton-network-sv-test.us.auth0.com
 - AUTH0_CLIENT_ID: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
 - AUTH0_CLIENT_SECRET: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
-- ARTIFACTORY_USERNAME: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
+- ARTIFACTORY_USER: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
 - ARTIFACTORY_PASSWORD: Your API key at digitalasset.jfrog.io (can be obtained by creating an API key in your user profile)
-- ARTIFACTORY_EMAIL: your email address
+
+By default, Pulumi will be using the charts and images as built locally and pushed to the dev artifactory using the `make` commands above.
+It also supports deploying a version based on externally released artifacts, the ones customers use.
+To use released as opposed to your local build, append the `pulumi` command below with `-c LOCAL_CHARTS=false -c VERSION_NUMBER="<chart version>"`,
+for example `-c LOCAL_CHARTS=false -c VERSION_NUMBER="0.1.1-snapshot.20230508.2322.0.bb8d43e3"`. Note, however, that pulumi config variables are persistent.
+In other words, once you used `-c`, the values you set there will be used in consecutive calls to `pulumi up`. To reset the values, use e.g. `pulumi config rm LOCAL_CHARTS`
 
 Please see the const definitions in the [Pulumi script](./cluster/pulumi/sv-runbook/index.ts) for some more configurable parameters before deploying (including the flag for whether to use local or released artifacts). These will be made more easily configurable from CLI soon.
 
 An SV node can *not* currently be deployed via Pulumi on our "standard" clusters, e.g. the scratchnet's, due to resource conflicts. The `sv` cluster should be used for that. To deploy the SV node following the runbook, cd to the `sv` deployment directory, and type:
 
-`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv`
+`TARGET_CLUSTER=<cluster running the global domain> pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv`
 
 Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv1.svc.sv.network.canton.global`.
 
