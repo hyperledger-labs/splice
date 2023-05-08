@@ -889,16 +889,44 @@ the cluster ingress and documentation server.
    of the configuration managed by Pulumi.
 
 
-## Testing the SV Helm Runbook against a local build
+## Testing the SV Helm Runbook
 
-The [SV runbook for a Helm
-deployment](./cluster/images/docs/src/src/sv_operator/sv_helm.rst) is
-written under the assumption that we've fully released a build of the
-software, including public Docker images and Helm charts in Artifactory.
-During development, while you're iterating on changes,
-you can also test against a local build. This is both faster and it avoids
-exposing those intermediate development states to customers. (We
-should not publicly publish any artifacts that have not been fully tested.)
+The [sv-runbook](./cluster/pulumi/sv-runbook) pulumi script reproduces the steps of the
+[SV runbook for Helm deployment](./cluster/images/docs/src/sv_operator/sv_helm.rst).
+It can be used to mimick a customer SV deployment, and can use the charts and images
+from the artifactory (as published for versions deployed to DevNet&TestNet), or those built locally.
+
+To build the required artifacts from your current local repo:
+
+1. Run `OVERWRITE_DOCKER_IMAGE=1 make docker-push -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
+   By default, this does **NOT** disable makefile caching. If that's what you want, you should instead run `make docker-push-force -j`.
+1. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
+
+The Pulumi script depends on the following env variables to be defined (e.g. by exporting them from your .envrc.private):
+
+- AUTH0_DOMAIN: please use our sv-test domain: canton-network-sv-test.us.auth0.com
+- AUTH0_CLIENT_ID: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- AUTH0_CLIENT_SECRET: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- ARTIFACTORY_USERNAME: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
+- ARTIFACTORY_PASSWORD: Your API key at digitalasset.jfrog.io (can be obtained by creating an API key in your user profile)
+- ARTIFACTORY_EMAIL: your email address
+
+Please see the const definitions in the [Pulumi script](./cluster/pulumi/sv-runbook/index.ts) for some more configurable parameters before deploying (including the flag for whether to use local or released artifacts). These will be made more easily configurable from CLI soon.
+
+An SV node can *not* currently be deployed via Pulumi on our "standard" clusters, e.g. the scratchnet's, due to resource conflicts. The `sv` cluster should be used for that. To deploy the SV node following the runbook, cd to the `sv` deployment directory, and type:
+
+`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv`
+
+Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv1.svc.sv.network.canton.global`.
+
+To bring the deployment down, run:
+
+`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook down -y --stack sv`
+
+
+## Testing the SV Helm Runbook against a local build manually
+
+If you wish to follow the SV runbook for Helm deployment manually, rather than through the Pulumi step, and use locally built resources:
 
 When working against a local cluster, you can skip all the artifactory
 setup in the runbook. We will instead be using docker images from

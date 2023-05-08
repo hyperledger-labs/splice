@@ -23,13 +23,13 @@ const svNamespace = new k8s.core.v1.Namespace("sv-1", {
 });
 
 // TODO(#4521): make these configurable
-const localCharts = true;
-const version = "0.1.1-snapshot.20230505.2313.0.48a0243f";
-const TARGET_CLUSTER = "scratchc";
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const SV_WALLET_USER_ID = "auth0|64553aa683015a9687d9cc2e";
-const CLUSTER_BASENAME = "sv";
-const CLUSTER_IP = "34.133.96.35";
+const localCharts = true; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
+const version = "0.1.1-snapshot.20230505.2313.0.48a0243f"; // Artifacts version, if localCharts == false
+const TARGET_CLUSTER = "scratchc"; // Cluster in which the global domain is running
+const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN; // Auth tenant domain
+const SV_WALLET_USER_ID = "auth0|64553aa683015a9687d9cc2e"; // admin@sv.com at the sv-test tenant
+const CLUSTER_BASENAME = "sv"; // Cluster in which this chart is being installed
+const CLUSTER_IP = "34.133.96.35"; // IP of the cluster in which this chart is being installed
 
 // Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
 // TODO(#4521): make sure it's OK to reuse these once automated
