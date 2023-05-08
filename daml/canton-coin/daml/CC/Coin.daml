@@ -270,7 +270,6 @@ template CoinRules
         validator : Party
         trafficCid: ContractId ValidatorTraffic
         extraTraffic : Int
-        minTopupWaitTime : RelTime
       controller validator
       do
         requireUnlocked lock
@@ -281,7 +280,6 @@ template CoinRules
         require "validator party and ValidatorTraffic match" (validator == traffic.validator)
         require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
         require "extraTraffic is at least as much as the configured minTopupAmount" (extraTraffic >= minTopupAmount)
-        require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupWaitTime <= now)
 
         contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
         let extraTrafficPrice = configUsd.domainFeesConfig.extraTrafficPrice
