@@ -17,7 +17,9 @@ import akka.http.scaladsl.server.Directives.{
   withRequestTimeoutResponse,
 }
 import akka.util.ByteString
+import com.daml.error.definitions.groups.CommandExecution.Interpreter
 import com.daml.network.http.v0.definitions as d0
+import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Printer
@@ -26,7 +28,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.util.{Failure, Success, Try}
 
-final case class HttpErrorWithGrpcCode(code: Status.Code, message: String) extends Exception
+final case class HttpErrorWithGrpcStatus(status: Status, message: String) extends Exception
 final case class HttpErrorWithHttpCode(code: StatusCode, message: String) extends Exception
 
 object HttpErrorHandler {
@@ -65,7 +67,7 @@ object HttpErrorHandler {
         case Failure(exception) => {
           exception match {
             case e: StatusRuntimeException if grpcCondition(e.getStatus.getCode) =>
-              Failure(new HttpErrorWithGrpcCode(e.getStatus.getCode, message))
+              Failure(new HttpErrorWithGrpcStatus(e.getStatus, message))
             case x => Failure(x)
           }
         }
@@ -83,14 +85,21 @@ final class HttpErrorHandler(
     override val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging {
 
-  private def mapToStatusCode(grpcCode: Status.Code): StatusCode = {
+  private def mapToStatusCode(grpcStatus: Status): StatusCode = {
+    val grpcCode = grpcStatus.getCode
     grpcCode match {
       case Status.Code.NOT_FOUND => StatusCodes.NotFound
       case Status.Code.ALREADY_EXISTS => StatusCodes.Conflict
       case Status.Code.ABORTED => StatusCodes.TooManyRequests
       case Status.Code.UNAVAILABLE => StatusCodes.ServiceUnavailable
       case Status.Code.INTERNAL => StatusCodes.InternalServerError
-      case Status.Code.FAILED_PRECONDITION => StatusCodes.BadRequest
+      case Status.Code.FAILED_PRECONDITION =>
+        if (
+          ErrorCodeUtils.isError(grpcStatus.getDescription, Interpreter.GenericInterpretationError)
+        )
+          StatusCodes.Conflict
+        else
+          StatusCodes.BadRequest
       case Status.Code.INVALID_ARGUMENT => StatusCodes.BadRequest
       case Status.Code.UNIMPLEMENTED => StatusCodes.BadRequest
       case _ => StatusCodes.InternalServerError
@@ -110,14 +119,14 @@ final class HttpErrorHandler(
       )
     )
 
-  private def completeErrorResponse(grpcCode: Status.Code, message: String): StandardRoute =
-    completeErrorResponse(mapToStatusCode(grpcCode), message)
+  private def completeErrorResponse(grpcStatus: Status, message: String): StandardRoute =
+    completeErrorResponse(mapToStatusCode(grpcStatus), message)
 
   def directive(implicit traceContext: TraceContext) = exceptionsDirective & timeoutDirective
 
   def exceptionsDirective(implicit traceContext: TraceContext) = {
     val handler = ExceptionHandler {
-      case HttpErrorWithGrpcCode(code, message) =>
+      case HttpErrorWithGrpcStatus(code, message) =>
         extractUri { uri =>
           logger.info(s"Request to $uri resulted in an HTTP exception: ${message}")
           completeErrorResponse(code, message)
@@ -133,7 +142,7 @@ final class HttpErrorHandler(
             s"Request to $uri resulted in a gRPC StatusRuntimeException: ${e.getMessage}",
             e,
           )
-          completeErrorResponse(e.getStatus.getCode, e.getStatus.getDescription)
+          completeErrorResponse(e.getStatus, e.getStatus.getDescription)
         }
       case e: Throwable =>
         extractUri { uri =>
