@@ -300,12 +300,12 @@ class CNNodeConsoleEnvironment(
         Seq("App References"),
       ) :++
       validators.remote.map(v =>
-        TopLevelValue(v.name, helpText("remote validator app", v.name), v, Seq("App References"))
+        TopLevelValue(v.name, helpText("validator app client", v.name), v, Seq("App References"))
       ) :+ TopLevelValue(
-        "remoteValidators",
+        "validatorClients",
         helpText(
-          "All remote validator app instances" + genericNodeReferencesDoc,
-          "Remote Validators",
+          "All validator app client instances" + genericNodeReferencesDoc,
+          "Validator Clients",
         ),
         validators.remote,
         Seq("App References"),
@@ -321,20 +321,20 @@ class CNNodeConsoleEnvironment(
       svs.remote.map(sv =>
         TopLevelValue(
           s"${sv.name}Client",
-          helpText("remote sv app", sv.name),
+          helpText("sv app client", sv.name),
           sv,
           Seq("App References"),
         )
       ) :+ TopLevelValue(
-        "remoteSvs",
-        helpText("All remote sv app instances" + genericNodeReferencesDoc, "Remote SVs"),
+        "svClients",
+        helpText("All sv app client instances" + genericNodeReferencesDoc, "SV clients"),
         svs.remote,
         Seq("App References"),
       ) :++
       wallets.map(w =>
         TopLevelValue(w.name, helpText("wallet app user", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
-        "remoteWallets",
+        "walletClients",
         helpText("All wallet app user instances" + genericNodeReferencesDoc, "Wallet Users"),
         wallets,
         Seq("App References"),
@@ -358,22 +358,22 @@ class CNNodeConsoleEnvironment(
       directories.remote.map(v =>
         TopLevelValue(
           v.name,
-          helpText("remote directory app", v.name),
+          helpText("directory app clients", v.name),
           v,
           Seq("App References"),
         )
       ) :+ TopLevelValue(
         "directoryClients",
         helpText(
-          "All remote directory app instances" + genericNodeReferencesDoc,
-          "Remote directory apps",
+          "All directory app client instances" + genericNodeReferencesDoc,
+          "directory app clients",
         ),
         directories.remote,
         Seq("App References"),
       ) :++ splitwells.local.map(v =>
         TopLevelValue(v.name, helpText("local splitwell app", v.name), v, Seq("App References"))
       ) :++ splitwells.remote.map(v =>
-        TopLevelValue(v.name, helpText("remote splitwell app", v.name), v, Seq("App References"))
+        TopLevelValue(v.name, helpText("splitwell app client", v.name), v, Seq("App References"))
       ) :+ TopLevelValue(
         "splitwells",
         helpText(
@@ -383,9 +383,9 @@ class CNNodeConsoleEnvironment(
         splitwells.local,
         Seq("App References"),
       ) :+ TopLevelValue(
-        "remoteSplitwells",
+        "splitwellClients",
         helpText(
-          "All remote splitwell instances" + genericNodeReferencesDoc,
+          "All splitwell client instances" + genericNodeReferencesDoc,
           "Splitwells",
         ),
         splitwells.remote,
@@ -393,12 +393,12 @@ class CNNodeConsoleEnvironment(
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
         .toList :++ svcClientOpt
-        .map(svc => TopLevelValue(svc.name, helpText("Remote SVC app", svc.name), svc, Seq("SVC")))
+        .map(svc => TopLevelValue(svc.name, helpText("SVC app client", svc.name), svc, Seq("SVC")))
         .toList :++ scans.local.headOption
         .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
         .toList :++ scans.remote.headOption
         .map(scan =>
-          TopLevelValue(scan.name, helpText("Remote scan app", scan.name), scan, Seq("Scan"))
+          TopLevelValue(scan.name, helpText("scan app client", scan.name), scan, Seq("Scan"))
         )
         .toList :+ TopLevelValue(
         "fullSvcApps",
