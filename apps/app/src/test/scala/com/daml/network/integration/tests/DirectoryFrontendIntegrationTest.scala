@@ -36,11 +36,6 @@ class DirectoryFrontendIntegrationTest
       aliceWallet.tap(100.0)
 
       val entryName = "mycoolentry"
-      val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
-      val expectedExpiry =
-        DateTimeFormatter
-          .ofPattern("MM/dd/yyyy HH:mm")
-          .format(expiry)
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
@@ -78,9 +73,14 @@ class DirectoryFrontendIntegrationTest
           currency should be("USD")
           interval should be("90 days")
 
-          // allowing for some variance on seconds to avoid a flaky test
-          val expiryWithSecsOffset = expectedExpiry.substring(0, expectedExpiry.length - 1)
-          expiresAt should startWith(expiryWithSecsOffset)
+          // only compare date and not time to avoid test flakes when running the test right when the hour changes
+          // We accept the flake when running this test right at the change of the date.
+          val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
+          val expectedExpiry =
+            DateTimeFormatter
+              .ofPattern("MM/dd/yyyy")
+              .format(expiry)
+          expiresAt should startWith(expectedExpiry)
         }
       }
     }
