@@ -72,7 +72,7 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     // insists on automatically selecting free ports and those may
     // collide with the ports used by our own services.
     if (autostartWebDrivers) {
-      startWebDrivers(env.executionContext)
+      startWebDrivers()
     }
     env
   }
@@ -93,7 +93,7 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
   override def beforeAll() = {
     super.beforeAll()
     if (autostartWebDrivers) {
-      startWebDrivers(provideEnvironment.executionContext)
+      startWebDrivers()
     }
   }
 
@@ -120,7 +120,9 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor with WebStorage
 
   val options: FirefoxOptions =
-    new FirefoxOptions().setLogLevel(FirefoxDriverLogLevel.DEBUG).addArguments("-headless")
+    new FirefoxOptions()
+      .setLogLevel(FirefoxDriverLogLevel.DEBUG)
+      .addArguments("-headless", "--log-no-truncate")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
@@ -202,14 +204,17 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     );
   }
 
-  protected def startWebDrivers(implicit ec: ExecutionContext) = {
+  protected def startWebDrivers() = {
     logger.info("Starting web drivers")
-    // We start all browsers in parallel, for faster test init.
-    frontendNames.toList.parTraverse { name =>
-      Future {
-        startWebDriver(name)
-      }
-    }.futureValue
+
+    // We start browsers in serial. This is done to allow reliable
+    // operation of the free port discovery used to assign BiDI ports
+    // to browsers. When starting browsers in parallel, we've observed
+    // races that result in two browsers attempting to start with the
+    // same BiDi port, with the second browser failing.
+    frontendNames.toList.foreach { name =>
+      startWebDriver(name)
+    }
     logger.info("Started web drivers")
   }
 
