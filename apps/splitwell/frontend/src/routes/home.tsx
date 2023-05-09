@@ -1,9 +1,5 @@
-import {
-  usePrimaryParty,
-  useUserState,
-  useStateSnapshotServiceClient,
-  StateSnapshotServiceClientProvider,
-} from 'common-frontend';
+import { usePrimaryParty, useUserState, useStateSnapshotServiceClient } from 'common-frontend';
+import { useScanClient } from 'common-frontend/lib';
 import {
   ListSplitwellInstallsRequest,
   SplitwellContext,
@@ -17,33 +13,36 @@ import { Container, Stack, Typography } from '@mui/material';
 import { SplitwellInstall, SplitwellInstallRequest } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ContractId } from '@daml/types';
 
-import GroupSetup from './GroupSetup';
-import Groups from './Groups';
-import {
-  useSplitwellLedgerApiClient,
-  SplitwellLedgerApiClientProvider,
-} from './contexts/SplitwellLedgerApiContext';
-import { useSplitwellClient } from './contexts/SplitwellServiceContext';
-import { config } from './utils/config';
+import GroupSetup from '../components/GroupSetup';
+import Groups from '../components/Groups';
+import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
+import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
 
 type SplitwellDomains = {
   preferred: string;
   others: string[];
 };
 
-const HomeWithContext: React.FC<{
-  userId: string;
-  svc: string | undefined;
-}> = ({ svc }) => {
+const Home: React.FC = () => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const stateSnapshotServiceClient = useStateSnapshotServiceClient();
+  const scanClient = useScanClient();
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
   const [installs, setInstalls] = useState<Map<string, ContractId<SplitwellInstall>>>(new Map());
   const [splitwellDomainIds, setSplitwellDomainIds] = useState<SplitwellDomains | undefined>();
   const [connectedDomainIds, setConnectedDomainIds] = useState<string[]>([]);
+  const [svc, setSvc] = useState<string | undefined>();
+
+  useEffect(() => {
+    const fetchSvc = async () => {
+      const svcPartyId = await scanClient.getSvcPartyId();
+      setSvc(svcPartyId);
+    };
+    fetchSvc();
+  }, [scanClient]);
 
   const primaryPartyId = usePrimaryParty(ledgerApiClient);
 
@@ -206,26 +205,6 @@ const HomeWithContext: React.FC<{
   } else {
     return <Typography>Loading …</Typography>;
   }
-};
-
-interface HomeProps {
-  userId: string;
-  svc: string | undefined;
-  ledgerApiToken: string;
-}
-
-const Home: React.FC<HomeProps> = ({ userId, svc, ledgerApiToken }) => {
-  return (
-    <SplitwellLedgerApiClientProvider
-      url={config.services.ledgerApi.url}
-      userId={userId}
-      token={ledgerApiToken}
-    >
-      <StateSnapshotServiceClientProvider url={config.services.ledgerApi.url}>
-        <HomeWithContext userId={userId} svc={svc} />
-      </StateSnapshotServiceClientProvider>
-    </SplitwellLedgerApiClientProvider>
-  );
 };
 
 export default Home;

@@ -41,9 +41,9 @@ import {
 } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
-import { useSplitwellLedgerApiClient } from './contexts/SplitwellLedgerApiContext';
-import { useSplitwellClient } from './contexts/SplitwellServiceContext';
-import { config } from './utils/config';
+import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
+import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
+import { config } from '../utils/config';
 
 const key = (group: Contract<CodegenGroup>) =>
   new GroupKey()

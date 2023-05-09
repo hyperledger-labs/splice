@@ -31,7 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { Choice, ContractId, Template } from '@daml/types';
 
-import { Contract, decodeProtoMetadata } from '..';
+import { Contract, decodeProtoMetadata, useUserState } from '..';
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -301,8 +301,6 @@ export class LedgerApiClient {
 
 export interface LedgerApiClientProps {
   url: string;
-  userId: string;
-  token: string;
 }
 
 // use this to create a Provider component and a use function in case you extended LedgerApiClient
@@ -320,9 +318,13 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
   const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiClientProps>> = ({
     children,
     url,
-    userId,
-    token,
   }) => {
+    const { userAccessToken, userId } = useUserState();
+    if (!userAccessToken || !userId) {
+      // The expectation is that useLedgerApiClient() is only called from components that are
+      // rendered only if the user is logged in.
+      return <context.Provider value={undefined}>{children}</context.Provider>;
+    }
     const activeContractsClient = new ActiveContractsServicePromiseClient(url);
     const commandServiceClient = new CommandServicePromiseClient(url);
     const userManagementClient = new UserManagementServicePromiseClient(url);
@@ -331,7 +333,7 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
       commandServiceClient,
       userManagementClient,
       userId,
-      token
+      userAccessToken
     );
     return <context.Provider value={apiClient}>{children}</context.Provider>;
   };

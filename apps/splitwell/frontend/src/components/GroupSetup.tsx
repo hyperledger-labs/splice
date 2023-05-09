@@ -9,8 +9,8 @@ import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from 
 
 import { GroupInvite } from '@daml.js/splitwell/lib/CN/Splitwell';
 
-import { useSplitwellLedgerApiClient } from './contexts/SplitwellLedgerApiContext';
-import { useSplitwellClient } from './contexts/SplitwellServiceContext';
+import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
+import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
 
 interface GroupSetupProps {
   svc: string;
