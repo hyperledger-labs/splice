@@ -104,6 +104,13 @@ local deployments(num, svConfig, config) =
       ],
       namespace=namespace,
     ),
+    c.deployment(config, "sv-web-ui", [
+      {
+        name: "val1-sv-ui",
+        port: 80,
+        internalOnly: true,
+      },
+    ], image="sv-web-ui", namespace=namespace, cpuRequest=0.5, extraEnvVars=[{ name: "CN_APP_SV_UI_CLUSTER", value: config.clusterDnsName }] + c.appUiAuthEnvBinding("sv")),
     c.deployment(config, "wallet-web-ui", [
       {
         name: "val1-wal-ui",

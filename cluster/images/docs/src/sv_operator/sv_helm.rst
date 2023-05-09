@@ -321,9 +321,18 @@ increase as mining rounds advance every 2.5 minutes and you will see
 ``sv_reward_collected`` entries in your transaction history.
 Once logged in one should see the transactions page.
 
+.. image:: images/wallet_home.png
+  :width: 600
+  :alt: After logged in into the wallet UI
+
+
 Logging into the SV UI
 ----------------------
 
 Open your browser at https://sv.sv-1.svc.YOUR_DOMAIN.com to login to the SV Operations user interface.
 You can use the credentials of the ``validatorWalletUser`` to login. These are the same credentials you used for the wallet login above. Note that only Super validators will be able to login.
 Once logged in one should see a page with some SV collective information.
+
+.. image:: images/sv_home.png
+  :width: 600
+  :alt: After logged in into the sv UI

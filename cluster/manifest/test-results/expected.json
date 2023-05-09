@@ -1232,6 +1232,125 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "sv-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "sv-web-ui"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "sv-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-sv-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-sv-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "wallet-web-ui",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
@@ -1660,6 +1779,125 @@
             ],
             "selector": {
                "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "sv-web-ui"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "sv-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-sv-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-sv-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-web-ui"
             }
          }
       },
@@ -2392,6 +2630,125 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "sv-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "sv-web-ui"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "sv-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-sv-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-3"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-sv-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "wallet-web-ui",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
@@ -3108,6 +3465,125 @@
             ],
             "selector": {
                "app": "validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "sv-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "sv-web-ui"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "sv-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "sv-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "sv-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_CLUSTER",
+                              "value": "cluster.network.global"
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ui-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SV_UI_AUTH_AUDIENCE",
+                              "value": "https://canton.network.global"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "sv-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-sv-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
+            "name": "sv-web-ui",
+            "namespace": "sv-4"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-sv-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "sv-web-ui"
             }
          }
       },
