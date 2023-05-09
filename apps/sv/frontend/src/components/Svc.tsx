@@ -76,10 +76,10 @@ const SvcView: React.FC = () => {
     ];
     return (
       <Box>
-        {getInfoTable('Sv Infos', svInfos)}
+        {getInfoTable('Sv Information', svInfos)}
         {getInfoTable('Svc Members', membersInfos)}
-        {getInfoTable('Svc Infos', svcInfos)}
-        {getInfoTable('Svc Config', configInfos)}
+        {getInfoTable('Svc Information', svcInfos)}
+        {getInfoTable('Svc Configuration', configInfos)}
       </Box>
     );
   } else {

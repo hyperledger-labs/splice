@@ -253,7 +253,7 @@ subcommands. A few highlights include the following:
   intent of this command is to allow developers to bring a cluster to a known
   good state.
 * `cncluster info` - Display a table showing all deployed images and resource
-  allocation settinos.
+  allocation settings.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
 * `cncluster logs` - Stream the logs for the specified module running
   in the cluster. This will attempt to apply JSON log formatting,
@@ -375,7 +375,7 @@ cncluster reset
 #### Kubectl and `cncluster` operations.
 
 Run the following commands in the deployment directory of the cluster
-you with to observe. For ScratchNet, this is
+you want to observe. For ScratchNet, this is
 `cluster/deployment/scratchnet`, and similar for other clsuters.
 
 1. Run `kubectl get pods` to get the status of all pods in the default namespace
@@ -615,7 +615,7 @@ configuration that have a longer lifecycle than any one deployment of
 the Canton Network software. This configuration includes the cluster
 ingress IP address, DNS records, and the certificate used for incoming
 traffic. From within a deployment directory for a cluster, this stack
-can be manged with `cncluster infra_pulumi`. The following commands
+can be managed with `cncluster infra_pulumi`. The following commands
 cover the typical lifecycle of a Canton Network cluster.
 
 * `cncluster infra_pulumi up` - Apply the infrastructure configuration
@@ -960,15 +960,15 @@ gcloud and local helm charts.
    version. Often you can use staging or devnet for this. If that does
    not work, you may need to lock another scratchnet and go through
    the usual `cncluster apply` flow.  Use the SV name, private and
-   public key from `apps/src/pack/eamples/sv/sv-onboarding.conf` in
+   public key from `apps/src/pack/examples/sv/sv-onboarding.conf` in
    `sv-values.yaml`.  Use either of the user ids from
    [our list of passwords](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true)
    as the `validator_wallet_user` in `validator-values.yaml` Use
    `https://canton.network.global` as the audience and
    `https://canton-network-dev.us.auth0.com/.well-known/jwks.json` as
    the JWKS url in `validator-values.yaml`.
-6. Once you created the config files, you can run the `helm install` commands. Instead of specifying the artifactory repo, specify the path
-   to the local tarball created by `make cluster/helm/build`, add `-f scratch.yaml` to overwrite the docker image repo and omit `--version`.
+6. Once you created the config files, you can run the `helm install` commands from the runbook. Instead of specifying the artifactory repo, specify the path
+   to the local tarball created by `make cluster/helm/build`, by adding `-f scratch.yaml` to overwrite all docker images repo and omit `--version`.
    So `helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml`
    becomes `helm install participant $REPO_ROOT/cluster/helm/target/cn-participant-*.tgz -n svc -f participant-values.yaml -f scratch.yaml`.
 7. If you made a change, uninstall the chart first, e.g., `helm
@@ -985,7 +985,7 @@ gcloud and local helm charts.
     ipAddress: "34.171.136.234" # ip address of the cluster as output by `cncluster ipaddr`
    ```
    cert-manager will already be setup so no need to do anything about that.
-9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global`.
+9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global` or `https://sv.sv-1.svc.scratchb.network.canton.global`.
 
 ## SV Operations
 

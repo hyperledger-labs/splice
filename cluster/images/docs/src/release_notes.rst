@@ -6,6 +6,10 @@ Release Notes
 2023-05-14
 ----------
 
+* Add Sv UI for SV user to SV runbook. This allows the SV operator
+  to see information about the SV collective and generate prepare a
+  validator onboarding by generating a validator onboarding secret.
+
 * Fix a bug where ``cn-node`` sometimes failed to start with a ``ClassNotFoundException``.
 
 2023-05-07

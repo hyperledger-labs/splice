@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sv-web-ui
+  name: sv-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sv-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: sv-web-ui
+    spec:
+      containers:
+        - env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.defaultJvmOptions }}
+            - name: CN_APP_SV_UI_AUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  key: client-id
+                  name: cn-app-sv-ui-auth
+                  optional: false
+            - name: CN_APP_SV_UI_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  key: url
+                  name: cn-app-sv-ui-auth
+                  optional: false
+            - name: CN_APP_SV_UI_AUTH_AUDIENCE
+              {{ if .Values.auth.audience }}
+              value: {{ .Values.auth.audience | quote }}
+              {{ else }}
+              value: "https://canton.network.global"
+              {{ end }}
+            - name: CN_APP_SV_UI_CLUSTER
+              value: {{ .Values.clusterUrl | quote }}
+          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Values.cluster.imageTag }}"
+          imagePullPolicy: Always
+          name: sv-web-ui
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          resources:
+            limits:
+              memory: 1536Mi
+            requests:
+              cpu: 500m
+              memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sv-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: sv-web-ui
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP

@@ -1032,7 +1032,11 @@ function subcmd_update_secrets() {
     "cn-app-wallet-ui-auth sv-1" \
     "cn-app-wallet-ui-auth sv-2" \
     "cn-app-wallet-ui-auth sv-3" \
-    "cn-app-wallet-ui-auth sv-4"
+    "cn-app-wallet-ui-auth sv-4" \
+    "cn-app-sv-ui-auth sv-1" \
+    "cn-app-sv-ui-auth sv-2" \
+    "cn-app-sv-ui-auth sv-3" \
+    "cn-app-sv-ui-auth sv-4"
   do
     # shellcheck disable=SC2086
     set -- $i

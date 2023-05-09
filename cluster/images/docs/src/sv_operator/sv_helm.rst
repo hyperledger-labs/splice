@@ -102,7 +102,8 @@ The SV app is configured with a secret as follows:
         "--from-literal=client-secret=${SECRET_OF_SV_AUTH0_APP}"
 
 
-The validator requires the following two secrets, one for the backend, the other for the web UI:
+The validator requires the following three secrets, the first one for the backend, the other two for the web UIs.
+Note one can also use the same client id for both UI by setting the same ``client-id`` parameter when generating both secrets.
 
 .. code-block:: bash
 
@@ -115,6 +116,10 @@ The validator requires the following two secrets, one for the backend, the other
     kubectl create --namespace sv-1 secret generic cn-app-wallet-ui-auth \
         "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com" \
         "--from-literal=client-id=${CLIENT_ID_OF_WALLET_WEB_UI_APP}"
+
+    kubectl create --namespace sv-1 secret generic cn-app-sv-ui-auth \
+        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=client-id=${CLIENT_ID_OF_SV_WEB_UI_APP}"
 
 
 Installing the Software
@@ -152,7 +157,7 @@ following content.
 
 .. code-block:: yaml
 
-    participant_address: "participant"
+    participantAddress: "participant"
     svSponsorPort: "5014"
     svSponsorAddress: "https://TARGET_CLUSTER.network.canton.global"
     scanPort: "5012"
@@ -204,14 +209,17 @@ namespaces. A typical query might look as follows:
 .. code-block:: bash
 
     $ kubectl get pods --all-namespaces |grep -v kube-system
-    NAMESPACE      NAME                                                       READY   STATUS    RESTARTS   AGE
-    docs           docs-86647d56dd-97d64                                      1/1     Running   0          34m
-    docs           gcs-proxy-86bf867fdc-c2tcm                                 1/1     Running   0          34m
-    sv-1           sv-app-59d4d499dd-nf4mj                                    1/1     Running   0          57m
-    sv-1           validator-app-68fc94d87f-fjz4z                             1/1     Running   0          17m
-    sv-1           wallet-web-ui-7c94df497f-c2pb4                             1/1     Running   0          17m
-    sv-1           participant-576cc9bc74-22wzx                               3/3     Running   0          151m
-    sv-1           postgres-0                                                 1/1     Running   0          151m
+    NAMESPACE         NAME                                                       READY   STATUS    RESTARTS      AGE
+    cluster-ingress   external-proxy-998cb664c-k7dfb                             1/1     Running   0             37m
+    docs              docs-688ccd855b-hsntm                                      1/1     Running   0             81m
+    docs              gcs-proxy-5ffcb46f7f-79lfv                                 1/1     Running   0             81m
+    sv-1              sv-app-7658c9fdd4-58xm6                                    1/1     Running   0             91m
+    sv-1              sv-web-ui-84b6d7994c-w67rp                                 1/1     Running   0             91m
+    sv-1              validator-app-b7fd68479-w4992                              1/1     Running   0             43m
+    sv-1              wallet-web-ui-54c9ddbb8-nvkmp                              1/1     Running   0             43m
+    sv-1              participant-6fdff7fc4-vzg8c                                3/3     Running   1 (72m ago)   72m
+    sv-1              postgres-0                                                 1/1     Running   0             120m
+
 
 Note also that ``Pod`` restarts may happen during bringup,
 particualrly if all helm charts are deployed at the same time. The
@@ -311,3 +319,11 @@ credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to see your balance
 increase as mining rounds advance every 2.5 minutes and you will see
 ``sv_reward_collected`` entries in your transaction history.
+Once logged in one should see the transactions page.
+
+Logging into the SV UI
+----------------------
+
+Open your browser at https://sv.sv-1.svc.YOUR_DOMAIN.com to login to the SV Operations user interface.
+You can use the credentials of the ``validatorWalletUser`` to login. These are the same credentials you used for the wallet login above. Note that only Super validators will be able to login.
+Once logged in one should see a page with some SV collective information.
