@@ -1,7 +1,7 @@
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, DirectoryEntry, IntervalDisplay } from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
@@ -10,26 +10,24 @@ import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
+import { useCoinPrice, useSubscriptionRequest } from '../hooks';
 import { SubscriptionRequestWithContext } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
   const { cid } = useParams();
-  const { getSubscriptionRequest } = useWalletClient();
+  const subscriptionRequestQuery = useSubscriptionRequest(cid!);
 
-  const [subscriptionRequest, setSubscriptionRequest] = useState<SubscriptionRequestWithContext>();
-  useEffect(() => {
-    const fetchSubscriptionRequest = async () => {
-      const subscriptionRequest = await getSubscriptionRequest(cid!);
-      setSubscriptionRequest(subscriptionRequest);
-    };
-    fetchSubscriptionRequest();
-  }, [cid, getSubscriptionRequest]);
-
-  if (!subscriptionRequest) {
+  if (subscriptionRequestQuery.isLoading) {
     return <Loading />;
   }
+  // TODO(#4139) implement error state from design
+  if (subscriptionRequestQuery.isError) {
+    console.error(subscriptionRequestQuery.error);
+    return <p>Something went wrong</p>;
+  }
+
+  const subscriptionRequest = subscriptionRequestQuery.data;
 
   return (
     <Container maxWidth="md">

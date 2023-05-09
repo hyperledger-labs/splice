@@ -40,6 +40,11 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
       },
     },
+    logger: {
+      log: args => {},
+      error: args => {},
+      warn: args => {},
+    },
   });
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>

@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, RateDisplay, Loading } from 'common-frontend';
-import React, { useEffect, useState } from 'react';
+import { AmountDisplay, DirectoryEntry, Loading, RateDisplay } from 'common-frontend';
+import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { ArrowOutward } from '@mui/icons-material';
@@ -22,48 +22,24 @@ import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
-import { AppPaymentRequest } from '../models/models';
+import { useCoinPrice, useAppPaymentRequest } from '../hooks';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
-  const { getAppPaymentRequest } = useWalletClient();
   const { cid } = useParams();
-  const [appPayment, setAppPayment] = useState<AppPaymentRequest>();
-
-  // TODO (#3333): react-query already does retries
-  useEffect(() => {
-    let timer: NodeJS.Timeout | undefined;
-    const fetchAppPayment = async (n: number) => {
-      await getAppPaymentRequest(cid!).then(
-        appPayment => {
-          console.debug('Payment request found');
-          setAppPayment(appPayment);
-        },
-        err => {
-          console.debug('Failed to get payment request, trying again...', err);
-          timer = setTimeout(fetchAppPayment, 500, n - 1);
-        }
-      );
-    };
-    fetchAppPayment(30);
-
-    return () => {
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [cid, getAppPaymentRequest]);
-
   const coinPriceQuery = useCoinPrice();
+  const appPaymentRequestQuery = useAppPaymentRequest(cid!);
 
-  if (!appPayment || coinPriceQuery.isLoading) {
+  if (appPaymentRequestQuery.isLoading || coinPriceQuery.isLoading) {
     return <Loading />;
   }
 
   // TODO(#4139) implement error state from design
-  if (coinPriceQuery.isError) {
+  if (coinPriceQuery.isError || appPaymentRequestQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
+  const appPayment = appPaymentRequestQuery.data;
   const { appPaymentRequest, deliveryOffer } = appPayment;
 
   const total = computeTotal(
