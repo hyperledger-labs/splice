@@ -296,6 +296,7 @@ object RetryProvider {
 
     private val retryableHttpStatusCodes: Set[StatusCode] = Set(
       StatusCodes.RequestTimeout,
+      StatusCodes.Conflict,
       StatusCodes.NotFound,
       StatusCodes.TooManyRequests,
       StatusCodes.InternalServerError,
