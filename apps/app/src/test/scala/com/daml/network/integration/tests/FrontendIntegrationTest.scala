@@ -157,20 +157,14 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           logger.info(s"FirefoxDriver failed to start ($name); retrying. The error was: $e")
           fail()
         }
-      logger.debug(s"FirefoxDriver started ($name)")
-      val bidi = Try(eventually() {
-        logger.debug(s"Attempting to open BiDi connection for FirefoxDriver ($name)")
-        Try(driver.getBiDi()).toEither.valueOr { e =>
-          logger.info(s"Failed to get BiDi connection to FirefoxDriver ($name). The error was $e")
-          fail()
-        }
-      }).toEither.valueOr { e =>
-        logger.info(
-          s"Failed to get BiDi connection to FirefoxDriver, even after retries ($name). The error was $e"
-        )
+
+      logger.debug(s"FirefoxDriver started, attempting to get BiDi connection... ($name)")
+      val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
+        logger.info(s"Failed to get BiDi connection to FirefoxDriver ($name). The error was $e")
         driver.quit()
         fail()
       }
+
       logger.debug(s"FirefoxDriver started and BiDi connection acquired ($name)")
       (driver, bidi)
     }
