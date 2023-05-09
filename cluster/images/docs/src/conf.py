@@ -24,7 +24,6 @@ project = u'Canton Network'
 copyright = f' {date.today().year}, Digital Asset'
 author = u'Digital Asset'
 
-
 # -- General configuration ---------------------------------------------------
 
 # We highlight code blocks by default as Scala, which is used in Canton
@@ -37,7 +36,8 @@ highlight_language = 'scala'
 # ones.
 extensions = [
     'sphinx.ext.todo',
-    'sphinx_copybutton'
+    'sphinx_copybutton',
+    'sphinx_reredirects'
     # ^^ Adds a copy-to-clipboard button to code-blocks.
     # It does not (yet) work for `parsed-literal::` directives, which
     # we use to inject version strings.
@@ -47,6 +47,12 @@ extensions = [
     # parsed_literal blocks just output a single <pre> tag, which does not
     # interact the right way with how copy-buttons are placed.
 ]
+
+## -- Redirects -----------------------------------------------------------
+redirects = {
+    "sv_operator/bootstrap": "onboarding.html"
+}
+
 
 todo_include_todos = True
 

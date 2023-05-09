@@ -33,10 +33,8 @@ Version: |version_literal|
    :maxdepth: 2
    :caption: Supervalidator Operators
 
-   sv_operator/bootstrap.rst
+   sv_operator/onboarding.rst
    sv_operator/sv_helm.rst
-
-.. TODO(#4246): ^ change `sv_operator/bootstrap.rst` to `sv_operator/onboarding.html` and add redirect
 
 
 .. toctree::

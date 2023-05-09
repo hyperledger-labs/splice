@@ -13,6 +13,11 @@
       proto3-suite = super.haskell.lib.dontCheck (super.haskell.lib.disableCabalFlag hsSuper.proto3-suite "swagger");
     };
   };
+  python3 = super.python3.override {
+    packageOverrides = pySelf : pySuper : {
+        sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
+    };
+  };
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
     let
       inherit (super.lib.strings) hasPrefix;

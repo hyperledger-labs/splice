@@ -50,6 +50,7 @@ in pkgs.mkShell {
     python3Packages.datadog
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
+    python3.pkgs.sphinx-reredirects
     ripgrep
     sbt
     scala
