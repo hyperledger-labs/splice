@@ -385,7 +385,11 @@ trait UserWalletStore
     } yield entries
 
   override protected def txLogParser =
-    new UserWalletTxLogParser(loggerFactory, key.endUserParty.toProtoPrimitive)
+    new UserWalletTxLogParser(
+      loggerFactory,
+      key.endUserParty.toProtoPrimitive,
+      key.endUserName,
+    )
 }
 
 object UserWalletStore {

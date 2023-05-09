@@ -29,7 +29,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.cn.wallet.install.{
   coinoperation,
-  CoinOperationOutcome,
+  ExecuteBatchResult,
   WalletAppInstall,
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
@@ -369,7 +369,7 @@ class TreasuryService(
     logger.debug(s"executing batch $batch with inputs $inputs")
     for {
       domainId <- userStore.domains.getDomainId(globalDomain)
-      (offset, outcomes) <- connection
+      (offset, result) <- connection
         // The only operation that is not self-conflicting is Tap, therefore batch execution w/o command dedup is safe.
         .submitWithResultAndOffsetNoDedup(
           Seq(walletManager.store.walletKey.validatorParty),
@@ -380,17 +380,17 @@ class TreasuryService(
         )
 
       // wait for store to ingest the new coin holdings *provided* they were updated, then return all outcomes to the callers
-      _ <- waitForIngestion(offset, outcomes).map(_ =>
-        batch.completeBatchOperations(outcomes)(logger, tc)
+      _ <- waitForIngestion(offset, result).map(_ =>
+        batch.completeBatchOperations(result)(logger, tc)
       )
     } yield Done
   }
 
   private def waitForIngestion(
       offset: String,
-      outcomes: Exercised[java.util.List[CoinOperationOutcome]],
+      outcomes: Exercised[ExecuteBatchResult],
   )(implicit tc: TraceContext): Future[Unit] =
-    if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+    if (outcomes.exerciseResult.outcomes.asScala.forall(isErrorOutcome)) {
       // We must not wait in this case, as the store won't see that offset until the next action comes,
       // as the transaction filter is in the way
       // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
@@ -734,9 +734,9 @@ object TreasuryService {
     }
 
     def completeBatchOperations(
-        outcomes: Exercised[java.util.List[CoinOperationOutcome]]
+        outcomes: Exercised[ExecuteBatchResult]
     )(implicit logger: TracedLogger, tc: TraceContext) = {
-      (outcomes.exerciseResult.asScala zip operationsToRun).foreach { case (outcome, op) =>
+      (outcomes.exerciseResult.outcomes.asScala zip operationsToRun).foreach { case (outcome, op) =>
         logger.debug(show"Completing operation $op with result ${outcome.toValue}")
         op.outcomePromise.success(outcome)
       }

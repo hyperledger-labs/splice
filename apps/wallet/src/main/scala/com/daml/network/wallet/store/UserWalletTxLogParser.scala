@@ -7,7 +7,21 @@ import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.CoinCreateSummary
-import com.daml.network.codegen.java.cn.wallet.install.CoinOperationOutcome
+import com.daml.network.codegen.java.cc.coin.InvalidTransferReason
+import com.daml.network.codegen.java.cc.coin.invalidtransferreason.{
+  ITR_InsufficientFunds,
+  ITR_Other,
+}
+import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
+  CO_AppPayment,
+  CO_BuyExtraTraffic,
+  CO_CompleteAcceptedTransfer,
+  CO_MergeTransferInputs,
+  CO_SubscriptionAcceptAndMakeInitialPayment,
+  CO_SubscriptionMakePayment,
+  CO_Tap,
+}
+import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, CoinOperationOutcome}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
@@ -27,7 +41,6 @@ import com.daml.network.history.{
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -40,6 +53,7 @@ import scala.math.BigDecimal.{javaBigDecimal2bigDecimal, RoundingMode}
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
     endUserParty: String,
+    endUserName: String,
 ) extends TxLogStore.Parser[
       UserWalletTxLogParser.TxLogIndexRecord,
       UserWalletTxLogParser.TxLogEntry,
@@ -62,8 +76,10 @@ class UserWalletTxLogParser(
           // We are inspecting the WalletAppInstall_ExecuteBatch event in order to distinguish the wallet automation
           // merging coins and collecting rewards from manually triggered transfers where the user sends coin to themselves.
           case WalletAppInstall_ExecuteBatch(node) =>
+            val operations = node.argument.value.operations.asScala
+            val outcomes = node.result.value.outcomes.asScala
             assert(
-              node.argument.value.operations.size() == node.result.value.size(),
+              operations.size == outcomes.size,
               "WalletAppInstall_ExecuteBatch should return exactly one CoinOperationOutcome for each CoinOperation",
             )
 
@@ -72,30 +88,96 @@ class UserWalletTxLogParser(
             // - COO_Error does not produce any child event
             // - all other outcomes produce exactly one child exercise event
             val outputsWithChildEvent =
-              node.result.value.asScala.foldLeft(
-                Queue.empty[(CoinOperationOutcome, ExercisedEvent)]
-              )((state, r) => {
-                r match {
-                  case _: COO_Error => state
-                  case outcome =>
-                    val nextChildEventId = state.length
-                    val childEvent =
-                      tree.getEventsById.get(exercised.getChildEventIds.get(nextChildEventId))
-                    childEvent match {
-                      case e: ExercisedEvent => state.appended(outcome -> e)
-                      case _ =>
-                        throw new RuntimeException(
-                          "All child events of WalletAppInstall_ExecuteBatch should be exercise events"
+              operations
+                .zip(outcomes)
+                .foldLeft(
+                  (
+                    Queue.empty[
+                      (
+                          CoinOperation,
+                          CoinOperationOutcome,
+                          Either[InvalidTransferReason, ExercisedEvent],
+                      )
+                    ],
+                    0,
+                  )
+                )({
+                  case ((result, nextChildEventId), r) => {
+                    r match {
+                      case (op, outcome: COO_Error) =>
+                        (
+                          result.appended(
+                            (op, outcome, Left(outcome.invalidTransferReasonValue))
+                          ),
+                          nextChildEventId,
                         )
+                      case (op, outcome) =>
+                        val childEvent =
+                          tree.getEventsById.get(exercised.getChildEventIds.get(nextChildEventId))
+                        childEvent match {
+                          case e: ExercisedEvent =>
+                            (result.appended((op, outcome, Right(e))), nextChildEventId + 1)
+                          case _ =>
+                            throw new RuntimeException(
+                              "All child events of WalletAppInstall_ExecuteBatch should be exercise events"
+                            )
+                        }
                     }
-                }
-              })
+                  }
+                })
+                ._1
 
             val result = outputsWithChildEvent.foldMap {
-              case (_: COO_MergeTransferInputs, childEvent) =>
+              // All errors are handled by producing a notification (if applicable)
+              case (op, _: COO_Error, Left(reason)) =>
+                // Only show notifications if the batch was submitted by the end user associated with this TxLog.
+                // We do not want the validator user (who is also signatory on the WalletAppInstall contract)
+                // to see the notifications of all other end-users hosted on the same participant.
+                if (node.result.value.endUserName == endUserName) {
+                  val details = reason match {
+                    case r: ITR_InsufficientFunds =>
+                      s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
+                    case r: ITR_Other => s"ITR_Other: ${r.description}"
+                    case _ => throw new RuntimeException(s"Invalid reason $reason")
+                  }
+                  op match {
+                    case _: CO_CompleteAcceptedTransfer =>
+                      State.fromNotification(
+                        tree,
+                        root,
+                        TxLogEntry.Notification.DirectTransferFailed,
+                        details,
+                      )
+                    case _: CO_SubscriptionMakePayment =>
+                      State.fromNotification(
+                        tree,
+                        root,
+                        TxLogEntry.Notification.SubscriptionPaymentFailed,
+                        details,
+                      )
+                    // The errors below should not produce notifications
+                    case _: CO_AppPayment => State.empty
+                    case _: CO_SubscriptionAcceptAndMakeInitialPayment => State.empty
+                    case _: CO_MergeTransferInputs => State.empty
+                    case _: CO_BuyExtraTraffic => State.empty
+                    case _: CO_Tap => State.empty
+                    case _ => throw new RuntimeException(s"Invalid operation $op")
+                  }
+                } else {
+                  State.empty
+                }
+              // Tag wallet automation (coin merging, reward collection) as such, to distinguish from
+              // explicit self-transfers
+              case (_, _: COO_MergeTransferInputs, Right(childEvent)) =>
                 parseTree(tree, childEvent)
                   .setTransferSubtype(TxLogEntry.Transfer.WalletAutomation)
-              case (_, childEvent) => parseTree(tree, childEvent)
+              // All other successful operations are handled by parsing their subtree
+              case (_, _, Right(childEvent)) => parseTree(tree, childEvent)
+              // The above cases should be exhaustive
+              case (op, outcome, child) =>
+                throw new RuntimeException(
+                  s"Impossible combination of $op with $outcome and $child"
+                )
             }
 
             result
@@ -133,7 +215,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.AppPaymentRejected,
+              TxLogEntry.BalanceChange.AppPaymentRejected,
             )
 
           case AcceptedAppPayment_Expire(node) =>
@@ -141,7 +223,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.AppPaymentExpired,
+              TxLogEntry.BalanceChange.AppPaymentExpired,
             )
 
           // ------------------------------------------------------------------
@@ -169,7 +251,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.SubscriptionInitialPaymentRejected,
+              TxLogEntry.BalanceChange.SubscriptionInitialPaymentRejected,
             )
 
           case SubscriptionInitialPayment_Expire(node) =>
@@ -177,7 +259,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.SubscriptionInitialPaymentExpired,
+              TxLogEntry.BalanceChange.SubscriptionInitialPaymentExpired,
             )
 
           case SubscriptionIdleState_MakePayment(_) =>
@@ -185,6 +267,15 @@ class UserWalletTxLogParser(
               tree,
               exercised.getChildEventIds.asScala.toList,
             ).setTransferSubtype(TxLogEntry.Transfer.SubscriptionPaymentAccepted)
+
+          case SubscriptionIdleState_ExpireSubscription(node) =>
+            // Note: this notification is shown to both the provider and the subscriber
+            State.fromNotification(
+              tree,
+              exercised,
+              TxLogEntry.Notification.SubscriptionExpired,
+              s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
+            )
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionPayment_Collect(_) =>
@@ -198,7 +289,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value._2,
-              BalanceChange.SubscriptionPaymentRejected,
+              TxLogEntry.BalanceChange.SubscriptionPaymentRejected,
             )
 
           case SubscriptionPayment_Expire(node) =>
@@ -206,7 +297,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value._2,
-              BalanceChange.SubscriptionPaymentExpired,
+              TxLogEntry.BalanceChange.SubscriptionPaymentExpired,
             )
 
           // ------------------------------------------------------------------
@@ -222,18 +313,23 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case Tap(node) =>
-            State.fromCoinCreateSummary(tree, root, node.result.value, BalanceChange.Tap)
+            State.fromCoinCreateSummary(tree, root, node.result.value, TxLogEntry.BalanceChange.Tap)
 
           case SvcRules_CollectSvReward(node) =>
             State.fromCoinCreateSummary(
               tree,
               root,
               node.result.value,
-              BalanceChange.SvRewardCollected,
+              TxLogEntry.BalanceChange.SvRewardCollected,
             )
 
           case Mint(node) =>
-            State.fromCoinCreateSummary(tree, root, node.result.value, BalanceChange.Mint)
+            State.fromCoinCreateSummary(
+              tree,
+              root,
+              node.result.value,
+              TxLogEntry.BalanceChange.Mint,
+            )
 
           // ------------------------------------------------------------------
           // Unlocking locked coins
@@ -244,7 +340,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.LockedCoinUnlocked,
+              TxLogEntry.BalanceChange.LockedCoinUnlocked,
             )
 
           case LockedCoinOwnerExpireLock(node) =>
@@ -252,7 +348,7 @@ class UserWalletTxLogParser(
               tree,
               root,
               node.result.value,
-              BalanceChange.LockedCoinExpired,
+              TxLogEntry.BalanceChange.LockedCoinExpired,
             )
 
           // ------------------------------------------------------------------
@@ -260,14 +356,19 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case CoinExpire(node) =>
-            State.fromCoinExpire(tree, exercised, node.result.value, BalanceChange.CoinExpired)
+            State.fromCoinExpire(
+              tree,
+              exercised,
+              node.result.value,
+              TxLogEntry.BalanceChange.CoinExpired,
+            )
 
           case LockedCoinExpireCoin(node) =>
             State.fromCoinExpire(
               tree,
               exercised,
               node.result.value,
-              BalanceChange.LockedCoinExpired,
+              TxLogEntry.BalanceChange.LockedCoinExpired,
             )
 
           // ------------------------------------------------------------------
@@ -439,6 +540,37 @@ object UserWalletTxLogParser {
       val CoinExpired = "coin_expired"
     }
 
+    /** An event that does not change anyone's coin balance. */
+    final case class Notification(
+        indexRecord: TxLogIndexRecord,
+        transactionSubtype: String,
+        date: Instant,
+        details: String,
+    ) extends TxLogEntry {
+      override def toResponseItem: httpDef.ListTransactionsResponseItem =
+        httpDef.ListTransactionsResponseItem(
+          transactionType = Notification.TransactionType,
+          transactionSubtype = transactionSubtype,
+          eventId = indexRecord.eventId,
+          offset = indexRecord.offset,
+          date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
+          details = Some(details),
+        )
+
+      override def setEventId(eventId: String): TxLogEntry = {
+        copy(indexRecord = indexRecord.copy(eventId = eventId))
+      }
+    }
+
+    object Notification {
+      val TransactionType = "notification"
+      val DirectTransferFailed = "direct_transfer_failed"
+      val AppPaymentFailed = "app_payment_failed"
+      val SubscriptionInitialPaymentFailed = "subscription_initial_payment_failed"
+      val SubscriptionPaymentFailed = "subscription_payment_failed"
+      val SubscriptionExpired = "subscription_expired"
+    }
+
     private def transferFromResponseItem(
         item: httpDef.ListTransactionsResponseItem
     ): Either[String, TxLogEntry.Transfer] = {
@@ -497,11 +629,29 @@ object UserWalletTxLogParser {
       )
     }
 
+    private def notificationFromResponseItem(
+        item: httpDef.ListTransactionsResponseItem
+    ): Either[String, TxLogEntry.Notification] = {
+      val indexRecord = TxLogIndexRecord(
+        offset = item.offset,
+        eventId = item.eventId,
+      )
+      for {
+        details <- item.details.toRight("Details missing")
+      } yield TxLogEntry.Notification(
+        transactionSubtype = item.transactionSubtype,
+        indexRecord = indexRecord,
+        date = item.date.toInstant,
+        details = details,
+      )
+    }
+
     // Note: deserialization is only needed for the Canton console
     def fromResponseItem(item: httpDef.ListTransactionsResponseItem): Either[String, TxLogEntry] = {
       item.transactionType match {
         case TxLogEntry.Transfer.TransactionType => transferFromResponseItem(item)
         case TxLogEntry.BalanceChange.TransactionType => balanceChangeFromResponseItem(item)
+        case TxLogEntry.Notification.TransactionType => notificationFromResponseItem(item)
         case _ => Left(s"Unknown item $item")
       }
     }
@@ -523,6 +673,8 @@ object UserWalletTxLogParser {
       entries = entries.filter {
         case t: TxLogEntry.Transfer => t.sender._1 == party || t.receivers.exists(_._1 == party)
         case b: TxLogEntry.BalanceChange => b.receiver == party
+        // Only relevant notifications are added to parsing state
+        case _: TxLogEntry.Notification => true
       }
     )
 
@@ -583,6 +735,7 @@ object UserWalletTxLogParser {
             )
           )
         case _: TxLogEntry.BalanceChange => None
+        case n: TxLogEntry.Notification => Some(n)
       }
 
       State(
@@ -687,7 +840,7 @@ object UserWalletTxLogParser {
               offset = tx.getOffset,
               eventId = transferEvent.getEventId,
             ),
-            transactionSubtype = BalanceChange.TransactionType,
+            transactionSubtype = TxLogEntry.BalanceChange.TransactionType,
             date = tx.getEffectiveAt,
             receiver = burntCoin.owner,
             amount = -burntCoin.amount.initialAmount,
@@ -738,6 +891,26 @@ object UserWalletTxLogParser {
         amount = coin.amount.initialAmount,
         receiver = coin.owner,
         coinPrice = ccsum.coinPrice,
+      )
+      State(
+        entries = immutable.Queue(newEntry)
+      )
+    }
+
+    def fromNotification(
+        tx: TransactionTree,
+        event: TreeEvent,
+        transactionSubtype: String,
+        details: String,
+    ): State = {
+      val newEntry = TxLogEntry.Notification(
+        indexRecord = TxLogIndexRecord(
+          offset = tx.getOffset,
+          eventId = event.getEventId,
+        ),
+        transactionSubtype = transactionSubtype,
+        date = tx.getEffectiveAt,
+        details = details,
       )
       State(
         entries = immutable.Queue(newEntry)

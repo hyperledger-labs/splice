@@ -284,21 +284,23 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
-  ): Unit = {
+  ) = {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    participantClient.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(userParty, sender),
-      readAs = Seq(),
-      update = acceptedPayment.exerciseSubscriptionInitialPayment_Collect(
-        appTc
-      ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
-    )
+    participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty, sender),
+        readAs = Seq(),
+        update = acceptedPayment.exerciseSubscriptionInitialPayment_Collect(
+          appTc
+        ),
+        domainId = domainId,
+        disclosedContracts =
+          Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      )
+      .exerciseResult
   }
 
   def rejectAcceptedSubscriptionRequest(
@@ -375,6 +377,26 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId = domainId,
       disclosedContracts =
         Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+    )
+  }
+
+  /** Expires a subscription that has not been paid in time. */
+  def expireUnpaidSubscription(
+      participantClient: CNParticipantClientReference,
+      userId: String,
+      actor: PartyId,
+      subscriptionIdleState: subsCodegen.SubscriptionIdleState.ContractId,
+      domainId: Option[DomainId] = None,
+  ): Unit = {
+    participantClient.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(actor),
+      readAs = Seq(),
+      update = subscriptionIdleState.exerciseSubscriptionIdleState_ExpireSubscription(
+        actor.toProtoPrimitive
+      ),
+      domainId = domainId,
+      disclosedContracts = Seq.empty,
     )
   }
 

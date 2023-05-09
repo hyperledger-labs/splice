@@ -112,8 +112,6 @@ data CoinOperation
       minTopupWaitTime: RelTime
   | CO_Tap with
       tapAmount: Decimal
-
-
   deriving (Eq, Show)
 
 -- Enum of the possible outcomes of operating on a Canton coin through the wallet.
@@ -130,6 +128,11 @@ data CoinOperationOutcome
   | COO_Error InvalidTransferReason
   deriving (Eq, Show)
 
+data ExecuteBatchResult = ExecuteBatchResult
+  with
+    endUserName : Text
+    outcomes: [CoinOperationOutcome]
+  deriving (Eq, Show)
 
 -- Note: includes the svc party, so that choices can look up CoinRules
 -- This should be replaced by explicit disclosure
@@ -143,7 +146,7 @@ template WalletAppInstall
     signatory endUserParty, validatorParty
 
     -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
-    nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
+    nonconsuming choice WalletAppInstall_ExecuteBatch: ExecuteBatchResult
       with
         context : API.PaymentTransferContext
         inputs : [API.TransferInput]
@@ -151,7 +154,9 @@ template WalletAppInstall
       controller validatorParty
       do
         accepted <- executeCoinOperationRec endUserParty validatorParty context inputs [] operations
-        return $ reverse accepted
+        return ExecuteBatchResult with
+          endUserName
+          outcomes = reverse accepted
 
     nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()
       with

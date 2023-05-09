@@ -848,6 +848,7 @@ components:
         # Supported transaction types:
         # - 'transfer', with fields: provider, sender, receivers, holding_fees, coin_price
         # - 'balance_change', with fields: receivers, coin_price
+        # - 'notification', with fields: details
         transaction_type:
           type: string
         transaction_subtype:
@@ -874,6 +875,8 @@ components:
         app_rewards_used:
           type: string
         validator_rewards_used:
+          type: string
+        details:
           type: string
 
     ListTransactionsResponse:

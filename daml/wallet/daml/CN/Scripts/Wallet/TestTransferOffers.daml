@@ -90,13 +90,13 @@ testTransferOffers = script do
         WalletAppInstall_TransferOffer_Accept with cid = offer
   transferContext <- getPaymentTransferContext app alice
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
-  outcomes <- completeTransfer accepted coin transferContext
+  ExecuteBatchResult { outcomes } <- completeTransfer accepted coin transferContext
   [COO_Error _] <- pure outcomes
   -- tap more coin and retry the transfer
   aliceCoinsBefore <- query @Coin alice.primaryParty
   tap app alice 101.05  -- chosen such that all coins of alice are consumed
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
-  outcomes <- completeTransfer accepted coin transferContext
+  ExecuteBatchResult { outcomes } <- completeTransfer accepted coin transferContext
   trace outcomes $ pure ()
   [COO_CompleteAcceptedTransfer _] <- pure outcomes
 

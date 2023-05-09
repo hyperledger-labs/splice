@@ -405,19 +405,20 @@ testSuccessfulBatchCCPaymentRequests = script do
       (bob.primaryParty, PaymentAmount 2.0 CC),
       (alice.primaryParty, PaymentAmount 2.0 CC)]
 
+  let endUserName = "wallet_service_participant_user"
   install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
-    endUserName = "wallet_service_participant_user"
+    endUserName = endUserName
     svcParty = app.svc
     validatorParty = validator
 
   context <- getPaymentTransferContext app alice
-  acceptedPaymentsCid <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  executeBatchResult <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     context
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
 
-  let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppPayment payment2Cid] = acceptedPaymentsCid
+  let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppPayment payment2Cid] = executeBatchResult.outcomes
   Some acceptedPayment <- queryContractId alice.primaryParty payment1Cid
   Some acceptedPayment2 <- queryContractId alice.primaryParty payment2Cid
   lockedCoins <- query @LockedCoin alice.primaryParty
@@ -425,6 +426,7 @@ testSuccessfulBatchCCPaymentRequests = script do
   [_, _] <- query @Coin alice.primaryParty
 
   -- check results
+  executeBatchResult.endUserName === endUserName
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider.primaryParty
@@ -477,7 +479,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 3.0 CC)]
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
-  outcomes <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
     context
@@ -527,7 +529,7 @@ testCO_MergeTransferInputs = script do
 
   context <- getPaymentTransferContext app alice
 
-  outcomes <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [validator] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin, API.InputCoin $ toInterfaceContractId coin2]
     operations = [CO_MergeTransferInputs]
     context
@@ -561,19 +563,19 @@ testBuyExtraTraffic = script do
 
   -- test that buying less extra traffic than the configured min topup amount fails
   let minTopupAmount = domainFeesConfig.minTopupAmount
-  outcomes1 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  result1 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [(CO_BuyExtraTraffic (minTopupAmount-1) traffic (minutes 1))]
     context
-  outcomes1 === [COO_Error (ITR_Other ("The requirement 'extraTraffic is at least as much as the configured minTopupAmount' was not met.") )]
+  result1.outcomes === [COO_Error (ITR_Other ("The requirement 'extraTraffic is at least as much as the configured minTopupAmount' was not met.") )]
 
   -- test that buying extra traffic works
   let topupAmount = 2 * minTopupAmount
-  outcomes2 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  result2 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [(CO_BuyExtraTraffic topupAmount traffic (minutes 1))]
     context
-  let [COO_BuyExtraTraffic updatedTrafficCid] = outcomes2
+  let [COO_BuyExtraTraffic updatedTrafficCid] = result2.outcomes
   (_, round) <- getLatestOpenRound app
   let extraTrafficPrice = domainFeesConfig.extraTrafficPrice
   now <- getTime
@@ -588,11 +590,11 @@ testBuyExtraTraffic = script do
 
   -- test that buying extra traffic too soon after previous topup fails
   coin2 <- tap app validator 42.0
-  outcomes3 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  result3 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin2]
     operations = [(CO_BuyExtraTraffic topupAmount updatedTrafficCid (minutes 1))]
     context
-  outcomes3 === [COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met.") )]
+  result3.outcomes === [COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met.") )]
 
   pure ()
 
@@ -632,7 +634,7 @@ testInsufficientFundsBatchSubscriptions = script do
   context <- getPaymentTransferContext app alice
   coin <- tap  app alice 5.0
   -- TODO(#2957): remove read-as SVC.
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -641,7 +643,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   coin <- tap app alice 15.0
   -- TODO(#2957): remove read-as SVC.
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -658,7 +660,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   coin <- tap app alice 5.0
   -- TODO(#2957): remove read-as SVC.
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
@@ -666,7 +668,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   coin <- tap app alice 15.0
   -- TODO(#2957): remove read-as SVC.
-  outcomes <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
