@@ -21,6 +21,7 @@ import {
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
+import useOwnedDirectoryEntries from '../hooks/useOwnedDirectoryEntries';
 import { useLedgerApiClient } from './LedgerApiContext';
 
 type DirectoryUiState = {
@@ -115,7 +116,12 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
   }, [primaryPartyId, providerPartyId, ledgerApiClient]);
 
   // Fetch user's directory entries
-  const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
+  const directoryEntriesQuery = useOwnedDirectoryEntries(primaryPartyId, providerPartyId);
+  const directoryEntries = useMemo(
+    () => directoryEntriesQuery.data || [],
+    [directoryEntriesQuery.data]
+  ); // TODO(#3333): move downstream stuff into their own react-queries
+
   const [subscriptionContracts, setSubscriptionContracts] = useState<Contract<Subscription>[]>([]);
   const [directoryEntriesContexts, setDirectoryEntriesContexts] = useState<
     Contract<DirectoryEntryContext>[]
@@ -130,17 +136,6 @@ export const DirectoryUiStateProvider: React.FC<React.PropsWithChildren> = ({ ch
     Contract<SubscriptionPayment>[]
   >([]);
   const [subPayData, setSubPayData] = useState<SubPayData[]>([]);
-
-  const fetchDirectoryEntries = useCallback(async () => {
-    if (ledgerApiClient && primaryPartyId && providerPartyId) {
-      const current = await ledgerApiClient.queryOwnedDirectoryEntries(
-        primaryPartyId,
-        providerPartyId
-      );
-      setDirectoryEntries(prev => (sameContracts(prev, current) ? prev : current));
-    }
-  }, [ledgerApiClient, primaryPartyId, providerPartyId]);
-  useInterval(fetchDirectoryEntries);
 
   const entriesWithContextCid = useMemo<EntryWithContextContractId[]>(() => {
     return directoryEntries.map(entry => {

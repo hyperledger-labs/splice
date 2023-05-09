@@ -12,6 +12,7 @@
     "@mui/lab": "^5.0.0-alpha.93",
     "@mui/material": "^5.9.3",
     "@mui/icons-material": "^5.10.16",
+    "@tanstack/react-query": "^4.29.5",
     "google-protobuf": "^3.21.0",
     "oidc-client-ts": "^2.2.1",
     "react": "^18.2.0",
@@ -46,6 +47,8 @@
     ]
   },
   "devDependencies": {
+    "@tanstack/eslint-plugin-query": "^4.29.4",
+    "@tanstack/react-query-devtools": "^4.29.6",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.4.3",

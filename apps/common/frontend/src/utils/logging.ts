@@ -9,6 +9,7 @@ export function callWithLogging<T extends Arr, R>(
 ): Promise<R> {
   const traceId = Math.random().toString(36).slice(-8);
   const callName = `${operationName}(${args
+    .filter(arg => typeof arg !== 'undefined') // turns out that JSON.stringify returns `undefined` instead of a string if arg is undefined
     .map(arg => JSON.stringify(arg).substring(0, MAX_OBJ_LENGTH_TO_LOG))
     .join(', ')}) [${traceId}]`;
 

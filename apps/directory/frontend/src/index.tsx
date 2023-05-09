@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, DirectoryClientProvider, theme, UserProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -19,15 +21,26 @@ import Home from './views/Home';
 import PostPayment from './views/PostPayment';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchInterval: 500, // re-fetch all queries every 500ms by default
+      },
+    },
+  });
+
   return (
     <AuthProvider authConf={config.auth}>
-      <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-        <LedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
-          <DirectoryClientProvider url={config.services.directory.url}>
-            <DirectoryUiStateProvider>{children}</DirectoryUiStateProvider>
-          </DirectoryClientProvider>
-        </LedgerApiClientProvider>
-      </UserProvider>
+      <QueryClientProvider client={queryClient}>
+        <ReactQueryDevtools initialIsOpen={false} />
+        <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+          <LedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
+            <DirectoryClientProvider url={config.services.directory.url}>
+              <DirectoryUiStateProvider>{children}</DirectoryUiStateProvider>
+            </DirectoryClientProvider>
+          </LedgerApiClientProvider>
+        </UserProvider>
+      </QueryClientProvider>
     </AuthProvider>
   );
 };

@@ -2,18 +2,15 @@ import { callWithLogging, Contract, useUserState } from 'common-frontend';
 import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
 
-import {
-  DirectoryEntry,
-  DirectoryEntryContext,
-  DirectoryInstall,
-} from '@daml.js/directory/lib/CN/Directory';
+import { DirectoryEntryContext, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 import {
   Subscription,
   SubscriptionIdleState,
   SubscriptionPayment,
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import Ledger, { CreateEvent, LedgerOptions } from '@daml/ledger';
-import { Choice, ContractId, Template } from '@daml/types';
+import { Query } from '@daml/ledger';
+import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const DIRECTORY_LEDGER_NAME = 'directory-ledger';
 
@@ -104,6 +101,20 @@ export class LedgerApiClient {
     return result[0];
   }
 
+  async query<T extends object, K, I extends string>(
+    operationName: string,
+    template: TemplateOrInterface<T, K, I>,
+    query?: Query<T>
+  ): Promise<CreateEvent<T, K, I>[]> {
+    return await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      operationName,
+      (t, q) => this.ledger.query(t, q),
+      template,
+      query
+    );
+  }
+
   async queryDirectoryInstall(
     user: string,
     provider: string
@@ -117,23 +128,6 @@ export class LedgerApiClient {
     return response
       .map(ev => this.toContract(ev))
       .find(c => c.payload.user === user && c.payload.provider === provider);
-  }
-
-  async queryOwnedDirectoryEntries(
-    user: string,
-    provider: string
-  ): Promise<Contract<DirectoryEntry>[]> {
-    // We query through our own participant here, so we get filtering to entries visible only to us.
-    // Alternatively, we could add a filtered API on the provider.
-    const response = await callWithLogging(
-      DIRECTORY_LEDGER_NAME,
-      'queryDirectoryEntries',
-      directoryEntry => this.ledger.query(directoryEntry),
-      DirectoryEntry
-    );
-    return response
-      .filter(c => c.payload.user === user && c.payload.provider === provider)
-      .map(ev => this.toContract(ev));
   }
 
   async querySubscriptions(user: string, provider: string): Promise<Contract<Subscription>[]> {
