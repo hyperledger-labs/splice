@@ -110,9 +110,7 @@ function clusterCertificate(
       },
       type: "Opaque",
       data: {
-        "key.json": dnsServiceAccountKey.privateKey.apply((k) =>
-          Buffer.from(k, "base64").toString("utf8")
-        ),
+        "key.json": dnsServiceAccountKey.privateKey,
       },
     },
     {
