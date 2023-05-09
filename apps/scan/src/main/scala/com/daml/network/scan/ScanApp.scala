@@ -83,7 +83,7 @@ class ScanApp(
         timeouts,
         store,
       )
-      domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      domainId <- waitForDomainConnection(store.domains, config.domains.global.alias)
       _ <- retryProvider.retryForAutomation(
         "wait for open mining round",
         store.multiDomainAcsStore

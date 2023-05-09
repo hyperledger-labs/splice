@@ -243,7 +243,7 @@ class ValidatorApp(
       walletManager =
         new UserWalletManager(
           ledgerClient,
-          config.domains.global,
+          config.domains.global.alias,
           store,
           config.automation,
           clock,
@@ -266,7 +266,7 @@ class ValidatorApp(
         loggerFactory,
         timeouts,
       )
-      domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      domainId <- waitForDomainConnection(store.domains, config.domains.global.alias)
       _ <- waitForAcsIngestion(store.multiDomainAcsStore, domainId)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(

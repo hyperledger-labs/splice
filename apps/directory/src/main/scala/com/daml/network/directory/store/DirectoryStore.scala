@@ -41,7 +41,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: DirectoryDomainConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(

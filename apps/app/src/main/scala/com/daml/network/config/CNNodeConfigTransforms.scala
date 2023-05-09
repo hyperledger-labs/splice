@@ -414,9 +414,9 @@ object CNNodeConfigTransforms {
       c.copy(
         domains = c.domains.copy(
           splitwell = SplitwellDomains(
-            DomainAlias.tryCreate("splitwellUpgrade"),
+            DomainConfig(DomainAlias.tryCreate("splitwellUpgrade")),
             Seq(
-              DomainAlias.tryCreate("splitwell")
+              DomainConfig(DomainAlias.tryCreate("splitwell"))
             ),
           )
         )

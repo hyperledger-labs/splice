@@ -28,7 +28,7 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: SvcDomainConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   def lookupCoinRules()(implicit
       tc: TraceContext

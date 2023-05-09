@@ -25,7 +25,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  override final def defaultAcsDomain = domainConfig.splitwell.preferred
+  override final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
 
   def lookupInstallWithOffset(
       domainId: DomainId,

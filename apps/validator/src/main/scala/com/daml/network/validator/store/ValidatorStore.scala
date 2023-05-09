@@ -33,7 +33,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: ValidatorDomainConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   def lookupWalletInstallByNameWithOffset(
       endUserName: String

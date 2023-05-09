@@ -2,16 +2,16 @@ package com.daml.network.splitwell.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNParticipantClientConfig,
   CNNodeBackendConfig,
   CNNodeClientConfig,
+  CNParticipantClientConfig,
+  DomainConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 
 case class SplitwellDomainConfig(
-    global: DomainAlias,
+    global: DomainConfig,
     splitwell: SplitwellDomains,
 )
 
@@ -21,8 +21,8 @@ case class SplitwellDomainConfig(
 // During an upgrade the preferred domain will be switched to the new domain
 // while the old domain will be added to others.
 case class SplitwellDomains(
-    preferred: DomainAlias,
-    others: Seq[DomainAlias],
+    preferred: DomainConfig,
+    others: Seq[DomainConfig],
 )
 
 case class SplitwellAppBackendConfig(

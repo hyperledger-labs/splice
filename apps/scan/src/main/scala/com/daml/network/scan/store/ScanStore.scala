@@ -34,7 +34,7 @@ trait ScanStore
 
   protected[this] def scanConfig: ScanAppBackendConfig
 
-  override final def defaultAcsDomain = scanConfig.domains.global
+  override final def defaultAcsDomain = scanConfig.domains.global.alias
 
   def lookupCoinRules()(implicit
       tc: TraceContext

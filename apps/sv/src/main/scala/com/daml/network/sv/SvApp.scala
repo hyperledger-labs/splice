@@ -109,7 +109,7 @@ class SvApp(
         svStore,
         ledgerClient,
       )
-      globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global)
+      globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
       (svcStore, svcAutomation) <- ensureOnboarded(
@@ -260,7 +260,7 @@ class SvApp(
             svcStore = newSvcStore(svStore.key)
             svcAutomation =
               newSvSvcAutomationService(svStore, svcStore, ledgerClient)
-            domainId <- waitForDomainConnection(svcStore.domains, config.domains.global)
+            domainId <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
             _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
             onboarded <- isOnboarded(svcStore)
             _ <-
@@ -337,7 +337,7 @@ class SvApp(
                 svcStore,
                 ledgerClient,
               )
-              _ <- waitForDomainConnection(svcStore.domains, config.domains.global)
+              _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
               _ <- addMemberToSvc(
                 svcStore,
                 globalDomain,

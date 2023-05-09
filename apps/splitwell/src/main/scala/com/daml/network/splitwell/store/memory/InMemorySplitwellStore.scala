@@ -33,7 +33,7 @@ class InMemorySplitwellStore(
     othersGroups <- Future
       .traverse(domainConfig.splitwell.others) { otherDomain =>
         for {
-          otherDomainId <- domains.signalWhenConnected(otherDomain)
+          otherDomainId <- domains.signalWhenConnected(otherDomain.alias)
           groups <- multiDomainAcsStore.listContractsOnDomain(
             splitwellCodegen.Group.COMPANION,
             otherDomainId,
@@ -44,7 +44,7 @@ class InMemorySplitwellStore(
     allGroupMembers = othersGroups.view
       .flatMap(_._2.view.flatMap(co => groupMembers(co.payload)))
       .toSet
-    preferredId <- domains.signalWhenConnected(domainConfig.splitwell.preferred)
+    preferredId <- domains.signalWhenConnected(domainConfig.splitwell.preferred.alias)
     // find members of 'othersGroups' with install contracts on 'preferred'
     preferredInstalledMembers <- multiDomainAcsStore
       .listContractsOnDomain(

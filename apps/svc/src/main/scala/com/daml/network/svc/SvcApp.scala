@@ -73,7 +73,7 @@ class SvcApp(
         loggerFactory,
         timeouts,
       )
-      domainId <- waitForDomainConnection(store.domains, config.domains.global)
+      domainId <- waitForDomainConnection(store.domains, config.domains.global.alias)
       _ = logger.info(s"SVC App is initialized")
     } yield {
       adminServerRegistry

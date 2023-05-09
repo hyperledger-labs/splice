@@ -21,7 +21,7 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: SvDomainConfig
 
-  override final def defaultAcsDomain = domainConfig.global
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   private def defaultAcsDomainIdF(implicit tc: TraceContext) =
     domains.signalWhenConnected(defaultAcsDomain)
