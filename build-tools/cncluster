@@ -496,27 +496,16 @@ function subcmd_set_machine_type() {
 subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
 
 function subcmd_get_dns01_key_id() {
-    kubectl get secret "$GCP_DNS_SA_SECRET" -o jsonpath='{.data.key\.json}' | base64 -d | jq -r '.private_key_id'
+    subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey | base64 -d | jq -r '.private_key_id'
 }
 
 subcommand_whitelist[update_dns01_secret]='Update the gcloud service account key used for letsencrypt dns challenges.'
 
 function subcmd_update_dns01_secret() {
-    IAM_ACCOUNT=dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
-    KEYS=$(gcloud iam service-accounts keys list --iam-account "$IAM_ACCOUNT" --format json | jq -c '.[]')
-    if [[ $(wc -l <<< "$KEYS") -gt 9 ]]; then
-        echo "Reached maximum number of service account keys, delete some keys through the gcloud console before proceeding."
-        # shellcheck disable=SC2016
-        echo 'Check using `cncluster get_dns01_key_id` that the keys you delete are not in use on any cluster.'
-        exit 1
-    fi
     if kubectl get secret "$GCP_DNS_SA_SECRET" > /dev/null 2>&1; then
       kubectl delete secret "$GCP_DNS_SA_SECRET"
     fi
-    # This can fail with a precondition error on an attempt to create
-    # keys beyond the tenth.
-    gcloud iam service-accounts keys create /tmp/key.json \
-           --iam-account "$IAM_ACCOUNT"
+    subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey | base64 --decode > /tmp/key.json
     kubectl create secret generic "$GCP_DNS_SA_SECRET" \
             --from-file=key.json=/tmp/key.json
     rm /tmp/key.json
@@ -564,23 +553,9 @@ function subcmd_create() {
         fi
     fi
 
-    subcmd_update_dns01_secret
-
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(#1447)
-    if ! kubectl get secret "${GCP_DNS_SA_SECRET}" > /dev/null; then
-
-        _log "Missing DNS Service Account secret, creating key..."
-        # This can fail with a precondition error on an attempt to create
-        # keys beyond the tenth.
-        gcloud iam service-accounts keys create /tmp/key.json \
-            --iam-account "dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com"
-
-        _log "...storing secret"
-        kubectl create secret generic "$GCP_DNS_SA_SECRET" \
-            --from-file=key.json=/tmp/key.json
-        rm /tmp/key.json
-    fi
+    subcmd_update_dns01_secret
 
     subcmd_infra_pulumi up --yes
 
@@ -1106,10 +1081,9 @@ function subcmd_papply() {
     make -C "${REPO_ROOT}" cluster/build
 
     # Use the existing secret to populate the secret needed in the
-    # ingress namespace. Eventually, the secret management will be
-    # done in Pulumi.
-    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
-                     | jq -r '.data["key.json"]')
+    # ingress namespace. Eventually, the secret will be directly referenced from the
+    # infrastructure Pulumi project.
+    dns_sa_key=$( subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey )
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
@@ -1155,10 +1129,9 @@ function subcmd_ppreview() {
     make -C "${REPO_ROOT}" cluster/build
 
     # Use the existing secret to populate the secret needed in the
-    # ingress namespace. Eventually, the secret management will be
-    # done in Pulumi.
-    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
-                     | jq -r '.data["key.json"]')
+    # ingress namespace. Eventually, the secret will be directly referenced from the
+    # infrastructure Pulumi project.
+    dns_sa_key=$( subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey )
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
@@ -1214,16 +1187,6 @@ function subcmd_infra_pulumi() {
   # some pulumi commands / sub-commands do not support the --stack flag
   if [[ "$1" != stack || "$2" != export ]]; then
     args+=( --stack "infra.${GCP_CLUSTER_BASENAME}" )
-  fi
-
-  if [[ "$1" == up ]]; then
-    # Use the existing secret to populate the secret needed in the
-    # ingress namespace. Eventually, the secret management will be
-    # done in Pulumi.
-    dns_sa_key=$(kubectl get secret clouddns-dns01-solver-svc-acct --namespace=default -ojson \
-                     | jq -r '.data["key.json"]')
-
-      args+=( -c "DNS_SA_KEY=${dns_sa_key}" )
   fi
 
   _pulumi "${args[@]}" "$@"

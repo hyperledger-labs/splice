@@ -987,6 +987,9 @@ jobs:
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
+          cmd_name: Setup cluster resources
+          cmd: make cluster/build
+      - run_bash_command_in_nix:
           cmd_name: Pulumi preview << parameters.cluster >>
           additional_nix_args: "--keep PULUMI_BACKEND_URL --keep PULUMI_CONFIG_PASSPHRASE"
           cluster: << parameters.cluster >>

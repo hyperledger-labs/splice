@@ -1,3 +1,4 @@
+import { dnsServiceAccountKey } from "./secrets";
 import * as gcp from "@pulumi/gcp";
 import * as k8s from "@pulumi/kubernetes";
 import * as certmanager from "@pulumi/kubernetes-cert-manager";
@@ -100,8 +101,6 @@ function clusterCertificate(
     }
   );
 
-  const config = new pulumi.Config();
-
   new k8s.core.v1.Secret(
     "clouddns-dns01-solver-svc-acct",
     {
@@ -111,7 +110,9 @@ function clusterCertificate(
       },
       type: "Opaque",
       data: {
-        "key.json": config.require("DNS_SA_KEY"),
+        "key.json": dnsServiceAccountKey.privateKey.apply((k) =>
+          Buffer.from(k, "base64").toString("utf8")
+        ),
       },
     },
     {
