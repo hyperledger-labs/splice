@@ -30,7 +30,7 @@
     "check": "npm run format:check && npm run lint:check",
     "format:fix": "prettier --write -- src",
     "format:check": "prettier --check -- src",
-    "lint:fix": "eslint --ignore-pattern src/com/* --fix -- src",
+    "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src"
   },
   "browserslist": {

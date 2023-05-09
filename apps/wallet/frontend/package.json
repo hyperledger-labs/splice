@@ -12,7 +12,7 @@
     "check": "npm run format:check && npm run lint:check",
     "format:fix": "prettier --write -- src",
     "format:check": "prettier --check -- src",
-    "lint:fix": "eslint --fix -- src",
+    "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src"
   },
   "dependencies": {
