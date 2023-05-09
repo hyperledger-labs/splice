@@ -30,6 +30,11 @@ See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 5) You should have completed the self hosted validator setup,
    including Auth 0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
+6) Your cluster either needs to be connected to the GCP DA Canton
+   DevNet VPN or you need a static egress IP. In the latter case,
+   please provide that IP address to your contact at Digital Asset to
+   add it to the firewall rules.
+
 
 Preparing a Cluster for Installation
 ------------------------------------
