@@ -1659,13 +1659,15 @@ workflows:
         context:
           - artifactory
           - slack-context
-        cluster: "devnet"
+        # "devnet"
+        cluster: "scratchnetc"
         requires:
            - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
     - preflight_check:
-        cluster: "devnet"
+        # "devnet"
+        cluster: "scratchnetc"
         <<: *main-branch-only
         context:
           - artifactory
