@@ -65,9 +65,21 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /admin/sv/coin-price/votes:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "ListCoinPriceVotes"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListCoinPriceVotesResponse"
   /admin/authorization:
     get:
-      tags: [ sv ]
+      tags: [sv]
       x-jvm-package: svAdmin
       operationId: "isAuthorized"
       responses:
@@ -77,7 +89,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/403"
   /onboard/validator:
     post:
-      tags: [ sv ]
+      tags: [sv]
       x-jvm-package: sv
       operationId: "onboardValidator"
       requestBody:
@@ -246,6 +258,16 @@ components:
           type: string
         candidateKey:
           type: string
+
+    ListCoinPriceVotesResponse:
+      type: object
+      required:
+        - coin_price_votes
+      properties:
+        coin_price_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
 
     StartSvOnboardingRequest:
       type: object

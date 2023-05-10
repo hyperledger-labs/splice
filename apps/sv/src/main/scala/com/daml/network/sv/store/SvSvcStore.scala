@@ -510,6 +510,15 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(vl.ValidatorLicense.COMPANION, _)
     )
 
+  def listCoinPriceVotes()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(cn.svc.coinprice.CoinPriceVote.COMPANION, _)
+    )
+
   private def lookupSvOnboardingRequestByCandidateNameWithOffset(
       candidateName: String
   )(implicit tc: TraceContext): Future[

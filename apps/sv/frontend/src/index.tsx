@@ -14,6 +14,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AuthCheck from './routes/authCheck';
+import CoinPrice from './routes/coinPrice';
 import Root from './routes/root';
 import Svc from './routes/svc';
 import ValidatorOnboarding from './routes/validatorOnboarding';
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
         <Route index element={<Svc />} />
         <Route path="svc" element={<Svc />} />
         <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
+        <Route path="cc-price" element={<CoinPrice />} />
       </Route>
     </Route>
   )

@@ -110,6 +110,28 @@ class SvFrontendIntegrationTest
         )
       }
     }
-  }
 
+    "can view median coin price and desired coin price by each SV" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the coin price tab", {
+            go to s"http://localhost:$port/cc-price"
+            loginOnCurrentPage(port, sv1.config.ledgerApiUser)
+          },
+        )(
+          "We see a median coin price, desired coin price of SV1 and other SVs",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "1 USD"
+            }
+            inside(find(id("cur-sv-coin-price"))) { case Some(e) =>
+              e.text shouldBe "Your Desired Canton Coin Price : 1 USD"
+            }
+            findAll(className("coin-price-table-row")).toSeq should have size 3
+            // TODO(#4495) add more assertion on coin price value when SV operator is allows to set desired coin price
+          },
+        )
+      }
+    }
+  }
 }

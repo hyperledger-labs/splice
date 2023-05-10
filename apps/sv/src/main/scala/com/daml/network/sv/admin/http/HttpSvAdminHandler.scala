@@ -109,6 +109,20 @@ class HttpSvAdminHandler(
         }
     }
 
+  def listCoinPriceVotes(
+      respond: v0.SvAdminResource.ListCoinPriceVotesResponse.type
+  )()(adminUser: String): Future[v0.SvAdminResource.ListCoinPriceVotesResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        coinPriceVotes <- svcStore.listCoinPriceVotes()
+      } yield {
+        definitions.ListCoinPriceVotesResponse(
+          coinPriceVotes.map(_.toJson).toVector
+        )
+      }
+    }
+  }
+
   def isAuthorized(
       respond: v0.SvAdminResource.IsAuthorizedResponse.type
   )(

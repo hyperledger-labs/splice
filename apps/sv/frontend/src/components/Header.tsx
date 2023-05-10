@@ -10,6 +10,7 @@ const Header: React.FC = () => {
   const navLinks = [
     { name: 'Information', path: 'svc' },
     { name: 'Validator Onboarding', path: 'validator-onboarding' },
+    { name: 'CC Price', path: 'cc-price' },
   ];
 
   const applyNavStyle = (isActive: boolean) => {

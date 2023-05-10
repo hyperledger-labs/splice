@@ -3,6 +3,7 @@ import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'commo
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,
+  ListCoinPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListValidatorLicensesResponse,
   Middleware,
@@ -24,6 +25,7 @@ export interface SvAdminClient {
   prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
+  listCoinPriceVotes: () => Promise<ListCoinPriceVotesResponse>;
 }
 
 class ApiMiddleware
@@ -59,6 +61,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         },
       listValidatorLicenses: async (): Promise<ListValidatorLicensesResponse> => {
         return await svAdminClient.listValidatorLicenses();
+      },
+      listCoinPriceVotes: async (): Promise<ListCoinPriceVotesResponse> => {
+        return await svAdminClient.listCoinPriceVotes();
       },
     };
   }, [url, userAccessToken]);
