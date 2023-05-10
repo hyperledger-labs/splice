@@ -282,6 +282,17 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
+### DevNet and TestNet
+
+The DevNet cluster is updated every day with the latest code from
+`main`. The Wednesday night release into DevNet is considered the
+release candidate for the upcoming weekend deployment into TestNet. If
+the Wednesay DevNet release passes its preflight test, the commit is
+marked with the `testnet-next` tag and deployed to TestNet the
+upcoming week. This allows the TestNet releases to be driven by our
+Wednesday to Wednesday weekly sprint cycle and adequately tested
+before being deployed to customers in TestNet.
+
 ### Manually Deploying via CI
 
 If necessary, it is possible to manually trigger CI/CD deployments to

@@ -1,18 +1,17 @@
 {
-    "name": "DevNet Nightly Re-deployment",
-    "description": "Nightly Re-deployment of DevNet",
+    "name": "DevNet Weekly RC Deployment",
+    "description": "Weekly DevNet Release Candidate Deployment",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "deploy-devnet",
-      "mark-for-testnet": "false"
+      "run-job": "deploy-devnet"
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
         6
       ],
-      "days-of-week" : [ "MON", "TUE", "WED", "FRI", "SAT", "SUN" ],
+      "days-of-week" : [ "THU" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     }
