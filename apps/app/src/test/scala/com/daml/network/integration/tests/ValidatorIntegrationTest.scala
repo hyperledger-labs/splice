@@ -247,16 +247,18 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       // Note that there's two sources of parallelism here - we submit many requests in parallel
       // (hence the use of Futures here), and also the wallet automation will pick up
       // several offboarding requests in parallel.
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        testUsers.map(user => Future { aliceValidatorClient.offboardUser(user) }),
-        entries => {
-          forAtLeast(numTestUsers, entries)(
-            _.message should (include(
-              s"offboarded user ${prefix}"
-            ) and endWith("from wallet"))
-          )
-        },
-      )
+      val offboardFutures =
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+          testUsers.map(user => Future { aliceValidatorClient.offboardUser(user) }),
+          entries => {
+            forAtLeast(numTestUsers, entries)(
+              _.message should (include(
+                s"offboarded user ${prefix}"
+              ) and endWith("from wallet"))
+            )
+          },
+        )
+      Future.sequence(offboardFutures).futureValue
     }
 
   }
