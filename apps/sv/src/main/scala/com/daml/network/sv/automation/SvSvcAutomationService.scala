@@ -52,5 +52,6 @@ class SvSvcAutomationService(
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
-  // TODO(M3-47): register PublishLocalCometBftNodeConfigTrigger
+  // TODO(#4628): register PublishLocalCometBftNodeConfigTrigger
+  // TODO(#4628): register ReconcileCometBftNetworkConfigWithSvcRulesTrigger
 }
