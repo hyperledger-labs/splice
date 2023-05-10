@@ -6,9 +6,11 @@ Release Notes
 2023-05-14
 ----------
 
-* Add Sv UI for SV user to SV runbook. This allows the SV operator
-  to see information about the SV collective and generate prepare a
-  validator onboarding by generating a validator onboarding secret.
+* Introduce a UI for the Super Validator operator, see :ref:`SV Helm-Based Runbook <sv-helm>`.
+
+  This UI currently allows the SV operator to see information about their SV party, and the rest of the SV collective.
+  It allows allows the SV operator to onboard a validator by generating a validator onboarding secret
+  (see the :ref:`Self-Hosted Validator runbook <self_hosted_validator>` for how that secret is then used by the validator operator).
 
 * Fix a bug where ``cn-node`` sometimes failed to start with a ``ClassNotFoundException``.
 
