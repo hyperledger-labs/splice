@@ -4,10 +4,8 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
-import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
-import com.daml.ledger.client.GrpcChannel
 import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserRequest,
@@ -28,13 +26,15 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
+import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.research.participant.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.empty.Empty
-import io.grpc.{Channel, Status as GrpcStatus, StatusRuntimeException}
+import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable

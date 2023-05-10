@@ -311,6 +311,7 @@ object BuildCommon {
       .dependsOn(
         `canton-akka-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
+        `canton-ledger-common`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -320,7 +321,6 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          daml_error,
           daml_telemetry,
           daml_tracing,
           daml_executors,
@@ -637,9 +637,6 @@ object BuildCommon {
           daml_lf_engine,
           daml_lf_value_java_proto % "protobuf", // needed for protobuf import
           daml_lf_transaction, // needed for importing java classes
-          daml_metrics,
-          daml_error,
-          daml_error_generator,
           daml_nonempty_cats,
           logback_classic,
           logback_core,
@@ -656,7 +653,6 @@ object BuildCommon {
           daml_test_evidence_tag % Test,
           daml_test_evidence_scalatest % Test,
           daml_test_evidence_generator_scalatest % Test,
-          daml_metrics_test_lib % Test,
           better_files,
           cats,
           cats_law % Test,
@@ -997,6 +993,16 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
         libraryDependencies ++= Seq(
+          daml_contextualized_logging,
+          daml_lf_engine,
+          daml_lf_archive_reader,
+          daml_tracing,
+          apache_commons_codec,
+          apache_commons_io,
+          daml_bindings_scala,
+          daml_ledger_resources,
+          daml_timer_utils,
+          daml_rs_grpc_akka,
           dropwizard_metrics_core,
           opentelemetry_api,
           akka_stream,
@@ -1021,7 +1027,6 @@ object BuildCommon {
           daml_metrics,
           daml_lf_data,
           daml_lf_transaction,
-          daml_ledger_api_common,
         ),
         Test / fork := true,
         Test / testForkedParallel := true,
@@ -1054,7 +1059,6 @@ object BuildCommon {
           auth0_java,
           auth0_jwks,
           circe_core,
-          daml_ledger_api_client,
           daml_jwt,
           daml_ports,
           daml_struct_spray_json,

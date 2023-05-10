@@ -4,17 +4,16 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{value as scalaValue, CommandsOuterClass}
+import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
 import com.daml.ledger.api.v1.contract_metadata.ContractMetadata.toJavaProto
-import com.daml.ledger.api.validation.NoLoggingValueValidator
 import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Value}
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,
   InterfaceCompanion,
   ValueDecoder,
+  Contract as CodegenContract,
 }
 import com.daml.lf.value as lf
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
@@ -23,13 +22,14 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf
-import io.circe.{parser as circe, Json}
+import io.circe.{Json, parser as circe}
 import org.apache.commons.codec.binary.Hex
 
 import scala.util.Try

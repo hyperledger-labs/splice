@@ -14,8 +14,8 @@ import com.daml.lf.data.Ref
 import com.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
 import com.daml.lf.typesig
 import com.daml.lf.value.json.ApiCodecCompressed
-import com.daml.platform.participant.util.LfEngineToApi
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.platform.participant.util.LfEngineToApi
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json

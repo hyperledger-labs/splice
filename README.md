@@ -483,7 +483,7 @@ Current Canton commit: `1b2f3bec3fb649a5bc2a5d0b7ec9149c0ec126c5`
    2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
    3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
       and resolve conflicts (if any).
-   4. Create a commit to ease review `git add canton/ && git reset *.rej && git commit -m"Reapply our changes"`
+   4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes"`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
@@ -493,7 +493,7 @@ Current Canton commit: `1b2f3bec3fb649a5bc2a5d0b7ec9149c0ec126c5`
          to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6.  Repeat the same with the sha256 of the protobufs in `daml_pbs.nix`.
-   6. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
+   6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
 5. Make a PR with your changes, so CI starts churning.
 6. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:

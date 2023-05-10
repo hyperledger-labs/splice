@@ -90,13 +90,11 @@ object CantonDependencies {
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
 
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
-  lazy val daml_ledger_api_common = "com.daml" %% "ledger-api-common" % daml_libraries_version
-  lazy val daml_ledger_api_client = "com.daml" %% "ledger-api-client" % daml_libraries_version
   lazy val daml_caching = "com.daml" %% "caching" % daml_libraries_version
-  lazy val daml_error = "com.daml" %% "error" % daml_libraries_version
-  lazy val daml_error_generator = "com.daml" %% "error-generator-lib" % daml_libraries_version
   lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
+  lazy val daml_contextualized_logging =
+    "com.daml" %% "contextualized-logging" % daml_libraries_version
   lazy val daml_resources_akka = "com.daml" %% "resources-akka" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
@@ -106,6 +104,10 @@ object CantonDependencies {
   lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
+  lazy val daml_bindings_scala = "com.daml" %% "bindings-scala" % daml_libraries_version
+  lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
+  lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
+  lazy val daml_rs_grpc_akka = "com.daml" %% "rs-grpc-akka" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
@@ -154,6 +156,8 @@ object CantonDependencies {
 
   lazy val logback_core = "ch.qos.logback" % "logback-core" % logback_version
 
+  lazy val apache_commons_codec = "commons-codec" % "commons-codec" % "1.11"
+  lazy val apache_commons_io = "commons-io" % "commons-io" % "2.11.0"
   lazy val log4j_core = "org.apache.logging.log4j" % "log4j-core" % log4j_version
   lazy val log4j_api = "org.apache.logging.log4j" % "log4j-api" % log4j_version
 
