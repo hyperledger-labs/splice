@@ -6397,6 +6397,9 @@
          "metadata": {
             "clusterName": "cluster",
             "cnjClusterName": "cluster",
+            "labels": {
+               "clusterName": "cluster"
+            },
             "name": "external",
             "namespace": "cluster-ingress"
          },

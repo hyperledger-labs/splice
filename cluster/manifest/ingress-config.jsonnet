@@ -11,6 +11,9 @@ local externalService(config, ports) = {
         namespace: "cluster-ingress",
         clusterName: config.clusterName,
         cnjClusterName: config.clusterName,
+        labels: {
+          clusterName: config.clusterName,
+        },
       },
       spec: {
         type: "LoadBalancer",
