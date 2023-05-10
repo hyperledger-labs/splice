@@ -1637,25 +1637,25 @@ workflows:
     jobs:
     - docker_images_push:
         <<: *notify-fail
-        <<: *main-branch-only
+        # <<: *main-branch-only
         context:
           - artifactory
           - slack-context
     - deployment_test:
         <<: *notify-fail
-        <<: *main-branch-only
+        # <<: *main-branch-only
         context:
           - artifactory
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
-        <<: *main-branch-only
+        # <<: *main-branch-only
         context:
           - artifactory
           - slack-context
         workflow_names: "deploy_devnet devnet_health_check"
     - deploy_cluster:
-        <<: *main-branch-only
+        # <<: *main-branch-only
         context:
           - artifactory
           - slack-context
@@ -1668,7 +1668,7 @@ workflows:
     - preflight_check:
         # "devnet"
         cluster: "scratchnetc"
-        <<: *main-branch-only
+        # <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
@@ -1678,7 +1678,7 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - publish_public_release:
-        <<: *main-branch-only
+        # <<: *main-branch-only
         requires:
           - preflight_check
         context:
