@@ -21,11 +21,13 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
 import org.scalatest.BeforeAndAfterEach
+import org.scalatest.exceptions.TestFailedException
 
 import scala.annotation.nowarn
 import scala.language.implicitConversions
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
 import org.scalatest.matchers.{MatchResult, Matcher}
@@ -231,6 +233,46 @@ object CNNodeTests {
       {
         val x = clue(s"(act) $action")(actionExpr)
         clue(s"(check) $check") {
+          eventually() {
+            val y = checkFun(x)
+            (x, y)
+          }
+        }
+      }
+    }
+
+    /** A version of clue that does not emit logger.error message on TestFailedException.
+      * Intended to be used when the clue is called inside an outer eventually() loop, in which case
+      * we do not want to print errors on failures that will be retried by that external loop.
+      */
+    def silentClue[T](message: String)(expr: => T): T = {
+      logger.debug(s"Running clue: ${message}")
+      Try(expr) match {
+        case Success(value) =>
+          logger.debug(s"Finished clue: ${message}")
+          value
+        case Failure(ex) =>
+          ex match {
+            case _: TestFailedException =>
+              logger.debug(s"Failed clue: ${message}", ex)
+            case _ =>
+              logger.error(s"Failed clue: ${message}", ex)
+          }
+          throw ex
+      }
+    }
+
+    /** A version of actAndCheck that does not emit logger.error messages on TestFailedException.
+      * Intended to be used when this is called inside an outer eventually() loop, in which case
+      * we do not want to print errors on failures that will be retried by that external loop.
+      */
+    def silentActAndCheck[T, U](
+        action: String,
+        actionExpr: => T,
+    )(check: String, checkFun: T => U): (T, U) = {
+      {
+        val x = silentClue(s"(act) $action")(actionExpr)
+        silentClue(s"(check) $check") {
           eventually() {
             val y = checkFun(x)
             (x, y)

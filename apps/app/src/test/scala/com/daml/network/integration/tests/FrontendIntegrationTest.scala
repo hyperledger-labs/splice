@@ -383,7 +383,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     // Therefore we retry the whole workflow and take screenshots on each failed attempt.
     eventually(timeUntilSuccess = 1.minutes) {
       dumpDebugInfoOnFailure {
-        actAndCheck(
+        silentActAndCheck(
           "Auth0 login: Open target web page",
           go to url,
         )(
@@ -396,7 +396,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
         )
 
         if (find(id("logout-button")).isDefined) {
-          actAndCheck(
+          silentActAndCheck(
             "Auth0 login: Log out",
             click on id("logout-button"),
           )(
@@ -417,7 +417,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   )(implicit
       webDriver: WebDriverType
   ) = {
-    actAndCheck(
+    silentActAndCheck(
       "Auth0 login: Click the login button",
       click on "oidc-login-button",
     )(
@@ -425,7 +425,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       _ => assertAuth0LoginFormVisible(),
     )
 
-    val (_, needsAuthorization) = actAndCheck(
+    val (_, needsAuthorization) = silentActAndCheck(
       "Auth0 login: Fill out and submit login form", {
         textField(id("username")).value = username
         find(id("password")).foreach(_.underlying.sendKeys(password))
@@ -442,7 +442,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     )
 
     if (needsAuthorization) {
-      actAndCheck(
+      silentActAndCheck(
         "Auth0 login: Give consent",
         click on xpath("//button[@value='accept']"),
       )(
