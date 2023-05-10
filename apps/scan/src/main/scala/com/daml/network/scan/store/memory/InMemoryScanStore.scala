@@ -121,6 +121,36 @@ class InMemoryScanStore(
     }
   }
 
+  override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
+    getRewardsCollected(None)
+
+  override def getRewardsCollectedInRound(round: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = getRewardsCollected(Some(round))
+
+  private def getRewardsCollected(round: Option[Long]): Future[BigDecimal] = {
+    for {
+      ret <- txLog
+        .getTxLogIndicesByFilter(_ match {
+          case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
+            round.fold(true)(_ == reward.round)
+          case _ => false
+        })
+        .map(rewards =>
+          rewards.foldLeft(BigDecimal.valueOf(0.0))((sum, reward) =>
+            reward match {
+              case r: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
+                sum + r.amount
+              case _ =>
+                throw Status.INTERNAL
+                  .withDescription("Unexpected log entry type")
+                  .asRuntimeException()
+            }
+          )
+        )
+    } yield ret
+  }
+
   private def sumRewardsCollectedInRound(
       log: TxLogStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
       round: Long,

@@ -32,9 +32,10 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import scala.concurrent.{ExecutionContext, Future}
+
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.{ExecutionContext, Future}
 
 class HttpScanHandler(
     store: ScanStore,
@@ -306,6 +307,21 @@ class HttpScanHandler(
           v0.ScanResource.GetRoundOfLatestDataResponse.OK(
             definitions
               .GetRoundOfLatestDataResponse(round, effectiveAt.atOffset(ZoneOffset.UTC))
+          )
+        }
+        .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))
+    }
+
+  def getRewardsCollected(
+      response: v0.ScanResource.GetRewardsCollectedResponse.type
+  )(round: Option[Long]): Future[v0.ScanResource.GetRewardsCollectedResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      round
+        .fold(store.getTotalRewardsCollectedEver())(store.getRewardsCollectedInRound(_))
+        .map { case amount =>
+          v0.ScanResource.GetRewardsCollectedResponse.OK(
+            definitions
+              .GetRewardsCollectedResponse(Codec.encode(amount))
           )
         }
         .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))

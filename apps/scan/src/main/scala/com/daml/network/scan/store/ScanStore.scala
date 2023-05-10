@@ -53,6 +53,9 @@ trait ScanStore
 
   def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)]
 
+  def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
+  def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
+
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]

@@ -153,6 +153,22 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
+    "Get the total rewards collected ever"
+  )
+  def getTotalRewardsCollectedEver(): BigDecimal =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardsCollected(None))
+    }
+
+  @Help.Summary(
+    "Get the total rewards collected in a specific round"
+  )
+  def getRewardsCollectedInRound(round: Long): BigDecimal =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetRewardsCollected(Some(round)))
+    }
+
+  @Help.Summary(
     "Get a list of top-earning app providers, and the total earned app rewards for each"
   )
   def getTopProvidersByAppRewards(round: Long, limit: Int): Seq[(PartyId, BigDecimal)] =

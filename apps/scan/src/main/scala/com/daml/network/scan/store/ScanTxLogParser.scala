@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 

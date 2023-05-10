@@ -164,6 +164,27 @@ paths:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+  /api/v0/get-rewards-collected:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getRewardsCollected"
+      parameters:
+        - in: query
+          name: round
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRewardsCollectedResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/top-providers-by-app-rewards:
     get:
       tags: [scan]
@@ -379,6 +400,12 @@ components:
         effectiveAt:
           type: string
           format: date-time
+    GetRewardsCollectedResponse:
+      type: object
+      required: ["amount"]
+      properties:
+        amount:
+          type: string
     GetValidatorTrafficBalanceResponse:
       type: object
       required: ["remainingBalance", "totalPurchased"]
