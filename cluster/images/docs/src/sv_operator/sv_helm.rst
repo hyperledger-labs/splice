@@ -39,6 +39,17 @@ See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 Preparing a Cluster for Installation
 ------------------------------------
 
+In the following, you will need your artifactory credentials from
+https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following environment variables.
+
+====================== ==========================================================================================
+Name                   Value
+---------------------- ------------------------------------------------------------------------------------------
+ARTIFACTORY_USER       Your artifactory user name shown at the top right.
+ARTIFACTORY_PASSWORD   Your artifactory API key. If you don't have one you can generate one on your profile page.
+ARTIFACTORY_USER_EMAIL The email address you used for your artifactory account.
+====================== ==========================================================================================
+
 Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
 
 .. code-block:: bash
@@ -76,16 +87,32 @@ An SV node currently requires the following to exist in your Auth0 tenant:
 - An API with audience `https://canton.network.global`  (this is currently the only audience supported. In the future, this will be made customizable.)
 - Two machine-to-machine applications, for the validator and for the sv-app. Both should be authorized for the API defined above.
 - One single-page-application for the wallet web UI, with allowed callback, logout URLs, web origins, and CORS origins configured to the wallet UI URL for your SV's validator. If you're using the ingress configuration of this runbook, that would be `https://wallet.sv-1.svc.YOUR_CLUSTER_URL`.
+- One single-page-application for the SV web UI, with allowed callback, logout URLs, web origins, and CORS origins configured to the wallet UI URL for your SV's validator. If you're using the ingress configuration of this runbook, that would be `https://sv.sv-1.svc.YOUR_CLUSTER_URL`.
+
+We will use the environment variables listed in the table to refer to aspects of your Auth0 configuration:
+
+======================= ===========================================================================
+Name                    Value
+----------------------- ---------------------------------------------------------------------------
+VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
+SV_CLIENT_ID            The client id of the Auth0 app for the sv app backend
+SV_CLIENT_SECRET        The client id of the Auth0 app for the sv app backend
+AUTH0_TENANT            The name of your auth0 tenant, shown at the top left of your Auth0 project.
+WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
+SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
+======================= ===========================================================================
+
 
 The following two secrets will instruct the participant to create service users for your validator and sv apps:
 
 .. code-block:: bash
 
     kubectl create --namespace sv-1 secret generic cn-app-sv1-validator-ledger-api-auth \
-        "--from-literal=ledger-api-user=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}@clients"
+        "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients"
 
     kubectl create --namespace sv-1 secret generic cn-app-sv1-ledger-api-auth \
-        "--from-literal=ledger-api-user=${CLIENT_ID_OF_SV_AUTH0_APP}@clients"
+        "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients"
 
 For technical reasons, please also create the following dummy secrets (a requirement that will be removed in the near future):
 
@@ -96,35 +123,36 @@ For technical reasons, please also create the following dummy secrets (a require
     kubectl create --namespace sv-1 secret generic cn-app-svc-ledger-api-auth "--from-literal=ledger-api-user=dummy"
 
 
-The SV app is configured with a secret as follows:
+The SV app app is configured with a secret as follows:
 
 .. code-block:: bash
 
     kubectl create --namespace sv-1 secret generic cn-app-sv-ledger-api-auth \
-        "--from-literal=ledger-api-user=${CLIENT_ID_OF_SV_AUTH0_APP}@clients" \
-        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
-        "--from-literal=client-id=${CLIENT_ID_OF_SV_AUTH0_APP}" \
-        "--from-literal=client-secret=${SECRET_OF_SV_AUTH0_APP}"
+        "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
+        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=client-id=${SV_CLIENT_ID}" \
+        "--from-literal=client-secret=${SV_CLIENT_SECRET}"
 
 
-The validator requires the following three secrets, the first one for the backend, the other two for the web UIs.
-Note one can also use the same client id for both UI by setting the same ``client-id`` parameter when generating both secrets.
+The validator app backend requires the following secret.
 
 .. code-block:: bash
 
     kubectl create --namespace sv-1 secret generic cn-app-validator-ledger-api-auth \
-        "--from-literal=ledger-api-user=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}@clients" \
-        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
-        "--from-literal=client-id=${CLIENT_ID_OF_VALIDATOR_AUTH0_APP}" \
-        "--from-literal=client-secret=${SECRET_OF_VALIDATOR_AUTH0_APP}"
+        "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
+        "--from-literal=url=https://${AUTH_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
+        "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
+
+To setup the wallet and SV UI, create the following two secrets.
 
     kubectl create --namespace sv-1 secret generic cn-app-wallet-ui-auth \
-        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com" \
-        "--from-literal=client-id=${CLIENT_ID_OF_WALLET_WEB_UI_APP}"
+        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=client-id=${WALLET_UI_CLIENT_ID}"
 
     kubectl create --namespace sv-1 secret generic cn-app-sv-ui-auth \
-        "--from-literal=url=https://${YOUR_AUTH0_TENANT}.us.auth0.com" \
-        "--from-literal=client-id=${CLIENT_ID_OF_SV_WEB_UI_APP}"
+        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=client-id=${SV_UI_CLIENT_ID}"
 
 
 Installing the Software
