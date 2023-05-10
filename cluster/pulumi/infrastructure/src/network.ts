@@ -151,7 +151,7 @@ function clusterCertificate(
   );
 }
 
-const project = gcp.organizations.getProjectOutput({});
+const project = gcp.config.project;
 
 function natGateway(
   clusterName: string,
@@ -160,7 +160,7 @@ function natGateway(
 ): gcp.compute.RouterNat {
   const privateNetwork = gcp.compute.Network.get(
     "default",
-    pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
+    `https://www.googleapis.com/compute/v1/projects/${project}/global/networks/default`
   );
 
   const subnet = gcp.compute.getSubnetworkOutput({
