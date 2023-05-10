@@ -1080,14 +1080,8 @@ function subcmd_papply() {
 
     make -C "${REPO_ROOT}" cluster/build
 
-    # Use the existing secret to populate the secret needed in the
-    # ingress namespace. Eventually, the secret will be directly referenced from the
-    # infrastructure Pulumi project.
-    dns_sa_key=$( subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey )
-
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
-          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
-          -c "DNS_SA_KEY=${dns_sa_key}")
+          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
 
     if [ -n "${IMAGE_TAG:-}" ]; then
         args+=(-c "IMAGE_TAG=${IMAGE_TAG}")
@@ -1128,14 +1122,8 @@ function subcmd_ppreview() {
 
     make -C "${REPO_ROOT}" cluster/build
 
-    # Use the existing secret to populate the secret needed in the
-    # ingress namespace. Eventually, the secret will be directly referenced from the
-    # infrastructure Pulumi project.
-    dns_sa_key=$( subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey )
-
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
-          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}" \
-          -c "DNS_SA_KEY=${dns_sa_key}")
+          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
 
     if [ -n "${IMAGE_TAG:-}" ]; then
         args+=(-c "IMAGE_TAG=${IMAGE_TAG}")

@@ -84,7 +84,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
     process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'
   );
 
-  const imageTagOverride = config.optional('IMAGE_TAG');
+  const imageTagOverride = config.get('IMAGE_TAG');
 
   return _.merge(
     chartDefaultValues,
