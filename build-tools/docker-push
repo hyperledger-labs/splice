@@ -37,7 +37,7 @@ fi
 
 if docker-check "${imageTag}" --optional; then
   if [ -z "${force}" ]; then
-    _warning "Cowardly refusing to push, tag already exists in repo:\n${imageTag}\n You can force push with make docker-push-force"
+    _warning "tag already exists in repo:\n${imageTag}\n images cannot be overwritten when CI is set"
     exit 0
   else
     _warning "Forcing push, tag already exists in repo:\n${imageTag}"

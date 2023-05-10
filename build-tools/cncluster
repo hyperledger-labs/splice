@@ -280,7 +280,7 @@ function subcmd_deploy() {
         _error "Error building images, cannot apply."
     fi
 
-    if ! make -C "${REPO_ROOT}" docker-push-force; then
+    if ! make -C "${REPO_ROOT}" docker-push -j; then
         _error "Error pushing images, cannot apply."
     fi
 
@@ -309,7 +309,7 @@ function subcmd_push() {
 
         clean_targets="${clean_targets} cluster/images/${module}/clean"
         db_targets="${db_targets} cluster/images/${module}/docker-build"
-        dpf_targets="${dpf_targets} cluster/images/${module}/docker-push-force"
+        dpf_targets="${dpf_targets} cluster/images/${module}/docker-push"
     done
 
     if [ -z "${db_targets}" ]; then

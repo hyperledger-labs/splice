@@ -16,9 +16,6 @@ docker-push: $(foreach image,$(images),cluster/images/$(image)/$(docker-push))
 .PHONY: docker-promote
 docker-promote: $(foreach image,$(images),cluster/images/$(image)/$(docker-promote))
 
-.PHONY: docker-push-force
-docker-push-force: $(foreach image,$(images),cluster/images/$(image)/docker-push-force)
-
 .PHONY: docker-check
 docker-check: $(foreach image,$(images),cluster/images/$(image)/docker-check)
 

@@ -898,8 +898,8 @@ from the artifactory (as published for versions deployed to DevNet&TestNet), or 
 
 To build the required artifacts from your current local repo:
 
-1. Run `OVERWRITE_DOCKER_IMAGE=1 make docker-push -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
-   By default, this does **NOT** disable makefile caching. If that's what you want, you should instead run `make docker-push-force -j`.
+1. Run `make docker-push -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
+   Note that this does an incremental build. If things break, you can force a full rebuild by first running `make clean`.
 1. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
 
 The Pulumi script depends on the following env variables to be defined (e.g. by exporting them from your .envrc.private):
@@ -948,8 +948,8 @@ gcloud and local helm charts.
 
    This will configure Helm to fetch docker images from GCP and enable
    the fixed token mode which is used for all scratchnet clusters.
-3. Run `OVERWRITE_DOCKER_IMAGE=1 make docker-push -j` to push docker images to GCP. You need to rerun this everytime you modify any of the images.
-   By default, this does **NOT** disable makefile caching. If that's what you want, you should instead run `make docker-push-force -j`.
+3. Run `make docker-push -j` to push docker images to GCP.
+   Note that this does an incremental build. If things break, you can force a full rebuild by first running `make clean`.
 4. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
 5. Following the runbook, create `participant-values.yaml`,
    `validator-values.yaml` and `sv-values.yaml`. Replace

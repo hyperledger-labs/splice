@@ -33,6 +33,7 @@ else
     # Local builds (which may be on an M1) are explicitly constrained
     # to x86.
     platform_opt := --platform=linux/amd64
+    docker_opt := --force
 endif
 
 docker-build := target/docker.id
@@ -54,10 +55,6 @@ include cluster/images/$(1)/local.mk
 
 # Stop make from deleting version files to get working caching.
 .NOTINTERMEDIATE: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-local-image-tag)
-
-.PHONY: $$(prefix)/docker-push-force
-$$(prefix)/docker-push-force: $$(prefix)/$(docker-image-tag) $$(prefix)/$(docker-build)
-	cd $$(@D) && docker-push $$$$(cat $$(abspath $$<)) --force
 
 .PHONY: $$(prefix)/docker-build
 $$(prefix)/docker-build: $$(prefix)/$(docker-build)
@@ -96,13 +93,8 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	@echo docker build triggered because these files changed: $?
 	docker build $(platform_opt) --iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
-ifdef OVERWRITE_DOCKER_IMAGE
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && docker-push $$(cat $(abspath $<)) --force
-else
-%/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
-endif
+	cd $(@D)/.. && docker-push $$(cat $(abspath $<)) $(docker_opt)
 
 %/$(docker-promote):  %/$(docker-image-tag)
 	cd $(@D)/.. && docker-promote $$(cat $(abspath $<)) $(shell image-tag-gen $$(basename $$(dirname $(@D))) --artifactory)
