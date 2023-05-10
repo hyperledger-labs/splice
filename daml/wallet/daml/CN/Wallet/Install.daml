@@ -37,8 +37,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    CO_BuyExtraTraffic extraTraffic trafficCid topupInterval -> do
-      resultE <- catchAll $ handleBuyExtraTraffic extraTraffic trafficCid topupInterval
+    CO_BuyExtraTraffic extraTraffic trafficCid minTopupWaitTime -> do
+      resultE <- catchAll $ handleBuyExtraTraffic extraTraffic trafficCid minTopupWaitTime
       handleResult COO_BuyExtraTraffic resultE
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
@@ -78,10 +78,10 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
-    handleBuyExtraTraffic extraTraffic trafficCid topupInterval = do
+    handleBuyExtraTraffic extraTraffic trafficCid minTopupWaitTime = do
       traffic <- fetch trafficCid
       now <- getTime
-      require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt topupInterval <= now)
+      require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupWaitTime <= now)
       exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraTraffic)
 
 executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do
@@ -109,7 +109,7 @@ data CoinOperation
   | CO_BuyExtraTraffic with
       extraTrafficAmount: Int
       validatorTraffic : ContractId ValidatorTraffic
-      topupInterval: RelTime
+      minTopupWaitTime: RelTime
   | CO_Tap with
       tapAmount: Decimal
   deriving (Eq, Show)

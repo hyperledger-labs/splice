@@ -42,7 +42,7 @@ class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
       clue("Purchase extra traffic and verify the transaction history") {
         eventually() {
           // Advance time till the automation kicks in and purchases extra traffic.
-          advanceTime(DomainFeesConstants.minTopupInterval.asJava)
+          advanceTime(DomainFeesConstants.minTopupWaitTime.asJava)
           bobValidatorWallet.balance().unlockedQty should be < BigDecimal(20)
           checkTxHistory(
             bobValidatorWallet,

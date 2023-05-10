@@ -8,11 +8,11 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, Positive
   */
 object DomainFeesConstants {
 
-  /** target throughput in bytes per second
+  /** target throughput in traffic units per second
     *
     * TODO(#4324): This will eventually be configured by each validator operator.
     */
-  val targetThroughput: NonNegativeNumeric[Double] = NonNegativeNumeric.tryCreate(1000.0) // 1kBps
+  val targetThroughput: NonNegativeNumeric[Double] = NonNegativeNumeric.tryCreate(5.0) // 5Mbps
 
   /** minimum interval between extra traffic purchases in seconds
     *
@@ -22,8 +22,8 @@ object DomainFeesConstants {
     *
     * TODO(#4324): This will eventually be configured by each validator operator.
     */
-  val minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5)
+  val minTopupWaitTime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5)
 
-  val assumedCoinTxSizeBytes: PositiveDouble = PositiveDouble.tryCreate(20_000.0) // 20kB
+  val assumedCoinTxSizeBytes: PositiveDouble = PositiveDouble.tryCreate(1_000_000.0) // 1MB
 
 }

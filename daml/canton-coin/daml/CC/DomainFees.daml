@@ -40,7 +40,7 @@ initialValidatorTraffic svc validator = ValidatorTraffic with
 -- | The limits defining the free base rate delivered by the domain.
 -- It defines the base rate as allowing at most (rate * burstWindow) of sequencing traffic within a window of burstWindow seconds.
 data BaseRateTrafficLimits = BaseRateTrafficLimits with
-    rate: Decimal -- ^ The base domain traffic rate in bytes/s
+    rate: Decimal -- ^ The base domain traffic rate in MB/s
     burstWindow: RelTime -- ^ Time window within base rate must not be exceeded
   deriving (Eq, Show)
 
