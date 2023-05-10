@@ -61,17 +61,28 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
             aliceValidatorWallet.tap(1000)
           }
           clue("Advance time to trigger top-up loop a few times") {
-            val minTopupWaitTime = DomainFeesConstants.minTopupWaitTime.asJava
-            advanceTime(minTopupWaitTime)
-            advanceTime(minTopupWaitTime)
-            advanceTime(minTopupWaitTime)
+            val domainFeesConfig =
+              scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig
+            val topupIntervalSecs = Math.max(
+              DomainFeesConstants.minTopupInterval.duration.toSeconds.toDouble,
+              domainFeesConfig.minTopupAmount.doubleValue() /
+                (DomainFeesConstants.targetThroughput.value - domainFeesConfig.baseRateTrafficLimits.rate
+                  .doubleValue()),
+            )
+            val topupInterval = java.time.Duration.ofSeconds(Math.ceil(topupIntervalSecs).toLong)
+            advanceTime(topupInterval)
+            advanceTime(topupInterval)
+            advanceTime(topupInterval)
           }
         },
         entries => {
           // Check that top up happens exactly once even though scan app reports that we should top up
-          forExactly(1, entries)(
-            _.message should include("successfully bought extra traffic")
-          )
+          forExactly(1, entries) { line =>
+            assert(
+              line.loggerName.endsWith("validator=aliceValidator") &&
+                line.message.contains("successfully bought extra traffic")
+            )
+          }
         },
       )
 

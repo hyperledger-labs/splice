@@ -37,10 +37,10 @@ class DomainFeesTimeBasedIntegrationTest
       )
   }
 
-  private lazy val loadTestDuration = 10.seconds
+  private lazy val loadTestDuration = 30.minutes
 
   "A validator with a correctly configured traffic top-up loop" when {
-    s"target throughput is ${DomainFeesConstants.targetThroughput} MB/s" must {
+    s"target throughput is ${DomainFeesConstants.targetThroughput} bytes/s" must {
       // bobValidator is used in this test as an example of a validator that will submit requests
       // at the base rate only and will not purchase any extra traffic.
       // TODO(M3-44): Once we're no longer mocking the canton sequencer and the top-up trigger is live for all tests,
@@ -127,12 +127,12 @@ class DomainFeesTimeBasedIntegrationTest
 
   private def testProvidedRateAndAssertLogs(
       wallet: WalletAppClientReference,
-      testRateMBps: Double,
+      testRateBytesPerSecond: Double,
       waitTimeMicros: Long,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     loggerFactory.assertLoggedWarningsAndErrorsSeq(
       {
-        val coinTxRate = testRateMBps * 1e6 / DomainFeesConstants.assumedCoinTxSizeBytes.value
+        val coinTxRate = testRateBytesPerSecond / DomainFeesConstants.assumedCoinTxSizeBytes.value
         val result = tryCoinTxs(wallet, coinTxRate)
         // Advance time to allow the base rate traffic limiter to reset.
         // Without this, the initial tap in subsequent tests may get throttled.

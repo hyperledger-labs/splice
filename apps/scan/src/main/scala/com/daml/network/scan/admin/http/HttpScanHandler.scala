@@ -385,7 +385,7 @@ class HttpScanHandler(
           .putIfAbsent(
             validatorParty,
             new RateLimiterWithExtraTraffic(
-              NonNegativeNumeric.tryCreate(baseRateLimits.rate.doubleValue() * 1e6),
+              NonNegativeNumeric.tryCreate(baseRateLimits.rate.doubleValue()),
               PositiveNumeric
                 .tryCreate(baseRateLimits.burstWindow.microseconds.doubleValue() / 1e6),
               DomainFeesConstants.assumedCoinTxSizeBytes,
