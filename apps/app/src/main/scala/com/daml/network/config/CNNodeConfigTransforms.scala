@@ -149,7 +149,7 @@ object CNNodeConfigTransforms {
     )
   }
 
-  type CnAppConfigTransform[A <: NodeConfig] = A => A
+  type CnAppConfigTransform[A] = A => A
   type DirectoryAppTransform = CnAppConfigTransform[DirectoryAppBackendConfig]
   type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]

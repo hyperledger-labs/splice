@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAdminAppClient,
@@ -8,8 +9,7 @@ import com.daml.network.validator.admin.api.client.commands.{
   UserInfo,
 }
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
@@ -102,7 +102,9 @@ final class ValidatorAppBackendReference(
     )
   }
 
-  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
+  override def httpClientConfig = NetworkAppClientConfig(
+    s"http://127.0.0.1:${config.clientAdminApi.port}"
+  )
 
   protected val nodes = consoleEnvironment.environment.validators
 
@@ -136,9 +138,8 @@ final class ValidatorAppBackendReference(
 final class ValidatorAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-    override val config: ValidatorAppClientConfig,
+    val config: ValidatorAppClientConfig,
 ) extends ValidatorAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi

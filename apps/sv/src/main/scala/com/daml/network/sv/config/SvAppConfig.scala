@@ -3,9 +3,10 @@ package com.daml.network.sv.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
-  CNParticipantClientConfig,
   CNNodeBackendConfig,
-  CNNodeClientConfig,
+  CNParticipantClientConfig,
+  HttpCNNodeClientConfig,
+  NetworkAppClientConfig,
 }
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
@@ -83,7 +84,7 @@ case class SvAppBackendConfig(
 }
 
 case class SvAppClientConfig(
-    adminApi: ClientConfig
-) extends CNNodeClientConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+    adminApi: NetworkAppClientConfig
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

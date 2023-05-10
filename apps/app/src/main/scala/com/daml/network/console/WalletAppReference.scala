@@ -16,7 +16,7 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.daml.network.wallet.store.UserWalletTxLogParser
-import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -361,9 +361,8 @@ abstract class WalletAppReference(
 final class WalletAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-    override val config: WalletAppClientConfig,
+    val config: WalletAppClientConfig,
 ) extends WalletAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi

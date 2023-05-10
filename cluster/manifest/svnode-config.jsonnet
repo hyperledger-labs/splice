@@ -68,8 +68,7 @@ local deployments(num, svConfig, config) =
             value: |||
               _onboarding {
                 type = "join-with-key"
-                sv-client.admin-api.port = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}
-                sv-client.admin-api.address = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}
+                sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}":"${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}
                 public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}
                 private-key = "%s"
               }

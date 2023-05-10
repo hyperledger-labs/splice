@@ -1,27 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.console.{
-  CNNodeAppReference,
-  ConsoleHttpCommandRunner,
-  DirectoryAppReference,
-  CNNodeAppBackendReference,
-  DirectoryAppBackendReference,
-  DirectoryAppClientReference,
-  ScanAppBackendReference,
-  ScanAppClientReference,
-  ScanAppReference,
-  SplitwellAppBackendReference,
-  SplitwellAppClientReference,
-  SplitwellAppReference,
-  SvAppBackendReference,
-  SvAppClientReference,
-  SvcAppBackendReference,
-  SvcAppClientReference,
-  ValidatorAppBackendReference,
-  ValidatorAppClientReference,
-  ValidatorAppReference,
-  WalletAppClientReference,
-}
+import com.daml.network.console.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.svc.config.SvcAppClientConfig

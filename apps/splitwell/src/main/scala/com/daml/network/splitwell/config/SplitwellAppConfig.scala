@@ -3,8 +3,8 @@ package com.daml.network.splitwell.config
 import com.daml.network.config.{
   AutomationConfig,
   CNNodeBackendConfig,
-  CNNodeClientConfig,
   CNParticipantClientConfig,
+  GrpcCNNodeClientConfig,
   DomainConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -48,6 +48,6 @@ case class SplitwellAppClientConfig(
     participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     ledgerApiUser: String,
-) extends CNNodeClientConfig {
+) extends GrpcCNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

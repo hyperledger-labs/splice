@@ -3,9 +3,10 @@ package com.daml.network.directory.config
 import com.daml.network.config.{
   AutomationConfig,
   CNLedgerApiClientConfig,
-  CNParticipantClientConfig,
   CNNodeBackendConfig,
-  CNNodeClientConfig,
+  CNParticipantClientConfig,
+  HttpCNNodeClientConfig,
+  NetworkAppClientConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
@@ -26,8 +27,8 @@ case class DirectoryAppBackendConfig(
 
 case class DirectoryAppClientConfig(
     ledgerApiUser: String,
-    adminApi: ClientConfig,
+    adminApi: NetworkAppClientConfig,
     ledgerApi: CNLedgerApiClientConfig,
-) extends CNNodeClientConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

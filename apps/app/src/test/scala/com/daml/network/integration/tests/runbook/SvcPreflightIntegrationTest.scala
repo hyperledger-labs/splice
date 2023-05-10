@@ -1,12 +1,11 @@
 package com.daml.network.integration.tests.runbook
 
 import com.daml.network.LiveDevNetTest
-import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeTestConsoleEnvironment,
   CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 

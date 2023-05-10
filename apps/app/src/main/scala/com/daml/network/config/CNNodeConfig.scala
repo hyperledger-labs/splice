@@ -1,5 +1,6 @@
 package com.daml.network.config
 
+import akka.http.scaladsl.model.Uri
 import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
@@ -12,21 +13,9 @@ import com.daml.network.splitwell.config.{
   SplitwellDomainConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{
-  ApprovedSvIdentityConfig,
-  ExpectedOnboardingConfig,
-  SvAppBackendConfig,
-  SvAppClientConfig,
-  SvOnboardingConfig,
-}
+import com.daml.network.sv.config.*
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
-import com.daml.network.validator.config.{
-  AppInstance,
-  ValidatorAppBackendConfig,
-  ValidatorAppClientConfig,
-  ValidatorDomainConfig,
-  ValidatorOnboardingConfig,
-}
+import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   TreasuryConfig,
   WalletAppClientConfig,
@@ -35,19 +24,10 @@ import com.daml.network.wallet.config.{
 }
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.config.{
-  CantonConfig,
-  CantonFeatures,
-  CantonParameters,
-  ConfigDefaults,
-  DefaultPorts,
-  DeprecatedConfigUtils,
-  MonitoringConfig,
-}
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.NonNegativeFiniteDuration.*
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
@@ -58,13 +38,14 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
-import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.generic.FieldCoproductHint
+import pureconfig.{ConfigReader, ConfigWriter}
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
+import scala.util.Try
 import scala.util.control.NoStackTrace
 
 case class CNNodeConfig(
@@ -385,8 +366,8 @@ object CNNodeConfig {
     TraceContext.empty,
   )
 
-  import pureconfig.generic.semiauto.*
   import CantonConfig.*
+  import pureconfig.generic.semiauto.*
 
   @nowarn("cat=unused")
   private implicit def cnNodeConfigReader(implicit
@@ -418,6 +399,11 @@ object CNNodeConfig {
       deriveReader[AuthTokenSourceConfig.ClientCredentials]
     implicit val authTokenSourceConfigReader: ConfigReader[AuthTokenSourceConfig] =
       deriveReader[AuthTokenSourceConfig]
+
+    implicit val uriReader: ConfigReader[Uri] =
+      ConfigReader.fromNonEmptyStringTry(s => Try(Uri.parseAbsolute(s)))
+    implicit val networkAppClientConfigReader: ConfigReader[NetworkAppClientConfig] =
+      deriveReader[NetworkAppClientConfig]
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
@@ -530,6 +516,11 @@ object CNNodeConfig {
       deriveWriter[AuthTokenSourceConfig.ClientCredentials]
     implicit val authTokenSourceConfigWriter: ConfigWriter[AuthTokenSourceConfig] =
       confidentialWriter[AuthTokenSourceConfig](AuthTokenSourceConfig.hideConfidential)
+
+    implicit val uriConfigWriter: ConfigWriter[Uri] =
+      ConfigWriter.stringConfigWriter.contramap(_.toString())
+    implicit val networkAppClientConfigReader: ConfigWriter[NetworkAppClientConfig] =
+      deriveWriter[NetworkAppClientConfig]
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]

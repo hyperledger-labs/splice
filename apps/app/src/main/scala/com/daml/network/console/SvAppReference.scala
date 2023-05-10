@@ -3,12 +3,12 @@ package com.daml.network.console
 import akka.util.ByteString
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
@@ -66,9 +66,8 @@ abstract class SvAppReference(
 class SvAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-    override val config: SvAppClientConfig,
+    val config: SvAppClientConfig,
 ) extends SvAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi
@@ -96,7 +95,9 @@ class SvAppBackendReference(
     )
   }
 
-  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
+  override def httpClientConfig = NetworkAppClientConfig(
+    s"http://127.0.0.1:${config.clientAdminApi.port}"
+  )
 
   protected val nodes = consoleEnvironment.environment.svs
 

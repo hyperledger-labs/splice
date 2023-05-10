@@ -191,7 +191,7 @@ trait LocalInstanceReferenceCommon extends InstanceReferenceCommon with NoTracin
     else
       NodeNotStarted.ErrorCanton(this)
 
-  override protected[console] def adminCommand[Result](
+  override def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
@@ -213,7 +213,7 @@ trait RemoteInstanceReference extends InstanceReferenceCommon {
 trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
   def config: NodeConfig
 
-  override protected[console] def adminCommand[Result](
+  override def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(

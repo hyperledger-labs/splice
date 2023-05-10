@@ -1,11 +1,10 @@
 package com.daml.network.environment
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.{GrpcVersionClient, HttpAdminAppClient}
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.CNHttpClientConfig.*
-import com.daml.network.environment.{BuildInfo, RetryProvider}
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
@@ -40,7 +39,7 @@ abstract class BaseAppConnection(
     )
 
   protected def runHttpCmd[Res, Result](
-      url: String,
+      url: Uri,
       command: HttpCommand[Res, Result],
       headers: List[HttpHeader] = List.empty[HttpHeader],
   )(implicit
@@ -50,7 +49,7 @@ abstract class BaseAppConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Result] = {
-    val client: command.Client = command.createClient(url)
+    val client: command.Client = command.createClient(url.toString())
     for {
       response <- EitherTUtil.toFuture(command.submitRequest(client, headers).leftMap[Throwable] {
         case Left(throwable) => throwable
@@ -150,7 +149,7 @@ abstract class AppConnection(
 /** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
   */
 abstract class HttpAppConnection(
-    config: ClientConfig,
+    config: NetworkAppClientConfig,
     retryProvider: RetryProvider,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
@@ -164,7 +163,7 @@ abstract class HttpAppConnection(
     with FlagCloseableAsync
     with NamedLogging {
 
-  private def getHttpAppVersionInfo(url: String): Future[HttpAdminAppClient.VersionInfo] = {
+  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] = {
     retryProvider.retryForAutomation(
       "get version",
       runHttpCmd(url, HttpAdminAppClient.GetVersion(), List()),

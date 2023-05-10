@@ -57,8 +57,7 @@ spec:
                 }
                 _onboarding {
                   type = "join-with-key"
-                  sv-client.admin-api.port = {{ .sponsorApiPort }}
-                  sv-client.admin-api.address = "{{ .sponsorApiUrl }}"
+                  sv-client.admin-api.url = "{{ .sponsorApiUrl }}"":""{{ .sponsorApiPort }}"
                   name = "{{ .keyName }}"
                   public-key = "{{ .publicKey }}"
                   private-key = "{{ .privateKey }}"

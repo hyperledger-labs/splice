@@ -1,12 +1,7 @@
 package com.daml.network.validator.config
 
 import com.daml.network.auth.AuthConfig
-import com.daml.network.config.{
-  AutomationConfig,
-  CNParticipantClientConfig,
-  CNNodeBackendConfig,
-  CNNodeClientConfig,
-}
+import com.daml.network.config.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
@@ -64,7 +59,7 @@ case class ValidatorAppBackendConfig(
 }
 
 case class ValidatorAppClientConfig(
-    adminApi: ClientConfig
-) extends CNNodeClientConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+    adminApi: NetworkAppClientConfig
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

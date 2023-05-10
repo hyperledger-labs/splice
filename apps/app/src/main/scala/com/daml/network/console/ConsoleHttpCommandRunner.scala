@@ -4,16 +4,16 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.{HttpCommand, HttpCommandException}
-import com.daml.network.config.CNHttpClientConfig.*
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeEnvironment
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.config.{ClientConfig, ConsoleCommandTimeout, ProcessingTimeout}
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, ProcessingTimeout}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
@@ -53,7 +53,7 @@ class ConsoleHttpCommandRunner(
       instanceName: String,
       command: HttpCommand[_, Result],
       headers: List[HttpHeader],
-      clientConfig: ClientConfig,
+      clientConfig: NetworkAppClientConfig,
   ): ConsoleCommandResult[Result] =
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
       span.setAttribute("instance_name", instanceName)
@@ -94,11 +94,13 @@ class ConsoleHttpCommandRunner(
         dispatchRequest(request)
       }
 
-      val host = clientConfig.url
+      val url = clientConfig.url
       try {
         val start = System.currentTimeMillis()
         val apiResult =
-          commandTimeout.await(commandDescription)(httpRunner.run(host, command, headers).value)
+          commandTimeout.await(commandDescription)(
+            httpRunner.run(url.toString(), command, headers).value
+          )
         val end = System.currentTimeMillis()
         logger.trace(s"$commandDescription, HTTP request took ${end - start} ms to complete")
         apiResult.toResult

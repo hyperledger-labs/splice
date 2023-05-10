@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as ro
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
-import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient

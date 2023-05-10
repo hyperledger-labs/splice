@@ -1,19 +1,6 @@
 package com.daml.network.config
 
-import com.digitalasset.canton.config.{
-  CachingConfigs,
-  CommunityCryptoConfig,
-  CryptoConfig,
-  InitConfig,
-  LocalNodeConfig,
-  LoggingConfig,
-  NodeConfig,
-  NodeMonitoringConfig,
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-  ProcessingTimeout,
-  QueryCostMonitoringConfig,
-}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -37,7 +24,8 @@ abstract class CNNodeBackendConfig extends LocalNodeConfig {
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
   */
-abstract class CNNodeClientConfig extends NodeConfig {}
+abstract class GrpcCNNodeClientConfig extends NodeConfig {}
+abstract class HttpCNNodeClientConfig extends NetworkAppNodeConfig {}
 
 /** This class aggregates binary-level configuration options that are shared between each CN app instance.
   * For example, the [[TracingConfig]] is configured once for all CN apps that are started by a CN binary as part of the

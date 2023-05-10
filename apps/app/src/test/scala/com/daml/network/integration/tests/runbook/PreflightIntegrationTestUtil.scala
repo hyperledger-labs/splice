@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.config.CNHttpClientConfig.*
+import akka.http.scaladsl.model.Uri
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import monocle.macros.syntax.lens.*
 import org.scalatest.OptionValues.*
 
 import java.io.IOException
-import java.net.{HttpURLConnection, URI}
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.net.{HttpURLConnection, URI}
 
 trait PreflightIntegrationTestUtil {
 
@@ -34,7 +34,7 @@ trait PreflightIntegrationTestUtil {
   }
 
   // We invoke the API via a basic HTTP request, just like we expect runbook users to do for now.
-  private def prepareValidatorOnboarding(url: String): String = {
+  private def prepareValidatorOnboarding(url: Uri): String = {
     val client = HttpClient
       .newBuilder()
       .connectTimeout(java.time.Duration.ofSeconds(20))

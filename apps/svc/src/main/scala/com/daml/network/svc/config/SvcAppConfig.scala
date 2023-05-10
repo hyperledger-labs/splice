@@ -2,9 +2,9 @@ package com.daml.network.svc.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNParticipantClientConfig,
   CNNodeBackendConfig,
-  CNNodeClientConfig,
+  CNParticipantClientConfig,
+  GrpcCNNodeClientConfig,
 }
 import com.digitalasset.canton.config.*
 
@@ -27,6 +27,6 @@ case class SvcAppBackendConfig(
 
 case class SvcAppClientConfig(
     adminApi: ClientConfig
-) extends CNNodeClientConfig {
+) extends GrpcCNNodeClientConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

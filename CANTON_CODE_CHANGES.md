@@ -19,6 +19,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `BaseLedgerApiAdministration.optionallyAwait` made public
 * `BaseLedgerApiAdministration.timeouts` made public
 * `LedgerApiCommandRunner.ledgerApiCommand` made public
+* `AdminCommandRunner.adminCommand` made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

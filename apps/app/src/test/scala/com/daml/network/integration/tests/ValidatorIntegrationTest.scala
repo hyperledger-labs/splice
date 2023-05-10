@@ -11,7 +11,6 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{

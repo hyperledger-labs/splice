@@ -4,9 +4,16 @@ import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
-import com.daml.network.config.CNNodeBackendConfig
+import com.daml.network.config.{CNNodeBackendConfig, NetworkAppClientConfig}
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
-import com.digitalasset.canton.config.{ClientConfig, NodeConfig, NonNegativeDuration}
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.console.commands.{
+  HealthAdministration,
+  KeyAdministrationGroup,
+  PartiesAdministrationGroup,
+  TopologyAdministrationGroup,
+}
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleEnvironment,
@@ -15,11 +22,6 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
   RemoteParticipantReference,
-}
-import com.digitalasset.canton.console.commands.{
-  HealthAdministration,
-  PartiesAdministrationGroup,
-  TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
@@ -33,8 +35,6 @@ import scala.util.control.NonFatal
 
 /** Copy of Canton ParticipantReference */
 trait CNNodeAppReference extends InstanceReference {
-
-  def config: NodeConfig
 
   override val name: String
 
@@ -70,6 +70,7 @@ trait CNNodeAppReference extends InstanceReference {
       consoleEnvironment,
       loggerFactory,
     )
+
   @Help.Summary("Topology management related commands")
   @Help.Group("Topology")
   @Help.Description(
@@ -106,12 +107,24 @@ trait CNNodeAppReference extends InstanceReference {
 }
 
 trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
+
+  // TODO (#4606): Refactor so that these two methods don't need to be implemented
+  override def keys: KeyAdministrationGroup = noGrpcError()
+
+  override def adminCommand[Result](
+      grpcCommand: GrpcAdminCommand[_, _, Result]
+  ): ConsoleCommandResult[Result] = noGrpcError()
+
+  private def noGrpcError() = throw new NotImplementedError(
+    "This app is not supposed to be used via gRPC."
+  )
+
   def token: Option[String] = None
 
   def headers =
     token.map(t => List(Authorization(OAuth2BearerToken(t)))).getOrElse(List.empty[HttpHeader])
 
-  def httpClientConfig: ClientConfig
+  def httpClientConfig: NetworkAppClientConfig
 
   override protected[console] def httpCommand[Result](
       httpCommand: HttpCommand[_, Result]

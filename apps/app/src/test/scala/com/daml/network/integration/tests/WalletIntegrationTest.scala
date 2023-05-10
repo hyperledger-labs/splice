@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
-import com.daml.network.config.CNHttpClientConfig.*
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
@@ -251,7 +250,7 @@ class WalletIntegrationTest
 
       implicit val httpClient: HttpRequest => Future[HttpResponse] =
         request => Http().singleRequest(request = request)
-      val walletClient = WalletClient(aliceWallet.httpClientConfig.url)
+      val walletClient = WalletClient(aliceWallet.httpClientConfig.url.toString())
 
       def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 
@@ -281,7 +280,7 @@ class WalletIntegrationTest
 
       implicit val httpClient: HttpRequest => Future[HttpResponse] =
         request => Http().singleRequest(request = request)
-      val walletClient = WalletClient(aliceWallet.httpClientConfig.url)
+      val walletClient = WalletClient(aliceWallet.httpClientConfig.url.toString())
 
       def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 

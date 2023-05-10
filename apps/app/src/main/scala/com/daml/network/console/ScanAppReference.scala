@@ -1,24 +1,23 @@
 package com.daml.network.console
 
-import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CNNodeUtil, Contract}
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
-import scala.jdk.CollectionConverters.*
-
 import java.time.Instant
+import scala.jdk.CollectionConverters.*
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -197,7 +196,8 @@ final class ScanAppBackendReference(
 
   override protected val instanceType = "Scan Backend"
 
-  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
+  override def httpClientConfig =
+    NetworkAppClientConfig(s"http://127.0.0.1:${config.clientAdminApi.port}")
 
   protected val nodes = cnNodeConsoleEnvironment.environment.scans
 
@@ -228,9 +228,8 @@ final class ScanAppBackendReference(
 final class ScanAppClientReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-    override val config: ScanAppClientConfig,
+    val config: ScanAppClientConfig,
 ) extends ScanAppReference(cnNodeConsoleEnvironment, name)
-    with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi

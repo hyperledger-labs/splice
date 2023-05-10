@@ -2,9 +2,10 @@ package com.daml.network.scan.config
 
 import com.daml.network.config.{
   AutomationConfig,
-  CNParticipantClientConfig,
   CNNodeBackendConfig,
-  CNNodeClientConfig,
+  HttpCNNodeClientConfig,
+  CNParticipantClientConfig,
+  NetworkAppClientConfig,
 }
 import com.digitalasset.canton.config.*
 
@@ -27,7 +28,7 @@ case class ScanAppBackendConfig(
 }
 
 case class ScanAppClientConfig(
-    adminApi: ClientConfig,
+    adminApi: NetworkAppClientConfig,
 
     /** Configures how long clients cache the CoinRules they receive from the ScanApp
       * before rehydrating their cached value. In general, clients have a mechanism to invalidate
@@ -36,7 +37,7 @@ case class ScanAppClientConfig(
       * if its CoinRules cache is outdated and the client never notices and rehydrates it.
       */
     coinRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-) extends CNNodeClientConfig
+) extends HttpCNNodeClientConfig
     with BaseScanAppConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

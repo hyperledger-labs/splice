@@ -2,17 +2,12 @@ package com.daml.network.console
 
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.util.Contract
-import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  ExternalLedgerApiClient,
-  GrpcRemoteInstanceReference,
-  Help,
-}
+import com.digitalasset.canton.console.{BaseInspection, ExternalLedgerApiClient, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
@@ -72,7 +67,9 @@ class DirectoryAppBackendReference(
   def config: DirectoryAppBackendConfig =
     consoleEnvironment.environment.config.directoriesByString(name)
 
-  override def httpClientConfig = ClientConfig("http://127.0.0.1", config.clientAdminApi.port)
+  override def httpClientConfig = NetworkAppClientConfig(
+    s"http://127.0.0.1:${config.clientAdminApi.port}"
+  )
 
   protected val nodes = consoleEnvironment.environment.directories
 
@@ -97,8 +94,7 @@ class DirectoryAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: DirectoryAppClientConfig, // adding this explicitly for easier overriding
-) extends DirectoryAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference {
+) extends DirectoryAppReference(consoleEnvironment, name) {
 
   import LedgerApiExtensions.*
 

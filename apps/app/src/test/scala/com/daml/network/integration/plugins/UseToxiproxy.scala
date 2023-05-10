@@ -53,19 +53,16 @@ case class UseToxiproxy(
     ): ScanAppClientConfig = {
       val bump = 20000 + extraPortBump
 
-      val originalAddress = remoteScanApp.adminApi.address
-      val originalPort = remoteScanApp.adminApi.port
+      val originalPort = remoteScanApp.adminApi.url.effectivePort
 
       val listenPort = originalPort + bump
       val listen = s"localhost:$listenPort"
 
       // need to remove http-prefix for toxiproxy
-      val (http, host) = (originalAddress.split("://")(0), originalAddress.split("://")(1))
-      val upstream = s"$host:$originalPort"
+      val upstream = s"localhost:$originalPort"
 
       addProxy(s"${instanceName}-scan-api", listen, upstream)
-      remoteScanApp.focus(_.adminApi.address).replace(s"$http://localhost")
-      remoteScanApp.focus(_.adminApi.port).replace(listenPort)
+      remoteScanApp.focus(_.adminApi.url).modify(_.withPort(listenPort))
     }
 
     val svLedgerApiConf =
