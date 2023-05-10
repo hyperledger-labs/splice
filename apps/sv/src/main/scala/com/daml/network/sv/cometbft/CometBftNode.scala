@@ -175,7 +175,7 @@ object CometBftNode {
       votingPower = config.votingPower,
     )
 
-  private def svNodeConfigToProto(config: daml.cometbft.SvNodeConfig): proto.cometbft.SvNodeConfig =
+  def svNodeConfigToProto(config: daml.cometbft.SvNodeConfig): proto.cometbft.SvNodeConfig =
     proto.cometbft.SvNodeConfig(cometbftNodes =
       config.cometBftNodes.asScala
         .map({ case (nodeId, nodeConfig) =>
