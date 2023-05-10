@@ -27,7 +27,7 @@ export class ConfigReader<
       const envConfig = JSON.parse(envConfigString);
       // Printing whole config files to the log is usually a bad idea because it can leak secrets,
       // but frontend configs are inherently unsafe and must not contain any secrets.
-      console.info(`Config from REACT_APP_CANTON_NETWORK_CONFIG:`, envConfig);
+      console.info(`Config from REACT_APP_CANTON_NETWORK_CONFIG:`, envConfigString);
       return this.schema.parse(envConfig);
     } else if (externalConfig !== undefined) {
       return this.schema.parse(externalConfig);

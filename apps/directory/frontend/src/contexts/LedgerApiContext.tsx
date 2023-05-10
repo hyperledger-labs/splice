@@ -229,5 +229,5 @@ export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApi
 };
 
 export const useLedgerApiClient: () => LedgerApiClient | undefined = () => {
-  return useContext<LedgerApiClient | undefined>(LedgerApiContext);
+  return useContext(LedgerApiContext);
 };

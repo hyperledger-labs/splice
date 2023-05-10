@@ -298,7 +298,7 @@ function useProviderParty(directoryClient: DirectoryClient): string | undefined 
   return providerPartyId;
 }
 
-function usePrimaryParty(): string | undefined {
+export function usePrimaryParty(): string | undefined {
   const ledgerApiClient = useLedgerApiClient();
   const [primaryParty, setPrimaryParty] = useState<string>();
 

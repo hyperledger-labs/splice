@@ -1,4 +1,4 @@
-import { User, WebStorageStateStore } from 'oidc-client-ts';
+import { Log, User, WebStorageStateStore } from 'oidc-client-ts';
 import React from 'react';
 import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
 
@@ -22,6 +22,17 @@ const AuthProvider: React.FC<AuthProviderProps> = ({
   if (isHs256UnsafeAuthConfig(authConf)) {
     return <>{children}</>;
   }
+
+  // Note: we tag the log output of the oidc-client-ts library to make it easier
+  // to handle in lnav (:filter-out) and ignore patterns for the log checker script (canton_log.ignore.txt).
+  const debugLogger = {
+    debug: (...args: unknown[]) => console.debug('[oidc-client-ts] ', ...args),
+    info: (...args: unknown[]) => console.info('[oidc-client-ts] ', ...args),
+    warn: (...args: unknown[]) => console.warn('[oidc-client-ts] ', ...args),
+    error: (...args: unknown[]) => console.error('[oidc-client-ts] ', ...args),
+  };
+  Log.setLogger(debugLogger);
+  Log.setLevel(Log.DEBUG);
 
   return (
     <OidcAuthProvider

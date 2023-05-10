@@ -12,13 +12,13 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
-import App from './App';
 import { DirectoryUiStateProvider } from './contexts/DirectoryContext';
 import { LedgerApiClientProvider } from './contexts/LedgerApiContext';
-import reportWebVitals from './reportWebVitals';
+import AuthCheck from './routes/authCheck';
+import Home from './routes/home';
+import PostPayment from './routes/postPayment';
+import Root from './routes/root';
 import { config } from './utils';
-import Home from './views/Home';
-import PostPayment from './views/PostPayment';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
@@ -47,29 +47,27 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/" element={<App />}>
-      <Route index element={<Home />} />
-      <Route path="home" element={<Home />} />
-      <Route path="post-payment" element={<PostPayment />} />
+    <Route
+      element={
+        <Providers>
+          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+        </Providers>
+      }
+    >
+      <Route path="/" element={<Root />}>
+        <Route index element={<Home />} />
+        <Route path="home" element={<Home />} />
+        <Route path="post-payment" element={<PostPayment />} />
+      </Route>
     </Route>
   )
 );
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    {
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Providers>
-          <RouterProvider router={router} />
-        </Providers>
-      </ThemeProvider>
-    }
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </ThemeProvider>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

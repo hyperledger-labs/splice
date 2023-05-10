@@ -1,12 +1,13 @@
-import { ErrorBoundary, Login, PartyId, useUserState } from 'common-frontend';
+import { ErrorBoundary, PartyId, useUserState } from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
-import { Box, Button, Container, Toolbar, Typography } from '@mui/material';
+import { Box, Button, Toolbar, Typography } from '@mui/material';
 
-import { config } from './utils/config';
+import { usePrimaryParty } from '../contexts/DirectoryContext';
 
-const App: React.FC = () => {
-  const { isAuthenticated, logout, primaryPartyId } = useUserState();
+const Root: React.FC = () => {
+  const { logout } = useUserState();
+  const primaryPartyId = usePrimaryParty();
 
   return (
     <ErrorBoundary>
@@ -29,27 +30,15 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {isAuthenticated && (
-              <Button color="inherit" onClick={logout}>
-                Log Out
-              </Button>
-            )}
+            <Button color="inherit" onClick={logout} id="logout-button">
+              Log Out
+            </Button>
           </Toolbar>
         </Box>
-        {isAuthenticated ? (
-          <Outlet />
-        ) : (
-          <Container style={{ height: '100%', flex: '1' }}>
-            <Login
-              title="Canton Name Service Log In"
-              authConfig={config.auth}
-              testAuthConfig={config.testAuth}
-            />
-          </Container>
-        )}
+        <Outlet />
       </Box>
     </ErrorBoundary>
   );
 };
 
-export default App;
+export default Root;

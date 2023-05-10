@@ -43,4 +43,8 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for infor
 FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 
+# Output of the oidc-client-ts frontend library. Interaction with Auth0 appears to be unreliable, so
+# we ignore all errors and rely on retry loops.
+\[oidc-client-ts\]
+
 # Make sure to have a trailing newline

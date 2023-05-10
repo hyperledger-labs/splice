@@ -3,9 +3,9 @@ import React, { useEffect } from 'react';
 
 import { Box, Container } from '@mui/material';
 
+import DirectoryEntries from '../components/DirectoryEntries';
+import RequestDirectoryEntry from '../components/RequestDirectoryEntry';
 import { useDirectoryUiState } from '../contexts/DirectoryContext';
-import DirectoryEntries from './DirectoryEntries';
-import RequestDirectoryEntry from './RequestDirectoryEntry';
 
 const Home: React.FC = () => {
   const { updateStatus } = useUserState();
