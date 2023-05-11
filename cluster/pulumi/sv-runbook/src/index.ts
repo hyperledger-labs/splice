@@ -169,7 +169,7 @@ installCNHelmChartByNamespaceName(
       // TODO(#4443): using basename diverges from the runbook instructions, and is currently
       // required because we store the tls in secret cn-<basename>net-tls, as opposed to
       // cn-net-tls as in the runbook.
-      basename: "sv",
+      basename: CLUSTER_BASENAME,
     },
   },
   localCharts,

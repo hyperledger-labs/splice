@@ -931,15 +931,16 @@ In other words, once you used `-c`, the values you set there will be used in con
 
 Please see the const definitions in the [Pulumi script](./cluster/pulumi/sv-runbook/index.ts) for some more configurable parameters before deploying (including the flag for whether to use local or released artifacts). These will be made more easily configurable from CLI soon.
 
-An SV node can *not* currently be deployed via Pulumi on our "standard" clusters, e.g. the scratchnet's, due to resource conflicts. The `sv` cluster should be used for that. To deploy the SV node following the runbook, cd to the `sv` deployment directory, and type:
+Note that at the moment, the `sv-runbook` stack can *not* be deployed in parallel to the `full` CN deployment. If you need to spin up both, you will need to use two separate scratchnet clusters.
+To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and type the following:
 
-`TARGET_CLUSTER=<cluster running the global domain> pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv`
+`TARGET_CLUSTER=<cluster running the global domain> pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv.${GCP_CLUSTER_BASENAME}`
 
-Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv1.svc.sv.network.canton.global`.
+Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.svc.sv.network.canton.global`.
 
 To bring the deployment down, run:
 
-`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook down -y --stack sv`
+`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook down -y --stack sv.${GCP_CLUSTER_BASENAME}`
 
 
 ## Testing the SV Helm Runbook against a local build manually
