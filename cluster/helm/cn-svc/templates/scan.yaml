@@ -19,11 +19,11 @@ spec:
     spec:
       containers:
       - name: scan-app
-        image: "{{ .Values.imageRepo }}/scan-app:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/scan-app:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         imagePullPolicy: Always
         ports:
         - containerPort: 5012
@@ -69,7 +69,7 @@ spec:
       - env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         name: scan-web-ui
         ports:

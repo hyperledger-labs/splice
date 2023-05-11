@@ -34,14 +34,10 @@ spec:
                   name: cn-app-sv-ui-auth
                   optional: false
             - name: CN_APP_SV_UI_AUTH_AUDIENCE
-              {{ if .Values.auth.audience }}
-              value: {{ .Values.auth.audience | quote }}
-              {{ else }}
-              value: "https://canton.network.global"
-              {{ end }}
+              value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
             - name: CN_APP_SV_UI_CLUSTER
               value: {{ .Values.clusterUrl | quote }}
-          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ .Values.cluster.imageTag }}"
+          image: "{{ .Values.imageRepo }}/sv-web-ui:{{ (.Values.cluster).imageTag }}"
           imagePullPolicy: Always
           name: sv-web-ui
           ports:

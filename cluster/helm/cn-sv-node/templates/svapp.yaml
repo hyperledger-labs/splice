@@ -31,11 +31,7 @@ spec:
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
-              {{ if .Values.participantAddress }}
-              value: {{ .Values.participantAddress | quote }}
-              {{ else }}
-              value: participant
-              {{ end }}
+              value: {{ .Values.participantAddress | default "participant" | quote }}
             {{- if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}

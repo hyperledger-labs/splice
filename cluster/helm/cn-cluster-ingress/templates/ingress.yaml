@@ -7,8 +7,8 @@ spec:
   selector:
     app: external-proxy
   type: LoadBalancer
-  loadBalancerIP: "{{ .Values.cluster.ipAddress }}"
-  loadBalancerSourceRanges: {{ .Values.cluster.networkSettings.externalIPRanges | toJson }}
+  loadBalancerIP: "{{ (.Values.cluster).ipAddress }}"
+  loadBalancerSourceRanges: {{ ((.Values.cluster).networkSettings).externalIPRanges | toJson }}
   ports:
   - name: http
     port: 80
@@ -103,7 +103,7 @@ kind: ConfigMap
 metadata:
   name: cluster-version-info
 data:
-  version: "{{ .Values.cluster.imageTag }}"
+  version: "{{ (.Values.cluster).imageTag }}"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -125,7 +125,7 @@ spec:
     spec:
       containers:
       - name: external-proxy
-        image: "{{ .Values.imageRepo }}/external-proxy:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/external-proxy:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
@@ -243,4 +243,4 @@ spec:
         secret:
           defaultMode: 420
           optional: false
-          secretName: "cn-{{ .Values.cluster.basename }}net-tls"
+          secretName: "cn-{{ (.Values.cluster).basename }}net-tls"

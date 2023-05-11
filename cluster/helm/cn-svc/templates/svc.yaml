@@ -19,12 +19,12 @@ spec:
     spec:
       containers:
       - name: svc-app
-        image: "{{ .Values.imageRepo }}/svc-app:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/svc-app:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "svc" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "svc" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5005
           name: svc-app-adm-api

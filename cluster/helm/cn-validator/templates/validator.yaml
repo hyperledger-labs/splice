@@ -19,22 +19,18 @@ spec:
     spec:
       containers:
       - name: validator-app
-        image: "{{ .Values.imageRepo }}/validator-app:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/validator-app:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
-        {{ if .Values.participantAddress }}
-          value: {{ .Values.participantAddress | quote }}
-        {{ else }}
-          value: participant
-        {{ end }}
+          value: {{ .Values.participantAddress | default "participant" | quote }}
         {{ if .Values.appDars -}}
         - name: CN_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
         {{ end }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- range $ii, $user := .Values.additionalUsers }}
         - name: {{ $user.name }}
           {{ if $user.value }}
@@ -68,11 +64,11 @@ spec:
         - name: CN_APP_VALIDATOR_WALLET_USER_NAME
           value: {{ .Values.validatorWalletUser }}
         {{ end }}
-        {{ if .Values.auth.audience }}
+        {{ if (.Values.auth).audience }}
         - name: CN_APP_VALIDATOR_AUTH_AUDIENCE
           value: {{ .Values.auth.audience | quote }}
         {{ end }}
-        {{ if .Values.auth.jwksUrl }}
+        {{ if (.Values.auth).jwksUrl }}
         - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
         {{ end }}

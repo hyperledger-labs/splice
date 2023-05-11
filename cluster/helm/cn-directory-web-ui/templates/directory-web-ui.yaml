@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: directory-web-ui
-        image: "{{ .Values.imageRepo }}/directory-web-ui:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/directory-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS

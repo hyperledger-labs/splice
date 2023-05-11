@@ -45,12 +45,12 @@ spec:
   selector:
     app: docs
   ports:
-  - name: http
-    port: 80
-    protocol: TCP
-  - name: https
-    port: 443
-    protocol: TCP
+    - name: http
+      port: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      protocol: TCP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -95,6 +95,6 @@ spec:
   selector:
     app: gcs-proxy
   ports:
-  - name: http
-    port: 8080
-    protocol: TCP
+    - name: http
+      port: 8080
+      protocol: TCP

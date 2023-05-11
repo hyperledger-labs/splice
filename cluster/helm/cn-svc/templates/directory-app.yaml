@@ -19,12 +19,12 @@ spec:
     spec:
       containers:
       - name: directory-app
-        image: "{{ .Values.imageRepo }}/directory-app:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/directory-app:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "directory" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "directory" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5010
           name: dir-api

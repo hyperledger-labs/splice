@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: {{ .Release.Name }}
-        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}

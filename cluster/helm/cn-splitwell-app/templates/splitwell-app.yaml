@@ -19,12 +19,12 @@ spec:
     spec:
       containers:
       - name: splitwell-app
-        image: "{{ .Values.imageRepo }}/splitwell-app:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/splitwell-app:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "splitwell" "fixedTokens" .Values.cluster.fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "splitwell" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5213
           name: sw-api
@@ -33,7 +33,7 @@ spec:
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
       - name: envoy-proxy-sw-api
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
+        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
         - name: GRPC_ADDRESS
