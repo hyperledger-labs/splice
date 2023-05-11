@@ -7,15 +7,17 @@ val domainUrl = sys.env.get("DOMAIN_URL") match {
   case Some(url) => url
 }
 
+val validatorUserName = sys.env.get("VALIDATOR_USER_NAME").getOrElse("validator_user")
+
 println("Starting participant node")
 splitwellParticipant.start()
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 splitwellParticipant.domains.connect("global", domainUrl)
-println(s"Creating validator user")
+println(s"Creating validator user:" + validatorUserName)
 val validatorParty =
   splitwellParticipant.ledger_api.parties.allocate("validator_user", "validator_user").party
 splitwellParticipant.ledger_api.users.create(
-  id = "validator_user",
+  id = validatorUserName,
   actAs = Set(validatorParty),
   readAs = Set.empty,
   primaryParty = Some(validatorParty),

@@ -63,6 +63,7 @@ class SelfHostedPreflightIntegrationTest
   "run through runbook with self-hosted validator" taggedAs LiveDevNetTest in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
+
     val cantonArgs = Seq(
       "-c",
       (validatorPath / "validator-participant.conf").toString,

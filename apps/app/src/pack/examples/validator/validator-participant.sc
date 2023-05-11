@@ -8,7 +8,7 @@ val domainUrl = sys.env.get("DOMAIN_URL") match {
 }
 
 // Note: the validator user name is defined in validator.conf or validator-secure.conf
-val validatorUserName = System.getProperty("VALIDATOR_USER_NAME", "validator_user")
+val validatorUserName = sys.env.get("VALIDATOR_USER_NAME").getOrElse("validator_user")
 
 logger.info("Starting participant node")
 validatorParticipant.start()
