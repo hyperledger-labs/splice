@@ -42,6 +42,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
 * Added a `cause` parameter to `CommandFailure`
 * LogReporter logs location, message and throwable on TestFailed event.
+* CommunityStorageFactory matches last branch on `CommunityDbConfig` instead of `DbConfig`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

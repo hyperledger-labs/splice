@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.environment.CNNodeBootstrapBase
@@ -106,7 +106,7 @@ object DirectoryAppBootstrap {
           testingConfigInternal,
           clock,
           directoryMetrics,
-          new CommunityStorageFactory(directoryConfig.storage),
+          new CNStorageFactory(directoryConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

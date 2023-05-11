@@ -562,6 +562,7 @@ commands:
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh << parameters.start_canton_options >> && ./start-frontends.sh -d && $(top -b -o %MEM -c -w 256 > log/memory &)
+          extra_env_vars: POSTGRES_DB=postgres
           cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
@@ -1093,7 +1094,7 @@ jobs:
           cmd: "\"apps-app/testOnly *PreflightIntegrationTest\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
-          extra_env_vars: DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
+          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "15m"
       - print_gcloud_logs_commands:

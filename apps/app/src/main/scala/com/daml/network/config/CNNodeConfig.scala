@@ -405,6 +405,12 @@ object CNNodeConfig {
     implicit val networkAppClientConfigReader: ConfigReader[NetworkAppClientConfig] =
       deriveReader[NetworkAppClientConfig]
 
+    implicit val postgresCNDbConfigReader: ConfigReader[CNDbConfig.Postgres] =
+      deriveReader[CNDbConfig.Postgres]
+    implicit val memoryCNDbConfigReader: ConfigReader[CNDbConfig.Memory] =
+      deriveReader[CNDbConfig.Memory]
+    implicit val cnDbConfigReader: ConfigReader[CNDbConfig] = deriveReader[CNDbConfig]
+
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val cnNodeLedgerApiClientConfigReader: ConfigReader[CNLedgerApiClientConfig] =
@@ -521,6 +527,14 @@ object CNNodeConfig {
       ConfigWriter.stringConfigWriter.contramap(_.toString())
     implicit val networkAppClientConfigReader: ConfigWriter[NetworkAppClientConfig] =
       deriveWriter[NetworkAppClientConfig]
+
+    implicit val postgresCNDbConfigWriter: ConfigWriter[CNDbConfig.Postgres] =
+      confidentialWriter[CNDbConfig.Postgres](pg =>
+        pg.copy(config = DbConfig.hideConfidential(pg.config))
+      )
+    implicit val memoryCNDbConfigWriter: ConfigWriter[CNDbConfig.Memory] =
+      deriveWriter[CNDbConfig.Memory]
+    implicit val cnDbConfigWriter: ConfigWriter[CNDbConfig] = deriveWriter[CNDbConfig]
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]

@@ -1,19 +1,12 @@
 package com.daml.network.directory.config
 
-import com.daml.network.config.{
-  AutomationConfig,
-  CNLedgerApiClientConfig,
-  CNNodeBackendConfig,
-  CNParticipantClientConfig,
-  HttpCNNodeClientConfig,
-  NetworkAppClientConfig,
-}
+import com.daml.network.config.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
 case class DirectoryAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    override val storage: CNDbConfig,
     ledgerApiUser: String,
     override val participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,

@@ -165,19 +165,23 @@ object DirectoryStore {
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
-  ): DirectoryStore =
+  ): DirectoryStore = {
+    val inMemory = new InMemoryDirectoryStore(
+      providerParty = providerParty,
+      svcParty = svcParty,
+      domains,
+      loggerFactory,
+      futureSupervisor,
+      retryProvider,
+    )
     storage match {
       case _: MemoryStorage =>
-        new InMemoryDirectoryStore(
-          providerParty = providerParty,
-          svcParty = svcParty,
-          domains,
-          loggerFactory,
-          futureSupervisor,
-          retryProvider,
-        )
-      case _: DbStorage => throw new RuntimeException("Not implemented")
+        inMemory
+      case _: DbStorage =>
+        // TODO (#4423): Replace with persistent version
+        inMemory
     }
+  }
 
   case class IdleDirectorySubscription(
       state: Contract[

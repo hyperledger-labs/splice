@@ -147,7 +147,7 @@ class CommunityStorageFactory(val config: CommunityStorageConfig) extends Storag
     config match {
       case CommunityStorageConfig.Memory(_, _) =>
         EitherT.rightT(new MemoryStorage(loggerFactory, timeouts))
-      case db: DbConfig =>
+      case db: CommunityDbConfig =>
         DbStorageSingle
           .create(
             db,

@@ -627,9 +627,10 @@ object BuildCommon {
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-external` % "compile->compile;test->test",
         `canton-util-internal` % "compile->compile;test->test",
+        `canton-community-testing` % "test",
       )
       .settings(
-        removeTestSources,
+        disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           akka_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.AkkaUtil.createActorSystem
