@@ -145,11 +145,8 @@ class Validator1PreflightIntegrationTest
           val transaction = readTransactionFromRow(tx)
           transaction.action should matchText("Received")
           val partyR = s"$alicePartyId\nvia\nvalidator1_validator_service_user::.*".r
-          partyR.matches(
-            transaction.partyDescription.getOrElse(fail("There should be a party."))
-          ) should be(
-            true
-          )
+          val description = transaction.partyDescription.getOrElse(fail("There should be a party."))
+          description should fullyMatch regex partyR
           transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
           transaction.usdAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
           transaction.rate should matchText(s"1 CC/USD")
