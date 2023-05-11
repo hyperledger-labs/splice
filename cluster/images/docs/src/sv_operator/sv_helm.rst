@@ -58,22 +58,21 @@ Ensure that your local helm installation has access to the Digital Asset Helm ch
         --username ${ARTIFACTORY_USER} \
         --password ${ARTIFACTORY_PASSWORD}
 
-Create the three application namespaces within Kubernetes and ensure they have image pull credentials for fetching images from the Digital Asset Docker image repository:
+Create the application namespace within Kubernetes and ensure is has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
 
 .. code-block:: bash
 
-    for ns_name in docs sv-1; do
-        kubectl create ns ${ns_name}
+    kubectl create ns sv-1
 
-        kubectl create secret docker-registry docker-reg-cred \
-            --docker-server=digitalasset-canton-network-docker.jfrog.io \
-            --docker-username=${ARTIFACTORY_USER} \
-            --docker-password=${ARTIFACTORY_PASSWORD} \
-            -n ${ns_name}
+    kubectl create secret docker-registry docker-reg-cred \
+        --docker-server=digitalasset-canton-network-docker.jfrog.io \
+        --docker-username=${ARTIFACTORY_USER} \
+        --docker-password=${ARTIFACTORY_PASSWORD} \
+        -n sv-1
 
-        kubectl patch serviceaccount default -n ${ns_name} \
-            -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
-    done
+    kubectl patch serviceaccount default -n sv-1 \
+        -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
+
 
 .. _helm-sv-auth0:
 
@@ -227,7 +226,6 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install docs canton-network-helm/cn-docs -n docs --version ${CHART_VERSION}
     helm install postgres canton-network-helm/cn-postgres -n sv-1 --version ${CHART_VERSION}
     helm install participant canton-network-helm/cn-participant -n sv-1 --version ${CHART_VERSION} -f participant-values.yaml
     helm install validator canton-network-helm/cn-validator -n sv-1 --version ${CHART_VERSION} -f validator-values.yaml
@@ -242,8 +240,6 @@ namespaces. A typical query might look as follows:
     $ kubectl get pods --all-namespaces |grep -v kube-system
     NAMESPACE         NAME                                                       READY   STATUS    RESTARTS      AGE
     cluster-ingress   external-proxy-998cb664c-k7dfb                             1/1     Running   0             37m
-    docs              docs-688ccd855b-hsntm                                      1/1     Running   0             81m
-    docs              gcs-proxy-5ffcb46f7f-79lfv                                 1/1     Running   0             81m
     sv-1              sv-app-7658c9fdd4-58xm6                                    1/1     Running   0             91m
     sv-1              sv-web-ui-84b6d7994c-w67rp                                 1/1     Running   0             91m
     sv-1              validator-app-b7fd68479-w4992                              1/1     Running   0             43m
