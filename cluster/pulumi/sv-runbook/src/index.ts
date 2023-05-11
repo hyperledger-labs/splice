@@ -7,7 +7,7 @@ import {
   scanUserParticipantSecret,
   sv1UserParticipantSecret,
   sv1UserValidatorParticipantSecret,
-  svAppSecret,
+  svAppSecrets,
   svValidatorSecrets,
   svcUserParticipantSecret,
 } from "./secrets";
@@ -140,20 +140,7 @@ const sv = installCNHelmChart(
   version,
   svImagePullDeps
     .concat([validator, participant])
-    .concat(svAppSecret(svNamespace))
-);
-
-const docsNamespace = exactNamespace("docs");
-const docsImagePullDeps = localCharts ? [] : imagePullSecret(docsNamespace);
-
-const docs = installCNHelmChart(
-  docsNamespace,
-  "docs",
-  "cn-docs",
-  {},
-  localCharts,
-  version,
-  docsImagePullDeps
+    .concat(svAppSecrets(svNamespace))
 );
 
 const ingressImagePullDeps = localCharts
@@ -184,5 +171,5 @@ installCNHelmChartByNamespaceName(
   },
   localCharts,
   version,
-  ingressImagePullDeps.concat([sv, validator, docs])
+  ingressImagePullDeps.concat([sv, validator])
 );

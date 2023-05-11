@@ -15,6 +15,7 @@ const validatorAuth0Secret = auth0.Client.get(
   validatorAuth0ClientId
 ).clientSecret;
 const walletUIClientId = "l9MS11POtbvPaVvgzns3Tdj9IDnosLwl";
+const svUIClientId = "8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx";
 
 function participantSecret(
   ns: ExactNamespace,
@@ -174,8 +175,11 @@ export function svValidatorSecrets(ns: ExactNamespace): k8s.core.v1.Secret[] {
   ];
 }
 
-export function svAppSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return appSecret(ns, "sv", sv1Auth0ClientId, sv1Auth0Secret);
+export function svAppSecrets(ns: ExactNamespace): k8s.core.v1.Secret[] {
+  return [
+    appSecret(ns, "sv", sv1Auth0ClientId, sv1Auth0Secret),
+    uiSecret(ns, "sv-ui", svUIClientId),
+  ];
 }
 
 // TODO(#4374): get rid of the dummy secrets
