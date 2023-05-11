@@ -148,13 +148,13 @@ object CNNodeUtil {
   val defaultLockHolderFee = new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal)
 
   val baseRateTrafficLimits = new BaseRateTrafficLimits(
-    new java.math.BigDecimal(2.0), // base rate
-    new RelTime(2_000_000), // burst window
+    damlDecimal(333.0), // base rate
+    new RelTime(10 * 60 * 1_000_000), // burst window
   )
   val defaultDomainFeesConfig = new DomainFeesConfig(
     baseRateTrafficLimits,
-    new java.math.BigDecimal(1.0), // extraTrafficPrice (in $/MB)
-    new java.math.BigDecimal(1.0), // readScalingFactor
+    damlDecimal(1.0), // extraTrafficPrice (in $/MB)
+    damlDecimal(0.02), // readScalingFactor
     1_000_000, // minTopupAmount (in bytes)
   )
 
