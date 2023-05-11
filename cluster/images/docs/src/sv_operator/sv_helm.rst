@@ -47,7 +47,6 @@ Name                   Value
 ---------------------- ------------------------------------------------------------------------------------------
 ARTIFACTORY_USER       Your artifactory user name shown at the top right.
 ARTIFACTORY_PASSWORD   Your artifactory API key. If you don't have one you can generate one on your profile page.
-ARTIFACTORY_USER_EMAIL The email address you used for your artifactory account.
 ====================== ==========================================================================================
 
 Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
@@ -70,7 +69,6 @@ Create the three application namespaces within Kubernetes and ensure they have i
             --docker-server=digitalasset-canton-network-docker.jfrog.io \
             --docker-username=${ARTIFACTORY_USER} \
             --docker-password=${ARTIFACTORY_PASSWORD} \
-            --docker-email=${ARTIFACTORY_USER_EMAIL} \
             -n ${ns_name}
 
         kubectl patch serviceaccount default -n ${ns_name} \
@@ -283,7 +281,6 @@ Create a cluster-ingress namespace with image pull permissions from the Artifact
         --docker-server=digitalasset-canton-network-docker.jfrog.io \
         --docker-username=${ARTIFACTORY_USER} \
         --docker-password=${ARTIFACTORY_PASSWORD} \
-        --docker-email=${ARTIFACTORY_USER_EMAIL} \
         -n cluster-ingress
 
     kubectl patch serviceaccount default -n cluster-ingress \
