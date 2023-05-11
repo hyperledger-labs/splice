@@ -17,10 +17,8 @@ import * as pulumi from "@pulumi/pulumi";
 // Note that for now this assumes the entire cluster is under this scripts's control,
 // i.e. it was only initialized with the `infrastructure` pulumi, no other `cncluster` scripts (specifically, no other secrets or namespaces created).
 
-const config = new pulumi.Config();
-const localChartsOpt = config.getBoolean("LOCAL_CHARTS"); // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-const localCharts = localChartsOpt === undefined ? true : localChartsOpt;
-const version = localCharts ? "" : config.require("VERSION_NUMBER"); // Artifacts version, if localCharts == false
+const version = process.env.CHARTS_VERSION;
+const localCharts = version == "" || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
 const CLUSTER_BASENAME = requiredEnv(
   "GCP_CLUSTER_BASENAME",
   "The cluster in which this chart is being installed"

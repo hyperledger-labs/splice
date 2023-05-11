@@ -925,11 +925,7 @@ The Pulumi script depends on the following env variables to be defined (e.g. by 
 
 By default, Pulumi will be using the charts and images as built locally and pushed to the dev artifactory using the `make` commands above.
 It also supports deploying a version based on externally released artifacts, the ones customers use.
-To use released as opposed to your local build, append the `pulumi` command below with `-c LOCAL_CHARTS=false -c VERSION_NUMBER="<chart version>"`,
-for example `-c LOCAL_CHARTS=false -c VERSION_NUMBER="0.1.1-snapshot.20230508.2322.0.bb8d43e3"`. Note, however, that pulumi config variables are persistent.
-In other words, once you used `-c`, the values you set there will be used in consecutive calls to `pulumi up`. To reset the values, use e.g. `pulumi config rm LOCAL_CHARTS`
-
-Please see the const definitions in the [Pulumi script](./cluster/pulumi/sv-runbook/index.ts) for some more configurable parameters before deploying (including the flag for whether to use local or released artifacts). These will be made more easily configurable from CLI soon.
+To use released as opposed to your local build, first export an environment variable `CHARTS_VERSION` with the version identifier to be used.
 
 Note that at the moment, the `sv-runbook` stack can *not* be deployed in parallel to the `full` CN deployment. If you need to spin up both, you will need to use two separate scratchnet clusters.
 To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and type the following:
