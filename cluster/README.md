@@ -1020,26 +1020,16 @@ It's recommended to complete *both* ways - approval via API for instant approval
 
 #### Approving via SV API
 
-Approval via the API is instant but not persisted across cluster redeploys (unless we somehow migrate over the state of our SV participants).
-Steps (from a cluster directory):
+Approval via the API is instant but not persisted across cluster redeploys.
+Steps (from a cluster directory, e.g., `cluter/deployment/testnet`):
 
-1. Start the `cn-node` console:
-
-```
-NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global cn-node --config ${REPO_ROOT}/apps/app/src/test/resources/preflight-topology.conf
-```
-
-2. In the console, run (substituting the correct name and public key):
+1. Run
 
 ```
-val name = "SV name"
-val publicKey = "SV key"
-svAppClients.foreach(sv => { println(s"approving ${name} on ${sv.name}"); sv.approveSvIdentity(name, publicKey) })
+$REPO_ROOT/scripts/approve-sv.sh $SV_NAME $SV_PUBLIC_KEY
 ```
 
-Note: It will also be possible to approve SV identities via the SV UI.
-However, we might still prefer to do so via the API as it is more convenient than clicking through the UI four times
-(once for each SV).
+2. Repeat the steps for every other cluster you want to update. Usually you should update at least devnet and testnet.
 
 #### Approving via SV config
 
