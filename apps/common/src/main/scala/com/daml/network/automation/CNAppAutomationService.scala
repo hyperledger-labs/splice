@@ -58,7 +58,6 @@ abstract class CNNodeAppAutomationService(
       registerTrigger(
         new OffsetIngestionService(
           store.offset.ingestionSink,
-          store.domains,
           connection,
           // We want to always poll periodically and quickly even in simtime mode so we overwrite
           // the polling interval and the clock.

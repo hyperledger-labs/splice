@@ -27,8 +27,8 @@ cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/sequencing.pr
 cp "$CANTON/protobuf/community/com/digitalasset/canton/v0/trace_context.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0/trace_context.proto"
 
 mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain"
-cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/transfer.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/transfer.proto"
-cp "$CANTON/protobuf/research/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/state_snapshot_service.proto"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/digitalasset/canton/research/participant/multidomain/transfer.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/transfer.proto"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/digitalasset/canton/research/participant/multidomain/state_service.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/research/participant/multidomain/state_service.proto"
 
 mkdir "$DIR/ts"
 

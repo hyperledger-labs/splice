@@ -16,7 +16,7 @@ option java_package = "com.digitalasset.canton.research.participant.multidomain"
 option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 
 // Allows clients to get state from the ledger.
-service StateSnapshotService {
+service StateService {
 
   // Get the list of in-flight transfers.
   // If there are no in-flight transfers, the stream returns a single response message with the offset at which the snapshot has been taken.
@@ -44,6 +44,10 @@ service StateSnapshotService {
   // Get the list of connected domains to which the party has the rights to submit to and the
   // participant is connected to.
   rpc GetConnectedDomains (GetConnectedDomainsRequest) returns (GetConnectedDomainsResponse);
+
+  // Get the current ledger end.
+  // Subscriptions started with the returned offset will serve updates created after this RPC was called.
+  rpc GetLedgerEnd (GetLedgerEndRequest) returns (GetLedgerEndResponse);
 }
 
 
@@ -114,8 +118,6 @@ message GetConnectedDomainsRequest {
   // Must be a valid PartyIdString (as described in ``value.proto``).
   // Required
   string party = 1;
-
-  ConnectedDomainsFilter connected_domain_filter = 2;
 }
 
 message GetConnectedDomainsResponse {
@@ -130,10 +132,14 @@ message GetConnectedDomainsResponse {
   repeated ConnectedDomain connected_domains = 1;
 }
 
-message ConnectedDomainsFilter {
-  // If empty, domains with all permissions are returned.
-  // Only the domains with the requested ParticipantPermission are returned.
-  // E.g if the permissions are set to Observation and the participant has Submission rights, the result will be empty.
-  // Passing the same permission twice is accepted and they are deduplicated.
-  repeated com.digitalasset.canton.protocol.v0.ParticipantPermission permissions = 1;
+message GetLedgerEndRequest {
+  // Must correspond to the ledger ID reported by the Ledger Identification Service.
+  // Must be a valid LedgerString (as describe in ``value.proto``).
+  // Optional
+  string ledger_id = 1;
+}
+
+message GetLedgerEndResponse {
+  // The absolute offset of the current ledger end.
+  string offset = 1;
 }

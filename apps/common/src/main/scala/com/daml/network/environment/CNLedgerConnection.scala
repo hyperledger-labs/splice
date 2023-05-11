@@ -107,11 +107,15 @@ class CNLedgerConnection(
 
   // The participant ledger end as opposed to the per-domain ledger end.
   // We use this for synchronization in `UpdateIngestionService`.
-  def participantLedgerEnd(): Future[LedgerOffset] =
-    client.participantLedgerEnd()
+  def participantLedgerEnd(): Future[LedgerOffset.Absolute] =
+    client.participantLedgerEnd() map {
+      case off: LedgerOffset.Absolute => off
+      case nonsenseOff =>
+        throw new IllegalStateException(s"I was promised a real offset, not $nonsenseOff")
+    }
 
-  def ledgerEnd(domain: DomainId): Future[LedgerOffset] =
-    client.ledgerEnd(domain)
+  def ledgerEnd(): Future[LedgerOffset.Absolute] =
+    client.ledgerEnd()
 
   def submitCommandsNoDedup(
       actAs: Seq[PartyId],

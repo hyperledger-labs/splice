@@ -110,10 +110,6 @@ message CompletionEndRequest {
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Optional
   string ledger_id = 1;
-
-  // Must be a valid domain ID
-  // Required
-  string domain_id = 2;
 }
 
 message CompletionEndResponse {

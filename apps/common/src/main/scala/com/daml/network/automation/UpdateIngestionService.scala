@@ -50,11 +50,7 @@ class UpdateIngestionService(
       subscribeFrom <- lastIngestedOffset match {
         case None =>
           for {
-            offset <- connection.ledgerEnd(domain).map {
-              // Documented as always being absolute
-              case absolute: LedgerOffset.Absolute => absolute.getOffset
-              case _ => sys.error("expected absolute offset")
-            }
+            offset <- connection.ledgerEnd().map(_.getOffset)
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
         case Some(offset) => Future.successful(offset)

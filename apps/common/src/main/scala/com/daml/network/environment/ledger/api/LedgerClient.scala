@@ -86,9 +86,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   private val multidomainCompletionServiceStub
       : multidomain.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
     withCredentials(multidomain.CommandCompletionServiceGrpc.stub(channel), token)
-  private val stateSnapshotServiceStub
-      : multidomain.StateSnapshotServiceGrpc.StateSnapshotServiceStub =
-    withCredentials(multidomain.StateSnapshotServiceGrpc.stub(channel), token)
+  private val stateServiceStub: multidomain.StateServiceGrpc.StateServiceStub =
+    withCredentials(multidomain.StateServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -107,10 +106,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
 
   override def close(): Unit = GrpcChannel.close(channel)
 
-  def ledgerEnd(domain: DomainId): Future[LedgerOffset] = {
-    val req = multidomain.GetLedgerEndRequest(domainId = domain.toProtoPrimitive)
-    updateServiceStub.getLedgerEnd(req).map { resp =>
-      LedgerOffset.fromProto(scalapbToJava(resp.getOffset)(_.companion))
+  def ledgerEnd(): Future[LedgerOffset.Absolute] = {
+    val req = multidomain.GetLedgerEndRequest()
+    stateServiceStub.getLedgerEnd(req).map { resp =>
+      new LedgerOffset.Absolute(resp.offset)
     }
   }
 
@@ -136,7 +135,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       domainId = domainId.toProtoPrimitive,
     )
     ClientAdapter
-      .serverStreaming(proto, stateSnapshotServiceStub.getActiveContracts)
+      .serverStreaming(proto, stateServiceStub.getActiveContracts)
       .map { scalaProto =>
         GetActiveContractsResponse fromProto scalapbToJava(scalaProto)(_.companion)
       }
@@ -417,7 +416,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     )
     ClientAdapter.serverStreaming(
       req,
-      stateSnapshotServiceStub.getInFlightTransfers,
+      stateServiceStub.getInFlightTransfers,
     ) map LedgerClient.GetInFlightTransfersResponse.fromProto
   }
 
@@ -427,7 +426,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     val req = multidomain.GetConnectedDomainsRequest(
       party = party.toProtoPrimitive
     )
-    stateSnapshotServiceStub.getConnectedDomains(req).map { resp =>
+    stateServiceStub.getConnectedDomains(req).map { resp =>
       resp.connectedDomains.map { cd =>
         DomainAlias.tryCreate(cd.domainAlias) -> DomainId.tryFromString(cd.domainId)
       }.toMap
