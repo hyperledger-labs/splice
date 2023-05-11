@@ -441,7 +441,7 @@ function subcmd_gcloud_logs() {
     _cluster_must_exist
 
     LOGFILE=$(mktemp "$namespace"-"$app"-XXXX.clog)
-    echo "Writing log to $LOGFILE"
+    _info "Writing log to $LOGFILE"
 
     function gcloud_read() {
         gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter"
@@ -553,29 +553,25 @@ function subcmd_create() {
         fi
     fi
 
+    _log "Authenticating to newly created cluster."
+    subcmd_activate
+
+    _log "Activating infrastructure Pulumi stack"
+    subcmd_infra_pulumi up --yes
+
+    _log "Updating DNS01 secret"
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(#1447)
     subcmd_update_dns01_secret
 
-    subcmd_infra_pulumi up --yes
-
-    #### Check for IP
-
+    _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)
 
     if [ -z "${IPADDR}" ]; then
         _error "Could not determine cluster IP address."
     fi
 
-    echo "Cluster at IP ${IPADDR}, applying configuration."
-
-    _log "Authenticating to newly created cluster."
-    subcmd_activate
-
-    _log "Applying current manifest to cluster."
-    _cluster_apply "${SOURCE_IMAGE_TAG}"
-
-    _log "Updating cluster secrets"
+    _log "Cluster at IP ${IPADDR}, updating cluster secrets..."
     subcmd_update_secrets
 
     _log "Cluster ready."
@@ -695,10 +691,13 @@ function subcmd_delete() {
     _prompt_to_confirm
     _cluster_must_exist
 
+    _info "Taking down pulumi infrastructure stack."
     subcmd_infra_pulumi down --yes
+
+    _info "Deleting GKE cluster."
     gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
 
-    echo "Cluster deleted."
+    _info "Cluster deleted."
 }
 
 ###
