@@ -133,6 +133,10 @@ spec:
         - name: ENABLE_INGRESS_MODES
           value: "{{ .Values.enableIngressModes }}"
         {{- end }}
+        {{- if .Values.svNamespace }}
+        - name: INGRESS_CONFIG_SV_NAMESPACE
+          value: "{{ .Values.svNamespace }}"
+        {{- end }}
         imagePullPolicy: Always
         ports:
         - containerPort: 80

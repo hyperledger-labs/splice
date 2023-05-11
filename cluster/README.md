@@ -761,15 +761,17 @@ You can expect the certificate and certificate key to always be available at `/t
 
 ### Force-updating the certificate
 
-The tls certificate is configured in
-[`tls.jsonnet`](/cluster/manifest/tls.jsonnet). If changes are required there, e.g. updating the DNS names covered it, you will need to propagate a new certificate in all clusters. To do that, follow these steps:
-```
-kubectl get certificate
-kubectl delete certificate cn-<cluster>-certificate
-kubectl get secret
-kubectl delete secret cn-<cluster>-tls
-cncluster apply
-```
+The tls certificate is configured in the infrastructure pulumi chart
+[here](/cluster/helm/infrastructure/src/network.ts). If changes are required there, e.g. updating the DNS names covered it, you will need to propagate a new certificate in all clusters. To do that manually in a running cluster, follow these steps:
+
+1. `kubectl edit certificate -n cluster-ingress cn-<cluster>-certificate`
+1. Edit the dnsNames list, and exit the editor
+1. `kubectl delete secret -n cluster-ingress cn-<cluster>net-tls`
+1. Wait for the secret to reappear in `kubectl get secret -n cluster-ingress`
+1. Restart the external proxy, e.g. with `kubectl delete pod -n cluster-ingress external-proxy-<...>`
+
+Note that these manual changes update an existing cluster, but you should make sure to update the pulumi chart consistently
+for those changes to also persist for future cluster deployments.
 
 ## Auth0 secrets
 
@@ -997,6 +999,9 @@ gcloud and local helm charts.
    ```
    cert-manager will already be setup so no need to do anything about that.
 9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global` or `https://sv.sv-1.svc.scratchb.network.canton.global`.
+
+Please remember that `cncluster reset` does not currently tear down anything deployed using Helm, so please
+make sure to delete manually any helm charts that were deployed manually.
 
 ## SV Operations
 

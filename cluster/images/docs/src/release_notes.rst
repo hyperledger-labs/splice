@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+2023-05-21
+----------
+
+* Make the Kubernetes namespace for the SV node configurable in the Helm charts (now defaulting to `sv` in the runbook), see :ref:`deployment using Helm <helm-sv-wallet-ui>`.
+
+
 2023-05-14
 ----------
 

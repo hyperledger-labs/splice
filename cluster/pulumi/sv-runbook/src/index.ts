@@ -34,6 +34,7 @@ const SV_WALLET_USER_ID =
   process.env.SV_WALLET_USER_ID || "auth0|64553aa683015a9687d9cc2e"; // Default to admin@sv.com at the sv-test tenant by default
 const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
 const CLUSTER_IP = infraStack.getOutput("ingressIp"); // IP of the cluster in which this chart is being installed
+const SV_NAMESPACE = process.env.SV_NAMESPACE || "sv";
 
 console.log(
   localCharts
@@ -41,6 +42,7 @@ console.log(
     : `Using charts from the artifactory, version ${version}`
 );
 console.log(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
+console.log(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
 // Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
 // TODO(#4443): make sure it's OK to reuse these once automated
@@ -50,7 +52,7 @@ const SV_PUBLIC_KEY =
 const SV_PRIVATE_KEY =
   "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo";
 
-const svNamespace = exactNamespace("sv-1");
+const svNamespace = exactNamespace(SV_NAMESPACE);
 
 const svImagePullDeps = localCharts ? [] : imagePullSecret(svNamespace);
 
@@ -153,6 +155,7 @@ installCNHelmChartByNamespaceName(
   // TODO(#4384): move these values into a file and distribute it with the release
   {
     enableIngressModes: "sv-external",
+    svNamespace: SV_NAMESPACE,
     cluster: {
       networkSettings: {
         externalIPRanges: [
