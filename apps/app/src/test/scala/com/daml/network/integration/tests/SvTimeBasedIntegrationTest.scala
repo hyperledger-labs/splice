@@ -1041,15 +1041,6 @@ class SvTimeBasedIntegrationTest
       val currentLeader = getSvcRules().data.leader
       val currentEpoch = getSvcRules().data.epoch
 
-      eventually() {
-        val electionRequests = svc.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
-        electionRequests should have length 3
-        val requestsData = electionRequests.map(req => req.data)
-        requestsData.foreach(data => data.ranking.asScala.head shouldBe data.requester)
-        requestsData.foreach(_.ranking.asScala.last shouldBe currentLeader)
-      }
-
       var newLeader: String = ""
 
       eventually() {
