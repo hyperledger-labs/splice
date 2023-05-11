@@ -226,8 +226,20 @@ class SvApp(
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  // SV app uploads package so no dep.
-  override lazy val requiredTemplates = Set.empty
+  // The SV app uploads package but there is a bug in Canton around concurrent package uploads
+  // so we wait for the validator app to finish the upload first. See https://github.com/DACH-NY/canton/issues/12993
+  override lazy val requiredTemplates =
+    config.onboarding match {
+      // The validator app waits on the sv app so if we wait on the dar upload here, we create
+      // a circular dependency.
+      // The validator app waits on the svc party before uploading a DAR so there is no chance of the
+      // upload happening concurrently here.
+      case _: SvOnboardingConfig.FoundCollective => Set.empty
+      case _ =>
+        Set(cc.coin.Coin.TEMPLATE_ID) ++
+          (if (config.enableCoinRulesUpgrade) Set(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID)
+           else Set.empty)
+    }
 
   private def ensureOnboarded(
       svStore: SvSvStore,
