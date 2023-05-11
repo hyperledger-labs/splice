@@ -17,7 +17,7 @@ find daml -name "*.dar" |
   xargs -P 16 -I {} sh -c "
     echo {} \$($DAMLC inspect-dar {} --json | jq -r \".main_package_id\")
   " |
-  sort -s > "$out_file"
+  LC_ALL=C sort -s > "$out_file"
 
 if [ -n "${CI-}" ]; then
     are_diff=0

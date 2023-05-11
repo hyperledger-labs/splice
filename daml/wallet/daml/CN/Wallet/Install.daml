@@ -134,8 +134,6 @@ data ExecuteBatchResult = ExecuteBatchResult
     outcomes: [CoinOperationOutcome]
   deriving (Eq, Show)
 
--- Note: includes the svc party, so that choices can look up CoinRules
--- This should be replaced by explicit disclosure
 template WalletAppInstall
   with
     svcParty : Party
