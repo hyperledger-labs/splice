@@ -2,6 +2,7 @@ Canton Network Documentation
 ============================
 
 Version: |version_literal|
+Helm Chart Version: |chart_version_literal|
 
 .. toctree::
    :maxdepth: 2
