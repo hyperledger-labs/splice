@@ -1044,12 +1044,21 @@ subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the cur
 function subcmd_pulumi() {
     _production_gate
 
+    pulumi_project="${1-}"
+    pulumi_cmd="${2-}"
+    if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
+        _info "Usage: $SCRIPTNAME pulumi <pulumi-cmd> <pulumi-project> [options...]"
+        exit 1
+    fi
+
+    shift 2
+
     # Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    _pulumi --stack "${GCP_CLUSTER_BASENAME}" \
-           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
-            "$@"
+    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+           --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+            "$pulumi_cmd" "$@"
 }
 
 ###
@@ -1093,7 +1102,7 @@ function subcmd_papply() {
         args+=(-c "FIXED_TOKENS=0")
     fi
 
-    subcmd_pulumi up --yes --show-sames "${args[@]}"
+    subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
 }
 ###
 
@@ -1135,8 +1144,8 @@ function subcmd_ppreview() {
         args+=(-c "FIXED_TOKENS=0")
     fi
 
-    subcmd_pulumi preview --show-sames "${args[@]}"
-    subcmd_pulumi preview --show-sames --json
+    subcmd_pulumi canton-network preview --show-sames "${args[@]}"
+    subcmd_pulumi canton-network preview --show-sames --json
 }
 
 ###
@@ -1148,7 +1157,7 @@ function subcmd_pdown() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi down --yes
+    subcmd_pulumi canton-network down --yes
 }
 
 ###
@@ -1160,7 +1169,39 @@ function subcmd_prefresh() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi refresh --yes
+    subcmd_pulumi canton-network refresh --yes
+}
+
+###
+
+subcommand_whitelist[papply_sv]="Apply the sv-runbook Pulumi stack"
+
+function subcmd_papply_sv(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    local -x TARGET_CLUSTER="${1-}"
+    if [ -z "$TARGET_CLUSTER" ]; then
+        _info "Usage: $SCRIPTNAME papply_sv <target-cluster> [<charts-version>]"
+        exit 1
+    fi
+
+    local -x CHARTS_VERSION="${2-}"
+
+    subcmd_pulumi sv-runbook up --yes
+}
+
+###
+
+subcommand_whitelist[pdown_sv]="Take the current sv-runbook Pulumi configuration down"
+
+function subcmd_pdown_sv(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi sv-runbook down --yes
 }
 
 ###

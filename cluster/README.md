@@ -923,20 +923,21 @@ The Pulumi script depends on the following env variables to be defined (e.g. by 
 - ARTIFACTORY_USER: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
 - ARTIFACTORY_PASSWORD: Your API key at digitalasset.jfrog.io (can be obtained by creating an API key in your user profile)
 
-By default, Pulumi will be using the charts and images as built locally and pushed to the dev artifactory using the `make` commands above.
-It also supports deploying a version based on externally released artifacts, the ones customers use.
-To use released as opposed to your local build, first export an environment variable `CHARTS_VERSION` with the version identifier to be used.
 
 Note that at the moment, the `sv-runbook` stack can *not* be deployed in parallel to the `full` CN deployment. If you need to spin up both, you will need to use two separate scratchnet clusters.
-To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and type the following:
+To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and run:
 
-`TARGET_CLUSTER=<cluster running the global domain> pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook up -y --stack sv.${GCP_CLUSTER_BASENAME}`
+`cncluster papply_sv <cluster running the global domain> [<artifactory charts version>]`
+
+By default, Pulumi will be using the charts and images as built locally and pushed to the dev artifactory using the `make` commands above.
+It also supports deploying a version based on externally released artifacts, the ones customers use
+by specifying their version in the `<artifactory charts version>` argument.
 
 Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.svc.sv.network.canton.global`.
 
 To bring the deployment down, run:
 
-`pulumi --cwd $REPO_ROOT/cluster/pulumi/sv-runbook down -y --stack sv.${GCP_CLUSTER_BASENAME}`
+`cncluster pdown_sv`
 
 
 ## Testing the SV Helm Runbook against a local build manually
