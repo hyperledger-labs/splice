@@ -31,6 +31,9 @@ object Dependencies {
   lazy val jwks_rsa =
     "com.auth0" % "jwks-rsa" % "0.21.2"
 
+  lazy val daml_lf_archive_reader =
+    "com.daml" %% "daml-lf-archive-reader" % CantonDependencies.daml_libraries_version
+
   lazy val daml_bindings_java =
     "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
 
@@ -48,4 +51,6 @@ object Dependencies {
 
   lazy val akka_spray_json =
     "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.8"
+
+  lazy val better_files = CantonDependencies.better_files
 }

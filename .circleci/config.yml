@@ -838,9 +838,6 @@ jobs:
       - execute_sbt_command:
           cmd: "lint"
       - run_todo_script
-      - run_bash_command_in_nix:
-          cmd_name: Check DAR package IDs
-          cmd: build-tools/dars-lock
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization

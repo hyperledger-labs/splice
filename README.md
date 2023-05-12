@@ -452,7 +452,7 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 
 To prevent accidental changes to dar files, we commit their current package IDs with the repo,
 in daml/dars.lock. CI verifies that those package IDs are correct. If you intentionally make
-changes in daml code, please run `build-tools/dars-lock` and commit the updated `dars.lock`
+changes in daml code, please run `sbt damlDarsLockFileUpdate` and commit the updated `dars.lock`
 file along with your dar changes.
 
 ### Bumping Our Canton fork

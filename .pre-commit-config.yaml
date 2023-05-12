@@ -15,6 +15,13 @@ repos:
         require_serial: true
         entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
         types: [scala]
+      - id: dars_lock
+        name: dars_lock
+        language: system
+        pass_filenames: false
+        require_serial: true
+        entry: "bash -c 'sbt --client \"damlDarsLockFileUpdate $@\"' bash"
+        files: '(daml\.yaml|.*\.daml)'
       - id: shellcheck
         name: shellcheck
         language: system

@@ -66,6 +66,7 @@ lazy val root = (project in file("."))
     `svc-governance-daml`,
     `svc-governance-v1test-daml`,
     `validator-lifecycle-daml`,
+    `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
     `canton-community-integration-testing`,
@@ -88,6 +89,49 @@ lazy val root = (project in file("."))
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
     // Needed to be able to resolve scalafmt snapshot versions
     resolvers += Resolver.sonatypeRepo("snapshots"),
+    damlDarsLockCheckerFileArg := {
+      // Sadly there dos not seem to be a way to get all values from all projects :/
+      val darFiles: Seq[File] = Seq(
+        (`cn-util-daml` / Compile / damlBuild).value,
+        (`canton-coin-api-daml` / Compile / damlBuild).value,
+        (`canton-coin-daml` / Compile / damlBuild).value,
+        (`canton-coin-v1test-daml` / Compile / damlBuild).value,
+        (`canton-coin-v2test-daml` / Compile / damlBuild).value,
+        (`wallet-payments-daml` / Compile / damlBuild).value,
+        (`wallet-daml` / Compile / damlBuild).value,
+        (`wallet-v1test-daml` / Compile / damlBuild).value,
+        (`directory-daml` / Compile / damlBuild).value,
+        (`splitwell-daml` / Compile / damlBuild).value,
+        (`svc-governance-daml` / Compile / damlBuild).value,
+        (`svc-governance-v1test-daml` / Compile / damlBuild).value,
+        (`validator-lifecycle-daml` / Compile / damlBuild).value,
+      ).flatten
+      val baseDir = baseDirectory.value.getPath + java.io.File.separator
+      val darPaths = darFiles.map(file => file.getPath.stripPrefix(baseDir))
+      val outputFile = "daml/dars.lock"
+      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
+    },
+    damlDarsLockFileUpdate :=
+      Def.taskDyn {
+        (`build-tools-dar-lock-checker` / Compile / run)
+          .toTask(" update" + damlDarsLockCheckerFileArg.value)
+      }.value,
+    damlDarsLockFileCheck :=
+      Def.taskDyn {
+        (`build-tools-dar-lock-checker` / Compile / run)
+          .toTask(" check" + damlDarsLockCheckerFileArg.value)
+      }.value,
+  )
+
+val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
+val damlDarsLockFileUpdate = taskKey[Unit]("Update the daml/dars.lock file")
+val damlDarsLockCheckerFileArg =
+  taskKey[String]("Argument line for updating the daml/dars.lock file")
+
+lazy val `build-tools-dar-lock-checker` = project
+  .in(file("build-tools/dar-lock-checker"))
+  .settings(
+    libraryDependencies ++= Seq(Dependencies.better_files, Dependencies.daml_lf_archive_reader)
   )
 
 lazy val `tools` = project
