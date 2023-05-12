@@ -1,15 +1,8 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  DirectoryEntry,
-  RateDisplay,
-  useInterval,
-  useUserState,
-} from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, RateDisplay, useUserState } from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
 import formatISO from 'date-fns/formatISO';
-import { useCallback, useState } from 'react';
 
 import {
   AccountBalanceWallet,
@@ -30,35 +23,25 @@ import Typography from '@mui/material/Typography';
 
 import { Party } from '@daml/types';
 
-import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
+import { useCoinPrice, useTransactions } from '../hooks';
 import { Transaction } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const { listTransactions } = useWalletClient();
-
-  const fetchTransactionsAfterId = useCallback(
-    async (beginAfterId?: string) => {
-      const transactions = await listTransactions(beginAfterId);
-      setTransactions(transactions);
-    },
-    [listTransactions]
-  );
-
-  const fetchTransactions = useCallback(
-    () => fetchTransactionsAfterId(),
-    [fetchTransactionsAfterId]
-  );
-
-  useInterval(fetchTransactions);
+  const txQuery = useTransactions();
 
   const coinPriceQuery = useCoinPrice();
   const { primaryPartyId } = useUserState();
 
-  if (coinPriceQuery.isLoading || !primaryPartyId) {
+  // TODO(#4139) Implement design for loading and error states
+  if (coinPriceQuery.isLoading || txQuery.isLoading || !primaryPartyId) {
     return <Loading />;
   }
+
+  if (txQuery.isError) {
+    <p>Error fetching transactions.</p>;
+  }
+
+  const pagedTransactions = txQuery.data ? txQuery.data.pages : [];
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center" id="tx-history">
@@ -68,25 +51,32 @@ const TransactionHistory: React.FC = () => {
       <TableContainer>
         <Table>
           <TableBody>
-            {transactions.map(tx => {
-              return (
-                <TransactionHistoryRow
-                  key={'tx-row-' + tx.id}
-                  transaction={tx}
-                  primaryPartyId={primaryPartyId}
-                />
-              );
-            })}
+            {pagedTransactions.map(
+              transactions =>
+                transactions &&
+                transactions.map(tx => {
+                  return (
+                    <TransactionHistoryRow
+                      key={'tx-row-' + tx.id}
+                      transaction={tx}
+                      primaryPartyId={primaryPartyId}
+                    />
+                  );
+                })
+            )}
           </TableBody>
         </Table>
       </TableContainer>
       <ViewMoreButton
-        loadMore={() => {
-          // TODO(#3792): this is loading more data, but the new data is not added to the current results
-          const afterId: string | undefined =
-            transactions.length > 0 ? transactions[transactions.length - 1].id : undefined;
-          return fetchTransactionsAfterId(afterId);
-        }}
+        label={
+          txQuery.isFetchingNextPage
+            ? 'Loading more...'
+            : txQuery.hasNextPage
+            ? 'Load More'
+            : 'Nothing more to load'
+        }
+        loadMore={() => txQuery.fetchNextPage()}
+        disabled={!txQuery.hasNextPage}
       />
     </Stack>
   );
@@ -191,12 +181,21 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
 };
 
 interface ViewMoreButtonProps {
-  loadMore: () => Promise<void>;
+  loadMore: () => void;
+  label: string;
+  disabled: boolean;
 }
-const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore }) => {
+const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabled = false }) => {
   return (
-    <Button variant="outlined" size="small" color="secondary" onClick={loadMore}>
-      View More
+    <Button
+      id="view-more-transactions"
+      variant="outlined"
+      size="small"
+      color="secondary"
+      onClick={loadMore}
+      disabled={disabled}
+    >
+      {label}
     </Button>
   );
 };

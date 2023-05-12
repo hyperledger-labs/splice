@@ -7,6 +7,9 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.scalatest.Assertion
+
+import scala.collection.parallel.immutable.ParVector
 
 class WalletTransactionHistoryIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
@@ -151,6 +154,111 @@ class WalletTransactionHistoryIntegrationTest
       }
     }
 
+    "paginate transactions" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceEntryName = perTestCaseName("alice.cns")
+      waitForWalletUser(aliceValidatorWallet)
+
+      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobEntryName = perTestCaseName("bob.cns")
+      waitForWalletUser(bobValidatorWallet)
+
+      val transferAmounts = ParVector.range(1, 20)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        actAndCheck(
+          "Alice goes to her wallet", {
+            browseToAliceWallet(aliceDamlUser)
+          },
+        )(
+          "Alice sees no transactions",
+          _ => {
+            txRows should have size 0
+          },
+        )
+
+        createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
+        createDirectoryEntry(bobUserParty, bobDirectory, bobEntryName, bobWallet)
+
+        aliceWallet.tap(500)
+
+        actAndCheck(
+          "Alice makes transfers to bob", {
+            transferAmounts.foreach(amount =>
+              p2pTransfer(
+                aliceValidator,
+                aliceWallet,
+                bobWallet,
+                bobUserParty,
+                BigDecimal(amount),
+              )
+            )
+          },
+        )(
+          "Alice sees the first page of transactions",
+          _ => {
+            // transactions are paginated in 10s and allowing for automation txs
+            assertTxsInRangeAndButtonHasCorrectLabel((8, 12))
+          },
+        )
+
+        actAndCheck(
+          "Load second page", {
+            click on id("view-more-transactions")
+          },
+        )(
+          "Alice sees second page of transactions appended",
+          _ => {
+            assertTxsInRangeAndButtonHasCorrectLabel((18, 25))
+          },
+        )
+
+        actAndCheck(
+          "Load third page", {
+            click on id("view-more-transactions")
+          },
+        )(
+          "Alice sees third page of transactions appended",
+          _ => {
+            assertTxsInRangeAndButtonHasCorrectLabel((18, 25))
+          },
+        )
+
+        // we have to click the button one last time to know there's no more data to fetch
+        actAndCheck(
+          "Load final empty page", {
+            click on id("view-more-transactions")
+          },
+        )(
+          "Alice sees there are no more transactions to load",
+          _ => {
+            assertTxsInRangeAndButtonHasCorrectLabel((20, 25), hasMore = false)
+          },
+        )
+
+      }
+    }
+  }
+
+  def viewMoreButton(implicit webdriver: WebDriverType): Element = {
+    find(id("view-more-transactions"))
+      .getOrElse(
+        fail("Unable to find button with id view-more-transactions")
+      )
+  }
+
+  def txRows(implicit webdriver: WebDriverType): Seq[Element] = {
+    findAll(className("tx-row")).toSeq
+  }
+
+  def assertTxsInRangeAndButtonHasCorrectLabel(range: (Int, Int), hasMore: Boolean = true)(implicit
+      webDriverType: WebDriverType
+  ): Assertion = {
+    val buttonText = viewMoreButton.text
+    val label = if (hasMore) "Load More" else "Nothing more to load"
+    assertInRange(txRows.size, (BigDecimal(range._1), BigDecimal(range._2)))
+    buttonText should be(label)
   }
 
 }
