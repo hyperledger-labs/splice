@@ -5,6 +5,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 class SvFrontendIntegrationTest
     extends FrontendIntegrationTest("sv1")
@@ -131,7 +132,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "can view median coin price and desired coin price by each SV" in { implicit env =>
+    "can view median coin price and update desired coin price by each SV" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the coin price tab", {
@@ -144,14 +145,136 @@ class SvFrontendIntegrationTest
             inside(find(id("median-coin-price-usd"))) { case Some(e) =>
               e.text shouldBe "1 USD"
             }
-            inside(find(id("cur-sv-coin-price"))) { case Some(e) =>
-              e.text shouldBe "Your Desired Canton Coin Price : 1 USD"
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "1 USD"
             }
-            findAll(className("coin-price-table-row")).toSeq should have size 3
-            // TODO(#4495) add more assertion on coin price value when SV operator is allows to set desired coin price
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+          },
+        )
+
+        actAndCheck(
+          "sv1 operator can change the desired price", {
+            click on "edit-coin-price-button"
+            click on "desired-coin-price-field"
+            numberField("desired-coin-price-field").underlying.clear()
+            numberField("desired-coin-price-field").underlying.sendKeys("10")
+
+            click on "update-coin-price-button"
+          },
+        )(
+          "median coin price changed and desired coin price of sv1 is updated",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+          },
+        )
+
+        actAndCheck(
+          "sv2 set the desired price", {
+            sv2.updateCoinPriceVote(BigDecimal(15.55))
+          },
+        )(
+          "median coin price changed and coin price updated on the row for sv2",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "12.775 USD"
+            }
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "15.55 USD")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+          },
+        )
+
+        actAndCheck(
+          "sv3 set the desired price", {
+            sv3.updateCoinPriceVote(BigDecimal(5))
+          },
+        )(
+          "median coin price changed and coin price updated on the row for sv2",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "15.55 USD")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "5 USD")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+          },
+        )
+        actAndCheck(
+          "sv4 set the desired price", {
+            sv4.updateCoinPriceVote(BigDecimal(9.0))
+          },
+        )(
+          "median coin price changed and coin price updated on the row for sv4",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "9.5 USD"
+            }
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "10 USD"
+            }
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "15.55 USD")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "5 USD")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "9 USD")
+          },
+        )
+        actAndCheck(
+          "sv1 update the desired price", {
+            sv1.updateCoinPriceVote(BigDecimal(1.0))
+          },
+        )(
+          "median coin price changed",
+          _ => {
+            inside(find(id("median-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "7 USD"
+            }
+            inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              e.text shouldBe "1 USD"
+            }
+            val rows = findAll(className("coin-price-table-row")).toSeq
+            rows should have size 3
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "15.55 USD")
+            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "5 USD")
+            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "9 USD")
           },
         )
       }
+    }
+  }
+
+  private def svCoinPriceShouldMatch(
+      rows: Seq[Element],
+      svParty: PartyId,
+      coinPrice: String,
+  ) = {
+    forExactly(1, rows) { row =>
+      row.childElement(className("sv-party")).text shouldBe svParty.toProtoPrimitive
+      row.childElement(className("coin-price")).text shouldBe coinPrice
     }
   }
 }

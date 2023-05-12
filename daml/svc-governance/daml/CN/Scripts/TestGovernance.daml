@@ -199,35 +199,25 @@ testCoinPriceVoting = do
   runNextIssuanceD app 1.2
 
   -- have all SV's adjust their prices
-  [(coinRulesCid, coinRules)] <- query @CoinRules svc
   [(svcRulesCid, _)] <- query @SvcRules svc
   forA_ (zip [1, 2, 3, 4] [sv1, sv2, sv3, sv4]) $ \(coinPriceInt, sv) -> do
     [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv)
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
-      coinRulesCid
       sv
       coinPrice = intToDecimal coinPriceInt
       voteCid
 
-  -- show that sv1 cannot update their vote again within less than one tick duration
+  [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv1)
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+    sv = sv1
+    coinPrice = 5.0
+    voteCid
+
+  [(coinRulesCid, coinRules)] <- query @CoinRules svc
   now <- getTime
   let coinConfig = CC.Schedule.getValueAsOf now coinRules.configSchedule
-  passTime (coinConfig.tickDuration - convertMicrosecondsToRelTime 1)
-
-  [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv1)
-  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
-    coinRulesCid
-    sv = sv1
-    coinPrice = 5.0
-    voteCid
-
-  -- it succeeds after one tick duration
-  passTime (convertMicrosecondsToRelTime 1)
-  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
-    coinRulesCid
-    sv = sv1
-    coinPrice = 5.0
-    voteCid
+  passTime (coinConfig.tickDuration)
 
   -- pass enough time to advance the open mining round and lock in the price
   [(roundToArchiveCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- sortOn (._2.round) <$> query @OpenMiningRound svc

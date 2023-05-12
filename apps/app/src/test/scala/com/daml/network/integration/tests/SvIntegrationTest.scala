@@ -40,6 +40,7 @@ import com.digitalasset.canton.topology.transaction.{
 import java.time.Instant
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.Random
 
 class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
@@ -800,6 +801,66 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       }
   }
 
+  "SVs can update their CoinPriceVote contracts" in { implicit env =>
+    initSvc()
+    val svParties = Seq(("sv1", sv1), ("sv2", sv2), ("sv3", sv3), ("sv4", sv4)).map {
+      case (svName, sv) => svName -> sv.getSvcInfo().svParty.toProtoPrimitive
+    }.toMap
+
+    clue("initially only sv1 has set the CoinPriceVote") {
+      eventually() {
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Some(BigDecimal(1.0)),
+          svParties("sv2") -> None,
+          svParties("sv3") -> None,
+          svParties("sv4") -> None,
+        )
+      }
+    }
+
+    actAndCheck(
+      "set CoinPriceVote of sv2, sv3 and sv4", {
+        sv2.updateCoinPriceVote(BigDecimal(4.0))
+        sv3.updateCoinPriceVote(BigDecimal(3.0))
+        sv4.updateCoinPriceVote(BigDecimal(2.0))
+      },
+    )(
+      "CoinPriceVote contract for sv2, sv3 anc sv4 are updated",
+      _ => {
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Some(BigDecimal(1.0)),
+          svParties("sv2") -> Some(BigDecimal(4.0)),
+          svParties("sv3") -> Some(BigDecimal(3.0)),
+          svParties("sv4") -> Some(BigDecimal(2.0)),
+        )
+      },
+    )
+
+    actAndCheck(
+      "update CoinPriceVote of sv1", {
+        sv1.updateCoinPriceVote(BigDecimal(5.0))
+      },
+    )(
+      "CoinPriceVote contract for sv1 are updated",
+      _ => {
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Some(BigDecimal(5.0)),
+          svParties("sv2") -> Some(BigDecimal(4.0)),
+          svParties("sv3") -> Some(BigDecimal(3.0)),
+          svParties("sv4") -> Some(BigDecimal(2.0)),
+        )
+      },
+    )
+  }
+
+  private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
+    sv1
+      .listCoinPriceVotes()
+      .groupBy(_.payload.sv)
+      .map { case (sv, contracts) =>
+        sv -> contracts.head.payload.coinPrice.toScala.map(BigDecimal(_))
+      }
+
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
     BigDecimal(amount).bigDecimal,
     new cc.api.v1.round.Round(0L),
@@ -823,7 +884,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       update = coin(amount, svcParty).create,
     )
 
-  def getCoins(
+  private def getCoins(
       participant: CNParticipantClientReference,
       party: PartyId,
       predicate: cc.coin.Coin.Contract => Boolean = _ => true,
@@ -832,14 +893,6 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .filterJava(cc.coin.Coin.COMPANION)(party, predicate)
       .sortBy(_.data.amount.initialAmount)
   }
-
-  def getCoinRules()(implicit env: CNNodeTestConsoleEnvironment) =
-    clue("There is exactly one CoinRules contract") {
-      val foundCoinRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
-      foundCoinRules should have length 1
-      foundCoinRules.head
-    }
 
   private def createSvOnboardingConfirmation(
       svcRules: SvcRules.Contract,

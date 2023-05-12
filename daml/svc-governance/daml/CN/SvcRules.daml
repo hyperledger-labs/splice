@@ -3,7 +3,7 @@ module CN.SvcRules where
 import DA.Action (void, when, unless)
 import DA.Foldable (forA_)
 import DA.List as List
-import DA.Optional (fromSome, isNone, isSome)
+import DA.Optional (fromSome, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -11,7 +11,6 @@ import DA.Time
 
 import CC.Coin
 import CC.Round
-import qualified CC.Schedule
 import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
@@ -585,24 +584,15 @@ template SvcRules with
         sv : Party
         voteCid : ContractId CoinPriceVote
         coinPrice : Decimal
-        coinRulesCid : ContractId CoinRules
       controller sv
       do
         requireUnlocked lock
-        -- fetch coin rules to access their config
-        coinRules <- fetch coinRulesCid
-        require "SVC matches" (coinRules.svc == svc)
-        now <- getTime
-        let coinConfig = CC.Schedule.getValueAsOf now coinRules.configSchedule
         -- validate and archive existing vote
         vote <- fetch voteCid
         archive voteCid
         require "SVC matches" (vote.svc == svc)
         require "SV matches" (vote.sv == sv)
         now <- getTime
-        unless (isNone $ vote.coinPrice) $
-          require "Last update happened at least one tick ago"
-            (vote.lastUpdatedAt `addRelTime` coinConfig.tickDuration <= now)
         -- create new vote
         create CoinPriceVote with
           svc

@@ -1,15 +1,27 @@
+import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
 import DateDisplay from 'common-frontend/lib/components/DateDisplay';
-import React from 'react';
+import React, { useState } from 'react';
 
-import { Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableRow from '@mui/material/TableRow';
+import EditIcon from '@mui/icons-material/Edit';
+import {
+  IconButton,
+  Stack,
+  Table,
+  TableContainer,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableRow,
+  Typography,
+  TextField,
+  Button,
+} from '@mui/material';
 
 import { Numeric, Optional, Party } from '@daml/types';
 
+import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { useCoinPriceVotes } from '../../hooks/useCoinPriceVotes';
 import { CoinPriceVote } from '../../models/models';
@@ -17,6 +29,22 @@ import { config } from '../../utils';
 
 const DesiredCoinPrice: React.FC = () => {
   const coinPriceVotesQuery = useCoinPriceVotes();
+  const { updateDesiredCoinPrice } = useSvAdminClient();
+  const [curPrice, setCurPrice] = useState<BigNumber>(new BigNumber(0.0));
+  const [enableEdit, setEnableEdit] = useState<boolean>(false);
+  const updateDesiredCoinPriceMutation = useMutation({
+    mutationFn: () => {
+      return updateDesiredCoinPrice(curPrice);
+    },
+    onSettled: async () => {
+      setEnableEdit(false);
+    },
+  });
+
+  const maybeBigNumber = (maybeNumeric: Optional<Numeric>) => {
+    return maybeNumeric !== null ? new BigNumber(maybeNumeric) : undefined;
+  };
+
   const svcInfosQuery = useSvcInfos();
   if (coinPriceVotesQuery.isLoading || svcInfosQuery.isLoading) {
     return <Loading />;
@@ -32,26 +60,76 @@ const DesiredCoinPrice: React.FC = () => {
     v => v.sv === svPartyId
   );
 
-  const maybeBigNumber = (maybeNumeric: Optional<Numeric>) => {
-    return maybeNumeric !== null ? new BigNumber(maybeNumeric) : undefined;
-  };
-
   const otherCoinPriceVotes = coinPriceVotesQuery.data
     .filter(v => v.sv !== svPartyId)
     .sort((a, b) => {
       return b.lastUpdatedAt.valueOf() - a.lastUpdatedAt.valueOf();
     });
 
+  const isInvalidPrice = curPrice.lte(0.0);
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
-      <Typography id="cur-sv-coin-price" mt={6} variant="h4">
-        {'Your Desired Canton Coin Price : '}
-        {curSvCoinPriceVote?.coinPrice ? (
-          <AmountDisplay amount={maybeBigNumber(curSvCoinPriceVote.coinPrice)!} currency="USD" />
-        ) : (
-          'Not Set'
-        )}
+      <Typography mt={6} variant="h4">
+        {'Your Desired Canton Coin Price'}
       </Typography>
+      {enableEdit ? (
+        updateDesiredCoinPriceMutation.isLoading ? (
+          <Loading />
+        ) : (
+          <Stack direction="row">
+            <TextField
+              error={isInvalidPrice}
+              label="Amount"
+              onChange={event => setCurPrice(new BigNumber(event.target.value))}
+              value={curPrice}
+              type="number"
+              id="desired-coin-price-field"
+            />
+            <Button
+              variant="contained"
+              disabled={isInvalidPrice}
+              onClick={() => updateDesiredCoinPriceMutation.mutate()}
+              id="update-coin-price-button"
+            >
+              Update
+            </Button>
+            <Button
+              variant="contained"
+              color="warning"
+              disabled={false}
+              onClick={() => setEnableEdit(false)}
+              id="cancel-coin-price-button"
+            >
+              Cancel
+            </Button>
+          </Stack>
+        )
+      ) : (
+        <Typography id="cur-sv-coin-price-usd" mt={6} variant="h6">
+          {curSvCoinPriceVote?.coinPrice ? (
+            <AmountDisplay amount={maybeBigNumber(curSvCoinPriceVote.coinPrice)!} currency="USD" />
+          ) : (
+            'Not Set'
+          )}
+          <IconButton
+            onClick={() => {
+              // set initial value for editing
+              setCurPrice(
+                curSvCoinPriceVote?.coinPrice
+                  ? maybeBigNumber(curSvCoinPriceVote.coinPrice)!
+                  : // TODO(#4632) If desired price is not yet set in this SV
+                    // Current median value would be a better choice than 0.0 as a initial value for editing.
+                    // but it would be easier to do it after #4632 is done.
+                    new BigNumber(0.0)
+              );
+              setEnableEdit(true);
+            }}
+          >
+            <EditIcon id="edit-coin-price-button" fontSize={'small'} />
+          </IconButton>
+        </Typography>
+      )}
+
       <Typography mt={6} variant="h4">
         Desired Canton Coin Prices of Other Super Validators
       </Typography>
@@ -96,9 +174,9 @@ const OtherCoinPricesRow: React.FC<OtherCoinPricesRowProps> = ({
   return (
     <TableRow className="coin-price-table-row">
       <TableCell>
-        <PartyId partyId={sv} className="sv-coin-price" />
+        <PartyId partyId={sv} className="sv-party" />
       </TableCell>
-      <TableCell>
+      <TableCell className="coin-price">
         {coinPrice ? <AmountDisplay amount={coinPrice} currency="USD" /> : 'Not Set'}
       </TableCell>
       <TableCell>

@@ -2,6 +2,7 @@ package com.daml.network.console
 
 import akka.util.ByteString
 import com.daml.network.auth.AuthUtil
+import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -120,6 +121,22 @@ class SvAppBackendReference(
         HttpSvAdminAppClient.PrepareValidatorOnboarding(expiresIn)
       )
     }
+
+  @Help.Summary("Update cc price vote (via admin API)")
+  def updateCoinPriceVote(coinPrice: BigDecimal): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.UpdateCoinPriceVote(coinPrice)
+      )
+    }
+
+  def listCoinPriceVotes(): Seq[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListCoinPriceVotes
+      )
+    }
+  }
 
   /** Remote participant this sv app is configured to interact with. */
   lazy val participantClient =

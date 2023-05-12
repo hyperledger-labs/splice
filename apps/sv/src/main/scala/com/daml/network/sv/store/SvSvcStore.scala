@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.v1test as v1testcc
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cc.validatorlicense as vl
+import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
@@ -517,6 +518,16 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   ] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(cn.svc.coinprice.CoinPriceVote.COMPANION, _)
+    )
+
+  def lookupCoinPriceVoteByThisSv()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomain(cp.CoinPriceVote.COMPANION)(
+        _,
+        co => co.payload.sv == key.svParty.toProtoPrimitive,
+      )
     )
 
   private def lookupSvOnboardingRequestByCandidateNameWithOffset(

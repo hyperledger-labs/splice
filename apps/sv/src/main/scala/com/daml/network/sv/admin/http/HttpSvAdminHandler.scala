@@ -6,6 +6,7 @@ import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
+import com.daml.network.util.Codec
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -120,6 +121,28 @@ class HttpSvAdminHandler(
           coinPriceVotes.map(_.toJson).toVector
         )
       }
+    }
+  }
+
+  def updateCoinPriceVote(
+      respond: v0.SvAdminResource.UpdateCoinPriceVoteResponse.type
+  )(
+      body: definitions.UpdateCoinPriceVoteRequest
+  )(adminUser: String): Future[v0.SvAdminResource.UpdateCoinPriceVoteResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val coinPrice = Codec.tryDecode(Codec.BigDecimal)(body.coinPrice)
+      SvApp
+        .updateCoinPriceVote(
+          coinPrice,
+          svcStore: SvSvcStore,
+          ledgerConnection,
+          globalDomain: DomainId,
+          logger,
+        )
+        .flatMap {
+          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+          case Right(()) => Future.successful(v0.SvAdminResource.UpdateCoinPriceVoteResponseOK)
+        }
     }
   }
 

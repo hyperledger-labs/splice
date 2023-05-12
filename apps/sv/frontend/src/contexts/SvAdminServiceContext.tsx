@@ -1,4 +1,5 @@
 import * as openapi from 'sv-openapi';
+import BigNumber from 'bignumber.js';
 import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
   RequestContext,
   ResponseContext,
   ServerConfiguration,
+  UpdateCoinPriceVoteRequest,
 } from 'sv-openapi';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
@@ -26,6 +28,7 @@ export interface SvAdminClient {
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
   listCoinPriceVotes: () => Promise<ListCoinPriceVotesResponse>;
+  updateDesiredCoinPrice: (coinPrice: BigNumber) => Promise<void>;
 }
 
 class ApiMiddleware
@@ -64,6 +67,10 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       listCoinPriceVotes: async (): Promise<ListCoinPriceVotesResponse> => {
         return await svAdminClient.listCoinPriceVotes();
+      },
+      updateDesiredCoinPrice: async (coinPrice: BigNumber): Promise<void> => {
+        const request: UpdateCoinPriceVoteRequest = { coinPrice: coinPrice.toString() };
+        return await svAdminClient.updateCoinPriceVote(request);
       },
     };
   }, [url, userAccessToken]);

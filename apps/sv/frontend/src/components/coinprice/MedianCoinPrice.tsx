@@ -10,13 +10,16 @@ import { useCoinPriceVotes } from '../../hooks/useCoinPriceVotes';
 const MedianCoinPrice: React.FC = () => {
   const coinPriceVotesQuery = useCoinPriceVotes();
 
-  const median = (votedPrices: BigNumber[] | undefined) => {
+  const median = (votedPrices: BigNumber[]) => {
     if (votedPrices && votedPrices.length > 0) {
-      const length = votedPrices.length;
+      const sorted = [...votedPrices].sort((a, b) => {
+        return a.isEqualTo(b) ? 0 : a.isLessThan(b) ? -1 : 1;
+      });
+      const length = sorted.length;
       const half = Math.floor(length / 2);
       return length % 2 !== 0
-        ? votedPrices[half]
-        : votedPrices[half - 1].plus(votedPrices[half]).multipliedBy(0.5);
+        ? sorted[half]
+        : sorted[half - 1].plus(sorted[half]).multipliedBy(0.5);
     }
     return undefined;
   };
@@ -30,7 +33,7 @@ const MedianCoinPrice: React.FC = () => {
   );
 
   const medianCoinPrice = useMemo(
-    () => (!!coinPrices ? median(coinPrices) : undefined),
+    () => (coinPrices ? median(coinPrices) : undefined),
     [coinPrices]
   );
 
@@ -43,8 +46,8 @@ const MedianCoinPrice: React.FC = () => {
   }
 
   return (
-    <Stack direction="column" spacing={1}>
-      <Typography variant="h6">Coin Price for Next Open Mining Round</Typography>
+    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+      <Typography variant="h4">Coin Price for Next Open Mining Round</Typography>
       <Typography id="median-coin-price-usd" variant="h2">
         {medianCoinPrice && <AmountDisplay amount={medianCoinPrice} currency="USD" />}
       </Typography>

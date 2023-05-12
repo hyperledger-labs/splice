@@ -5,9 +5,10 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.{definitions, svAdmin as http}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.duration.FiniteDuration
@@ -88,6 +89,47 @@ object HttpSvAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ApproveSvIdentityResponse.OK =>
+      Right(())
+    }
+  }
+
+  case object ListCoinPriceVotes
+      extends BaseCommand[http.ListCoinPriceVotesResponse, Seq[
+        Contract[CoinPriceVote.ContractId, CoinPriceVote]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListCoinPriceVotesResponse] =
+      client.listCoinPriceVotes(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListCoinPriceVotesResponse.OK(response) =>
+      response.coinPriceVotes
+        .traverse(req => Contract.fromJson(CoinPriceVote.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  case class UpdateCoinPriceVote(coinPrice: BigDecimal)
+      extends BaseCommand[http.UpdateCoinPriceVoteResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.UpdateCoinPriceVoteResponse] =
+      client.updateCoinPriceVote(
+        body = definitions.UpdateCoinPriceVoteRequest(Codec.encode(coinPrice)),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.UpdateCoinPriceVoteResponse.OK =>
       Right(())
     }
   }

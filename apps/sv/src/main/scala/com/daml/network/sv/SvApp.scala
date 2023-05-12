@@ -53,6 +53,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
 class SvApp(
@@ -169,6 +170,7 @@ class SvApp(
             HttpMethods.DELETE,
             HttpMethods.GET,
             HttpMethods.POST,
+            HttpMethods.PUT,
             HttpMethods.HEAD,
             HttpMethods.OPTIONS,
           )
@@ -996,6 +998,41 @@ object SvApp {
         }
       }
     } yield res
+  }
+
+  def updateCoinPriceVote(
+      desiredCoinPrice: BigDecimal,
+      svcStore: SvSvcStore,
+      ledgerConnection: CNLedgerConnection,
+      globalDomain: DomainId,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    svcStore.lookupCoinPriceVoteByThisSv().flatMap {
+      case Some(vote) if vote.payload.coinPrice.toScala.contains(desiredCoinPrice.bigDecimal) =>
+        logger.info(s"Coin price vote is already set to $desiredCoinPrice")
+        Future.successful(Right(()))
+      case Some(vote) =>
+        for {
+          svcRules <- svcStore.getSvcRules()
+          cmd = svcRules.contractId.exerciseSvcRules_UpdateCoinPriceVote(
+            svcStore.key.svParty.toProtoPrimitive,
+            vote.contractId,
+            desiredCoinPrice.bigDecimal,
+          )
+          _ <- ledgerConnection.submitCommandsNoDedup(
+            actAs = Seq(svcStore.key.svParty),
+            readAs = Seq(svcStore.key.svcParty),
+            commands = cmd.commands().asScala.toSeq,
+            domainId = globalDomain,
+          )
+        } yield Right(())
+      case None =>
+        Future.successful(
+          Left(
+            s"No cc price vote contract found for this SV. It is not expected as it should be created when the SV was added to SVC,"
+          )
+        )
+    }
   }
 
   private[sv] def approveSvIdentity(
