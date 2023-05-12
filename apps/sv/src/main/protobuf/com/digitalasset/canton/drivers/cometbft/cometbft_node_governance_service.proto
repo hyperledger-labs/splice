@@ -233,3 +233,11 @@ message SvNodeConfigChangeRequest {
   // The change being requested.
   SvNodeConfigChange change = 3;
 }
+
+// The general cometbft-canton-network abci app
+// proto type. Can be either Seqeuencer or Governance command.
+message CometBftTx {
+  oneof message {
+    UpdateNetworkConfigRequest updateNetworkConfigRequest = 3;
+  }
+}

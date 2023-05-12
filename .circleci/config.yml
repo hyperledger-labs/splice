@@ -819,7 +819,17 @@ commands:
          # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: make docker-build -j
-
+  docker_login_artifactory:
+    steps:
+      - run:
+          name: Login to artifactory
+          command: |
+            if [[ -z "${ARTIFACTORY_USER}" || -z "${ARTIFACTORY_PASSWORD}" ]]; then
+                echo "artifactory user:key is empty: ${ARTIFACTORY_USER} / pw. maybe add context:artifactory?"
+                exit 1
+            fi
+            echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
+            echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
 jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -884,6 +894,11 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout
+      # Used to pull docker images for cometbft
+      - docker_login_artifactory
+      # Used to start cometbft docker containers
+      - setup_remote_docker:
+          version: 20.10.14
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -1191,14 +1206,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - run:
-          name: Login to artifactory
-          command: |
-             if [[ -z "${ARTIFACTORY_USER}" || -z "${ARTIFACTORY_PASSWORD}" ]]; then
-                 echo "artifactory user:key is empty: ${ARTIFACTORY_USER} / pw. maybe add context:artifactory?"
-                 exit 1
-             fi
-             echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
+      - docker_login_artifactory
       - checkout
       - setup_sbt_test_job
       - run_bash_command_in_nix:
