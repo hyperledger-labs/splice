@@ -36,9 +36,7 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   if (!isAuthorized) {
     console.debug('undefined isAuthorized');
   }
-  console.log(userId);
-  console.log(typeof userId == 'undefined');
-  console.log(isAuthorized && userId === undefined);
+
   if (isAuthenticated && isAuthorized) {
     return <Outlet />;
   } else {

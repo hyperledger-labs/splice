@@ -37,11 +37,11 @@ class SvFrontendIntegrationTest
         loggerFactory.assertLogs(
           {
             actAndCheck(
-              "login works with correct password", {
+              "login does not work with wrong password", {
                 login(port, "NobodyCares!")
               },
             )(
-              "login does not work with wrong password",
+              "login fails",
               _ => find(id("loginFailed")).value.text should matchText("User failed to login!"),
             )
           },

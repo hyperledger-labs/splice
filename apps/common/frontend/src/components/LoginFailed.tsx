@@ -1,8 +1,6 @@
 import { ReactNode } from 'react';
 import React from 'react';
 
-import { theme } from '../theme';
-
 interface IProps {
   children?: ReactNode;
 }
@@ -14,7 +12,7 @@ class LoginFailed extends React.Component<IProps> {
         <div
           style={{
             padding: '8px',
-            background: theme.palette.warning.main,
+            background: '#FFCC99',
             display: 'flex',
             justifyContent: 'space-between',
           }}
