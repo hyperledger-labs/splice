@@ -15,8 +15,12 @@ CI_VCSTYPE="github"
 CI_ORGNAME="DACH-NY"
 CI_PROJECT="the-real-canton-coin"
 
-echo "Please enter the job number. This should be a ~5 digit number."
-read -r CI_BUILD_NUM
+if [ -z "${1:-}" ]; then
+  echo "Please enter the job number. This should be a ~5 digit number."
+  read -r CI_BUILD_NUM
+else
+  CI_BUILD_NUM="${1}"
+fi
 
 BASE_TARGET_DIRECTORY="$(pwd)/log/ci/$CI_BUILD_NUM"
 mkdir -p "$BASE_TARGET_DIRECTORY"
