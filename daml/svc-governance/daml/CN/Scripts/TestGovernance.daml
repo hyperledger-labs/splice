@@ -1,0 +1,246 @@
+module CN.Scripts.TestGovernance where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import Daml.Script
+import DA.Time
+
+import CC.Coin
+import CC.Round
+import CC.Schedule
+
+import CN.SvcRules
+import CN.SVC.CoinPrice
+
+import CN.Scripts.SvcTestUtils
+
+
+-- Vote Requests
+----------------
+
+-- | Tests vote request machinery on featured app right granting and revoking.
+testVoteRequest : Script ()
+testVoteRequest = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  -- allocate an app provider, and check that there is no app right
+  provider <- allocateParty "provider"
+  [] <- query @FeaturedAppRight provider
+
+  -- sv1 initiates the granting of the featured app right for the provider
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
+        provider
+    reason = Reason with url = ""; body = "they are great!"
+
+  -- sv2 rejects initially
+  voteCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+    voter = sv2
+    requestCid
+    accept = False
+    reason = Reason with url = ""; body = "the justificaiton is not good enough"
+
+  -- there are two votes, which is not enough to consider the vote definitive and grant the app right
+  executeAllDefinitiveVotes app
+  [] <- query @FeaturedAppRight provider
+  votes <- query @Vote svc
+  length votes === 2
+
+  -- a day passes and sv2 updates their vote
+  passTime (days 1)
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateVote with
+    voter = sv2
+    voteCid
+    accept = True
+    reason = Reason with url = ""; body = "OK, after rereading the materials, I agree."
+
+  -- there are still only two votes, which is not enough to consider the vote definitive and grant the app right
+  executeAllDefinitiveVotes app
+  [] <- query @FeaturedAppRight provider
+  votes <- query @Vote svc
+  length votes === 2
+
+  -- sv3 rejects
+  submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+    voter = sv3
+    requestCid
+    accept = False
+    reason = Reason with url = ""; body = "I disagree that they've earned that right."
+
+  -- there are now three votes, out of which two accept, which are enough to grant the right
+  executeAllDefinitiveVotes app
+  [(rightCid, right)] <- query @FeaturedAppRight provider
+  right === FeaturedAppRight with svc; provider
+
+  -- the request and all votes have been archived
+  [] <- query @VoteRequest svc
+  [] <- query @Vote svc
+
+  -- a request that does not get answered in time just expires, together with all its votes
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
+        rightCid
+    reason = Reason with url = ""; body = "they are no longer great!"
+
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+      voter = sv2
+      requestCid
+      accept = True
+      reason = Reason with url = ""; body = ""
+
+  -- wait until they expire
+  passTime (svcRules.config.voteRequestTimeout)
+  expireAllExpiredContracts svc
+  [] <- query @VoteRequest svc
+  [] <- query @Vote svc
+
+  -- we can remove the granted right using a confirmation request, provided enough parties answer in time
+  initateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
+        rightCid
+
+  -- the right is now revoked
+  [] <- query @FeaturedAppRight provider
+  pure ()
+
+-- | Test SvcRules configuration changes.
+testSvcRulesConfigChange : Script ()
+testSvcRulesConfigChange = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  [(_, svcRules)] <- query @SvcRules svc
+
+  -- run the voting process to change the config
+  let newConfig = svcRules.config with maxTextLength = svcRules.config.maxTextLength + 1024 * 1024
+  initateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_SetConfig SvcRules_SetConfig with
+        newConfig
+
+  -- check that the config change happened
+  [(_, svcRules)] <- query @SvcRules svc
+  svcRules.config === newConfig
+
+
+-- | Test membership removal and GC of CoinPriceVotes
+testRemoveMember : Script ()
+testRemoveMember = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+
+  -- check that the leader is currently sv1
+  [(_, svcRules)] <- query @SvcRules svc
+  svcRules.leader === sv1
+
+  -- run the voting process to change the config and remove the current leader 'sv1'
+  initateAndAcceptVote app [sv2, sv3, sv4] $
+    ARC_SvcRules with
+      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+        member = sv1
+
+  -- check that the member was removed and the leader changed to sv2
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  Map.keys (svcRules.members) === [sv2, sv3, sv4]
+  svcRules.leader === sv2
+
+  -- duplicate the CoinPriceVote for sv2 to test duplicate removal
+  coinPriceVotes <- query @CoinPriceVote svc
+  let [(sv2VoteCid1, sv2Vote)] = filter (\(_, vote) -> vote.sv == sv2) coinPriceVotes
+  sv2VoteCid2 <- submit svc $ createCmd sv2Vote
+
+  -- there should now be five votes
+  coinPriceVotes <- query @CoinPriceVote svc
+  length coinPriceVotes === 5
+
+  -- garbage collect the CoinPriceVote of sv1
+  let [(sv1VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv1) coinPriceVotes
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectCoinPriceVotes with
+    nonMemberVoteCids = [sv1VoteCid]
+    duplicateVoteCids = [[sv2VoteCid1, sv2VoteCid2]]
+
+  -- there should now be only three votes
+  coinPriceVotes <- query @CoinPriceVote svc
+  length coinPriceVotes === 3
+
+  -- one cannot archive a vote by listing it as a duplicate of its own
+  let [(sv3VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv3) coinPriceVotes
+  submitMultiMustFail [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectCoinPriceVotes with
+    nonMemberVoteCids = []
+    duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
+
+
+-- Coin Prices
+--------------
+
+
+unitTestMedian : Script ()
+unitTestMedian = do
+  median [1.0] === 1.0
+  median [2.0, 1.0] === 1.5
+  median [3.0, 1.0, 2.0] === 2.0
+  median [1.0, 2.0, 3.0, 4.0] === 2.5
+  median [1.0, 200.0, 3.0, 4.0, 1000.0] === 4.0
+
+
+testCoinPriceVoting : Script ()
+testCoinPriceVoting = do
+
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+
+  -- run a normal issuance so time advances and the coin price is set to 1.2 for everybody
+  runNextIssuanceD app 1.2
+
+  -- have all SV's adjust their prices
+  [(coinRulesCid, coinRules)] <- query @CoinRules svc
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ (zip [1, 2, 3, 4] [sv1, sv2, sv3, sv4]) $ \(coinPriceInt, sv) -> do
+    [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv)
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+      coinRulesCid
+      sv
+      coinPrice = intToDecimal coinPriceInt
+      voteCid
+
+  -- show that sv1 cannot update their vote again within less than one tick duration
+  now <- getTime
+  let coinConfig = CC.Schedule.getValueAsOf now coinRules.configSchedule
+  passTime (coinConfig.tickDuration - convertMicrosecondsToRelTime 1)
+
+  [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv1)
+  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+    coinRulesCid
+    sv = sv1
+    coinPrice = 5.0
+    voteCid
+
+  -- it succeeds after one tick duration
+  passTime (convertMicrosecondsToRelTime 1)
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+    coinRulesCid
+    sv = sv1
+    coinPrice = 5.0
+    voteCid
+
+  -- pass enough time to advance the open mining round and lock in the price
+  [(roundToArchiveCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- sortOn (._2.round) <$> query @OpenMiningRound svc
+  coinPriceVotes <- query @CoinPriceVote svc
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_AdvanceOpenMiningRounds with
+    coinRulesCid
+    roundToArchiveCid
+    middleRoundCid
+    latestRoundCid
+    coinPriceVoteCids = map fst coinPriceVotes
+
+  -- check that the most recent round has the median a coin price of the votes
+  (_, latestRound) <- (last . sortOn (._2.round)) <$> query @OpenMiningRound svc
+  latestRound.coinPrice === 3.5
+
+  pure ()

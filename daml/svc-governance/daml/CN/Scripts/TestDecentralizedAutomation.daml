@@ -1,0 +1,218 @@
+module CN.Scripts.TestDecentralizedAutomation where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+
+import CC.Coin
+
+import CN.SvcRules
+import CN.Util.Assert
+
+import CC.Scripts.Util
+import CN.Scripts.SvcTestUtils
+
+
+-- Automation leader election
+-----------------------------
+
+unitTestLeaderElectionVoting : Script ()
+unitTestLeaderElectionVoting = do
+  let rankings =
+        [ ("A",   ["A",   "D", "B", "bad"])
+        , ("B",   ["B",   "D", "A", "bad"])
+        , ("bad", ["bad", "D", "A", "B"  ])
+        ]
+  let votes = tallyVotes (map snd rankings) (VotingState Map.empty Set.empty)
+  let candidates = sortOn snd
+        [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
+  let winner = instantRunOffVoting 2 2 rankings
+  trace (votes, candidates, winner) $
+    instantRunOffVoting 2 2 rankings === "B"
+
+
+testLeaderElection : Script ()
+testLeaderElection = do
+
+  (app, svc, (mallory, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1, and mallory is the leader
+
+  -- run an issuance
+  runNextIssuanceD app 1.0
+
+  -- mallory stops acting, which the others detect; they thus request a re-election
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  req1 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv2
+    ranking = [sv2, sv3, sv4, mallory]
+    reason = ERR_LeaderUnavailable
+  req2 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv3
+    ranking = [sv3, sv4, sv2, mallory]
+    reason = ERR_LeaderUnavailable
+  req3 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv4
+    ranking = [sv4, sv3, sv2, mallory]
+    reason = ERR_LeaderUnavailable
+  -- mallory tries to get himself re-elected
+  req4 <- submitMulti [mallory] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = mallory
+    ranking = [mallory, sv2, sv3, sv4]
+    reason = ERR_LeaderUnavailable
+  -- mallory does not get re-elected, as sv1 reaches a weak majority first
+  _ <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_ElectLeader with
+    actor = sv3
+    requestCids = [req1, req2, req3, req4]
+
+  [(_, svcRules)] <- query @SvcRules svc
+  require "SV2 got elected" (svcRules.leader == sv2)
+
+  -- run a few more issuances
+  runNextIssuanceD app 1.1
+  runNextIssuanceD app 1.2
+
+  -- wow! stuff works :D
+  return ()
+
+
+testUnclaimedRewardsMerging : Script ()
+testUnclaimedRewardsMerging = do
+  (app, _, _) <- initDevNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- onboard a validator
+  validator1 <- setupValidator app "validator1"
+  provider1 <- setupUser app "provider1" validator1
+
+  forA_ [1..6] do \_ -> generateUnclaimedReward app provider1
+
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_MergeUnclaimedRewards with
+      coinRulesCid
+      unclaimedRewardCids = (fmap fst unclaimedRewards)
+
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  length unclaimedRewards === 1
+
+  pure ()
+
+
+
+-- Testing confirmations
+------------------------
+
+testRequiredNumOfConfirmationInDevNet : Script ()
+testRequiredNumOfConfirmationInDevNet = do
+  (_, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  -- add 9 phamton SVs
+  forA_ [5 .. 13] $ \i -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    let svName = "sv" <> show i
+    phamtonSv <- allocateParty $ svName
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  Map.size svcRules.members === 13
+
+  svX <- allocateParty "svX"
+
+  -- create 4 confirmations
+  let action = ARC_SvcRules with
+        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+          newMemberParty = svX
+          newMemberName = "svX"
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  -- There are 13 SVC members in total, which implies f = 4 and thus 9 confirmations are required in a non-DevNet.
+  -- However, in DevNet only 4 confirmations are required to run a confirmed action
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action
+      confirmationCids
+
+  -- check that the `action` was executed
+  [(_, svcRules)] <- query @SvcRules svc
+  require "svX is a member" (svX `Map.member` svcRules.members)
+
+  pure ()
+
+testConfirmationExpiry : Script ()
+testConfirmationExpiry = do
+  (app, svc, (sv1, _, _, _)) <- initCollective False
+  -- we now have a collective with BFT for f = 1, and sv1 is the leader
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- create a single confirmation which will not suffice to initiate an action
+  svConfirmationCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+    confirmer = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_AddMember $ SvcRules_AddMember with
+        newMemberParty = svX
+        newMemberName = "svX"
+
+  -- leader tries to expire the confirmation, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+  -- wait for the confirmation TTL to pass
+  passTime (minutes 5)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+
+-- Testing the SVC activity lock
+--------------------------------
+
+testLockAndUnlockSvcRulesCoinRules: Script ()
+testLockAndUnlockSvcRulesCoinRules = do
+  (app, svc, (_, sv2, _, _)) <- initDevNetCollective
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(coinRulesCid, _)] <- query @CoinRules svc
+
+  -- lock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sponsor = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMultiMustFail [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  -- unlock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sponsor = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMulti [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  pure ()

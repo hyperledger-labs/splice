@@ -1,0 +1,245 @@
+module CN.Scripts.TestOnboarding where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.Optional (fromSome)
+import qualified DA.Map as Map
+import Daml.Script
+import DA.Time
+
+import CC.ValidatorLicense
+
+import qualified CN.CometBft as CometBft
+import CN.SvcRules
+import CN.SvOnboarding
+
+import CN.Scripts.SvcTestUtils
+
+
+testOnboardValidator : Script ()
+testOnboardValidator = do
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+
+  -- sv2 (not the leader) onboards the new validator
+  onboardValidator app sv2 v1
+
+  -- v1 received a validator license
+  [(_, validatorLicense)] <- query @ValidatorLicense svc
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    svc
+
+  -- so v1 is onboarded!
+  pure ()
+
+
+testSvOnboarding : Script ()
+testSvOnboarding = do
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- an onboarding request for svX has been created
+  [(_, svOnboardingRequest)] <- query @SvOnboardingRequest svc
+  svOnboardingRequest === SvOnboardingRequest with
+    candidateName = "svX"
+    candidateParty = svX
+    token
+    sponsor = sv2
+    svc
+    expiresAt = svOnboardingRequest.expiresAt
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+  executeAllConfirmedActions app
+
+  -- svX is now a confirmed SV
+  [(svOnboardingConfirmedCid, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed svc
+  svOnboardingConfirmed === SvOnboardingConfirmed with
+    svParty = svX
+    svName = "svX"
+    reason = "because"
+    svc
+    expiresAt = svOnboardingConfirmed.expiresAt
+
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  -- once svX becomes able to read as svc (e.g., after party migration to svX's participant), it completes the onboarding by adding itself to the SvcRules
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  assert (svX `elem` Map.keys svcRules.members)
+
+  -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
+  -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
+  let cometBftConfig = CometBft.SvNodeConfig with
+        cometBftNodes = Map.fromList
+          [ ( "svX-node-id-1"
+            , CometBft.CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 0
+            )
+          , ( "svX-node-id-2"
+            , CometBft.CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 1
+            )
+          ]
+        governanceKeys = [CometBft.GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
+        sequencingKeys = []
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetCometBftConfig with
+    sv = svX
+    cometBftConfig
+
+  -- check that the config was actually set
+  [(_, svcRules)] <- query @SvcRules svc
+  fmap (.cometBftConfig) (Map.lookup svX svcRules.members) === Some cometBftConfig
+
+  pure ()
+
+
+testSvOnboardingRequestExpiry : Script ()
+testSvOnboardingRequestExpiry = do
+  (app, _, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- leader tries to expire the onboarding, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+  -- wait for the onboarding to expire
+  passTime (hours 25)
+
+  -- leader expires the onboarding
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- leader cannot archive the onboarding as svX is not yet added as member
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+  -- create a SvOnboardingConfirmed contract
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX"
+
+  -- leader can archive the onboarding as svX is added as member
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+
+testSvOnboardingConfirmedExpiry : Script ()
+testSvOnboardingConfirmedExpiry = do
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+
+  executeAllConfirmedActions app
+
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed svc
+
+  -- leader tries to expire the confirmation but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+
+  -- wait for the confirmation to expire
+  passTime (hours 25)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+
+
+testSvNameUniquenessNotInDevNet : Script ()
+testSvNameUniquenessNotInDevNet = do
+  -- When it is not in devnet, new member cannot be added to SVC if its name is already used by any existing member.
+  (_, svc, (_, sv2, _, _)) <- initMainNetCollective
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
+
+  svX <- allocateParty "svX"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
+
+
+testSvMemberOverwriteInDevNet : Script ()
+testSvMemberOverwriteInDevNet = do
+  (_, svc, (sv1, sv2, _, _)) <- initDevNetCollective
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  (fromSome (Map.lookup sv1 svcRules.members)).name === "sv1"
+  (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
+  svX <- allocateParty "svX"
+
+  -- Failing the template precondition check if the existing member being overwritten is the current leader.
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1"
+
+  -- overwriting existing member successfuly
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
+
+  pure ()
