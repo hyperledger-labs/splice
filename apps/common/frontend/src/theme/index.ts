@@ -73,7 +73,7 @@ theme = createTheme(theme, {
       main: '#F3FF97',
     },
     warning: {
-      main: '#FD8575',
+      main: '#FFCC99',
     },
     error: {
       main: '#FD8575',

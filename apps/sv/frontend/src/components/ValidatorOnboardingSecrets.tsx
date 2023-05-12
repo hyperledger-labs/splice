@@ -12,7 +12,6 @@ import TableRow from '@mui/material/TableRow';
 import { Party } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
-import { SvUiStateProvider } from '../contexts/SvContext';
 import { useValidatorOnboardings } from '../hooks/useValidatorOnboardings';
 import { config } from '../utils';
 
@@ -106,9 +105,7 @@ const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, sponsor, secre
 const ValidatorOnboardingSecretsWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <SvUiStateProvider>
-        <ValidatorOnboardingSecrets />
-      </SvUiStateProvider>
+      <ValidatorOnboardingSecrets />
     </SvClientProvider>
   );
 };

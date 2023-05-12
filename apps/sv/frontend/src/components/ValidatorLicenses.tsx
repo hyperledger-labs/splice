@@ -9,18 +9,18 @@ import TableRow from '@mui/material/TableRow';
 
 import { Party } from '@daml/types';
 
-import { SvUiStateProvider, useSvUiState } from '../contexts/SvContext';
+import { useSvcInfos } from '../contexts/SvContext';
 import { useValidatorLicenses } from '../hooks/useValidatorLicenses';
 import { config } from '../utils';
 
 const ValidatorLicenses: React.FC = () => {
-  const svUiState = useSvUiState();
   const validatorLicensesQuery = useValidatorLicenses();
-  if (validatorLicensesQuery.isLoading || !svUiState) {
+  const svcInfosQuery = useSvcInfos();
+  if (validatorLicensesQuery.isLoading || svcInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (validatorLicensesQuery.isError) {
+  if (validatorLicensesQuery.isError || svcInfosQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
@@ -50,7 +50,7 @@ const ValidatorLicenses: React.FC = () => {
                   validator={lincense.payload.validator}
                   sponsor={lincense.payload.sponsor}
                   createdAt={new Date(parseInt(lincense.metadata.createdAt) / 1000)}
-                  sv={svUiState.svPartyId}
+                  sv={svcInfosQuery.data!.svPartyId}
                 />
               );
             })}
@@ -91,9 +91,7 @@ const LicenseRow: React.FC<LicenseRowProps> = ({ validator, sponsor, createdAt, 
 const ValidatorLicensesWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <SvUiStateProvider>
-        <ValidatorLicenses />
-      </SvUiStateProvider>
+      <ValidatorLicenses />
     </SvClientProvider>
   );
 };

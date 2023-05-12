@@ -10,24 +10,26 @@ import TableRow from '@mui/material/TableRow';
 
 import { Numeric, Optional, Party } from '@daml/types';
 
-import { SvUiStateProvider, useSvUiState } from '../../contexts/SvContext';
+import { useSvcInfos } from '../../contexts/SvContext';
 import { useCoinPriceVotes } from '../../hooks/useCoinPriceVotes';
 import { CoinPriceVote } from '../../models/models';
 import { config } from '../../utils';
 
 const DesiredCoinPrice: React.FC = () => {
-  const svUiState = useSvUiState();
   const coinPriceVotesQuery = useCoinPriceVotes();
-  if (coinPriceVotesQuery.isLoading || !svUiState) {
+  const svcInfosQuery = useSvcInfos();
+  if (coinPriceVotesQuery.isLoading || svcInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (coinPriceVotesQuery.isError) {
+  if (coinPriceVotesQuery.isError || svcInfosQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
+  const svPartyId = svcInfosQuery.data!.svPartyId;
+
   const curSvCoinPriceVote: CoinPriceVote | undefined = coinPriceVotesQuery.data.find(
-    v => v.sv === svUiState.svPartyId
+    v => v.sv === svPartyId
   );
 
   const maybeBigNumber = (maybeNumeric: Optional<Numeric>) => {
@@ -35,7 +37,7 @@ const DesiredCoinPrice: React.FC = () => {
   };
 
   const otherCoinPriceVotes = coinPriceVotesQuery.data
-    .filter(v => v.sv !== svUiState.svPartyId)
+    .filter(v => v.sv !== svPartyId)
     .sort((a, b) => {
       return b.lastUpdatedAt.valueOf() - a.lastUpdatedAt.valueOf();
     });
@@ -109,9 +111,7 @@ const OtherCoinPricesRow: React.FC<OtherCoinPricesRowProps> = ({
 const DesiredCoinPriceWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <SvUiStateProvider>
-        <DesiredCoinPrice />
-      </SvUiStateProvider>
+      <DesiredCoinPrice />
     </SvClientProvider>
   );
 };

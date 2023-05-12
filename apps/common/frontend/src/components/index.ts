@@ -9,6 +9,7 @@ import FeaturedAppRight from './FeaturedAppRight';
 import IntervalDisplay from './IntervalDisplay';
 import Loading from './Loading';
 import Login from './Login';
+import LoginFailed from './LoginFailed';
 import PartyId from './PartyId';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
@@ -28,4 +29,5 @@ export {
   TitledTable,
   IntervalDisplay,
   Loading,
+  LoginFailed,
 };

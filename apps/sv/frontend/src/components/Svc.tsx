@@ -7,7 +7,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { SvUiStateProvider, useSvUiState } from '../contexts/SvContext';
+import { useSvcInfos } from '../contexts/SvContext';
 import { config } from '../utils';
 
 function createRow(key: string, value: string) {
@@ -37,41 +37,42 @@ function getInfoTable(title: string, rows: { key: string; value: string }[]) {
 }
 
 const SvcView: React.FC = () => {
-  const resp = useSvUiState();
-  if (resp) {
+  const resp = useSvcInfos();
+  if (!resp.isLoading) {
+    const data = resp.data!;
     var cs: { key: string; value: string }[] = [];
-    resp.svcRules.payload.members.forEach((value, key) => cs.push(createRow(key, value.name)));
-    const svInfos = [createRow('svUser', resp.svUser), createRow('svPartyId', resp.svPartyId)];
+    data.svcRules.payload.members.forEach((value, key) => cs.push(createRow(key, value.name)));
+    const svInfos = [createRow('svUser', data.svUser), createRow('svPartyId', data.svPartyId)];
     const membersInfos: { key: string; value: string }[] = [];
     for (var member of cs) {
       membersInfos.push(createRow(`${member.value} PartyId`, member.key));
     }
     const svcInfos = [
       createRow(
-        `${resp.svcRules.payload.members.get(resp.svcRules.payload.leader)!.name} svcLeaderPartyId`,
-        resp.svcRules.payload.leader.toString()
+        `${data.svcRules.payload.members.get(data.svcRules.payload.leader)!.name} svcLeaderPartyId`,
+        data.svcRules.payload.leader.toString()
       ),
-      createRow('svcPartyId', resp.svcPartyId),
-      createRow('coinRulesContractId', resp.coinRulesContractId),
-      createRow('svcRulesContractId', resp.svcRules.contractId),
-      createRow('isDevNet', resp.svcRules.payload.isDevNet ? 'True' : 'False'),
+      createRow('svcPartyId', data.svcPartyId),
+      createRow('coinRulesContractId', data.coinRulesContractId),
+      createRow('svcRulesContractId', data.svcRules.contractId),
+      createRow('isDevNet', data.svcRules.payload.isDevNet ? 'True' : 'False'),
     ];
     const configInfos = [
       createRow(
         'svOnboardingConfirmedTimeout (μs)',
-        resp.svcRules.payload.config.svOnboardingConfirmedTimeout.microseconds
+        data.svcRules.payload.config.svOnboardingConfirmedTimeout.microseconds
       ),
       createRow(
         'actionConfirmationTimeout (μs)',
-        resp.svcRules.payload.config.actionConfirmationTimeout.microseconds
+        data.svcRules.payload.config.actionConfirmationTimeout.microseconds
       ),
       createRow(
         'maxNumCometBftNodes',
-        resp.svcRules.payload.config.cometBftConfigLimits.maxNumCometBftNodes
+        data.svcRules.payload.config.cometBftConfigLimits.maxNumCometBftNodes
       ),
       createRow(
         'numUnclaimedRewardsThreshold',
-        resp.svcRules.payload.config.numUnclaimedRewardsThreshold
+        data.svcRules.payload.config.numUnclaimedRewardsThreshold
       ),
     ];
     return (
@@ -94,9 +95,7 @@ const SvcView: React.FC = () => {
 const SvcWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <SvUiStateProvider>
-        <SvcView />
-      </SvUiStateProvider>
+      <SvcView />
     </SvClientProvider>
   );
 };

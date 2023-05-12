@@ -27,17 +27,29 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   useEffect(() => {
     svClient
       .isAuthorized()
-      .then(resp => setIsAuthorized(true))
-      .catch(error => setIsAuthorized(false));
-  }, [svClient, userId, userAccessToken]);
-  if (!isAuthorized) {
-    console.debug('undefined authorization');
-  }
+      .then(r => setIsAuthorized(true))
+      .catch(error => {
+        setIsAuthorized(false);
+      });
+  }, [svClient, userAccessToken, isAuthenticated]);
 
+  if (!isAuthorized) {
+    console.debug('undefined isAuthorized');
+  }
+  console.log(userId);
+  console.log(typeof userId == 'undefined');
+  console.log(isAuthorized && userId === undefined);
   if (isAuthenticated && isAuthorized) {
     return <Outlet />;
   } else {
-    return <Login title="SV Operations" authConfig={authConfig} testAuthConfig={testAuthConfig} />;
+    return (
+      <Login
+        loginFailed={!isAuthorized && userId !== undefined}
+        title="SV Operations"
+        authConfig={authConfig}
+        testAuthConfig={testAuthConfig}
+      />
+    );
   }
 };
 

@@ -26,8 +26,28 @@ class SvFrontendIntegrationTest
             login(port, sv1.config.ledgerApiUser)
           },
         )(
-          "login does not work with wrong password",
+          "logged in in the sv ui",
           _ => find(id("app-title")).value.text should matchText("SV OPERATIONS"),
+        )
+      }
+    }
+
+    "warn if user fails to login" in { _ =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        loggerFactory.assertLogs(
+          {
+            actAndCheck(
+              "login works with correct password", {
+                login(port, "NobodyCares!")
+              },
+            )(
+              "login does not work with wrong password",
+              _ => find(id("loginFailed")).value.text should matchText("User failed to login!"),
+            )
+          },
+          _.warningMessage should include(
+            "Authorization Failed"
+          ),
         )
       }
     }

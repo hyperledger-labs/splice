@@ -9,14 +9,16 @@ import { isHs256UnsafeAuthConfig } from '../config';
 import { AuthConfig, TestAuthConfig } from '../config/schema';
 import { useUserState } from '../contexts';
 import { theme } from '../theme';
+import LoginFailed from './LoginFailed';
 
 interface LoginProps {
   title: string;
   authConfig: AuthConfig;
   testAuthConfig?: TestAuthConfig;
+  loginFailed?: boolean;
 }
 
-const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig }) => {
+const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig, loginFailed }) => {
   // We have some integration tests that do Auth0 login tests and others that do self-signed token login tests,
   // but because we start the UIs outside sbt they have one static config.
   // So for tests the UI must support both algorithms at the same time;
@@ -44,6 +46,7 @@ const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig }) => {
 
   return (
     <Container maxWidth="xs">
+      {loginFailed && <LoginFailed />}
       <Stack alignItems="center" paddingTop={16} spacing={4}>
         <Typography
           variant="h5"
@@ -53,9 +56,7 @@ const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig }) => {
         >
           {title}
         </Typography>
-
         {mainLoginPrompt}
-
         {testLoginPrompt}
       </Stack>
     </Container>
@@ -128,6 +129,7 @@ const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope
         onClick={e => {
           e.preventDefault();
           loginWithSst(userId, secret, audience, scope);
+          setUserId('');
         }}
       >
         Log In

@@ -1051,6 +1051,16 @@ approved-sv-identities = [
 It might be a good idea to deploy your changes to a scratchnet to ensure that you didn't break the config,
 which would prevent our SVs from initializing after the next redeploy.
 
+## Interacting with Canton Network UIs
+
+To login to the following UIs use our test credentials from [our list of passwords](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true):
+
+| Endpoints                                                  | Description                                                                                            |
+|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `https://sv.sv-1.svc.<CLUSTER>.network.canton.global/`     | Admin user interface for Sv Operator to find information about the collective and perform admin tasks. |
+| `https://wallet.sv-1.svc.<CLUSTER>.network.canton.global/` | User interface for the validators to transfer money and manage applications.                           |
+
+
 ## Appendix: Kubernetes Resources
 
 * Kubernetes Documentation
