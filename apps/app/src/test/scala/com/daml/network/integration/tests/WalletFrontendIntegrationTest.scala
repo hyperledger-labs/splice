@@ -5,8 +5,6 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level.WARN
 
 class WalletFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -89,40 +87,31 @@ class WalletFrontendIntegrationTest
           onboardAndTapTest(damlUser)
       }
 
-      // TODO(#4616) update test when tap errors are rendered on page
-      "fail when trying to use more than 10 decimal points" ignore { implicit env =>
+      "fail when trying to use more than 10 decimal points" in { implicit env =>
         val aliceDamlUser = aliceWallet.config.ledgerApiUser
         onboardWalletUser(aliceWallet, aliceValidator)
 
-        val manyDigits = "0.19191919191919199191"
+        val manyDigits = "1.19191919191919199191"
 
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice taps balance with more than 10 decimal places in the wallet", {
               browseToAliceWallet(aliceDamlUser)
-              loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(WARN))(
-                {
-                  // Using tapCoins will fail the assertion within
-                  click on "tap-amount-field"
-                  numberField("tap-amount-field").underlying.sendKeys(manyDigits)
-                  click on "tap-button"
-                },
-                logs => {
-                  logs should have size 1
-                  logs.head.errorMessage should include(
-                    s"Failed to decode: Could not read Decimal string \\\"$manyDigits\\\""
-                  )
-                },
-              )
+              click on "tap-amount-field"
+              numberField("tap-amount-field").value = manyDigits
+              click on "tap-button"
             },
           )(
-            "Alice has unchanged balance",
+            "Alice has unchanged balance and sees error message",
             _ => {
               val ccText = find(id("wallet-balance-cc")).value.text.trim
               val usdText = find(id("wallet-balance-usd")).value.text.trim
+              val errorMessage = find(id("tap-error-message")).value.text.trim
 
               ccText should not be "..."
               usdText should not be "..."
+              errorMessage should be("Tap operation failed")
+
               val cc = BigDecimal(ccText.split(" ").head)
               val usd = BigDecimal(usdText.split(" ").head)
 
